@@ -61,12 +61,14 @@ test('malformed statistics fail closed without fabricating facts', () => {
 test('URL conditions keep statistics isolated from progress and normalize bounded pagination', () => {
   const query = statisticsQueryFromURL(
     new URLSearchParams(
-      'view=statistics&report=receivables&group=product&q=other&sq=客户&stats_page=2&currency=USD&status=overdue'
+      'view=statistics&report=receivables&group=product&q=other&sq=客户&stats_page=2&currency=USD&status=overdue&period=custom&stfrom=2026-10-01&stto=2026-10-31'
     )
   )
   assert.equal(query.keyword, '客户')
   assert.equal(query.group_by, 'customer')
   assert.equal(query.period, 'all')
+  assert.equal(query.date_from, '')
+  assert.equal(query.date_to, '')
   assert.equal(query.limit, 8)
   assert.equal(query.offset, 8)
   assert.equal(query.currency, 'USD')

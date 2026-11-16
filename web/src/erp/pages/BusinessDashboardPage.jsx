@@ -105,16 +105,16 @@ export default function BusinessDashboardPage() {
   )
   const changeView = (nextView) => {
     const previous = new URLSearchParams(window.location.search)
-    const keys = ['q', 'scope', 'due_status', 'blocked_only', 'unlinked_only', 'owner', 'from', 'to', 'page', 'page_size', 'selected']
+    const keys = ['q', 'scope', 'due_status', 'blocked_only', 'unlinked_only', 'owner', 'from', 'to', 'page', 'page_size', 'selected', 'display']
     if (view === 'orders' || view === 'production') {
       viewQueries.current[view] = Object.fromEntries(keys.filter((key) => previous.has(key)).map((key) => [key, previous.get(key)]))
+    } else if (view === 'statistics') {
+      viewQueries.current.statistics = previous.get('display') === 'chart' ? { display: 'chart' } : {}
     }
-    if (nextView !== 'statistics') {
-      keys.forEach((key) => previous.delete(key))
-      for (const [key, value] of Object.entries(viewQueries.current[nextView] || {})) previous.set(key, value)
-    }
+    keys.forEach((key) => previous.delete(key))
+    for (const [key, value] of Object.entries(viewQueries.current[nextView] || {})) previous.set(key, value)
     previous.set('view', nextView)
-    setParams(withProgressFilters(previous, {}))
+    setParams(nextView === 'statistics' ? previous : withProgressFilters(previous, {}))
     setSelection(null)
   }
   const progressSearch = {
@@ -287,137 +287,131 @@ export default function BusinessDashboardPage() {
           />
         }
       />
-      <div className="erp-progress-controls">
-        <div className="erp-progress-toolbar">
-          {statisticsActive ? (
-            statistics.toolbar
-          ) : (
-            <>
-              <div
-                className="erp-progress-metric-row"
-                role="group"
-                aria-label="进度快捷筛选"
-              >
-                <ProgressDueFilters
-                  compact
-                  query={filterQuery}
-                  counts={filterCounts}
-                  onChange={update}
-                />
-                <ProgressBlockedFilter
-                  compact
-                  query={filterQuery}
-                  counts={filterCounts}
-                  taskAccess={access?.tasks}
-                  onChange={update}
-                />
-              </div>
-              <SearchInput
-                className="erp-progress-search"
-                aria-label="搜索订单、客户或产品"
-                placeholder="搜单号、客户、产品"
-                {...progressSearch}
-                allowClear
-                maxLength={100}
+      {!statisticsActive && (
+        <div className="erp-progress-controls">
+          <div className="erp-progress-toolbar">
+            <div
+              className="erp-progress-metric-row"
+              role="group"
+              aria-label="进度快捷筛选"
+            >
+              <ProgressDueFilters
+                compact
+                query={filterQuery}
+                counts={filterCounts}
+                onChange={update}
               />
-              <Popover
-                trigger="click"
-                open={moreOpen}
-                onOpenChange={setMoreOpen}
-                placement="bottom"
-                content={
-                  <section
-                    className="erp-progress-filters"
-                    role="dialog"
-                    aria-label="筛选进度"
-                  >
-                    <BusinessProgressFilterFields
-                      query={filterQuery}
-                      counts={filterCounts}
-                      taskAccess={access?.tasks}
-                      resetKey={filterResetKey}
-                      onChange={update}
-                      onDateRange={() => {
-                        setMoreOpen(false)
-                        setDateOpen(true)
-                      }}
-                    />
-                    <div className="erp-progress-filter-actions">
-                      <Button
-                        onClick={() => {
-                          setFilterResetKey((value) => value + 1)
-                          update(progressFilterReset(query))
-                        }}
-                      >
-                        重置筛选
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={() => {
-                          setMoreOpen(false)
-                          filterTriggerRef.current?.focus()
-                        }}
-                      >
-                        完成
-                      </Button>
-                    </div>
-                  </section>
-                }
-              >
-                <Button
-                  ref={filterTriggerRef}
-                  icon={<FilterOutlined />}
-                  aria-haspopup="dialog"
-                  aria-expanded={moreOpen}
-                  aria-label={
-                    filterCount
-                      ? `筛选进度，已应用 ${filterCount} 项`
-                      : '筛选进度'
-                  }
+              <ProgressBlockedFilter
+                compact
+                query={filterQuery}
+                counts={filterCounts}
+                taskAccess={access?.tasks}
+                onChange={update}
+              />
+            </div>
+            <SearchInput
+              className="erp-progress-search"
+              aria-label="搜索订单、客户或产品"
+              placeholder="搜单号、客户、产品"
+              {...progressSearch}
+              allowClear
+              maxLength={100}
+            />
+            <Popover
+              trigger="click"
+              open={moreOpen}
+              onOpenChange={setMoreOpen}
+              placement="bottom"
+              content={
+                <section
+                  className="erp-progress-filters"
+                  role="dialog"
+                  aria-label="筛选进度"
                 >
-                  筛选{filterCount ? ` · ${filterCount}` : ''}
-                </Button>
-              </Popover>
-              <SupplementalHelp
-                label="进度计算"
-                aria-label="查看进度计算说明"
-                title="进度如何计算"
-                content={
-                  <div className="erp-progress-help">
-                    <p>
-                      出货进度按已实际出货数量计算，取消的出货不计入。不同单位分开查看。
-                    </p>
-                    <p>
-                      领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
-                    </p>
-                    <p>
-                      选项数量表示保留其他条件时，选择该项可查到的记录数；交期与任务受阻可以组合。筛选数量只统计额外条件；搜索词、已逾期、7天内和受阻快捷项不重复计数，重置时保留。关联任务仅包含当前账号可见内容。
-                    </p>
+                  <BusinessProgressFilterFields
+                    query={filterQuery}
+                    counts={filterCounts}
+                    taskAccess={access?.tasks}
+                    resetKey={filterResetKey}
+                    onChange={update}
+                    onDateRange={() => {
+                      setMoreOpen(false)
+                      setDateOpen(true)
+                    }}
+                  />
+                  <div className="erp-progress-filter-actions">
+                    <Button
+                      onClick={() => {
+                        setFilterResetKey((value) => value + 1)
+                        update(progressFilterReset(query))
+                      }}
+                    >
+                      重置筛选
+                    </Button>
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        setMoreOpen(false)
+                        filterTriggerRef.current?.focus()
+                      }}
+                    >
+                      完成
+                    </Button>
                   </div>
+                </section>
+              }
+            >
+              <Button
+                ref={filterTriggerRef}
+                icon={<FilterOutlined />}
+                aria-haspopup="dialog"
+                aria-expanded={moreOpen}
+                aria-label={
+                  filterCount
+                    ? `筛选进度，已应用 ${filterCount} 项`
+                    : '筛选进度'
                 }
-              />
-              <div className="erp-progress-freshness">
-                {data
-                  ? `更新于 ${dayjs(data.snapshot_at).format('HH:mm')}`
-                  : loading
-                    ? '正在查询…'
-                    : '等待查询'}
-              </div>
-            </>
-          )}
-        </div>
-        {statisticsActive ? (
-          statistics.controls
-        ) : extraFilters.length > 0 ? (
-          <div className="erp-progress-active-filters">
-            {extraFilters.map((item) => (
-              <Tag key={item.key} closable onClose={() => update(item.clear)}>
-                {item.label}
-              </Tag>
-            ))}
+              >
+                筛选{filterCount ? ` · ${filterCount}` : ''}
+              </Button>
+            </Popover>
+            <SupplementalHelp
+              label="进度计算"
+              aria-label="查看进度计算说明"
+              title="进度如何计算"
+              content={
+                <div className="erp-progress-help">
+                  <p>
+                    出货进度按已实际出货数量计算，取消的出货不计入。不同单位分开查看。
+                  </p>
+                  <p>
+                    领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
+                  </p>
+                  <p>
+                    选项数量表示保留其他条件时，选择该项可查到的记录数；交期与任务受阻可以组合。筛选数量只统计额外条件；搜索词、已逾期、7天内和受阻快捷项不重复计数，重置时保留。关联任务仅包含当前账号可见内容。
+                  </p>
+                </div>
+              }
+            />
+            <div className="erp-progress-freshness">
+              {data
+                ? `更新于 ${dayjs(data.snapshot_at).format('HH:mm')}`
+                : loading
+                  ? '正在查询…'
+                  : '等待查询'}
+            </div>
           </div>
-        ) : null}
-      </div>
+          {extraFilters.length > 0 ? (
+            <div className="erp-progress-active-filters">
+              {extraFilters.map((item) => (
+                <Tag key={item.key} closable onClose={() => update(item.clear)}>
+                  {item.label}
+                </Tag>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
       {statisticsActive ? (
         statistics.content
       ) : error ? (

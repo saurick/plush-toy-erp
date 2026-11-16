@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Tag, Tooltip } from 'antd'
+import { Alert, Button, Popover } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import SupplementalHelp from '@/common/components/help/SupplementalHelp'
@@ -8,6 +8,7 @@ import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -46,8 +47,8 @@ const clearGroup = {
 const displayOptions = [
   { label: '表格', value: 'table' },
   { label: '图表', value: 'chart' },
-  { label: '表格与图表', value: 'combined' },
 ]
+const summaryScrollKey = 'business-statistics:summary-scroll'
 const deliverySegments = [
   ['done', '已交齐'],
   ['pending_not_late', '待交付（未逾期）'],
@@ -60,13 +61,36 @@ const groupValue = (group, key) =>
   key === 'pending_not_late' ? group.pending - group.overdue : group[key]
 
 function StatisticsChart({ groups, report, currency, onDrill }) {
-  const [activeSegment, setActiveSegment] = useState(null)
+  const [inspection, setInspection] = useState(null)
+  const touchPointer = useRef(false)
   const ages = report === 'receivables'
   const segments = (ages ? STATISTICS_AGES : deliverySegments).filter(
-    ([key]) =>
-      !['closed', 'unknown', 'unknown_due'].includes(key) ||
-      groups.some((group) => group[key] > 0)
+    ([key]) => groups.some((group) => (ages ? group[key] : groupValue(group, key)) > 0)
   )
+  // Touch holds the inspection open until the user dismisses it or chooses a source.
+  useEffect(() => {
+    if (!inspection?.anchor) return undefined
+    const dismiss = (event) => {
+      if (event.type === 'keydown') {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        event.stopPropagation()
+        inspection.anchor.focus({ preventScroll: true })
+        setInspection(null)
+      } else if (
+        !inspection.anchor.contains(event.target) &&
+        !event.target.closest?.('.erp-statistics-chart-tooltip')
+      ) {
+        setInspection(null)
+      }
+    }
+    document.addEventListener('pointerdown', dismiss, true)
+    document.addEventListener('keydown', dismiss, true)
+    return () => {
+      document.removeEventListener('pointerdown', dismiss, true)
+      document.removeEventListener('keydown', dismiss, true)
+    }
+  }, [inspection])
   const values = groups.map((group) =>
     ages ? group.balance : String(group.count)
   )
@@ -78,11 +102,12 @@ function StatisticsChart({ groups, report, currency, onDrill }) {
   )
   return (
     <div
+      role="region"
       className="erp-statistics-chart"
       aria-label={ages ? '客户应收账龄图' : '交付订单分布图'}
     >
       <div className="erp-statistics-legend">
-        <span>{ages ? '未结金额' : '订单数 · 单'} · 当前页</span>
+        <span>当前页 · {ages ? `未结金额（${currency}）` : '订单数（单）'}</span>
         {segments.map(([key, label]) => (
           <span key={key}>
             <i className={`erp-statistics-tone-${key}`} />
@@ -96,6 +121,7 @@ function StatisticsChart({ groups, report, currency, onDrill }) {
             <Button
               type="link"
               className="erp-statistics-chart-name"
+              data-statistics-group={group.key}
               title={group.name}
               onClick={() => onDrill(group)}
             >
@@ -113,24 +139,31 @@ function StatisticsChart({ groups, report, currency, onDrill }) {
                   const total = ages ? group.balance : String(group.count)
                   const share = statisticsRatio(String(value), total)
                   const segmentKey = `${group.key}:${key}`
+                  const pinned = inspection?.key === segmentKey && inspection.anchor
+                  const openSources = () => {
+                    setInspection(null)
+                    onDrill(group, sourceStatus(key))
+                  }
                   return share > 0 ? (
-                    <Tooltip
+                    <Popover
                       key={key}
                       trigger={['hover', 'focus']}
                       placement="top"
                       classNames={{ root: 'erp-statistics-chart-tooltip' }}
                       destroyOnHidden
-                      open={activeSegment === segmentKey}
+                      open={inspection?.key === segmentKey}
                       onOpenChange={(open) =>
-                        setActiveSegment((current) =>
-                          open
-                            ? segmentKey
-                            : current === segmentKey
-                              ? null
-                              : current
+                        setInspection((current) =>
+                          current?.anchor
+                            ? current
+                            : open
+                              ? { key: segmentKey }
+                              : current?.key === segmentKey
+                                ? null
+                                : current
                         )
                       }
-                      title={
+                      content={
                         <div className="erp-statistics-chart-tooltip-content">
                           <strong className="erp-statistics-chart-tooltip-name">
                             {group.name}
@@ -145,11 +178,15 @@ function StatisticsChart({ groups, report, currency, onDrill }) {
                             当前筛选{ages ? '未结' : '共'} {number(total, ages)}{' '}
                             {ages ? currency : '单'} · 占本行 {number(share)}%
                           </span>
-                          <span className="erp-statistics-chart-tooltip-action">
-                            {ages
-                              ? '点击查看来源应收'
-                              : `点击查看这 ${number(value)} 单`}
-                          </span>
+                          {pinned ? (
+                            <Button size="small" onClick={openSources}>
+                              {ages ? '查看来源应收' : '查看来源订单'}
+                            </Button>
+                          ) : (
+                            <span className="erp-statistics-chart-tooltip-action">
+                              {ages ? '点击查看来源应收' : `点击查看这 ${number(value)} 单`}
+                            </span>
+                          )}
                         </div>
                       }
                     >
@@ -158,26 +195,29 @@ function StatisticsChart({ groups, report, currency, onDrill }) {
                         className={`erp-statistics-tone-${key}`}
                         style={{ width: `${share}%` }}
                         aria-label={`${group.name} · ${label} ${number(value, ages)} ${ages ? currency : '单'}`}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Escape') setActiveSegment(null)
+                        onPointerDown={(event) => {
+                          touchPointer.current = event.pointerType === 'touch'
                         }}
-                        onClick={() => {
-                          setActiveSegment(null)
-                          onDrill(group, sourceStatus(key))
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') setInspection(null)
+                        }}
+                        onClick={(event) => {
+                          if (event.detail > 0 && touchPointer.current) {
+                            const anchor = event.currentTarget
+                            setInspection(pinned ? null : { key: segmentKey, anchor })
+                          } else {
+                            openSources()
+                          }
                         }}
                       />
-                    </Tooltip>
+                    </Popover>
                   ) : null
                 })}
               </div>
             </div>
-            <Button
-              type="link"
-              className="erp-statistics-chart-number"
-              onClick={() => onDrill(group)}
-            >
+            <span className="erp-statistics-chart-number">
               {number(ages ? group.balance : group.count, ages)}
-            </Button>
+            </span>
           </div>
         ))}
       </div>
@@ -222,9 +262,7 @@ export default function useBusinessStatistics({
       fallbackSize: query.limit,
     })
   const sourcePage = sourceOffset / sourcePageSize + 1
-  const display = ['chart', 'table', 'combined'].includes(params.get('display'))
-    ? params.get('display')
-    : 'table'
+  const display = params.get('display') === 'chart' ? 'chart' : 'table'
   const requestKey = JSON.stringify([
     queryKey,
     groupKey,
@@ -239,6 +277,8 @@ export default function useBusinessStatistics({
   const [error, setError] = useState('')
   const begin = useLatestRequestCoordinator()
   const bodyRef = useRef(null)
+  const backRef = useRef(null)
+  const drillOrigin = useRef('')
   const tableSticky = useMemo(() => ({ getContainer: () => bodyRef.current }), [])
   const data =
     active && state?.key === requestKey && state?.profile === adminProfile
@@ -248,27 +288,27 @@ export default function useBusinessStatistics({
   const ages = query.report === 'receivables'
   const statusLabels = {
     ...STATISTICS_STATUSES,
+    overdue: ages ? '逾期未结' : STATISTICS_STATUSES.overdue,
     undated: ages ? '未定到期日' : '未定交期',
   }
   const money = board?.access?.sales_amounts === true
+  const canSortAmount =
+    ages || hasActionPermission(adminProfile, PermissionCode.FIELD_SALES_COMMERCIAL_READ)
   const allowed = ages ? canFinance : canSales
   const update = useCallback(
     (changes, { resetPage = true, replace = false } = {}) => {
-      setParams(
-        (previous) => {
-          const next = new URLSearchParams(previous)
-          if (resetPage) {
-            next.delete('stats_page')
-            next.delete('source_page')
-          }
-          for (const [key, value] of Object.entries(changes)) {
-            if (value == null || value === '') next.delete(key)
-            else next.set(key, String(value))
-          }
-          return next
-        },
-        { replace }
-      )
+      // Navigation may already contain a filter edit that has not rendered yet.
+      const next = new URLSearchParams(window.location.search)
+      const fields = typeof changes === 'function' ? changes(next) : changes
+      if (resetPage) {
+        next.delete('stats_page')
+        next.delete('source_page')
+      }
+      for (const [key, value] of Object.entries(fields)) {
+        if (value == null || value === '') next.delete(key)
+        else next.set(key, String(value))
+      }
+      setParams(next, { replace })
     },
     [setParams]
   )
@@ -357,14 +397,10 @@ export default function useBusinessStatistics({
     sourceOffset,
     update,
   ])
-  const search = {
-    resetKey: query.group_by,
-    value: query.keyword,
-    onSearch: (keyword) => update({ sq: keyword, ...clearGroup }),
-  }
   const drill = (group, status = 'all') => {
+    drillOrigin.current = group.key
     outlet?.pageUIState?.values?.set(
-      'business-statistics:summary-scroll',
+      summaryScrollKey,
       bodyRef.current?.scrollTop || 0
     )
     update(
@@ -381,23 +417,32 @@ export default function useBusinessStatistics({
     )
   }
   useEffect(() => {
-    if (!loading && !groupKey && data && bodyRef.current) {
-      bodyRef.current.scrollTop =
-        outlet?.pageUIState?.values?.get(
-          'business-statistics:summary-scroll'
-        ) || 0
+    if (!active || !groupKey || !drillOrigin.current) return
+    bodyRef.current?.scrollTo(0, 0)
+    backRef.current?.focus({ preventScroll: true })
+  }, [active, groupKey])
+  useEffect(() => {
+    const body = bodyRef.current
+    if (!active || loading || groupKey || !data || !body) return
+    const values = outlet?.pageUIState?.values
+    const top = values?.get(summaryScrollKey)
+    if (top != null) {
+      body.scrollTop = top
+      values.delete(summaryScrollKey)
     }
-  }, [data, groupKey, loading, outlet?.pageUIState])
-  const switchReport = (report) =>
-    update({
-      report,
-      group: report === 'receivables' ? 'customer' : query.group_by,
-      status: 'all',
-      sort: 'count',
-      ...clearGroup,
-    })
+    if (drillOrigin.current) {
+      Array.from(body.querySelectorAll('[data-statistics-group]'))
+        .find((node) => node.dataset.statisticsGroup === drillOrigin.current)
+        ?.focus({ preventScroll: true })
+      drillOrigin.current = ''
+    }
+  }, [active, data, groupKey, loading, outlet?.pageUIState])
+  const switchReport = (report) => {
+    const changesGroup = params.get('group') === 'product'
+    update({ report, status: '', sort: '', direction: '', ...(changesGroup ? { sq: '' } : {}), ...clearGroup })
+  }
   const reportOptions = [
-    ...(canSales ? [{ value: 'delivery', label: '订单交付' }] : []),
+    ...(canSales ? [{ value: 'delivery', label: '交付汇总' }] : []),
     ...(canFinance ? [{ value: 'receivables', label: '应收账龄' }] : []),
   ]
   useEffect(() => {
@@ -413,110 +458,137 @@ export default function useBusinessStatistics({
       )
     }
   }, [active, allowed, canSales, canFinance, update]) // Same source permissions as the formal pages.
-  const toolbar = (
-    <div className="erp-statistics-filters">
-      <div className="erp-statistics-filter-field">
-        <label htmlFor="statistics-report">统计内容</label>
-        <Select
-          allowClear={false /* 不可清空：交付与应收使用不同统计合同，必须明确当前统计内容。 */}
-          placeholder="统计内容"
-          id="statistics-report"
-          aria-label="统计内容"
-          value={query.report}
-          options={reportOptions}
-          onChange={switchReport}
-        />
-        <SupplementalHelp
-          label="统计口径"
-          aria-label="查看统计口径"
-          title="统计口径"
-          content={
-            <div className="erp-statistics-help">
-              <p>
-                订单按有效明细的实际出货判断交齐，草稿、未生效和取消订单不计入；交期按未交付明细的最早交期筛选。逾期与
-                7 天内交付仅计算仍待交付的订单。
-              </p>
-              <p>
-                客户按档案归组，产品按产品档案归组。产品汇总按订单去重，同一订单可能出现在多个产品行；底部合计再次去重。
-              </p>
-              <p>
-                客户金额使用订单冻结总额；产品金额使用明细货品金额，不分摊税费、运费。已出货金额使用出货快照，缺失时显示“—”。
-              </p>
-              <p>
-                应收按当前已过账的未结余额计算，扣除核销和红冲并计入冲正。按中国日期划分账龄，未填到期日单列；不同币种分开查看。
-              </p>
-              <p>
-                图表显示当前页，合计包含筛选后的完整数据。选择数字可查看同一筛选下的来源。
-              </p>
-            </div>
-          }
-        />
-      </div>
+  const startDate = query.period === 'custom' ? query.date_from : board?.date_from || ''
+  const endDate = query.period === 'custom' ? query.date_to : board?.date_to || ''
+  const updatePeriod = (period, from = '', to = '') =>
+    update({ period, stfrom: from, stto: to, ...clearGroup })
+  const changeDate = (field, value) =>
+    update((current) => ({
+      period: (value || current.get(field === 'stfrom' ? 'stto' : 'stfrom')) ? 'custom' : 'all',
+      [field]: value,
+      ...clearGroup,
+    }))
+  const product = query.group_by === 'product'
+  const sortOptions = [
+    { value: 'count:desc', label: ages ? '未结笔数降序' : '订单数降序' },
+    { value: 'overdue:desc', label: ages ? '逾期笔数降序' : '逾期单数降序' },
+    { value: 'name:asc', label: '名称升序' },
+    ...(canSortAmount ? [{ value: 'amount:desc', label: '金额降序' }] : []),
+  ]
+  const currentSort = `${query.sort}:${query.direction}`
+  const filters = (
+    <div className="erp-statistics-filters" role="group" aria-label="统计筛选">
       {!ages && (
-        <>
-          <div className="erp-statistics-filter-field">
-            <span>订单交期</span>
-            <FilterSelect
-              emptyValue="all"
-              label="交期范围"
-              placeholder="交期范围"
-              aria-label="交期范围"
-              value={query.period}
-              options={[
-                { value: 'month', label: '本月' },
-                { value: 'soon', label: '未来 7 天' },
-                { value: 'all', label: '全部交期' },
-                { value: 'custom', label: '自定义' },
-              ]}
-              onChange={(period) => update({ period, ...clearGroup })}
-            />
-          </div>
-          <DateRangeFilter
-            startValue={
-              query.period === 'custom' ? query.date_from : data?.date_from || ''
-            }
-            endValue={
-              query.period === 'custom' ? query.date_to : data?.date_to || ''
-            }
-            onStartChange={(value) =>
-              update({
-                period: 'custom',
-                stfrom: value,
-                stto: query.date_to || data?.date_to || '',
-                ...clearGroup,
-              })
-            }
-            onEndChange={(value) =>
-              update({
-                period: 'custom',
-                stto: value,
-                stfrom: query.date_from || data?.date_from || '',
-                ...clearGroup,
-              })
+        <Select
+          allowClear={false /* 不可清空：汇总必须选择客户或产品。 */}
+          presentation="compact"
+          className="erp-business-filter-control"
+          aria-label="汇总维度"
+          value={query.group_by}
+          options={[
+            { value: 'customer', label: '按客户' },
+            { value: 'product', label: '按产品' },
+          ]}
+          onChange={(group) => update({ group, sq: '', ...clearGroup })}
+        />
+      )}
+      {!ages && (
+        <div className="erp-statistics-delivery-period" role="group" aria-label="订单交期">
+          <FilterSelect
+            className="erp-business-filter-control"
+            emptyValue="all"
+            label="订单交期"
+            placeholder="全部交期"
+            aria-label="交期范围"
+            value={query.period}
+            options={[
+              { value: 'month', label: '本月' },
+              { value: 'soon', label: '未来 7 天' },
+              { value: 'custom', label: '自定义' },
+            ]}
+            onChange={(period) =>
+              period === 'custom'
+                ? updatePeriod(period, startDate, endDate)
+                : updatePeriod(period)
             }
           />
-        </>
+          {query.period === 'custom' && (
+            <DateRangeFilter
+              startValue={startDate}
+              endValue={endDate}
+              inputReadOnly={false}
+              onStartChange={(value) => changeDate('stfrom', value)}
+              onEndChange={(value) => changeDate('stto', value)}
+            />
+          )}
+        </div>
       )}
-      <SearchInput
-        aria-label={query.group_by === 'product' ? '搜索产品' : '搜索客户'}
-        placeholder={query.group_by === 'product' ? '搜索产品' : '搜索客户'}
-        allowClear
-        maxLength={100}
-        {...search}
-      />
       <Select
-        allowClear={false /* 不可清空：金额统计必须明确单一币种，不能混加不同币种。 */}
-        label="统计币种"
-        placeholder="统计币种"
+        allowClear={false /* 不可清空：金额统计必须明确单一币种。 */}
+        presentation="compact"
+        className="erp-business-filter-control erp-statistics-currency"
+        label="币种"
         aria-label="统计币种"
         value={query.currency}
-        options={['CNY', 'USD', 'HKD'].map((currency) => ({
-          value: currency,
-          label: `币种 ${currency}`,
-        }))}
+        options={['CNY', 'USD', 'HKD'].map((currency) => ({ value: currency, label: currency }))}
         onChange={(currency) => update({ currency, ...clearGroup })}
       />
+      <SearchInput
+        className="erp-statistics-search"
+        aria-label={product ? '搜索产品' : '搜索客户'}
+        placeholder={product ? '搜索产品' : '搜索客户'}
+        value={query.keyword}
+        resetKey={`${query.report}:${query.group_by}`}
+        allowClear
+        maxLength={100}
+        onSearch={(sq) => update({ sq, ...clearGroup })}
+      />
+      <Select
+        allowClear={false /* 不可清空：默认排序为单数或笔数降序。 */}
+        presentation="compact"
+        className="erp-business-filter-control erp-statistics-sort"
+        label="排序"
+        aria-label="统计排序"
+        placeholder="选择排序"
+        value={sortOptions.some(({ value }) => value === currentSort) ? currentSort : undefined}
+        options={sortOptions}
+        onChange={(value) => {
+          const [sort, direction] = value.split(':')
+          update({ sort, direction })
+        }}
+      />
     </div>
+  )
+  const scopeHelp = (
+    <SupplementalHelp
+      label="统计口径"
+      aria-label="查看统计口径"
+      title={ages ? '应收账龄口径' : '交付汇总口径'}
+      content={
+        <div className="erp-statistics-help">
+          {ages ? (
+            <p>
+              统计已过账的未结余额，扣除核销和红冲，计入冲正。按中国日期计算账龄，未填到期日单列；不同币种分开查看。
+            </p>
+          ) : (
+            <>
+              {query.period !== 'all' && (startDate || endDate) && (
+                <p>当前订单交期：{startDate || '不限'} 至 {endDate || '不限'}。</p>
+              )}
+              <p>按实际出货判断交齐；交期按待交明细的最早交期。逾期与 7 天内交付只统计仍待交付的订单。</p>
+              {product && <p>同一订单可能出现在多个产品行，筛选结果合计按订单去重。</p>}
+              {money && (
+                <p>
+                  {product ? '货品金额按订单明细计算，不分摊税费、运费。' : '订单金额取冻结的订单总额。'}
+                  已出货金额取出货快照，缺失时显示“—”。
+                </p>
+              )}
+            </>
+          )}
+          <p>状态数字按其他查询条件统计。表格合计覆盖选中状态的全部结果，图表显示当前页。点击名称或状态数字可查看来源。</p>
+        </div>
+      }
+    />
   )
   const counts = board?.counts
   const metricItems = ages
@@ -543,67 +615,58 @@ export default function useBusinessStatistics({
         ['pending', '待交付', counts?.pending],
         ['overdue', '当前逾期', counts?.overdue],
       ]
-  const controls = (
+  const snapshot = (
+    <span className="erp-statistics-meta">
+      <span>{data ? `截至 ${dayjs(data.snapshot_at).format('YYYY-MM-DD HH:mm')}` : ''}</span>
+    </span>
+  )
+  const metrics = (
     <div className="erp-statistics-summary-row">
-      {!groupKey ? (
-        <div className="erp-statistics-metrics" aria-label="统计概览">
-          {metricItems.map(([key, label, value]) => (
-            <FilterChip
-              key={key}
-              disabled={loading || !board}
-              selected={query.status === key}
-              count={
-                <>
-                  <strong
-                    className={key === 'overdue' ? 'erp-statistics-danger' : ''}
-                  >
-                    {number(loading ? null : value, ages)}
-                  </strong>
-                  {!ages && <small>单</small>}
-                </>
-              }
-              onClick={() => update({ status: key })}
-            >
-              {label}
-            </FilterChip>
-          ))}
-          {!ages && money && (
-            <span className="erp-statistics-total-amount">
-              {query.group_by === 'product' ? '货品金额' : '合同金额'}{' '}
-              <strong>{number(board?.totals.amount, true)}</strong>{' '}
-              {query.currency}
-            </span>
-          )}
-        </div>
-      ) : (
-        <div className="erp-statistics-source-context">
-          <Tag>
-            {statusLabels[query.status] || '全部'} · {query.currency}
-          </Tag>
-          <span>沿用汇总筛选查看来源{!ages && '订单'}</span>
-        </div>
-      )}
-      <span className="erp-statistics-meta">
-        <span>
-          {data
-            ? `截至 ${dayjs(data.snapshot_at).format('YYYY-MM-DD HH:mm')}`
-            : loading
-              ? '正在查询…'
-              : '等待查询'}
-        </span>
-      </span>
+      <div className="erp-statistics-metrics" role="group" aria-label={ages ? '账龄筛选' : '交付状态筛选'}>
+        {metricItems.map(([key, label, value]) => (
+          <FilterChip
+            key={key}
+            disabled={loading || !board}
+            selected={query.status === key}
+            count={
+              <>
+                <strong
+                  className={
+                    key === 'overdue' && !loading && Number(value) > 0
+                      ? 'erp-statistics-danger'
+                      : undefined
+                  }
+                >
+                  {number(loading ? null : value, ages)}
+                </strong>
+                {!ages && <small>单</small>}
+              </>
+            }
+            onClick={() => {
+              if (key === 'all' && query.status === 'all') return
+              update({ status: key === 'all' || query.status === key ? '' : key })
+            }}
+          >
+            {label}
+          </FilterChip>
+        ))}
+      </div>
+      {snapshot}
     </div>
   )
-  const valueLink = (row, key, asMoney = false) => (
-    <Button
-      type="link"
-      className={`erp-statistics-value${key === 'overdue' ? ' erp-statistics-danger' : ''}`}
-      disabled={row[key] === 0 || row[key] == null}
-      onClick={() => drill(row, sourceStatus(key))}
-    >
-      {number(row[key], asMoney)}
-    </Button>
-  )
+  const valueLink = (row, key, asMoney = false) => {
+    const text = number(row[key], asMoney)
+    if (!(Number(row[key]) > 0)) return <span className="erp-statistics-inactive-value">{text}</span>
+    return (
+      <Button
+        type="link"
+        className={`erp-statistics-value${key === 'overdue' ? ' erp-statistics-danger' : ''}`}
+        onClick={() => drill(row, ['count', 'balance'].includes(key) ? 'all' : sourceStatus(key))}
+      >
+        {text}
+      </Button>
+    )
+  }
   const summaryColumns = [
     {
       title: query.group_by === 'product' ? '产品' : '客户',
@@ -613,6 +676,7 @@ export default function useBusinessStatistics({
         <Button
           type="link"
           className="erp-statistics-name"
+          data-statistics-group={row.key}
           title={row.name}
           onClick={() => drill(row)}
         >
@@ -628,16 +692,6 @@ export default function useBusinessStatistics({
       render: (_, row) => valueLink(row, 'count'),
     },
   ]
-  // Count drills into all records, rather than a status named "count".
-  summaryColumns[1].render = (_, row) => (
-    <Button
-      type="link"
-      className="erp-statistics-value"
-      onClick={() => drill(row)}
-    >
-      {number(row.count)}
-    </Button>
-  )
   if (ages) {
     summaryColumns.push(
       {
@@ -645,15 +699,7 @@ export default function useBusinessStatistics({
         key: 'balance',
         align: 'right',
         width: 155,
-        render: (_, row) => (
-          <Button
-            type="link"
-            className="erp-statistics-value"
-            onClick={() => drill(row)}
-          >
-            {number(row.balance, true)}
-          </Button>
-        ),
+        render: (_, row) => valueLink(row, 'balance', true),
       },
       ...STATISTICS_AGES.map(([key, label]) => ({
         title: label,
@@ -822,6 +868,18 @@ export default function useBusinessStatistics({
           'undated',
         ]
   ).map((value) => ({ value, label: statusLabels[value] }))
+  const sourceScope = [
+    ages ? '应收账龄' : product ? '交付汇总 · 按产品' : '交付汇总 · 按客户',
+    !ages && (sourceFrom || sourceTo || data?.date_from || data?.date_to
+      ? `${sourceFrom || data?.date_from || '不限'} 至 ${sourceTo || data?.date_to || '不限'}`
+      : query.period === 'all' ? '全部交期' : ''),
+    query.status !== 'all' && statusLabels[query.status],
+    query.currency,
+  ].filter(Boolean).join(' · ')
+  const sourceTitle = [
+    data?.group_name || groupLabel,
+    ages ? '应收来源' : '来源订单',
+  ].filter(Boolean).join(' · ')
   const content = (
     <>
       <BusinessViewSurface
@@ -829,89 +887,71 @@ export default function useBusinessStatistics({
         activeView={`statistics:${query.report}:${groupKey || query.group_by}:${display}`}
         loading={loading}
       >
-        <div className="erp-statistics-result-head">
+        <div className="erp-statistics-toolbar">
           {groupKey ? (
             <>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                aria-label="返回汇总"
-                onClick={() => update(clearGroup, { resetPage: false })}
-              >
-                返回汇总
-              </Button>
-              <strong title={data?.group_name || groupLabel}>
-                {data?.group_name || groupLabel || '来源明细'} ·{' '}
-                {ages ? '应收来源' : '来源订单'}
-              </strong>
-            </>
-          ) : (
-            <strong>
-              {ages
-                ? '客户应收账龄'
-                : query.group_by === 'product'
-                  ? '产品交付汇总'
-                  : '客户交付汇总'}{' '}
-              <small>{number(board?.total)} 项</small>
-            </strong>
-          )}
-          <span className="erp-statistics-toolbar-spacer" />
-          {groupKey ? (
-            <FilterSelect
-              label="来源状态"
-              placeholder="来源状态"
-              aria-label="来源状态"
-              emptyValue="all"
-              value={sourceFilter}
-              options={statusOptions}
-              onChange={(source_status) =>
-                update({ source_status, source_page: '' }, { resetPage: false })
-              }
-            />
-          ) : (
-            <>
-              {!ages && (
-                <Select
-                  allowClear={false /* 不可清空：统计聚合必须明确客户或产品维度，空值没有可执行的汇总口径。 */}
-                  label="汇总维度"
-                  placeholder="汇总维度"
-                  aria-label="汇总维度"
-                  value={query.group_by}
-                  options={[
-                    { value: 'customer', label: '按客户' },
-                    { value: 'product', label: '按产品' },
-                  ]}
-                  onChange={(group) => update({ group, sq: '', ...clearGroup })}
-                />
-              )}
-              <FilterSelect
-                emptyValue="count:desc"
-                label="统计排序"
-                placeholder="统计排序"
-                aria-label="统计排序"
-                value={`${query.sort}:${query.direction}`}
-                options={[
-                  { value: 'count:desc', label: '按单数 ↓' },
-                  { value: 'overdue:desc', label: '按逾期 ↓' },
-                  { value: 'name:asc', label: '按名称 ↑' },
-                  ...(money || ages
-                    ? [{ value: 'amount:desc', label: '按金额 ↓' }]
-                    : []),
-                ]}
-                onChange={(value) => {
-                  const [sort, direction] = value.split(':')
-                  update({ sort, direction })
-                }}
-              />
-              <div className="erp-business-visual-switch">
-                <Segmented
-                  aria-label="页面展示方式"
-                  value={display}
-                  options={displayOptions}
-                  onChange={(value) =>
-                    update({ display: value }, { resetPage: false })
+              <div className="erp-statistics-result-head">
+                <Button
+                  ref={backRef}
+                  icon={<ArrowLeftOutlined aria-hidden="true" />}
+                  onClick={() => update(clearGroup, { resetPage: false })}
+                >
+                  返回汇总
+                </Button>
+                <strong className="erp-statistics-source-title">
+                  {sourceTitle}
+                </strong>
+                <FilterSelect
+                  className="erp-statistics-source-filter"
+                  label="来源状态"
+                  placeholder="全部来源状态"
+                  aria-label="来源状态"
+                  emptyValue="all"
+                  value={sourceFilter}
+                  options={statusOptions}
+                  onChange={(source_status) =>
+                    update({ source_status, source_page: '' }, { resetPage: false })
                   }
                 />
               </div>
+              <div className="erp-statistics-summary-row">
+                <span className="erp-statistics-source-context">{sourceScope}</span>
+                {snapshot}
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className="erp-statistics-summary-head"
+                data-report={query.report}
+                data-custom-period={!ages && query.period === 'custom' ? '' : undefined}
+              >
+                <div className="erp-statistics-report-picker">
+                  {reportOptions.length > 1 ? (
+                    <SlidingTabList
+                      aria-label="统计内容"
+                      value={query.report}
+                      options={reportOptions}
+                      onChange={switchReport}
+                    />
+                  ) : (
+                    <strong>{reportOptions[0]?.label || '经营统计'}</strong>
+                  )}
+                  {scopeHelp}
+                </div>
+                {allowed && filters}
+                <div className="erp-business-visual-switch">
+                  <Segmented
+                    aria-label="页面展示方式"
+                    value={display}
+                    options={displayOptions}
+                    onChange={(value) =>
+                      update({ display: value === 'chart' ? value : '' }, { resetPage: false })
+                    }
+                  />
+                </div>
+              </div>
+              {allowed && metrics}
             </>
           )}
         </div>
@@ -934,22 +974,7 @@ export default function useBusinessStatistics({
             <Empty description="当前筛选暂无记录" />
           ) : (
             <>
-              {!groupKey && (
-                <div className="erp-statistics-context">
-                  <span>
-                    当前范围：
-                    {ages
-                      ? '当前未结应收'
-                      : query.period === 'all'
-                        ? '全部交期订单'
-                        : `${board.date_from || '不限'} 至 ${board.date_to || '不限'}`}{' '}
-                    · {statusLabels[query.status] || '全部'} · 合计覆盖完整筛选
-                    {query.group_by === 'product' ? ' · 订单合计去重' : ''}
-                  </span>
-                  <span>点击数字查看来源{!ages && '订单'}</span>
-                </div>
-              )}
-              {(groupKey || display !== 'chart') && (
+              {(groupKey || display === 'table') && (
                 <Table
                   sticky={tableSticky}
                   className="erp-statistics-table"
@@ -972,7 +997,7 @@ export default function useBusinessStatistics({
                                 align={column.align}
                               >
                                 {index === 0
-                                    ? '全部筛选合计'
+                                    ? '筛选结果合计'
                                     : number(
                                         board.totals[column.key],
                                         amountKeysForTable.includes(column.key)
@@ -986,7 +1011,7 @@ export default function useBusinessStatistics({
                   }
                 />
               )}
-              {!groupKey && display !== 'table' && (
+              {!groupKey && display === 'chart' && (
                 <StatisticsChart
                   groups={board.groups}
                   report={query.report}
@@ -994,7 +1019,7 @@ export default function useBusinessStatistics({
                   onDrill={drill}
                 />
               )}
-              {!groupKey &&
+              {!groupKey && display === 'table' &&
                 (board.totals.missing_amount > 0 ||
                   board.totals.missing_shipment_amount > 0) &&
                 money && (
@@ -1031,7 +1056,7 @@ export default function useBusinessStatistics({
       )}
     </>
   )
-  return { canUse: canSales || canFinance, toolbar, controls, content }
+  return { canUse: canSales || canFinance, content }
 }
 const amountKeysForTable = [
   'amount',

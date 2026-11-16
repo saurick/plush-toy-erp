@@ -661,9 +661,6 @@
   :where(.erp-business-date-range-filter__type.ant-select)
   .ant-select-selector,
 [data-erp-theme='dark'] .erp-business-date-range-filter__type-label,
-[data-erp-theme='dark']
-  .erp-business-date-range-filter
-  .erp-business-date-input.ant-picker,
 [data-erp-theme='dark'] .erp-business-date-input.ant-picker {
   border-color: var(--erp-field-border);
   background: var(--erp-field-bg);

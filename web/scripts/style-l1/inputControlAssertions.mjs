@@ -539,8 +539,6 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
     }
 
     const focusOwnerOf = (node) => {
-      const dateRange = node.closest('.erp-business-date-range-filter')
-      if (dateRange instanceof HTMLElement) return dateRange
       const select = node.closest('.ant-select')
       const selector = select?.querySelector('.ant-select-selector')
       // AutoComplete renders its custom Input as the visible border owner.
@@ -587,6 +585,8 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         )
       const focusStyle = hasOverlayOutline ? outlineLayer : ownerStyle
       const nodeStyle = window.getComputedStyle(node)
+      const dateRange = owner.closest('.erp-business-date-range-filter')
+      const dateRangeStyle = dateRange ? window.getComputedStyle(dateRange) : null
       const classes =
         typeof owner.className === 'string'
           ? owner.className.trim().split(/\s+/).filter(Boolean).slice(0, 6)
@@ -656,17 +656,12 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         targetBackground: nodeStyle.backgroundColor,
         targetOutlineWidth: nodeStyle.outlineWidth,
         isAffixInput: node.matches('.ant-input-affix-wrapper > input'),
-        compoundChildren: owner.matches('.erp-business-date-range-filter')
-          ? Array.from(
-              owner.querySelectorAll('.ant-picker, .ant-select-selector')
-            ).map((child) => {
-              const style = getComputedStyle(child)
-              return {
-                boxShadow: style.boxShadow,
-                borderColor: style.borderColor,
-              }
-            })
-          : [],
+        duplicateDateRangeFocus: Boolean(
+          dateRangeStyle &&
+          (dateRangeStyle.boxShadow !== 'none' ||
+            (dateRangeStyle.outlineStyle !== 'none' &&
+              Number.parseFloat(dateRangeStyle.outlineWidth) > 0))
+        ),
         activeTagName: document.activeElement?.tagName || '',
         activeClassName: String(document.activeElement?.className || ''),
         theme: document.documentElement.dataset.erpTheme || 'light',
@@ -750,11 +745,8 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
   )
   metrics.forEach((item) => {
     assert(
-      item.compoundChildren.every(
-        (child) =>
-          child.boxShadow === 'none' && child.borderColor === 'rgba(0, 0, 0, 0)'
-      ),
-      `${scenarioName} 组合日期框只允许外层绘制焦点，内部控件不能出现第二层边框或阴影: ${JSON.stringify(item)}`
+      !item.duplicateDateRangeFocus,
+      `${scenarioName} 起止日期各自显示焦点，日期范围容器不能重复绘制: ${JSON.stringify(item)}`
     )
     if (item.isAffixInput) {
       assertAffixInputMetric(

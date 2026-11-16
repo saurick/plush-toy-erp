@@ -97,6 +97,13 @@ body
   opacity: 0;
 }
 
+/* Apply filter sizes together across breakpoints and animate only feedback. */
+.erp-business-filter-control.ant-select-single :is(.ant-select-selector, .ant-select-selection-item),
+.erp-search-input.ant-input-affix-wrapper:not(:where(.erp-mobile-search__control)),
+.erp-search-input :is(input.ant-input, .erp-search-submit) {
+  transition-property: color, background-color, border-color, box-shadow;
+}
+
 /* 手机输入与组合外壳的字号即时生效，避免 iPhone 聚焦时缩放页面。 */
 @media screen and (max-width: 767px) {
   #root,

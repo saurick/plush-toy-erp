@@ -319,6 +319,7 @@ export function DateRangeFilter({
   endValue,
   onStartChange,
   onEndChange,
+  inputReadOnly,
 }) {
   const hasMultipleDateTypes = options.length > 1
   const showInlineTypes = hasMultipleDateTypes && typePresentation === 'inline'
@@ -382,6 +383,7 @@ export function DateRangeFilter({
           placeholder="开始日期"
           status={rangeInvalid ? 'error' : undefined}
           value={startValue}
+          inputReadOnly={inputReadOnly}
           disabledDate={endValue ? startDisabledDate : undefined}
           onChange={onStartChange}
         />
@@ -397,6 +399,7 @@ export function DateRangeFilter({
           placeholder="结束日期"
           status={rangeInvalid ? 'error' : undefined}
           value={endValue}
+          inputReadOnly={inputReadOnly}
           disabledDate={startValue ? endDisabledDate : undefined}
           onChange={onEndChange}
         />

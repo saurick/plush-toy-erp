@@ -265,15 +265,17 @@ export function statisticsQueryFromURL(params) {
     report === 'delivery' && params.get('group') === 'product'
       ? 'product'
       : 'customer'
-  const period = ['month', 'soon', 'all', 'custom'].includes(
-    params.get('period')
-  )
-    ? params.get('period')
-    : 'month'
+  const requestedPeriod = params.get('period')
+  const period =
+    report === 'receivables'
+      ? 'all'
+      : ['month', 'soon', 'all', 'custom'].includes(requestedPeriod)
+        ? requestedPeriod
+        : 'month'
   return {
     report,
     group_by,
-    period: report === 'receivables' ? 'all' : period,
+    period,
     currency: ['CNY', 'USD', 'HKD'].includes(params.get('currency'))
       ? params.get('currency')
       : 'CNY',
