@@ -170,6 +170,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRejectsInvalidContract(t *testing
 		{name: "numeric todo", params: map[string]any{"todo_only": float64(1)}},
 		{name: "conflicting modes", params: map[string]any{"todo_only": true, "approval_only": true}},
 		{name: "non string keyword", params: map[string]any{"keyword": float64(1)}},
+		{name: "removed subject filter", params: map[string]any{"task_group": "handoff_receipt_inbound"}},
 		{name: "oversized keyword", params: map[string]any{"keyword": strings.Repeat("长", 201)}},
 		{name: "invalid status", params: map[string]any{"status": "unknown"}},
 		{name: "non target pending status", params: map[string]any{"status": "pending"}},

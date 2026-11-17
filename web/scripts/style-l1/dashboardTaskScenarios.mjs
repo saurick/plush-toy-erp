@@ -9,6 +9,7 @@ import { createProcessRuntimeClosureScenarios } from './processRuntimeClosureSce
 import { createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
 import { createTaskTrackingFilterScenarios } from './taskTrackingFilterScenarios.mjs'
 import { workflowExceptionScenario } from './workflowExceptionScenario.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 async function assertNarrowScreenAccountAccess(page) {
   await page.getByRole('button', { name: '打开导航菜单', exact: true }).click()
@@ -2152,7 +2153,7 @@ export function createDashboardTaskScenarios({
     },
     {
       name: 'erp-task-board-single-role-scope-desktop',
-      path: '/erp/task-board?role=sales',
+      path: '/erp/task-board?role=sales&task_group=handoff_receipt_inbound',
       auth: 'admin',
       effectiveSession: {
         configRevision: 'style-l1-task-board-warehouse-scope',
@@ -2184,7 +2185,21 @@ export function createDashboardTaskScenarios({
           },
         ],
       },
+      workflowTaskFixtures: Array.from({ length: 45 }, (_, index) => ({
+        id: 9450 + index,
+        task_code: `STYLE-SUBJECT-${index}`,
+        task_group: index < 23 ? 'handoff_receipt_inbound' : 'handoff_outsourcing_inbound',
+        task_name: index < 23 ? '确认材料入库' : '确认加工回货入库',
+        source_type: index < 23 ? 'purchase_receipt' : 'outsourcing_fact',
+        source_id: index + 1,
+        source_no: `STYLE-SUBJECT-${index}`,
+        owner_role_key: index < 43 ? 'warehouse' : 'boss',
+        task_status_key: 'ready',
+        version: 1,
+        payload: {},
+      })),
       viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 2,
       verify: async (page) => {
         await page
           .getByRole('region', { name: '任务管理', exact: true })
@@ -2252,7 +2267,29 @@ export function createDashboardTaskScenarios({
           await extraFilters.getByText(label, { exact: true }).waitFor()
         }
         assert.equal(await extraFilters.getByLabel('负责岗位', { exact: true }).count(), 0)
-        await page.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '完成', exact: true }).click()
+        assert.equal(await extraFilters.getByRole('combobox', { name: '办理事项', exact: true }).count(), 0)
+        assert.equal(new URL(page.url()).searchParams.has('task_group'), false)
+        await page.getByText('第 1-20 条 / 共 43 条', { exact: true }).waitFor()
+        await extraFilters.getByRole('button', { name: '完成', exact: true }).click()
+        const search = page.getByRole('textbox', { name: /可搜索/ })
+        await search.fill('材料入库')
+        await search.press('Enter')
+        await page.getByText('第 1-20 条 / 共 23 条', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('q'), '材料入库')
+        await page.getByRole('button', { name: '下一页', exact: true }).click()
+        await page.getByText('第 21-23 条 / 共 23 条', { exact: true }).waitFor()
+        await page.reload()
+        await page.getByText('第 21-23 条 / 共 23 条', { exact: true }).waitFor()
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
+        await extraFilters.waitFor()
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: path.resolve(outputDir, 'erp-task-board-title-search.png') })
+        await extraFilters.getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByRole('button', { name: '清除搜索', exact: true }).click()
+        await page.getByText('第 1-20 条 / 共 43 条', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.has('q'), false)
+        await page.setViewportSize({ width: 1440, height: 900 })
         await page.screenshot({
           path: path.resolve(
             outputDir,

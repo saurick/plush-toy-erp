@@ -29,6 +29,23 @@ import {
 
 const now = Math.floor(Date.now() / 1000)
 
+test('移除的事项条件不恢复、不请求，清理旧链接时保留其他筛选与页码', () => {
+  const before = 'q=入库&source=outsourcing_fact&task_group=handoff_outsourcing_inbound&page=2'
+  const filters = readWorkflowTaskBoardFiltersFromSearch(before)
+  assert.equal(Object.hasOwn(filters, 'taskGroup'), false)
+  assert.equal(workflowTaskBoardExtraFilterCount(filters), 1)
+  assert.equal(Object.hasOwn(buildWorkflowTaskBoardRequest(filters), 'task_group'), false)
+  assert.equal(Object.hasOwn(buildWorkflowTaskBoardRequest({ ...filters, taskGroup: 'handoff_outsourcing_inbound' }), 'task_group'), false)
+  assert.equal(Object.hasOwn(buildWorkflowTaskBoardRequest(filters, { calendar: true }), 'task_group'), false)
+  assert.equal(buildWorkflowTaskBoardRequest(filters).offset, 20)
+  const next = writeWorkflowTaskBoardFiltersToSearch(before, filters)
+  assert.equal(next.has('task_group'), false)
+  assert.equal(next.get('source'), 'outsourcing_fact')
+  assert.equal(next.get('q'), '入库')
+  assert.equal(next.get('page'), '2')
+  assert.equal(Object.hasOwn(buildWorkflowTaskBoardRequest(readWorkflowTaskBoardFiltersFromSearch(next)), 'task_group'), false)
+})
+
 test('task filter count excludes search, visible category and sorting, counting a date range once', () => {
   assert.equal(workflowTaskBoardExtraFilterCount({ keyword: '小熊', mode: 'approval', lane: 'actionable', sort: 'newest' }), 0)
   assert.equal(workflowTaskBoardExtraFilterCount({ lane: 'finished', period: 'custom', dateFrom: '2026-10-01', dateTo: '2026-10-22', status: 'done', role: 'warehouse', sourceType: 'sales_order' }), 4)

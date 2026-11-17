@@ -388,7 +388,7 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
 
   Object.values(FILTER_QUERY_KEYS).forEach((key) => params.delete(key))
-  for (const key of ['module_key', 'chain_key']) params.delete(key)
+  for (const key of ['module_key', 'chain_key', 'task_group']) params.delete(key)
   DISCOVERY_FILTER_KEYS.forEach((key) => { params.delete(DISCOVERY_REQUEST_KEYS[key]); if (normalized[key]) params.set(DISCOVERY_REQUEST_KEYS[key], normalized[key]) })
 
   for (const key of ['period', 'dateFrom', 'dateTo']) {

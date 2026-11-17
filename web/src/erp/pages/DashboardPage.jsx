@@ -392,7 +392,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
   useEffect(() => {
     const deniedApproval = !canViewApprovalInbox && requestedFilters.mode === 'approval'
-    const retiredFilters = searchParams.has('module_key') || searchParams.has('chain_key') ||
+    const retiredFilters = searchParams.has('module_key') || searchParams.has('chain_key') || searchParams.has('task_group') ||
       (filters.lane === 'finished' && searchParams.has('due'))
     if (!isTaskBoardView || (!deniedApproval && !retiredFilters)) return
     setSearchParams(
