@@ -38,6 +38,7 @@ const devPageSources = [
   'DevPermissionRelationshipsPage.jsx',
   'DevIntegrationPage.jsx',
   'DevFlowStateObservatoryPage.jsx',
+  'DevFlowExplorerPage.jsx',
   'DevTaskHandlingPage.jsx',
   'DevBusinessUsabilityPage.jsx',
   'DevDocsPage.jsx',
@@ -158,6 +159,7 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
     [
       ['product-engineering', '产品能力'],
       ['product-engineering', '业务链路'],
+      ['product-engineering', '流程探索'],
       ['product-engineering', '业务规则'],
       ['product-engineering', '业务专题'],
       ['product-engineering', '任务办理'],
@@ -220,7 +222,7 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
     false,
     '页面说明检查保留登记和深链，通过测试执行按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 7)
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 8)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'development-resources')
   assert.deepEqual(
     getDevSecondaryNavItems('quality').map((item) => item.key),
@@ -351,7 +353,7 @@ test('devHub: tools share one area registry without duplicate overview stage inv
 })
 
 test('devHub: dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 16)
+  assert.equal(devPageSources.length, 17)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -417,6 +419,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     [
       '/__dev/product-core',
       '/__dev/status-flows',
+      '/__dev/flow-explorer',
       '/__dev/business-rules',
       '/__dev/business-topics',
       '/__dev/task-handling',
@@ -581,7 +584,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 19)
+  assert.equal(summary.entryCount, 20)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

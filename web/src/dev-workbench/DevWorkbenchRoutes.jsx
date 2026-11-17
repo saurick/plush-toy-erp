@@ -24,6 +24,7 @@ import {
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
+  DEV_FLOW_EXPLORER_ROUTE,
   DEV_TASK_HANDLING_ROUTE,
   DEV_TESTING_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
@@ -93,6 +94,10 @@ const DevProjectSkillsPage = createDevLazyRoute(
 const DevFlowStateObservatoryPage = createDevLazyRoute(
   DEV_STATUS_FLOWS_ROUTE,
   () => import('./pages/DevFlowStateObservatoryPage.jsx')
+)
+const DevFlowExplorerPage = createDevLazyRoute(
+  DEV_FLOW_EXPLORER_ROUTE,
+  () => import('./pages/DevFlowExplorerPage.jsx')
 )
 const DevTaskHandlingPage = createDevLazyRoute(DEV_TASK_HANDLING_ROUTE, () => import('./pages/DevTaskHandlingPage.jsx'))
 const DevBusinessRulesPage = createDevLazyRoute(
@@ -218,6 +223,7 @@ export default function DevWorkbenchRoutes() {
             path="status-flows"
             element={<DevFlowStateObservatoryPage />}
           />
+          <Route path="flow-explorer" element={<DevFlowExplorerPage />} />
           <Route path="task-handling" element={<DevTaskHandlingPage />} />
           <Route path="business-topics" element={<DevBusinessTopicsPage />} />
           <Route path="business-rules" element={<DevBusinessRulesPage />} />

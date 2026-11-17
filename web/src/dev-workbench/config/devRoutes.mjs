@@ -13,6 +13,7 @@ export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 export const DEV_DOCS_ROUTE = '/__dev/docs'
 export const DEV_PROJECT_SKILLS_ROUTE = '/__dev/project-skills'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
+export const DEV_FLOW_EXPLORER_ROUTE = '/__dev/flow-explorer'
 export const DEV_BUSINESS_RULES_ROUTE = '/__dev/business-rules'
 export const DEV_TASK_HANDLING_ROUTE = '/__dev/task-handling'
 export const DEV_BUSINESS_TOPICS_ROUTE = '/__dev/business-topics'
@@ -49,7 +50,7 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
     key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_ENGINEERING_ROUTE,
     label: '产品与业务',
-    description: '产品能力、业务链路与规则、专题、权限与交互设计',
+    description: '产品能力、业务链路、流程探索、规则、专题、权限与交互设计',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.developmentResources,
@@ -83,6 +84,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_STATUS_FLOWS_ROUTE,
     label: '业务链路',
+  }),
+  Object.freeze({
+    key: 'flow-explorer',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_FLOW_EXPLORER_ROUTE,
+    label: '流程探索',
   }),
   Object.freeze({
     key: 'business-rules',

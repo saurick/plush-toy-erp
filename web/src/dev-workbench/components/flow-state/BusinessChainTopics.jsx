@@ -25,6 +25,7 @@ export default function BusinessChainTopics({
   selectedTopicKey,
   filterControls,
   onExploreChain,
+  onOpenExplorer,
   onOpenView,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -194,6 +195,9 @@ export default function BusinessChainTopics({
           }
         />
         {filterControls}
+        {!mapOpen && !financeSelected && topic && onOpenExplorer ? (
+          <Button onClick={(event) => onOpenExplorer(topic.key, null, event.currentTarget)}>在流程探索中打开</Button>
+        ) : null}
         {!mapOpen && !financeSelected ? (
           <Button
             ref={mapOpener}
@@ -297,6 +301,7 @@ export default function BusinessChainTopics({
                 node={node}
                 onSelect={selectNode}
                 onExploreChain={onExploreChain}
+                onOpenExplorer={onOpenExplorer}
                 visibleStepKeys={filtered ? new Set(matchingActions.map((action) => action.step.key)) : null}
                 onInspectStep={(key) => updateReading({ [queryKeys.roleTopicStep]: key })}
               />

@@ -5,6 +5,7 @@ import { createDevFinanceWorkbenchScenarios } from './devFinanceWorkbenchScenari
 import { createDevBusinessChainScenarios } from './devBusinessChainScenarios.mjs'
 import { createDevFlowDetailScenarios } from './devFlowDetailScenarios.mjs'
 import { createDevBusinessRelationsScenarios } from './devBusinessRelationsScenarios.mjs'
+import { createDevBusinessChainDesignScenarios } from './devBusinessChainDesignScenarios.mjs'
 
 export const DEV_FLOW_STATE_OBSERVATORY_PATH = '/__dev/status-flows?view=chain&chain=all'
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -33,5 +34,5 @@ export function createDevFlowStateObservatoryScenarios(deps) {
       await assertNoHorizontalOverflow(page)
       assert.deepEqual(writes.get(page), [], '结构页面保持只读')
     },
-  }, ...createDevBusinessRulesScenarios(deps), ...createDevBusinessTopicsScenarios(deps), ...createDevFinanceWorkbenchScenarios({ ...deps, startNoWriteAudit }), ...createDevBusinessRelationsScenarios(deps), ...createDevBusinessChainScenarios({ ...deps, observatoryPath: DEV_FLOW_STATE_OBSERVATORY_PATH, startNoWriteAudit }), ...createDevFlowDetailScenarios(deps)]
+  }, ...createDevBusinessRulesScenarios(deps), ...createDevBusinessTopicsScenarios(deps), ...createDevBusinessChainDesignScenarios({ ...deps, startNoWriteAudit }), ...createDevFinanceWorkbenchScenarios({ ...deps, startNoWriteAudit }), ...createDevBusinessRelationsScenarios(deps), ...createDevBusinessChainScenarios({ ...deps, observatoryPath: DEV_FLOW_STATE_OBSERVATORY_PATH, startNoWriteAudit }), ...createDevFlowDetailScenarios(deps)]
 }

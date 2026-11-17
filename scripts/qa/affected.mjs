@@ -98,6 +98,9 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-business-usability-desktop-light",
   "dev-drill-recovery-desktop-light",
   "dev-flow-state-observatory-desktop-light",
+  "dev-flow-explorer-navigation-desktop",
+  "dev-flow-explorer-reading-desktop",
+  "dev-flow-explorer-export-desktop",
   "dev-business-topics-navigation-desktop",
   "dev-page-task-handling-desktop-light",
   "dev-quality-gates-desktop-light",
@@ -723,6 +726,7 @@ function devBrowserScenarioNames(file) {
     ? ["dev-business-rules-navigation-desktop", "dev-business-rules-context-return-desktop", "dev-business-rules-selection-recovery-desktop"]
     : [];
   const mappings = [
+    /^web\/src\/dev-workbench\/config\/devBusinessChain(?:Design|Exploration|Granularity|NodeCatalog|Map)[^/]*\.mjs$/u.test(file) ||
     [/ProductCoreRelations|ReadingNavigation|dev-reading-navigation/u, ["dev-page-product-core-desktop-light", "dev-business-topics-navigation-desktop", "dev-page-business-chain-audit-desktop-light", "dev-version-center-tabs-pagination-desktop"]],
     [/DevPageHeader|styles\/dev-workbench-(?:density|layout)\.css/u, ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-workbench-patterns-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]],
     [/DevSourceReferences|dev-source-references/u, ["dev-workbench-content-desktop-light", "dev-workbench-patterns-desktop-light", "dev-flow-rules-complete", "dev-page-integration-desktop-light", "dev-project-skills-guidance-desktop-light"]],

@@ -1,5 +1,6 @@
 import React from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { buildDevFlowExplorerLocation } from '../../pages/devFlowExplorerNavigation.mjs'
 import BusinessChainTopics from './BusinessChainTopics.jsx'
 import BusinessRelationFilters from './BusinessRelationFilters.jsx'
 import {
@@ -11,6 +12,7 @@ import {
 export default function BusinessTopicsView({ catalog, actions, currentChainKey, onOpenView }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const selectTopic = (key) => setSearchParams((previous) => {
     const next = new URLSearchParams(previous)
     next.set(keys.roleTopic, key ?? '')
@@ -37,6 +39,23 @@ export default function BusinessTopicsView({ catalog, actions, currentChainKey, 
           onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
         />}
         onOpenView={onOpenView}
+        onOpenExplorer={(chainKey, nodeKey, opener) => {
+          const { pathname, search, hash, state } = location
+          navigate({ pathname, search, hash }, {
+            replace: true,
+            state: {
+              ...state,
+              flowRestoreFrame: {
+                pathname,
+                search: search.replace(/^\?/u, ''),
+                scroll: window.scrollY,
+                focus: (opener.getAttribute('aria-label') || opener.textContent).trim(),
+                taskScoped: false,
+              },
+            },
+          })
+          navigate(buildDevFlowExplorerLocation(chainKey, nodeKey))
+        }}
         onExploreChain={(key, nodeKey) => onOpenView('states', {
           [keys.chain]: key,
           [keys.node]: nodeKey || null,

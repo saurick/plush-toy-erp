@@ -1,5 +1,5 @@
 import React from 'react'
-import { Button } from 'antd'
+import { Button, Space } from 'antd'
 import { describeDevBusinessChainResponsibility } from '../../config/devBusinessChainProjection.mjs'
 import './businessTopicDetails.css'
 import { ChainEvidenceLinks } from '../DevProductCoreRelations.jsx'
@@ -15,6 +15,7 @@ export default function BusinessTopicDetails({
   node,
   onSelect,
   onExploreChain,
+  onOpenExplorer,
   onInspectStep,
   visibleStepKeys,
 }) {
@@ -73,9 +74,14 @@ export default function BusinessTopicDetails({
           )
         })}
       </ul>
-      {node.machineKeys?.length && onExploreChain ? (
-        <Button onClick={() => onExploreChain(topic.key, node.key)}>查看规则</Button>
-      ) : null}
+      <Space wrap>
+        {node.machineKeys?.length && onExploreChain ? (
+          <Button onClick={() => onExploreChain(topic.key, node.key)}>查看规则</Button>
+        ) : null}
+        {onOpenExplorer ? (
+          <Button onClick={(event) => onOpenExplorer(topic.key, node.key, event.currentTarget)}>从此节点探索</Button>
+        ) : null}
+      </Space>
     </aside>
   )
 }
