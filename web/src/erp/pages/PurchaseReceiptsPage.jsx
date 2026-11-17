@@ -8,6 +8,9 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
+import { canReadReference } from '../utils/remoteReferences.mjs'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
@@ -38,10 +41,7 @@ import {
   postPurchaseReceipt,
 } from '../api/purchaseApi.mjs'
 import { createPayableFromPurchaseReceipt } from '../api/operationalFactApi.mjs'
-import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
-  listAllMaterials,
-  listAllSuppliers,
   listAllUnits,
   listAllWarehouses,
 } from '../api/masterDataOrderApi.mjs'
@@ -147,7 +147,6 @@ const STATUS_COLORS = Object.freeze({
   [PurchaseReceiptStatus.CANCELLED]: 'red',
 })
 const DATE_FILTER_OPTIONS = [{ label: '入库日期', value: 'received_at' }]
-const REFERENCE_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
 function receiptStatusLabel(status, record, { emptyText = '-' } = {}) {
   const key = String(status || '').trim()
@@ -164,12 +163,6 @@ function statusTag(status, record) {
       {receiptStatusLabel(status, record)}
     </Tag>
   )
-}
-
-function wait(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
 }
 
 function optionalText(value) {
@@ -246,11 +239,11 @@ export default function PurchaseReceiptsPage() {
     useState(false)
   const [financeSourceReceipt, setFinanceSourceReceipt] = useState(null)
   const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
-  const [materials, setMaterials] = useState([])
-  const [suppliers, setSuppliers] = useState([])
+  const [materials, , mergeMaterials] = useReferenceRecords(adminProfile)
+  const [suppliers, , mergeSuppliers] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
-  const [inventoryLots, setInventoryLots] = useState([])
+  const [inventoryLots, , mergeInventoryLots] = useReferenceRecords(adminProfile)
   const exceptionAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const financeSourceAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
@@ -652,70 +645,27 @@ export default function PurchaseReceiptsPage() {
   }, [loadRows])
 
   const loadReferenceOptions = useCallback(async () => {
-    let lastError
+    const request = beginLatestRequest('receipt-references')
     try {
-      let materialResult
-      let supplierResult
-      let unitResult
-      let warehouseResult
-      let lotResult
-      for (
-        let attempt = 0;
-        attempt <= REFERENCE_LOAD_RETRY_DELAYS_MS.length;
-        attempt += 1
-      ) {
-        try {
-          materialResult = await listAllMaterials({ active_only: true })
-          supplierResult = await listAllSuppliers()
-          unitResult = await listAllUnits()
-          warehouseResult = await listAllWarehouses({ active_only: true })
-          lotResult = await listAllInventoryLots()
-          lastError = null
-          break
-        } catch (error) {
-          lastError = error
-          const retryDelay = REFERENCE_LOAD_RETRY_DELAYS_MS[attempt]
-          if (!retryDelay) {
-            break
-          }
-          await wait(retryDelay)
-        }
-      }
-      if (lastError) {
-        throw lastError
-      }
-      setMaterials(
-        Array.isArray(materialResult?.materials) ? materialResult.materials : []
-      )
-      setSuppliers(
-        Array.isArray(supplierResult?.suppliers) ? supplierResult.suppliers : []
-      )
-      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
-      setWarehouses(
-        Array.isArray(warehouseResult?.warehouses)
-          ? warehouseResult.warehouses
-          : []
-      )
-      setInventoryLots(
-        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
-      )
+      const [unitResult, warehouseResult] = await Promise.all([
+        listAllUnits({}, { signal: request.signal }),
+        listAllWarehouses({ active_only: true }, { signal: request.signal }),
+      ])
+      if (!request.isCurrent()) return
+      setUnits(unitResult.units || [])
+      setWarehouses(warehouseResult.warehouses || [])
     } catch (error) {
-      showPageLoadError(error, '加载入库相关资料')
-      setMaterials([])
-      setSuppliers([])
-      setUnits([])
-      setWarehouses([])
-      setInventoryLots([])
-    }
-  }, [])
+      if (!isRpcAbortError(error) && request.isCurrent()) showPageLoadError(error, '加载收货单位和仓库')
+    } finally { request.finish() }
+  }, [beginLatestRequest])
 
   useEffect(() => {
     loadReferenceOptions()
   }, [loadReferenceOptions])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadRows)
-  }, [loadRows, outletContext])
+    return outletContext?.registerPageRefresh?.(() => Promise.all([loadRows(), loadReferenceOptions()]))
+  }, [loadRows, loadReferenceOptions, outletContext])
 
   const runReceiptAction = useCallback(
     async (receipt, action, successText) => {
@@ -1157,8 +1107,16 @@ export default function PurchaseReceiptsPage() {
     setWarehouseFilter,
   ])
 
+  const referenceReceipts = [...rows, selectedRow, detailReceipt, receiptExceptionSource, financeSourceReceipt].filter(Boolean)
+  const referenceItems = referenceReceipts.flatMap((row) => row.items || [])
+  useReferenceHydration({
+    suppliers: { ids: [...referenceReceipts.map((row) => row.supplier_id), supplierFilter], records: suppliers, onRecords: mergeSuppliers, enabled: canReadReference(adminProfile, 'suppliers') },
+    materials: { ids: [...referenceItems.map((row) => row.material_id), materialFilter], records: materials, onRecords: mergeMaterials, enabled: canReadReference(adminProfile, 'materials') },
+    inventory_lots: { ids: [...referenceItems.map((row) => row.lot_id), lotFilter], records: inventoryLots, onRecords: mergeInventoryLots, enabled: canReadReference(adminProfile, 'inventory_lots') },
+  }, adminProfile, rows)
+
   return (
-    <BusinessPageLayout inWorkspace className="erp-purchase-receipts-page">
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ suppliers: mergeSuppliers, materials: mergeMaterials, inventory_lots: mergeInventoryLots }} inWorkspace className="erp-purchase-receipts-page">
       <PageHeaderCard compact helpKey="inbound" title="采购入库" />
       <SourceActionAccessNotice access={receiptSourceAccess} />
       <SourceActionAccessNotice access={payableSourceAccess} />
@@ -1202,7 +1160,9 @@ export default function PurchaseReceiptsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="suppliers"
               aria-label="供应商"
               className="erp-business-filter-control--status"
               value={supplierFilter}
@@ -1215,7 +1175,9 @@ export default function PurchaseReceiptsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="materials"
               aria-label="材料"
               className="erp-business-filter-control--status"
               value={materialFilter}
@@ -1241,7 +1203,9 @@ export default function PurchaseReceiptsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="inventory_lots"
               aria-label="批次"
               className="erp-business-filter-control--status"
               value={lotFilter}
@@ -1698,6 +1662,6 @@ export default function PurchaseReceiptsPage() {
         onChanged={loadRows}
       />
       {columnOrderModal}
-    </BusinessPageLayout>
+    </ReferenceRecordsProvider>
   )
 }

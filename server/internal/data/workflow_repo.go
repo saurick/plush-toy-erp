@@ -244,8 +244,8 @@ func (r *workflowRepo) ResolveWorkflowTaskMutation(
 	return workflowTaskReceiptWithNumber(ctx, r.data.postgres, event, intentHash, commandKey, actorID)
 }
 
-func (r *workflowRepo) workflowTaskListQuery(filter biz.WorkflowTaskFilter) *ent.WorkflowTaskQuery {
-	query := r.data.postgres.WorkflowTask.Query()
+func workflowTaskListQuery(client *ent.Client, filter biz.WorkflowTaskFilter) *ent.WorkflowTaskQuery {
+	query := client.WorkflowTask.Query()
 	if filter.VisibilityScope != nil {
 		query = query.Where(workflowTaskRevisionVisibilityPredicate(filter.VisibilityScope, filter.OwnerRoleKey))
 	} else if scopePredicate := workflowTaskVisibilityPredicate(filter); scopePredicate != nil {
@@ -279,7 +279,18 @@ func (r *workflowRepo) workflowTaskListQuery(filter biz.WorkflowTaskFilter) *ent
 }
 
 func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
-	query := r.workflowTaskListQuery(filter)
+	var items []*biz.WorkflowTask
+	var total int
+	err := r.readWorkflowSnapshot(ctx, filter.Keyword, func(client *ent.Client) error {
+		var err error
+		items, total, err = loadWorkflowTasks(ctx, client, filter)
+		return err
+	})
+	return items, total, err
+}
+
+func loadWorkflowTasks(ctx context.Context, client *ent.Client, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
+	query := workflowTaskListQuery(client, filter)
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -298,7 +309,7 @@ func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.Workflo
 	for _, row := range rows {
 		out = append(out, entWorkflowTaskToBiz(row))
 	}
-	if err := hydrateWorkflowTaskDisplayContexts(ctx, r.data.postgres, out); err != nil {
+	if err := hydrateWorkflowTaskDisplayContexts(ctx, client, out); err != nil {
 		return nil, 0, err
 	}
 	return out, total, nil
@@ -1875,5 +1886,11 @@ func workflowEscalationTarget(action string) string {
 
 func (r *workflowRepo) CountWorkflowTasksByStatus(ctx context.Context, filter biz.WorkflowTaskFilter) (map[string]int, error) {
 	filter.TaskStatusKey = ""
-	return scanBusinessStatusCounts(ctx, r.workflowTaskListQuery(filter).GroupBy(workflowtask.FieldTaskStatusKey).Aggregate(ent.Count()).Scan)
+	var counts map[string]int
+	err := r.readWorkflowSnapshot(ctx, filter.Keyword, func(client *ent.Client) error {
+		var err error
+		counts, err = scanBusinessStatusCounts(ctx, workflowTaskListQuery(client, filter).GroupBy(workflowtask.FieldTaskStatusKey).Aggregate(ent.Count()).Scan)
+		return err
+	})
+	return counts, err
 }

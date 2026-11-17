@@ -76,6 +76,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   listAllInventoryBalances,
+  getInventoryDistribution,
   listAllInventoryLots,
   listAllInventoryTxns,
   listInventoryBalances,
@@ -471,8 +472,8 @@ export default function InventoryLedgerPage() {
 
   const loadDistributionBalances = useCallback(
     async ({ signal }) => {
-      const data = await listAllInventoryBalances(inventoryCommonParams, { signal })
-      return getRowsFromData(VIEW_BALANCES, data)
+      const data = await getInventoryDistribution(inventoryCommonParams, { signal })
+      return data.warehouses
     },
     [inventoryCommonParams]
   )
@@ -1771,8 +1772,7 @@ export default function InventoryLedgerPage() {
               <BusinessViewPanels activeView={activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? 'distribution' : activeView} views={outletContext?.taskBusiness ? [] : [VIEW_BALANCES, VIEW_LOTS, VIEW_TXNS, 'distribution']}>
                 {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
                   <InventoryDistributionOverview
-                    balances={distributionData.rows}
-                    warehouses={warehouses}
+                    distribution={distributionData.rows}
                     loading={distributionData.loading}
                     error={distributionData.error}
                     onRetry={distributionData.reload}

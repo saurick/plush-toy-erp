@@ -103,43 +103,11 @@ test('finance due uses outstanding facts without combining currencies', () => {
   assert.equal(Object.hasOwn(model.counts, 'amount'), false)
 })
 
-test('inventory distribution compares balance records without summing mixed units', () => {
-  const model = buildInventoryDistributionModel(
-    [
-      {
-        id: 1,
-        warehouse_id: 7,
-        subject_type: 'MATERIAL',
-        subject_id: 11,
-        unit_id: 1,
-        quantity: '500',
-        available_quantity: '450',
-      },
-      {
-        id: 2,
-        warehouse_id: 7,
-        subject_type: 'MATERIAL',
-        subject_id: 12,
-        unit_id: 2,
-        quantity: '3',
-        available_quantity: '0',
-      },
-      {
-        id: 3,
-        warehouse_id: 8,
-        subject_type: 'PRODUCT',
-        subject_id: 20,
-        unit_id: 3,
-        quantity: '10',
-        available_quantity: '10',
-      },
-    ],
-    [
-      { id: 7, name: '材料仓', code: 'WH-M' },
-      { id: 8, name: '成品仓', code: 'WH-F' },
-    ]
-  )
-
+test('inventory distribution renders server aggregates without combining quantity units', () => {
+  const model = buildInventoryDistributionModel([
+    { warehouse_id: 7, warehouse_name: '材料仓（WH-M）', record_count: 2, stock_count: 2, available_record_count: 1, unavailable_record_count: 1 },
+    { warehouse_id: 8, warehouse_name: '成品仓（WH-F）', record_count: 1, stock_count: 1, available_record_count: 1, unavailable_record_count: 0 },
+  ])
   assert.equal(model.rows[0].warehouseName, '材料仓（WH-M）')
   assert.equal(model.rows[0].recordCount, 2)
   assert.equal(model.rows[0].stockCount, 2)
@@ -148,19 +116,12 @@ test('inventory distribution compares balance records without summing mixed unit
   assert.equal(Object.hasOwn(model.rows[0], 'quantity'), false)
 })
 
-test('inventory distribution identifies historical warehouses missing from active references', () => {
+test('inventory distribution uses the server label for inactive historical warehouses', () => {
   const model = buildInventoryDistributionModel([
-    {
-      id: 1,
-      warehouse_id: 99,
-      subject_type: 'MATERIAL',
-      subject_id: 11,
-      unit_id: 1,
-      available_quantity: '1',
-    },
+    { warehouse_id: 99, warehouse_name: '已停用历史仓库', record_count: 1, stock_count: 1, available_record_count: 1, unavailable_record_count: 0 },
   ])
-
-  assert.equal(model.rows[0].warehouseName, '仓库资料未提供')
+  assert.equal(model.rows[0].warehouseName, '已停用历史仓库')
+  assert.deepEqual(buildInventoryDistributionModel().counts, { warehouses: 0, records: 0, stocks: 0, unavailableRecords: 0 })
 })
 
 test('production process derives each product lane from authoritative operations and batches', () => {

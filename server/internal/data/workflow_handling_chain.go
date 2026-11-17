@@ -4,8 +4,10 @@ import (
 	"context"
 	stdsql "database/sql"
 	"fmt"
+	"strings"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent/workflowtask"
 )
 
 func (r *workflowRepo) GetWorkflowHandlingChain(ctx context.Context, taskID int, view biz.WorkflowHandlingChainView, scope *biz.WorkflowTaskVisibilityScope) (*biz.WorkflowHandlingChain, error) {
@@ -58,12 +60,12 @@ func (r *workflowRepo) GetWorkflowHandlingChainPage(ctx context.Context, taskID 
 
 // The task chain and its event stream share the same relation and visibility.
 func workflowHandlingChainSQL(taskID int, view biz.WorkflowHandlingChainView, scope *biz.WorkflowTaskVisibilityScope) (string, []any) {
-	visible, args := progressTaskSQL(biz.BusinessProgressQuery{Access: biz.BusinessProgressAccess{Tasks: true}, TaskVisibility: scope})
+	visible, args := workflowTaskVisibilitySQL(scope)
 	args = append(args, taskID)
 	anchor := fmt.Sprintf("$%d", len(args))
 	contextTasks := "SELECT * FROM visible_tasks"
 	if view == biz.WorkflowHandlingChainLinkView {
-		contextTasks += " UNION SELECT * FROM workflow_tasks WHERE id=" + anchor
+		contextTasks += " UNION ALL SELECT " + strings.Join(workflowtask.Columns, ",") + " FROM workflow_tasks WHERE id=" + anchor + " AND NOT EXISTS(SELECT 1 FROM visible_tasks WHERE id=" + anchor + ")"
 	}
 	// Task detail follows the exact source, batch or exception identity. Sharing
 	// a sales order is only sufficient in the explicitly requested order view.

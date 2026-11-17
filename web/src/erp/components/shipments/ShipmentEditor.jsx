@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FolderOpenOutlined } from '@ant-design/icons'
 import { Alert, AutoComplete, Button, Form, Input, InputNumber, Space, Tag, Typography } from 'antd'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
@@ -203,7 +204,9 @@ function ShipmentFormFields({
           label="销售订单"
           name="sales_order_id"
         >
-          <Select
+          <RemoteReferenceSelect
+            referenceType="sales_orders"
+            params={{ lifecycle_scope: 'current' }}
             allowClear
             disabled={disabled || sourceSelectionOnly}
             optionFilterProp="label"
@@ -218,7 +221,8 @@ function ShipmentFormFields({
           label="客户"
           name="customer_id"
         >
-          <Select
+          <RemoteReferenceSelect
+            referenceType="customers"
             allowClear
             disabled={disabled || sourceLocked}
             optionFilterProp="label"
@@ -891,6 +895,8 @@ function ShipmentItemFormContent({
       rules={[{ required: true, message: '请选择产品' }]}
     >
       <ProductFieldControl
+        as={RemoteReferenceSelect}
+        referenceType="products"
         thumbnail={productID ? <ProductThumbnail productId={productID} name={referenceLabel(productOptions, productID, '产品')} /> : null}
         allowClear
         disabled={sourceLocked}
@@ -921,7 +927,9 @@ function ShipmentItemFormContent({
           label="SKU"
           name={fieldName('product_sku_id')}
         >
-          <Select
+          <RemoteReferenceSelect
+            referenceType="product_skus"
+            params={{ product_id: productID }}
             allowClear
             disabled={sourceLocked || !Number(productID || 0)}
             optionFilterProp="label"

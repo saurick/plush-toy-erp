@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"reflect"
 	"testing"
 
 	"server/internal/biz"
@@ -96,6 +97,20 @@ func TestLoadAdminRBACUsesRolePermissionSource(t *testing.T) {
 	if biz.AdminHasPermission(admin, "legacy.disabled.permission") {
 		t.Fatalf("permission outside rbac.go source must not grant access")
 	}
+	batched := []*biz.AdminUser{{ID: 100}, {ID: 101}, {ID: 102, IsSuperAdmin: true}}
+	if err := loadAdminsRBAC(ctx, db, batched); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(batched[0].Roles, admin.Roles) || !reflect.DeepEqual(batched[0].Permissions, admin.Permissions) {
+		t.Fatal("batched directory permissions differ from single-account authorization")
+	}
+	if len(batched[1].Roles) != 0 || len(batched[1].Permissions) != 0 {
+		t.Fatal("directory identities shared another employee's permissions")
+	}
+	if !reflect.DeepEqual(batched[2].Permissions, biz.AllPermissionKeys()) {
+		t.Fatal("directory lost super administrator semantics")
+	}
+
 }
 
 func TestLoadAdminRBACSuperAdminGetsAllPermissions(t *testing.T) {

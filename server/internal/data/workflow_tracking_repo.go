@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	stdsql "database/sql"
 	"sort"
 	"strings"
 
@@ -15,42 +14,8 @@ import (
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
 
-	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 )
-
-// A snapshot keeps a handoff, its nodes, and its people consistent during reads.
-func (r *workflowRepo) readTracking(ctx context.Context, read func(*ent.Client) error) error {
-	if r.data.sqldb != nil {
-		d := r.data.sqlDialect
-		if d == "" {
-			d = dialect.Postgres
-		}
-		options := &stdsql.TxOptions{}
-		if d == dialect.Postgres {
-			options.Isolation, options.ReadOnly = stdsql.LevelRepeatableRead, true
-		}
-		tx, err := r.data.sqldb.BeginTx(ctx, options)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = tx.Rollback() }()
-		client := newBusinessEntClient(ent.Driver(entsql.NewDriver(d, entsql.Conn{ExecQuerier: tx})))
-		if err := read(client); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := read(tx.Client()); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
 
 func trackingTaskParticipation(actorID int) predicate.WorkflowTask {
 	return workflowtask.HasEventsWith(workflowtaskevent.ActorID(actorID), workflowtaskevent.EventTypeNotIn("created", "payload_refreshed"))
@@ -198,7 +163,7 @@ func trackingCurrentTaskFilter(q biz.WorkflowTrackingQuery) []predicate.Workflow
 
 // Page both record kinds together before hydrating entities and their relations.
 // The same predicates own list, count, detail access and the page subqueries.
-func trackingPageIDs(d string, q biz.WorkflowTrackingQuery, kind string) *entsql.Selector {
+func trackingPage(d string, q biz.WorkflowTrackingQuery) *entsql.Selector {
 	builder := entsql.Dialect(d)
 	p, t := builder.Table(processinstance.Table), builder.Table(workflowtask.Table)
 	processes := builder.Select(p.C(processinstance.FieldID), p.C(processinstance.FieldStartedAt)).
@@ -215,47 +180,63 @@ func trackingPageIDs(d string, q biz.WorkflowTrackingQuery, kind string) *entsql
 	page := builder.Select("id", "kind").From(merged).
 		OrderBy(entsql.Desc("started_at"), entsql.Desc("kind"), entsql.Desc("id")).
 		Limit(q.Limit).Offset(q.Offset).As("tracking_page")
-	return builder.Select(page.C("id")).From(page).Where(entsql.EQ(page.C("kind"), kind))
+	return builder.Select(page.C("id"), page.C("kind")).From(page)
 }
 
 func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowTrackingQuery) (*biz.WorkflowTrackingPage, error) {
 	page := &biz.WorkflowTrackingPage{Items: []*biz.WorkflowTrackingEntry{}, StatusCounts: map[string]int{}}
-	err := r.readTracking(ctx, func(client *ent.Client) error {
-		processes, tasks := trackingProcesses(client, q), trackingStandaloneTasks(client, q)
-		// Reuse the list's visibility and filters in the same read snapshot.
-		// Only the selected status and pagination are excluded from the facets.
-		for _, status := range []string{"active", "completed"} {
-			facet := q
-			facet.Status = status
-			processCount, err := trackingProcesses(client, facet).Count(ctx)
-			if err != nil {
-				return err
-			}
-			taskCount, err := trackingStandaloneTasks(client, facet).Count(ctx)
-			if err != nil {
-				return err
-			}
-			page.StatusCounts[status] = processCount + taskCount
+	err := r.readWorkflowSnapshot(ctx, q.Keyword, func(client *ent.Client) error {
+		facet := q
+		facet.Status = ""
+		processCounts, err := scanBusinessStatusCounts(ctx, trackingProcesses(client, facet).GroupBy(processinstance.FieldStatus).Aggregate(ent.Count()).Scan)
+		if err != nil {
+			return err
+		}
+		taskCounts, err := scanBusinessStatusCounts(ctx, trackingStandaloneTasks(client, facet).GroupBy(workflowtask.FieldTaskStatusKey).Aggregate(ent.Count()).Scan)
+		if err != nil {
+			return err
+		}
+		page.StatusCounts["active"] = processCounts[biz.ProcessStatusActive] + processCounts[biz.ProcessStatusBlocked] + taskCounts["ready"] + taskCounts["blocked"]
+		page.StatusCounts["completed"] = processCounts[biz.ProcessStatusCompleted] + taskCounts["done"] + taskCounts["rejected"] + taskCounts["withdrawn"]
+		for status, count := range page.StatusCounts {
 			if q.Status == "" || q.Status == status {
-				page.Total += page.StatusCounts[status]
+				page.Total += count
 			}
 		}
 		if q.Offset >= page.Total {
 			return nil
 		}
-		processes.Where(func(s *entsql.Selector) {
-			s.Where(entsql.In(s.C(processinstance.FieldID), trackingPageIDs(s.Dialect(), q, "process")))
-		})
-		tasks.Where(func(s *entsql.Selector) {
-			s.Where(entsql.In(s.C(workflowtask.FieldID), trackingPageIDs(s.Dialect(), q, "task")))
-		})
-		ps, err := processes.All(ctx)
-		if err != nil {
+		var refs []struct {
+			ID   int    `json:"id"`
+			Kind string `json:"kind"`
+		}
+		if err := client.WorkflowTask.Query().Where(func(s *entsql.Selector) {
+			selected := trackingPage(s.Dialect(), q).As("selected_tracking")
+			s.From(selected).Select(selected.C("id"), selected.C("kind"))
+		}).Select().Scan(ctx, &refs); err != nil {
 			return err
 		}
-		ts, err := tasks.All(ctx)
-		if err != nil {
-			return err
+		processIDs, taskIDs := []int{}, []int{}
+		for _, ref := range refs {
+			if ref.Kind == "process" {
+				processIDs = append(processIDs, ref.ID)
+			} else {
+				taskIDs = append(taskIDs, ref.ID)
+			}
+		}
+		var ps []*ent.ProcessInstance
+		var ts []*ent.WorkflowTask
+		if len(processIDs) > 0 {
+			ps, err = client.ProcessInstance.Query().Where(processinstance.IDIn(processIDs...)).All(ctx)
+			if err != nil {
+				return err
+			}
+		}
+		if len(taskIDs) > 0 {
+			ts, err = client.WorkflowTask.Query().Where(workflowtask.IDIn(taskIDs...)).All(ctx)
+			if err != nil {
+				return err
+			}
 		}
 		for _, p := range ps {
 			page.Items = append(page.Items, &biz.WorkflowTrackingEntry{Ref: biz.WorkflowTrackingRef{Kind: "process", ID: p.ID}, Instance: entProcessInstanceToBiz(p)})
@@ -280,7 +261,7 @@ func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowT
 
 func (r *workflowRepo) GetWorkflowTracking(ctx context.Context, q biz.WorkflowTrackingQuery, ref biz.WorkflowTrackingRef, beforeEventID int) (*biz.WorkflowTrackingEntry, error) {
 	entry := &biz.WorkflowTrackingEntry{Ref: ref}
-	err := r.readTracking(ctx, func(client *ent.Client) error {
+	err := r.readWorkflowSnapshot(ctx, q.Keyword, func(client *ent.Client) error {
 		if ref.Kind == "process" {
 			row, err := trackingProcesses(client, q).Where(processinstance.ID(ref.ID)).Only(ctx)
 			if ent.IsNotFound(err) {

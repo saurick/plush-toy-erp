@@ -7,8 +7,7 @@ import {
 } from './BusinessVisualizationFrame.jsx'
 
 export default function InventoryDistributionOverview({
-  balances,
-  warehouses,
+  distribution,
   loading,
   error,
   onRetry,
@@ -16,8 +15,8 @@ export default function InventoryDistributionOverview({
   switcher,
 }) {
   const model = useMemo(
-    () => buildInventoryDistributionModel(balances, warehouses),
-    [balances, warehouses]
+    () => buildInventoryDistributionModel(distribution),
+    [distribution]
   )
   return (
     <BusinessVisualizationFrame

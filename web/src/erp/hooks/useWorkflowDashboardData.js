@@ -71,12 +71,16 @@ export default function useWorkflowDashboardData({
     }
     setLoading(true)
     if (isTaskBoardView && mountedRef.current) {
-      setTaskBoardResponseState({
+      setTaskBoardResponseState((current) => ({
         scopeKey: requestWorkbenchScopeKey,
         requestKey: taskBoardRequestKey,
-        response: null,
+        response:
+          current?.scopeKey === requestWorkbenchScopeKey &&
+          current?.requestKey === taskBoardRequestKey
+            ? current.response
+            : null,
         error: '',
-      })
+      }))
     } else if (mountedRef.current) {
       setWorkbenchResponseState((current) => ({
         scopeKey: requestWorkbenchScopeKey,

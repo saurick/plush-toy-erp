@@ -450,7 +450,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	// Warehouse and shipment.
 	addMenu(PermissionWarehouseManage, "inventory", "warehouse-settings", "仓库设置", "warehouse-settings", "仓库名称、类型和启停", permissionControlButton, "显示并允许维护", permissionMethods("masterdata", "create_warehouse", "update_warehouse"), businessUsageConditions)
-	inventoryReadMethods := append(permissionMethods("inventory", "list_inventory_balances", "list_inventory_lots", "list_inventory_txns"), permissionMethods("operational_fact", "list_stock_reservations")...)
+	inventoryReadMethods := append(permissionMethods("inventory", "get_inventory_distribution", "list_inventory_balances", "list_inventory_lots", "list_inventory_txns"), permissionMethods("operational_fact", "list_stock_reservations")...)
 	inventoryReadMethods = append(inventoryReadMethods, permissionMethods("customer_config", "start_inventory_adjustment_approval_process", "get_inventory_adjustment_approval_process", "execute_inventory_adjustment_submit", "execute_inventory_adjustment_post")...)
 	addMenu(PermissionWarehouseInventoryRead, "inventory", "inventory-ledger", "库存台账", "inventory-ledger-content", "库存余额、批次和流水", permissionControlPage, "允许进入并查看", inventoryReadMethods, businessUsageConditions)
 	addMenu(PermissionWarehouseInboundRead, "inbound", "purchase-receipts", "采购入库", "warehouse-inbound-list", "入库列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("purchase", "get_purchase_receipt", "list_purchase_receipts"), purchaseOrderReceiptProgressMethods...), businessUsageConditions)

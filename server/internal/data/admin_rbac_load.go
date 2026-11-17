@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"server/internal/biz"
@@ -97,7 +98,7 @@ ORDER BY p.permission_key ASC`, adminID)
 	return biz.NormalizePermissionKeys(raw), nil
 }
 
-func scanAdminRole(rows *sql.Rows) (biz.AdminRole, error) {
+func scanAdminRole(rows interface{ Scan(...any) error }) (biz.AdminRole, error) {
 	var item biz.AdminRole
 	var primaryMenuPathsJSON string
 	var secondaryMenuPathsJSON string
@@ -128,4 +129,94 @@ func scanAdminRole(rows *sql.Rows) (biz.AdminRole, error) {
 	item.PrimaryMenuPaths = settings.PrimaryMenuPaths
 	item.SecondaryMenuPaths = settings.SecondaryMenuPaths
 	return item, nil
+}
+
+// Directory reads load assignments in bounded batches instead of issuing two
+// extra requests per employee. Single-account authentication retains its path.
+func loadAdminsRBAC(ctx context.Context, db *sql.DB, admins []*biz.AdminUser) error {
+	const batchSize = 500
+	employees := []*biz.AdminUser{}
+	for _, admin := range admins {
+		admin.Roles, admin.Permissions = nil, nil
+		if admin.IsEmployee() {
+			employees = append(employees, admin)
+		}
+	}
+	for offset := 0; offset < len(employees); offset += batchSize {
+		end := offset + batchSize
+		if end > len(employees) {
+			end = len(employees)
+		}
+		batch := employees[offset:end]
+		args, keys, byID := []any{}, []string{}, map[int]*biz.AdminUser{}
+		for i, admin := range batch {
+			args = append(args, admin.ID)
+			keys = append(keys, fmt.Sprintf("$%d", i+1))
+			byID[admin.ID] = admin
+		}
+		where := strings.Join(keys, ",")
+		rows, err := db.QueryContext(ctx, `SELECT aur.admin_user_id,r.id,r.role_key,r.name,r.description,r.builtin,r.role_type,r.disabled,r.sort_order,r.version,
+ r.navigation_mode,r.primary_menu_paths,r.secondary_menu_paths FROM admin_user_roles aur JOIN roles r ON r.id=aur.role_id
+ WHERE aur.admin_user_id IN (`+where+`) ORDER BY aur.admin_user_id,r.sort_order,r.id`, args...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id int
+			role, err := scanAdminRole(adminRoleAccountScanner{rows: rows, id: &id})
+			if err != nil {
+				_ = rows.Close()
+				return err
+			}
+			byID[id].Roles = append(byID[id].Roles, role)
+		}
+		err = rows.Err()
+		closeErr := rows.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		rows, err = db.QueryContext(ctx, `SELECT DISTINCT aur.admin_user_id,p.permission_key FROM admin_user_roles aur
+ JOIN roles r ON r.id=aur.role_id JOIN role_permissions rp ON rp.role_id=r.id JOIN permissions p ON p.id=rp.permission_id
+ WHERE aur.admin_user_id IN (`+where+`) AND r.disabled=FALSE ORDER BY aur.admin_user_id,p.permission_key`, args...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id int
+			var key string
+			if err := rows.Scan(&id, &key); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			byID[id].Permissions = append(byID[id].Permissions, key)
+		}
+		err = rows.Err()
+		closeErr = rows.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		for _, admin := range batch {
+			if admin.IsSuperAdmin {
+				admin.Permissions = biz.AllPermissionKeys()
+			} else {
+				admin.Permissions = biz.NormalizePermissionKeys(admin.Permissions)
+			}
+		}
+	}
+	return nil
+}
+
+type adminRoleAccountScanner struct {
+	rows *sql.Rows
+	id   *int
+}
+
+func (s adminRoleAccountScanner) Scan(dest ...any) error {
+	return s.rows.Scan(append([]any{s.id}, dest...)...)
 }

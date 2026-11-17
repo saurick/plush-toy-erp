@@ -29,15 +29,35 @@ func (r *businessProgressRepo) read(ctx context.Context, fn func(*stdsql.Tx) err
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if r.data.sqlDialect != dialect.SQLite {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL jit = off"); err != nil {
+			return err
+		}
+	}
 	if err = fn(tx); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
+func (r *businessProgressRepo) readProgress(ctx context.Context, q biz.BusinessProgressQuery, fn func(*stdsql.Tx) error) error {
+	return r.read(ctx, func(tx *stdsql.Tx) error {
+		// Aggregate pages must not repeatedly scan a whole task summary when fresh
+		// data or derived source relations have underestimated cardinality. Keep
+		// this planner policy inside the read transaction; keyed details retain
+		// index-based nested loops. The shared snapshot owns the JIT policy.
+		if q.ID == 0 && r.data.sqlDialect != dialect.SQLite {
+			if _, err := tx.ExecContext(ctx, "SET LOCAL enable_nestloop = off"); err != nil {
+				return err
+			}
+		}
+		return fn(tx)
+	})
+}
+
 func (r *businessProgressRepo) ListBusinessProgress(ctx context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressBoard, error) {
 	result := &biz.BusinessProgressBoard{Rows: []*biz.BusinessProgressRow{}, SnapshotAt: q.SnapshotAt, Access: q.Access}
-	err := r.read(ctx, func(tx *stdsql.Tx) error {
+	err := r.readProgress(ctx, q, func(tx *stdsql.Tx) error {
 		cte, args := progressQuery(q, r.data.sqlDialect)
 		err := tx.QueryRowContext(ctx, cte+progressCountsSQL(q), args...).
 			Scan(&result.Counts.Total, &result.Counts.Overdue, &result.Counts.DueSoon, &result.Counts.Undated, &result.Counts.Blocked, &result.Counts.Unlinked, &result.Total)
@@ -125,7 +145,7 @@ func progressDate(value string) string {
 
 func (r *businessProgressRepo) GetBusinessProgress(ctx context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressDetail, error) {
 	result := &biz.BusinessProgressDetail{Sections: map[string][]biz.BusinessProgressRecord{}, HasMore: map[string]bool{}, SnapshotAt: q.SnapshotAt, Access: q.Access}
-	err := r.read(ctx, func(tx *stdsql.Tx) error {
+	err := r.readProgress(ctx, q, func(tx *stdsql.Tx) error {
 		cte, args := progressQuery(q, r.data.sqlDialect)
 		rows, err := loadBusinessProgressRows(ctx, tx, q, cte, args)
 		if err != nil {

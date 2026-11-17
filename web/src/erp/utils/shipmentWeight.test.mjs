@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url'
 import {
   calculateShipmentLineNetWeightG,
   hasFinalShipmentWeight,
-  listAllShipmentWeightReferenceRecords,
   normalizeNetWeightG,
   normalizeShipmentQuantity,
   parseShipmentNetWeightEntry,
@@ -16,7 +15,6 @@ import {
   shipmentGrossNetWeightError,
   shipmentNetWeightEntryFromGrams,
   shipmentNetWeightEntryToGrams,
-  shipmentWeightReferenceOption,
 } from './shipmentWeight.mjs'
 
 test('business data consistency: gross kilograms cannot be below net grams', () => {
@@ -172,70 +170,6 @@ test('shipmentWeight: one unresolved line suppresses the whole total instead of 
   assert.equal(preview.totalNetWeightG, null)
   assert.equal(preview.linePreviews[0].lineNetWeightG, '1')
   assert.equal(preview.issues[0].lineNumber, 2)
-})
-
-test('shipmentWeight: product and SKU weight references load every page including inactive records', async () => {
-  const allRecords = Array.from({ length: 251 }, (_, index) => ({
-    id: index + 1,
-    default_unit_id: 10,
-    is_active: index !== 250,
-    unit_net_weight_g: index === 250 ? '0.625' : '0.5',
-  }))
-  const requests = []
-  const records = await listAllShipmentWeightReferenceRecords(
-    async (params) => {
-      requests.push(params)
-      const page = allRecords.slice(params.offset, params.offset + params.limit)
-      return {
-        products: page,
-        total: allRecords.length,
-        limit: params.limit,
-        offset: params.offset,
-      }
-    },
-    'products',
-    { active_only: true, limit: 500 }
-  )
-
-  assert.equal(records.length, 251)
-  assert.equal(records.at(-1).is_active, false)
-  assert.deepEqual(requests, [
-    { limit: 200, offset: 0 },
-    { limit: 200, offset: 200 },
-  ])
-  assert.equal(
-    resolveShipmentWeightPreview({
-      items: [{ product_id: 251, unit_id: 10, quantity: '2' }],
-      products: records,
-    }).totalNetWeightG,
-    '1.25'
-  )
-  assert.deepEqual(
-    shipmentWeightReferenceOption(records.at(-1), (record) => ({
-      value: record.id,
-      label: `产品 ${record.id}`,
-    })),
-    {
-      value: 251,
-      label: '产品 251（已停用）',
-      disabled: true,
-    }
-  )
-})
-
-test('shipmentWeight: incomplete reference pagination fails closed instead of returning a partial cache', async () => {
-  await assert.rejects(
-    listAllShipmentWeightReferenceRecords(
-      async () => ({
-        product_skus: [{ id: 1 }],
-        total: 75,
-        limit: 200,
-        offset: 0,
-      }),
-      'product_skus'
-    ),
-    /产品净重资料不完整/u
-  )
 })
 
 test('shipmentWeight: decimal string calculation preserves values beyond JavaScript safe integer range', () => {
@@ -453,10 +387,7 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
     shipmentsPageSource,
     /quantity:\s*normalizeShipmentQuantity\(item\?\.quantity\)/u
   )
-  assert.match(
-    shipmentsPageSource,
-    /listAllShipmentWeightReferenceRecords\(listProducts, 'products'\)/u
-  )
+  assert.match(shipmentsPageSource, /useReferenceHydration/u)
   assert.match(shipmentsPageSource, /shipmentWeightReferenceOption/u)
   assert.doesNotMatch(
     shipmentsPageSource,

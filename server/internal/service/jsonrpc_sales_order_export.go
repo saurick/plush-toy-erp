@@ -84,6 +84,10 @@ func (d *jsonrpcDispatcher) salesOrderExportError(ctx context.Context, err error
 }
 
 func salesOrderListFilterFromParams(pm map[string]any) (biz.SalesOrderFilter, bool) {
+	ids, valid := optionalReferenceIDs(pm, "ids")
+	if !valid {
+		return biz.SalesOrderFilter{}, false
+	}
 	sampleBOMID := 0
 	if _, exists := pm["bom_id"]; exists {
 		var valid bool
@@ -101,6 +105,7 @@ func salesOrderListFilterFromParams(pm map[string]any) (biz.SalesOrderFilter, bo
 		return biz.SalesOrderFilter{}, false
 	}
 	return biz.SalesOrderFilter{
+		IDs:     ids,
 		Keyword: getString(pm, "keyword"), CustomerID: getInt(pm, "customer_id", 0), BOMID: sampleBOMID,
 		LifecycleStatus: getString(pm, "lifecycle_status"), LifecycleScope: getString(pm, "lifecycle_scope"),
 		DateField: getString(pm, "date_field"), DateFrom: dateFrom, DateTo: dateTo,

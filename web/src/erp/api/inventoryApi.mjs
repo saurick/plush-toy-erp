@@ -3,6 +3,7 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import {
   JsonRpc,
+  requireRpcData,
   requireRpcEntity,
   requireRpcPage,
 } from '@/common/utils/jsonRpc'
@@ -13,6 +14,21 @@ const inventoryRpc = new JsonRpc({
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
+
+export async function getInventoryDistribution(params = {}, options = {}) {
+  const result = await inventoryRpc.call(RpcMethod.inventory.GET_INVENTORY_DISTRIBUTION, params, options)
+  const data = requireRpcData(result, '库存分布数据不完整，请重新读取').distribution
+  if (!data || !Array.isArray(data.warehouses) || data.warehouses.some((row) =>
+    !row || !Number.isSafeInteger(row.warehouse_id) || row.warehouse_id <= 0 ||
+    ![row.record_count, row.stock_count, row.available_record_count, row.unavailable_record_count].every((value) => Number.isSafeInteger(value) && value >= 0) ||
+    row.available_record_count + row.unavailable_record_count !== row.record_count) ||
+    new Set(data.warehouses.map((row) => row.warehouse_id)).size !== data.warehouses.length) {
+    const error = new Error('库存分布数据不完整，请重新读取')
+    error.isInvalidResponse = true
+    throw error
+  }
+  return data
+}
 
 export async function listInventoryBalances(params = {}, options = {}) {
   const result = await inventoryRpc.call(

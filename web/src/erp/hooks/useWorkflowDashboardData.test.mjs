@@ -258,3 +258,61 @@ test('task board pagination preserves the query summary while the new lane page 
     []
   )
 })
+
+test('task board refresh retains settled rows and replaces them after the response arrives', async (t) => {
+  let complete
+  const view = await dashboardHarness(t, (_method, params) =>
+    view.calls.length === 1
+      ? taskBoardPage(params, 1)
+      : new Promise((resolve) => {
+          complete = () => resolve(taskBoardPage(params, 0))
+        })
+  )
+  await view.renderQuery({ isTaskBoardView: true })
+  await view.flush()
+  let refresh
+  await view.act(() => {
+    refresh = view.current.reloadTaskData()
+  })
+  assert.equal(view.current.loading, true)
+  assert.equal(
+    view.current.taskBoardResponseState.response.lanes[0].tasks[0].id,
+    1
+  )
+  await view.act(async () => {
+    complete()
+    await refresh
+  })
+  assert.equal(view.current.loading, false)
+  assert.equal(view.current.taskBoardResponseState.response.total, 0)
+})
+
+test('task board search changes clear old rows and ignore a superseded response', async (t) => {
+  const pending = new Map()
+  const view = await dashboardHarness(t, (_method, params) =>
+    !params.keyword
+      ? taskBoardPage(params, 1)
+      : new Promise((resolve) =>
+          pending.set(params.keyword, () =>
+            resolve(taskBoardPage(params, params.keyword === '旧条件' ? 1 : 0))
+          )
+        )
+  )
+  await view.renderQuery({ isTaskBoardView: true })
+  await view.flush()
+  await view.renderQuery({
+    isTaskBoardView: true,
+    taskBoardRequest: { ...taskBoardRequest, keyword: '旧条件' },
+  })
+  assert.equal(view.current.taskBoardResponseState.response, null)
+  await view.renderQuery({
+    isTaskBoardView: true,
+    taskBoardRequest: { ...taskBoardRequest, keyword: '新条件' },
+  })
+  assert.equal(view.calls[1].init.signal.aborted, true)
+  await view.act(async () => pending.get('新条件')())
+  assert.equal(view.current.taskBoardResponseState.response.total, 0)
+  await view.act(async () => pending.get('旧条件')())
+  assert.equal(view.current.taskBoardResponseState.response.total, 0)
+  assert.equal(view.current.loading, false)
+})

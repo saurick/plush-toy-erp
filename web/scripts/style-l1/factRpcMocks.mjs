@@ -1998,6 +1998,18 @@ export async function installFactRpcMocks(page, context) {
         .some((value) => value.includes(keyword))
     }
     switch (method) {
+      case 'get_inventory_distribution': {
+        const matches = (!params.subject_type || inventoryBalance.subject_type === params.subject_type) &&
+          (!params.warehouse_id || inventoryBalance.warehouse_id === Number(params.warehouse_id)) &&
+          (!params.subject_id || inventoryBalance.subject_id === Number(params.subject_id))
+        data = { distribution: { warehouses: matches ? [{
+          warehouse_id: inventoryBalance.warehouse_id, warehouse_name: '成品仓', warehouse_code: 'WH-F',
+          record_count: 1, stock_count: 1,
+          available_record_count: Number(inventoryBalance.available_quantity) > 0 ? 1 : 0,
+          unavailable_record_count: Number(inventoryBalance.available_quantity) > 0 ? 0 : 1,
+        }] : [] } }
+        break
+      }
       case 'list_inventory_balances':
         {
           const inventoryBalances =

@@ -17,7 +17,7 @@ test('shipment source references can only be established by candidate import', (
   assert.match(source, /sourceSelectionOnly=\{isWritableModal\}/u)
   assert.match(
     source,
-    /label="销售订单"[\s\S]*?<Select[\s\S]*?disabled=\{disabled \|\| sourceSelectionOnly\}/u
+    /label="销售订单"[\s\S]*?<RemoteReferenceSelect[\s\S]*?referenceType="sales_orders"[\s\S]*?disabled=\{disabled \|\| sourceSelectionOnly\}/u
   )
   assert.match(
     source,

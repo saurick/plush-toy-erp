@@ -257,86 +257,24 @@ export function buildFinanceDueModel(facts = [], options = {}) {
   }
 }
 
-function warehouseLabel(warehouse, warehouseID) {
-  const name = normalizedText(warehouse?.name)
-  const code = normalizedText(warehouse?.code)
-  if (name && code) return `${name}（${code}）`
-  return name || code || (warehouseID ? '仓库资料未提供' : '未分仓')
-}
-
-export function buildInventoryDistributionModel(
-  balances = [],
-  warehouses = []
-) {
-  const warehouseMap = new Map(
-    (Array.isArray(warehouses) ? warehouses : []).map((warehouse) => [
-      Number(warehouse?.id || 0),
-      warehouse,
-    ])
-  )
-  const groups = new Map()
-  ;(Array.isArray(balances) ? balances : []).forEach((balance) => {
-    const warehouseID = Number(balance?.warehouse_id || 0)
-    if (!groups.has(warehouseID)) {
-      groups.set(warehouseID, {
-        warehouseID,
-        warehouseName: warehouseLabel(
-          warehouseMap.get(warehouseID),
-          warehouseID
-        ),
-        recordCount: 0,
-        availableRecordCount: 0,
-        unavailableRecordCount: 0,
-        stockKeys: new Set(),
-      })
-    }
-    const group = groups.get(warehouseID)
-    group.recordCount += 1
-    const available = decimalNumber(balance?.available_quantity)
-    if (available !== null && available > 0) group.availableRecordCount += 1
-    else group.unavailableRecordCount += 1
-    group.stockKeys.add(
-      [
-        normalizedText(balance?.subject_type, 'UNKNOWN'),
-        Number(balance?.subject_id || 0),
-        Number(balance?.product_sku_id || 0),
-      ].join(':')
-    )
-  })
-
-  const totalRecords = Array.from(groups.values()).reduce(
-    (sum, group) => sum + group.recordCount,
-    0
-  )
-  const rows = Array.from(groups.values())
-    .map((group) => ({
-      warehouseID: group.warehouseID,
-      warehouseName: group.warehouseName,
-      recordCount: group.recordCount,
-      stockCount: group.stockKeys.size,
-      availableRecordCount: group.availableRecordCount,
-      unavailableRecordCount: group.unavailableRecordCount,
-      percent:
-        totalRecords > 0
-          ? clampPercent((group.recordCount / totalRecords) * 100)
-          : 0,
-    }))
-    .sort(
-      (left, right) =>
-        right.recordCount - left.recordCount ||
-        left.warehouseName.localeCompare(right.warehouseName, 'zh-CN')
-    )
-
+export function buildInventoryDistributionModel(distribution = []) {
+  const totalRecords = distribution.reduce((sum, row) => sum + row.record_count, 0)
+  const rows = distribution.map((row) => ({
+    warehouseID: row.warehouse_id,
+    warehouseName: row.warehouse_code ? `${row.warehouse_name}（${row.warehouse_code}）` : row.warehouse_name,
+    recordCount: row.record_count,
+    stockCount: row.stock_count,
+    availableRecordCount: row.available_record_count,
+    unavailableRecordCount: row.unavailable_record_count,
+    percent: totalRecords > 0 ? clampPercent((row.record_count / totalRecords) * 100) : 0,
+  }))
   return {
     rows,
     counts: {
-      warehouses: rows.length,
-      records: totalRecords,
-      stocks: rows.reduce((sum, row) => sum + row.stockCount, 0),
-      unavailableRecords: rows.reduce(
-        (sum, row) => sum + row.unavailableRecordCount,
-        0
-      ),
+    warehouses: rows.length,
+    records: totalRecords,
+    stocks: rows.reduce((sum, row) => sum + row.stockCount, 0),
+    unavailableRecords: rows.reduce((sum, row) => sum + row.unavailableRecordCount, 0),
     },
   }
 }

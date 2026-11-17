@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	stdsql "database/sql"
 	"time"
 
 	"server/internal/biz"
@@ -10,7 +9,6 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/workflowtask"
 
-	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
 )
@@ -18,56 +16,13 @@ import (
 var _ biz.WorkflowRoleTaskViewRepo = (*workflowRepo)(nil)
 
 func (r *workflowRepo) ListWorkflowRoleTaskView(ctx context.Context, query biz.WorkflowRoleTaskViewQuery) (*biz.WorkflowRoleTaskViewPage, error) {
-	if r == nil || r.data == nil || r.data.postgres == nil {
-		return nil, biz.ErrBadParam
-	}
-	if !query.IncludeCounts {
-		return loadWorkflowRoleTaskView(ctx, r.data.postgres, query)
-	}
-	if r.data.sqldb != nil {
-		return r.listWorkflowRoleTaskViewInSQLTx(ctx, query)
-	}
-
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { rollbackEntTx(ctx, tx, r.log) }()
-	page, err := loadWorkflowRoleTaskView(ctx, tx.Client(), query)
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return page, nil
-}
-
-func (r *workflowRepo) listWorkflowRoleTaskViewInSQLTx(ctx context.Context, query biz.WorkflowRoleTaskViewQuery) (*biz.WorkflowRoleTaskViewPage, error) {
-	sqlDialect := r.data.sqlDialect
-	if sqlDialect == "" {
-		sqlDialect = dialect.Postgres
-	}
-	txOptions := &stdsql.TxOptions{}
-	if sqlDialect == dialect.Postgres {
-		txOptions.Isolation = stdsql.LevelRepeatableRead
-		txOptions.ReadOnly = true
-	}
-	sqlTx, err := r.data.sqldb.BeginTx(ctx, txOptions)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = sqlTx.Rollback() }()
-	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
-	page, err := loadWorkflowRoleTaskView(ctx, client, query)
-	if err != nil {
-		return nil, err
-	}
-	if err := sqlTx.Commit(); err != nil {
-		return nil, err
-	}
-	return page, nil
+	var page *biz.WorkflowRoleTaskViewPage
+	err := r.readWorkflowSnapshot(ctx, query.Keyword, func(client *ent.Client) error {
+		var err error
+		page, err = loadWorkflowRoleTaskView(ctx, client, query)
+		return err
+	})
+	return page, err
 }
 
 func loadWorkflowRoleTaskView(ctx context.Context, client *ent.Client, query biz.WorkflowRoleTaskViewQuery) (*biz.WorkflowRoleTaskViewPage, error) {

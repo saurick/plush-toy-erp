@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
+	"entgo.io/ent/dialect"
 	"time"
 
 	"server/internal/biz"
@@ -27,16 +27,21 @@ func loadWorkflowTaskCalendar(ctx context.Context, client *ent.Client, base *ent
 		Offset: query.Offset, Limit: limit, SnapshotAt: snapshot,
 	}
 	var dates []struct {
-		DueAt time.Time `json:"due_at"`
-		Count int       `json:"count"`
+		Day   string `json:"day"`
+		Count int    `json:"count"`
 	}
-	err = base.Clone().Where(workflowtask.DueAtGTE(from.UTC()), workflowtask.DueAtLT(before.UTC())).
-		GroupBy(workflowtask.FieldDueAt).Aggregate(ent.Count()).Scan(ctx, &dates)
+	err = base.Clone().Where(workflowtask.DueAtGTE(from.UTC()), workflowtask.DueAtLT(before.UTC()), func(s *sql.Selector) {
+		day := "date(" + s.C(workflowtask.FieldDueAt) + ", '+8 hours')"
+		if s.Dialect() == dialect.Postgres {
+			day = "TO_CHAR(" + s.C(workflowtask.FieldDueAt) + " AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')"
+		}
+		s.Select(sql.As(day, "day"), sql.As("COUNT(*)", "count")).GroupBy("day")
+	}).Select().Scan(ctx, &dates)
 	if err != nil {
 		return nil, err
 	}
 	for _, date := range dates {
-		result.Days[date.DueAt.In(from.Location()).Format("2006-01-02")] += date.Count
+		result.Days[date.Day] = date.Count
 	}
 	result.Overdue, err = base.Clone().Where(workflowtask.DueAtLT(snapshot)).Count(ctx)
 	if err != nil {
@@ -56,27 +61,33 @@ func loadWorkflowTaskCalendar(ctx context.Context, client *ent.Client, base *ent
 		day, _ := time.ParseInLocation("2006-01-02", query.Selection, from.Location())
 		selected = selected.Where(workflowtask.DueAtGTE(day.UTC()), workflowtask.DueAtLT(day.AddDate(0, 0, 1).UTC()))
 	}
-	var revisionRows []struct {
-		ID      int        `json:"id"`
-		Version int        `json:"version"`
-		DueAt   *time.Time `json:"due_at"`
+	var revisions []struct {
+		Total    int    `json:"total"`
+		Revision string `json:"revision"`
 	}
-	err = selected.Clone().Order(ent.Asc(workflowtask.FieldID)).
-		Select(workflowtask.FieldID, workflowtask.FieldVersion, workflowtask.FieldDueAt).Scan(ctx, &revisionRows)
+	serverHash := false
+	err = selected.Clone().Where(func(s *sql.Selector) {
+		id, version, due := s.C(workflowtask.FieldID), s.C(workflowtask.FieldVersion), s.C(workflowtask.FieldDueAt)
+		item := "CAST(" + id + " AS TEXT) || ':' || CAST(" + version + " AS TEXT) || ':' || COALESCE(CAST(" + due + " AS TEXT),'')"
+		revision := "COALESCE(GROUP_CONCAT(" + item + ", char(10) ORDER BY " + id + "),'')"
+		if s.Dialect() == dialect.Postgres {
+			serverHash = true
+			revision = "encode(sha256(convert_to(COALESCE(string_agg(" + item + ", E'\\n' ORDER BY " + id + "),''),'UTF8')),'hex')"
+		}
+		s.Select(sql.As("COUNT(*)", "total"), sql.As(revision, "revision"))
+	}).Select().Scan(ctx, &revisions)
 	if err != nil {
 		return nil, err
 	}
-	hash := sha256.New()
-	for _, row := range revisionRows {
-		deadline := ""
-		if row.DueAt != nil {
-			deadline = row.DueAt.UTC().Format(time.RFC3339Nano)
-		}
-		// hash.Hash.Write never returns an error.
-		_, _ = fmt.Fprintf(hash, "%d:%d:%s\n", row.ID, row.Version, deadline)
+	if len(revisions) != 1 {
+		return nil, biz.ErrBadParam
 	}
-	result.Total = len(revisionRows)
-	result.Revision = hex.EncodeToString(hash.Sum(nil))
+	result.Total, result.Revision = revisions[0].Total, revisions[0].Revision
+	// SQLite fixtures do not provide PostgreSQL's native SHA-256 function.
+	if !serverHash {
+		digest := sha256.Sum256([]byte(result.Revision))
+		result.Revision = hex.EncodeToString(digest[:])
+	}
 	if query.Revision != "" && query.Revision != result.Revision {
 		result.Offset = 0
 	}

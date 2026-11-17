@@ -19,9 +19,11 @@ import {
 } from 'antd'
 import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 
-import { loadReferenceIDs, mergeReferenceRecords } from '../utils/remoteReferences.mjs'
+import { loadReferenceIDs, mergeReferenceRecords, canReadReference } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { sourceBusinessActionUUID,
@@ -65,14 +67,9 @@ import {
 } from '../api/operationalFactApi.mjs'
 import { submitShipmentFinanceApprovalProcess } from '../api/customerConfigApi.mjs'
 import {
-  listAllCustomers,
-  listAllSalesOrders,
   listAllUnits,
   listAllWarehouses,
-  listProductSKUs,
-  listProducts,
 } from '../api/masterDataOrderApi.mjs'
-import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
   createFinishedGoodsQualityInspectionDraft,
   listAllFinishedGoodsQualityInspections,
@@ -179,7 +176,6 @@ import {
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import {
-  listAllShipmentWeightReferenceRecords,
   normalizeShipmentQuantity,
   resolveShipmentSubmittedTotalNetWeight,
   resolveShipmentWeightPreview,
@@ -363,18 +359,19 @@ export default function ShipmentsPage() {
   const [salesOrderSourceCurrent, setSalesOrderSourceCurrent] = useState(1)
   const [salesOrderSourceLoadFailed, setSalesOrderSourceLoadFailed] =
     useState(false)
-  const [customers, setCustomers] = useState([])
-  const [inventoryLots, setInventoryLots] = useState([])
+  const [customers, , mergeCustomers] = useReferenceRecords(adminProfile)
+  const [inventoryLots, , mergeInventoryLots] = useReferenceRecords(adminProfile)
   const [warehouses, setWarehouses] = useState([])
-  const [products, setProducts] = useState([])
-  const [productSKUs, setProductSKUs] = useState([])
+  const [products, , mergeProducts] = useReferenceRecords(adminProfile)
+  const [productSKUs, , mergeProductSKUs] = useReferenceRecords(adminProfile)
   const [salesOrderItems, setSalesOrderItems] = useState([])
-  const [salesOrders, setSalesOrders] = useState([])
+  const [salesOrders, setSalesOrders, mergeSalesOrders] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
   const [sourceLoading, setSourceLoading] = useState(false)
   const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
   const [sourceImportUndo, setSourceImportUndo] = useState(null)
+  const referenceDraftItems = Form.useWatch('items', { form: shipmentForm, preserve: true }) || []
   const sourceImportSnapshot = Form.useWatch(shipmentSourceImportSnapshot, {
     form: shipmentForm,
     preserve: true,
@@ -778,58 +775,27 @@ export default function ShipmentsPage() {
   }, [loadRows])
 
   const loadReferenceOptions = useCallback(async () => {
+    const request = beginLatestRequest('shipment-references')
     try {
-      const [
-        customerResult,
-        lotResult,
-        nextProducts,
-        nextProductSKUs,
-        salesOrderResult,
-        unitResult,
-        warehouseResult,
-      ] = await Promise.all([
-        listAllCustomers({ active_only: true }),
-        canViewInventory ? listAllInventoryLots() : null,
-        listAllShipmentWeightReferenceRecords(listProducts, 'products'),
-        listAllShipmentWeightReferenceRecords(listProductSKUs, 'product_skus'),
-        listAllSalesOrders(),
-        listAllUnits(),
-        listAllWarehouses({ active_only: true }),
+      const [unitResult, warehouseResult] = await Promise.all([
+        listAllUnits({}, { signal: request.signal }),
+        canViewInventory ? listAllWarehouses({ active_only: true }, { signal: request.signal }) : {},
       ])
-      setCustomers(
-        Array.isArray(customerResult?.customers) ? customerResult.customers : []
-      )
-      setInventoryLots(
-        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
-      )
-      setProducts(nextProducts)
-      setProductSKUs(nextProductSKUs)
-      setSalesOrders(
-        Array.isArray(salesOrderResult?.sales_orders)
-          ? salesOrderResult.sales_orders
-          : []
-      )
-      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
-      setWarehouses(Array.isArray(warehouseResult?.warehouses) ? warehouseResult.warehouses : [])
+      if (!request.isCurrent()) return
+      setUnits(unitResult.units || [])
+      setWarehouses(warehouseResult.warehouses || [])
     } catch (error) {
-      showPageLoadError(error, '加载出货相关资料')
-      setCustomers([])
-      setInventoryLots([])
-      setWarehouses([])
-      setProducts([])
-      setProductSKUs([])
-      setSalesOrders([])
-      setUnits([])
-    }
-  }, [canViewInventory])
+      if (!isRpcAbortError(error) && request.isCurrent()) showPageLoadError(error, '加载出货单位和仓库')
+    } finally { request.finish() }
+  }, [beginLatestRequest, canViewInventory])
 
   useEffect(() => {
     loadReferenceOptions()
   }, [loadReferenceOptions])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadRows)
-  }, [loadRows, outletContext])
+    return outletContext?.registerPageRefresh?.(() => Promise.all([loadRows(), loadReferenceOptions()]))
+  }, [loadRows, loadReferenceOptions, outletContext])
 
   const modalSelectedShipment = useMemo(() => {
     const shipment = shipmentModal?.shipment
@@ -928,7 +894,7 @@ export default function ShipmentsPage() {
       current.filter((order) => Number.isSafeInteger(Number(order?.id)) && Number(order.id) > 0),
       rows.map(shipmentSourceOrderFromCandidate)
     ))
-  }, [])
+  }, [setSalesOrders])
 
   const loadSalesOrderSources = useCallback(
     async ({ keyword = '', page = 1, filters = salesOrderSourceQueryRef.current.filters || {} } = {}) => {
@@ -1697,8 +1663,18 @@ export default function ShipmentsPage() {
     }),
   }
 
+  const referenceShipments = [...rows, selectedRow, modalSelectedShipment].filter(Boolean)
+  const referenceItems = [...referenceShipments.flatMap((row) => row.items || []), ...referenceDraftItems]
+  useReferenceHydration({
+    customers: { ids: [...referenceShipments.map((row) => row.customer_id), customerFilter], records: customers, onRecords: mergeCustomers, enabled: canReadReference(adminProfile, 'customers') },
+    sales_orders: { ids: [...referenceShipments.map((row) => row.sales_order_id), selectedSalesOrderID], records: salesOrders, onRecords: mergeSalesOrders, enabled: canReadReference(adminProfile, 'sales_orders') },
+    products: { ids: [...referenceItems.map((row) => row.product_id), productFilter], records: products, onRecords: mergeProducts, enabled: canReadReference(adminProfile, 'products') },
+    product_skus: { ids: referenceItems.map((row) => row.product_sku_id), records: productSKUs, onRecords: mergeProductSKUs, enabled: canReadReference(adminProfile, 'product_skus') },
+    inventory_lots: { ids: referenceItems.map((row) => row.lot_id), records: inventoryLots, onRecords: mergeInventoryLots, enabled: canViewInventory },
+  }, adminProfile, rows)
+
   return (
-    <BusinessPageLayout inWorkspace className="erp-shipments-page">
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ customers: mergeCustomers, sales_orders: mergeSalesOrders, products: mergeProducts, product_skus: mergeProductSKUs, inventory_lots: mergeInventoryLots }} inWorkspace className="erp-shipments-page">
       <PageHeaderCard compact helpKey="shipments" title="出货单" />
 
       <BusinessOperationPanel
@@ -1733,7 +1709,9 @@ export default function ShipmentsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="customers"
               aria-label="客户"
               className="erp-business-filter-control--status"
               value={customerFilter}
@@ -1746,7 +1724,9 @@ export default function ShipmentsPage() {
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
-            <SelectFilter
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="products"
               aria-label="产品"
               className="erp-business-filter-control--status"
               value={productFilter}
@@ -2224,6 +2204,6 @@ export default function ShipmentsPage() {
         }}
         onSubmit={submitShipmentQualitySource}
       />
-    </BusinessPageLayout>
+    </ReferenceRecordsProvider>
   )
 }

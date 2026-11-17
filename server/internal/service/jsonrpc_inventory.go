@@ -32,6 +32,23 @@ func (d *jsonrpcDispatcher) handleInventory(
 	switch method {
 	case "create_inventory_operation", "save_inventory_operation_draft", "post_inventory_operation", "cancel_inventory_operation", "get_inventory_operation", "list_inventory_operations":
 		return d.handleInventoryOperation(ctx, method, id, pm, claims.UserID)
+	case "get_inventory_distribution":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
+			return id, res, nil
+		}
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		items, err := d.inventoryUC.GetInventoryDistributionForAccess(ctx, inventoryBalanceSelectionFromParams(pm), scope)
+		if err != nil {
+			return id, d.mapInventoryError(ctx, err), nil
+		}
+		rows := make([]any, 0, len(items))
+		for _, row := range items {
+			rows = append(rows, map[string]any{"warehouse_id": row.WarehouseID, "warehouse_name": row.WarehouseName, "warehouse_code": row.WarehouseCode, "record_count": row.RecordCount, "stock_count": row.StockCount, "available_record_count": row.AvailableRecordCount, "unavailable_record_count": row.UnavailableRecordCount})
+		}
+		return id, okData(map[string]any{"distribution": map[string]any{"warehouses": rows}}), nil
 	case "list_inventory_balances":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
@@ -105,20 +122,19 @@ func (d *jsonrpcDispatcher) handleInventory(
 	}
 }
 
-func inventoryBalanceFilterFromParams(pm map[string]any) biz.InventoryBalanceFilter {
+func inventoryBalanceSelectionFromParams(pm map[string]any) biz.InventoryBalanceFilter {
 	return biz.InventoryBalanceFilter{
-		SubjectType:   getString(pm, "subject_type"),
-		StockCategory: getString(pm, "stock_category"),
-		SubjectID:     getInt(pm, "subject_id", 0),
-		ProductSkuID:  getInt(pm, "product_sku_id", 0),
-		WarehouseID:   getInt(pm, "warehouse_id", 0),
-		LotID:         getInt(pm, "lot_id", 0),
-		Keyword:       getString(pm, "keyword"),
-		SortBy:        getString(pm, "sort_by"),
-		SortDirection: getString(pm, "sort_direction"),
-		Limit:         getInt(pm, "limit", 50),
-		Offset:        getInt(pm, "offset", 0),
+		SubjectType: getString(pm, "subject_type"), StockCategory: getString(pm, "stock_category"), SubjectID: getInt(pm, "subject_id", 0), ProductSkuID: getInt(pm, "product_sku_id", 0), WarehouseID: getInt(pm, "warehouse_id", 0), LotID: getInt(pm, "lot_id", 0), Keyword: getString(pm, "keyword"),
 	}
+}
+
+func inventoryBalanceFilterFromParams(pm map[string]any) biz.InventoryBalanceFilter {
+	filter := inventoryBalanceSelectionFromParams(pm)
+	filter.SortBy = getString(pm, "sort_by")
+	filter.SortDirection = getString(pm, "sort_direction")
+	filter.Limit = getInt(pm, "limit", 50)
+	filter.Offset = getInt(pm, "offset", 0)
+	return filter
 }
 
 func inventoryLotFilterFromParams(pm map[string]any) (biz.InventoryLotFilter, bool) {

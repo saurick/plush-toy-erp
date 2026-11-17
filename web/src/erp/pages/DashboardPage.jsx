@@ -446,7 +446,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const taskBoardUpdating =
     isTaskBoardView &&
     taskBoardHasLoaded &&
-    !taskBoardResponse &&
+    (loading || !taskBoardResponse) &&
     !taskBoardLoadError
   const taskBoardVisibleCount = filters.lane === 'all'
     ? taskBoardSummaryResponse?.total ?? taskBoardModel.total

@@ -1120,6 +1120,7 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 | `cancel_inventory_operation` | 取消库存作业 | 按当前状态和关联约束取消库存作业，保留业务追溯。 |
 | `create_inventory_operation` | 创建库存作业 | 登记库存作业，供后续业务办理和追溯。 |
 | `get_inventory_operation` | 查看库存作业 | 读取库存作业详情，供业务核对。 |
+| `get_inventory_distribution` | 查询仓库库存分布 | 在相同库存权限与筛选范围内按仓库汇总余额记录、存货项及有无可用量的记录数；不分页返回余额明细。 |
 | `list_inventory_balances` | 查询库存余额 | 读取库存余额，支持在权限与筛选范围内排序后分页。 |
 | `list_inventory_lots` | 查询库存批次 | 读取库存批次，支持在权限与筛选范围内排序后分页。 |
 | `list_inventory_operations` | 查询库存作业 | 读取库存作业，供列表查询、引用和追溯。 |
@@ -32537,6 +32538,98 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
 
+#### 查询仓库库存分布 `inventory.get_inventory_distribution`
+
+##### 请求参数
+
+**顶层字段**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+
+对象引用、权限、状态和并发版本由后端校验。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "get_inventory_distribution",
+  "params": {
+    "subject_type": "PRODUCT"
+  },
+  "id": "rpc-demo-inventory.get_inventory_distribution"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 成功为 0；错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的返回内容。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.distribution` | object | 依据：`server/internal/service/jsonrpc_inventory.go:51`。 |
+
+**`distribution`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.distribution.warehouses` | array | 依据：`server/internal/service/jsonrpc_inventory.go:51`。 |
+| `result.data.distribution.warehouses[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+
+**`distribution.warehouses[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.distribution.warehouses[].available_record_count` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+| `result.data.distribution.warehouses[].record_count` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+| `result.data.distribution.warehouses[].stock_count` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+| `result.data.distribution.warehouses[].unavailable_record_count` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+| `result.data.distribution.warehouses[].warehouse_code` | string | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+| `result.data.distribution.warehouses[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+| `result.data.distribution.warehouses[].warehouse_name` | string | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-inventory.get_inventory_distribution",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "distribution": {
+        "warehouses": [
+          {
+            "available_record_count": 2,
+            "record_count": 3,
+            "stock_count": 2,
+            "unavailable_record_count": 1,
+            "warehouse_code": "WH-F",
+            "warehouse_id": 2,
+            "warehouse_name": "成品仓"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+样例依据：[TestRPCDocumentedExamples](../internal/service/jsonrpc_documented_examples_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
+执行核对入口：[TestRPCDocumentedExamples/inventory.get_inventory_distribution](../internal/service/jsonrpc_documented_examples_test.go)；实际执行状态读取对应源码身份的原始回执。
+
 #### 查看库存作业 `inventory.get_inventory_operation`
 
 ##### 请求参数
@@ -32685,17 +32778,17 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:116`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
-| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:115`。 |
+| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
-| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:113`。 |
-| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:117`。 |
-| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:118`。 |
-| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:111`。 |
-| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:112`。 |
-| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:110`。 |
-| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:114`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:134`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -32726,44 +32819,44 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_balances` | array | 依据：`server/internal/service/jsonrpc_inventory.go:48`。 |
-| `result.data.inventory_balances[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:247`。 |
+| `result.data.inventory_balances` | array | 依据：`server/internal/service/jsonrpc_inventory.go:65`。 |
+| `result.data.inventory_balances[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:263`。 |
 
 **`inventory_balances[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_balances[].active_reserved_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:259`。 |
-| `result.data.inventory_balances[].available_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:260`。 |
-| `result.data.inventory_balances[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:250`。 |
-| `result.data.inventory_balances[].issuable_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:261`。 |
-| `result.data.inventory_balances[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:256`。 |
-| `result.data.inventory_balances[].lot_status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:263`。 |
-| `result.data.inventory_balances[].pending_inspection_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:264`。 |
-| `result.data.inventory_balances[].pending_packaging_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:265`。 |
-| `result.data.inventory_balances[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:254`。 |
-| `result.data.inventory_balances[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:258`。 |
-| `result.data.inventory_balances[].ready_to_ship_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:266`。 |
-| `result.data.inventory_balances[].restricted_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:262`。 |
-| `result.data.inventory_balances[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:252`。 |
-| `result.data.inventory_balances[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:253`。 |
-| `result.data.inventory_balances[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:251`。 |
-| `result.data.inventory_balances[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:257`。 |
+| `result.data.inventory_balances[].active_reserved_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:275`。 |
+| `result.data.inventory_balances[].available_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:276`。 |
+| `result.data.inventory_balances[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:266`。 |
+| `result.data.inventory_balances[].issuable_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:277`。 |
+| `result.data.inventory_balances[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:272`。 |
+| `result.data.inventory_balances[].lot_status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:279`。 |
+| `result.data.inventory_balances[].pending_inspection_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:280`。 |
+| `result.data.inventory_balances[].pending_packaging_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:281`。 |
+| `result.data.inventory_balances[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:270`。 |
+| `result.data.inventory_balances[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:274`。 |
+| `result.data.inventory_balances[].ready_to_ship_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:282`。 |
+| `result.data.inventory_balances[].restricted_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:278`。 |
+| `result.data.inventory_balances[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:268`。 |
+| `result.data.inventory_balances[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:269`。 |
+| `result.data.inventory_balances[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:267`。 |
+| `result.data.inventory_balances[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:273`。 |
 
 **`inventory_balances[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_balances[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:267`。 |
-| `result.data.inventory_balances[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:255`。 |
+| `result.data.inventory_balances[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:283`。 |
+| `result.data.inventory_balances[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:271`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:50`。 |
-| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:51`。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:49`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:67`。 |
+| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:68`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:66`。 |
 
 ```json
 {
@@ -32815,22 +32908,22 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:129`。 |
-| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
-| `ids` | array | 可选 | 解析器 `optionalReferenceIDs`；调用 `optionalReferenceIDs(pm, "ids")`。 依据：`server/internal/service/jsonrpc_inventory.go:125`。 |
+| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:145`。 |
+| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:149`。 |
+| `ids` | array | 可选 | 解析器 `optionalReferenceIDs`；调用 `optionalReferenceIDs(pm, "ids")`。 依据：`server/internal/service/jsonrpc_inventory.go:141`。 |
 | `ids[]` | integer | 条件必填（ids 有值） | 解析器 `productionOrderJSONSafeInt`；调用 `productionOrderJSONSafeInt(value)`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_reference_ids.go:17`。 |
 | `include_status_counts` | boolean &#124; null | 可选 | 解析器 `getOptionalJSONRPCBool`；调用 `getOptionalJSONRPCBool(params, "include_status_counts")`。 依据：`server/internal/service/jsonrpc_business_status_counts.go:7`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:145`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:161`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
-| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:142`。 |
-| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:148`。 |
-| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:149`。 |
-| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:144`。 |
-| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:140`。 |
-| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:141`。 |
-| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:139`。 |
-| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:143`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:158`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:164`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:165`。 |
+| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:160`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:156`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:157`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:155`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:159`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -32864,46 +32957,46 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_lots` | array | 依据：`server/internal/service/jsonrpc_inventory.go:76`。 |
-| `result.data.inventory_lots[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:281`。 |
+| `result.data.inventory_lots` | array | 依据：`server/internal/service/jsonrpc_inventory.go:93`。 |
+| `result.data.inventory_lots[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:297`。 |
 
 **`inventory_lots[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_lots[].color_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:291`。 |
-| `result.data.inventory_lots[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:301`。 |
-| `result.data.inventory_lots[].dye_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:292`。 |
-| `result.data.inventory_lots[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:284`。 |
-| `result.data.inventory_lots[].lot_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:289`。 |
-| `result.data.inventory_lots[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:288`。 |
-| `result.data.inventory_lots[].production_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:293`。 |
-| `result.data.inventory_lots[].received_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:300`。 |
-| `result.data.inventory_lots[].status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:294`。 |
-| `result.data.inventory_lots[].status_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:296`。 |
-| `result.data.inventory_lots[].status_changed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:298`。 |
-| `result.data.inventory_lots[].status_changed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:299`。 |
-| `result.data.inventory_lots[].status_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:297`。 |
-| `result.data.inventory_lots[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:286`。 |
-| `result.data.inventory_lots[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:287`。 |
-| `result.data.inventory_lots[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:285`。 |
+| `result.data.inventory_lots[].color_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:307`。 |
+| `result.data.inventory_lots[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:317`。 |
+| `result.data.inventory_lots[].dye_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:308`。 |
+| `result.data.inventory_lots[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:300`。 |
+| `result.data.inventory_lots[].lot_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:305`。 |
+| `result.data.inventory_lots[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:304`。 |
+| `result.data.inventory_lots[].production_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:309`。 |
+| `result.data.inventory_lots[].received_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:316`。 |
+| `result.data.inventory_lots[].status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:310`。 |
+| `result.data.inventory_lots[].status_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:312`。 |
+| `result.data.inventory_lots[].status_changed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:314`。 |
+| `result.data.inventory_lots[].status_changed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:315`。 |
+| `result.data.inventory_lots[].status_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:313`。 |
+| `result.data.inventory_lots[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:302`。 |
+| `result.data.inventory_lots[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:303`。 |
+| `result.data.inventory_lots[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:301`。 |
 
 **`inventory_lots[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_lots[].supplier_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:290`。 |
-| `result.data.inventory_lots[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:302`。 |
-| `result.data.inventory_lots[].version` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:295`。 |
+| `result.data.inventory_lots[].supplier_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:306`。 |
+| `result.data.inventory_lots[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:318`。 |
+| `result.data.inventory_lots[].version` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:311`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:78`。 |
-| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:79`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:95`。 |
+| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:96`。 |
 | `result.data.status_counts` | object &#124; null | 后端返回映射。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:77`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:94`。 |
 
 ```json
 {
@@ -33090,20 +33183,20 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:156`。 |
-| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:160`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:174`。 |
+| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:172`。 |
+| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:176`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:190`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
-| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:170`。 |
+| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:186`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
-| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:168`。 |
-| `source_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "source_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:173`。 |
-| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:172`。 |
-| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:166`。 |
-| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:167`。 |
-| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:165`。 |
-| `txn_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "txn_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:171`。 |
-| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:169`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:184`。 |
+| `source_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "source_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:189`。 |
+| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:188`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:182`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:183`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:181`。 |
+| `txn_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "txn_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:187`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:185`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -33136,49 +33229,49 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_txns` | array | 依据：`server/internal/service/jsonrpc_inventory.go:98`。 |
-| `result.data.inventory_txns[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:316`。 |
+| `result.data.inventory_txns` | array | 依据：`server/internal/service/jsonrpc_inventory.go:115`。 |
+| `result.data.inventory_txns[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:332`。 |
 
 **`inventory_txns[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_txns[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:339`。 |
-| `result.data.inventory_txns[].created_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:340`。 |
-| `result.data.inventory_txns[].direction` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:327`。 |
-| `result.data.inventory_txns[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:319`。 |
-| `result.data.inventory_txns[].idempotency_key` | string | 依据：`server/internal/service/jsonrpc_inventory.go:336`。 |
-| `result.data.inventory_txns[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:325`。 |
-| `result.data.inventory_txns[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:341`。 |
-| `result.data.inventory_txns[].occurred_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:338`。 |
-| `result.data.inventory_txns[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:323`。 |
-| `result.data.inventory_txns[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:328`。 |
-| `result.data.inventory_txns[].reversal_of_txn_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:337`。 |
-| `result.data.inventory_txns[].source_document_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:333`。 |
-| `result.data.inventory_txns[].source_document_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:332`。 |
-| `result.data.inventory_txns[].source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:334`。 |
-| `result.data.inventory_txns[].source_line_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:335`。 |
-| `result.data.inventory_txns[].source_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:331`。 |
+| `result.data.inventory_txns[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:355`。 |
+| `result.data.inventory_txns[].created_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:356`。 |
+| `result.data.inventory_txns[].direction` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:343`。 |
+| `result.data.inventory_txns[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:335`。 |
+| `result.data.inventory_txns[].idempotency_key` | string | 依据：`server/internal/service/jsonrpc_inventory.go:352`。 |
+| `result.data.inventory_txns[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:341`。 |
+| `result.data.inventory_txns[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:357`。 |
+| `result.data.inventory_txns[].occurred_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:354`。 |
+| `result.data.inventory_txns[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:339`。 |
+| `result.data.inventory_txns[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:344`。 |
+| `result.data.inventory_txns[].reversal_of_txn_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:353`。 |
+| `result.data.inventory_txns[].source_document_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:349`。 |
+| `result.data.inventory_txns[].source_document_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:348`。 |
+| `result.data.inventory_txns[].source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:350`。 |
+| `result.data.inventory_txns[].source_line_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:351`。 |
+| `result.data.inventory_txns[].source_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:347`。 |
 
 **`inventory_txns[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_txns[].source_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:330`。 |
-| `result.data.inventory_txns[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:321`。 |
-| `result.data.inventory_txns[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:322`。 |
-| `result.data.inventory_txns[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:320`。 |
-| `result.data.inventory_txns[].txn_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:326`。 |
-| `result.data.inventory_txns[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:329`。 |
-| `result.data.inventory_txns[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:324`。 |
+| `result.data.inventory_txns[].source_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:346`。 |
+| `result.data.inventory_txns[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:337`。 |
+| `result.data.inventory_txns[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:338`。 |
+| `result.data.inventory_txns[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:336`。 |
+| `result.data.inventory_txns[].txn_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:342`。 |
+| `result.data.inventory_txns[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:345`。 |
+| `result.data.inventory_txns[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:340`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:100`。 |
-| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:101`。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:99`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:117`。 |
+| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:118`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:116`。 |
 
 ```json
 {
@@ -58525,17 +58618,17 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `bom_id` | integer | 条件必填（id 未提供 且 bom_id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "bom_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_sales_order_export.go:90`。 |
+| `bom_id` | integer | 条件必填（id 未提供 且 bom_id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "bom_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_sales_order_export.go:94`。 |
 | `customer_id` | integer | 条件必填（id 未提供 且 customer_id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "customer_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_sales_order_export.go:33`。 |
-| `date_field` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "date_field")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:106`。 |
-| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:95`。 |
-| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:99`。 |
+| `date_field` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "date_field")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:111`。 |
+| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:99`。 |
+| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:103`。 |
 | `id` | integer | 条件必填（id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid &#124;&#124; !jsonRPCParamsAllowed(pm, "id")”。 依据：`server/internal/service/jsonrpc_sales_order_export.go:25`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:104`。 |
-| `lifecycle_scope` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_scope")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:105`。 |
-| `lifecycle_status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:105`。 |
-| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:107`。 |
-| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:107`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:109`。 |
+| `lifecycle_scope` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_scope")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:110`。 |
+| `lifecycle_status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:110`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:112`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:112`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -59543,19 +59636,21 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `bom_id` | integer | 条件必填（bom_id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "bom_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_sales_order_export.go:90`。 |
-| `customer_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "customer_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_export.go:104`。 |
-| `date_field` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "date_field")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:106`。 |
-| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:95`。 |
-| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:99`。 |
+| `bom_id` | integer | 条件必填（bom_id 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "bom_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_sales_order_export.go:94`。 |
+| `customer_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "customer_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_export.go:109`。 |
+| `date_field` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "date_field")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:111`。 |
+| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:99`。 |
+| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:103`。 |
+| `ids` | array | 可选 | 解析器 `optionalReferenceIDs`；调用 `optionalReferenceIDs(pm, "ids")`。 依据：`server/internal/service/jsonrpc_sales_order_export.go:87`。 |
+| `ids[]` | integer | 条件必填（ids 有值） | 解析器 `productionOrderJSONSafeInt`；调用 `productionOrderJSONSafeInt(value)`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_reference_ids.go:17`。 |
 | `include_status_counts` | boolean &#124; null | 可选 | 解析器 `getOptionalJSONRPCBool`；调用 `getOptionalJSONRPCBool(params, "include_status_counts")`。 依据：`server/internal/service/jsonrpc_business_status_counts.go:7`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:104`。 |
-| `lifecycle_scope` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_scope")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:105`。 |
-| `lifecycle_status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:105`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:109`。 |
+| `lifecycle_scope` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_scope")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:110`。 |
+| `lifecycle_status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "lifecycle_status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:110`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
-| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:107`。 |
-| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:107`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:112`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_export.go:112`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 

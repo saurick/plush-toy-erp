@@ -758,11 +758,15 @@ func TestWorkflowRepo_GetWorkflowTaskBoardUsesDistinctFacetAndBoundedQueries(t *
 	assertQueryShape := func(t *testing.T, captured []string, maxSelects int) {
 		t.Helper()
 		selects := 0
+		countQueries := 0
 		distinctSourceFacet := false
 		for _, line := range captured {
 			upper := strings.ToUpper(line)
-			if strings.Contains(upper, "DRIVER.QUERY") && strings.Contains(upper, "SELECT") {
+			if strings.Contains(upper, "QUERY=SELECT") {
 				selects++
+				if strings.Contains(upper, "COUNT(") {
+					countQueries++
+				}
 			}
 			if strings.Contains(upper, "SELECT DISTINCT") && strings.Contains(upper, "SOURCE_TYPE") {
 				distinctSourceFacet = true
@@ -770,6 +774,9 @@ func TestWorkflowRepo_GetWorkflowTaskBoardUsesDistinctFacetAndBoundedQueries(t *
 		}
 		if !distinctSourceFacet {
 			t.Fatalf("source facet query must use SELECT DISTINCT, logs=%v", captured)
+		}
+		if countQueries != 1 {
+			t.Fatalf("task board must count all lanes in one database query: got %d", countQueries)
 		}
 		if selects > maxSelects {
 			t.Fatalf("task board exceeded bounded SELECT count: got=%d max=%d logs=%v", selects, maxSelects, captured)
@@ -780,13 +787,52 @@ func TestWorkflowRepo_GetWorkflowTaskBoardUsesDistinctFacetAndBoundedQueries(t *
 	if _, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Limit: 5, SnapshotAt: snapshotAt}); err != nil {
 		t.Fatalf("get overview query shape: %v", err)
 	}
-	assertQueryShape(t, readLogs(), 11)
+	// Three facets, one aggregate, four bounded lanes and one batched display read.
+	assertQueryShape(t, readLogs(), 9)
 
 	resetLogs()
 	if _, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{LaneKey: biz.WorkflowTaskBoardLaneException, Limit: 20, SnapshotAt: snapshotAt}); err != nil {
 		t.Fatalf("get focused query shape: %v", err)
 	}
-	assertQueryShape(t, readLogs(), 9)
+	assertQueryShape(t, readLogs(), 6)
+
+	resetLogs()
+	if _, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Keyword: "常规", LaneKey: biz.WorkflowTaskBoardLaneAll, Limit: 1, SnapshotAt: snapshotAt}); err != nil {
+		t.Fatalf("get search query shape: %v", err)
+	}
+	assertQueryShape(t, readLogs(), 6)
+}
+
+func TestWorkflowPostgresTaskBoardSearchKeepsJITLocal(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	data, _ := openPurchaseReceiptPostgresTestData(t)
+	data.sqldb.SetMaxOpenConns(1)
+	data.sqldb.SetMaxIdleConns(1)
+	if _, err := data.sqldb.ExecContext(ctx, "SET jit = on"); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
+	query := biz.WorkflowTaskBoardQuery{Keyword: "无匹配搜索-" + postgresTestSuffix(), LaneKey: biz.WorkflowTaskBoardLaneAll, Sort: biz.WorkflowTaskBoardSortSmart, Limit: 1, SnapshotAt: time.Now()}
+	for _, fail := range []bool{false, true} {
+		if fail {
+			query.Sort = "invalid-sort"
+		}
+		board, err := repo.GetWorkflowTaskBoard(ctx, query)
+		if fail && !errors.Is(err, biz.ErrBadParam) {
+			t.Fatalf("expected read transaction failure, got %v", err)
+		}
+		if !fail && (err != nil || board.Total != 0 || board.Counts != (biz.WorkflowTaskBoardCounts{})) {
+			t.Fatalf("empty search must return zero counts: board=%+v err=%v", board, err)
+		}
+		var setting string
+		if err := data.sqldb.QueryRowContext(ctx, "SHOW jit").Scan(&setting); err != nil {
+			t.Fatal(err)
+		}
+		if setting != "on" {
+			t.Fatalf("search changed pooled connection JIT after failure=%t: %s", fail, setting)
+		}
+	}
 }
 
 func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t *testing.T) {

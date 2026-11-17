@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	stdsql "database/sql"
 	"time"
 
 	"server/internal/biz"
@@ -10,7 +9,6 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/workflowtask"
 
-	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
 )
@@ -18,53 +16,16 @@ import (
 var _ biz.WorkflowWorkbenchRepo = (*workflowRepo)(nil)
 
 func (r *workflowRepo) GetWorkflowWorkbench(ctx context.Context, query biz.WorkflowWorkbenchQuery) (*biz.WorkflowWorkbenchPage, error) {
-	if r == nil || r.data == nil || r.data.postgres == nil || query.SnapshotAt.IsZero() {
+	if query.SnapshotAt.IsZero() {
 		return nil, biz.ErrBadParam
 	}
-	if r.data.sqldb != nil {
-		return r.getWorkflowWorkbenchInSQLTx(ctx, query)
-	}
-
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { rollbackEntTx(ctx, tx, r.log) }()
-	page, err := loadWorkflowWorkbench(ctx, tx.Client(), query)
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return page, nil
-}
-
-func (r *workflowRepo) getWorkflowWorkbenchInSQLTx(ctx context.Context, query biz.WorkflowWorkbenchQuery) (*biz.WorkflowWorkbenchPage, error) {
-	sqlDialect := r.data.sqlDialect
-	if sqlDialect == "" {
-		sqlDialect = dialect.Postgres
-	}
-	txOptions := &stdsql.TxOptions{}
-	if sqlDialect == dialect.Postgres {
-		txOptions.Isolation = stdsql.LevelRepeatableRead
-		txOptions.ReadOnly = true
-	}
-	sqlTx, err := r.data.sqldb.BeginTx(ctx, txOptions)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = sqlTx.Rollback() }()
-	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
-	page, err := loadWorkflowWorkbench(ctx, client, query)
-	if err != nil {
-		return nil, err
-	}
-	if err := sqlTx.Commit(); err != nil {
-		return nil, err
-	}
-	return page, nil
+	var page *biz.WorkflowWorkbenchPage
+	err := r.readWorkflowSnapshot(ctx, "", func(client *ent.Client) error {
+		var err error
+		page, err = loadWorkflowWorkbench(ctx, client, query)
+		return err
+	})
+	return page, err
 }
 
 func loadWorkflowWorkbench(ctx context.Context, client *ent.Client, query biz.WorkflowWorkbenchQuery) (*biz.WorkflowWorkbenchPage, error) {

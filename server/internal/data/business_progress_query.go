@@ -6,26 +6,27 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect"
-	entsql "entgo.io/ent/dialect/sql"
 	"server/internal/biz"
 	"server/internal/data/model/ent/workflowtask"
 )
 
 func progressTaskSQL(q biz.BusinessProgressQuery) (string, []any) {
-	t := entsql.Dialect(dialect.Postgres).Table(workflowtask.Table)
-	s := entsql.Dialect(dialect.Postgres).Select(t.C("*")).From(t)
-	if q.Access.Tasks && q.TaskVisibility != nil {
-		workflowTaskRevisionVisibilityPredicate(q.TaskVisibility, "")(s)
-	} else {
-		s.Where(entsql.False())
+	var scope *biz.WorkflowTaskVisibilityScope
+	if q.Access.Tasks {
+		scope = q.TaskVisibility
 	}
-	return s.Query()
+	return workflowTaskVisibilitySQL(scope, workflowtask.FieldID, workflowtask.FieldTaskCode, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceID, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldAssigneeID, workflowtask.FieldDueAt, workflowtask.FieldBlockedReason)
 }
 
 // Production lines, rather than order headers, are the join key. One production
 // order may contain products for different sales orders.
 func progressCTE(q biz.BusinessProgressQuery) (string, []any) {
 	visibleSQL, args := progressTaskSQL(q)
+	taskScope := "x.view_key='" + q.View + "'"
+	if q.ID > 0 {
+		args = append(args, q.ID)
+		taskScope += fmt.Sprintf(" AND x.board_id=$%d", len(args))
+	}
 	boardID, workJoin := "pi.production_order_id", ""
 	if q.View == "orders" {
 		boardID = "si.sales_order_id"
@@ -39,8 +40,10 @@ func progressCTE(q biz.BusinessProgressQuery) (string, []any) {
 	if !q.Access.WIP {
 		wipAllowed = "FALSE"
 	}
+	// Keep source-type filters and joins on the task table instead of repeatedly
+	// scanning a materialized visibility result for each source document.
 	return fmt.Sprintf(`WITH
-visible_tasks AS (%s),
+visible_tasks AS NOT MATERIALIZED (%s),
 work_lines AS (
  SELECT pi.*, po.status AS production_status, %s AS board_id
  FROM production_order_items pi JOIN production_orders po ON po.id=pi.production_order_id
@@ -115,16 +118,19 @@ sales_lines AS (
  LEFT JOIN products p ON p.id=l.product_id JOIN units u ON u.id=l.unit_id
  LEFT JOIN shipped d ON d.sales_order_item_id=l.id WHERE l.line_status<>'canceled'
 ),
+ranked_sales_lines AS (
+ SELECT *,ROW_NUMBER() OVER (PARTITION BY sales_order_id ORDER BY product_label,id) AS product_rank
+ FROM sales_lines
+),
 sales_summary AS (
  SELECT l.sales_order_id, COUNT(*) AS product_count, MIN(l.product_label) AS product,
- COALESCE((SELECT x.product_id FROM sales_lines x WHERE x.sales_order_id=l.sales_order_id
- ORDER BY x.product_label,x.id LIMIT 1),0) AS product_id,
+ COALESCE(MAX(CASE WHEN product_rank=1 THEN product_id END),0) AS product_id,
  MIN(CASE WHEN line_status='open' AND shipped_quantity<ordered_quantity THEN due_at END) AS open_due,
  MIN(due_at) AS any_due, COUNT(DISTINCT unit_id) AS unit_count, MIN(unit_name) AS unit_name,
  SUM(ordered_quantity) AS ordered_quantity, SUM(shipped_quantity) AS shipped_quantity,
  SUM(CASE WHEN line_status='open' AND shipped_quantity<ordered_quantity THEN 1 ELSE 0 END) AS unfulfilled,
  SUM(CASE WHEN bom_id IS NOT NULL AND bom_fingerprint IS NOT NULL THEN 1 ELSE 0 END) AS engineering_ready
- FROM sales_lines l GROUP BY l.sales_order_id
+ FROM ranked_sales_lines l GROUP BY l.sales_order_id
 ),
 %s,
 task_rows AS (
@@ -133,14 +139,43 @@ task_rows AS (
  CASE WHEN t.task_status_key='blocked' THEN 0 WHEN t.task_status_key='ready' THEN 1 ELSE 2 END,
  CASE WHEN t.due_at IS NULL THEN 1 ELSE 0 END,t.due_at,t.id) AS attention_rank
  FROM task_sources x JOIN visible_tasks t ON t.id=x.task_id LEFT JOIN admin_users a ON a.id=t.assignee_id
+ WHERE %s
 ),
-task_summary AS (
+task_summary AS MATERIALIZED (
  SELECT view_key,board_id,
  SUM(CASE WHEN task_status_key IN ('ready','blocked') THEN 1 ELSE 0 END) AS open_tasks,
  SUM(CASE WHEN task_status_key='blocked' THEN 1 ELSE 0 END) AS blocked_tasks,
- SUM(CASE WHEN task_status_key IN ('ready','blocked') AND assignee_id IS NULL THEN 1 ELSE 0 END) AS unassigned_tasks
+ SUM(CASE WHEN task_status_key IN ('ready','blocked') AND assignee_id IS NULL THEN 1 ELSE 0 END) AS unassigned_tasks,
+ MAX(CASE WHEN attention_rank=1 AND task_status_key IN ('ready','blocked') THEN id ELSE 0 END) AS attention_task_id,
+ MAX(CASE WHEN attention_rank=1 AND task_status_key IN ('ready','blocked') THEN task_name ELSE '' END) AS attention_task,
+ MAX(CASE WHEN attention_rank=1 AND task_status_key='blocked' THEN COALESCE(blocked_reason,'') ELSE '' END) AS attention_reason,
+ MAX(CASE WHEN attention_rank=1 AND task_status_key IN ('ready','blocked') THEN assignee_name ELSE '' END) AS attention_owner,
+ MAX(CASE WHEN attention_rank=1 AND task_status_key IN ('ready','blocked') THEN owner_role_key ELSE '' END) AS attention_role
  FROM task_rows GROUP BY view_key,board_id
-)`, visibleSQL, boardID, workJoin, productionAllowed, wipAllowed, wipAllowed, workflowTaskSourceLinksCTE), args
+)`, visibleSQL, boardID, workJoin, productionAllowed, wipAllowed, wipAllowed, workflowTaskSourceLinksCTE, taskScope), args
+}
+
+// Scope filters use the source column so PostgreSQL can use its statistics.
+// The displayed active flag is derived from this same status predicate.
+func progressActiveSQL(view string) string {
+	if view == "orders" {
+		statuses := []string{biz.SalesOrderStatusDraft, biz.SalesOrderStatusSubmitted, biz.SalesOrderStatusActive}
+		return "s.lifecycle_status IN ('" + strings.Join(statuses, "','") + "') AND " +
+			"(COALESCE(a.unfulfilled,0)>0 OR a.product_count IS NULL OR EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=s.id))"
+	}
+	statuses := []string{biz.ProductionOrderStatusDraft, biz.ProductionOrderStatusReleased}
+	return "p.status IN ('" + strings.Join(statuses, "','") + "')"
+}
+
+func progressBaseScopeSQL(q biz.BusinessProgressQuery) string {
+	switch q.Scope {
+	case "active":
+		return " WHERE " + progressActiveSQL(q.View)
+	case "ended":
+		return " WHERE NOT (" + progressActiveSQL(q.View) + ")"
+	default:
+		return ""
+	}
 }
 
 func progressBase(q biz.BusinessProgressQuery) string {
@@ -150,15 +185,13 @@ func progressBase(q biz.BusinessProgressQuery) string {
  COALESCE(a.product,'未填写产品') AS product,COALESCE(a.product_count,0) AS product_count,
  COALESCE(a.product_id,0) AS product_id,
  COALESCE(s.sales_owner,'') AS sales_owner,COALESCE(a.open_due,a.any_due,s.planned_delivery_date) AS due_at,s.updated_at,
- CASE WHEN s.lifecycle_status IN ('draft','submitted','active') AND
- (COALESCE(a.unfulfilled,0)>0 OR a.product_count IS NULL OR EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=s.id))
- THEN 1 ELSE 0 END AS active,0 AS unlinked,
+ CASE WHEN ` + progressActiveSQL(q.View) + ` THEN 1 ELSE 0 END AS active,0 AS unlinked,
  CASE WHEN a.unit_count=1 THEN a.unit_name ELSE '' END AS unit_name,
  CASE WHEN a.unit_count=1 THEN a.ordered_quantity END AS ordered_quantity,
  CASE WHEN a.unit_count=1 AND NOT EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=s.id) THEN a.shipped_quantity END AS shipped_quantity,
  CASE WHEN a.product_count>0 AND NOT EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=s.id) THEN 1 ELSE 0 END AS delivery_known,
  NULL AS completed_quantity,COALESCE(a.product_count,0) AS engineering_total,COALESCE(a.engineering_ready,0) AS engineering_ready
- FROM sales_orders s JOIN customers c ON c.id=s.customer_id LEFT JOIN sales_summary a ON a.sales_order_id=s.id`
+ FROM sales_orders s JOIN customers c ON c.id=s.customer_id LEFT JOIN sales_summary a ON a.sales_order_id=s.id` + progressBaseScopeSQL(q)
 	}
 	customer, owner := "''", "''"
 	completionAllowed := "TRUE"
@@ -177,7 +210,7 @@ func progressBase(q biz.BusinessProgressQuery) string {
  ORDER BY CASE WHEN COALESCE(NULLIF(i2.product_name_snapshot,''),pr2.name) IS NULL THEN 1 ELSE 0 END,
  COALESCE(NULLIF(i2.product_name_snapshot,''),pr2.name),i2.id LIMIT 1),0) AS product_id,
  COALESCE(%s,'') AS sales_owner,p.planned_end_at AS due_at,p.updated_at,
- CASE WHEN p.status IN ('DRAFT','RELEASED') THEN 1 ELSE 0 END AS active,
+ CASE WHEN %s THEN 1 ELSE 0 END AS active,
  CASE WHEN COUNT(i.sales_order_item_id)<COUNT(i.id) OR COUNT(i.id)=0 THEN 1 ELSE 0 END AS unlinked,
  CASE WHEN COUNT(DISTINCT i.unit_id)=1 THEN MIN(COALESCE(NULLIF(i.unit_name_snapshot,''),u.name)) ELSE '' END AS unit_name,
  CASE WHEN COUNT(DISTINCT i.unit_id)=1 THEN SUM(i.planned_quantity) END AS ordered_quantity,
@@ -185,8 +218,8 @@ func progressBase(q biz.BusinessProgressQuery) string {
  NULL AS shipped_quantity,0 AS delivery_known,0 AS engineering_total,0 AS engineering_ready
  FROM production_orders p LEFT JOIN production_order_items i ON i.production_order_id=p.id
  LEFT JOIN products pr ON pr.id=i.product_id LEFT JOIN units u ON u.id=i.unit_id
- LEFT JOIN completed done ON done.source_line_id=i.id
- GROUP BY p.id,p.order_no,p.status,p.planned_end_at,p.updated_at`, customer, owner, completionAllowed)
+ LEFT JOIN completed done ON done.source_line_id=i.id%s
+ GROUP BY p.id,p.order_no,p.status,p.planned_end_at,p.updated_at`, customer, owner, progressActiveSQL(q.View), completionAllowed, progressBaseScopeSQL(q))
 }
 
 func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []any) {
@@ -214,23 +247,16 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
  COALESCE(w.in_progress_batches,0) AS in_progress_batches,COALESCE(w.outsourced_batches,0) AS outsourced_batches,
  COALESCE(w.waiting_batches,0) AS waiting_batches,COALESCE(w.rejected_batches,0) AS rejected_batches,COALESCE(w.planned_batches,0) AS planned_batches,
  COALESCE(t.open_tasks,0) AS open_tasks,COALESCE(t.blocked_tasks,0) AS blocked_tasks,COALESCE(t.unassigned_tasks,0) AS unassigned_tasks,
- CASE WHEN a.task_status_key IN ('ready','blocked') THEN a.id ELSE 0 END AS attention_task_id,
- CASE WHEN a.task_status_key IN ('ready','blocked') THEN a.task_name ELSE '' END AS attention_task,
- CASE WHEN a.task_status_key='blocked' THEN COALESCE(a.blocked_reason,'') ELSE '' END AS attention_reason,
- CASE WHEN a.task_status_key IN ('ready','blocked') THEN a.assignee_name ELSE '' END AS attention_owner,
- CASE WHEN a.task_status_key IN ('ready','blocked') THEN a.owner_role_key ELSE '' END AS attention_role
+ COALESCE(t.attention_task_id,0) AS attention_task_id,
+ COALESCE(t.attention_task,'') AS attention_task,
+ COALESCE(t.attention_reason,'') AS attention_reason,
+ COALESCE(t.attention_owner,'') AS attention_owner,
+ COALESCE(t.attention_role,'') AS attention_role
  FROM base b LEFT JOIN production p ON p.board_id=b.id LEFT JOIN materials m ON m.board_id=b.id
  LEFT JOIN batches w ON w.board_id=b.id LEFT JOIN task_summary t ON t.board_id=b.id AND t.view_key='` + q.View + `'
- LEFT JOIN task_rows a ON a.board_id=b.id AND a.view_key='` + q.View + `' AND a.attention_rank=1
 ), filtered AS (SELECT * FROM joined j WHERE 1=1`
 	if q.ID > 0 {
 		cte += " AND j.id=" + bind(q.ID)
-	}
-	if q.Scope == "active" {
-		cte += " AND j.active=1"
-	}
-	if q.Scope == "ended" {
-		cte += " AND j.active=0"
 	}
 	like := func(value string) string {
 		return bind("%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(strings.ToLower(value)) + "%")
@@ -240,7 +266,7 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 		if q.View == "production" && q.Access.Sales {
 			linkedOwnerSearch = " OR EXISTS(SELECT 1 FROM production_order_items i JOIN sales_order_items l ON l.id=i.sales_order_item_id JOIN sales_orders s ON s.id=l.sales_order_id WHERE i.production_order_id=j.id AND lower(s.sales_owner) LIKE " + key + " ESCAPE '\\')"
 		}
-		return "(lower(j.sales_owner) LIKE " + key + " ESCAPE '\\'" + linkedOwnerSearch + " OR EXISTS(SELECT 1 FROM task_rows tr WHERE tr.board_id=j.id AND tr.view_key='" + q.View + "' AND tr.task_status_key IN ('ready','blocked') AND (lower(tr.assignee_name) LIKE " + key + " ESCAPE '\\' OR lower(tr.owner_role_key) LIKE " + key + " ESCAPE '\\')))"
+		return "(lower(j.sales_owner) LIKE " + key + " ESCAPE '\\'" + linkedOwnerSearch + " OR j.id IN (SELECT tr.board_id FROM task_rows tr WHERE tr.view_key='" + q.View + "' AND tr.task_status_key IN ('ready','blocked') AND (lower(tr.assignee_name) LIKE " + key + " ESCAPE '\\' OR lower(tr.owner_role_key) LIKE " + key + " ESCAPE '\\')))"
 	}
 	if q.Keyword != "" {
 		key := like(q.Keyword)

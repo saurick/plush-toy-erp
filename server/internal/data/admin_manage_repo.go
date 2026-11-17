@@ -144,11 +144,10 @@ func (r *adminManageRepo) ListAdmins(ctx context.Context) ([]*biz.AdminUser, err
 	}
 	out := make([]*biz.AdminUser, 0, len(rows))
 	for _, row := range rows {
-		admin, mapErr := r.toBizAdmin(ctx, row)
-		if mapErr != nil {
-			return nil, mapErr
-		}
-		out = append(out, admin)
+		out = append(out, mapEntAdminUser(row))
+	}
+	if err := loadAdminsRBAC(ctx, r.data.sqldb, out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

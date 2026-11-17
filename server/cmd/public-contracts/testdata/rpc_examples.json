@@ -13804,6 +13804,33 @@
       "id": 2
     }
   },
+  "inventory.get_inventory_distribution": {
+    "basis": "handler-fixture",
+    "data": {
+      "distribution": {
+        "warehouses": [
+          {
+            "available_record_count": 2,
+            "record_count": 3,
+            "stock_count": 2,
+            "unavailable_record_count": 1,
+            "warehouse_code": "WH-F",
+            "warehouse_id": 2,
+            "warehouse_name": "成品仓"
+          }
+        ]
+      }
+    },
+    "message": "OK",
+    "params": {
+      "subject_type": "PRODUCT"
+    },
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "case": "inventory.get_inventory_distribution",
+      "test": "TestRPCDocumentedExamples"
+    }
+  },
   "inventory.list_inventory_balances": {
     "basis": "handler-fixture",
     "data": {

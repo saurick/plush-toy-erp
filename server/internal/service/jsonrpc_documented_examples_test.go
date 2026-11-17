@@ -68,6 +68,10 @@ func documentedRPCProjection(expected, actual any, path string) error {
 // through the real handler, authorization, usecase and JSON serialization.
 type documentedInventoryRepo struct{ biz.InventoryRepo }
 
+func (*documentedInventoryRepo) GetInventoryDistributionForAccess(context.Context, biz.InventoryBalanceFilter, biz.WarehouseDataScope) ([]biz.InventoryDistributionRow, error) {
+	return []biz.InventoryDistributionRow{{WarehouseID: 2, WarehouseName: "成品仓", WarehouseCode: "WH-F", RecordCount: 3, StockCount: 2, AvailableRecordCount: 2, UnavailableRecordCount: 1}}, nil
+}
+
 func (*documentedInventoryRepo) ListInventoryLotsForAccess(context.Context, biz.InventoryLotFilter, biz.WarehouseDataScope) ([]*biz.InventoryLot, int, error) {
 	at := time.Date(2026, 6, 17, 8, 0, 0, 0, time.UTC)
 	return []*biz.InventoryLot{{ID: 1, StockCategory: "MAIN", SubjectType: "MATERIAL", SubjectID: 1, LotNo: "INV-LEDGER-LOT-001", SupplierLotNo: inventoryStringPtr("SUP-LOT-001"), Status: "ACTIVE", Version: 1, ReceivedAt: &at, CreatedAt: at, UpdatedAt: at}}, 1, nil
@@ -150,7 +154,7 @@ func TestRPCDocumentedExamples(t *testing.T) {
 	if err := json.Unmarshal(raw, &examples); err != nil {
 		t.Fatal(err)
 	}
-	registered := []string{"admin.audit_logs", "admin.me", "admin.set_role_settings", "attachment.clear_material_image", "attachment.list_material_image_references", "inventory.list_inventory_balances", "inventory.list_inventory_lots", "inventory.list_inventory_txns", "sales_order.export_sales_orders"}
+	registered := []string{"admin.audit_logs", "admin.me", "admin.set_role_settings", "attachment.clear_material_image", "attachment.list_material_image_references", "inventory.get_inventory_distribution", "inventory.list_inventory_balances", "inventory.list_inventory_lots", "inventory.list_inventory_txns", "sales_order.export_sales_orders"}
 	for _, key := range registered {
 		t.Run(key, func(t *testing.T) {
 			example, present := examples[key]

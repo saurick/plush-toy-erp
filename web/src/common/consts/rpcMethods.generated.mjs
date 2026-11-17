@@ -140,6 +140,7 @@ export const RpcMethod = Object.freeze({
   inventory: Object.freeze({
     CANCEL_INVENTORY_OPERATION: 'cancel_inventory_operation',
     CREATE_INVENTORY_OPERATION: 'create_inventory_operation',
+    GET_INVENTORY_DISTRIBUTION: 'get_inventory_distribution',
     GET_INVENTORY_OPERATION: 'get_inventory_operation',
     LIST_INVENTORY_BALANCES: 'list_inventory_balances',
     LIST_INVENTORY_LOTS: 'list_inventory_lots',

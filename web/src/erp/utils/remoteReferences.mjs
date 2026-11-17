@@ -5,6 +5,7 @@ import {
   listProducts,
   listProductSKUs,
   listUnits,
+  listSalesOrders,
 } from '../api/masterDataOrderApi.mjs'
 import { listInventoryLots } from '../api/inventoryApi.mjs'
 import { listPurchaseReceipts } from '../api/purchaseApi.mjs'
@@ -17,12 +18,14 @@ import {
   unitOption,
   inventoryLotOption,
   purchaseReceiptOption,
+  salesOrderOption,
 } from './referenceSelectOptions.mjs'
 import { listReferenceRecordsByIDs } from './referencePagination.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 
 export const remoteReferences = {
+  sales_orders: { list: listSalesOrders, option: salesOrderOption, lookupParams: { lifecycle_scope: 'all' } },
   customers: { list: listCustomers, option: customerOption, active: true },
   suppliers: { list: listSuppliers, option: supplierOption, active: true },
   materials: { list: listMaterials, option: materialOption, active: true },
@@ -51,7 +54,7 @@ export function mergeReferenceRecords(current, incoming) {
 export function loadReferenceIDs(type, ids, options = {}) {
   return listReferenceRecordsByIDs(
     remoteReferences[type].list,
-    {},
+    remoteReferences[type].lookupParams || {},
     type,
     ids,
     options
@@ -59,6 +62,7 @@ export function loadReferenceIDs(type, ids, options = {}) {
 }
 
 const referencePermissions = {
+  sales_orders: PermissionCode.SALES_ORDER_READ,
   customers: PermissionCode.CUSTOMER_READ,
   suppliers: PermissionCode.SUPPLIER_READ,
   materials: PermissionCode.MATERIAL_READ,

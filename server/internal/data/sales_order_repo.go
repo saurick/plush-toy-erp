@@ -230,6 +230,9 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 
 func (r *salesOrderRepo) salesOrderListQuery(filter biz.SalesOrderFilter) *ent.SalesOrderQuery {
 	query := r.data.postgres.SalesOrder.Query()
+	if len(filter.IDs) > 0 {
+		query = query.Where(salesorder.IDIn(filter.IDs...))
+	}
 	if filter.Keyword != "" {
 		query = query.Where(salesorder.Or(
 			businessDocumentKeyword("sales", filter.Keyword),

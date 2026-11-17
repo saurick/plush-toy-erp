@@ -21,7 +21,6 @@ const MAX_NET_WEIGHT_SCALED = NumericContract.maxUnits
 const HALF_DECIMAL_FACTOR_TEXT = '5'.padEnd(DECIMAL_SCALE, '0')
 const POSITIVE_DECIMAL_PATTERN =
   /^\+?(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/u
-const SHIPMENT_WEIGHT_REFERENCE_PAGE_SIZE = 200
 
 function normalizedID(value) {
   const text = String(value ?? '').trim()
@@ -200,76 +199,6 @@ function recordByID(records, id) {
       (record) => normalizedID(record?.id) === targetID
     ) || null
   )
-}
-
-function invalidShipmentWeightReferenceResponse() {
-  const error = new Error('产品净重资料不完整，请刷新后重试')
-  error.isInvalidResponse = true
-  return error
-}
-
-export async function listAllShipmentWeightReferenceRecords(
-  listPage,
-  itemKey,
-  params = {}
-) {
-  if (typeof listPage !== 'function' || typeof itemKey !== 'string') {
-    throw invalidShipmentWeightReferenceResponse()
-  }
-
-  const baseParams = { ...params }
-  delete baseParams.active_only
-  delete baseParams.limit
-  delete baseParams.offset
-  const records = []
-  const recordIDs = new Set()
-  let expectedTotal = null
-  let offset = 0
-
-  for (;;) {
-    const data = await listPage({
-      ...baseParams,
-      limit: SHIPMENT_WEIGHT_REFERENCE_PAGE_SIZE,
-      offset,
-    })
-    const page = data?.[itemKey]
-    const total = data?.total
-    const responseLimit = data?.limit
-    const responseOffset = data?.offset
-    if (
-      !Array.isArray(page) ||
-      !Number.isSafeInteger(total) ||
-      total < 0 ||
-      !Number.isSafeInteger(responseLimit) ||
-      responseLimit <= 0 ||
-      responseLimit > SHIPMENT_WEIGHT_REFERENCE_PAGE_SIZE ||
-      page.length > responseLimit ||
-      !Number.isSafeInteger(responseOffset) ||
-      responseOffset !== offset ||
-      (expectedTotal !== null && total !== expectedTotal)
-    ) {
-      throw invalidShipmentWeightReferenceResponse()
-    }
-    expectedTotal ??= total
-
-    for (const record of page) {
-      const recordID = normalizedID(record?.id)
-      if (!recordID || recordIDs.has(recordID)) {
-        throw invalidShipmentWeightReferenceResponse()
-      }
-      recordIDs.add(recordID)
-      records.push(record)
-    }
-
-    if (records.length > expectedTotal) {
-      throw invalidShipmentWeightReferenceResponse()
-    }
-    if (records.length === expectedTotal) return records
-    if (page.length === 0 || page.length < responseLimit) {
-      throw invalidShipmentWeightReferenceResponse()
-    }
-    offset += page.length
-  }
 }
 
 export function shipmentWeightReferenceOption(record, toOption) {

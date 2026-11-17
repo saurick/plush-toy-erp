@@ -176,6 +176,7 @@ type SalesOrderWithItems struct {
 }
 
 type SalesOrderFilter struct {
+	IDs             []int
 	Keyword         string
 	CustomerID      int
 	BOMID           int

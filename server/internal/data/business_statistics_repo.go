@@ -227,89 +227,90 @@ func (r *businessStatisticsRepo) query(q biz.BusinessStatisticsQuery) (string, [
 	return cte, args
 }
 
-func validateStatisticsBalances(ctx context.Context, tx *sql.Tx, q biz.BusinessStatisticsQuery, cte string, args []any) error {
-	if q.Report != "receivables" {
-		return nil
-	}
-	var invalid int
-	if err := tx.QueryRowContext(ctx, cte+` SELECT COUNT(*) FROM balances WHERE balance<0 OR allocated<0 OR credited<0`, args...).Scan(&invalid); err != nil {
-		return err
-	}
-	if invalid > 0 {
-		return biz.ErrBadParam
-	}
-	return nil
-}
-
 func (r *businessStatisticsRepo) Statistics(ctx context.Context, q biz.BusinessStatisticsQuery) (*biz.BusinessStatisticsBoard, error) {
 	out := &biz.BusinessStatisticsBoard{Report: q.Report, GroupBy: q.GroupBy, Currency: q.Currency, DateFrom: q.DateFrom, DateTo: q.DateTo, SnapshotAt: q.SnapshotAt, Access: q.Access, Groups: []biz.BusinessStatisticsGroup{}}
 	err := r.reader.read(ctx, func(tx *sql.Tx) error {
 		cte, args := r.query(q)
-		if err := validateStatisticsBalances(ctx, tx, q, cte, args); err != nil {
-			return err
-		}
-		metrics := deliveryMetricsSQL
+		metrics, n := deliveryMetricsSQL, 12
 		scan := func(s statisticsScanner, m *biz.BusinessStatisticsMetrics) error {
 			return scanDeliveryMetrics(s, m, q.Access.SalesAmounts)
 		}
+		invalid := "0"
 		if q.Report == "receivables" {
-			metrics = receivableMetricsSQL
-			scan = scanReceivableMetrics
+			metrics, n, scan = receivableMetricsSQL, 10, scanReceivableMetrics
+			invalid = "(SELECT COUNT(*) FROM balances WHERE balance<0 OR allocated<0 OR credited<0)"
 		}
-		if err := scan(tx.QueryRowContext(ctx, cte+" SELECT "+metrics+" FROM scope_rows", args...), &out.Counts); err != nil {
-			return err
-		}
-		if err := scan(tx.QueryRowContext(ctx, cte+" SELECT "+metrics+" FROM selected", args...), &out.Totals); err != nil {
-			return err
-		}
-		if err := tx.QueryRowContext(ctx, cte+` SELECT COUNT(DISTINCT group_key) FROM selected`, args...).Scan(&out.Total); err != nil {
-			return err
+		names := make([]string, n)
+		for i := range names {
+			names[i] = fmt.Sprintf("metric_%d", i)
 		}
 		order := map[string]string{"count": "COUNT(*)", "name": "MIN(group_name)", "overdue": "SUM(overdue)", "amount": "SUM(amount)"}[q.Sort]
 		if q.Report == "receivables" && q.Sort == "amount" {
 			order = "SUM(balance)"
 		}
-		args = append(args, q.Limit, q.Offset)
-		rows, err := tx.QueryContext(ctx, cte+` SELECT group_key,MIN(group_name),`+metrics+` FROM selected GROUP BY group_key ORDER BY `+order+" "+q.Direction+fmt.Sprintf(",MIN(group_name),group_key LIMIT $%d OFFSET $%d", len(args)-1, len(args)), args...)
+		args = append(args, q.Offset, q.Limit)
+		offset, limit := fmt.Sprintf("$%d", len(args)-1), fmt.Sprintf("$%d", len(args))
+		// One statement shares the aggregate source; only summaries and the requested
+		// group page cross the database boundary, even for empty or later pages.
+		query := cte + `, grouped(group_key,group_name,` + strings.Join(names, ",") + `,ordinal) AS (
+ SELECT group_key,MIN(group_name),` + metrics + `,ROW_NUMBER() OVER(ORDER BY ` + order + " " + q.Direction + `,MIN(group_name),group_key)
+ FROM selected GROUP BY group_key), report AS (
+ SELECT 0 AS section,'' AS group_key,'' AS group_name,0 AS ordinal,(SELECT COUNT(*) FROM grouped) AS total,` + invalid + ` AS invalid,` + metrics + ` FROM scope_rows
+ UNION ALL SELECT 1,'','',0,0,0,` + metrics + ` FROM selected
+ UNION ALL SELECT 2,group_key,group_name,ordinal,0,0,` + strings.Join(names, ",") + ` FROM grouped WHERE ordinal>` + offset + ` AND ordinal<=` + offset + `+` + limit + `)
+ SELECT * FROM report ORDER BY section,ordinal`
+		if r.reader.data.sqlDialect == dialect.SQLite {
+			query = statisticsBindParameter.ReplaceAllString(query, `?${1}`)
+		}
+		rows, err := tx.QueryContext(ctx, query, args...)
 		if err != nil {
 			return err
 		}
 		defer func() { _ = rows.Close() }()
 		for rows.Next() {
-			g := biz.BusinessStatisticsGroup{}
-			if err = scan(&statisticsGroupScanner{rows: rows, key: &g.Key, name: &g.Name}, &g.BusinessStatisticsMetrics); err != nil {
+			var section, ordinal, total, invalid int
+			var key, name string
+			var metric biz.BusinessStatisticsMetrics
+			if err := scan(statisticsPrefixedScanner{rows: rows, prefix: []any{&section, &key, &name, &ordinal, &total, &invalid}}, &metric); err != nil {
 				return err
 			}
-			out.Groups = append(out.Groups, g)
+			if invalid > 0 {
+				return biz.ErrBadParam
+			}
+			switch section {
+			case 0:
+				out.Counts = metric
+				out.Total = total
+			case 1:
+				out.Totals = metric
+			case 2:
+				out.Groups = append(out.Groups, biz.BusinessStatisticsGroup{Key: key, Name: name, BusinessStatisticsMetrics: metric})
+			}
 		}
 		return rows.Err()
 	})
 	return out, err
 }
 
-type statisticsGroupScanner struct {
-	rows      *sql.Rows
-	key, name *string
+type statisticsPrefixedScanner struct {
+	rows   *sql.Rows
+	prefix []any
 }
 
-func (s *statisticsGroupScanner) Scan(dest ...any) error {
-	return s.rows.Scan(append([]any{s.key, s.name}, dest...)...)
+func (s statisticsPrefixedScanner) Scan(dest ...any) error {
+	return s.rows.Scan(append(s.prefix, dest...)...)
 }
 
 func (r *businessStatisticsRepo) StatisticsSources(ctx context.Context, q biz.BusinessStatisticsQuery) (*biz.BusinessStatisticsSources, error) {
 	out := &biz.BusinessStatisticsSources{DateFrom: q.DateFrom, DateTo: q.DateTo, Rows: []biz.BusinessStatisticsSource{}, SnapshotAt: q.SnapshotAt, Access: q.Access}
 	err := r.reader.read(ctx, func(tx *sql.Tx) error {
 		cte, args := r.query(q)
-		if err := validateStatisticsBalances(ctx, tx, q, cte, args); err != nil {
-			return err
-		}
 		args = append(args, q.GroupKey)
 		where := fmt.Sprintf(" WHERE group_key=$%d AND ", len(args)) + statisticsStatusWhere(q.SourceStatus)
-		var name sql.NullString
-		if err := tx.QueryRowContext(ctx, cte+` SELECT COUNT(*),MIN(group_name) FROM selected`+where, args...).Scan(&out.Total, &name); err != nil {
-			return err
+		invalid := "0"
+		if q.Report == "receivables" {
+			invalid = "(SELECT COUNT(*) FROM balances WHERE balance<0 OR allocated<0 OR credited<0)"
 		}
-		out.GroupName = name.String
 		projection := `id,number,customer,product,product_count,due_date,
  CASE WHEN overdue=1 THEN 'overdue' ELSE delivery_status END,owner,unit,
  CAST(ordered_quantity AS TEXT),CAST(shipped_quantity AS TEXT),CAST(CASE WHEN missing_amount=0 THEN amount END AS TEXT),''`
@@ -317,7 +318,16 @@ func (r *businessStatisticsRepo) StatisticsSources(ctx context.Context, q biz.Bu
 			projection = `id,fact_no,group_name,'',0,due_date,aging,'','',NULL,NULL,CAST(balance AS TEXT),source_number`
 		}
 		args = append(args, q.Limit, q.Offset)
-		rows, err := tx.QueryContext(ctx, cte+" SELECT "+projection+" FROM selected"+where+fmt.Sprintf(" ORDER BY overdue DESC,CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,due_date,id LIMIT $%d OFFSET $%d", len(args)-1, len(args)), args...)
+		order := "overdue DESC,CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,due_date,id"
+		statement := cte + `, source_scope AS (SELECT * FROM selected` + where + `), source_page(ordinal,id,number,customer,product,product_count,due_date,status,owner,unit,ordered_quantity,shipped_quantity,amount,source_number) AS (
+ SELECT ROW_NUMBER() OVER(ORDER BY ` + order + `),` + projection + ` FROM source_scope` + fmt.Sprintf(" ORDER BY "+order+" LIMIT $%d OFFSET $%d", len(args)-1, len(args)) + `)
+ SELECT 0 AS section,COUNT(*) AS total,MIN(group_name) AS group_name,` + invalid + ` AS invalid,0 AS ordinal,
+ 0 AS id,'' AS number,'' AS customer,'' AS product,0 AS product_count,NULL AS due_date,'' AS status,'' AS owner,'' AS unit,NULL AS ordered_quantity,NULL AS shipped_quantity,NULL AS amount,'' AS source_number FROM source_scope
+ UNION ALL SELECT 1,0,'',0,source_page.* FROM source_page ORDER BY section,ordinal`
+		if r.reader.data.sqlDialect == dialect.SQLite {
+			statement = statisticsBindParameter.ReplaceAllString(statement, `?${1}`)
+		}
+		rows, err := tx.QueryContext(ctx, statement, args...)
 		if err != nil {
 			return err
 		}
@@ -325,8 +335,18 @@ func (r *businessStatisticsRepo) StatisticsSources(ctx context.Context, q biz.Bu
 		for rows.Next() {
 			row := biz.BusinessStatisticsSource{}
 			var product, due, ordered, shipped, amount sql.NullString
-			if err = rows.Scan(&row.ID, &row.Number, &row.Customer, &product, &row.ProductCount, &due, &row.Status, &row.Owner, &row.Unit, &ordered, &shipped, &amount, &row.SourceNumber); err != nil {
+			var section, total, invalid, ordinal int
+			var groupName sql.NullString
+			if err = rows.Scan(&section, &total, &groupName, &invalid, &ordinal, &row.ID, &row.Number, &row.Customer, &product, &row.ProductCount, &due, &row.Status, &row.Owner, &row.Unit, &ordered, &shipped, &amount, &row.SourceNumber); err != nil {
 				return err
+			}
+			if invalid > 0 {
+				return biz.ErrBadParam
+			}
+			if section == 0 {
+				out.Total = total
+				out.GroupName = groupName.String
+				continue
 			}
 			row.Product, row.DueDate = product.String, due.String
 			if row.OrderedQuantity, err = statisticsDecimal(ordered); err != nil {

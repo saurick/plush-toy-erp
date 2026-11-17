@@ -2,15 +2,81 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/workflowtask"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 )
+
+func TestWorkflowIdentitySearchRejectsMalformedFulfillmentBinding(t *testing.T) {
+	ctx := context.Background()
+	_, client := openInventoryRepoTestData(t, "workflow_identity_binding_contract")
+	fixture := createInventoryTestFixtures(t, ctx, client)
+	const keyword = "SOURCE-IDENTITY-ONLY"
+	client.Product.UpdateOneID(fixture.productID).SetStyleNo(keyword).SaveX(ctx)
+	cases := []struct {
+		name   string
+		change func(*ent.WorkflowTaskUpdateOne, map[string]any)
+	}{
+		{"contract", func(u *ent.WorkflowTaskUpdateOne, p map[string]any) {
+			p["source_task_contract"] = "invalid"
+			u.SetPayload(p)
+		}},
+		{"producer", func(u *ent.WorkflowTaskUpdateOne, p map[string]any) {
+			p["source_task_producer"] = "invalid"
+			u.SetPayload(p)
+		}},
+		{"record", func(u *ent.WorkflowTaskUpdateOne, p map[string]any) { p["source_record_id"] = 0; u.SetPayload(p) }},
+		{"role", func(u *ent.WorkflowTaskUpdateOne, _ map[string]any) { u.SetOwnerRoleKey(biz.SalesRoleKey) }},
+		{"capability", func(u *ent.WorkflowTaskUpdateOne, _ map[string]any) {
+			u.SetRequiredCapabilityKey(biz.PermissionWorkflowTaskRead)
+		}},
+		{"code", func(u *ent.WorkflowTaskUpdateOne, _ map[string]any) { u.SetTaskCode("unbound-code") }},
+		{"group", func(u *ent.WorkflowTaskUpdateOne, _ map[string]any) { u.SetTaskGroup(biz.WorkflowFollowupTaskGroup) }},
+	}
+	for index, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			identity := fmt.Sprintf("BINDING-%d", index)
+			fact := client.OutsourcingFact.Create().SetFactNo(identity).
+				SetFactType(biz.OutsourcingFactReturnReceipt).SetSubjectType(biz.InventorySubjectProduct).
+				SetSubjectID(fixture.productID).SetWarehouseID(fixture.productWarehouseID).
+				SetUnitID(fixture.unitID).SetQuantity(decimal.NewFromInt(1)).SetIdempotencyKey(identity).SaveX(ctx)
+			if err := syncFulfillmentTask(ctx, client, "outsourcing_inbound", fact.ID, fact.FactNo, "/erp/warehouse/inbound", "ready", "", 0); err != nil {
+				t.Fatal(err)
+			}
+			task := assertFulfillmentTask(t, ctx, client, "outsourcing_inbound", fact.ID, "ready", biz.WarehouseRoleKey)
+			for _, p := range []struct {
+				name  string
+				match func() bool
+			}{
+				{"source binding", func() bool {
+					return client.WorkflowTask.Query().Where(workflowtask.ID(task.ID), workflowTaskHasIdentitySourceBinding()).ExistX(ctx)
+				}},
+				{"source search", func() bool {
+					return client.WorkflowTask.Query().Where(workflowtask.ID(task.ID), workflowTaskSourceIdentityKeywordPredicate(keyword)).ExistX(ctx)
+				}},
+			} {
+				if !p.match() {
+					t.Fatalf("valid %s was rejected", p.name)
+				}
+			}
+			update := client.WorkflowTask.UpdateOneID(task.ID)
+			tc.change(update, task.Payload)
+			update.SaveX(ctx)
+			if client.WorkflowTask.Query().Where(workflowtask.ID(task.ID), workflowTaskHasIdentitySourceBinding()).ExistX(ctx) ||
+				client.WorkflowTask.Query().Where(workflowtask.ID(task.ID), workflowTaskSourceIdentityKeywordPredicate(keyword)).ExistX(ctx) {
+				t.Fatal("malformed source binding exposed the linked product identity")
+			}
+		})
+	}
+}
 
 func TestWorkflowOutsourcingFactIdentitySearchRespectsVisibility(t *testing.T) {
 	ctx := context.Background()

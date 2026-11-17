@@ -4,6 +4,7 @@ import BusinessLineItemActionButton from '../business-list/BusinessLineItemActio
 
 import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
@@ -275,7 +276,9 @@ export default function PurchaseReceiptExceptionModal({
                                       },
                                     ]}
                                   >
-                                    <Select
+                                    <RemoteReferenceSelect
+                                      referenceType="inventory_lots"
+                                      params={{ subject_type: 'MATERIAL' }}
                                       placeholder="请选择目标批次"
                                       showSearch
                                       optionFilterProp="label"

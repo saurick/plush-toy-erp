@@ -14,7 +14,7 @@ import (
 )
 
 func workflowExceptionCTE(q biz.WorkflowExceptionQuery) (string, []any) {
-	visible, args := progressTaskSQL(biz.BusinessProgressQuery{Access: biz.BusinessProgressAccess{Tasks: true}, TaskVisibility: q.Visibility})
+	visible, args := workflowTaskVisibilitySQL(q.Visibility)
 	t := entsql.Dialect(dialect.Postgres).Table("visible_tasks")
 	s := entsql.Dialect(dialect.Postgres).Select(t.C("id")).From(t)
 	workflowTaskDiscoveryPredicate(q.WorkflowTaskDiscoveryFilter)(s)

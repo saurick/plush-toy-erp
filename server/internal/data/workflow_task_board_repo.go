@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	stdsql "database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,59 +12,21 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/workflowtask"
 
-	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
 )
 
 func (r *workflowRepo) GetWorkflowTaskBoard(ctx context.Context, query biz.WorkflowTaskBoardQuery) (*biz.WorkflowTaskBoard, error) {
-	if r == nil || r.data == nil || r.data.postgres == nil || query.SnapshotAt.IsZero() {
+	if query.SnapshotAt.IsZero() {
 		return nil, biz.ErrBadParam
 	}
-	if r.data.sqldb != nil {
-		return r.getWorkflowTaskBoardInSQLTx(ctx, query)
-	}
-
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { rollbackEntTx(ctx, tx, r.log) }()
-	board, err := loadWorkflowTaskBoard(ctx, tx.Client(), query)
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return board, nil
-}
-
-func (r *workflowRepo) getWorkflowTaskBoardInSQLTx(ctx context.Context, query biz.WorkflowTaskBoardQuery) (*biz.WorkflowTaskBoard, error) {
-	sqlDialect := r.data.sqlDialect
-	if sqlDialect == "" {
-		sqlDialect = dialect.Postgres
-	}
-	txOptions := &stdsql.TxOptions{}
-	if sqlDialect == dialect.Postgres {
-		txOptions.Isolation = stdsql.LevelRepeatableRead
-		txOptions.ReadOnly = true
-	}
-	sqlTx, err := r.data.sqldb.BeginTx(ctx, txOptions)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = sqlTx.Rollback() }()
-	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(sqlDialect, entsql.Conn{ExecQuerier: sqlTx})))
-	board, err := loadWorkflowTaskBoard(ctx, client, query)
-	if err != nil {
-		return nil, err
-	}
-	if err := sqlTx.Commit(); err != nil {
-		return nil, err
-	}
-	return board, nil
+	var board *biz.WorkflowTaskBoard
+	err := r.readWorkflowSnapshot(ctx, query.Keyword, func(client *ent.Client) error {
+		var err error
+		board, err = loadWorkflowTaskBoard(ctx, client, query)
+		return err
+	})
+	return board, err
 }
 
 func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.WorkflowTaskBoardQuery) (*biz.WorkflowTaskBoard, error) {
@@ -130,22 +91,9 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 	if err != nil {
 		return nil, err
 	}
-	total, err := baseQuery.Clone().Count(ctx)
+	total, counts, err := loadWorkflowTaskBoardCounts(ctx, baseQuery, query)
 	if err != nil {
 		return nil, err
-	}
-
-	counts := biz.WorkflowTaskBoardCounts{}
-	for _, laneKey := range biz.WorkflowTaskBoardLaneKeys() {
-		lanePredicate, predicateErr := workflowTaskBoardLanePredicate(laneKey, query)
-		if predicateErr != nil {
-			return nil, predicateErr
-		}
-		count, countErr := baseQuery.Clone().Where(lanePredicate).Count(ctx)
-		if countErr != nil {
-			return nil, countErr
-		}
-		setWorkflowTaskBoardLaneCount(&counts, laneKey, count)
 	}
 	classifiedTotal := counts.Actionable + counts.Exception + counts.Due + counts.Finished
 	if classifiedTotal != total {
@@ -210,6 +158,48 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		OwnerRoleKeys: ownerRoleKeys,
 		Assignees:     assignees,
 	}, nil
+}
+
+func loadWorkflowTaskBoardCounts(ctx context.Context, base *ent.WorkflowTaskQuery, query biz.WorkflowTaskBoardQuery) (int, biz.WorkflowTaskBoardCounts, error) {
+	type laneCount struct {
+		key       string
+		predicate predicate.WorkflowTask
+	}
+	lanes := make([]laneCount, 0, len(biz.WorkflowTaskBoardLaneKeys()))
+	for _, key := range biz.WorkflowTaskBoardLaneKeys() {
+		p, err := workflowTaskBoardLanePredicate(key, query)
+		if err != nil {
+			return 0, biz.WorkflowTaskBoardCounts{}, err
+		}
+		lanes = append(lanes, laneCount{key: key, predicate: p})
+	}
+	var rows []struct {
+		Total      int `json:"total"`
+		Actionable int `json:"actionable"`
+		Exception  int `json:"exception"`
+		Due        int `json:"due"`
+		Finished   int `json:"finished"`
+	}
+	// Reuse the page predicates while evaluating the expensive search only once
+	// for all counts. Only this single aggregate row crosses the database boundary.
+	err := base.Clone().Where(func(s *entsql.Selector) {
+		s.Select(entsql.As("COUNT(*)", "total"))
+		for _, lane := range lanes {
+			condition := entsql.Dialect(s.Dialect()).Select().From(entsql.Table(workflowtask.Table))
+			lane.predicate(condition)
+			s.AppendSelectExprAs(entsql.ExprFunc(func(b *entsql.Builder) {
+				b.WriteString("COALESCE(SUM(CASE WHEN ").Join(condition.P()).WriteString(" THEN 1 ELSE 0 END), 0)")
+			}), lane.key)
+		}
+	}).Select().Scan(ctx, &rows)
+	if err != nil {
+		return 0, biz.WorkflowTaskBoardCounts{}, err
+	}
+	if len(rows) != 1 {
+		return 0, biz.WorkflowTaskBoardCounts{}, fmt.Errorf("%w: expected one count row, got %d", biz.ErrWorkflowTaskBoardStatus, len(rows))
+	}
+	row := rows[0]
+	return row.Total, biz.WorkflowTaskBoardCounts{Actionable: row.Actionable, Exception: row.Exception, Due: row.Due, Finished: row.Finished}, nil
 }
 
 func workflowTaskBoardOrder(sortKey, laneKey string) ([]workflowtask.OrderOption, error) {
@@ -428,22 +418,6 @@ func workflowExceptionTaskPredicate() predicate.WorkflowTask {
 
 func workflowTaskBoardUnsettledStatusPredicate() predicate.WorkflowTask {
 	return workflowtask.TaskStatusKeyIn("ready", "blocked")
-}
-
-func setWorkflowTaskBoardLaneCount(counts *biz.WorkflowTaskBoardCounts, laneKey string, count int) {
-	if counts == nil {
-		return
-	}
-	switch laneKey {
-	case biz.WorkflowTaskBoardLaneActionable:
-		counts.Actionable = count
-	case biz.WorkflowTaskBoardLaneException:
-		counts.Exception = count
-	case biz.WorkflowTaskBoardLaneDue:
-		counts.Due = count
-	case biz.WorkflowTaskBoardLaneFinished:
-		counts.Finished = count
-	}
 }
 
 func workflowTaskBoardLaneCount(counts biz.WorkflowTaskBoardCounts, laneKey string) int {

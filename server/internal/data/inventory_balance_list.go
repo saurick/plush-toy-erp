@@ -169,12 +169,7 @@ func inventoryBalanceListPageSQL(ctx context.Context, dialectName string, filter
  CASE WHEN lot_status<>'ACTIVE' THEN quantity ELSE 0 END AS restricted_quantity
  FROM scoped
  ), balances AS (SELECT * FROM stock` + basePage + `),
- reservations AS (
- SELECT b.id AS balance_id,SUM(s.quantity) AS quantity FROM balances b JOIN stock_reservations s
- ON s.product_id=b.subject_id AND s.warehouse_id=b.warehouse_id AND s.unit_id=b.unit_id
- AND s.product_sku_id IS NOT DISTINCT FROM b.product_sku_id AND s.lot_id IS NOT DISTINCT FROM b.lot_id
- WHERE b.subject_type='PRODUCT' AND s.status='ACTIVE' GROUP BY b.id
- ), receipts AS (
+ ` + inventoryBalanceReservationCTEs("balances") + `, receipts AS (
  SELECT f.*,b.id AS balance_id FROM balances b JOIN production_facts f
  ON f.subject_id=b.subject_id AND f.warehouse_id=b.warehouse_id AND f.unit_id=b.unit_id
  AND f.product_sku_id IS NOT DISTINCT FROM b.product_sku_id AND f.lot_id IS NOT DISTINCT FROM b.lot_id
@@ -184,17 +179,15 @@ func inventoryBalanceListPageSQL(ctx context.Context, dialectName string, filter
  SELECT balance_id,SUM(inspection_quantity) AS pending_inspection_quantity,
  SUM(packaging_quantity) AS pending_packaging_quantity,MAX(invalid_source) AS invalid_source
  FROM receipt_readiness GROUP BY balance_id
- ), available AS (
- SELECT b.*,COALESCE(s.quantity,0) AS active_reserved_quantity,
- CASE WHEN b.quantity>COALESCE(s.quantity,0) THEN b.quantity-COALESCE(s.quantity,0) ELSE 0 END AS available_quantity,
- COALESCE(r.pending_inspection_quantity,0) AS pending_inspection_quantity,
+ ), prepared AS (
+ SELECT b.*,COALESCE(r.pending_inspection_quantity,0) AS pending_inspection_quantity,
  COALESCE(r.pending_packaging_quantity,0) AS pending_packaging_quantity,COALESCE(r.invalid_source,0) AS invalid_source
- FROM balances b LEFT JOIN reservations s ON s.balance_id=b.id LEFT JOIN readiness r ON r.balance_id=b.id
+ FROM available b LEFT JOIN readiness r ON r.balance_id=b.id
  ), ranked AS (
- SELECT available.*,CASE WHEN subject_type='PRODUCT' THEN
+ SELECT prepared.*,CASE WHEN subject_type='PRODUCT' THEN
  CASE WHEN lot_status='ACTIVE' AND available_quantity>pending_inspection_quantity+pending_packaging_quantity
  THEN available_quantity-pending_inspection_quantity-pending_packaging_quantity ELSE 0 END END AS ready_to_ship_quantity
- FROM available
+ FROM prepared
  ) SELECT id,subject_type,subject_id,product_sku_id,warehouse_id,lot_id,unit_id,quantity,updated_at,stock_category,lot_status,
  active_reserved_quantity,available_quantity,COALESCE(issuable_quantity,0),restricted_quantity,
  pending_inspection_quantity,pending_packaging_quantity,COALESCE(ready_to_ship_quantity,0),invalid_source
