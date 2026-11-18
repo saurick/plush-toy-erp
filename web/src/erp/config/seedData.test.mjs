@@ -141,7 +141,7 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(navLabels.includes('加工环节'))
   assert(navLabels.includes('采购订单'))
   assert(navLabels.includes('入库办理'))
-  assert(navLabels.includes('质量检验'))
+  assert(navLabels.includes('质量检验记录'))
   assert(navLabels.includes('库存查询'))
   assert(navLabels.includes('委外订单'))
   assert(navLabels.includes('生产订单'))
@@ -154,21 +154,21 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(navLabels.includes('对账管理'))
   assert(navLabels.includes('应付管理'))
   assert(navLabels.includes('应收管理'))
-  assert(navLabels.includes('收付款核销'))
+  assert(navLabels.includes('收付款单'))
   assert(navLabels.includes('发票管理'))
   assert.deepEqual(
     financeItems.map((item) => [item.key, item.label]),
     [
       ['receivables', '应收管理'],
       ['payables', '应付管理'],
-      ['finance-payments', '收付款核销'],
+      ['finance-payments', '收付款单'],
       ['reconciliation', '对账管理'],
       ['invoices', '发票管理'],
     ]
   )
   assert.equal(
     financeItems.find((item) => item.key === 'finance-payments')?.title,
-    '收付款与核销'
+    '收付款单'
   )
   assert(!navLabels.includes('客户/供应商'))
   assert(!navLabels.includes('订单/款式立项'))

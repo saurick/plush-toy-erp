@@ -25,6 +25,17 @@ import {
   withProgressFilters,
 } from './businessProgress.mjs'
 
+test('进度表排序随视图和方向校验，清除或切换成不适用的视图后移除整组参数', () => {
+  const lines = new URLSearchParams('view=orders&display=lines&q=小熊&sort_by=product&sort_direction=desc')
+  assert.equal(progressQueryFromURL(lines).sort_by, 'product')
+  assert.equal(progressQueryFromURL(lines).sort_direction, 'desc')
+  for (const changes of [{ display: '' }, { view: 'production' }, { sort_direction: 'unknown' }, { sort_by: '' }]) {
+    const next = withProgressFilters(lines, changes)
+    assert.equal(next.has('sort_by') || next.has('sort_direction'), false)
+    assert.equal(next.get('q'), '小熊')
+  }
+})
+
 test('progress search describes matching styles without changing order quantities or default labels', () => {
   const row = { ...progressFixtureRow(), product: '饼干小熊', product_count: 8, product_type_count: 6, product_match_count: 2 }
   assert.equal(progressProductLabel(row), '饼干小熊（命中 2 款，共 6 款）')
@@ -188,8 +199,8 @@ test('source links identify the source record and keep task codes encoded', () =
     '/erp/sales/project-orders/sales-orders?sales_order_id=4'
   )
   assert.equal(
-    progressSourcePath({ kind: 'task', number: 'TASK + 1' }),
-    '/erp/task-board?q=TASK%20%2B%201&status=all'
+    progressSourcePath({ kind: 'task', id: 42, number: 'TASK + 1' }),
+    '/erp/task-board?task_id=42'
   )
 })
 

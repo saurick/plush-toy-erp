@@ -43,7 +43,10 @@ import {
   useBusinessColumnOrder,
 } from '../business-list/BusinessListToolbarActions.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
-import { canReadProductionExceptionDecisions, productionExceptionSummary } from '../../utils/productionRecordViews.mjs'
+import {
+  canReadProductionExceptionDecisions, productionExceptionSummary, productionExceptionExecutionLabel,
+  PRODUCTION_EXCEPTION_APPROVAL_LABELS, PRODUCTION_EXCEPTION_EXECUTION_LABELS,
+} from '../../utils/productionRecordViews.mjs'
 import ProductionRecordDrawer from '../production-records/ProductionRecordDrawer.jsx'
 import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
@@ -90,17 +93,6 @@ const TYPE_LABELS = {
   OVER_ISSUE: '超领申请',
   WIP_CONCESSION: '在制品让步',
 }
-const STATUS_LABELS = {
-  [ProductionExceptionStatus.SUBMITTED]: '待审批',
-  [ProductionExceptionStatus.APPROVED]: '已批准',
-  [ProductionExceptionStatus.REJECTED]: '已拒绝',
-  [ProductionExceptionStatus.CANCELLED]: '已取消',
-}
-const EXECUTION_LABELS = {
-  [ProductionExceptionExecutionStatus.PENDING]: '待业务办理',
-  [ProductionExceptionExecutionStatus.APPLIED]: '业务已执行',
-  [ProductionExceptionExecutionStatus.REVERSED]: '业务已冲正',
-}
 const TYPE_FILTER_OPTIONS = [
   { label: '全部异常类型', value: '' },
   ...['SCRAP', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE'].map((value) => ({ label: TYPE_LABELS[value], value })),
@@ -110,8 +102,8 @@ const TYPE_FILTER_OPTIONS = [
 const EXECUTION_FILTER_OPTIONS = [
   { label: '全部业务状态', value: '' },
   { label: '待办理 / 额度生效', value: ProductionExceptionExecutionStatus.PENDING },
-  { label: EXECUTION_LABELS.APPLIED, value: ProductionExceptionExecutionStatus.APPLIED },
-  { label: EXECUTION_LABELS.REVERSED, value: ProductionExceptionExecutionStatus.REVERSED },
+  { label: PRODUCTION_EXCEPTION_EXECUTION_LABELS.APPLIED, value: ProductionExceptionExecutionStatus.APPLIED },
+  { label: PRODUCTION_EXCEPTION_EXECUTION_LABELS.REVERSED, value: ProductionExceptionExecutionStatus.REVERSED },
 ]
 function mutationReceiptMatches(item, action, reason, actorID) {
   const record = action?.record
@@ -150,6 +142,7 @@ export default function ProductionExceptionDecisionPanel({
 }) {
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const taskBusiness = useBusinessPageContext()?.taskBusiness
+  const inTask = Boolean(taskBusiness)
   const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useBusinessSearchParams()
@@ -248,7 +241,7 @@ export default function ProductionExceptionDecisionPanel({
         setRows([exactRecord])
         setTotal(1)
         setSelectedID(exactRecord.id)
-        if (linkedDetailOpenedRef.current !== exactRecord.id) {
+        if (!inTask && linkedDetailOpenedRef.current !== exactRecord.id) {
           linkedDetailOpenedRef.current = exactRecord.id
           setDetailID(exactRecord.id)
         }
@@ -312,6 +305,7 @@ export default function ProductionExceptionDecisionPanel({
       }
     }
   }, [
+    inTask,
     keyword,
     handlingStatus,
     beginLatestRequest,
@@ -522,33 +516,33 @@ export default function ProductionExceptionDecisionPanel({
         defaultPriority: 30,
         title: '审批状态',
         dataIndex: 'status',
-        render: (value) => <Tag>{STATUS_LABELS[value] || '状态待确认'}</Tag>,
+        render: (value) => <Tag>{PRODUCTION_EXCEPTION_APPROVAL_LABELS[value] || '状态待确认'}</Tag>,
       },
       {
         defaultPriority: 40,
         title: '业务状态',
         dataIndex: 'execution_status',
-        render: (value, record) => (
-          <Tag>
-            {record.decision_type === 'OVER_ISSUE' &&
-            record.status === ProductionExceptionStatus.APPROVED &&
-            value === 'PENDING'
-              ? '超领额度生效'
-              : EXECUTION_LABELS[value] || '待业务办理'}
-          </Tag>
-        ),
+        render: (_, record) => <Tag>{productionExceptionExecutionLabel(record)}</Tag>,
       },
       { align: 'left', title: '原因', dataIndex: 'reason' },
     ],
     []
   )
-  const { tableColumns, openColumnOrder, columnOrderModal } =
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
       moduleKey: 'production-exceptions-decisions',
       moduleTitle: '生产异常处置申请',
       columns,
     })
+
+  const detailColumns = useMemo(() => [
+    ...visibleColumns,
+    { title: '批准数量', dataIndex: 'approved_quantity' },
+    { title: '审批意见', dataIndex: 'decision_reason' },
+    { title: '执行原因', dataIndex: 'execution_reason' },
+    { title: '冲正原因', dataIndex: 'reverse_reason' },
+  ], [visibleColumns])
 
   if (!canRead) return null
 
@@ -873,6 +867,7 @@ export default function ProductionExceptionDecisionPanel({
         rowKey="id"
         loading={loading}
         columns={tableColumns}
+        taskDetailColumns={detailColumns}
         dataSource={rows}
         rowSelection={{
             type: 'radio',
@@ -908,11 +903,7 @@ export default function ProductionExceptionDecisionPanel({
         title="生产异常详情"
         record={detailRecord}
         summary={productionExceptionSummary(detailRecord || {})}
-        columns={[...columns,
-          { title: '审批意见', dataIndex: 'decision_reason' },
-          { title: '执行原因', dataIndex: 'execution_reason' },
-          { title: '冲正原因', dataIndex: 'reverse_reason' },
-        ]}
+        columns={detailColumns}
         actions={detailID === selectedID && actionAvailability.execute.visible ? (
           <Button type="primary" disabled={actionAvailability.execute.disabled} onClick={beginExecution}>确认执行</Button>
         ) : null}
@@ -921,6 +912,7 @@ export default function ProductionExceptionDecisionPanel({
         taskInline
         size="confirm"
         title="确认生产异常处置"
+        hasChanges={reason.length > 0}
         open={Boolean(action)}
         confirmLoading={loading}
         maskClosable={!loading}
@@ -938,6 +930,8 @@ export default function ProductionExceptionDecisionPanel({
           <strong>{action?.record?.decision_no || '异常申请待核对'} · {TYPE_LABELS[action?.record?.decision_type] || '生产异常'}</strong>
           {action?.record ? renderExceptionSource(action.record, true) : null}
           <p>{productionExceptionSummary(action?.record || {}).next}</p>
+          {action?.kind === 'execute' && action.record.approved_quantity != null ? <p>批准数量：{action.record.approved_quantity}</p> : null}
+          {action?.record?.decision_reason ? <p>审批意见：{action.record.decision_reason}</p> : null}
           <label htmlFor="production-exception-reason">{reasonLabel}</label>
           <Input.TextArea
             id="production-exception-reason"

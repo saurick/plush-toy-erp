@@ -4,6 +4,7 @@ import { Alert, Button, Tag } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../../utils/moduleTableColumns.mjs'
 import { BusinessOperationPanel, SearchInput, SelectFilter } from '../business-list/BusinessListLayout.jsx'
 import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import { clearTrackingFilters, readTrackingFilters, writeTrackingFilters, readTrackingPagination, writeTrackingPagination, TRACKING_STATUS_OPTIONS, TRACKING_SCOPE_OPTIONS, TRACKING_ROLE_OPTIONS, TRACKING_ATTENTION_OPTIONS, TRACKING_SOURCE_OPTIONS } from '../../utils/workflowTrackingFilters.mjs'
@@ -23,6 +24,8 @@ import { WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import './workflowTracking.css'
 import useBusinessListStickyHeader from '../business-list/useBusinessListStickyHeader.js'
 
+const trackingSortFields = { started_at: 'started_at' }
+
 export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, onOpenTask, onScopeChange, taskHandlingOpen = false, toolbarContainer = null }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [result, setResult] = useState(null)
@@ -38,6 +41,9 @@ export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, o
   const source = sourceType && Number.isSafeInteger(sourceID) && sourceID > 0
     ? { source_type: sourceType, source_id: sourceID } : {}
   const filters = readTrackingFilters(searchParams, scope)
+  const sortKey = `track_sort_${scope}`
+  const direction = searchParams.get(sortKey)
+  const sort = ['asc', 'desc'].includes(direction) ? { sort_by: 'started_at', sort_direction: direction } : null
   const { page: pageNumber, pageSize } = readTrackingPagination(searchParams, scope)
   const changeFilters = (changes) => setSearchParams((current) => writeTrackingFilters(current, scope, changes), { replace: true })
   const changePage = (number, size) => {
@@ -48,7 +54,7 @@ export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, o
   const hasFilters = Boolean(keyword || Object.values(filters).some(Boolean))
   const filtersKey = JSON.stringify({ scope, keyword, ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value)), ...source, limit: pageSize })
   const listKey = JSON.stringify([filtersKey, sessionKey])
-  const paramsKey = JSON.stringify({ ...JSON.parse(filtersKey), offset: (pageNumber - 1) * pageSize })
+  const paramsKey = JSON.stringify({ ...JSON.parse(filtersKey), ...(sort ? { sort_direction: direction } : {}), offset: (pageNumber - 1) * pageSize })
   const key = JSON.stringify([paramsKey, sessionKey, refreshKey, reload])
   const search = {
     resetKey: scope,
@@ -157,7 +163,13 @@ render: (_, entry) => (
             <SelectFilter aria-label="当前岗位" value={filters.owner_role_key} disabled={filters.status === 'completed'} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => changeFilters({ owner_role_key })} />
             {!source.source_id ? <SelectFilter aria-label="单据类型" value={filters.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => changeFilters({ source_type })} /> : null}
             <SelectFilter aria-label="关注事项" value={filters.attention} disabled={filters.status === 'completed'} options={TRACKING_ATTENTION_OPTIONS} onChange={(attention) => changeFilters({ attention })} />
-            <DateRangeFilter options={[{ value: 'started_at', label: '发起时间' }]} value="started_at" startValue={filters.date_from} endValue={filters.date_to} onStartChange={(date_from) => changeFilters({ date_from })} onEndChange={(date_to) => changeFilters({ date_to })} />
+            <DateRangeFilter
+              options={[{ value: 'started_at', label: '发起时间' }]}
+              value="started_at"
+              startValue={filters.date_from}
+              endValue={filters.date_to}
+              onRangeChange={(date_from, date_to) => changeFilters({ date_from, date_to })}
+            />
           </>
         )}
         actions={source.source_id ? <Button onClick={() => { const next = new URLSearchParams(searchParams); next.delete('track_source_type'); next.delete('track_source_id'); for (const view of ['started', 'participated', 'visible']) next.delete(`track_page_${view}`); setSearchParams(next) }}>清除单据范围</Button> : null}
@@ -174,7 +186,16 @@ render: (_, entry) => (
           sticky={sticky}
           scrollToolbar
           rowKey={(entry) => `${entry.kind}:${entry.id}`}
-          columns={columns}
+          columns={applyBusinessServerColumnSorters(columns, trackingSortFields, sort)}
+          onChange={(_page, _filters, sorter) => {
+            const nextSort = readBusinessServerTableSort(sorter, trackingSortFields)
+            setSearchParams((previous) => {
+              const next = writeTrackingPagination(previous, scope, 1, pageSize)
+              if (nextSort) next.set(sortKey, nextSort.sort_direction)
+              else next.delete(sortKey)
+              return next
+            }, { replace: true })
+          }}
           dataSource={page?.items || []}
           loading={!current || outOfRange}
           pagination={false}

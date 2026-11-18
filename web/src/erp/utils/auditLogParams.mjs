@@ -7,6 +7,7 @@ function normalizeString(value) {
 export function buildAuditLogParams({
   source = '',
   eventKey = '',
+  eventType = '',
   keyword = '',
   createdFrom = '',
   createdTo = '',
@@ -26,6 +27,10 @@ export function buildAuditLogParams({
   const normalizedEventKey = normalizeString(eventKey)
   if (normalizedEventKey) {
     params.event_key = normalizedEventKey
+  }
+  const normalizedEventType = normalizeString(eventType)
+  if (normalizedEventType) {
+    params.event_type = normalizedEventType
   }
 
   const normalizedKeyword = normalizeString(keyword)

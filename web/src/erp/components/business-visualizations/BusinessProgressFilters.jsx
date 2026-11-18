@@ -1,20 +1,52 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button } from 'antd'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import FilterSelect from '@/common/components/select/FilterSelect.jsx'
 import { listBusinessProgressOwners } from '../../api/businessProgressApi.mjs'
-import { savedTextFilterValue, withSavedTextFilter } from '../../utils/businessFilterPresentation.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../RemoteReferenceSelect.jsx'
+import FilterSelect from '@/common/components/select/FilterSelect.jsx'
+import FilterField from '@/common/components/navigation/FilterField.jsx'
+import { savedTextFilterValue, withSavedTextFilter } from '../../utils/businessFilterPresentation.mjs'
+import { canReadReference } from '../../utils/remoteReferences.mjs'
 import MobileFilterChoices from '../../mobile/components/MobileFilterChoices.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
+  PROGRESS_DELIVERY_STATUS_OPTIONS,
   progressDueOptions,
 } from '../../utils/businessProgress.mjs'
 
 const countLabel = (value) =>
   Number.isSafeInteger(value) ? value.toLocaleString('zh-CN') : '—'
+
+const deliveryViews = [{ value: 'orders', label: '整单' }, { value: 'lines', label: '产品明细' }]
+
+export function ProgressDeliverySwitch({ query, onChange }) {
+  return <SlidingSegmented aria-label="交付查看方式" hierarchy="secondary" options={deliveryViews} value={query.display || 'orders'} onChange={onChange} />
+}
+
+export function ProgressDeliveryFilters({ query, counts, onChange }) {
+  return (
+    <div className="erp-progress-due-options" role="group" aria-label="交付明细状态">
+      {PROGRESS_DELIVERY_STATUS_OPTIONS.map(({ value, label }) => {
+        const count = countLabel(value === 'all' ? counts?.total : counts?.delivery?.[value] ?? counts?.[value])
+        return (
+          <FilterChip
+            key={value}
+            selected={query.delivery_status === value}
+            removable={value !== 'all'}
+            count={`${count} 条`}
+            onClick={() => onChange({ delivery_status: query.delivery_status === value ? 'all' : value })}
+          >
+            {label}
+          </FilterChip>
+        )
+      })}
+    </div>
+  )
+}
 
 export function ProgressDueFilters({
   query,
@@ -48,7 +80,7 @@ export function ProgressDueFilters({
 }
 
 export function ProgressBlockedFilter({ query, counts, taskAccess, onChange, compact = false }) {
-  if (query.scope === 'ended') return null
+  if (query.scope === 'ended' || query.display === 'lines') return null
   return (
     <FilterChip
       selected={query.blocked_only}
@@ -89,7 +121,7 @@ function ProgressOwnerFilter({ query, onChange }) {
     <>
       <FilterSelect
         label={label}
-        aria-label={label}
+        labelPlacement="stacked"
         placeholder="请选择人员"
         showSearch
         optionFilterProp="label"
@@ -115,33 +147,43 @@ export default function BusinessProgressFilterFields({
 }) {
   return (
     <div className={`erp-progress-filter-fields${compact ? ' erp-progress-filter-fields--compact' : ''}`}>
-      <fieldset role={compact ? 'presentation' : undefined}>
-        <legend>记录范围</legend>
-        {compact ? <MobileFilterChoices label="记录范围" options={PROGRESS_SCOPE_OPTIONS} value={query.scope} onChange={(scope) => onChange({ scope })} /> : <FilterChipGroup
-          aria-label="记录范围"
-          options={PROGRESS_SCOPE_OPTIONS}
-          value={query.scope}
-          onChange={(scope) => onChange({ scope })}
-        />}
-      </fieldset>
-      <fieldset role={compact ? 'presentation' : undefined}>
-        <legend>交期情况（单选）</legend>
-        <ProgressDueFilters query={query} counts={counts} onChange={onChange} />
-      </fieldset>
-      {query.scope !== 'ended' && (
-        <fieldset role={compact ? 'presentation' : undefined}>
-          <legend>任务异常</legend>
+      {compact ? <MobileFilterChoices label="记录范围" options={PROGRESS_SCOPE_OPTIONS} value={query.scope} onChange={(scope) => onChange({ scope })} /> : <FilterChipGroup
+        label="记录范围"
+        options={PROGRESS_SCOPE_OPTIONS}
+        value={query.scope}
+        onChange={(scope) => onChange({ scope })}
+      />}
+      {query.display !== 'lines' && (
+        <FilterField label="交期情况（单选）">
+          <ProgressDueFilters query={query} counts={counts} onChange={onChange} />
+        </FilterField>
+      )}
+      {query.scope !== 'ended' && query.display !== 'lines' && (
+        <FilterField label="任务异常">
           <ProgressBlockedFilter
             query={query}
             counts={counts}
             taskAccess={taskAccess}
             onChange={onChange}
           />
-        </fieldset>
+        </FilterField>
+      )}
+      {query.view === 'orders' && canReadReference(adminProfile, 'customers') && (
+        <ReferenceRecordsProvider component={FilterField} label="客户" adminProfile={adminProfile}>
+          <RemoteReferenceSelect
+            referenceType="customers"
+            component={FilterSelect}
+            label={false}
+            aria-label="客户"
+            options={[{ label: '全部客户', value: '' }]}
+            value={query.customer_id || ''}
+            onChange={(value) => onChange({ customer_id: value || '' })}
+            showSearch
+          />
+        </ReferenceRecordsProvider>
       )}
       {query.view === 'production' && (
-        <fieldset role={compact ? 'presentation' : undefined}>
-          <legend>销售关联</legend>
+        <FilterField label="销售关联">
           <FilterChip
             selected={query.unlinked_only}
             removable
@@ -150,7 +192,7 @@ export default function BusinessProgressFilterFields({
           >
             仅看未关联销售
           </FilterChip>
-        </fieldset>
+        </FilterField>
       )}
       {!compact && open && (
         <ProgressOwnerFilter
@@ -160,12 +202,11 @@ export default function BusinessProgressFilterFields({
         />
       )}
       {!compact && (
-        <fieldset>
-          <legend>交期范围</legend>
+        <FilterField label="交期范围">
           <Button block onClick={onDateRange}>
             {query.date_from || query.date_to ? `${query.date_from || '不限'} 至 ${query.date_to || '不限'}` : '自定义交期日期'}
           </Button>
-        </fieldset>
+        </FilterField>
       )}
     </div>
   )

@@ -1,4 +1,6 @@
+import { getBusinessDocumentSectionKey, getBusinessDocumentTypeKey } from '../erp/config/businessModules.mjs'
 import { WorkCenterPaginationPolicy } from '../common/consts/policies.generated.mjs'
+import { WorkflowTaskBoardSort } from '../common/consts/statuses.generated.mjs'
 import { getWorkflowTaskIdentity } from '../erp/utils/workflowTaskIdentity.mjs'
 
 const TASK_BOARD_LANE_KEYS = Object.freeze([
@@ -171,6 +173,19 @@ function compareTaskIDDescending(left, right) {
   return normalizeText(right?.id).localeCompare(normalizeText(left?.id))
 }
 
+function compareTaskTimes(left, right, sort) {
+  const time = (task) => Number(FINISHED_TASK_STATUS_KEYS.has(taskStatus(task)) ? task.completed_at : task.due_at) || null
+  const a = time(left)
+  const b = time(right)
+  if (a === null || b === null) return Number(a === null) - Number(b === null)
+  return sort === WorkflowTaskBoardSort.TIME_DESC ? b - a : a - b
+}
+
+export function sortWorkbenchMockTasks(tasks, sort) {
+  return tasks.sort((a, b) => compareTaskTimes(a, b, sort) ||
+    normalizeText(a.task_name).localeCompare(normalizeText(b.task_name)) || compareTaskIDDescending(a, b))
+}
+
 export function buildWorkflowTaskBoardMock({
   tasks = [],
   params = {},
@@ -200,11 +215,11 @@ export function buildWorkflowTaskBoardMock({
   const sourceTypes = [
     ...new Set(
       visibleTasks
-        .map((task) => normalizeText(task.source_type))
+        .map((task) => getBusinessDocumentTypeKey(task.source_type))
         .filter(Boolean)
     ),
   ].sort((left, right) => left.localeCompare(right))
-  const sourceType = normalizeText(params.source_type)
+  const sourceType = getBusinessDocumentTypeKey(params.source_type)
   const dayStart = Math.floor((normalizedSnapshotAt + 8 * 3600) / 86400) * 86400 - 8 * 3600
   const periodDays = { today: 1, '7d': 7, '30d': 30 }[params.period]
   const from = periodDays ? dayStart - (periodDays - 1) * 86400 : params.period === 'custom' ? Date.parse(`${params.date_from}T00:00:00+08:00`) / 1000 : null
@@ -217,9 +232,15 @@ export function buildWorkflowTaskBoardMock({
         matchesKeyword(task, params.keyword) &&
         matchesStatus(task, status, normalizedSnapshotAt) &&
         matchesDue(task, due, normalizedSnapshotAt) &&
-        (!sourceType || normalizeText(task.source_type) === sourceType)
+        (!sourceType || getBusinessDocumentTypeKey(task.source_type) === sourceType) &&
+        (!params.source_section || params.source_section === 'all' || getBusinessDocumentSectionKey(task.source_type) === params.source_section)
     )
-    .sort(compareTaskIDDescending)
+    .sort((a, b) => {
+      if (params.sort === WorkflowTaskBoardSort.TIME_ASC || params.sort === WorkflowTaskBoardSort.TIME_DESC) {
+        return compareTaskTimes(a, b, params.sort) || compareTaskIDDescending(a, b)
+      }
+      return compareTaskIDDescending(a, b)
+    })
   const laneTasks = Object.fromEntries(
     TASK_BOARD_LANE_KEYS.map((key) => [key, []])
   )

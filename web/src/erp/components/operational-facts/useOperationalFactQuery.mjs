@@ -5,10 +5,12 @@ import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mj
 import useBusinessPageState from '../../hooks/useBusinessPageState.js'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   compactParams,
   trimOptional,
 } from '../../utils/sourceDocumentValues.mjs'
+import { canReadReference, loadReferenceIDs } from '../../utils/remoteReferences.mjs'
 import { getBusinessPaginationParams } from '../../utils/businessPagination.mjs'
 import {
   searchParamPositiveInt,
@@ -26,6 +28,28 @@ import {
   DEFAULT_OPERATIONAL_FACT_PAGINATION,
   buildOperationalFactViewConfigs,
 } from './operationalFactPageConfig.mjs'
+
+async function loadAccountPartyNames(rows, config, profile, { signal, isCurrent }) {
+  const factType = config.listParams?.fact_type
+  if (!['RECEIVABLE', 'PAYABLE'].includes(factType) || !rows?.length) return rows
+
+  const isReceivable = factType === 'RECEIVABLE'
+  const type = isReceivable ? 'customers' : 'suppliers'
+  const partyType = isReceivable ? 'CUSTOMER' : 'SUPPLIER'
+  if (!profile || !canReadReference(profile, type)) return rows
+  const ids = rows.filter((row) => row.counterparty_type === partyType).map((row) => row.counterparty_id)
+  try {
+    const data = await loadReferenceIDs(type, ids, { signal })
+    const names = new Map(data[type].map((party) => [party.id, party.name]))
+    return rows.map((row) => row.counterparty_type === partyType
+      ? { ...row, counterpartyDisplayName: names.get(row.counterparty_id) }
+      : row)
+  } catch (error) {
+    if (signal?.aborted || isRpcAbortError(error)) throw error
+    if (isCurrent()) message.error(getActionErrorMessage(error, '加载往来单位名称'))
+    return rows
+  }
+}
 
 export function useOperationalFactQuery({
   initialActiveKey,
@@ -298,7 +322,7 @@ export function useOperationalFactQuery({
             ? listedRows.filter(
                 (item) => Number(item?.id || 0) === exactProductionFactID
               )
-            : listedRows
+            : await loadAccountPartyNames(listedRows, config, adminProfile, { isCurrent: shouldApplyRequest })
         if (!shouldApplyRequest()) {
           return
         }
@@ -427,7 +451,7 @@ export function useOperationalFactQuery({
         ? exportRows.filter(
             (item) => Number(item?.id || 0) === exactProductionFactID
           )
-        : exportRows
+        : loadAccountPartyNames(exportRows, activeConfig, adminProfile, { signal, isCurrent: () => !signal?.aborted })
     },
     [
       activeConfig,

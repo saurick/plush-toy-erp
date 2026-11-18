@@ -16,7 +16,7 @@ import {
   requireWorkflowTaskMutationParams,
   workflowTaskMutationSignature,
 } from '../../src/erp/utils/workflowTaskMutation.mjs'
-import { buildWorkflowTaskBoardMock, workflowTaskMockNumberKeyword } from '../../src/mocks/workflowTaskBoardMock.mjs'
+import { sortWorkbenchMockTasks, buildWorkflowTaskBoardMock, workflowTaskMockNumberKeyword } from '../../src/mocks/workflowTaskBoardMock.mjs'
 import { purchaseReceiptMutationSignature } from '../../src/erp/utils/purchaseReceiptMutation.mjs'
 import {
   stylePaginatedRpcData,
@@ -2542,18 +2542,7 @@ export async function installFactRpcMocks(page, context) {
           risk: riskTasks,
           approval: approvalTasks,
         }
-        Object.values(queues).forEach((items) =>
-          items.sort((left, right) => {
-            const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
-            const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
-            if (leftDue !== rightDue) return leftDue - rightDue
-            const nameOrder = String(left.task_name || '').localeCompare(
-              String(right.task_name || '')
-            )
-            if (nameOrder !== 0) return nameOrder
-            return Number(right.id || 0) - Number(left.id || 0)
-          })
-        )
+        sortWorkbenchMockTasks(queues[queueKey], params.sort)
         data = {
           snapshot_at: snapshotAt,
           queue_key: queueKey,

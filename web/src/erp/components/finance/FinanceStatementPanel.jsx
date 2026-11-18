@@ -103,7 +103,14 @@ export default function FinanceStatementPanel({ canReadReceivables, canReadPayab
             <SelectFilter aria-label="对账往来类型" allowClear={false /* 不可清空：查询须明确客户或供应商 */} value={filter.counterparty_type} options={options} onChange={(value) => change({ counterparty_type: value, counterparty_id: undefined })} />
             <SelectFilter aria-label="对账往来方" placeholder="选择往来方" showSearch optionFilterProp="label" value={filter.counterparty_id} options={parties[filter.counterparty_type].map((item) => partyOption(item, '往来方'))} onChange={(value) => change({ counterparty_id: value })} />
             <SelectFilter aria-label="对账币种" allowClear={false /* 不可清空：不同币种不能合并为一个余额 */} value={filter.currency} options={BUSINESS_CURRENCY_OPTIONS} onChange={(value) => change({ currency: value })} />
-            <DateRangeFilter options={[{ value: 'posted', label: '记账日期' }]} value="posted" startValue={filter.date_from} endValue={filter.date_to} onStartChange={(value) => change({ date_from: value })} onEndChange={(value) => change({ date_to: value })} />
+            <DateRangeFilter
+              required
+              options={[{ value: 'posted', label: '记账日期' }]}
+              value="posted"
+              startValue={filter.date_from}
+              endValue={filter.date_to}
+              onRangeChange={(date_from, date_to) => change({ date_from, date_to })}
+            />
           </>
         )}
         primaryAction={<Button type="primary" loading={busy} disabled={!filter.counterparty_id || !filter.date_from || !filter.date_to || filter.date_from > filter.date_to} onClick={() => load(1, true)}>查询对账</Button>}

@@ -18,6 +18,7 @@ import { BUSINESS_CURRENCY_OPTIONS } from './businessCurrency.mjs'
 import { unixSecondsToBusinessDate } from './businessDate.mjs'
 
 export const BUSINESS_ROUTE_PATHS = Object.freeze({
+  businessDashboard: '/erp/business-dashboard',
   customers: '/erp/master/partners/customers',
   suppliers: '/erp/master/partners/suppliers',
   materials: '/erp/master/materials',

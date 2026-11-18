@@ -234,7 +234,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         await page.screenshot({ path: path.join(outputDir, `mobile-filter-clear-${width}.png`) })
       }
       await open()
-      await dialog.getByRole('group', { name: '来源单据', exact: true }).getByRole('button', { name: '全部', exact: true }).click()
+      await dialog.getByRole('group', { name: '单据类型', exact: true }).getByRole('button', { name: '全部', exact: true }).click()
       await close()
       assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 1 项')
       assert(await trigger.evaluate((node) => document.activeElement === node), '调整条件并收起后返回筛选入口')

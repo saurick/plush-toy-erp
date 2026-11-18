@@ -22,9 +22,9 @@ type DocumentProductPreview struct {
 }
 
 type DocumentProductIdentity struct {
-	ProductID   int
-	ProductName string
-	ProductCode string
+	ProductID   int    `json:"product_id"`
+	ProductName string `json:"product_name"`
+	ProductCode string `json:"product_code"`
 }
 
 type DocumentProductPreviewOptions struct {

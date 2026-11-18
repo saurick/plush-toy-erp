@@ -825,6 +825,15 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 			}
 		}
 	}
+	if _u.mutation.CreateIdempotencyKeyCleared() {
+		_spec.ClearField(salesorder.FieldCreateIdempotencyKey, field.TypeString)
+	}
+	if _u.mutation.CreateIntentHashCleared() {
+		_spec.ClearField(salesorder.FieldCreateIntentHash, field.TypeString)
+	}
+	if _u.mutation.CreateActorIDCleared() {
+		_spec.ClearField(salesorder.FieldCreateActorID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.OrderNo(); ok {
 		_spec.SetField(salesorder.FieldOrderNo, field.TypeString, value)
 	}
@@ -1989,6 +1998,15 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 				ps[i](selector)
 			}
 		}
+	}
+	if _u.mutation.CreateIdempotencyKeyCleared() {
+		_spec.ClearField(salesorder.FieldCreateIdempotencyKey, field.TypeString)
+	}
+	if _u.mutation.CreateIntentHashCleared() {
+		_spec.ClearField(salesorder.FieldCreateIntentHash, field.TypeString)
+	}
+	if _u.mutation.CreateActorIDCleared() {
+		_spec.ClearField(salesorder.FieldCreateActorID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.OrderNo(); ok {
 		_spec.SetField(salesorder.FieldOrderNo, field.TypeString, value)

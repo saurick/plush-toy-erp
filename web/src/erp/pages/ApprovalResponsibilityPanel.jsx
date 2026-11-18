@@ -1030,7 +1030,6 @@ export default function ApprovalResponsibilityPanel({
               canEdit
                 ? {
                     title: '双击调整审批责任',
-                    style: { cursor: 'pointer' },
                     onDoubleClick: (event) => {
                       if (
                         event.defaultPrevented ||

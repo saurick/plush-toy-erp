@@ -132,6 +132,15 @@ func testProductionFinishedGoodsPartialPackingAndShipment(t *testing.T, f produc
 			t.Fatalf("shipment readiness page %d: rows=%v total=%d err=%v want lot=%d quantity=%s", offset, rows, total, err, want.lotID, want.quantity)
 		}
 	}
+	for offset, want := range []int{*second.LotID, *first.LotID, standaloneLot.ID} {
+		rows, total, err := inv.ListInventoryBalancesForAccess(ctx, biz.InventoryBalanceFilter{
+			SubjectID: first.SubjectID, SubjectType: first.SubjectType, SortBy: biz.InventorySortPendingPackaging,
+			SortDirection: "desc", Limit: 1, Offset: offset,
+		}, biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{warehouse.ID}})
+		if err != nil || total != 3 || len(rows) != 1 || rows[0].LotID == nil || *rows[0].LotID != want {
+			t.Fatalf("pending packing page %d: rows=%v total=%d err=%v want lot=%d", offset, rows, total, err, want)
+		}
+	}
 	shipment := func(receipt *biz.ProductionFact, quantity int64) *biz.Shipment {
 		t.Helper()
 		no := fmt.Sprintf("SHIP-%d-%d", receipt.ID, quantity)

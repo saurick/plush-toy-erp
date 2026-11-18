@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 
 import test from 'node:test'
+import { operationalFactActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
@@ -276,7 +277,7 @@ test('outsourcing order source actions submit only source-owned form values', ()
 })
 
 test('posted outsourcing returns expose source-bound payable through related records', () => {
-  assert.match(source, />\s*委外记录\s*</u)
+  assert.match(source, /getBusinessDocumentTitle\('outsourcing_fact'\)/u)
   assert.match(source, /finance\.payable\.confirm/u)
   assert.match(
     payableAction,
@@ -325,8 +326,8 @@ test('outsourcing record lifecycle uses exact permissions, canonical commands, a
     /\.\.\.\(!isPost \? \{ reason: String\(reason \|\| ''\)\.trim\(\) \} : \{\}\)/u
   )
   assert.match(sourceFactActions, /写入后重新读取仍未确认目标状态/u)
-  assert.match(sourceFactActions, /作废不会产生任何库存变动/u)
-  assert.match(sourceFactActions, /库存已恢复至过账前状态/u)
+  assert.match(operationalFactActionPresentation('outsourcing', { fact_type: 'RETURN_RECEIPT', status: 'DRAFT' }, 'cancel').description, /不会改变库存/u)
+  assert.match(operationalFactActionPresentation('outsourcing', { fact_type: 'RETURN_RECEIPT', status: 'POSTED' }, 'cancel').success, /本次库存影响已恢复/u)
   assert.match(source, /canPostFact=\{canPostOutsourcingFact\}/u)
   assert.match(source, /canCancelFact=\{canCancelOutsourcingFact\}/u)
   assert.match(source, /onPostFact=\{postSelectedOutsourcingFact\}/u)

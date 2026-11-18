@@ -46,6 +46,7 @@ test('audit logs preserve drawer focus return, request recovery and honest page-
 
 test('audit logs visible summary uses registered labels and safe business copy', () => {
   const pageSource = readSource('../pages/AuditLogsPage.jsx')
+  const actionCatalog = readSource('./auditActionFilters.mjs')
 
   assert.match(
     pageSource,
@@ -53,7 +54,7 @@ test('audit logs visible summary uses registered labels and safe business copy',
   )
   assert.match(
     pageSource,
-    /label: getVisibleAuditText\(event\.action_label, '其他系统操作'\)/u
+    /getVisibleAuditText\(event\.action_label, '其他系统操作'\)/u
   )
   assert.match(
     pageSource,
@@ -69,7 +70,7 @@ test('audit logs visible summary uses registered labels and safe business copy',
     'workflow_task.break_glass',
   ]) {
     assert.match(
-      pageSource,
+      actionCatalog,
       new RegExp(`'${eventKey.replaceAll('.', '\\.')}':`, 'u')
     )
   }

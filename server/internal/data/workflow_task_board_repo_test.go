@@ -68,6 +68,52 @@ func TestWorkflowRepo_IndependentTaskBoardCountsAndPayloadSearch(t *testing.T) {
 	}
 }
 
+func TestWorkflowRepo_DocumentSectionFiltersBeforeCountsAndPagination(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_document_section?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	fixtures := []struct{ source, status, role string }{
+		{"production_fact", "ready", biz.WarehouseRoleKey},
+		{"production-progress", "done", biz.WarehouseRoleKey},
+		{"production_order", "ready", biz.WarehouseRoleKey},
+		{"purchase_receipt", "ready", biz.WarehouseRoleKey},
+		{"production_wip_batch", "ready", biz.ProductionRoleKey},
+	}
+	for i, fixture := range fixtures {
+		client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("DOCUMENT-SECTION-%d", i)).
+			SetTaskName("单据模块筛选").SetTaskGroup("generic").SetSourceType(fixture.source).SetSourceID(i + 1).
+			SetTaskStatusKey(fixture.status).SetOwnerRoleKey(fixture.role).SetPayload(map[string]any{}).SaveX(ctx)
+	}
+	query := biz.WorkflowTaskBoardQuery{SourceSection: "production", OwnerRoleKey: biz.WarehouseRoleKey, LaneKey: "all", Limit: 1, Offset: 1, SnapshotAt: time.Now()}
+	board, err := repo.GetWorkflowTaskBoard(ctx, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if board.Total != 3 || board.Counts.Actionable != 2 || board.Counts.Finished != 1 || len(board.Lanes) != 1 || len(board.Lanes[0].Tasks) != 1 || board.Lanes[0].Total != 3 {
+		t.Fatalf("section must be applied before counts and pagination: %+v", board)
+	}
+	if fmt.Sprint(board.SourceTypes) != "[production_fact production_order purchase_receipt]" {
+		t.Fatalf("section selection must retain visible document facets: %v", board.SourceTypes)
+	}
+	query.SourceType, query.Offset = "production_fact", 0
+	board, err = repo.GetWorkflowTaskBoard(ctx, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if board.Total != 2 || board.Counts.Actionable != 1 || board.Counts.Finished != 1 {
+		t.Fatalf("leaf must include all canonical document source members: %+v", board.Counts)
+	}
+	query.SourceSection, query.SourceType = "", ""
+	board, err = repo.GetWorkflowTaskBoard(ctx, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if board.Total != 4 {
+		t.Fatalf("clearing section must restore the same visible scope: %d", board.Total)
+	}
+}
+
 func TestWorkflowRepo_ExceptionLaneKeepsReadyExceptionsUntilTerminal(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_ready_exceptions?mode=memory&cache=shared&_fk=1")
@@ -434,6 +480,20 @@ func TestWorkflowRepo_GetWorkflowTaskBoardAppliesFocusedLaneSortContract(t *test
 	}
 	if got, want := readCodes(biz.WorkflowTaskBoardLaneFinished, biz.WorkflowTaskBoardSortSmart), []string{"SORT-FINISHED-NEW", "SORT-FINISHED-OLD", "SORT-FINISHED-UNKNOWN"}; fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("finished smart sort=%v, want %v", got, want)
+	}
+	for _, tc := range []struct {
+		sortKey string
+		want    []string
+	}{
+		{biz.WorkflowTaskBoardSortTimeAsc, []string{"SORT-FINISHED-OLD", "SORT-FINISHED-NEW", "SORT-EARLY", "SORT-HIGH", "SORT-CRITICAL", "SORT-FINISHED-UNKNOWN"}},
+		{biz.WorkflowTaskBoardSortTimeDesc, []string{"SORT-CRITICAL", "SORT-HIGH", "SORT-EARLY", "SORT-FINISHED-NEW", "SORT-FINISHED-OLD", "SORT-FINISHED-UNKNOWN"}},
+	} {
+		for offset, want := range tc.want {
+			board, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{LaneKey: biz.WorkflowTaskBoardLaneAll, Sort: tc.sortKey, Limit: 1, Offset: offset, SnapshotAt: snapshotAt})
+			if err != nil || board.Total != len(tc.want) || len(board.Lanes[0].Tasks) != 1 || board.Lanes[0].Tasks[0].TaskCode != want {
+				t.Fatalf("sort=%s offset=%d want=%s board=%+v err=%v", tc.sortKey, offset, want, board, err)
+			}
+		}
 	}
 }
 

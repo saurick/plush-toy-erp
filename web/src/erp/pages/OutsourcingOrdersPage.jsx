@@ -6,6 +6,8 @@ import {
   PrinterOutlined,
 } from '@ant-design/icons'
 import { Button, Space } from 'antd'
+import { filterColumnsByEffectiveFieldPolicy, resolveDefaultFieldPolicySurface } from '../utils/adminProfileSync.mjs'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
@@ -519,13 +521,14 @@ export default function OutsourcingOrdersPage() {
     [resolveSupplierName]
   )
 
+  const galleryColumns = useMemo(() => documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.OUTSOURCING_ORDER, adminProfile), [adminProfile])
   const listColumns = useMemo(
-    () => [...documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.OUTSOURCING_ORDER, adminProfile), ...dataColumns],
-    [adminProfile, dataColumns]
+    () => [...galleryColumns, ...dataColumns],
+    [galleryColumns, dataColumns]
   )
 
   const detailColumns = useMemo(
-    () => [
+    () => filterColumnsByEffectiveFieldPolicy([
       ...dataColumns,
       {
         align: 'left',
@@ -580,9 +583,10 @@ export default function OutsourcingOrdersPage() {
         title: '乙方签约人',
         dataIndex: ['supplier_snapshot', 'signer_name'],
       },
-    ],
-    [dataColumns]
+    ], adminProfile, resolveDefaultFieldPolicySurface(OUTSOURCING_ORDERS_MODULE_KEY)),
+    [dataColumns, adminProfile]
   )
+  const taskDetailColumns = useMemo(() => [...galleryColumns, ...detailColumns], [galleryColumns, detailColumns])
 
   const {
     tableColumns: columns,
@@ -664,7 +668,7 @@ export default function OutsourcingOrdersPage() {
       authorized: canReadOutsourcingFacts,
       selected: Boolean(selectedRow),
       busy: returnRecordsLoading,
-      busyReason: '委外记录加载完成后可继续',
+      busyReason: `${getBusinessDocumentTitle('outsourcing_fact')}加载完成后可继续`,
     })
 
   const outsourcingViewSwitch = (
@@ -672,7 +676,7 @@ export default function OutsourcingOrdersPage() {
       aria-label="委外订单内容分类"
       value={summaryVisible ? 'items' : 'contracts'}
       options={[
-        { value: 'contracts', label: '加工合同' },
+        { value: 'contracts', label: getBusinessDocumentTitle('outsourcing_order') },
         ...(canRead ? [{ value: 'items', label: '加工明细' }] : []),
       ]}
       onChange={(view) => {
@@ -689,7 +693,7 @@ export default function OutsourcingOrdersPage() {
       <PageHeaderCard
         compact
         helpKey="processing-contracts"
-        title="委外订单"
+        title={getBusinessDocumentTitle('outsourcing_order')}
       />
       <BusinessToolbarWorkspace contentSwitch={outsourcingViewSwitch}>
         {summaryVisible ? (
@@ -763,7 +767,6 @@ export default function OutsourcingOrdersPage() {
                     exact={Boolean(
                       routeOutsourcingOrderID || routeOutsourcingFactID
                     )}
-                    className="erp-business-filter-control--status"
                     value={statusFilter}
                     options={lifecycleStatusOptions}
                     onChange={(value) => {
@@ -796,19 +799,15 @@ export default function OutsourcingOrdersPage() {
                     }}
                     startValue={dateRange?.[0] || ''}
                     endValue={dateRange?.[1] || ''}
-                    onStartChange={(value) => {
-                      setDateRange((current) => [value, current?.[1] || ''])
-                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                    }}
-                    onEndChange={(value) => {
-                      setDateRange((current) => [current?.[0] || '', value])
+                    onRangeChange={(from, to) => {
+                      setDateRange([from, to])
                       setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
                     }}
                   />
                   <SelectFilter
                     emptyValue="updated_at:desc"
                     aria-label="排序方式"
-                    className="erp-business-filter-control--sort"
+                    purpose="sort"
                     value={sortValue}
                     options={OUTSOURCING_ORDER_SORT_OPTIONS}
                     onChange={(value) => {
@@ -958,7 +957,7 @@ export default function OutsourcingOrdersPage() {
                       loading={returnRecordsLoading}
                       onClick={() => openRelatedReturnRecords(selectedRow)}
                     >
-                      委外记录
+                      {getBusinessDocumentTitle('outsourcing_fact')}
                     </Button>
                   </BusinessActionTooltip>
                 ) : null}
@@ -1021,6 +1020,7 @@ export default function OutsourcingOrdersPage() {
             <BusinessDataTable
               rowKey="id"
               columns={columns}
+              taskDetailColumns={taskDetailColumns}
               dataSource={rows}
               loading={loading}
               rowSelection={{

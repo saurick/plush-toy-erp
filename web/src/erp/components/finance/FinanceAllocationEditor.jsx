@@ -2,6 +2,7 @@ import React from 'react'
 import { Alert, Form, Input } from 'antd'
 
 import { FinancePaymentStatus } from '../../../common/consts/statuses.generated.mjs'
+import { financePaymentActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -44,7 +45,7 @@ export function FinanceAllocationEditor({
       okText={
         currentPayment?.status === FinancePaymentStatus.POSTED
           ? '确认抵扣'
-          : '过账并核销'
+          : financePaymentActionPresentation(currentPayment).label
       }
       cancelText="取消"
       confirmLoading={loading}

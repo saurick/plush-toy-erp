@@ -202,6 +202,13 @@ export const TASK_HANDLING_DUTIES = Object.freeze(
       '岗位以具体工序任务分派为准'
     ),
     ...duties(
+      'shipment_quality',
+      ['quality'],
+      '在本张出货前检验单登记判定，核对产品、仓库和批次',
+      '合格或让步接收后交业务申请财务放行，不合格继续阻止出货',
+      { relationRefs: [['shipment', 'quality']] }
+    ),
+    ...duties(
       'shipment',
       ['sales'],
       '编制出货资料并申请放行；条件齐备后确认实际发货',

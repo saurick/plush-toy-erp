@@ -13,7 +13,7 @@ title: '任务筛选',
 open: false,
 onOpenChange() {},
 count,
-        summary: count ? ['任务状态：待处理', '来源单据：销售订单', '排序：等待最久'] : [],
+        summary: count ? ['任务状态：待处理', '单据类型：销售订单', '排序：等待最久'] : [],
         onReset: () => setCount(0),
       }))
   }
@@ -21,7 +21,7 @@ count,
   const trigger = document.querySelector('.mobile-filter-trigger')
   assert.equal(trigger.querySelector('.mobile-filter-trigger__label').textContent, '待处理')
   assert.equal(trigger.querySelector('.erp-control-count').textContent, '+2')
-  assert.equal(trigger.getAttribute('title'), '任务状态：待处理；来源单据：销售订单；排序：等待最久')
+  assert.equal(trigger.getAttribute('title'), '任务状态：待处理；单据类型：销售订单；排序：等待最久')
   await harness.click(document.querySelector('.mobile-filter-clear'))
   assert.equal(trigger.querySelector('.mobile-filter-trigger__label').textContent, '筛选')
   assert.equal(trigger.querySelector('.erp-control-count'), null)

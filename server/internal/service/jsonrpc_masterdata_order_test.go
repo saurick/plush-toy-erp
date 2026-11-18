@@ -416,6 +416,10 @@ func (s *stubSalesOrderJSONRPCRepo) SaveSalesOrderWithItems(_ context.Context, i
 	return out, nil
 }
 
+func (s *stubSalesOrderJSONRPCRepo) ResolveSalesOrderCreateReplay(context.Context, *biz.SalesOrderMutation) (*biz.SalesOrderWithItems, bool, error) {
+	return nil, false, nil
+}
+
 func (s *stubSalesOrderJSONRPCRepo) CustomerIsActive(context.Context, int) (bool, error) {
 	if !s.customerActive {
 		return false, biz.ErrCustomerNotFound
@@ -1441,6 +1445,7 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
 	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
 	params := mustJSONRPCStruct(t, map[string]any{
+		"idempotency_key":      "sales-order-example-create",
 		"tax_mode":             biz.SalesOrderTaxModeNone,
 		"freight_terms":        biz.SalesOrderFreightTermsIncluded,
 		"order_no":             "SO001",

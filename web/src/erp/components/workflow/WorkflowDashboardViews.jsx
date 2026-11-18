@@ -17,6 +17,8 @@ import {
   TASK_BOARD_LANE_DEFINITIONS,
   getWorkflowTaskReason,
   getWorkflowTaskStatusRiskTags,
+  readWorkflowTaskTimeSort,
+  workflowTaskTimeColumnSort,
 } from '../../utils/workflowTaskBoard.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -228,7 +230,7 @@ export function openTaskTableRow(event, task, onOpenTask) {
   openWorkflowTaskRow(event, () => onOpenTask(task))
 }
 
-export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
+export function TaskLane({ lane, keyword = '', loading = false, sort, onSort, onOpenTask }) {
   const tableRef = React.useRef(null)
   const sticky = useBusinessListStickyHeader(tableRef, true)
   return (
@@ -274,6 +276,7 @@ export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
             align: 'left',
             title: '任务时间',
             key: 'time',
+            ...workflowTaskTimeColumnSort(sort, '按任务时间排序：待办看截止时间，已结束看结束时间'),
             width: '18%',
             render: (_, task) => (
               <div className="erp-workbench-task-cell">
@@ -326,6 +329,7 @@ export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
             ),
           },
         ]}
+        onChange={(_page, _filters, sorter) => onSort(readWorkflowTaskTimeSort(sorter))}
         onRow={(task) => ({
           'data-task-id': task.id,
           'data-task-code': task.task_code,
@@ -346,26 +350,5 @@ export function TaskLane({ lane, keyword = '', loading = false, onOpenTask }) {
         }}
       />
     </section>
-  )
-}
-
-export function WorkbenchQueueEmpty({
-  activeOption,
-  fallbackOption,
-  onSwitchQueue,
-}) {
-  const description = fallbackOption
-    ? `${activeOption.label}暂无任务，可切到${fallbackOption.label}继续处理。`
-    : '当前没有需要处理的任务。'
-
-  return (
-    <div className="erp-workbench-queue-empty">
-      <Empty description={description} />
-      {fallbackOption ? (
-        <Button size="small" onClick={() => onSwitchQueue(fallbackOption.key)}>
-          查看{fallbackOption.label}
-        </Button>
-      ) : null}
-    </div>
   )
 }

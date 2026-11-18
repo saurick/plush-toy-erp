@@ -358,6 +358,7 @@ export function createBusinessFormalAssertions(deps) {
         .click()
     }
     await dialog.waitFor()
+    await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
     await waitForFiniteAnimations(page)
     const metrics = await page.evaluate(() => {
       const panel = document.querySelector(
@@ -365,7 +366,7 @@ export function createBusinessFormalAssertions(deps) {
       )
       const range = panel?.querySelector('.erp-business-date-range-filter')
       const typeLabel = range?.querySelector(
-        '.erp-business-date-range-filter__type-label'
+        '.erp-filter-field > legend'
       )
       const dateInputs = range
         ? Array.from(

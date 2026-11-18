@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { Form } from 'antd'
+import { Alert, Button, Form, Space } from 'antd'
+import { useLocation } from 'react-router-dom'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useResponsiveSwitch from '@/common/components/navigation/useResponsiveSwitch.js'
 import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
@@ -70,7 +72,7 @@ import {
   BusinessViewSwitch,
 } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import usePurchaseFollowups from '../hooks/usePurchaseFollowups.js'
-import { purchaseFollowupParams } from '../utils/purchaseFollowup.mjs'
+import { canReadPurchaseFollowups, purchaseFollowupParams } from '../utils/purchaseFollowup.mjs'
 import { withoutBlankPurchaseOrderDraftLines } from '../utils/businessLineItems.mjs'
 import {
   BUSINESS_ROUTE_PATHS,
@@ -130,7 +132,7 @@ import {
   resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
-import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
+import { requireSourceActionRecord, createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
 import {
   normalizeSourceOrderLifecycleReason,
   prepareSourceOrderLifecycleAttempt,
@@ -153,6 +155,7 @@ export default function PurchaseOrdersPage() {
   const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -169,10 +172,11 @@ export default function PurchaseOrdersPage() {
   const canRead = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_READ)
   const canCreate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_CREATE)
   const canUpdate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_UPDATE)
-  const canReadFollowups = canRead && (
-    hasActionPermission(adminProfile, PermissionCode.PURCHASE_RECEIPT_READ) ||
-    hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_INBOUND_READ)
-  )
+  const canReadFollowups = canReadPurchaseFollowups(adminProfile)
+  const scopedFollowup = searchParams.get('view') === 'followup' && searchParams.has('sales_order_id')
+  const progressOrigin = adminProfile.id && location.state?.progressOrigin?.adminID === adminProfile.id ? location.state.progressOrigin : null
+  const followupSalesID = searchParamPositiveInt(searchParams, 'sales_order_id')
+  const canReadScopedFollowup = canReadFollowups && Boolean(followupSalesID) && hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_READ)
   const receiptSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receipt)
   const canCreatePurchaseReceipt = receiptSourceAccess.allowed
   const [loading, setLoading] = useState(false)
@@ -228,15 +232,22 @@ export default function PurchaseOrdersPage() {
     'sortValue',
     'updated_at:desc'
   )
-  const [contentView, setContentView] = useBusinessPageState(
+  const [savedView, setContentView] = useBusinessPageState(
     'purchaseView',
     'list'
   )
+  const contentView = scopedFollowup ? 'followup' : savedView
   const purchaseViewTransition = useResponsiveSwitch(contentView, searchParams.toString())
-  const [followupViewState, setFollowupViewState] = useBusinessPageState(
+  const [savedFollowup, setSavedFollowup] = useBusinessPageState(
     'followupViewState',
     {}
   )
+  const [scopedFilters, setScopedFilters] = useState(null)
+  const scopeKey = `${adminProfile.id}:${followupSalesID}`
+  const localFilters = scopedFilters?.key === scopeKey ? scopedFilters : {}
+  const updateScopedFilters = (changes) => setScopedFilters((current) => ({ ...(current?.key === scopeKey ? current : {}), ...changes, key: scopeKey }))
+  const followupViewState = scopedFollowup ? localFilters.view || {} : savedFollowup
+  const setFollowupViewState = scopedFollowup ? (view) => updateScopedFilters({ view }) : setSavedFollowup
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
     pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
@@ -422,15 +433,17 @@ export default function PurchaseOrdersPage() {
     supplierFilter,
   ])
 
-  const followupParams = purchaseFollowupParams(followupViewState, { keyword: linkedKeyword || keyword, supplierID: supplierFilter, orderID: routePurchaseOrderID })
+  const followupKeyword = scopedFollowup ? localFilters.keyword || '' : linkedKeyword || keyword
+  const followupSupplier = scopedFollowup ? localFilters.supplier || '' : supplierFilter
+  const followupParams = purchaseFollowupParams(followupViewState, { keyword: followupKeyword, supplierID: followupSupplier, orderID: routePurchaseOrderID, salesOrderID: scopedFollowup ? followupSalesID : null })
   const followupData = usePurchaseFollowups({
-    enabled: canReadFollowups && contentView === 'followup',
+    enabled: canReadFollowups && contentView === 'followup' && (!scopedFollowup || canReadScopedFollowup),
     params: followupParams,
   })
   const reloadFollowupData = followupData.reload
   useEffect(() => {
-    if (!canReadFollowups && contentView !== 'list') setContentView('list')
-  }, [canReadFollowups, contentView, setContentView])
+    if (!canReadFollowups && savedView !== 'list') setContentView('list')
+  }, [canReadFollowups, savedView, setContentView])
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
@@ -932,6 +945,7 @@ export default function PurchaseOrdersPage() {
         params = lifecycleAttempt.attempt.params
       }
       const updated = await action.run(params)
+      if (action.returnsRecord !== false) requireSourceActionRecord(updated, record.id)
       if (lifecycleAttempt) {
         lifecycleAttemptsRef.current.settle(
           lifecycleAttempt.scope,
@@ -941,11 +955,11 @@ export default function PurchaseOrdersPage() {
       }
       if (action.key === 'submit') {
         const title = orderSubmissionSuccessMessage('purchase_order', updated)
-        reportBusinessResult(title, record)
+        await reportBusinessResult(title, { id: record.id, purchase_order_no: record.purchase_order_no }, getPurchaseOrder)
         showProcessSubmissionReceipt({ result: updated, title })
       } else {
         const title = action.successMessage || `采购订单已${action.label}`
-        reportBusinessResult(title, updated || record)
+        reportBusinessResult(title, updated)
         message.success(title)
       }
       if (updated && action.returnsRecord !== false) {
@@ -1052,6 +1066,7 @@ export default function PurchaseOrdersPage() {
 
   const {
     tableColumns: columns,
+    visibleColumns: taskDetailColumns,
     exportColumns: visibleDataColumns,
     openColumnOrder,
     columnOrderModal,
@@ -1310,6 +1325,7 @@ export default function PurchaseOrdersPage() {
         loading={loading}
         rowKey="id"
         columns={columns}
+        taskDetailColumns={taskDetailColumns}
         dataSource={orders}
         rowSelection={{
           type: 'checkbox',
@@ -1331,9 +1347,8 @@ export default function PurchaseOrdersPage() {
             ? 'ant-table-row-selected'
             : ''
         }
-        onRow={(record) => ({
+        onRow={recordActionBusy ? undefined : (record) => ({
           onClick: (event) => {
-            if (recordActionBusy) return
             if (
               event.target?.closest?.(
                 '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
@@ -1357,7 +1372,7 @@ export default function PurchaseOrdersPage() {
         emptyDescription="暂无采购订单"
       />
     ),
-    [applySelectedRowKeys, columns, loading, orders, pagination, recordActionBusy, selectedRowKeys, setPagination, setSelectedOrder, total]
+    [applySelectedRowKeys, columns, taskDetailColumns, loading, orders, pagination, recordActionBusy, selectedRowKeys, setPagination, setSelectedOrder, total]
   )
 
   const purchaseViewSwitch = (
@@ -1377,6 +1392,7 @@ export default function PurchaseOrdersPage() {
         purchaseViewTransition.request(view, () => {
           if (selectedRowKeysRef.current.length) applySelectedRowKeys([])
           setSelectedOrder(null)
+          if (scopedFollowup && view === 'list') setSearchParams({})
           setContentView(view)
         }, { before: () => !recordActionBusy })
       }}
@@ -1391,11 +1407,17 @@ export default function PurchaseOrdersPage() {
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ suppliers: mergeSuppliers, materials: mergeMaterials }} className="erp-purchase-orders-page">
       <PageHeaderCard
         helpKey="accessories-purchase"
-        title="采购订单"
+        title={getBusinessDocumentTitle('purchase_order')}
         compact
       />
 
       <SourceActionAccessNotice access={receiptSourceAccess} />
+      {scopedFollowup && (
+        <Space wrap>
+          <span>采购跟进 · {progressOrigin?.orderNo || '当前销售订单'}</span>
+          {progressOrigin && <Button size="small" onClick={() => navigate(-1)}>返回进度看板</Button>}
+        </Space>
+      )}
       <BusinessToolbarWorkspace contentSwitch={purchaseViewSwitch} switching={purchaseViewTransition.pending}>
         {contentView === 'list' && <PurchaseOrderOperationPanel
           showListTools={contentView === 'list'}
@@ -1491,7 +1513,7 @@ export default function PurchaseOrdersPage() {
           preserveViews={outletContext?.taskBusiness ? undefined : ['list', 'followup']}
           loading={contentView === 'list' ? loading : followupData.loading}
         >
-          {contentView !== 'list' ? (
+          {scopedFollowup && !canReadScopedFollowup ? <Alert type="error" showIcon message="无法查看本单采购跟进，请核对销售单和采购查看权限。" /> : contentView !== 'list' ? (
             <PurchaseFollowupPanel
               queryParams={followupParams}
               viewState={followupViewState}
@@ -1500,11 +1522,11 @@ export default function PurchaseOrdersPage() {
               loading={followupData.loading}
               error={followupData.error}
               onRetry={followupData.reload}
-              keyword={linkedKeyword || keyword}
-              onKeywordChange={(value) => { clearRouteContext(); setKeyword(value) }}
-              supplierFilter={supplierFilter}
+              keyword={followupKeyword}
+              onKeywordChange={(value) => { if (scopedFollowup) updateScopedFilters({ keyword: value }); else { clearRouteContext(); setKeyword(value) } }}
+              supplierFilter={followupSupplier}
               supplierOptions={supplierOptions}
-              onSupplierChange={setSupplierFilter}
+              onSupplierChange={scopedFollowup ? (supplier) => updateScopedFilters({ supplier }) : setSupplierFilter}
               onOpen={(row) => {
                 if (row.source_type === 'purchase_order') {
                   setContentView('list')
@@ -1542,7 +1564,7 @@ export default function PurchaseOrdersPage() {
         }
         open={Boolean(detailOrder)}
         record={detailOrder}
-        title="采购订单详情"
+        title={`${getBusinessDocumentTitle('purchase_order')}详情`}
         onClose={() => setDetailOrder(null)}
       />
 

@@ -1,4 +1,6 @@
+import { productionExceptionExecutionLabel, PRODUCTION_EXCEPTION_APPROVAL_LABELS } from './productionRecordViews.mjs'
 import { formatUnixDateTime } from './masterDataOrderView.mjs'
+import { QUALITY_RESULT_LABELS, QUALITY_STATUS_LABELS } from './qualityInspectionLabels.mjs'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -50,10 +52,21 @@ export function workflowTaskBusinessSummary(record = {}, metadata = {}) {
   const statusValue = text(record.status || record.lifecycle_status).toUpperCase()
   const fields = []
   const add = (label, value) => { if (value) fields.push({ label, value }) }
-  add('业务状态', record.disposition_no && statusValue === 'POSTED' ? '已确认' : STATUS_LABELS[statusValue])
+  const statusLabel = record.inspection_no ? QUALITY_STATUS_LABELS[statusValue] : STATUS_LABELS[statusValue]
+  if (record.decision_no) {
+    add('审批状态', PRODUCTION_EXCEPTION_APPROVAL_LABELS[statusValue])
+    add('业务状态', productionExceptionExecutionLabel(record))
+    add('批准数量', quantity(record.approved_quantity))
+    add('审批意见', text(record.decision_reason))
+    add('执行原因', text(record.execution_reason))
+    add('冲正原因', text(record.reverse_reason))
+  } else {
+    add('业务状态', record.disposition_no && statusValue === 'POSTED' ? '已确认' : statusLabel)
+  }
   add('BOM 版本', bomVersion)
   add('包装版本', text(record.packaging_version_snapshot || record.packaging_version))
-  add('检验结论', ({ PASS: '合格', FAIL: '不合格', CONCESSION: '让步接收' })[text(record.result).toUpperCase()])
+  add('检验结论', QUALITY_RESULT_LABELS[text(record.result).toUpperCase()])
+  if (record.inspection_no) add('判定意见', text(record.decision_note))
   const unit = text(record.unit_name_snapshot || record.unit_name)
   add(unit ? `本次数量（${unit}）` : '本次数量', quantity(record.quantity))
   add('本次金额', quantity(record.amount) ? `${text(record.currency)} ${quantity(record.amount)}`.trim() : '')

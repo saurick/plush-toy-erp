@@ -1312,61 +1312,6 @@
           "navigation_mode": "recommended",
           "non_production_only": false,
           "permission_policy": {
-            "template_key": "boss",
-            "registered": true,
-            "default_permissions": [
-              "erp.workbench.read",
-              "erp.business_dashboard.read",
-              "erp.print_template.read",
-              "field.party_private.read",
-              "field.sales_commercial.read",
-              "field.procurement_commercial.read",
-              "field.finance_settlement.read",
-              "customer.read",
-              "supplier.read",
-              "payment_method.manage",
-              "material.read",
-              "process.read",
-              "product.read",
-              "product_sku.read",
-              "bom.read",
-              "contact.read",
-              "sales_order.read",
-              "sales_order_item.read",
-              "engineering.material.read",
-              "engineering.material.boss_approve",
-              "workflow.task.read",
-              "workflow.task.supervise",
-              "workflow.task.update",
-              "workflow.task.assign",
-              "workflow.task.approve",
-              "workflow.task.reject",
-              "purchase.order.read",
-              "outsourcing.order.read",
-              "outsourcing.fact.read",
-              "purchase.receipt.read",
-              "purchase.receipt.adjustment.read",
-              "purchase.return.read",
-              "warehouse.inventory.read",
-              "warehouse.inbound.read",
-              "warehouse.outbound.read",
-              "warehouse.adjustment.approve",
-              "shipment.read",
-              "quality.inspection.read",
-              "production.exception.approve",
-              "finance.payable.read",
-              "finance.invoice.read",
-              "finance.receivable.read",
-              "finance.reconciliation.read",
-              "finance.report.read",
-              "finance.payment.read",
-              "finance.payment.approve",
-              "production.fact.read",
-              "production.wip.read",
-              "pmc.plan.read",
-              "pmc.risk.read",
-              "mobile.boss.access"
-            ],
             "assignable_permissions": [
               "help.business.edit",
               "help.business.publish",
@@ -1530,7 +1475,62 @@
               "mobile.finance.access",
               "mobile.pmc.access",
               "mobile.engineering.access"
-            ]
+            ],
+            "default_permissions": [
+              "erp.workbench.read",
+              "erp.business_dashboard.read",
+              "erp.print_template.read",
+              "field.party_private.read",
+              "field.sales_commercial.read",
+              "field.procurement_commercial.read",
+              "field.finance_settlement.read",
+              "customer.read",
+              "supplier.read",
+              "payment_method.manage",
+              "material.read",
+              "process.read",
+              "product.read",
+              "product_sku.read",
+              "bom.read",
+              "contact.read",
+              "sales_order.read",
+              "sales_order_item.read",
+              "engineering.material.read",
+              "engineering.material.boss_approve",
+              "workflow.task.read",
+              "workflow.task.supervise",
+              "workflow.task.update",
+              "workflow.task.assign",
+              "workflow.task.approve",
+              "workflow.task.reject",
+              "purchase.order.read",
+              "outsourcing.order.read",
+              "outsourcing.fact.read",
+              "purchase.receipt.read",
+              "purchase.receipt.adjustment.read",
+              "purchase.return.read",
+              "warehouse.inventory.read",
+              "warehouse.inbound.read",
+              "warehouse.outbound.read",
+              "warehouse.adjustment.approve",
+              "shipment.read",
+              "quality.inspection.read",
+              "production.exception.approve",
+              "finance.payable.read",
+              "finance.invoice.read",
+              "finance.receivable.read",
+              "finance.reconciliation.read",
+              "finance.report.read",
+              "finance.payment.read",
+              "finance.payment.approve",
+              "production.fact.read",
+              "production.wip.read",
+              "pmc.plan.read",
+              "pmc.risk.read",
+              "mobile.boss.access"
+            ],
+            "registered": true,
+            "template_key": "boss"
           },
           "permissions": [
             "erp.workbench.read"
@@ -1737,62 +1737,6 @@
         "navigation_mode": "recommended",
         "non_production_only": false,
         "permission_policy": {
-          "template_key": "warehouse",
-          "registered": true,
-          "default_permissions": [
-            "erp.workbench.read",
-            "customer.read",
-            "supplier.read",
-            "material.read",
-            "process.read",
-            "product.read",
-            "product_sku.read",
-            "contact.read",
-            "sales_order.read",
-            "sales_order_item.read",
-            "workflow.task.read",
-            "workflow.task.update",
-            "workflow.task.approve",
-            "workflow.task.reject",
-            "workflow.task.complete",
-            "purchase.order.read",
-            "outsourcing.order.read",
-            "outsourcing.fact.read",
-            "outsourcing.material_issue.create",
-            "outsourcing.return_receipt.create",
-            "outsourcing.fact.post",
-            "outsourcing.fact.cancel",
-            "purchase.receipt.read",
-            "purchase.receipt.create",
-            "purchase.receipt.cancel_draft",
-            "purchase.receipt.adjustment.read",
-            "purchase.receipt.adjustment.create",
-            "purchase.receipt.adjustment.post",
-            "purchase.receipt.adjustment.cancel",
-            "purchase.return.read",
-            "purchase.return.create",
-            "purchase.return.post",
-            "purchase.return.cancel",
-            "warehouse.manage",
-            "warehouse.inventory.read",
-            "warehouse.inbound.read",
-            "warehouse.inbound.confirm",
-            "warehouse.packaging.execute",
-            "warehouse.outbound.read",
-            "warehouse.outbound.confirm",
-            "warehouse.adjustment.create",
-            "stock.reservation.create",
-            "stock.reservation.release",
-            "shipment.read",
-            "quality.inspection.read",
-            "production.exception.execute",
-            "production.fact.read",
-            "production.wip.read",
-            "production.completion.create",
-            "production.material_issue.create",
-            "pmc.plan.read",
-            "mobile.warehouse.access"
-          ],
           "assignable_permissions": [
             "help.business.edit",
             "help.business.publish",
@@ -1956,7 +1900,63 @@
             "mobile.finance.access",
             "mobile.pmc.access",
             "mobile.engineering.access"
-          ]
+          ],
+          "default_permissions": [
+            "erp.workbench.read",
+            "customer.read",
+            "supplier.read",
+            "material.read",
+            "process.read",
+            "product.read",
+            "product_sku.read",
+            "contact.read",
+            "sales_order.read",
+            "sales_order_item.read",
+            "workflow.task.read",
+            "workflow.task.update",
+            "workflow.task.approve",
+            "workflow.task.reject",
+            "workflow.task.complete",
+            "purchase.order.read",
+            "outsourcing.order.read",
+            "outsourcing.fact.read",
+            "outsourcing.material_issue.create",
+            "outsourcing.return_receipt.create",
+            "outsourcing.fact.post",
+            "outsourcing.fact.cancel",
+            "purchase.receipt.read",
+            "purchase.receipt.create",
+            "purchase.receipt.cancel_draft",
+            "purchase.receipt.adjustment.read",
+            "purchase.receipt.adjustment.create",
+            "purchase.receipt.adjustment.post",
+            "purchase.receipt.adjustment.cancel",
+            "purchase.return.read",
+            "purchase.return.create",
+            "purchase.return.post",
+            "purchase.return.cancel",
+            "warehouse.manage",
+            "warehouse.inventory.read",
+            "warehouse.inbound.read",
+            "warehouse.inbound.confirm",
+            "warehouse.packaging.execute",
+            "warehouse.outbound.read",
+            "warehouse.outbound.confirm",
+            "warehouse.adjustment.create",
+            "stock.reservation.create",
+            "stock.reservation.release",
+            "shipment.read",
+            "quality.inspection.read",
+            "production.exception.execute",
+            "production.fact.read",
+            "production.wip.read",
+            "production.completion.create",
+            "production.material_issue.create",
+            "pmc.plan.read",
+            "mobile.warehouse.access"
+          ],
+          "registered": true,
+          "template_key": "warehouse"
         },
         "permissions": [
           "erp.workbench.read",
@@ -2217,8 +2217,16 @@
           "product_id": 7,
           "product_name": "模拟小熊",
           "products": [
-            { "product_code": "DEMO-BEAR", "product_id": 7, "product_name": "模拟小熊" },
-            { "product_code": "DEMO-RABBIT", "product_id": 8, "product_name": "模拟小兔" }
+            {
+              "product_code": "DEMO-BEAR",
+              "product_id": 7,
+              "product_name": "模拟小熊"
+            },
+            {
+              "product_code": "DEMO-RABBIT",
+              "product_id": 8,
+              "product_name": "模拟小兔"
+            }
           ],
           "style_no": "DEMO-INTERNAL"
         }
@@ -2922,6 +2930,7 @@
         "tasks": false,
         "wip": false
       },
+      "task_total": 0,
       "has_more": {},
       "row": {
         "active": false,
@@ -3055,31 +3064,93 @@
     "params": {}
   },
   "business.list_progress": {
-    "basis": "handler-fixture",
+    "basis": "backend-wire-shape",
     "data": {
       "access": {
-        "production": true,
-        "sales": false,
+        "production": false,
+        "sales": true,
         "tasks": false,
         "wip": false
       },
       "counts": {
         "blocked": 0,
+        "delivery": {
+          "closed": 0,
+          "delivered": 0,
+          "unknown": 0
+        },
         "due_soon": 0,
-        "overdue": 0,
-        "total": 0,
+        "overdue": 1,
+        "total": 1,
         "undated": 0,
         "unlinked": 0
       },
-      "rows": [],
+      "rows": [
+        {
+          "active": true,
+          "attention_owner": "",
+          "attention_reason": "",
+          "attention_role": "",
+          "attention_task": "",
+          "attention_task_id": 0,
+          "blocked": false,
+          "blocked_tasks": 0,
+          "completed_quantity": null,
+          "current_operation": "",
+          "customer": "模拟客户",
+          "delivery_known": true,
+          "due_date": "2026-10-17",
+          "due_soon": false,
+          "engineering_ready": 0,
+          "engineering_total": 0,
+          "id": 101,
+          "in_progress_batches": 0,
+          "line": {
+            "customer_product_no": "BEAR-DEMO",
+            "delivery_status": "overdue",
+            "line_no": 1,
+            "remaining_quantity": "72",
+            "sales_order_id": 31
+          },
+          "material_pending": 0,
+          "material_total": 0,
+          "open_tasks": 0,
+          "operation_count": 0,
+          "order_no": "SO-DEMO-0031",
+          "ordered_quantity": "120",
+          "outsourced_batches": 0,
+          "overdue": true,
+          "planned_batches": 0,
+          "product": "云朵小熊",
+          "product_count": 1,
+          "product_id": 7,
+          "production_closed": 0,
+          "production_orders": 0,
+          "rejected_batches": 0,
+          "sales_owner": "",
+          "shipped_quantity": "48",
+          "status": "active",
+          "unassigned_tasks": 0,
+          "unit": "只",
+          "unlinked": false,
+          "updated_at": "",
+          "view": "orders",
+          "waiting_batches": 0
+        }
+      ],
       "snapshot_at": "2026-10-19T07:16:23.192414Z",
-      "total": 0
+      "total": 1
     },
     "message": "OK",
     "params": {
-      "owner_name": "模拟业务员"
-    },
-    "test": "TestBusinessProgressJSONRPCPermissionsAndValidation"
+      "display": "lines",
+      "id": 31,
+      "owner_name": "模拟业务员",
+      "scope": "all",
+      "sort_by": "due_date",
+      "sort_direction": "asc",
+      "view": "orders"
+    }
   },
   "business.list_progress_owner_options": {
     "basis": "handler-fixture",
@@ -3087,6 +3158,23 @@
     "message": "OK",
     "params": { "view": "orders" },
     "test": "TestBusinessProgressOwnerOptionsRPC"
+  },
+  "business.list_progress_tasks": {
+    "basis": "handler-fixture",
+    "data": {
+      "rows": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "view": "orders",
+      "id": 2,
+      "task_status": "open",
+      "owner_role_key": "quality",
+      "limit": 20,
+      "offset": 0
+    },
+    "test": "TestBusinessProgressTaskPageRPC"
   },
   "business.list_receivable_statistics_sources": {
     "basis": "backend-wire-shape",
@@ -13781,6 +13869,33 @@
       "reason": "接口调用示例"
     }
   },
+  "inventory.get_inventory_distribution": {
+    "basis": "handler-fixture",
+    "data": {
+      "distribution": {
+        "warehouses": [
+          {
+            "available_record_count": 2,
+            "record_count": 3,
+            "stock_count": 2,
+            "unavailable_record_count": 1,
+            "warehouse_code": "WH-F",
+            "warehouse_id": 2,
+            "warehouse_name": "成品仓"
+          }
+        ]
+      }
+    },
+    "message": "OK",
+    "params": {
+      "subject_type": "PRODUCT"
+    },
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "case": "inventory.get_inventory_distribution",
+      "test": "TestRPCDocumentedExamples"
+    }
+  },
   "inventory.get_inventory_operation": {
     "basis": "backend-wire-shape",
     "data": {
@@ -13811,33 +13926,6 @@
     },
     "params": {
       "id": 2
-    }
-  },
-  "inventory.get_inventory_distribution": {
-    "basis": "handler-fixture",
-    "data": {
-      "distribution": {
-        "warehouses": [
-          {
-            "available_record_count": 2,
-            "record_count": 3,
-            "stock_count": 2,
-            "unavailable_record_count": 1,
-            "warehouse_code": "WH-F",
-            "warehouse_id": 2,
-            "warehouse_name": "成品仓"
-          }
-        ]
-      }
-    },
-    "message": "OK",
-    "params": {
-      "subject_type": "PRODUCT"
-    },
-    "test": "TestRPCDocumentedExamples",
-    "verification": {
-      "case": "inventory.get_inventory_distribution",
-      "test": "TestRPCDocumentedExamples"
     }
   },
   "inventory.list_inventory_balances": {
@@ -13871,7 +13959,7 @@
     },
     "message": "OK",
     "params": {
-      "sort_by": "ready_to_ship_quantity",
+      "sort_by": "available_quantity",
       "sort_direction": "desc",
       "subject_id": 1,
       "subject_type": "PRODUCT",
@@ -14680,6 +14768,7 @@
   "masterdata.list_payment_method_options": {
     "basis": "handler-fixture",
     "data": {
+      "can_delete": false,
       "has_more": false,
       "items": [
         {
@@ -14689,8 +14778,7 @@
           "method": "aa",
           "version": 1
         }
-      ],
-      "can_delete": false
+      ]
     },
     "message": "OK",
     "params": {
@@ -15616,16 +15704,16 @@
         "source_no": null,
         "source_type": null,
         "status": "CANCELLED",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": null,
         "supplier_name": null,
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 3,
-        "warehouse_id": 1,
-        "subject_name": "",
-        "subject_code": ""
+        "warehouse_id": 1
       }
     },
     "message": "OK",
@@ -15999,16 +16087,16 @@
         "source_no": null,
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": null,
         "supplier_name": null,
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1,
-        "subject_name": "",
-        "subject_code": ""
+        "warehouse_id": 1
       }
     },
     "message": "OK",
@@ -16078,16 +16166,16 @@
         "source_no": null,
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "PRODUCT",
         "supplier_id": null,
         "supplier_name": null,
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1,
-        "subject_name": "",
-        "subject_code": ""
+        "warehouse_id": 1
       }
     },
     "message": "OK",
@@ -16783,19 +16871,19 @@
         "reverse_reason": "DEMO",
         "reversed_at": 1,
         "reversed_by": 1,
+        "source_identity": {
+          "batch_no": "WIP-PHOTO-DEMO",
+          "code": "PRODUCT-7",
+          "name": "模拟小熊",
+          "sku_code": "SKU-7",
+          "subject_id": 7,
+          "subject_type": "PRODUCT"
+        },
         "status": "APPROVED",
         "stock_disposition_required": false,
         "target_operation_id": 1,
         "target_supplier_id": 1,
-        "version": 1,
-        "source_identity": {
-          "subject_type": "PRODUCT",
-          "subject_id": 7,
-          "name": "模拟小熊",
-          "code": "PRODUCT-7",
-          "sku_code": "SKU-7",
-          "batch_no": "WIP-PHOTO-DEMO"
-        }
+        "version": 1
       }
     },
     "params": {
@@ -16901,11 +16989,11 @@
     },
     "message": "OK",
     "params": {
-      "sort_by": "amount",
-      "sort_direction": "desc",
       "keyword": "抱抱猴子",
       "limit": 10,
       "offset": 0,
+      "sort_by": "amount",
+      "sort_direction": "desc",
       "status": "POSTED"
     },
     "test": "TestOperationalFactFinancePaymentCreateAndListContract"
@@ -16950,12 +17038,12 @@
     },
     "message": "OK",
     "params": {
-      "sort_by": "amount",
-      "sort_direction": "desc",
       "include_status_counts": true,
       "include_totals": true,
       "limit": 1,
       "offset": 20,
+      "sort_by": "amount",
+      "sort_direction": "desc",
       "status": "DRAFT"
     }
   },
@@ -17019,8 +17107,8 @@
     "message": "OK",
     "params": {
       "handling_status": "APPROVED",
-      "keyword": "PE-DEMO",
       "include_status_counts": true,
+      "keyword": "PE-DEMO",
       "limit": 20
     },
     "test": "TestRPCDocumentedBusinessQuickCounts",
@@ -17155,9 +17243,9 @@
     },
     "message": "OK",
     "params": {
+      "limit": 20,
       "sort_by": "total_net_weight_g",
-      "sort_direction": "desc",
-      "limit": 20
+      "sort_direction": "desc"
     },
     "test": "TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions"
   },
@@ -17256,16 +17344,16 @@
         "source_no": null,
         "source_type": null,
         "status": "POSTED",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": null,
         "supplier_name": null,
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 2,
-        "warehouse_id": 1,
-        "subject_name": "",
-        "subject_code": ""
+        "warehouse_id": 1
       }
     },
     "message": "OK",
@@ -17582,16 +17670,16 @@
         "source_no": "DEMO",
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": 1,
         "supplier_name": "DEMO",
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1,
-        "subject_name": "",
-        "subject_code": ""
+        "warehouse_id": 1
       }
     },
     "params": {
@@ -17627,16 +17715,16 @@
         "source_no": "DEMO",
         "source_type": "OUTSOURCING_ORDER",
         "status": "DRAFT",
+        "subject_code": "",
         "subject_id": 1,
+        "subject_name": "",
         "subject_type": "MATERIAL",
         "supplier_id": 1,
         "supplier_name": "DEMO",
         "unit_id": 1,
         "updated_at": 1792394184,
         "version": 0,
-        "warehouse_id": 1,
-        "subject_name": "",
-        "subject_code": ""
+        "warehouse_id": 1
       }
     },
     "params": {
@@ -19245,6 +19333,57 @@
       "production_order_id": 1
     },
     "test": "TestProductionWIPJSONRPCCanonicalReadCancelAndSplit"
+  },
+  "production_wip.list_warehouse_production_work": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "counts": {
+        "": 1,
+        "AWAITING_INBOUND": 1
+      },
+      "items": [
+        {
+          "action": "",
+          "action_batch_id": 91003,
+          "batch_no": "WIP-PHOTO-DEMO",
+          "fact_id": 901,
+          "fact_no": "FG-PHOTO-DEMO",
+          "fact_status": "DRAFT",
+          "fact_version": 1,
+          "id": 901,
+          "kind": "RECEIPT",
+          "lot_no": "FG-LOT-DEMO",
+          "operation_name": "手工制作",
+          "order_no": "MO-PHOTO-DEMO",
+          "packaging_confirmed": false,
+          "pending_inspection_quantity": "0",
+          "pending_packaging_quantity": "0",
+          "product_code": "PRODUCT-7",
+          "product_id": 7,
+          "product_name": "模拟小熊",
+          "production_order_id": 71,
+          "production_order_item_id": 7100,
+          "production_wip_batch_id": 91003,
+          "quantity": "30",
+          "sku_code": "SKU-7",
+          "stage": "AWAITING_INBOUND",
+          "unit_name": "只",
+          "warehouse_id": 1,
+          "warehouse_name": "模拟成品仓"
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "keyword": "",
+      "kind": "RECEIPT",
+      "limit": 20,
+      "offset": 0,
+      "sort_by": "quantity",
+      "sort_direction": "desc",
+      "stage": ""
+    }
   },
   "production_wip.prepare_production_outsourcing_order": {
     "basis": "backend-wire-shape",
@@ -21653,15 +21792,34 @@
   "sales_order.list_engineering_material_requests": {
     "basis": "handler-fixture",
     "data": {
-      "items": [],
-      "total": 0
+      "items": [
+        {
+          "id": 3,
+          "sales_order_id": 7,
+          "order_no": "ORDER-7",
+          "order_status": "active",
+          "products": ["模拟小熊"],
+          "product_refs": [
+            {
+              "product_id": 9,
+              "product_name": "模拟小熊",
+              "product_code": "BEAR-9"
+            }
+          ],
+          "status": "APPROVED",
+          "submitted_at": "2026-09-15T08:00:00Z"
+        }
+      ],
+      "total": 11
     },
     "message": "OK",
     "params": {
       "keyword": "order",
       "limit": 10,
       "page": 2,
-      "status": "APPROVED"
+      "status": "APPROVED",
+      "sort_by": "submitted_at",
+      "sort_direction": "asc"
     },
     "test": "TestEngineeringMaterialListJSONRPCRequiresSourceReadAndValidFilters"
   },
@@ -21760,8 +21918,10 @@
     },
     "message": "OK",
     "params": {
+      "customer_id": 42,
       "sales_owner_name": "模拟跟单员",
-      "customer_id": 42
+      "sort_by": "customer_name",
+      "sort_direction": "asc"
     },
     "test": "TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction"
   },
@@ -21901,6 +22061,7 @@
       "currency": "USD",
       "customer_id": 1,
       "freight_terms": "INCLUDED",
+      "idempotency_key": "sales-order-example-create",
       "order_date": "2026-05-31",
       "order_no": "SO001",
       "payment_method": "30天月结",
@@ -22442,21 +22603,21 @@
         "discovery": null,
         "display_context": {
           "available": true,
-          "source_no": "SO-PHOTO-DEMO",
-          "source_line_count": null,
           "items": [
             {
+              "code": "PRODUCT-7",
+              "has_product_images": true,
+              "image_attachment_id": 0,
               "kind": "product",
               "name": "模拟小鹿",
-              "code": "PRODUCT-7",
-              "style_no": "",
               "order_no": "",
-              "supplier_item_no": "",
               "product_id": 7,
-              "image_attachment_id": 0,
-              "has_product_images": true
+              "style_no": "",
+              "supplier_item_no": ""
             }
-          ]
+          ],
+          "source_line_count": null,
+          "source_no": "SO-PHOTO-DEMO"
         },
         "due_at": null,
         "escalate_target_role_key": null,
@@ -22548,8 +22709,9 @@
       "lane_key": "all",
       "limit": 20,
       "offset": 20,
-      "sort": "newest",
-      "todo_only": true
+      "sort": "time_asc",
+      "todo_only": true,
+      "source_section": "production"
     },
     "test": "TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage"
   },
@@ -22854,7 +23016,8 @@
     "params": {
       "limit": 8,
       "offset": 0,
-      "queue_key": "actionable"
+      "queue_key": "actionable",
+      "sort": "time_desc"
     },
     "test": "TestWorkflowWorkbenchReturnsOneBoundedSnapshotForProjectedRoles"
   },
@@ -23054,6 +23217,7 @@
       "offset": 24,
       "owner_role_key": "engineering",
       "scope": "participated",
+      "sort_direction": "asc",
       "source_type": "sales_order",
       "status": "active"
     },
@@ -23371,56 +23535,5 @@
       "task_id": 1
     },
     "test": "TestJsonrpcDispatcher_WorkflowUrgeTaskRecordsEventIntent"
-  },
-  "production_wip.list_warehouse_production_work": {
-    "basis": "backend-wire-shape",
-    "params": {
-      "sort_by": "quantity",
-      "sort_direction": "desc",
-      "kind": "RECEIPT",
-      "stage": "",
-      "keyword": "",
-      "limit": 20,
-      "offset": 0
-    },
-    "data": {
-      "items": [
-        {
-          "id": 901,
-          "kind": "RECEIPT",
-          "stage": "AWAITING_INBOUND",
-          "production_order_id": 71,
-          "production_order_item_id": 7100,
-          "order_no": "MO-PHOTO-DEMO",
-          "fact_id": 901,
-          "fact_no": "FG-PHOTO-DEMO",
-          "fact_status": "DRAFT",
-          "fact_version": 1,
-          "production_wip_batch_id": 91003,
-          "batch_no": "WIP-PHOTO-DEMO",
-          "operation_name": "手工制作",
-          "product_id": 7,
-          "product_name": "模拟小熊",
-          "product_code": "PRODUCT-7",
-          "sku_code": "SKU-7",
-          "unit_name": "只",
-          "warehouse_id": 1,
-          "warehouse_name": "模拟成品仓",
-          "lot_no": "FG-LOT-DEMO",
-          "quantity": "30",
-          "pending_inspection_quantity": "0",
-          "pending_packaging_quantity": "0",
-          "packaging_confirmed": false,
-          "action_batch_id": 91003,
-          "action": ""
-        }
-      ],
-      "total": 1,
-      "counts": {
-        "": 1,
-        "AWAITING_INBOUND": 1
-      }
-    },
-    "message": "OK"
   }
 }

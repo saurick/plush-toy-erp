@@ -22,6 +22,7 @@
 :where(
   button:not(:disabled, [aria-disabled='true']),
   a[href]:not([aria-disabled='true']),
+  tr[data-row-action]:not([aria-disabled='true']),
   summary,
   select:not(:disabled),
   input[type='checkbox']:not(:disabled),
@@ -45,6 +46,14 @@ input[type='radio']:disabled,
 label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
 :where(button, a[href], [role='button'], [role='link'], [role='menuitem'], [role='option'], [role='tab'], [role='treeitem'])[aria-disabled='true'] {
   cursor: not-allowed;
+}
+
+/* 收起的选择框用于展开候选。打开后由控件区分可输入和只读状态。 */
+.ant-select.ant-select-show-search:not(.ant-select-open, .ant-select-disabled, .ant-select-auto-complete, .ant-select-customize-input)
+  > .ant-select-selector,
+.ant-select.ant-select-show-search:not(.ant-select-open, .ant-select-disabled, .ant-select-auto-complete, .ant-select-customize-input)
+  > .ant-select-selector input {
+  cursor: pointer;
 }
 
 .erp-sliding-segmented.ant-segmented .ant-segmented-group::before,
@@ -248,6 +257,8 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   position: relative;
   display: inline-flex;
   min-height: 32px;
+  min-width: 0;
+  max-width: 100%;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
@@ -261,7 +272,8 @@ label:has(:where(input[type='checkbox'], input[type='radio']):disabled),
   font-size: var(--erp-font-small);
   font-weight: 500;
   line-height: 1.4;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 

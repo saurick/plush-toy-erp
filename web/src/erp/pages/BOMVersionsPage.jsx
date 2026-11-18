@@ -12,6 +12,7 @@ import {
   UploadOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Space, Typography } from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
@@ -732,7 +733,7 @@ export default function BOMVersionsPage() {
 
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ products: mergeProducts, materials: mergeMaterials }}>
-      <PageHeaderCard compact helpKey="material-bom" title="物料清单（BOM）" />
+      <PageHeaderCard compact helpKey="material-bom" title={getBusinessDocumentTitle('bom_header')} />
 
       <BusinessOperationPanel
         compact
@@ -791,7 +792,6 @@ export default function BOMVersionsPage() {
                 setStatus(nextStatus || '')
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              style={{ width: 140 }}
             />
           </>
         }

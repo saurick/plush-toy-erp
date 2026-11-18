@@ -8,6 +8,7 @@ import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { loadDocumentGalleryProducts } from '../../api/documentProductGalleryApi.mjs'
 import { DOCUMENT_PRODUCT_SOURCES } from '../../utils/businessProductGallery.mjs'
 import ProgressMetricHint from './ProgressMetricHint.jsx'
+import { VisualizationStatus } from './BusinessVisualizationFrame.jsx'
 import { WorkflowTaskBlockedTag } from '../workflow/WorkflowTaskBlocker.jsx'
 import WorkflowTaskImagePlaceholder from '../workflow/WorkflowTaskImagePlaceholder.jsx'
 import WorkflowTaskReason from '../workflow/WorkflowTaskReason.jsx'
@@ -17,6 +18,8 @@ import {
   progressDeliveryDetails,
   progressDue,
   progressIdentityPresentation,
+  progressLineStatus,
+  progressQuantity,
   progressStatusLabel,
 } from '../../utils/businessProgress.mjs'
 
@@ -108,7 +111,7 @@ export function ProgressDelivery({
           <strong>{delivery.text}</strong>
         )}
       </span>
-      {showProgress && delivery.percent > 0 && (
+      {showProgress && (delivery.percent > 0 || (row.line && delivery.percent === 0)) && (
         <ProgressMetricHint row={row} metric={progressDeliveryDetails(row)}>
           <span
             className="erp-progress-track"
@@ -125,6 +128,20 @@ export function ProgressDelivery({
       )}
     </span>
   )
+}
+
+export function ProgressLineProduct({ row }) {
+  return <ProductIdentity productId={row.product_id} name={row.product} code={row.line.customer_product_no} compact />
+}
+
+export function ProgressLineRemaining({ row }) {
+  return row.line.remaining_quantity === null
+    ? '—'
+    : `${progressQuantity(row.line.remaining_quantity)} ${row.unit}`
+}
+
+export function ProgressLineStatus({ row, snapshotAt }) {
+  return <VisualizationStatus status={progressLineStatus(row, snapshotAt)} />
 }
 
 export function ProgressAttention({ row, access, compact = false, suffix }) {

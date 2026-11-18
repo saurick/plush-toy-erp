@@ -183,6 +183,14 @@ func TestWorkflowTrackingMergedPagination(t *testing.T) {
 			}
 		}
 	}
+	q.SortDirection, q.Limit = "asc", 1
+	for offset, want := range append(append([]biz.WorkflowTrackingRef{}, expected[1:]...), expected[0]) {
+		q.Offset = offset
+		page, err := repo.ListWorkflowTracking(ctx, q)
+		if err != nil || page.Total != len(expected) || len(page.Items) != 1 || page.Items[0].Ref != want {
+			t.Fatalf("oldest first offset=%d want=%v page=%v err=%v", offset, want, page, err)
+		}
+	}
 	q.Offset, q.Limit, q.Keyword = 1, 1, "跟进"
 	page, err := repo.ListWorkflowTracking(ctx, q)
 	if err != nil || page.Total != 3 || len(page.Items) != 1 || page.Items[0].Ref != expected[2] {

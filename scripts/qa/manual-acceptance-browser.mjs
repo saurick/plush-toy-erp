@@ -1331,38 +1331,6 @@ export function readMobileTaskTotal(tabKey, ariaLabel = "") {
   return match ? Number(match[1]) : null;
 }
 
-export function evaluateGlobalDashboardEvidence(
-  queueLabels,
-  visibleRows,
-  minimumRecords,
-) {
-  const queueCounts = Object.fromEntries(
-    (queueLabels || []).flatMap((label) => {
-      const match = String(label || "").match(/^(.+?)，\s*(\d+)\s*项(?:，|$)/u);
-      return match ? [[match[1].trim(), Number(match[2])]] : [];
-    }),
-  );
-  const observedTotal = Object.values(queueCounts).reduce(
-    (total, value) => total + value,
-    0,
-  );
-  const minimumSatisfied =
-    observedTotal >= minimumRecords && Number(visibleRows) > 0;
-  return {
-    status: minimumSatisfied
-      ? "minimum_proven"
-      : observedTotal > 0 || Number(visibleRows) > 0
-        ? "page_has_data_minimum_not_proven"
-        : "not_proven",
-    evidenceSource: "workbench queue filters and visible task rows",
-    queueCounts,
-    visibleRows: Number(visibleRows) || 0,
-    observedTotal,
-    minimumRecords,
-    minimumSatisfied,
-  };
-}
-
 export function evaluateBusinessDashboardEvidence(metrics, requirements) {
   const actual =
     Number.isSafeInteger(metrics?.total) && metrics.total >= 0
@@ -1432,64 +1400,6 @@ export function evaluateBusinessDashboardCurrentBatchEvidence({
   };
 }
 
-export function evaluateDashboardTaskCurrentBatchEvidence({
-  evidence,
-  currentBatch,
-  roleKey,
-  taskGroup = null,
-  taskCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey],
-  visibleTaskCodes = [],
-  currentBatchTaskCodes = [],
-}) {
-  const expectedPrefix = String(taskCodePrefix || "").trim();
-  const taskProbe = currentBatch?.probes?.find(
-    (probe) => probe.exactTaskCodePrefix === expectedPrefix,
-  );
-  const currentBatchBound =
-    currentBatch?.dataStatus === "pass" &&
-    taskProbe?.status === "pass" &&
-    taskProbe?.batchEvidence === "exact_task_codes" &&
-    taskProbe?.exactOwnerRoleKey === roleKey &&
-    taskProbe?.exactTaskCodePrefix === expectedPrefix &&
-    (taskGroup === null || taskProbe?.exactTaskGroup === taskGroup);
-  const matchingCurrentBatchTaskCodes = visibleTaskCodes.filter((value) =>
-    String(value || "").startsWith(`${expectedPrefix}-`),
-  );
-  const exactCurrentBatchTaskCodes = currentBatchTaskCodes.filter((value) =>
-    String(value || "").startsWith(`${expectedPrefix}-`),
-  );
-  const currentBatchPageBound =
-    Number.isSafeInteger(currentBatch?.actual) &&
-    currentBatch.actual > 0 &&
-    exactCurrentBatchTaskCodes.length > 0 &&
-    exactCurrentBatchTaskCodes.length <= currentBatch.actual &&
-    new Set(exactCurrentBatchTaskCodes).size ===
-      exactCurrentBatchTaskCodes.length;
-  const currentBatchVisible = matchingCurrentBatchTaskCodes.length > 0;
-  const minimumSatisfied =
-    evidence?.minimumSatisfied === true &&
-    currentBatchBound &&
-    currentBatchPageBound &&
-    currentBatchVisible;
-  return {
-    ...evidence,
-    status: minimumSatisfied
-      ? "minimum_proven"
-      : Number(evidence?.observedTotal) > 0
-        ? "page_has_data_minimum_not_proven"
-        : "not_proven",
-    evidenceSource:
-      "dashboard totals and visible task-code metadata bound to the current exact-source batch",
-    currentBatchActual: currentBatch?.actual ?? null,
-    currentBatchBound,
-    currentBatchPageSize: exactCurrentBatchTaskCodes.length,
-    currentBatchPageBound,
-    visibleCurrentBatchTaskCount: matchingCurrentBatchTaskCodes.length,
-    currentBatchVisible,
-    minimumSatisfied,
-  };
-}
-
 export function browserProjectionBaselineProven(binding) {
   const baseline = binding?.dataset?.baseline;
   if (baseline?.exactEmptyBusinessBaseline === true) return true;
@@ -1511,13 +1421,11 @@ function dailyBrowserTaskProbe(currentBatch, roleKey) {
     probe.status === "pass" && probe.dailyOpenTaskCodes?.length > 0);
 }
 
-async function readDailyTaskPageEvidence(page, target, currentBatch, probe, { mobile = false, dashboard = false } = {}) {
+async function readDailyTaskPageEvidence(page, target, currentBatch, probe, { mobile = false } = {}) {
   if (currentBatch.dataStatus !== "pass" || currentBatch.actual <= 0) {
     throw new BrowserAcceptanceError(`${target.title} 未绑定本批来源任务读回`);
   }
-  const rowSelector = dashboard
-    ? ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]"
-    : mobile ? ".erp-mobile-list-item[data-task-code]" : ".erp-task-table-row[data-task-code]";
+  const rowSelector = mobile ? ".erp-mobile-list-item[data-task-code]" : ".erp-task-table-row[data-task-code]";
   const found = await page.waitForFunction((selector) => {
     const rows = [...document.querySelectorAll(selector)].filter((node) => {
       const { width, height } = node.getBoundingClientRect();
@@ -1533,7 +1441,7 @@ async function readDailyTaskPageEvidence(page, target, currentBatch, probe, { mo
   }, rowSelector, { timeout: PAGE_TIMEOUT_MS });
   const defaults = await found.jsonValue();
   let matched = defaults.codes.find((code) => probe.dailyOpenTaskCodes.includes(code));
-  if (!matched && !dashboard) {
+  if (!matched) {
     matched = probe.dailyOpenTaskCodes[0];
     const input = mobile
       ? page.getByPlaceholder("搜任务或单号", { exact: true })
@@ -1566,189 +1474,41 @@ async function readDashboardEvidence(page, target, datasetBinding) {
     datasetBinding,
   );
   if (target.key === "global-dashboard") {
-    const daily = dailyBrowserTaskProbe(currentBatch, "boss");
-    if (daily) return readDailyTaskPageEvidence(page, target, currentBatch, daily, { dashboard: true });
-    const taskCodePrefix = String(
-      datasetBinding?.readiness?.taskVisibleCodePrefixes?.boss || "",
-    ).trim();
-    if (!taskCodePrefix) {
-      throw new BrowserAcceptanceError(
-        "全局看板缺少当前任务批次的岗位编码前缀",
-      );
+    const probe = currentBatch.probes.find((item) => item.id === "sales-orders");
+    const prefix = probe?.batchPrefix;
+    if (!prefix || probe.batchEvidence !== "prefix_filtered" || probe.queryKeyword !== prefix) {
+      throw new BrowserAcceptanceError("工作台汇总缺少已核对的本批销售订单前缀");
     }
-    await page.waitForFunction(
-      () => {
-        const labels = [
-          ...document.querySelectorAll(
-            ".erp-workbench-queue-filter[aria-label]",
-          ),
-        ].map((node) => node.getAttribute("aria-label") || "");
-        const total = labels.reduce((sum, label) => {
-          const match = label.match(/，\s*(\d+)\s*项(?:，|$)/u);
-          return sum + Number(match?.[1] || 0);
-        }, 0);
-        return (
-          total > 0 &&
-          document.querySelector(
-            ".erp-workbench-queue-panel .erp-task-table-row",
-          )
-        );
-      },
-      null,
-      { timeout: PAGE_TIMEOUT_MS },
-    );
-    const visitedQueuePages = new Set();
-    for (;;) {
-      const visible = await page.evaluate(
-        (prefix) =>
-          [
-            ...document.querySelectorAll(
-              ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
-            ),
-          ].some(
-            (row) =>
-              row.getBoundingClientRect().height > 0 &&
-              (row.getAttribute("data-task-code") || "").startsWith(
-                prefix + "-",
-              ),
-          ),
-        taskCodePrefix,
-      );
-      if (visible) break;
-      const pager = page.getByRole("navigation", {
-        name: "任务分页",
-        exact: true,
-      });
-      const next = pager.locator(
-        ".ant-pagination-next:not(.ant-pagination-disabled)",
-      );
-      if (!(await next.count())) break;
-      const previous = await page
-        .locator(
-          ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
-        )
-        .evaluateAll((rows) =>
-          rows.map((row) => row.getAttribute("data-task-code")).join("|"),
-        );
-      if (visitedQueuePages.has(previous))
-        throw new BrowserAcceptanceError("工作台分页重复，无法证明本批任务");
-      visitedQueuePages.add(previous);
+    const summary = page.getByRole("region", { name: "工作台汇总" });
+    const search = summary.getByPlaceholder("订单号、产品或款号");
+    await search.fill(prefix);
+    await search.press("Enter");
+    const orderNumbers = new Set();
+    let previousFirstRow = "";
+    while (orderNumbers.size < target.minimumRecords) {
+      const result = await page.waitForFunction(({ prefix, previousFirstRow }) => {
+        const area = document.querySelector(".erp-workbench-summaries");
+        if (!area || area.querySelector(".ant-spin-spinning")) return false;
+        const rows = [...area.querySelectorAll("tbody tr[data-row-key]")];
+        const first = rows[0]?.dataset.rowKey;
+        if (!first || first === previousFirstRow) return false;
+        const numbers = rows.map((row) => row.querySelector("button.ant-btn-link")?.textContent.trim());
+        return numbers.every((number) => number?.startsWith(prefix)) ? { first, numbers } : false;
+      }, { prefix, previousFirstRow }, { timeout: PAGE_TIMEOUT_MS });
+      const { first, numbers } = await result.jsonValue();
+      previousFirstRow = first;
+      for (const number of numbers) orderNumbers.add(number);
+      const next = summary.locator(".ant-pagination-next:not(.ant-pagination-disabled) button");
+      if (orderNumbers.size >= target.minimumRecords || !(await next.count())) break;
       await next.click();
-      await page.waitForFunction(
-        (previous) => {
-          const loading = [
-            ...document.querySelectorAll(
-              '.erp-task-pagination [role="status"]',
-            ),
-          ].some((node) => (node.textContent || "").includes("正在加载"));
-          const codes = [
-            ...document.querySelectorAll(
-              ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
-            ),
-          ]
-            .filter((row) => row.getBoundingClientRect().height > 0)
-            .map((row) => row.getAttribute("data-task-code"));
-          return !loading && codes.length > 0 && codes.join("|") !== previous;
-        },
-        previous,
-        { timeout: PAGE_TIMEOUT_MS },
-      );
     }
-    await page.waitForFunction(
-      ({ taskCodePrefix, expectedCount }) => {
-        const exactCodes = [
-          ...document.querySelectorAll(
-            '[data-testid="dashboard-workflow-task-evidence"] [data-task-code]',
-          ),
-        ]
-          .filter(
-            (node) =>
-              node.getAttribute("data-task-terminal") === "false" &&
-              (node.getAttribute("data-task-code") || "").startsWith(
-                `${taskCodePrefix}-`,
-              ),
-          )
-          .map((node) => node.getAttribute("data-task-code") || "");
-        const visibleCurrentBatchRow = [
-          ...document.querySelectorAll(
-            ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
-          ),
-        ].some((node) => {
-          const rect = node.getBoundingClientRect();
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            (node.getAttribute("data-task-code") || "").startsWith(
-              `${taskCodePrefix}-`,
-            )
-          );
-        });
-        return (
-          exactCodes.length > 0 &&
-          exactCodes.length <= expectedCount &&
-          new Set(exactCodes).size === exactCodes.length &&
-          visibleCurrentBatchRow
-        );
-      },
-      {
-        taskCodePrefix,
-        expectedCount: currentBatch.actual,
-      },
-      { timeout: PAGE_TIMEOUT_MS },
-    );
-    const metrics = await page.evaluate(
-      (taskCodePrefix) => ({
-        queueLabels: [
-          ...document.querySelectorAll(
-            ".erp-workbench-queue-filter[aria-label]",
-          ),
-        ].map((node) => node.getAttribute("aria-label") || ""),
-        visibleRows: [
-          ...document.querySelectorAll(
-            ".erp-workbench-queue-panel .erp-task-table-row",
-          ),
-        ].filter((node) => {
-          const rect = node.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        }).length,
-        visibleTaskCodes: [
-          ...document.querySelectorAll(
-            ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
-          ),
-        ]
-          .filter((node) => {
-            const rect = node.getBoundingClientRect();
-            return rect.width > 0 && rect.height > 0;
-          })
-          .map((node) => node.getAttribute("data-task-code") || ""),
-        currentBatchTaskCodes: [
-          ...document.querySelectorAll(
-            '[data-testid="dashboard-workflow-task-evidence"] [data-task-code]',
-          ),
-        ]
-          .filter(
-            (node) =>
-              node.getAttribute("data-task-terminal") === "false" &&
-              (node.getAttribute("data-task-code") || "").startsWith(
-                `${taskCodePrefix}-`,
-              ),
-          )
-          .map((node) => node.getAttribute("data-task-code") || ""),
-      }),
-      taskCodePrefix,
-    );
-    return evaluateDashboardTaskCurrentBatchEvidence({
-      evidence: evaluateGlobalDashboardEvidence(
-        metrics.queueLabels,
-        metrics.visibleRows,
-        target.minimumRecords,
-      ),
-      currentBatch,
-      roleKey: "boss",
-      taskCodePrefix,
-      visibleTaskCodes: metrics.visibleTaskCodes,
-      currentBatchTaskCodes: metrics.currentBatchTaskCodes,
-    });
+    const minimumSatisfied = currentBatch.actual >= target.minimumRecords && orderNumbers.size >= target.minimumRecords;
+    return {
+      status: minimumSatisfied ? "minimum_proven" : "page_has_data_minimum_not_proven",
+      minimumRecords: target.minimumRecords, minimumSatisfied, observedTotal: orderNumbers.size,
+      currentBatchBound: true, currentBatchActual: currentBatch.actual,
+      evidenceSource: "distinct current-batch sales order numbers visible in workbench summary rows",
+    };
   }
   if (target.key === "business-dashboard") {
     await page.getByRole("tab", { name: "订单交付", exact: true }).click();

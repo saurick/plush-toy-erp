@@ -3,6 +3,7 @@ import {
   WarehouseProductionStage as Stage,
 } from '../../common/consts/statuses.generated.mjs'
 import { numeric20Scale6QuantityUnits } from './numeric20Scale6.mjs'
+import { operationalFactActionPresentation } from './businessFactActionPresentation.mjs'
 
 export const warehouseProductionStageLabels = Object.freeze({
   [Stage.RETURN]: '待点数',
@@ -76,7 +77,7 @@ export function validateWarehouseProductionWorkPage(data, request) {
 export function warehouseProductionActionLabel(row) {
   if (!row) return '办理当前记录'
   if (row?.stage === Stage.RETURN) return '登记回货点数'
-  if (row?.stage === Stage.INBOUND) return '确认成品入库'
+  if (row?.stage === Stage.INBOUND) return operationalFactActionPresentation('production', { fact_type: 'FINISHED_GOODS_RECEIPT' }).label
   if (row?.stage === Stage.PACKAGING) return '办理查货包装'
   return '查看处理进度'
 }

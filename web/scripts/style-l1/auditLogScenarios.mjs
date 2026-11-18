@@ -1,14 +1,21 @@
 import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
+import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
-import { waitForFiniteAnimations } from './browserReadiness.mjs'
-import { assertGroupedSelectHierarchy } from './groupedSelectAssertions.mjs'
 
 const events = Array.from({ length: 201 }, (_, index) => ({
   id: index + 1,
   source: index % 2 ? 'server_bootstrap' : 'admin_manage',
   event_key: index % 2 ? 'admin_bootstrap.blocked' : 'admin_user.roles.set',
+  ...(index === 197 || index === 199
+    ? {
+        source: 'workflow',
+        event_type: 'process_instance_created',
+        event_key: `process_instance.created/${index + 1}`,
+        action_label: '发起流程',
+      }
+    : {}),
   created_at: Date.parse('2026-09-26T12:00:00+08:00') / 1000 - index,
   payload: {
     actor: { display_name: '系统管理员', username: 'audit-admin' },
@@ -59,6 +66,7 @@ export async function installAuditRoute(page) {
       (event) =>
         (!params.source || params.source === event.source) &&
         (!params.event_key || params.event_key === event.event_key) &&
+        (!params.event_type || params.event_type === event.event_type) &&
         (!params.keyword ||
           params.keyword === '读取失败' ||
           JSON.stringify(event.payload).includes(params.keyword))
@@ -123,37 +131,62 @@ export function createAuditLogScenarios({
         50
       )
       const filters = page.locator('.erp-business-filter-popover__content')
-      const operation = filters.locator('.ant-select')
+      const sources = page.getByRole('group', { name: '操作来源', exact: true })
+      const types = page.getByRole('group', { name: '操作类型', exact: true })
+      const sourceButton = (label) => sources.getByRole('button', { name: label, exact: true })
+      const typeButton = (label) => types.getByRole('button', { name: label, exact: true })
+      const rows = page.locator('.ant-table-tbody tr[data-row-key]')
+      assert.equal(await types.count(), 0)
+      await sourceButton('系统管理').click()
       const originalViewport = page.viewportSize()
       for (const width of [1024, 1920, 3840]) {
         await page.setViewportSize({ ...originalViewport, width })
-        await page.getByRole('button', { name: '筛选', exact: true }).click()
-        await operation.waitFor({ state: 'visible' })
-        await waitForFiniteAnimations(page)
-        const bounds = await operation.boundingBox()
-        assert(bounds.width >= 220 && bounds.width <= 280, `操作类型筛选不应拉满面板，${width}px 视口实际为 ${bounds.width}px`)
-        const choices = await filters.locator('.erp-business-filter-field--choices').boundingBox()
-        assert(choices.width > bounds.width + 200, '整行筛选选项保留可用空间')
-        await assertNoHorizontalOverflow(page, `操作记录筛选 ${width}px`)
-        await filters.getByRole('button', { name: '收起', exact: true }).click()
-        await filters.waitFor({ state: 'hidden' })
+        await typeButton('员工岗位变更').waitFor()
+        const sourceBounds = await sources.boundingBox()
+        const typeBounds = await types.boundingBox()
+        assert(typeBounds.y >= sourceBounds.y + sourceBounds.height, '操作类型在来源按钮下方')
+        await assertNoHorizontalOverflow(page, `操作类型按钮 ${width}px`)
       }
       await page.setViewportSize(originalViewport)
-      await page.getByRole('button', { name: '筛选', exact: true }).click()
-      await operation.waitFor({ state: 'visible' })
-      const filteredRead = page.waitForResponse((response) => {
+      await page.locator('.ant-pagination-next button').click()
+      await rows.getByText('历史员工101', { exact: false }).first().waitFor()
+      await typeButton('员工岗位变更').press('Enter')
+      await page.locator('tr[data-row-key="1"]').waitFor()
+      assert.equal(page.auditRequests.at(-1).offset, 0)
+      assert.equal(page.auditRequests.at(-1).event_key, 'admin_user.roles.set')
+      await typeButton('创建员工账号').click()
+      await page.getByText('当前条件下没有操作记录', { exact: true }).waitFor()
+      await sourceButton('流程与任务').click()
+      await types.getByRole('button', { name: '全部操作', pressed: true }).waitFor()
+      assert.equal(await typeButton('创建员工账号').count(), 0)
+      await rows.nth(1).getByText('发起流程', { exact: true }).waitFor()
+      assert.equal(page.auditRequests.at(-1).event_key, undefined)
+      const initiatedRead = page.waitForResponse((response) => {
         if (!response.url().endsWith('/rpc/admin')) return false
-        const body = response.request().postDataJSON()
-        return body?.method === 'audit_logs' && body.params?.event_key
+        return response.request().postDataJSON()?.params?.event_type === 'process_instance_created'
       })
-      await operation.getByRole('combobox').press('ArrowDown')
-      await assertGroupedSelectHierarchy(page.locator('.ant-select-dropdown:visible'), '操作类型')
-      await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
-      await filteredRead
-      assert(page.auditRequests.some((params) => params.event_key), '选择操作类型应提交筛选条件')
-      await operation.locator('.ant-select-clear').click()
-      await page.waitForFunction(() => document.querySelector('.ant-pagination-total-text')?.textContent?.includes('201'))
+      await typeButton('发起流程').click()
+      await initiatedRead
+      await rows.nth(1).getByText('发起流程', { exact: true }).waitFor()
+      assert.equal(await rows.count(), 2)
+      assert.equal(page.auditRequests.at(-1).source, 'workflow')
+      assert.equal(page.auditRequests.at(-1).event_key, undefined)
+      const filteredDownload = page.waitForEvent('download')
+      await openBusinessTableTool(page, '导出筛选结果')
+      const initiatedCsv = await readFile(await (await filteredDownload).path(), 'utf8')
+      assert.equal(initiatedCsv.trim().split('\n').length, 3)
+      assert(initiatedCsv.includes('历史员工198') && initiatedCsv.includes('历史员工200'))
+      await page.getByRole('button', { name: '筛选', exact: true }).click()
+      assert.equal(await filters.getByRole('combobox', { name: '操作类型' }).count(), 0)
+      await filters.getByRole('button', { name: '高风险', exact: true }).click()
+      await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
       await filters.getByRole('button', { name: '收起', exact: true }).click()
+      assert.equal(await typeButton('发起流程').getAttribute('aria-pressed'), 'true')
+      await typeButton('全部操作').click()
+      await types.getByRole('button', { name: '全部操作', pressed: true }).waitFor()
+      await sourceButton('全部来源').click()
+      await types.waitFor({ state: 'hidden' })
+      await page.waitForFunction(() => document.querySelector('.ant-pagination-total-text')?.textContent?.includes('201'))
       const pager = page.locator('.ant-pagination')
       const readAuditPage = (limit, offset) => page.waitForResponse((response) => {
         if (!response.url().endsWith('/rpc/admin')) return false
@@ -198,7 +231,6 @@ export function createAuditLogScenarios({
       )
       await page.keyboard.press('Escape')
       await columnDialog.waitFor({ state: 'hidden' })
-      const sources = page.getByRole('group', { name: '操作来源', exact: true })
       const group = await sources.elementHandle()
       const before = await sources.boundingBox()
       const system = sources.getByRole('button', { name: '系统管理', exact: true })
@@ -256,6 +288,27 @@ export function createAuditLogScenarios({
         headers.map((text) => text.trim()),
         ['发生时间', '操作人', '动作', '业务对象', '风险', '操作来源', '详情']
       )
+      await page.getByRole('button', { name: '筛选', exact: true }).click()
+      const dates = filters.getByRole('group', { name: '操作时间', exact: true })
+      const periods = dates.getByRole('group', { name: '时间范围', exact: true })
+      const today = currentBusinessDate()
+      assert.equal(await periods.getByRole('button', { name: '不限', pressed: true }).count(), 1)
+      assert.equal(await dates.getByRole('textbox').count(), 0)
+      const [dateRead] = await Promise.all([
+        page.waitForResponse((response) => response.url().endsWith('/rpc/admin') &&
+          response.request().postDataJSON()?.params?.created_from),
+        periods.getByRole('button', { name: '今天', exact: true }).press('Enter'),
+      ])
+      const dateParams = dateRead.request().postDataJSON().params
+      assert.equal(dateParams.created_from, `${today}T00:00:00+08:00`)
+      assert.equal(dateParams.created_to, `${today}T23:59:59.999999999+08:00`)
+      await periods.getByRole('button', { name: '自定义日期', exact: true }).click()
+      assert.deepEqual(await dates.getByRole('textbox').evaluateAll((nodes) => nodes.map((node) => node.value)),
+        [today.replaceAll('-', '/'), today.replaceAll('-', '/')])
+      await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
+      await periods.getByRole('button', { name: '不限', pressed: true }).waitFor()
+      assert.equal(await dates.getByRole('textbox').count(), 0)
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
       await assertNoHorizontalOverflow(page, 'system-audit-logs-desktop')
     },
   }
@@ -277,17 +330,18 @@ export function createAuditLogScenarios({
           .first()
           .waitFor()
         await verifyDrawer(page, width >= 768 ? 640 : width)
-        if (width < 768) {
-          await page.getByRole('button', { name: '筛选', exact: true }).click()
-          const filters = page.locator('.erp-business-filter-popover__content')
-          const operation = filters.locator('.ant-select')
-          await operation.waitFor({ state: 'visible' })
-          await waitForFiniteAnimations(page)
-          const panelBounds = await filters.boundingBox()
-          const fieldBounds = await operation.boundingBox()
-          assert(Math.abs(panelBounds.width - fieldBounds.width) <= 1, '窄屏筛选保留整行可用宽度')
-          await filters.getByRole('button', { name: '收起', exact: true }).click()
-        }
+        const sources = page.getByRole('group', { name: '操作来源' })
+        await sources.getByRole('button', { name: '系统管理' }).click()
+        const types = page.getByRole('group', { name: '操作类型' })
+        const buttons = types.getByRole('button')
+        const bounds = await buttons.evaluateAll((nodes) => nodes.map((node) => {
+          const { left, right, height } = node.getBoundingClientRect()
+          return { left, right, height }
+        }))
+        assert(bounds.length > 1)
+        assert(bounds.every(({ left, right, height }) => left >= 0 && right <= width + 1 && height >= (width < 768 ? 44 : 32)), '操作类型按钮应在视口内换行并可点选')
+        await types.getByRole('button', { name: '员工岗位变更' }).click()
+        await types.getByRole('button', { name: '员工岗位变更', pressed: true }).waitFor()
         await assertNoHorizontalOverflow(page, `audit-${name}`)
       },
     })),

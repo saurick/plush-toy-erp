@@ -114,6 +114,12 @@
   flex: 0 1 auto;
 }
 
+.app-table.ant-table-wrapper td.ant-table-cell .ant-tag {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .app-table.ant-table-wrapper .ant-table-cell > .ant-tag:only-child {
   margin-inline-end: 0;
 }

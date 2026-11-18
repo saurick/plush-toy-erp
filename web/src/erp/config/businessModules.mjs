@@ -1,3 +1,11 @@
+import { WorkflowTaskDiscoveryCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
+
+const documentTypeBySource = new Map(
+  WorkflowTaskDiscoveryCatalog.documents.flatMap((document) =>
+    document.sources.map((source) => [source, document])
+  )
+)
+
 const businessSectionMeta = Object.freeze([
   { key: 'master', title: '基础资料' },
   { key: 'sales', title: '销售管理' },
@@ -19,7 +27,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'customers',
     sectionKey: 'master',
-    label: '客户档案',
     title: '客户档案',
     path: '/erp/master/partners/customers',
     shortLabel: '客户',
@@ -32,7 +39,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'suppliers',
     sectionKey: 'master',
-    label: '供应商与加工厂',
     title: '供应商与加工厂',
     path: '/erp/master/partners/suppliers',
     shortLabel: '供应商',
@@ -46,7 +52,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'products',
     sectionKey: 'master',
-    label: '产品档案',
     title: '产品档案',
     path: '/erp/master/products',
     shortLabel: '产品',
@@ -67,7 +72,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'materials',
     sectionKey: 'master',
-    label: '材料档案',
     title: '材料档案',
     path: '/erp/master/materials',
     shortLabel: '材料',
@@ -88,8 +92,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'sales-orders',
     sectionKey: 'sales',
-    label: '销售订单',
-    title: '销售订单',
+    title: documentTypeBySource.get('sales_order').label,
     path: '/erp/sales/project-orders/sales-orders',
     shortLabel: '销售订单',
     pageKind: 'formal',
@@ -101,8 +104,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'material-bom',
     sectionKey: 'engineering',
-    label: '物料清单（BOM）',
-    title: '物料清单（BOM）',
+    title: documentTypeBySource.get('bom_header').label,
     path: '/erp/purchase/material-bom',
     shortLabel: '物料清单',
     pageKind: 'formal',
@@ -121,7 +123,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'processes',
     sectionKey: 'engineering',
-    label: '加工环节',
     title: '加工环节',
     path: '/erp/engineering/processes',
     shortLabel: '环节',
@@ -143,8 +144,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'accessories-purchase',
     sectionKey: 'purchase',
-    label: '采购订单',
-    title: '采购订单',
+    title: documentTypeBySource.get('purchase_order').label,
     path: '/erp/purchase/accessories',
     shortLabel: '采购',
     pageKind: 'formal',
@@ -172,7 +172,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'inventory',
     sectionKey: 'warehouse',
-    label: '库存查询',
     title: '库存查询',
     path: '/erp/warehouse/inventory',
     shortLabel: '库存',
@@ -206,7 +205,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'inbound',
     sectionKey: 'warehouse',
-    label: '入库办理',
     title: '入库办理',
     path: '/erp/warehouse/inbound',
     shortLabel: '入库',
@@ -241,8 +239,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'quality-inspections',
     sectionKey: 'quality',
-    label: '质量检验',
-    title: '质量检验',
+    title: documentTypeBySource.get('quality_inspection').label,
     path: '/erp/production/quality-inspections',
     shortLabel: '质检',
     pageKind: 'formal',
@@ -274,8 +271,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'processing-contracts',
     sectionKey: 'outsourcing',
-    label: '委外订单',
-    title: '委外订单',
+    title: documentTypeBySource.get('outsourcing_order').label,
     path: '/erp/purchase/processing-contracts',
     shortLabel: '委外',
     pageKind: 'formal',
@@ -310,8 +306,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-orders',
     sectionKey: 'production',
-    label: '生产订单',
-    title: '生产订单',
+    title: documentTypeBySource.get('production_order').label,
     path: '/erp/production/orders',
     shortLabel: '生产订单',
     pageKind: 'formal',
@@ -356,7 +351,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-scheduling',
     sectionKey: 'production',
-    label: '排产确认',
     title: '排产确认',
     path: '/erp/production/scheduling',
     shortLabel: '排程',
@@ -381,8 +375,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-progress',
     sectionKey: 'production',
-    label: '生产记录',
-    title: '生产记录',
+    title: documentTypeBySource.get('production_fact').label,
     path: '/erp/production/progress',
     shortLabel: '记录',
     pageKind: 'formal',
@@ -411,7 +404,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-exceptions',
     sectionKey: 'production',
-    label: '异常处理',
     title: '异常处理',
     path: '/erp/production/exceptions',
     shortLabel: '异常',
@@ -445,8 +437,7 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'shipments',
     sectionKey: 'shipment',
-    label: '出货单',
-    title: '出货单',
+    title: documentTypeBySource.get('shipment').label,
     path: '/erp/warehouse/shipments',
     shortLabel: '出货',
     pageKind: 'formal',
@@ -474,7 +465,6 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'outbound',
     sectionKey: 'warehouse',
-    label: '出库办理',
     title: '出库办理',
     path: '/erp/warehouse/outbound',
     shortLabel: '出库',
@@ -506,7 +496,6 @@ export const businessModuleDefinitions = Object.freeze([
     key: 'receivables',
     tabLabel: '应收',
     sectionKey: 'finance',
-    label: '应收管理',
     title: '应收管理',
     path: '/erp/finance/receivables',
     shortLabel: '应收',
@@ -529,7 +518,6 @@ export const businessModuleDefinitions = Object.freeze([
     key: 'payables',
     tabLabel: '应付',
     sectionKey: 'finance',
-    label: '应付管理',
     title: '应付管理',
     path: '/erp/finance/payables',
     shortLabel: '应付',
@@ -553,8 +541,7 @@ export const businessModuleDefinitions = Object.freeze([
     key: 'finance-payments',
     tabLabel: '收付款',
     sectionKey: 'finance',
-    label: '收付款核销',
-    title: '收付款与核销',
+    title: documentTypeBySource.get('finance_payment').label,
     path: '/erp/finance/payments',
     shortLabel: '收付款',
     pageKind: 'formal',
@@ -583,7 +570,6 @@ export const businessModuleDefinitions = Object.freeze([
     key: 'reconciliation',
     tabLabel: '对账',
     sectionKey: 'finance',
-    label: '对账管理',
     title: '对账管理',
     path: '/erp/finance/reconciliation',
     shortLabel: '对账',
@@ -606,7 +592,6 @@ export const businessModuleDefinitions = Object.freeze([
     key: 'invoices',
     tabLabel: '发票',
     sectionKey: 'finance',
-    label: '发票管理',
     title: '发票管理',
     path: '/erp/finance/invoices',
     shortLabel: '发票',
@@ -620,7 +605,7 @@ export const businessModuleDefinitions = Object.freeze([
     sourceRefs: ['finance_facts', 'shipments'],
     currentScope: ['从已出货出货单生成发票记录', '过账', '取消'],
   },
-])
+].map((moduleItem) => Object.freeze({ ...moduleItem, label: moduleItem.title })))
 
 const businessModuleMap = new Map(
   businessModuleDefinitions.map((moduleItem) => [
@@ -634,6 +619,34 @@ const businessModuleMap = new Map(
 
 export function getBusinessModule(moduleKey) {
   return businessModuleMap.get(String(moduleKey || '').trim()) || null
+}
+
+// 单据分类描述关联对象，页面入口仍可表达汇总办理任务。
+export function getBusinessDocumentTypeKey(sourceType) {
+  const source = String(sourceType || '').trim()
+  return documentTypeBySource.get(source)?.key || source
+}
+
+export function getBusinessDocumentTitle(sourceType, fallback = '来源待核对') {
+  const source = String(sourceType || '').trim()
+  return documentTypeBySource.get(source)?.label || getBusinessModule(source)?.title || fallback
+}
+
+export function getBusinessDocumentSectionKey(sourceType) {
+  return documentTypeBySource.get(String(sourceType || '').trim())?.section_key || ''
+}
+
+export function businessDocumentSectionOptions(values = WorkflowTaskDiscoveryCatalog.documents.map(({ key }) => key)) {
+  const available = new Set(values.map(getBusinessDocumentSectionKey))
+  return businessSectionMeta
+    .filter(({ key }) => available.has(key))
+    .map(({ key, title }) => ({ value: key, label: title }))
+}
+
+export function businessDocumentTypeOptions(values = []) {
+  return [...new Set(values.map(getBusinessDocumentTypeKey).filter((key) => key && key !== 'all'))]
+    .map((value) => ({ value, label: getBusinessDocumentTitle(value) }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'))
 }
 
 const productCoreReviewBlockedPageKeys = new Set([

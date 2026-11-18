@@ -1,4 +1,4 @@
-import React, { useImperativeHandle, useMemo, useRef } from 'react'
+import React, { useCallback, useImperativeHandle, useMemo, useRef } from 'react'
 import { Table } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { normalizeTableColumns, resolveTableColumnSizing } from './tableColumns.mjs'
@@ -16,10 +16,14 @@ function MeasuredHeaderTable({ style, ...props }) {
 
 const AppTable = React.forwardRef(
   (
-    { columns, className = '', locale, components, rowSelection, style, scrollToolbar = false, scrollControlsOnEmpty = false, ...props },
+    { columns, className = '', locale, components, onRow, rowSelection, style, scrollToolbar = false, scrollControlsOnEmpty = false, ...props },
     ref
   ) => {
     const tableRef = useRef(null)
+    const getRowProps = useCallback((record, index) => {
+      const row = onRow(record, index)
+      return row?.onClick || row?.onDoubleClick ? { ...row, 'data-row-action': true } : row
+    }, [onRow])
     const loading = typeof props.loading === 'object' ? props.loading?.spinning === true : Boolean(props.loading)
     const pagination = useAppPagination(props.pagination)
     const hasRowSelection = Boolean(rowSelection)
@@ -70,6 +74,7 @@ const AppTable = React.forwardRef(
       <>
         <Table
           {...props}
+          onRow={onRow && getRowProps}
           pagination={pagination}
           ref={tableRef}
           className={`app-table${sizing?.growth ? ' app-table--column-grow' : ''} ${className}`.trim()}

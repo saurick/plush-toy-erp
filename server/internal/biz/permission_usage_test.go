@@ -165,7 +165,11 @@ func TestTaskTrajectorySurfacesRegisterProcessContextAndTaskEvents(t *testing.T)
 	if !ok {
 		t.Fatal("workflow task read usage missing")
 	}
-	assertMethods(t, taskReadUsage, "global-dashboard")
+	for _, surface := range taskReadUsage.Surfaces {
+		if surface.PageKey == "global-dashboard" {
+			t.Fatal("工作台汇总不承接任务读取")
+		}
+	}
 	assertMethods(t, taskReadUsage, "task-board")
 
 	mobilePermissions := map[string]string{

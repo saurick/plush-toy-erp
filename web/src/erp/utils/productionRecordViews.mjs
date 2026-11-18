@@ -13,12 +13,30 @@ export function productionFactSummary(record = {}) {
   if (record.status === OperationalFactStatus.POSTED) {
     return receipt
       ? { title: '成品已确认入库', next: '成品库存已记录；检验、查货与包装进度仍需在生产执行核对。' }
-      : { title: '生产记录已过账', next: '本次业务结果已记录；后续工序和返工批次在生产执行中继续跟进。' }
+      : { title: '生产记录已确认', next: '本次业务结果已记录；后续工序和返工批次在生产执行中继续跟进。' }
   }
   if (record.status === OperationalFactStatus.CANCELLED) {
     return { title: '生产记录已取消', next: '本记录不再办理；请结合有效记录核对数量和库存，取消原因在下方查看。' }
   }
   return { title: '生产记录状态待核对', next: '请刷新记录确认当前状态；可办理动作以当前权限和业务校验为准。' }
+}
+
+export const PRODUCTION_EXCEPTION_APPROVAL_LABELS = {
+  [ProductionExceptionStatus.SUBMITTED]: '待审批',
+  [ProductionExceptionStatus.APPROVED]: '已批准',
+  [ProductionExceptionStatus.REJECTED]: '已拒绝',
+  [ProductionExceptionStatus.CANCELLED]: '已取消',
+}
+export const PRODUCTION_EXCEPTION_EXECUTION_LABELS = {
+  [ProductionExceptionExecutionStatus.PENDING]: '待业务办理',
+  [ProductionExceptionExecutionStatus.APPLIED]: '业务已执行',
+  [ProductionExceptionExecutionStatus.REVERSED]: '业务已冲正',
+}
+
+export function productionExceptionExecutionLabel(record) {
+  if (record.decision_type === 'OVER_ISSUE' && record.status === ProductionExceptionStatus.APPROVED &&
+    record.execution_status === ProductionExceptionExecutionStatus.PENDING) return '超领额度生效'
+  return PRODUCTION_EXCEPTION_EXECUTION_LABELS[record.execution_status] || '业务状态待核对'
 }
 
 export function productionExceptionSummary(record = {}) {

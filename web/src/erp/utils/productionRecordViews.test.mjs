@@ -36,7 +36,7 @@ test('material and rework drafts do not claim posted results', () => {
     assert.match(next, /草稿尚未影响库存/u)
   }
   assert.equal(productionFactSummary({ status: 'CANCELLED' }).title, '生产记录已取消')
-  assert.match(productionFactSummary({ status: 'POSTED' }).title, /已过账/u)
+  assert.match(productionFactSummary({ status: 'POSTED' }).title, /已确认/u)
   assert.match(productionFactSummary({ status: 'UNKNOWN' }).title, /待核对/u)
 })
 

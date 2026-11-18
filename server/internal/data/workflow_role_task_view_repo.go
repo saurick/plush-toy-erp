@@ -197,7 +197,7 @@ func buildWorkflowRoleTaskVisibilityEntQuery(
 ) *ent.WorkflowTaskQuery {
 	dbQuery := client.WorkflowTask.Query().Where(workflowTaskDiscoveryPredicate(query.WorkflowTaskDiscoveryFilter))
 	if query.SourceType != "" {
-		dbQuery = dbQuery.Where(workflowtask.SourceType(query.SourceType))
+		dbQuery = dbQuery.Where(workflowtask.SourceTypeIn(biz.WorkflowDocumentSourceTypes(query.SourceType)...))
 	}
 	duePredicate, dueErr := workflowTaskBoardDueFilterPredicate(biz.WorkflowTaskBoardQuery{Due: query.Due, SnapshotAt: query.SnapshotAt})
 	if dueErr != nil {

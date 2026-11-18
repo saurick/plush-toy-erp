@@ -1,10 +1,6 @@
-import { chooseSelectOption } from './selectControlActions.mjs'
 import assert from 'node:assert/strict'
 
-export function createPermissionAccessLayoutScenarios({
-  openControlledAntSelectDropdown,
-  selectVirtualizedAntOption,
-}) {
+export function createPermissionAccessLayoutScenarios() {
   const scenarios = [
     {
       themeMode: 'light',
@@ -48,7 +44,7 @@ export function createPermissionAccessLayoutScenarios({
           }
         }
         return {
-          select: read('.erp-role-effective-access__toolbar > .ant-select'),
+          moduleChoices: read('.erp-role-effective-access__toolbar > .erp-filter-field'),
           filters: read('.erp-role-effective-access__filters'),
           results: read('.erp-role-effective-access__results'),
           header: read('.erp-role-effective-access__table .ant-table-thead'),
@@ -59,13 +55,12 @@ export function createPermissionAccessLayoutScenarios({
           pageScrollWidth: document.documentElement.scrollWidth,
         }
       })
+      const horizontalGap = metrics.filters.x - metrics.moduleChoices.right
+      const verticalGap = metrics.filters.y - metrics.moduleChoices.bottom
       assert(
-        metrics.filters.x - metrics.select.right <= 16,
-        `模块和访问筛选应相邻排列: ${JSON.stringify(metrics)}`
-      )
-      assert(
-        Math.abs(metrics.filters.y - metrics.select.y) <= 4,
-        `桌面筛选应保持同一行: ${JSON.stringify(metrics)}`
+        (horizontalGap >= -1 && horizontalGap <= 16) ||
+          (verticalGap >= -1 && verticalGap <= 16),
+        `模块和访问筛选按可用宽度排列或换行，不相互覆盖: ${JSON.stringify(metrics)}`
       )
       assert(
         metrics.module.height < metrics.pageRow.height,
@@ -114,23 +109,8 @@ export function createPermissionAccessLayoutScenarios({
         `显示 ${blockedRows.length} 页`
       )
 
-      const moduleSelect = page.locator(
-        '.erp-role-effective-access__toolbar > .ant-select'
-      )
-      let dropdown = await openControlledAntSelectDropdown(
-        page,
-        moduleSelect,
-        '筛选业务模块'
-      )
-      const moduleLabel = await dropdown
-        .locator('.ant-select-item-option')
-        .filter({ hasText: '基础资料' })
-        .getAttribute('title')
-      await selectVirtualizedAntOption(page, dropdown, {
-        label: '筛选业务模块',
-        optionLabel: moduleLabel,
-      })
-      await page.keyboard.press('Escape')
+      const moduleChoices = page.getByRole('group', { name: '筛选业务模块', exact: true })
+      await moduleChoices.getByRole('button', { name: /^基础资料/u }).click()
       assert.equal(
         await page.locator('.erp-role-effective-access__module').count(),
         1
@@ -139,16 +119,7 @@ export function createPermissionAccessLayoutScenarios({
         await page.locator('.erp-role-effective-access__module').innerText(),
         /基础资料/u
       )
-      dropdown = await openControlledAntSelectDropdown(
-        page,
-        moduleSelect,
-        '筛选业务模块'
-      )
-      await selectVirtualizedAntOption(page, dropdown, {
-        label: '筛选业务模块',
-        optionLabel: '全部模块',
-      })
-      await page.keyboard.press('Escape')
+      await moduleChoices.getByRole('button', { name: '不限', exact: true }).click()
       await filters.getByRole('button', { name: /^全部/u }).click()
       assert.equal(await rows.count(), allCount, '恢复筛选应完整恢复访问结果')
 
@@ -173,6 +144,35 @@ export function createPermissionAccessLayoutScenarios({
   return [
     ...scenarios,
     {
+      name: 'permission-center-direct-module-filters',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+        await page.getByRole('tab', { name: /岗位导航/u }).click()
+        await page.getByRole('tab', { name: '页面访问', exact: true }).click()
+        const rows = page.locator('.erp-role-effective-access__page')
+        await rows.first().waitFor()
+        const count = await rows.count()
+        const modules = page.getByRole('group', { name: '筛选业务模块', exact: true })
+        const states = page.getByRole('group', { name: '筛选页面访问', exact: true })
+        for (const width of [1440, 1280, 820]) {
+          await page.setViewportSize({ width, height: 900 })
+          const geometry = await modules.evaluate((node) => ({ width: node.clientWidth, content: node.scrollWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }))
+          assert(geometry.content <= geometry.width + 1 && geometry.page <= 1, JSON.stringify(geometry))
+        }
+        await modules.getByRole('button', { name: /^基础资料/u }).click()
+        assert.equal(await page.locator('.erp-role-effective-access__module').count(), 1)
+        await states.getByRole('button', { name: /^不可进入/u }).click()
+        const blocked = await rows.allTextContents()
+        assert(blocked.length > 0 && blocked.every((row) => row.includes('不可进入')))
+        await modules.getByRole('button', { name: '不限', exact: true }).click()
+        await states.getByRole('button', { name: /^全部/u }).click()
+        assert.equal(await rows.count(), count)
+      },
+    },
+    {
       name: 'permission-center-page-access-design',
       path: '/__dev/ui-design',
       viewport: { width: 1440, height: 1000 },
@@ -193,11 +193,9 @@ export function createPermissionAccessLayoutScenarios({
             blockedRows.every((row) => row.includes('不可进入'))
         )
         await filters.getByRole('button', { name: /^全部/u }).click()
-        await chooseSelectOption(frame
-          .getByRole('combobox', { name: '筛选业务模块' }), '基础资料')
+        await frame.getByRole('group', { name: '筛选业务模块' }).getByRole('button', { name: /^基础资料/u }).click()
         assert.equal(await frame.locator('.permission-access-group').count(), 1)
-        await chooseSelectOption(frame
-          .getByRole('combobox', { name: '筛选业务模块' }), '')
+        await frame.getByRole('group', { name: '筛选业务模块' }).getByRole('button', { name: '不限', exact: true }).click()
         await frame.locator('.permission-access-help summary').click()
         assert.equal(
           await frame.locator('.permission-access-help').getAttribute('open'),

@@ -17,7 +17,7 @@ export default function InventoryOperationDetails({ operation }) {
       { key: 'scope', label: '盘点 / 作业范围', children: `${operation?.items?.length || 0} 行库存` },
     ]}
       />
-      {count ? <div className="erp-business-inline-note">逐行核对账面数、实盘数与差异。零差异也保留完成记录；批准后由仓库过账，库存变化时须重新盘点。</div> : null}
+      {count ? <div className="erp-business-inline-note">逐行核对账面数、实盘数与差异。零差异也保留完成记录；批准后由仓库确认盘点并更新库存，库存变化时须重新盘点。</div> : null}
       <Table
         rowKey="id"
         size="small"

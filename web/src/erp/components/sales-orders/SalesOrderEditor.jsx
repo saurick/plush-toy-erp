@@ -17,6 +17,7 @@ export default function SalesOrderEditor({
   open,
   form,
   editingOrder,
+  createResultUnknown = false,
   saving,
   itemLoading,
   referencesLoading,
@@ -73,19 +74,37 @@ export default function SalesOrderEditor({
       form={form}
       title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
       okText={
-        !editingOrder || editingOrder.lifecycle_status === SalesOrderStatus.DRAFT
-          ? '保存草稿'
-          : '保存'
+        createResultUnknown
+          ? '核对保存结果'
+          : !editingOrder ||
+              editingOrder.lifecycle_status === SalesOrderStatus.DRAFT
+            ? '保存草稿'
+            : '保存'
       }
       open={open}
       onOk={onOk}
+      validateOnSave={!createResultUnknown}
       onCancel={onCancel}
       confirmLoading={saving}
       loading={itemLoading || referencesLoading}
     >
-      <BusinessForm form={form} layout="vertical" className="erp-business-action-form">
+      {createResultUnknown ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="上次保存结果待确认"
+          description="请点击“核对保存结果”，系统会按原内容重试，不会重复创建订单。确认后可继续编辑。"
+        />
+      ) : null}
+      <BusinessForm
+        form={form}
+        disabled={createResultUnknown}
+        layout="vertical"
+        className="erp-business-action-form"
+      >
         <SalesOrderFormFields
           orderID={editingOrder?.id}
+          disabled={createResultUnknown}
           itemsSection={
             <BusinessFormSection
               title="订货明细"
@@ -110,9 +129,9 @@ export default function SalesOrderEditor({
               ) : null}
               <SalesOrderItemsFormSection
                 form={form}
-                canCreateItem={canCreateItem}
-                canUpdateItem={canUpdateItem}
-                canCancelItem={canCancelItem}
+                canCreateItem={!createResultUnknown && canCreateItem}
+                canUpdateItem={!createResultUnknown && canUpdateItem}
+                canCancelItem={!createResultUnknown && canCancelItem}
                 productSKUs={productSKUs}
                 unitOptions={unitOptions}
                 orderID={editingOrder?.id}
@@ -128,8 +147,10 @@ export default function SalesOrderEditor({
               ownerId={editingOrder?.id}
               title="订单附件"
               description="上传客户 PO、合同、样品图或确认截图；附件不改变订单状态。"
-              canUpload={canUpdateOrder || canCreateOrder}
-              canWithdraw={canUpdateOrder}
+              canUpload={
+                !createResultUnknown && (canUpdateOrder || canCreateOrder)
+              }
+              canWithdraw={!createResultUnknown && canUpdateOrder}
               variant="inline"
               compact
             />

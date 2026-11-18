@@ -561,7 +561,7 @@ test('workflowApi: workbench uses one bounded queue projection and forwards canc
     calls.push({ method, params, options })
     return { data: response }
   })
-  const params = { queue_key: 'actionable', limit: 100, offset: 0 }
+  const params = { queue_key: 'actionable', sort: 'time_desc', limit: 100, offset: 0 }
   const controller = new AbortController()
 
   assert.equal(
@@ -597,6 +597,7 @@ test('workflowApi: workbench rejects unsafe queries and malformed successful res
   for (const params of [
     {},
     { queue_key: 'unknown', limit: 8, offset: 0 },
+    { queue_key: 'risk', sort: 'newest', limit: 8, offset: 0 },
     { queue_key: 'risk', limit: 0, offset: 0 },
     { queue_key: 'risk', limit: 101, offset: 0 },
     { queue_key: 'risk', limit: 8, offset: -1 },

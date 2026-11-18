@@ -50,13 +50,13 @@ export function createBusinessFormInteractionScenarios({
     await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
     const filters = page.getByRole('dialog', { name: '筛选条件' })
     await filters.waitFor()
+    const dateTypes = filters.getByRole('group', { name: '日期类型', exact: true })
+    await dateTypes.getByRole('button', { name: '计划出货日期', exact: true }).waitFor()
+    await dateTypes.getByRole('button', { name: '实际出货日期', exact: true }).waitFor()
     for (const label of ['实际出货日期', '计划出货日期']) {
       await waitForFiniteAnimations(page)
-      await filters.locator('.erp-business-date-range-filter__type .ant-select-selector').click()
-      const popup = page.locator('.ant-select-dropdown:visible')
-      await popup.getByText('计划出货日期', { exact: true }).waitFor()
-      await popup.getByText('实际出货日期', { exact: true }).waitFor()
-      await popup.getByText(label, { exact: true }).click()
+      await dateTypes.getByRole('button', { name: label, exact: true }).click()
+      assert.equal(await dateTypes.getByRole('button', { name: label, exact: true }).getAttribute('aria-pressed'), 'true')
       await filters.getByRole('group', { name: label, exact: true }).waitFor()
     }
     await waitForFiniteAnimations(page)
@@ -989,7 +989,7 @@ export function createBusinessFormInteractionScenarios({
             })
             await clickLineItemAction(modal.locator('.erp-sales-order-lines-form__row').first(), '复制第 1 行')
             const originalViewport = page.viewportSize()
-            await page.setViewportSize({ width: 1280, height: originalViewport.height })
+            await page.setViewportSize({ width: 1024, height: originalViewport.height })
             await assertLineItemsUnifiedHorizontalScroll(modal, {
               scenarioName: 'business-formal-purchase-order-form-modal',
               minRows: 2,
@@ -1362,12 +1362,15 @@ export function createBusinessFormInteractionScenarios({
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'shipment-date-filter-desktop',
           unsortableHeaders: [
-            '总净重（克）',
+            '产品图片',
             '实际运费',
             '包装信息',
             '备注',
           ],
         })
+        const imageHeader = page.locator('.erp-business-data-table-card .ant-table-thead th').filter({ hasText: /^产品图片$/u })
+        assert(await imageHeader.count() > 0, '出货图片列保留认款入口')
+        assert.equal(await imageHeader.locator('.ant-table-column-sorters').count(), 0, '图片展示列没有业务排序依据，不提供排序入口')
         await assertBusinessModuleToolbarControlStyle(page, {
           scenarioName: 'shipment-date-filter-desktop',
           requireSearch: false,
@@ -1385,12 +1388,10 @@ export function createBusinessFormInteractionScenarios({
       verify: async (page) => {
         await expectHeading(page, '出货单')
         await openShipmentDateFilters(page)
+        await page.getByRole('group', { name: '时间范围', exact: true }).getByRole('button', { name: '自定义日期', exact: true }).click()
         const metrics = await page.evaluate(() => {
           const control = document.querySelector(
             '.erp-business-date-range-filter'
-          )
-          const range = control?.querySelector(
-            '.erp-business-date-range-filter__range'
           )
           const inputs = Array.from(
             control?.querySelectorAll('.erp-business-date-input') || []
@@ -1398,6 +1399,8 @@ export function createBusinessFormInteractionScenarios({
             const inputElement = input.querySelector('input') || input
             const rect = input.getBoundingClientRect()
             return {
+              top: rect.top,
+              bottom: rect.bottom,
               width: rect.width,
               clientWidth: inputElement.clientWidth,
               scrollWidth: inputElement.scrollWidth,
@@ -1405,9 +1408,6 @@ export function createBusinessFormInteractionScenarios({
           })
           return {
             controlWidth: control?.getBoundingClientRect().width || 0,
-            rangeFlexDirection: range
-              ? getComputedStyle(range).flexDirection
-              : '',
             inputs,
           }
         })
@@ -1415,9 +1415,9 @@ export function createBusinessFormInteractionScenarios({
           metrics.controlWidth > 0 && metrics.controlWidth <= 358,
           `shipment-date-filter-mobile 日期筛选控件应适配窄屏宽度: ${JSON.stringify(metrics)}`
         )
-        assert.equal(
-          metrics.rangeFlexDirection,
-          'column',
+        assert(
+          metrics.inputs.length === 2 &&
+            metrics.inputs[1].top >= metrics.inputs[0].bottom,
           `shipment-date-filter-mobile 起止日期在窄屏应改为上下排列: ${JSON.stringify(metrics)}`
         )
         assert(

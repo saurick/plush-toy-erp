@@ -17,6 +17,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
@@ -26,7 +27,9 @@ import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js
 import { loadReferenceIDs, mergeReferenceRecords, canReadReference } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
-import { sourceBusinessActionUUID,
+import {
+  requireSourceActionRecord,
+  sourceBusinessActionUUID,
   createSourceBusinessActionAttemptStore,
   isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
@@ -1280,8 +1283,8 @@ export default function ShipmentsPage() {
     }
     try {
       setSaving(true)
-      const updated = await action({ id: shipment.id })
-      reportBusinessResult(`${actionLabel}已完成`, updated || shipment)
+      const updated = requireSourceActionRecord(await action({ id: shipment.id }), shipment.id)
+      reportBusinessResult(`${actionLabel}已完成`, updated)
       message.success(`${actionLabel}已完成`)
       await loadRows()
     } catch (error) {
@@ -1314,7 +1317,7 @@ export default function ShipmentsPage() {
         id: selectedRow.id,
         shipment_no: selectedRow.shipment_no,
       })
-      reportBusinessResult('财务审批已提交；成品质检仍由品质检验单独判定', selectedRow)
+      await reportBusinessResult('财务审批已提交；成品质检仍由品质检验单独判定', { id: selectedRow.id, shipment_no: selectedRow.shipment_no }, getShipment)
       showProcessSubmissionReceipt({
         result,
         title: '财务审批已提交；成品质检仍由品质检验单独判定',
@@ -1675,7 +1678,7 @@ export default function ShipmentsPage() {
 
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ customers: mergeCustomers, sales_orders: mergeSalesOrders, products: mergeProducts, product_skus: mergeProductSKUs, inventory_lots: mergeInventoryLots }} inWorkspace className="erp-shipments-page">
-      <PageHeaderCard compact helpKey="shipments" title="出货单" />
+      <PageHeaderCard compact helpKey="shipments" title={getBusinessDocumentTitle('shipment')} />
 
       <BusinessOperationPanel
         inWorkspace
@@ -1701,7 +1704,6 @@ export default function ShipmentsPage() {
               counts={statusCounts}
               loading={loading}
               exact={Boolean(routeShipmentID)}
-              className="erp-business-filter-control--status"
               value={statusFilter}
               options={SHIPMENT_STATUS_OPTIONS}
               onChange={(nextStatus) => {
@@ -1761,12 +1763,9 @@ export default function ShipmentsPage() {
               }}
               startValue={dateFilterStart}
               endValue={dateFilterEnd}
-              onStartChange={(nextStart) => {
-                setDateFilterStart(nextStart)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
-              onEndChange={(nextEnd) => {
-                setDateFilterEnd(nextEnd)
+              onRangeChange={(from, to) => {
+                setDateFilterStart(from)
+                setDateFilterEnd(to)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />

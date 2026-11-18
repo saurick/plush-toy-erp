@@ -111,6 +111,7 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
   }
   const shared = { path: salesPath, auth: 'admin', effectiveSession: customerRuntimeEffectiveSession, beforeNavigate: installRoute }
   const applyDateRange = async (page, filters) => {
+    await filters.getByRole('button', { name: '自定义日期', exact: true }).click()
     await filters.getByRole('textbox', { name: '开始日期', exact: true }).click()
     const picker = page.locator('.ant-picker-dropdown:visible')
     const day = picker.locator('td.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)[title]').nth(10)

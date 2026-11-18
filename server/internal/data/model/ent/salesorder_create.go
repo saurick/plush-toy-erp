@@ -25,6 +25,48 @@ type SalesOrderCreate struct {
 	hooks    []Hook
 }
 
+// SetCreateIdempotencyKey sets the "create_idempotency_key" field.
+func (_c *SalesOrderCreate) SetCreateIdempotencyKey(v string) *SalesOrderCreate {
+	_c.mutation.SetCreateIdempotencyKey(v)
+	return _c
+}
+
+// SetNillableCreateIdempotencyKey sets the "create_idempotency_key" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableCreateIdempotencyKey(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetCreateIdempotencyKey(*v)
+	}
+	return _c
+}
+
+// SetCreateIntentHash sets the "create_intent_hash" field.
+func (_c *SalesOrderCreate) SetCreateIntentHash(v string) *SalesOrderCreate {
+	_c.mutation.SetCreateIntentHash(v)
+	return _c
+}
+
+// SetNillableCreateIntentHash sets the "create_intent_hash" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableCreateIntentHash(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetCreateIntentHash(*v)
+	}
+	return _c
+}
+
+// SetCreateActorID sets the "create_actor_id" field.
+func (_c *SalesOrderCreate) SetCreateActorID(v int) *SalesOrderCreate {
+	_c.mutation.SetCreateActorID(v)
+	return _c
+}
+
+// SetNillableCreateActorID sets the "create_actor_id" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillableCreateActorID(v *int) *SalesOrderCreate {
+	if v != nil {
+		_c.SetCreateActorID(*v)
+	}
+	return _c
+}
+
 // SetOrderNo sets the "order_no" field.
 func (_c *SalesOrderCreate) SetOrderNo(v string) *SalesOrderCreate {
 	_c.mutation.SetOrderNo(v)
@@ -506,6 +548,21 @@ func (_c *SalesOrderCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *SalesOrderCreate) check() error {
+	if v, ok := _c.mutation.CreateIdempotencyKey(); ok {
+		if err := salesorder.CreateIdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "create_idempotency_key", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.create_idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.CreateIntentHash(); ok {
+		if err := salesorder.CreateIntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "create_intent_hash", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.create_intent_hash": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.CreateActorID(); ok {
+		if err := salesorder.CreateActorIDValidator(v); err != nil {
+			return &ValidationError{Name: "create_actor_id", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.create_actor_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.OrderNo(); !ok {
 		return &ValidationError{Name: "order_no", err: errors.New(`ent: missing required field "SalesOrder.order_no"`)}
 	}
@@ -644,6 +701,18 @@ func (_c *SalesOrderCreate) createSpec() (*SalesOrder, *sqlgraph.CreateSpec) {
 		_node = &SalesOrder{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(salesorder.Table, sqlgraph.NewFieldSpec(salesorder.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.CreateIdempotencyKey(); ok {
+		_spec.SetField(salesorder.FieldCreateIdempotencyKey, field.TypeString, value)
+		_node.CreateIdempotencyKey = &value
+	}
+	if value, ok := _c.mutation.CreateIntentHash(); ok {
+		_spec.SetField(salesorder.FieldCreateIntentHash, field.TypeString, value)
+		_node.CreateIntentHash = &value
+	}
+	if value, ok := _c.mutation.CreateActorID(); ok {
+		_spec.SetField(salesorder.FieldCreateActorID, field.TypeInt, value)
+		_node.CreateActorID = &value
+	}
 	if value, ok := _c.mutation.OrderNo(); ok {
 		_spec.SetField(salesorder.FieldOrderNo, field.TypeString, value)
 		_node.OrderNo = value

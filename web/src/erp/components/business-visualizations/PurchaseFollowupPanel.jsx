@@ -26,7 +26,7 @@ import {
   BusinessVisualizationFrame,
   VisualizationState,
 } from './BusinessVisualizationFrame.jsx'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 
 const dateSourceLabel = {
@@ -269,10 +269,10 @@ export default function PurchaseFollowupPanel({
                   }
                 />
               </div>
-              <FilterSelect
+              <FilterChipGroup
+                allowClear
                 emptyValue="all"
                 label="交期来源"
-                placeholder="交期来源"
                 aria-label="交期来源"
                 value={confirmation}
                 onChange={(value) => change({ confirmation: value })}

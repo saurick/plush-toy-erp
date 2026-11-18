@@ -24,7 +24,7 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 		"customer_order_no", "customer_snapshot", "sales_owner", "contact_snapshot",
 		"delivery_snapshot", "payment_method", "payment_term_days", "price_condition_note",
 		"tax_mode", "tax_rate", "freight_terms", "quoted_freight_amount", "order_date",
-		"planned_delivery_date", "note", "items",
+		"planned_delivery_date", "note", "items", "idempotency_key",
 	) {
 		return nil, false
 	}
@@ -40,6 +40,14 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 	orderDate, ok := getRequiredJSONRPCTime(pm, "order_date")
 	if !ok {
 		return nil, false
+	}
+	idempotencyKey := ""
+	if raw, exists := pm["idempotency_key"]; exists {
+		value, valid := raw.(string)
+		if !valid || strings.TrimSpace(value) == "" || len(strings.TrimSpace(value)) > 128 {
+			return nil, false
+		}
+		idempotencyKey = strings.TrimSpace(value)
 	}
 	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
 	if !ok {
@@ -58,6 +66,7 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 		return nil, false
 	}
 	return &biz.SalesOrderMutation{
+		IdempotencyKey:      idempotencyKey,
 		OrderNo:             getString(pm, "order_no"),
 		CustomerID:          customerID,
 		Currency:            getString(pm, "currency"),

@@ -1217,7 +1217,7 @@ async function assertVisibleDateFilterGeometry(page, scenarioName) {
   const issues = await page.evaluate(() =>
     [
       ...document.querySelectorAll(
-        '.erp-business-date-range-filter :is(.erp-business-date-input, .erp-business-date-range-filter__type-label, .erp-business-date-range-filter__type.ant-select > .ant-select-selector)'
+        '.erp-business-date-range-filter .erp-business-date-input'
       ),
     ].flatMap((element) => {
       const rect = element.getBoundingClientRect()

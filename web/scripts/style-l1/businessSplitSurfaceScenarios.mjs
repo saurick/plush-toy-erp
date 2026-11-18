@@ -130,7 +130,7 @@ beforeNavigate: installBOMMaterialMatchingMocks,
         const { left, right } = await open(page, '材料档案')
         const graph = left.locator('.erp-help-flow .erp-markdown-mermaid').first()
         await graph.locator('[data-mermaid-node-id]').first().waitFor()
-        await graph.locator('[data-mermaid-fullscreen-action="open"]').click()
+        await graph.locator('[data-diagram-fullscreen-action="open"]').click()
         await within(left, graph, '帮助图表全屏范围')
         await expect(graph).toHaveAttribute('aria-modal', 'false')
         await right.getByRole('button', { name: /新建材料$/u }).click()
@@ -140,7 +140,7 @@ beforeNavigate: installBOMMaterialMatchingMocks,
         await within(left, graph, '另一栏编辑时的图表范围')
         assert.equal(await page.locator('body').evaluate((node) => node.style.overflow), '')
         await page.screenshot({ path: `${outputDir}/business-split-help-fullscreen-both-active.png`, fullPage: true })
-        await graph.locator('[data-mermaid-fullscreen-action="close"]').click()
+        await graph.locator('[data-diagram-fullscreen-action="close"]').click()
         await expect(right.getByLabel('名称', { exact: true })).toHaveValue('图表旁的草稿')
       },
     },

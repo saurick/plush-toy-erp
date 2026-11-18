@@ -189,7 +189,7 @@ export default function HelpScenarioIllustration({
               <span aria-hidden="true">→</span>
               <span>按配置审批</span>
               <span aria-hidden="true">→</span>
-              <strong>确认过账</strong>
+              <strong>确认入账</strong>
             </div>
           )}
         </>

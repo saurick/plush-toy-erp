@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react'
 import { getActionErrorMessage } from '../../common/utils/errorMessage'
+import { isAuthFailureCode, isAdminSessionUnavailableCode, RpcErrorCode } from '../../common/consts/errorCodes'
 import { isRpcAbortError } from '../../common/utils/jsonRpc'
 import {
   getWorkflowTaskBoard,
@@ -21,15 +22,12 @@ import useLatestRequestCoordinator from './useLatestRequestCoordinator.js'
 export default function useWorkflowDashboardData({
   scopeKey,
   taskBoardRequest,
-  workbenchRequest,
-  isTaskBoardView,
-  productCorePreview = false,
+  riskRequest = null,
   suspended = false,
   onBeforeTaskBoardLoad,
 }) {
   const [loading, setLoading] = useState(false)
-  const [workbenchResponseState, setWorkbenchResponseState] = useState(null)
-  const [workbenchCountsState, setWorkbenchCountsState] = useState(null)
+  const [riskResponseState, setRiskResponseState] = useState(null)
   const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
   const [taskBoardSummaryState, setTaskBoardSummaryState] = useState(null)
   const mountedRef = useRef(false)
@@ -46,93 +44,90 @@ export default function useWorkflowDashboardData({
     () => getWorkflowTaskBoardSummaryRequestKey(taskBoardRequest),
     [taskBoardRequest]
   )
-  const workbenchRequestKey = useMemo(
-    () => JSON.stringify([scopeKey, workbenchRequest]),
-    [scopeKey, workbenchRequest]
+  // The server builds filter choices from the visible tasks before applying document and list filters.
+  const taskBoardOptionsScope = JSON.stringify([
+    taskBoardRequest.owner_role_key || '',
+    Boolean(taskBoardRequest.approval_only),
+    Boolean(taskBoardRequest.todo_only),
+  ])
+  const riskRequestKey = useMemo(
+    () => JSON.stringify([scopeKey, riskRequest]),
+    [scopeKey, riskRequest]
   )
 
   const reloadTaskData = useCallback(async () => {
     const request = beginLatestRequest('dashboard-load')
-    const requestWorkbenchScopeKey = scopeKey
-    if (productCorePreview) {
-      setWorkbenchResponseState(null)
-      setWorkbenchCountsState(null)
-      setLoading(false)
-      request.finish()
-      return true
-    }
+    const requestScopeKey = scopeKey
     if (suspended) {
       setLoading(false)
       request.finish()
       return true
     }
-    if (isTaskBoardView && mountedRef.current) {
+    if (!riskRequest && mountedRef.current) {
       onBeforeTaskBoardLoad?.(taskBoardRequest)
     }
     setLoading(true)
-    if (isTaskBoardView && mountedRef.current) {
+    if (!riskRequest && mountedRef.current) {
       setTaskBoardResponseState((current) => ({
-        scopeKey: requestWorkbenchScopeKey,
+        scopeKey: requestScopeKey,
         requestKey: taskBoardRequestKey,
         response:
-          current?.scopeKey === requestWorkbenchScopeKey &&
+          current?.scopeKey === requestScopeKey &&
           current?.requestKey === taskBoardRequestKey
             ? current.response
             : null,
         error: '',
       }))
     } else if (mountedRef.current) {
-      setWorkbenchResponseState((current) => ({
-        scopeKey: requestWorkbenchScopeKey,
-        requestKey: workbenchRequestKey,
+      setRiskResponseState((current) => ({
+        scopeKey: requestScopeKey,
+        requestKey: riskRequestKey,
+        sort: current?.sort,
         response:
-          current?.scopeKey === requestWorkbenchScopeKey &&
-          current?.response?.queue_key === workbenchRequest.queue_key
+          current?.scopeKey === requestScopeKey
             ? current.response
             : null,
         error: '',
       }))
     }
     try {
-      if (isTaskBoardView) {
+      if (!riskRequest) {
         const taskBoardResult = await getWorkflowTaskBoard(taskBoardRequest, {
           signal: request.signal,
         })
         if (
           mountedRef.current &&
           request.isCurrent() &&
-          scopeKeyRef.current === requestWorkbenchScopeKey
+          scopeKeyRef.current === requestScopeKey
         ) {
           setTaskBoardResponseState({
-            scopeKey: requestWorkbenchScopeKey,
+            scopeKey: requestScopeKey,
             requestKey: taskBoardRequestKey,
             response: taskBoardResult,
             error: '',
           })
           setTaskBoardSummaryState({
-            scopeKey: requestWorkbenchScopeKey,
+            scopeKey: requestScopeKey,
             requestKey: taskBoardSummaryRequestKey,
+            optionsScope: taskBoardOptionsScope,
             response: taskBoardResult,
           })
         }
       } else {
-        const workbenchResult = await getWorkflowWorkbench(workbenchRequest, {
+        const riskResult = await getWorkflowWorkbench(riskRequest, {
           signal: request.signal,
         })
         if (
           mountedRef.current &&
           request.isCurrent() &&
-          scopeKeyRef.current === requestWorkbenchScopeKey
+          scopeKeyRef.current === requestScopeKey
         ) {
-          setWorkbenchResponseState({
-            scopeKey: requestWorkbenchScopeKey,
-            requestKey: workbenchRequestKey,
-            response: workbenchResult,
+          setRiskResponseState({
+            scopeKey: requestScopeKey,
+            requestKey: riskRequestKey,
+            sort: riskRequest.sort,
+            response: riskResult,
             error: '',
-          })
-          setWorkbenchCountsState({
-            scopeKey: requestWorkbenchScopeKey,
-            counts: workbenchResult.counts,
           })
         }
       }
@@ -144,24 +139,26 @@ export default function useWorkflowDashboardData({
       if (
         mountedRef.current &&
         request.isCurrent() &&
-        scopeKeyRef.current === requestWorkbenchScopeKey
+        scopeKeyRef.current === requestScopeKey
       ) {
-        const fallback = isTaskBoardView ? '加载任务管理失败' : '加载工作台失败'
+        const fallback = riskRequest ? '加载风险任务失败' : '加载任务管理失败'
         const errorMessage = getActionErrorMessage(error, fallback)
-        if (isTaskBoardView) {
+        if (!riskRequest) {
           setTaskBoardResponseState({
-            scopeKey: requestWorkbenchScopeKey,
+            scopeKey: requestScopeKey,
             requestKey: taskBoardRequestKey,
             response: null,
             error: errorMessage,
           })
         } else {
-          setWorkbenchResponseState((current) => ({
-            scopeKey: requestWorkbenchScopeKey,
-            requestKey: workbenchRequestKey,
+          const accessLost = isAuthFailureCode(error?.code) || isAdminSessionUnavailableCode(error?.code) ||
+            Number(error?.code) === RpcErrorCode.PERMISSION_DENIED
+          setRiskResponseState((current) => ({
+            scopeKey: requestScopeKey,
+            requestKey: riskRequestKey,
+            sort: current?.sort,
             response:
-              current?.scopeKey === requestWorkbenchScopeKey &&
-              current?.response?.queue_key === workbenchRequest.queue_key
+              !accessLost && current?.scopeKey === requestScopeKey
                 ? current.response
                 : null,
             error: errorMessage,
@@ -173,7 +170,7 @@ export default function useWorkflowDashboardData({
       if (
         mountedRef.current &&
         request.isCurrent() &&
-        scopeKeyRef.current === requestWorkbenchScopeKey
+        scopeKeyRef.current === requestScopeKey
       ) {
         setLoading(false)
       }
@@ -181,15 +178,14 @@ export default function useWorkflowDashboardData({
     }
   }, [
     beginLatestRequest,
-    isTaskBoardView,
     onBeforeTaskBoardLoad,
-    productCorePreview,
     suspended,
     taskBoardRequest,
     taskBoardRequestKey,
     taskBoardSummaryRequestKey,
-    workbenchRequest,
-    workbenchRequestKey,
+    taskBoardOptionsScope,
+    riskRequest,
+    riskRequestKey,
     scopeKey,
   ])
 
@@ -202,15 +198,21 @@ export default function useWorkflowDashboardData({
   }, [reloadTaskData])
 
   const currentScope = (state) => (state?.scopeKey === scopeKey ? state : null)
+  const summary = currentScope(taskBoardSummaryState)
+  const options = summary?.optionsScope === taskBoardOptionsScope ? summary.response : null
   return {
     loading,
-    workbenchResponseState: currentScope(workbenchResponseState),
-    workbenchCountsState: currentScope(workbenchCountsState),
+    riskResponseState: currentScope(riskResponseState),
     taskBoardResponseState: currentScope(taskBoardResponseState),
-    taskBoardSummaryState: currentScope(taskBoardSummaryState),
+    taskBoardSummaryState: summary,
+    taskBoardFilterOptions: options && {
+      sourceTypes: options.source_types,
+      ownerRoleKeys: options.owner_role_keys,
+      assignees: options.assignees,
+    },
     taskBoardRequestKey,
     taskBoardSummaryRequestKey,
-    workbenchRequestKey,
+    riskRequestKey,
     reloadTaskData,
   }
 }

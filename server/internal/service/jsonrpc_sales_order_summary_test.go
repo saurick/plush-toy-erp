@@ -79,12 +79,17 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 		allowed, disabled, anonymous, super bool
 	}{
 		{name: "source reader", permissions: reads, allowed: true, params: map[string]any{"customer": " 模拟客户 ", "offset": 20, "limit": 20}},
-		{name: "exact customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 42, "sales_owner_name": "模拟跟单员"}},
+		{name: "exact customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 42, "sales_owner_name": "模拟跟单员", "sort_by": "customer_name", "sort_direction": "asc"}},
+		{name: "unsupported sort", permissions: reads, params: map[string]any{"sort_by": "unknown", "sort_direction": "desc"}},
 		{name: "cleared customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 0}},
 		{name: "negative customer", permissions: reads, params: map[string]any{"customer_id": -1}},
 		{name: "fractional customer", permissions: reads, params: map[string]any{"customer_id": 1.5}},
 		{name: "string customer", permissions: reads, params: map[string]any{"customer_id": "42"}},
 		{name: "null customer", permissions: reads, params: map[string]any{"customer_id": nil}},
+		{name: "restricted price", permissions: reads, params: map[string]any{"sort_by": " unit_price ", "sort_direction": "asc"}},
+		{name: "restricted currency", permissions: append(append([]string{}, reads...), biz.PermissionFieldSalesCommercialRead), params: map[string]any{"sort_by": "currency", "sort_direction": "desc"}},
+		{name: "commercial price", permissions: append(append([]string{}, reads...), biz.PermissionFieldSalesCommercialRead), params: map[string]any{"sort_by": "unit_price", "sort_direction": "asc"}, allowed: true},
+		{name: "settlement currency", permissions: append(append([]string{}, reads...), biz.PermissionFieldSalesCommercialRead, biz.PermissionFieldFinanceSettlementRead), params: map[string]any{"sort_by": "currency", "sort_direction": "desc"}, allowed: true},
 		{name: "commercial role", permissions: append(append([]string{}, reads...), biz.PermissionFieldSalesCommercialRead), allowed: true},
 		{name: "super admin", super: true, allowed: true},
 		{name: "missing workbench", permissions: reads[1:]},
@@ -103,7 +108,11 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 		{name: "reversed dates", permissions: reads, params: map[string]any{"date_from": "2026-09-03", "date_to": "2026-09-01"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			admin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, tc.permissions...)
+			roles := []string{biz.SalesRoleKey}
+			if tc.name == "settlement currency" {
+				roles = append(roles, biz.FinanceRoleKey)
+			}
+			admin := workflowJSONRPCAdmin(roles, tc.permissions...)
 			admin.Disabled, admin.IsSuperAdmin = tc.disabled, tc.super
 			base := &stubSalesOrderJSONRPCRepo{}
 			d := newSalesOrderJSONRPCTestData(t, base, admin)
@@ -120,7 +129,7 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 			if !tc.allowed {
 				return
 			}
-			if tc.name == "exact customer" && (repo.filter.CustomerID != 42 || repo.filter.SalesOwnerName != "模拟跟单员") {
+			if tc.name == "exact customer" && (repo.filter.CustomerID != 42 || repo.filter.SalesOwnerName != "模拟跟单员" || repo.filter.SortBy != "customer_name" || repo.filter.SortDirection != "asc") {
 				t.Fatalf("exact customer filter was lost: %+v", repo.filter)
 			}
 			d.applySensitiveFieldReadPolicy(ctx, "sales_order", "list_sales_order_summary", result)
@@ -128,7 +137,7 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 			if row["production_quantity"] != "12" || row["customer_name"] != "模拟客户" || row["unit_name"] != "只" || row["import_source"] != nil {
 				t.Fatalf("wrong summary mapping: %+v", row)
 			}
-			priceAllowed := tc.super || tc.name == "commercial role"
+			priceAllowed := tc.super || biz.PermissionSetHasAny(biz.PermissionKeySet(tc.permissions), biz.PermissionFieldSalesCommercialRead)
 			if (row["unit_price"] != nil) != priceAllowed {
 				t.Fatalf("commercial field leak: %+v", row)
 			}

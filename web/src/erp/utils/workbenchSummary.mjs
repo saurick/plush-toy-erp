@@ -1,4 +1,5 @@
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { WorkbenchSummarySort } from '../../common/consts/statuses.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { canListEngineeringMaterial } from './engineeringMaterialTask.mjs'
 
@@ -19,6 +20,9 @@ export function getWorkbenchSummaryOptions(profile) {
   if (canListEngineeringMaterial(profile)) {
     options.push({ value: 'materials', label: '材料汇总' })
   }
+  if (hasActionPermission(profile, PermissionCode.FINANCE_PAYMENT_READ)) {
+    options.push({ value: 'payments', label: '收付款汇总' })
+  }
   return options
 }
 
@@ -36,7 +40,42 @@ export const SALES_SUMMARY_STATUSES = [
   { value: 'canceled', label: '已取消' },
 ]
 
-function summaryDate(value) {
+export const SALES_SUMMARY_SORT_FIELDS = {
+  order_no: WorkbenchSummarySort.ORDER_NO,
+  order_date: WorkbenchSummarySort.ORDER_DATE,
+  customer_name: WorkbenchSummarySort.CUSTOMER_NAME,
+  customer_order_no: WorkbenchSummarySort.CUSTOMER_ORDER_NO,
+  customer_product_no: WorkbenchSummarySort.CUSTOMER_PRODUCT_NO,
+  product: WorkbenchSummarySort.PRODUCT,
+  ordered_quantity: WorkbenchSummarySort.ORDERED_QUANTITY,
+  pre_shipment_sample_quantity: WorkbenchSummarySort.SAMPLE_QUANTITY,
+  production_quantity: WorkbenchSummarySort.PRODUCTION_QUANTITY,
+  unit_name: WorkbenchSummarySort.UNIT_NAME,
+  unshipped_quantity: WorkbenchSummarySort.UNSHIPPED_QUANTITY,
+  sales_owner: WorkbenchSummarySort.SALES_OWNER,
+  unit_price: WorkbenchSummarySort.UNIT_PRICE,
+  currency: WorkbenchSummarySort.CURRENCY,
+  lifecycle_status: WorkbenchSummarySort.LIFECYCLE_STATUS,
+  order_category: WorkbenchSummarySort.ORDER_CATEGORY,
+  designer: WorkbenchSummarySort.DESIGNER,
+  note: WorkbenchSummarySort.NOTE,
+  process_requirement: WorkbenchSummarySort.PROCESS_REQUIREMENT,
+  planned_delivery_date: WorkbenchSummarySort.PLANNED_DELIVERY_DATE,
+}
+export const MATERIAL_SUMMARY_SORT_FIELDS = {
+  order_no: WorkbenchSummarySort.ORDER_NO,
+  submitted_at: WorkbenchSummarySort.SUBMITTED_AT,
+}
+
+export function readSummarySort(params, prefix, fields) {
+  const field = params.get(`${prefix}.sort_by`)
+  const direction = params.get(`${prefix}.sort_direction`)
+  return Object.hasOwn(fields, field) && ['asc', 'desc'].includes(direction)
+    ? { sort_by: field, sort_direction: direction }
+    : null
+}
+
+export function summaryDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value || '')) return ''
   const date = new Date(`${value}T00:00:00Z`)
   return Number.isFinite(date.getTime()) && date.toISOString().startsWith(value)
@@ -55,6 +94,7 @@ export function readSalesSummaryFilters(params) {
   const dateTo = summaryDate(text('to'))
   return {
     keyword: text('q'),
+    ...readSummarySort(params, 'sales', SALES_SUMMARY_SORT_FIELDS),
     ...(hasCustomerID ? { customer_id: customerID } : {}),
     customer: hasCustomerID ? '' : text('customer'),
     ...(ownerName ? { sales_owner_name: ownerName } : {}),

@@ -510,12 +510,9 @@ export function createTaskImagePreviewScenarios({
             '/erp/task-board?q=图片预览&lane=exception',
             'task-image-preview-table',
           ],
-          ['/erp/dashboard', 'task-image-preview-workbench'],
+          ['/erp/task-board?view=risk', 'task-image-preview-risk'],
         ]) {
           await page.goto(new URL(url, page.url()).href)
-          if (url === '/erp/dashboard') {
-            await page.getByRole('button', { name: /^阻塞\/逾期，/ }).click()
-          }
           await assertPreview(page, button, outputDir, name)
         }
         await assertLinkedItemsPreviewStability(page)

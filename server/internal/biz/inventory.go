@@ -255,14 +255,22 @@ type InventoryBalanceKey struct {
 }
 
 const (
-	InventorySortSubjectCode   = "subject_code"
-	InventorySortWarehouseName = "warehouse_name"
-	InventorySortQuantity      = "quantity"
-	InventorySortLotNo         = "lot_no"
-	InventorySortReceivedAt    = "received_at"
-	InventorySortIssuable      = "issuable_quantity"
-	InventorySortRestricted    = "restricted_quantity"
-	InventorySortReadyToShip   = "ready_to_ship_quantity"
+	InventorySortSubjectCode       = "subject_code"
+	InventorySortWarehouseName     = "warehouse_name"
+	InventorySortQuantity          = "quantity"
+	InventorySortLotNo             = "lot_no"
+	InventorySortReceivedAt        = "received_at"
+	InventorySortIssuable          = "issuable_quantity"
+	InventorySortRestricted        = "restricted_quantity"
+	InventorySortReadyToShip       = "ready_to_ship_quantity"
+	InventorySortRegistrationOrder = "registration_order"
+	InventorySortStockKind         = "stock_kind"
+	InventorySortSKUCode           = "sku_code"
+	InventorySortUnitName          = "unit_name"
+	InventorySortReserved          = "active_reserved_quantity"
+	InventorySortUnreserved        = "available_quantity"
+	InventorySortPendingInspection = "pending_inspection_quantity"
+	InventorySortPendingPackaging  = "pending_packaging_quantity"
 )
 
 type InventoryBalanceFilter struct {
@@ -1087,7 +1095,9 @@ func normalizeInventoryBalanceFilter(in InventoryBalanceFilter) (InventoryBalanc
 		return InventoryBalanceFilter{}, ErrBadParam
 	}
 	if !validBusinessListSort(in.SortBy, in.SortDirection, InventorySortSubjectCode, InventorySortWarehouseName, InventorySortLotNo, InventorySortQuantity,
-		InventorySortIssuable, InventorySortRestricted, InventorySortReadyToShip) {
+		InventorySortIssuable, InventorySortRestricted, InventorySortReadyToShip,
+		InventorySortRegistrationOrder, InventorySortStockKind, InventorySortSKUCode, InventorySortUnitName,
+		InventorySortReserved, InventorySortUnreserved, InventorySortPendingInspection, InventorySortPendingPackaging) {
 		return InventoryBalanceFilter{}, ErrBadParam
 	}
 	normalizeInventoryListPagination(&in.Limit, &in.Offset)

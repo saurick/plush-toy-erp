@@ -591,6 +591,40 @@ func TestProductionWIPFabricAllocationUsesManagerSelectionAndSingleContract(t *t
 	if err != nil || len(assigned.OutsourcingAllocations) != 1 {
 		t.Fatalf("manager selected a subset: %v", err)
 	}
+	// The existing contract has no header batch. Only its allocated line belongs to this order.
+	warehouse := createTestProductWarehouse(t, ctx, f.client, "CONTRACT-LINK-WH")
+	unbound := f.client.OutsourcingOrderItem.Create().SetOutsourcingOrderID(firstLine.OutsourcingOrderID).SetLineNo(2).
+		SetSubjectType(biz.OutsourcingOrderSubjectMaterial).SetMaterialID(f.materialID).SetProcessID(firstLine.ProcessID).
+		SetUnitID(f.unitID).SetOutsourcingQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+	addTask := func(code, source string, id int) int {
+		return f.client.WorkflowTask.Create().SetTaskCode(code).SetTaskName("复核加工记录").SetTaskGroup("manual").SetTaskStatusKey("ready").
+			SetOwnerRoleKey("quality").SetSourceType(source).SetSourceID(id).SaveX(ctx).ID
+	}
+	factTask := func(code string, line *ent.OutsourcingOrderItem) int {
+		fact := f.client.OutsourcingFact.Create().SetFactNo(code).SetFactType(biz.OutsourcingFactReturnReceipt).
+			SetSourceType(biz.OutsourcingOrderSourceType).SetSourceID(line.OutsourcingOrderID).SetSourceLineID(line.ID).
+			SetSubjectType(biz.InventorySubjectProduct).SetSubjectID(f.productID).SetWarehouseID(warehouse.ID).
+			SetUnitID(f.unitID).SetQuantity(decimal.NewFromInt(1)).SetIdempotencyKey(code).SaveX(ctx)
+		return addTask(code, "outsourcing_fact", fact.ID)
+	}
+	want := map[int]bool{addTask("BOUND-CONTRACT", "outsourcing_order", firstLine.OutsourcingOrderID): true, factTask("BOUND-FACT", firstLine): true,
+		addTask("OTHER-CONTRACT", "outsourcing_order", secondLine.OutsourcingOrderID): false, factTask("OTHER-LINE", unbound): false}
+	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
+	for view, id := range map[string]int{"production": aggregate.ProductionOrderID, "orders": f.client.SalesOrder.Query().OnlyX(ctx).ID} {
+		page, err := uc.Tasks(ctx, biz.BusinessProgressQuery{ID: id, View: view, TaskRole: "quality", Access: biz.BusinessProgressAccess{Production: true, Sales: true, Tasks: true}, TaskVisibility: &biz.WorkflowTaskVisibilityScope{StandaloneAllowAllOwnerRoles: true}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		seen := map[int]bool{}
+		for _, task := range page.Rows {
+			seen[task.ID] = true
+		}
+		for id, linked := range want {
+			if seen[id] != linked {
+				t.Fatalf("%s task %d linked=%v, want %v", view, id, seen[id], linked)
+			}
+		}
+	}
 
 }
 

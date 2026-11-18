@@ -10,6 +10,11 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 async function choose(page, scope, label, text) {
+  const choices = scope.getByRole('group', { name: label, exact: true })
+  if (await choices.count()) {
+    await choices.getByRole('button', { name: text, exact: true }).click()
+    return
+  }
   const input = page.getByRole('combobox', { name: label, exact: true })
   await scope.locator('.ant-select').filter({ has: input }).locator('.ant-select-selector').click()
   await waitForFiniteAnimations(page)
@@ -63,14 +68,14 @@ rows: [
         await picker.getByRole('button', { name: '清空筛选', exact: true }).click()
         await choose(page, picker, '订单核对筛选', '待核对（1）')
         assert.equal(await picker.locator('.ant-table-row').count(), 1)
-        await picker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '订单核对筛选', exact: true }) }).locator('.ant-select-clear').click()
+        await picker.getByRole('group', { name: '订单核对筛选', exact: true }).getByRole('button', { name: '不限', exact: true }).click()
         assert.equal(await picker.locator('.ant-table-row').count(), 2)
         await assertImportFilterPrompt(page, picker, '订单核对筛选', '按核对状态筛选', ['全部订单'])
         await choose(page, picker, '订单核对筛选', '待核对（1）')
         await choose(page, picker, '订单 SO-FILTER-A 的客户', 'CUS-STYLE-L1')
         await picker.getByText('当前范围没有待核对订单', { exact: true }).waitFor()
         await assertImportPickerStableLayout(picker, layout, 'sales-excel-empty-review')
-        assert.equal(await picker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '订单核对筛选', exact: true }) }).locator('.ant-select-selection-item').innerText(), '待核对（0）')
+        assert.equal(await picker.getByRole('group', { name: '订单核对筛选', exact: true }).locator('[aria-pressed="true"]').innerText(), '待核对（0）')
         await assertImportToolbarLayout(page, picker, 'sales-excel-empty-review')
         assert.match(await picker.innerText(), /已选 1 条/u)
         await picker.getByRole('button', { name: '清空筛选', exact: true }).click()
@@ -151,7 +156,7 @@ path: '/erp/purchase/material-bom',
         const before = await picker.locator('.ant-table-row').count()
         await choose(page, picker, 'BOM 待处理筛选', '待选择物料')
         assert.ok(await picker.locator('.ant-table-row').count() < before)
-        await picker.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: 'BOM 待处理筛选', exact: true }) }).locator('.ant-select-clear').click()
+        await picker.getByRole('group', { name: 'BOM 待处理筛选', exact: true }).getByRole('button', { name: '不限', exact: true }).click()
         assert.equal(await picker.locator('.ant-table-row').count(), before)
         await assertImportFilterPrompt(page, picker, 'BOM 待处理筛选', '筛选待处理项', ['全部部位'])
         await choose(page, picker, 'BOM 待处理筛选', '待选择物料')
@@ -374,12 +379,12 @@ path: '/erp/purchase/accessories',
         await expectLocator(count).toHaveText('已选 8 条')
         await expectLocator(picker.getByRole('button', { name: '全选筛选结果（8 条）', exact: true })).toBeDisabled()
         await picker.getByRole('button', { name: '清空已选', exact: true }).click()
-        const filter = picker.locator('[data-import-review-filter]')
-        await chooseSelectOption(filter, { label: '辅料' })
+        const filter = picker.getByRole('group', { name: '库存分类', exact: true })
+        await filter.getByRole('button', { name: '辅料', exact: true }).click()
         await expectLocator(rowChecks).toHaveCount(2)
         await expectLocator(picker.getByRole('button', { name: /全选筛选结果/u })).toHaveCount(0)
         await header.check()
-        await chooseSelectOption(filter, { label: '主料' })
+        await filter.getByRole('button', { name: '主料', exact: true }).click()
         await expectLocator(count).toHaveText('已选 2 条')
         await picker.getByRole('button', { name: '全选筛选结果（6 条）', exact: true }).click()
         await expectLocator(count).toHaveText('已选 8 条')
@@ -476,8 +481,8 @@ path: '/erp/purchase/accessories',
             await dialog.getByRole('button', { name: '返回可导入明细', exact: true }).click()
             assert.equal(await dialog.locator('tbody tr').count(), before)
           } else {
-            const prompt = kind === 'purchase' ? '按库存分类筛选' : '筛选待处理项'
-            assert.equal(await dialog.locator('[data-import-review-filter] .design-select-value').innerText(), prompt)
+            const label = kind === 'purchase' ? '库存分类' : '待处理项'
+            assert.equal(await dialog.getByRole('group', { name: label, exact: true }).locator('[aria-pressed="true"]').innerText(), '不限')
           }
           for (const width of [1440, 390]) {
             await page.setViewportSize({ width, height: 900 })

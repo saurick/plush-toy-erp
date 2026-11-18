@@ -1,4 +1,5 @@
 import React from 'react'
+import { getBusinessDocumentTitle } from '../../config/businessModules.mjs'
 import { OperationalFactStatus, ShipmentStatus, StockReservationStatus } from '../../../common/consts/statuses.generated.mjs'
 import {
   cancelFinanceFact,
@@ -80,7 +81,7 @@ export const OCCURRED_DATE_FILTER_OPTIONS = [
 ]
 
 const SHIPMENT_DATE_FILTER_OPTIONS = [
-  { label: '计划出货日期', value: 'planned_ship_at' },
+  { label: '计划出货日期', value: 'planned_ship_at', upcoming: true },
   { label: '实际出货日期', value: 'shipped_at' },
 ]
 
@@ -106,11 +107,11 @@ const FACT_TYPE_LABELS = Object.freeze({
 })
 
 const SOURCE_TYPE_LABELS = Object.freeze({
-  SHIPMENT: '出货单',
-  PRODUCTION_FACT: '生产记录',
-  OUTSOURCING_FACT: '委外记录',
-  PURCHASE_RECEIPT: '采购入库',
-  SALES_ORDER: '销售订单',
+  SHIPMENT: getBusinessDocumentTitle('shipment'),
+  PRODUCTION_FACT: getBusinessDocumentTitle('production_fact'),
+  OUTSOURCING_FACT: getBusinessDocumentTitle('outsourcing_fact'),
+  PURCHASE_RECEIPT: getBusinessDocumentTitle('purchase_receipt'),
+  SALES_ORDER: getBusinessDocumentTitle('sales_order'),
 })
 
 const COUNTERPARTY_TYPE_LABELS = Object.freeze({
@@ -322,6 +323,7 @@ function customerColumnText(record = {}, options = {}) {
 
 function counterpartyColumnText(record = {}, { emptyText = '-' } = {}) {
   if (!record.counterparty_type) return emptyText
+  if (record.counterpartyDisplayName) return record.counterpartyDisplayName
   const fallback = safeRefText('往来方', record.counterparty_id, { emptyText })
   if (fallback === emptyText) return fallback
   const label = counterpartyTypeLabel(record.counterparty_type)
@@ -353,7 +355,7 @@ export function financeSettlementActionFor(factType) {
 export function buildOperationalFactViewConfigs() {
   return {
     production: {
-      title: '生产记录与成品入库',
+      title: getBusinessDocumentTitle('production_fact'),
       listKey: 'production_facts',
       list: listProductionFacts,
       listAll: listAllProductionFacts,
@@ -366,7 +368,7 @@ export function buildOperationalFactViewConfigs() {
       defaultDateField: 'occurred_at',
     },
     outsourcing: {
-      title: '委外记录',
+      title: getBusinessDocumentTitle('outsourcing_fact'),
       listKey: 'outsourcing_facts',
       list: listOutsourcingFacts,
       listAll: listAllOutsourcingFacts,
@@ -379,7 +381,7 @@ export function buildOperationalFactViewConfigs() {
       defaultDateField: 'occurred_at',
     },
     shipments: {
-      title: '出货记录',
+      title: getBusinessDocumentTitle('shipment'),
       listKey: 'shipments',
       list: listShipments,
       listAll: listAllShipments,

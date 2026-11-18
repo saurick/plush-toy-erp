@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
@@ -22,8 +23,8 @@ import (
 )
 
 // WorkflowSourceTaskBackfillResult reports active source documents inspected by
-// the controlled upgrade repair. Created tasks always remain ready for a real
-// role owner; the repair never fabricates done/rejected workflow outcomes.
+// the controlled upgrade repair. Open handoffs reflect current source gates;
+// the repair never fabricates historical decisions or release approvals.
 type WorkflowSourceTaskBackfillResult struct {
 	Applied                      bool `json:"applied"`
 	ProductionSchedulingScanned  int  `json:"production_scheduling_scanned"`
@@ -34,6 +35,7 @@ type WorkflowSourceTaskBackfillResult struct {
 	ProductionExceptionExisting  int  `json:"production_exception_existing"`
 	FulfillmentProductionScanned int  `json:"fulfillment_production_scanned"`
 	FulfillmentShipmentScanned   int  `json:"fulfillment_shipment_scanned"`
+	ShipmentQualityScanned       int  `json:"shipment_quality_scanned"`
 	SourceTimeIntentsNormalized  int  `json:"source_time_intents_normalized"`
 }
 
@@ -68,7 +70,7 @@ func BackfillMissingWorkflowSourceTasks(
 	if _, err = sqlTx.ExecContext(ctx, "SET LOCAL lock_timeout = '5s'"); err != nil {
 		return nil, err
 	}
-	if _, err = sqlTx.ExecContext(ctx, "LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+	if _, err = sqlTx.ExecContext(ctx, "LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, quality_inspections, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"); err != nil {
 		return nil, err
 	}
 	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(
@@ -188,6 +190,20 @@ func reconcileMissingWorkflowSourceTasksWithClient(
 		return nil, err
 	}
 	for _, row := range shipments {
+		pending, err := client.QualityInspection.Query().Where(
+			qualityinspection.SourceType(biz.QualityInspectionSourceShipment), qualityinspection.SourceID(row.ID),
+			qualityinspection.InspectionType(biz.QualityInspectionTypeFinishedGoods), qualityinspection.SupersededAtIsNil(),
+			qualityinspection.StatusIn(biz.QualityInspectionStatusDraft, biz.QualityInspectionStatusSubmitted),
+		).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, inspection := range pending {
+			if err := fulfillmentInspectionTask(ctx, client, inspection); err != nil {
+				return nil, err
+			}
+			result.ShipmentQualityScanned++
+		}
 		full, err := shipmentWithItems(ctx, client, row)
 		if err != nil {
 			return nil, err

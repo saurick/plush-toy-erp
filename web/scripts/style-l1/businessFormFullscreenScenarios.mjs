@@ -155,7 +155,7 @@ export function createBusinessFormFullscreenScenarios({ assert, outputDir }, sce
         await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/u }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame.getByRole('button', { name: '业务汇总', exact: true }).waitFor()
+        await frame.locator('#dashboard-summary-search').waitFor()
         await frame.locator('.nav-item[data-page="purchase"]').click()
         await frame.locator('[data-action="new-record"]').click()
         const form = frame.locator('.form-view')

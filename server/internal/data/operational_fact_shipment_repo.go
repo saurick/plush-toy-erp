@@ -1270,7 +1270,11 @@ func validateShipmentFinishedGoodsQualityGate(ctx context.Context, tx *inventory
 	if tx == nil || tx.client == nil || shipmentID <= 0 {
 		return biz.ErrBadParam
 	}
-	inspections, err := tx.client.QualityInspection.Query().Where(
+	return shipmentFinishedGoodsQualityGate(ctx, tx.client, shipmentID)
+}
+
+func shipmentFinishedGoodsQualityGate(ctx context.Context, client *ent.Client, shipmentID int) error {
+	inspections, err := client.QualityInspection.Query().Where(
 		qualityinspection.SupersededAtIsNil(),
 		qualityinspection.SourceType(biz.QualityInspectionSourceShipment),
 		qualityinspection.SourceID(shipmentID),
@@ -2102,17 +2106,25 @@ func commitShipment(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment, a
 }
 
 func syncShipmentHandoff(ctx context.Context, client *ent.Client, row *biz.Shipment, actorID int) error {
-	status := ""
-	if len(row.Items) > 0 {
-		status = "ready"
-	}
-	if row.Status == biz.ShipmentStatusShipped {
+	status, reason := "", ""
+	switch {
+	case row.Status == biz.ShipmentStatusShipped:
 		status = "done"
-	}
-	if row.Status == biz.ShipmentStatusCancelled {
+	case row.Status == biz.ShipmentStatusCancelled:
 		status = "withdrawn"
+	case len(row.Items) > 0:
+		switch err := shipmentFinishedGoodsQualityGate(ctx, client, row.ID); {
+		case err == nil:
+			status = "ready"
+		case errors.Is(err, biz.ErrShipmentQualityPending):
+			status, reason = "blocked", "等待品质完成出货前检验"
+		case errors.Is(err, biz.ErrShipmentQualityRejected):
+			status, reason = "blocked", "出货前检验不合格，请核对检验结果"
+		default:
+			return err
+		}
 	}
-	return syncFulfillmentTask(ctx, client, "shipment_execute", row.ID, row.ShipmentNo, "", status, "", actorID)
+	return syncFulfillmentTask(ctx, client, "shipment_execute", row.ID, row.ShipmentNo, "", status, reason, actorID)
 }
 
 func shipmentWithItems(ctx context.Context, client *ent.Client, row *ent.Shipment) (*biz.Shipment, error) {

@@ -21,6 +21,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 
@@ -43,6 +44,7 @@ import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
 import useQualityInspectionReferences from '../components/quality-inspections/useQualityInspectionReferences.js'
 import { message } from '@/common/utils/antdApp'
+import { QUALITY_STATUS_OPTIONS } from '../utils/qualityInspectionLabels.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
@@ -94,7 +96,6 @@ import {
   QUALITY_INSPECTION_TYPE_FILTER_OPTIONS,
   QUALITY_INSPECTIONS_MODULE_KEY,
   QUALITY_RESULT_FILTER_OPTIONS,
-  QUALITY_STATUS_OPTIONS,
 } from '../components/quality-inspections/qualityInspectionColumns.jsx'
 import { formatQuantity } from '../utils/businessLineItems.mjs'
 import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
@@ -209,7 +210,7 @@ function buildDecisionSourceSummary({
     sourceNo = referenceLabel(
       purchaseReceiptOptions,
       inspection?.purchase_receipt_id,
-      '采购入库已关联'
+      '采购入库单'
     )
   }
   if (!sourceNo && sourceType === 'OUTSOURCING_FACT') {
@@ -224,7 +225,7 @@ function buildDecisionSourceSummary({
       ? referenceLabel(
           allPurchaseReceiptItemOptions,
           inspection.purchase_receipt_item_id,
-          '入库行已关联'
+          '入库行'
         )
       : ''
   const subjectLabel = businessSubjectLabel(subjectType)
@@ -238,7 +239,7 @@ function buildDecisionSourceSummary({
     ? referenceLabel(
         inventoryLotOptions,
         inspection.inventory_lot_id,
-        '批次已关联'
+        '批次'
       )
     : ''
 
@@ -1128,7 +1129,7 @@ export default function QualityInspectionsPage() {
   useEffect(() => {
     if (!taskHandling || taskEntryRef.current === taskHandling.taskID || !selectedRow ||
       Number(selectedRow.id) !== routeQualityInspectionID || outletContext?.workflowTaskNavigation?.businessReceipt) return
-    if (['handoff_production_quality', 'handoff_receipt_quality', 'handoff_outsourcing_quality'].includes(taskHandling.group) &&
+    if (['handoff_production_quality', 'handoff_receipt_quality', 'handoff_outsourcing_quality', 'handoff_shipment_quality'].includes(taskHandling.group) &&
         !outletContext?.taskBusiness?.readOnly && canUpdate && [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status)) {
       taskEntryRef.current = taskHandling.taskID
       setQualityTaskFocusOpen(true)
@@ -1388,7 +1389,7 @@ export default function QualityInspectionsPage() {
 
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ ...referenceRecords }} className="erp-quality-inspections-page">
-      <PageHeaderCard compact helpKey="quality-inspections" title="质量检验" />
+      <PageHeaderCard compact helpKey="quality-inspections" title={getBusinessDocumentTitle('quality_inspection')} />
       {((!routeQualityInspectionID && inspectionTypeFilter === 'INCOMING') || selectedIsIncomingInspection) && (
         <>
           <SourceActionAccessNotice access={qualitySourceAccess} />
@@ -1429,7 +1430,6 @@ export default function QualityInspectionsPage() {
                 Boolean(routeQualityInspectionID) &&
                 inspectionTypeFilter !== 'PRODUCTION_STAGE'
               }
-              className="erp-business-filter-control--status"
               value={statusFilter}
               options={QUALITY_STATUS_OPTIONS}
               onChange={(nextStatus) => {
@@ -1578,12 +1578,9 @@ export default function QualityInspectionsPage() {
               }}
               startValue={dateFilterStart}
               endValue={dateFilterEnd}
-              onStartChange={(nextStart) => {
-                setDateFilterStart(nextStart)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
-              onEndChange={(nextEnd) => {
-                setDateFilterEnd(nextEnd)
+              onRangeChange={(from, to) => {
+                setDateFilterStart(from)
+                setDateFilterEnd(to)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
@@ -1937,6 +1934,7 @@ export default function QualityInspectionsPage() {
         loading={loading}
         dataSource={rows}
         columns={columns}
+        taskDetailColumns={visibleDataColumns}
         pagination={createBusinessTablePagination({
           pagination,
           total,
@@ -1997,7 +1995,12 @@ export default function QualityInspectionsPage() {
           size="small"
           items={[
           { key: 'inspection', label: '质检单', children: selectedRow?.inspection_no },
-          { key: 'batch', label: '在制批次', children: selectedRow?.wip_batch_no || selectedRow?.batch_no },
+          ...(isProductionStageQualityInspection(selectedRow)
+            ? [{ key: 'batch', label: '在制批次', children: selectedRow?.wip_batch_no || selectedRow?.batch_no }]
+            : [
+                { key: 'source', label: selectedRow?.source_type === 'SHIPMENT' ? '出货单' : '来源单号', children: selectedRow?.source_no || '单号未提供' },
+                { key: 'lot', label: '库存批次', children: referenceLabel(inventoryLotOptions, selectedRow?.inventory_lot_id, '批次', { emptyText: '未关联' }) },
+              ]),
           { key: 'state', label: '当前状态', children: selectedRow?.status === QualityInspectionStatus.DRAFT ? '待提交检验' : '待质量判定' },
         ]}
         />
@@ -2057,7 +2060,7 @@ export default function QualityInspectionsPage() {
         description="查看当前质检单的来源、批次、检验状态和判定结果；如需提交、判定或取消，请使用列表上方的当前操作区。"
         open={Boolean(detailInspection)}
         record={detailInspection}
-        title="质量检验详情"
+        title={`${getBusinessDocumentTitle('quality_inspection')}详情`}
         onClose={closeQualityInspectionDetails}
       >
         {detailInspection?.superseded_at || detailInspection?.correction_of_inspection_id ? (

@@ -18,7 +18,6 @@ export function createPurchaseReceiptScenarios(deps) {
     assertNoHorizontalOverflow,
     assertPurchaseReceiptRowItemCount,
     assertTextAbsent,
-    expectButton,
     expectHeading,
     expectText,
     selectPurchaseReceiptRow,
@@ -58,9 +57,6 @@ export function createPurchaseReceiptScenarios(deps) {
   }
 
   const assertPurchaseReceiptToolbarShell = async (page, scenarioName) => {
-    for (const label of ['导出筛选结果', '列设置']) {
-      await expectButton(page, label)
-    }
     assert.equal(
       await page.getByRole('button', { name: '批量删除' }).count(),
       0,
@@ -108,13 +104,14 @@ export function createPurchaseReceiptScenarios(deps) {
         .click()
     }
     await filterDialog.waitFor()
+    await filterDialog.getByRole('button', { name: '自定义日期', exact: true }).click()
     await waitForFiniteAnimations(page)
     const metrics = await page.evaluate(() => {
       const control = Array.from(
         document.querySelectorAll('.erp-business-date-range-filter')
       ).find((node) => node.textContent?.includes('入库日期'))
       const label = control?.querySelector(
-        '.erp-business-date-range-filter__type-label'
+        '.erp-filter-field > legend'
       )
       const range = control?.querySelector(
         '.erp-business-date-range-filter__range'
@@ -123,7 +120,6 @@ export function createPurchaseReceiptScenarios(deps) {
         control?.querySelectorAll('.erp-business-date-input.ant-picker') || []
       )
       const style = control ? window.getComputedStyle(control) : null
-      const labelStyle = label ? window.getComputedStyle(label) : null
       const controlBox = control?.getBoundingClientRect()
       const labelBox = label?.getBoundingClientRect()
       return {
@@ -137,9 +133,8 @@ export function createPurchaseReceiptScenarios(deps) {
         controlClientWidth: control?.clientWidth || 0,
         rangeScrollWidth: range?.scrollWidth || 0,
         rangeClientWidth: range?.clientWidth || 0,
-        labelBackground: labelStyle?.backgroundColor || '',
-        labelBorder: labelStyle?.borderColor || '',
-        labelRadius: labelStyle?.borderRadius || '',
+        labelBottom: labelBox?.bottom || 0,
+        periodTop: control?.querySelector('.erp-filter-chip-group')?.getBoundingClientRect().top || 0,
         dateInputs: dateInputs.map((input) => {
           const inputStyle = window.getComputedStyle(input)
           const inputBox = input.getBoundingClientRect()
@@ -172,8 +167,7 @@ export function createPurchaseReceiptScenarios(deps) {
     )
     assert(
       metrics.gap >= 6 &&
-        Number.parseFloat(metrics.labelRadius) >= 8 &&
-        metrics.labelBorder !== 'rgba(0, 0, 0, 0)' &&
+        metrics.periodTop >= metrics.labelBottom &&
         metrics.dateInputs.length === 2 &&
         metrics.dateInputs.every(
           (input) =>
@@ -208,7 +202,7 @@ export function createPurchaseReceiptScenarios(deps) {
       .first()
     await row.scrollIntoViewIfNeeded()
     await openBusinessRecordDetails(page, receiptNo)
-    const details = page.getByRole('dialog', { name: /^采购入库详情/u })
+    const details = page.getByRole('dialog', { name: /^采购收货单详情/u })
     await details.locator('.erp-business-row-item-card').first().waitFor()
     const metrics = await page.evaluate(() => {
       const list = document.querySelector('.erp-business-details-modal')
@@ -262,6 +256,7 @@ export function createPurchaseReceiptScenarios(deps) {
       '单位',
       '单价',
       '金额',
+      '入库结果',
       '采购订单行',
       '来源行号',
       '备注',
@@ -417,7 +412,8 @@ export function createPurchaseReceiptScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '采购入库')
+        await expectHeading(page, '入库办理')
+        await page.getByRole('tab', { name: '采购收货单', exact: true, selected: true }).waitFor()
         await expectText(page, 'PR-STYLE-L1')
         await assertPurchaseReceiptToolbarShell(
           page,
@@ -477,7 +473,7 @@ export function createPurchaseReceiptScenarios(deps) {
                 '收货日期',
                 '过账时间',
                 '明细行数',
-                '入库数量',
+                '收货数量',
               ].includes(node.text)
                 ? node.scrollWidth > node.clientWidth + 1
                 : false
@@ -535,7 +531,7 @@ export function createPurchaseReceiptScenarios(deps) {
         })
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'inbound',
-          heading: '采购入库',
+          heading: '入库办理',
         })
       },
     },

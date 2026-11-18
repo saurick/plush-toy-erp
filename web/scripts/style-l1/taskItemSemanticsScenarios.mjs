@@ -189,9 +189,9 @@ function createTaskItemLayoutScenarios({ assert }) {
     { mobile: false, width: 1440, theme: 'light' },
     { mobile: false, width: 1440, theme: 'dark' },
     { mobile: false, width: 1056, theme: 'light' },
-    { mobile: false, width: 1056, theme: 'light', workbench: true },
+    { mobile: false, width: 1056, theme: 'light', risk: true },
     { mobile: true, width: 390, theme: 'light', restricted: true },
-  ].map(({ mobile, width, theme, restricted = false, workbench = false }) => {
+  ].map(({ mobile, width, theme, restricted = false, risk = false }) => {
     const now = Math.floor(Date.now() / 1000)
     const product = { kind: 'product', name: '示例狐狸', code: 'FOX-1', product_id: 1, image_attachment_id: 880001, order_no: 'SO-001' }
     const rabbit = { kind: 'product', name: '示例挂兔', code: 'RABBIT-2', product_id: 2, image_attachment_id: 0 }
@@ -209,17 +209,17 @@ function createTaskItemLayoutScenarios({ assert }) {
       { id: 97408, task_name: '核对产品图片', display_context: { available: true, source_no: 'SHIP-008', items: [{ ...product, product_id: 8, image_attachment_id: 880008, name: '失败重试产品' }] } },
     ].map((entry, index) => ({ ...base, ...entry, created_at: now - index, task_code: `STYLE-L1-ITEM-LAYOUT-${entry.id}` }))
     const downloads = new Map()
-    const actions = ['workflow.task.read', 'mobile.sales.access', ...(workbench ? ['erp.workbench.read'] : []), ...(restricted ? [] : ['product.read'])]
+    const actions = ['workflow.task.read', 'mobile.sales.access', ...(risk ? ['erp.workbench.read'] : []), ...(restricted ? [] : ['product.read'])]
     return {
-      name: `task-item-layout-${mobile ? 'mobile' : workbench ? 'workbench' : 'desktop'}-${width}-${theme}${restricted ? '-restricted' : ''}`,
-      path: mobile ? '/m/sales/tasks' : workbench ? '/erp/dashboard' : '/erp/task-board?mode=todo&lane=actionable',
+      name: `task-item-layout-${mobile ? 'mobile' : risk ? 'risk' : 'desktop'}-${width}-${theme}${restricted ? '-restricted' : ''}`,
+      path: mobile ? '/m/sales/tasks' : risk ? '/erp/task-board?view=risk' : '/erp/task-board?mode=todo&lane=actionable',
       auth: 'admin',
       themeMode: theme,
       viewport: { width, height: mobile ? 844 : 1000 },
       deviceScaleFactor: mobile ? 3 : 3840 / 1440,
       ...(mobile ? { adminProfile: { username: 'style-l1-item-layout', is_super_admin: false, roles: [{ role_key: 'sales', name: '业务' }], permissions: actions, menus: [] } } : {}),
       effectiveSession: { configRevision: 'style-l1-item-layout', configHash: 'style-l1-item-layout-hash', customer: { key: 'yoyoosun', name: '永绅' }, pages: ['global-dashboard', 'task-board'], actions, workflow_visible_owner_role_keys_by_capability: { 'workflow.task.read': ['sales'] }, fieldPolicies: {}, workPools: [], source: 'active_customer_config_revision' },
-      workflowTaskFixtures: entries,
+      workflowTaskFixtures: risk ? entries.map((entry) => ({ ...entry, urge_count: 1 })) : entries,
       beforeNavigate: async (page) => {
         downloads.clear()
         const content = await page.evaluate(() => {

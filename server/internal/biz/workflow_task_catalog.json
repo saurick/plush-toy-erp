@@ -551,6 +551,16 @@
       ]
     },
     {
+      "key": "shipment_quality",
+      "label": "出货前检验",
+      "group": "发货",
+      "module": "quality",
+      "chain": "fulfillment",
+      "groups": [
+        "handoff_shipment_quality"
+      ]
+    },
+    {
       "key": "quality_other",
       "label": "质量检验（环节待核对）",
       "group": "质检",
@@ -2291,19 +2301,22 @@
     {
       "stage": "shipment",
       "label": "放行与实际发货",
-      "role": "业务 / 财务",
+      "role": "业务 / 品质 / 财务",
       "stages": [
+        "shipment_quality",
         "shipment"
       ],
       "result": "业务准备、财务放行、业务实际发货完成后，才表示真实发货。",
       "role_keys": [
         "sales",
+        "quality",
         "finance"
       ],
       "handoffs": [
         "业务核对订单、可发货数量和客户要求，准备出货单。",
         "财务审批放行后，业务显式确认实际发货。",
-        "实际发货后减少库存，形成应收、对账等后续业务来源。"
+        "实际发货后减少库存，形成应收、对账等后续业务来源。",
+        "按需发起出货前检验，品质从待办打开本次检验单。未判定或不合格时出货受阻，录入合格或让步接收后再核对财务放行。"
       ],
       "approvals": [
         {
@@ -2327,6 +2340,12 @@
             "role_keys": [
               "sales"
             ]
+          },
+          {
+            "key": "quality",
+            "label": "品质办理出货前检验",
+            "detail_refs": ["handoff:3"],
+            "role_keys": ["quality"]
           },
           {
             "key": "approval",
@@ -2369,7 +2388,23 @@
         "edges": [
           {
             "from": "prepare",
-            "to": "approval"
+            "to": "approval",
+            "label": "未发起检验"
+          },
+          {
+            "from": "prepare",
+            "to": "quality",
+            "label": "已发起检验"
+          },
+          {
+            "from": "quality",
+            "to": "approval",
+            "label": "合格或让步接收"
+          },
+          {
+            "from": "quality",
+            "to": "blocked",
+            "label": "不合格"
           },
           {
             "from": "approval",
@@ -2392,7 +2427,7 @@
         "issues": "财务未放行，库存、质量或包装条件不足，或出货登记需要纠错。",
         "action": "业务与财务核对未放行原因；补齐真实条件后按原单规则重办。未实际发货的单据按规则修改或取消；已发货错误走正式取消及冲正，受下游依赖限制。",
         "resume": "取得有效放行且可发货数量、质量和包装均符合条件，再显式确认实际发货；放行或任务完成不代表已发货。",
-        "task_stages": [],
+        "task_stages": ["shipment_quality"],
         "guides": []
       }
     },
@@ -3285,6 +3320,168 @@
       "diagram": {
         "branch_label": "款项或抵扣有误"
       }
+    }
+  ],
+  "documents": [
+    {
+      "key": "sales_order",
+      "label": "销售订单",
+      "sources": [
+        "sales_order",
+        "sales-orders",
+        "project-orders"
+      ],
+      "section_key": "sales"
+    },
+    {
+      "key": "purchase_order",
+      "label": "采购订单",
+      "sources": [
+        "purchase_order",
+        "purchase-order",
+        "accessories-purchase"
+      ],
+      "section_key": "purchase"
+    },
+    {
+      "key": "outsourcing_order",
+      "label": "委外订单",
+      "sources": [
+        "outsourcing_order",
+        "outsourcing-order",
+        "processing-contracts"
+      ],
+      "section_key": "outsourcing"
+    },
+    {
+      "key": "production_order",
+      "label": "生产订单",
+      "sources": [
+        "production_order",
+        "production-order",
+        "production-orders"
+      ],
+      "section_key": "production"
+    },
+    {
+      "key": "purchase_receipt",
+      "label": "采购收货单",
+      "sources": [
+        "purchase_receipt",
+        "purchase-receipt",
+        "inbound"
+      ],
+      "section_key": "purchase"
+    },
+    {
+      "key": "shipment",
+      "label": "出货单",
+      "sources": [
+        "shipment",
+        "shipments"
+      ],
+      "section_key": "shipment"
+    },
+    {
+      "key": "production_fact",
+      "label": "生产记录",
+      "sources": [
+        "production_fact",
+        "production-fact",
+        "production-progress"
+      ],
+      "section_key": "production"
+    },
+    {
+      "key": "quality_inspection",
+      "label": "质量检验记录",
+      "sources": [
+        "quality_inspection",
+        "quality-inspection",
+        "quality-inspections"
+      ],
+      "section_key": "quality"
+    },
+    {
+      "key": "bom_header",
+      "label": "物料清单（BOM）",
+      "sources": [
+        "bom_header",
+        "material-bom"
+      ],
+      "section_key": "engineering"
+    },
+    {
+      "key": "engineering_material_request",
+      "label": "工程用料申请",
+      "sources": [
+        "engineering_material_request"
+      ],
+      "section_key": "engineering"
+    },
+    {
+      "key": "production_exception_decision",
+      "label": "生产异常处置单",
+      "sources": [
+        "production_exception_decision"
+      ],
+      "section_key": "production"
+    },
+    {
+      "key": "production_wip_batch",
+      "label": "生产工序批次",
+      "sources": [
+        "production_wip_batch"
+      ],
+      "section_key": "production"
+    },
+    {
+      "key": "production_packaging_confirmation",
+      "label": "包装确认记录",
+      "sources": [
+        "production_packaging_confirmation"
+      ],
+      "section_key": "production"
+    },
+    {
+      "key": "outsourcing_fact",
+      "label": "加工收发记录",
+      "sources": [
+        "outsourcing_fact"
+      ],
+      "section_key": "outsourcing"
+    },
+    {
+      "key": "finance_payment",
+      "label": "收付款单",
+      "sources": [
+        "finance_payment"
+      ],
+      "section_key": "finance"
+    },
+    {
+      "key": "inventory_operation",
+      "label": "库存作业单",
+      "sources": [
+        "inventory_operation"
+      ],
+      "section_key": "warehouse"
+    },
+    {
+      "key": "purchase_rejection_disposition",
+      "label": "采购拒收处置单",
+      "sources": [
+        "purchase_rejection_disposition"
+      ],
+      "section_key": "purchase"
+    },
+    {
+      "key": "outsourcing_return_disposition",
+      "label": "委外回货处置单",
+      "sources": [
+        "outsourcing_return_disposition"
+      ],
+      "section_key": "outsourcing"
     }
   ]
 }

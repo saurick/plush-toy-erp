@@ -3,7 +3,9 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"server/internal/biz"
@@ -80,6 +82,11 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 	}
 
 	pending := createCase("PENDING", true)
+	quality := assertFulfillmentTask(t, ctx, client, "shipment_quality", pending.inspection.ID, "ready", biz.QualityRoleKey)
+	if quality.Payload["entry_path"] != fmt.Sprintf("/erp/production/quality-inspections?quality_inspection_id=%d", pending.inspection.ID) {
+		t.Fatalf("quality task opened the wrong inspection: %+v", quality)
+	}
+	assertFulfillmentTask(t, ctx, client, "shipment_execute", pending.shipment.ID, "blocked", biz.SalesRoleKey)
 	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
 	processCreate := sourceBoundProcessCreate(
 		biz.ProcessKeyFinishedGoodsDelivery,
@@ -103,6 +110,8 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 	if _, err := inventoryUC.PassQualityInspection(ctx, approximateQualityInspectionDecision(pending.inspection.ID, biz.QualityInspectionResultConcession)); err != nil {
 		t.Fatalf("pass pending inspection: %v", err)
 	}
+	assertFulfillmentTask(t, ctx, client, "shipment_quality", pending.inspection.ID, "done", biz.QualityRoleKey)
+	assertFulfillmentTask(t, ctx, client, "shipment_execute", pending.shipment.ID, "ready", biz.SalesRoleKey)
 	if _, _, err := processRepo.CreateProcessInstanceFromSource(ctx, processCreate, 7); err != nil {
 		t.Fatalf("passed inspection process start: %v", err)
 	}
@@ -120,6 +129,11 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 	}
 	if _, err := inventoryUC.RejectQualityInspection(ctx, approximateQualityInspectionDecision(rejected.inspection.ID, biz.QualityInspectionResultReject)); err != nil {
 		t.Fatalf("reject inspection: %v", err)
+	}
+	assertFulfillmentTask(t, ctx, client, "shipment_quality", rejected.inspection.ID, "done", biz.QualityRoleKey)
+	blocked := assertFulfillmentTask(t, ctx, client, "shipment_execute", rejected.shipment.ID, "blocked", biz.SalesRoleKey)
+	if blocked.BlockedReason == nil || !strings.Contains(*blocked.BlockedReason, "不合格") {
+		t.Fatalf("rejected result absent from sales handoff: %+v", blocked)
 	}
 	rejectedActor := shipmentReleaseActorForTest(t, ctx, client, rejected.shipment.ID)
 	if _, _, err := processRepo.CreateProcessInstanceFromSource(
@@ -142,6 +156,8 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 	if _, err := inventoryUC.CancelQualityInspection(ctx, cancelled.inspection.ID, nil); err != nil {
 		t.Fatalf("cancel inspection: %v", err)
 	}
+	assertFulfillmentTask(t, ctx, client, "shipment_quality", cancelled.inspection.ID, "withdrawn", biz.QualityRoleKey)
+	assertFulfillmentTask(t, ctx, client, "shipment_execute", cancelled.shipment.ID, "ready", biz.SalesRoleKey)
 	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, cancelled.shipment.ID)
 	if shipped, err := operationalUC.ShipShipment(ctx, cancelled.shipment.ID); err != nil || shipped.Status != biz.ShipmentStatusShipped {
 		t.Fatalf("cancelled inspection should not block shipment: shipment=%+v err=%v", shipped, err)

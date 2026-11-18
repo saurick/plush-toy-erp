@@ -51,9 +51,38 @@ func TestBusinessProgressOwnerOptionsRPC(t *testing.T) {
 	}
 }
 
+func (r *progressAPIRepo) ListBusinessProgressTasks(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressTaskPage, error) {
+	r.query, r.calls = q, r.calls+1
+	return &biz.BusinessProgressTaskPage{Rows: []biz.BusinessProgressRecord{}}, r.err
+}
 func (r *progressAPIRepo) GetBusinessProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressDetail, error) {
 	r.query, r.calls = q, r.calls+1
 	return nil, biz.ErrSalesOrderNotFound
+}
+
+func TestBusinessProgressTaskPageRPC(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	params := map[string]any{"view": "orders", "id": 2, "task_status": "open", "owner_role_key": "quality", "limit": 20, "offset": 0}
+	for label, withTasks := range map[string]bool{"visible": true, "forbidden": false} {
+		t.Run(label, func(t *testing.T) {
+			keys := []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}
+			if withTasks {
+				keys = append(keys, biz.PermissionWorkflowTaskRead)
+			}
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, keys...)
+			repo := &progressAPIRepo{}
+			d.businessProgressUC = biz.NewBusinessProgressUsecase(repo)
+			_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress_tasks", "tasks", newDataStruct(params))
+			if withTasks {
+				if err != nil || res.Code != errcode.OK.Code || repo.query.ID != 2 || repo.query.TaskRole != "quality" || repo.query.TaskVisibility == nil ||
+					repo.query.TaskStatus != "open" || res.Data.AsMap()["total"] != float64(0) {
+					t.Fatalf("task page: result=%+v query=%+v err=%v", res, repo.query, err)
+				}
+			} else if err != nil || res.Code != errcode.PermissionDenied.Code || repo.calls != 0 {
+				t.Fatalf("task visibility required: result=%+v calls=%d err=%v", res, repo.calls, err)
+			}
+		})
+	}
 }
 
 func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
@@ -62,8 +91,8 @@ func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 	r := &progressAPIRepo{}
 	d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
 	ctx := workflowJSONRPCAdminContext()
-	_, res, err := d.handleBusiness(ctx, "list_progress", "1", newDataStruct(map[string]any{"owner_name": "模拟业务员"}))
-	if err != nil || res.Code != errcode.OK.Code || r.calls != 1 || r.query.View != "production" || r.query.OwnerName != "模拟业务员" || !r.query.Access.Production || r.query.Access.Sales || r.query.Access.WIP || r.query.Access.Tasks {
+	_, res, err := d.handleBusiness(ctx, "list_progress", "1", nil)
+	if err != nil || res.Code != errcode.OK.Code || r.calls != 1 || r.query.View != "production" || !r.query.Access.Production || r.query.Access.Sales || r.query.Access.WIP || r.query.Access.Tasks {
 		t.Fatalf("default production result=%+v query=%+v err=%v", res, r.query, err)
 	}
 	for _, input := range []struct {
@@ -71,6 +100,15 @@ func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 		code   int32
 	}{
 		{map[string]any{"view": "orders"}, errcode.PermissionDenied.Code},
+		{map[string]any{"display": "lines", "id": 7}, errcode.PermissionDenied.Code},
+		{map[string]any{"view": "production", "display": "lines"}, errcode.InvalidParam.Code},
+		{map[string]any{"display": "lines", "delivery_status": "blocked"}, errcode.InvalidParam.Code},
+		{map[string]any{"display": "lines", "delivery_status": "undated", "date_from": "2026-11-15"}, errcode.InvalidParam.Code},
+		{map[string]any{"customer_id": -1}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_by": "unknown", "sort_direction": "asc"}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_by": "due_date", "sort_direction": "sideways"}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_by": "product", "sort_direction": "asc"}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_direction": "asc"}, errcode.InvalidParam.Code},
 		{map[string]any{"limit": 101}, errcode.InvalidParam.Code},
 		{map[string]any{"offset": -1}, errcode.InvalidParam.Code},
 		{map[string]any{"scope": "finished"}, errcode.InvalidParam.Code},
@@ -113,6 +151,20 @@ func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 		if err != nil || res.Code != want || r.calls != calls {
 			t.Fatalf("%s result=%+v calls=%d err=%v", state, res, r.calls, err)
 		}
+	}
+}
+
+func TestBusinessProgressJSONRPCDeliveryLineQueryKeepsOrderIdentity(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	d, _, _, _ := newProductionOrderJSONRPCTestData(t, biz.PermissionERPBusinessDashboardRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead)
+	r := &progressAPIRepo{}
+	d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
+	_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress", "delivery", newDataStruct(map[string]any{
+		"view": "orders", "display": "lines", "delivery_status": "overdue", "scope": "all", "id": 31, "customer_id": 7, "owner_name": "模拟业务员", "offset": 20, "sort_by": "due_date", "sort_direction": "asc",
+	}))
+	if err != nil || res.Code != errcode.OK.Code || !r.query.Access.Sales || r.query.ID != 31 || r.query.CustomerID != 7 || r.query.OwnerName != "模拟业务员" ||
+		r.query.Display != "lines" || r.query.DeliveryStatus != "overdue" || r.query.SortBy != biz.BusinessProgressSortDueDate || r.query.SortDirection != "asc" || r.query.Scope != "all" || r.query.Offset != 20 {
+		t.Fatalf("line query=%+v result=%+v error=%v", r.query, res, err)
 	}
 }
 

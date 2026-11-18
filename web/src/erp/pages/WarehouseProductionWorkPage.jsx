@@ -16,6 +16,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listWarehouseProductionWork } from '../api/warehouseProductionApi.mjs'
 import { postProductionFact } from '../api/operationalFactApi.mjs'
+import { operationalFactActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
@@ -54,6 +55,7 @@ import { useProductionFactActions } from '../components/production-orders/usePro
 import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../utils/moduleTableColumns.mjs'
 
 const EMPTY_PAGE = { items: [], total: 0, counts: {} }
+const RECEIPT_ACTION = operationalFactActionPresentation('production', { fact_type: 'FINISHED_GOODS_RECEIPT' })
 const WAREHOUSE_WORK_SORT_FIELDS = { quantity: 'quantity' }
 
 function warehouseWorkProduct(row = {}) {
@@ -245,11 +247,11 @@ export default function WarehouseProductionWorkPage({ kind }) {
         id: receiptReview.fact_id,
         expected_version: receiptReview.fact_version,
       })
-      message.success('成品已确认入库；待检、待包装数量仍不能发货')
+      message.success(RECEIPT_ACTION.success)
       setReceiptReview(null)
       await loadRows()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '确认成品入库'))
+      message.error(getActionErrorMessage(error, RECEIPT_ACTION.label))
       await loadRows()
     } finally {
       setSaving(false)
@@ -521,10 +523,10 @@ export default function WarehouseProductionWorkPage({ kind }) {
         </p>
       </BusinessDetailsModal>
       <BusinessFormModal
-        title="确认成品入库"
+        title={RECEIPT_ACTION.label}
         open={Boolean(receiptReview)}
         confirmLoading={saving}
-        okText="确认成品入库"
+        okText={RECEIPT_ACTION.label}
         onOk={confirmReceipt}
         onCancel={() => {
           if (!saving) setReceiptReview(null)

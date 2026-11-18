@@ -106,6 +106,7 @@ type WorkflowTaskBoardQuery struct {
 	OwnerRoleKey             string
 	Due                      string
 	SourceType               string
+	SourceSection            string
 	LaneKey                  string
 	Sort                     string
 	ApprovalOnly             bool

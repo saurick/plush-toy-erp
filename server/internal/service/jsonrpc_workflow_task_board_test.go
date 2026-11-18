@@ -179,6 +179,9 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRejectsInvalidContract(t *testing
 		{name: "non target closed status", params: map[string]any{"status": "closed"}},
 		{name: "invalid owner role", params: map[string]any{"owner_role_key": "unknown"}},
 		{name: "invalid due", params: map[string]any{"due": "tomorrow"}},
+		{name: "non string source section", params: map[string]any{"source_section": true}},
+		{name: "unknown source section", params: map[string]any{"source_section": "unknown"}},
+		{name: "source outside section", params: map[string]any{"source_section": "production", "source_type": "purchase_receipt"}},
 		{name: "invalid lane", params: map[string]any{"lane_key": "unknown"}},
 		{name: "invalid sort", params: map[string]any{"lane_key": biz.WorkflowTaskBoardLaneActionable, "sort": "unknown"}},
 		{name: "overview custom sort", params: map[string]any{"sort": biz.WorkflowTaskBoardSortNewest}},
@@ -334,13 +337,13 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage(t *testing.T) 
 		workflowUC:  biz.NewWorkflowUsecase(repo),
 	}
 	_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_board", "all-todo", mustJSONRPCStruct(t, map[string]any{
-		"lane_key": "all", "todo_only": true, "sort": "newest", "limit": 20, "offset": 20, "keyword": "包装",
+		"lane_key": "all", "todo_only": true, "sort": "time_asc", "limit": 20, "offset": 20, "keyword": "包装", "source_section": "production",
 	}))
 	if err != nil || res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("all todo page: %+v %v", res, err)
 	}
 	q := repo.query
-	if q.LaneKey != biz.WorkflowTaskBoardLaneAll || !q.TodoOnly || q.Limit != 20 || q.Offset != 20 || q.Sort != biz.WorkflowTaskBoardSortNewest || q.Keyword != "包装" {
+	if q.LaneKey != biz.WorkflowTaskBoardLaneAll || !q.TodoOnly || q.Limit != 20 || q.Offset != 20 || q.Sort != biz.WorkflowTaskBoardSortTimeAsc || q.Keyword != "包装" || q.SourceSection != "production" {
 		t.Fatalf("all todo query lost pagination or filters: %+v", q)
 	}
 	if q.VisibilityScope == nil || q.VisibilityScope.StandaloneAllowAllOwnerRoles || len(q.VisibilityScope.StandaloneVisibleOwnerRoleKeys) != 1 || q.VisibilityScope.StandaloneVisibleOwnerRoleKeys[0] != biz.SalesRoleKey {

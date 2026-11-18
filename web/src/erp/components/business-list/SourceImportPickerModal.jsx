@@ -147,6 +147,7 @@ export default function SourceImportPickerModal({
   const [onlySelected, setOnlySelected] = useState(false)
   const [selectingAll, setSelectingAll] = useState(false)
   const selectionBlocked = loading || readDenied || Boolean(loadError) || selectingAll
+  const rowSelectionBlocked = (row) => selectionBlocked || Boolean(isRowDisabled?.(row))
   const [selectAllError, setSelectAllError] = useState('')
   const [allFilteredKeys, setAllFilteredKeys] = useState([])
   const selectAllRequest = useRef(null)
@@ -648,8 +649,7 @@ export default function SourceImportPickerModal({
             onChange: (keys) => { if (!selectionBlocked) updateSelectedRowKeys(keys) },
             getCheckboxProps: (row) => ({
               'aria-label': '选择此条记录',
-              disabled:
-                selectionBlocked || (typeof isRowDisabled === 'function' && isRowDisabled(row)),
+              disabled: rowSelectionBlocked(row),
             }),
             getTitleCheckboxProps: () => ({ 'aria-label': '全选本页', title: pageHasMixedGroups ? '先按销售订单筛选，再全选' : '全选本页', disabled: selectionBlocked || pageHasMixedGroups || pagedRows.every((row) => isRowDisabled?.(row)) }),
           }}
@@ -658,13 +658,9 @@ export default function SourceImportPickerModal({
               ? 'erp-source-import-picker__row--disabled'
               : ''
           }
-          onRow={(row) => ({
+          onRow={(row) => rowSelectionBlocked(row) ? {} : ({
             onClick: (event) => {
               if (isInteractiveRowTarget(event.target)) return
-              if (selectionBlocked) return
-              if (typeof isRowDisabled === 'function' && isRowDisabled(row)) {
-                return
-              }
               updateSelectedRowKeys(
                 toggleKey(selectedRowKeys, getKey(row), multiple)
               )

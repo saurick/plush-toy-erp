@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Input, Popconfirm, Tag } from 'antd'
 import { useLocation } from 'react-router-dom'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
@@ -26,8 +27,10 @@ import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { canReadProductionProcess, productionFactSummary } from '../utils/productionRecordViews.mjs'
 import ProductionRecordDrawer from '../components/production-records/ProductionRecordDrawer.jsx'
+import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
+import { operationalFactActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import {
   useProductionFactActions,
   productionDraftSaveActionFor,
@@ -67,9 +70,12 @@ import ProductionReworkModal from '../components/production-facts/ProductionRewo
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
-import FinanceDueOverview from '../components/business-visualizations/FinanceDueOverview.jsx'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
+import { buildFinanceDueModel, financeDueFilterOptions, paginateVisualizationRows } from '../utils/businessVisualizationModels.mjs'
+import { financeDueColumns, FinanceDueQuickFilters, financeDueRowProps } from '../components/business-visualizations/FinanceDueOverview.jsx'
 import ProductionProcessProgress from '../components/business-visualizations/ProductionProcessProgress.jsx'
 import {
+  VisualizationState,
   BusinessViewSurface,
   BusinessViewSwitch,
 } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
@@ -229,9 +235,7 @@ export function OperationalFactWorkspace({
   )
 
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
-  const productionHandling = outletContext?.workflowTaskNavigation?.productionHandling
   const [productionReviewID, setProductionReviewID] = useState(null)
-  const taskReviewRef = useRef(0)
   const taskContext = operationalFactTaskContext(
     currentActiveKey,
     activeSelectedRow
@@ -316,20 +320,44 @@ export function OperationalFactWorkspace({
     setContentView,
   ])
 
-  const loadFinanceDueRows = useCallback(
-    ({ signal }) => loadExportRows({ signal }),
-    [loadExportRows]
-  )
+  const showingFinanceDue = contentView === 'due' && isFinanceDuePage
   const financeDueData = useBusinessVisualizationData({
-    enabled: contentView === 'due' && isFinanceDuePage,
-    load: loadFinanceDueRows,
+    enabled: showingFinanceDue,
+    load: loadExportRows,
     actionLabel: '加载财务到期顺序',
   })
+  const dueModel = useMemo(
+    () => showingFinanceDue ? buildFinanceDueModel(financeDueData.rows) : null,
+    [showingFinanceDue, financeDueData.rows]
+  )
+  const dueFilter = visualViewState.finance?.filter || 'all'
+  const dueRows = useMemo(() => {
+    const rows = dueModel?.rows || []
+    return dueFilter === 'all' ? rows : rows.filter((row) => row.dueStatus.key === dueFilter)
+  }, [dueModel, dueFilter])
+  const duePage = useMemo(
+    () => paginateVisualizationRows(dueRows, visualViewState.finance?.page),
+    [dueRows, visualViewState.finance?.page]
+  )
+  const dueCountsUnavailable = financeDueData.loading || Boolean(financeDueData.error)
+  const dueOptions = dueModel ? financeDueFilterOptions(dueModel.counts).map((option) =>
+    dueCountsUnavailable ? { ...option, count: '—' } : option
+  ) : []
+  const additionalDueOptions = dueOptions.filter((option) => option.additional)
+  const hasAdditionalDueFilter = additionalDueOptions.some((option) => option.value === dueFilter)
+  const changeDueFilter = (filter) => {
+    setVisualViewState((current) => ({ ...current, finance: { ...current.finance, filter, page: 1 } }))
+  }
+  const changeStatusFilter = (nextStatus) => {
+    setStatusFilter(nextStatus)
+    resetPaginationForKey()
+    if (showingFinanceDue) changeDueFilter(dueFilter)
+  }
   const reloadFinanceDueData = financeDueData.reload
 
   const visibleDetailRecord =
     detailRecord ||
-    [...activeRows, ...financeDueData.rows].find(
+    (showingFinanceDue ? dueModel.rows : activeRows).find(
       (record) => record.id === detailRecordID
     ) ||
     null
@@ -531,10 +559,10 @@ export function OperationalFactWorkspace({
     }
   }
 
-  const columns = useMemo(
-    () => applyBusinessColumnSorters(buildOperationalFactColumns(currentActiveKey, activeFinanceFactType)),
-    [currentActiveKey, activeFinanceFactType]
-  )
+  const columns = useMemo(() => {
+    const factColumns = applyBusinessColumnSorters(buildOperationalFactColumns(currentActiveKey, activeFinanceFactType))
+    return showingFinanceDue ? financeDueColumns(factColumns) : factColumns
+  }, [currentActiveKey, activeFinanceFactType, showingFinanceDue])
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
     '当前操作由系统按业务规则校验和处理；不会直接修改其他业务页面的库存、出货、财务记录或待办任务。'
@@ -551,9 +579,10 @@ export function OperationalFactWorkspace({
     columns,
   })
 
+  const exportCount = showingFinanceDue ? dueRows.length : activeTotal
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: `operational-facts-export:${currentActiveKey}`,
-    loadRows: loadExportRows,
+    loadRows: showingFinanceDue ? () => dueRows : loadExportRows,
     filename: `业务记录-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: activeConfig.title,
@@ -650,19 +679,16 @@ export function OperationalFactWorkspace({
     currentActiveKey === 'production' &&
     productionReviewID !== null &&
     activeSelectedRow?.id === productionReviewID
-  const postButtonLabel = selectedIsProductionCompletion
-    ? '确认成品入库'
-    : '过账'
-  const postConfirmTitle = selectedIsProductionCompletion
-    ? '确认实收并增加成品库存？'
-    : '确认过账？'
-  const cancelButtonLabel = selectedIsProductionCompletion
-    ? activeSelectedRow?.status === OperationalFactStatus.DRAFT
-      ? '作废完工报告'
-      : '撤销成品入库'
-    : activeSelectedRow?.status === OperationalFactStatus.DRAFT
-      ? '作废草稿'
-      : '取消'
+  const factActionScope = ['production', 'outsourcing', 'finance'].includes(currentActiveKey)
+    ? currentActiveKey : null
+  const factActionRecord = activeSelectedRow || { fact_type: activeConfig.listParams?.fact_type }
+  const postPresentation = factActionScope
+    ? operationalFactActionPresentation(factActionScope, factActionRecord) : null
+  const cancelPresentation = factActionScope
+    ? operationalFactActionPresentation(factActionScope, factActionRecord, 'cancel') : null
+  const postButtonLabel = postPresentation?.label || '确认业务记录'
+  const postConfirmTitle = postPresentation?.title
+  const cancelButtonLabel = cancelPresentation?.label || '取消'
   const shipmentCancelButtonLabel =
     activeSelectedRow?.status === ShipmentStatus.DRAFT ? '作废草稿' : '取消发货'
   const shipmentCancelActionLabel =
@@ -840,7 +866,8 @@ export function OperationalFactWorkspace({
   }
 
   const activeFilterCount = [
-    !['finance', 'production', 'reservations'].includes(currentActiveKey) && statusFilter,
+    (showingFinanceDue || !['finance', 'production', 'reservations'].includes(currentActiveKey)) && statusFilter,
+    hasAdditionalDueFilter,
     routeSalesOrderID,
     routeFactID,
     activeDateRange[0] || activeDateRange[1],
@@ -885,15 +912,14 @@ export function OperationalFactWorkspace({
   const processError =
     processOrdersData.error ||
     (selectedProcessOrderID ? processAggregateData.error : '')
-  useEffect(() => {
-    if (productionHandling?.group !== 'handoff_production_inbound' ||
-      taskReviewRef.current === productionHandling.taskID ||
-      Number(activeSelectedRow?.id) !== productionHandling.sourceID ||
-      activeSelectedRow?.status !== OperationalFactStatus.DRAFT || !canPostSelected ||
-      sourceBoundDraftTransitionBlocked) return
-    taskReviewRef.current = productionHandling.taskID
-    setProductionReviewID(activeSelectedRow.id)
-  }, [productionHandling, activeSelectedRow, canPostSelected, sourceBoundDraftTransitionBlocked])
+  useTaskBusinessEditor({
+    record: activeSelectedRow,
+    enabled: reviewProductBeforePost && canPostSelected &&
+      activeSelectedRow?.status === OperationalFactStatus.DRAFT &&
+      !sourceBoundDraftTransitionBlocked &&
+      outletContext?.taskBusiness?.contract?.actionKeys.includes('operational-fact-post'),
+    open: (record) => setProductionReviewID(record.id),
+  })
   const postButton = (
     <Button
       size="small"
@@ -937,7 +963,13 @@ export function OperationalFactWorkspace({
         hidden={contentView === 'process'}
         compact
         contentSwitch={contentViewSwitch}
-        onClearFilters={() => clearFilters(resolvedRouteKeyword || linkedKeyword || keyword)}
+        onClearFilters={() => {
+          clearFilters(resolvedRouteKeyword || linkedKeyword || keyword)
+          if (showingFinanceDue) {
+            setStatusFilter('')
+            changeDueFilter(hasAdditionalDueFilter ? 'all' : dueFilter)
+          }
+        }}
         activeFilterCount={activeFilterCount}
         filters={
           <>
@@ -965,20 +997,28 @@ export function OperationalFactWorkspace({
                 resetPaginationForKey()
               }}
             />
+            {showingFinanceDue && (
+              <FinanceDueQuickFilters
+                inline
+                options={dueOptions}
+                value={dueFilter}
+                disabled={dueCountsUnavailable}
+                onChange={changeDueFilter}
+                statusLabel={statusFilter && FINANCE_STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label}
+                onClearStatus={() => changeStatusFilter('')}
+              />
+            )}
             {['finance', 'production', 'reservations'].includes(currentActiveKey) ? (
               <BusinessStatusFilter
-                inline
+                inline={!showingFinanceDue}
+                label={showingFinanceDue ? '单据状态' : undefined}
                 aria-label="单据状态"
                 counts={statusCounts}
                 loading={loading}
-                className="erp-business-filter-control--status"
                 value={statusFilter}
                 options={currentActiveKey === 'production' ? PRODUCTION_STATUS_OPTIONS : currentActiveKey === 'reservations' ? RESERVATION_STATUS_OPTIONS : FINANCE_STATUS_OPTIONS}
                 exact={currentActiveKey === 'production' && Boolean(routeFactID)}
-                onChange={(nextStatus) => {
-                  setStatusFilter(nextStatus)
-                  resetPaginationForKey()
-                }}
+                onChange={changeStatusFilter}
               />
             ) : (
               <SelectFilter
@@ -986,10 +1026,16 @@ export function OperationalFactWorkspace({
                 className="erp-business-filter-control--status"
                 value={statusFilter}
                 options={STATUS_OPTIONS}
-                onChange={(nextStatus) => {
-                  setStatusFilter(nextStatus)
-                  resetPaginationForKey()
-                }}
+                onChange={changeStatusFilter}
+              />
+            )}
+            {showingFinanceDue && (
+              <FilterChipGroup
+                label="其他到期情况"
+                options={additionalDueOptions}
+                value={dueFilter}
+                disabled={dueCountsUnavailable}
+                onChange={changeDueFilter}
               />
             )}
             <DateRangeFilter
@@ -1005,24 +1051,8 @@ export function OperationalFactWorkspace({
               }}
               startValue={activeDateRange[0] || ''}
               endValue={activeDateRange[1] || ''}
-              onStartChange={(nextStart) => {
-                setDateRangeByKey((prev) => ({
-                  ...prev,
-                  [currentActiveKey]: [
-                    nextStart,
-                    prev[currentActiveKey]?.[1] || '',
-                  ],
-                }))
-                resetPaginationForKey()
-              }}
-              onEndChange={(nextEnd) => {
-                setDateRangeByKey((prev) => ({
-                  ...prev,
-                  [currentActiveKey]: [
-                    prev[currentActiveKey]?.[0] || '',
-                    nextEnd,
-                  ],
-                }))
+              onRangeChange={(from, to) => {
+                setDateRangeByKey((prev) => ({ ...prev, [currentActiveKey]: [from, to] }))
                 resetPaginationForKey()
               }}
             />
@@ -1059,13 +1089,13 @@ export function OperationalFactWorkspace({
           <BusinessListToolbarActions
             moduleTitle={pageTitle}
             onExport={exportRows}
-            exportDisabled={loading || exporting || activeTotal === 0}
+            exportDisabled={loading || exporting || (showingFinanceDue && dueCountsUnavailable) || exportCount === 0}
             exportDisabledReason={
               exporting
                 ? '正在准备导出，请稍候'
-                : loading
+                : loading || (showingFinanceDue && dueCountsUnavailable)
                   ? `${activeConfig.title}加载完成后可导出`
-                  : activeTotal === 0
+                  : exportCount === 0
                     ? `当前筛选没有可导出的${activeConfig.title}`
                     : ''
             }
@@ -1153,21 +1183,22 @@ export function OperationalFactWorkspace({
                 !activeSelectedRow
                   ? '请先选择一条业务记录'
                   : activeSelectedRow.status !== OperationalFactStatus.DRAFT
-                    ? '只有业务草稿可以过账'
+                    ? '只有业务草稿可以确认生效'
                     : !canPostSelected
                       ? selectedIsProductionCompletion
                         ? '只有仓库岗位可以核对并确认成品入库'
                         : '当前账号没有确认该类生产记录的权限'
                       : sourceBoundDraftTransitionBlocked
-                        ? '该历史草稿缺少可核对来源，不能过账或作废'
+                        ? '该历史草稿缺少可核对来源，不能确认或作废'
                         : saving
-                          ? '当前操作完成后可过账'
+                          ? '当前操作完成后可确认'
                           : ''
               }
             >
               {reviewProductBeforePost ? postButton : (
                 <Popconfirm
                   title={postConfirmTitle}
+                  description={postPresentation.description}
                   onConfirm={() =>
                     runRowAction(
                       activeConfig,
@@ -1176,8 +1207,8 @@ export function OperationalFactWorkspace({
                       postButtonLabel
                     )
                   }
-                  okText="确认"
-                  cancelText="取消"
+                  okText={postButtonLabel}
+                  cancelText="返回"
                 >
                   {postButton}
                 </Popconfirm>
@@ -1311,12 +1342,13 @@ export function OperationalFactWorkspace({
               }
             >
               <Popconfirm
-                title="确认当前财务记录？"
+                title={postPresentation.title}
+                description={postPresentation.description}
                 onConfirm={() =>
-                  runRowAction(activeConfig, activeSelectedRow, 'post', '确认')
+                  runRowAction(activeConfig, activeSelectedRow, 'post', postButtonLabel)
                 }
-                okText="确认"
-                cancelText="取消"
+                okText={postButtonLabel}
+                cancelText="返回"
               >
                 <Button
                   size="small"
@@ -1332,7 +1364,7 @@ export function OperationalFactWorkspace({
                     saving
                   }
                 >
-                  确认
+                  {postButtonLabel}
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
@@ -1660,7 +1692,7 @@ export function OperationalFactWorkspace({
                         ? '只有仓库岗位可以撤销已确认的成品入库'
                         : '当前账号没有取消该类生产记录的权限'
                       : sourceBoundDraftTransitionBlocked
-                        ? '该历史草稿缺少可核对来源，不能过账或作废'
+                        ? '该历史草稿缺少可核对来源，不能确认或作废'
                         : saving
                           ? '当前操作完成后可取消'
                           : ''
@@ -1745,6 +1777,7 @@ export function OperationalFactWorkspace({
       </BusinessOperationPanel>
 
       <BusinessViewSurface
+        label={showingFinanceDue ? '财务到期顺序' : undefined}
         activeView={contentView}
         preserveViews={isProductionRecordsPage && !outletContext?.taskBusiness ? ['list', 'process'] : undefined}
         loading={
@@ -1754,23 +1787,8 @@ export function OperationalFactWorkspace({
           processAggregateData.loading
         }
       >
-        {contentView === 'due' && isFinanceDuePage ? (
-          <FinanceDueOverview
-            viewState={visualViewState.finance}
-            onViewStateChange={(value) =>
-              setVisualViewState((current) => ({ ...current, finance: value }))
-            }
-            facts={financeDueData.rows}
-            loading={financeDueData.loading}
-            error={financeDueData.error}
-            onRetry={financeDueData.reload}
-            onOpen={(row) => {
-              const source = financeDueData.rows.find(
-                (fact) => Number(fact?.id || 0) === Number(row?.id || 0)
-              )
-              if (source) openOperationalFactDetails(source)
-            }}
-          />
+        {showingFinanceDue && financeDueData.error ? (
+          <VisualizationState error={financeDueData.error} onRetry={financeDueData.reload} />
         ) : contentView === 'process' && canUseProductionProcessView ? (
           <ProductionProcessProgress
             viewState={visualViewState[selectedProcessOrderID]}
@@ -1809,9 +1827,10 @@ export function OperationalFactWorkspace({
           <BusinessDataTable
             rowKey="id"
             columns={tableColumns}
-            dataSource={activeRows}
-            loading={loading}
-            rowSelection={{
+            taskDetailColumns={visibleColumns}
+            dataSource={showingFinanceDue ? (financeDueData.loading ? [] : duePage.rows) : activeRows}
+            loading={showingFinanceDue ? financeDueData.loading : loading}
+            rowSelection={showingFinanceDue ? undefined : {
               type: 'radio',
               selectedRowKeys: activeSelectedRow ? [activeSelectedRow.id] : [],
               onChange: (_keys, selectedRows) =>
@@ -1825,16 +1844,23 @@ export function OperationalFactWorkspace({
                 ? 'ant-table-row-selected'
                 : ''
             }
-            onRow={(record) => ({
+            onRow={(record) => showingFinanceDue ? financeDueRowProps(record, openOperationalFactDetails) : ({
               onClick: () =>
                 setSelectedByKey((prev) => ({
                   ...prev,
                   [currentActiveKey]: record,
                 })),
             })}
-            onOpenRecord={openOperationalFactDetails}
-            emptyDescription="暂无业务记录"
-            pagination={createBusinessTablePagination({
+            onOpenRecord={showingFinanceDue ? undefined : openOperationalFactDetails}
+            emptyDescription={showingFinanceDue ? '当前筛选暂无数据' : '暂无业务记录'}
+            pagination={showingFinanceDue ? {
+              current: duePage.page,
+              pageSize: duePage.pageSize,
+              total: duePage.total,
+              showSizeChanger: false,
+              onChange: (page) =>
+                setVisualViewState((current) => ({ ...current, finance: { ...current.finance, page } })),
+            } : createBusinessTablePagination({
               pagination: activePagination,
               total: activeTotal,
               onChange: (current, pageSize) =>
@@ -1843,7 +1869,7 @@ export function OperationalFactWorkspace({
                   [currentActiveKey]: { current, pageSize },
                 })),
             })}
-            scroll={{ x: 1320 }}
+            scroll={showingFinanceDue ? undefined : { x: 1320 }}
           />
         )}
       </BusinessViewSurface>
@@ -1852,8 +1878,9 @@ export function OperationalFactWorkspace({
         title="核对本次生产记录"
         summary={productionFactSummary(activeSelectedRow || {})}
         open={productionReviewOpen}
+        loading={saving}
         record={activeSelectedRow}
-        columns={columns}
+        columns={visibleColumns}
         onClose={saving ? undefined : () => setProductionReviewID(null)}
         actions={
           <Button
@@ -1874,9 +1901,9 @@ export function OperationalFactWorkspace({
       {columnOrderModal}
       {currentActiveKey === 'production' ? (
         <ProductionRecordDrawer
-          title="生产记录详情"
+          title={`${getBusinessDocumentTitle('production_fact')}详情`}
           summary={productionFactSummary(visibleDetailRecord || {})}
-          columns={columns}
+          columns={visibleColumns}
           open={Boolean(visibleDetailRecord)}
           record={visibleDetailRecord}
           onClose={() => setDetailRecord(null)}
@@ -1982,22 +2009,10 @@ export function OperationalFactWorkspace({
       />
       <BusinessModal
         size="confirm"
-        title={
-          currentActiveKey === 'finance'
-            ? activeSelectedRow?.status === OperationalFactStatus.DRAFT
-              ? '作废财务草稿'
-              : '取消财务记录'
-            : selectedIsProductionCompletion
-              ? activeSelectedRow?.status === OperationalFactStatus.DRAFT
-                ? '作废生产完工报告'
-                : '撤销成品入库'
-              : activeSelectedRow?.status === OperationalFactStatus.DRAFT
-                ? '作废业务草稿'
-                : '取消已过账业务记录'
-        }
+        title={cancelButtonLabel}
         open={financeCancelOpen}
-        okText={selectedIsProductionCompletion ? cancelButtonLabel : '确认取消'}
-        cancelText="暂不取消"
+        okText={cancelButtonLabel}
+        cancelText="返回"
         confirmLoading={saving}
         maskClosable={!saving}
         onOk={confirmFinanceCancellation}
@@ -2009,15 +2024,7 @@ export function OperationalFactWorkspace({
         }}
       >
         <p>
-          {activeSelectedRow?.status === OperationalFactStatus.DRAFT
-            ? currentActiveKey === 'finance'
-              ? '草稿尚未确认，作废不会生成过账或库存变更；系统会记录操作人、时间和原因。'
-              : selectedIsProductionCompletion
-                ? '完工报告尚未由仓库确认，作废不会变更成品库存；系统会记录操作人、时间和原因。'
-                : '草稿尚未过账，不会变更库存；系统会记录操作人、时间和原因。'
-            : selectedIsProductionCompletion
-              ? '撤销后将保留原入库时间，按系统规则冲正成品库存，并记录本次操作人、时间和原因。'
-              : '取消后将保留原过账时间，按系统规则冲正库存，并记录本次操作人、时间和原因。'}
+          {cancelPresentation?.description}
         </p>
         <label htmlFor="operational-fact-cancel-reason">业务原因</label>
         <Input.TextArea

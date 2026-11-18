@@ -21,6 +21,7 @@ func (SalesOrder) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
+				"sales_orders_create_intent_bundle":       "((create_idempotency_key IS NULL AND create_intent_hash IS NULL AND create_actor_id IS NULL) OR (create_idempotency_key IS NOT NULL AND create_intent_hash IS NOT NULL AND create_actor_id IS NOT NULL AND create_actor_id > 0 AND length(trim(create_idempotency_key)) BETWEEN 1 AND 128 AND length(create_intent_hash) = 64))",
 				"sales_orders_lifecycle_status_allowed":   "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
 				"sales_orders_version_positive":           "version > 0",
 				"sales_orders_currency_allowed":           "currency IN ('USD', 'CNY', 'HKD')",
@@ -40,6 +41,9 @@ func (SalesOrder) Annotations() []schema.Annotation {
 
 func (SalesOrder) Fields() []ent.Field {
 	return []ent.Field{
+		field.String("create_idempotency_key").Optional().Nillable().NotEmpty().MaxLen(128).Immutable(),
+		field.String("create_intent_hash").Optional().Nillable().MinLen(64).MaxLen(64).Immutable(),
+		field.Int("create_actor_id").Optional().Nillable().Positive().Immutable(),
 		field.String("order_no").
 			NotEmpty().
 			MaxLen(64),
@@ -127,6 +131,7 @@ func (SalesOrder) Edges() []ent.Edge {
 
 func (SalesOrder) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Fields("create_idempotency_key").Unique(),
 		index.Fields("order_no").Unique(),
 		index.Fields("customer_id"),
 		index.Fields("customer_order_no"),

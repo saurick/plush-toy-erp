@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { MobileTaskFlowHeaderView, MobileTaskHeaderContext } from './MobileTaskFlowHeader.jsx'
-import { TaskBusinessInformationContext } from '../../hooks/useBusinessPageContext.js'
+import { TaskBusinessInformationContext, TaskBusinessStepVisibleContext } from '../../hooks/useBusinessPageContext.js'
 import useTaskBusinessInformation from '../../hooks/useTaskBusinessInformation.js'
 
 function VisitedTaskSteps({ activeStep, version, children, panels, overlay }) {
@@ -35,7 +35,9 @@ function VisitedTaskSteps({ activeStep, version, children, panels, overlay }) {
               hidden={step !== activeStep}
               style={{ display: step === activeStep ? 'contents' : 'none' }}
             >
-              {visited.current[step] || null}
+              <TaskBusinessStepVisibleContext.Provider value={step === activeStep}>
+                {visited.current[step] || null}
+              </TaskBusinessStepVisibleContext.Provider>
             </div>
       ))}
         </div>

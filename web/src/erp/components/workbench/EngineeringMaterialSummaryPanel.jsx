@@ -13,6 +13,12 @@ import {
   SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
 import EngineeringMaterialRequestModal from '../sales-orders/EngineeringMaterialRequestModal.jsx'
+import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
+import ProductIdentity, { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
+import { normalizeGalleryProducts } from '../../utils/businessProductGallery.mjs'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../../utils/moduleTableColumns.mjs'
 import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
@@ -25,6 +31,8 @@ import {
 import {
   summaryPage,
   updateSummarySearch,
+  MATERIAL_SUMMARY_SORT_FIELDS,
+  readSummarySort,
 } from '../../utils/workbenchSummary.mjs'
 
 const STATUS_OPTIONS = [
@@ -35,6 +43,31 @@ const STATUS_OPTIONS = [
 ]
 const formatTime = (value) =>
   new Date(value).toLocaleString('zh-CN', { hour12: false })
+
+const galleryThumbnail = (product) => (
+  <ProductThumbnail productId={product.productID} name={product.name} code={product.code} preview={false} />
+)
+
+function MaterialSummaryProductCell({ record }) {
+  const { adminProfile } = useBusinessPageContext() || {}
+  const names = record.products.join('、') || '未填写产品名称'
+  if (!hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)) return names
+  const products = normalizeGalleryProducts(record.product_refs)
+  if (!products.length) return names
+  return (
+    <ProductIdentity
+      compact
+      thumbnail={
+        <BusinessProductGallery compact products={products} title={record.order_no} renderThumbnail={galleryThumbnail}>
+          {galleryThumbnail(products[0])}
+        </BusinessProductGallery>
+      }
+    >
+      <span>{names}</span>
+      {products.length > 1 && <small>共 {products.length} 款产品</small>}
+    </ProductIdentity>
+  )
+}
 
 const statusTag = (record) => (
   <span>
@@ -66,6 +99,8 @@ export default function EngineeringMaterialSummaryPanel({
     ? params.get('materials.status')
     : ''
   const page = summaryPage(params.get('materials.page'))
+  const sort = readSummarySort(params, 'materials', MATERIAL_SUMMARY_SORT_FIELDS)
+  const requestKey = JSON.stringify({ keyword, status, page, limit: 20, ...sort })
   const [result, setResult] = useState({ items: [], total: 0 })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -80,7 +115,7 @@ export default function EngineeringMaterialSummaryPanel({
     setLoading(canRead)
     if (canRead) {
       listEngineeringMaterialRequests(
-        { keyword, status, page, limit: 20 },
+        JSON.parse(requestKey),
         { signal: controller.signal }
       )
         .then((value) => {
@@ -96,7 +131,7 @@ export default function EngineeringMaterialSummaryPanel({
         })
     }
     return () => controller.abort()
-  }, [canRead, keyword, status, page, reload, refreshRevision, adminProfile])
+  }, [canRead, requestKey, reload, refreshRevision, adminProfile])
 
   const updateFilter = (key, value) => {
     setParams(updateSummarySearch(params, 'materials', { [key]: value }), {
@@ -144,7 +179,7 @@ export default function EngineeringMaterialSummaryPanel({
         title: '产品',
         dataIndex: 'products',
         width: 240,
-        render: (value) => value.join('、') || '未填写产品名称',
+        render: (_, record) => <MaterialSummaryProductCell record={record} />,
       },
       {
         title: '审批状态',
@@ -216,8 +251,13 @@ export default function EngineeringMaterialSummaryPanel({
           rowKey="id"
           dataSource={result.items}
           onOpenRecord={setSelected}
+          onChange={(_pagination, _filters, sorter, extra) => {
+            if (extra.action !== 'sort') return
+            const next = readBusinessServerTableSort(sorter, MATERIAL_SUMMARY_SORT_FIELDS)
+            setParams(updateSummarySearch(params, 'materials', next || { sort_by: '', sort_direction: '' }), { replace: true })
+          }}
           columns={[
-            ...tableColumns,
+            ...applyBusinessServerColumnSorters(tableColumns, MATERIAL_SUMMARY_SORT_FIELDS, sort),
             {
               key: 'actions',
               align: 'center',

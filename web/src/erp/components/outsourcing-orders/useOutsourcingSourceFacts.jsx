@@ -1,6 +1,7 @@
 import { ExportOutlined, ImportOutlined } from '@ant-design/icons'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Button, Input, Space } from 'antd'
+import { operationalFactActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { outsourcingTaskFactMatches, outsourcingTaskScope } from '../../utils/outsourcingTaskScope.mjs'
 import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
@@ -274,7 +275,8 @@ export function useOutsourcingSourceFacts({
 
       const expectedStatus = isPost ? OperationalFactStatus.POSTED : OperationalFactStatus.CANCELLED
       const command = isPost ? postOutsourcingFact : cancelOutsourcingFact
-      const actionLabel = isPost ? '过账委外记录' : '取消委外记录'
+      const presentation = operationalFactActionPresentation('outsourcing', fact, action)
+      const actionLabel = presentation.label
       const attempt = Object.freeze({
         id: factID,
         expected_version: fact?.version,
@@ -347,11 +349,7 @@ export function useOutsourcingSourceFacts({
           setQualityInspectionByFactID({})
         }
 
-        const successText = isPost
-            ? '委外记录已过账'
-            : currentStatus === OperationalFactStatus.DRAFT
-              ? '委外草稿已作废，库存未发生变动'
-              : '委外记录已取消，库存已恢复至过账前状态'
+        const successText = presentation.success
         reportBusinessResult(successText, confirmed)
         message.success(successText)
       } finally {
@@ -384,17 +382,15 @@ export function useOutsourcingSourceFacts({
         message.warning('当前委外记录状态或账号权限不允许取消')
         return
       }
-      const isDraft = status === OperationalFactStatus.DRAFT
+      const presentation = operationalFactActionPresentation('outsourcing', fact, 'cancel')
       let cancelReason = ''
       modal.confirm({
         maskClosable: true,
-        title: isDraft ? '确认作废委外草稿？' : '确认取消已过账委外记录？',
+        title: presentation.title,
         content: (
           <Space direction="vertical" style={{ width: '100%' }}>
             <span>
-              {isDraft
-                ? '草稿尚未过账，本次作废不会产生任何库存变动。'
-                : '取消后将冲正本次过账，并把库存恢复至过账前状态。'}
+              {presentation.description}
             </span>
             <label htmlFor="outsourcing-fact-cancel-reason">业务原因</label>
             <Input.TextArea
@@ -409,7 +405,7 @@ export function useOutsourcingSourceFacts({
             />
           </Space>
         ),
-        okText: isDraft ? '确认作废' : '确认取消过账',
+        okText: presentation.label,
         cancelText: '返回',
         okButtonProps: { danger: true },
         onOk: (_close) => {
@@ -927,25 +923,27 @@ export function useOutsourcingSourceFacts({
       sourceFactInFlightRef.current = true
       setSourceFactLoading(true)
       try {
+        let confirmedRecord
+        let refreshed
         try {
-          await save(request, record)
+          confirmedRecord = await save(request, record)
         } catch (error) {
           if (!isSourceBusinessActionResultUnknown(error)) throw error
-          const currentFacts = await loadRelatedOutsourcingFacts(order.id)
-          const confirmed = findOperationalFactDraftSaveResult(
-            currentFacts,
-            request,
-            record,
-            action
-          )
-          if (!confirmed) throw error
+          refreshed = await loadRelatedOutsourcingFacts(order.id)
+          confirmedRecord = findOperationalFactDraftSaveResult(refreshed, request, record, action)
+          if (!confirmedRecord) throw error
         }
-        const refreshed = await loadRelatedOutsourcingFacts(order.id)
-        setRelatedReturnFacts(refreshed)
         setSourceFactOpen(false)
         setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
-        reportBusinessResult('委外草稿已保存，尚未过账', refreshed.find((fact) => fact.id === record.id) || record)
-        message.success('委外草稿已保存，请核对后再过账')
+        reportBusinessResult('委外草稿已保存，尚未确认出入库', confirmedRecord)
+        try {
+          setRelatedReturnFacts(refreshed ?? await loadRelatedOutsourcingFacts(order.id))
+        } catch {
+          setRelatedReturnFacts((previous) => previous.map((fact) => fact.id === confirmedRecord.id ? confirmedRecord : fact))
+          message.warning('委外草稿已保存，列表暂未刷新，请重新读取')
+          return
+        }
+        message.success('委外草稿已保存，请核对后确认发料或回货入库')
       } catch (error) {
         message.error(getActionErrorMessage(error, '保存委外草稿'))
       } finally {

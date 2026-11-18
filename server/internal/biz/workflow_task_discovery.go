@@ -16,6 +16,7 @@ type WorkflowTaskStage struct {
 
 type WorkflowTaskDiscoveryCatalog struct {
 	Stages          []WorkflowTaskStage
+	Documents       []WorkflowDocumentType
 	Chains, Modules []struct{ Key, Label string }
 }
 

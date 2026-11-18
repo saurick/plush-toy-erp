@@ -1,5 +1,5 @@
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
-import { isCompleteDateRange } from './filterDateRange.mjs'
+import { isCompleteDateRange, RECENT_DATE_PERIOD_OPTIONS } from './filterDateRange.mjs'
 
 export const WORKFLOW_HISTORY_STATUS_OPTIONS = Object.freeze([
   { value: '', label: '全部结果' },
@@ -8,12 +8,7 @@ export const WORKFLOW_HISTORY_STATUS_OPTIONS = Object.freeze([
   { value: WorkflowTaskStatus.WITHDRAWN, label: '已撤回' },
 ])
 
-export const WORKFLOW_HISTORY_PERIOD_OPTIONS = Object.freeze([
-  { value: '', label: '全部时间' },
-  { value: 'today', label: '今天' },
-  { value: '7d', label: '近 7 天' },
-  { value: '30d', label: '近 30 天' },
-])
+export const WORKFLOW_HISTORY_PERIOD_OPTIONS = RECENT_DATE_PERIOD_OPTIONS
 
 export function isWorkflowHistoryDateFilter({
   period = '',

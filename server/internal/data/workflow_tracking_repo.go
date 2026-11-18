@@ -177,8 +177,12 @@ func trackingPage(d string, q biz.WorkflowTrackingQuery) *entsql.Selector {
 		filter(tasks)
 	}
 	merged := processes.UnionAll(tasks).As("tracking")
+	startedOrder := entsql.Desc("started_at")
+	if q.SortDirection == "asc" {
+		startedOrder = entsql.Asc("started_at")
+	}
 	page := builder.Select("id", "kind").From(merged).
-		OrderBy(entsql.Desc("started_at"), entsql.Desc("kind"), entsql.Desc("id")).
+		OrderBy(startedOrder, entsql.Desc("kind"), entsql.Desc("id")).
 		Limit(q.Limit).Offset(q.Offset).As("tracking_page")
 	return builder.Select(page.C("id"), page.C("kind")).From(page)
 }
@@ -247,6 +251,9 @@ func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowT
 		sort.Slice(page.Items, func(i, j int) bool {
 			a, b := page.Items[i], page.Items[j]
 			if !a.StartedAt().Equal(b.StartedAt()) {
+				if q.SortDirection == "asc" {
+					return a.StartedAt().Before(b.StartedAt())
+				}
 				return a.StartedAt().After(b.StartedAt())
 			}
 			if a.Ref.Kind != b.Ref.Kind {

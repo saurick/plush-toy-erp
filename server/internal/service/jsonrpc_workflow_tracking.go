@@ -37,7 +37,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 		}
 		return id, okData(map[string]any{"tracking": d.workflowTrackingDetail(ctx, admin, entry)}), nil
 	}
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "scope", "keyword", "status", "owner_role_key", "attention", "source_type", "source_id", "date_from", "date_to", "limit", "offset"); res != nil {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "scope", "keyword", "status", "owner_role_key", "attention", "source_type", "source_id", "date_from", "date_to", "sort_direction", "limit", "offset"); res != nil {
 		return id, res, nil
 	}
 	var errResult *v1.JsonrpcResult
@@ -56,7 +56,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 	if errResult != nil {
 		return id, errResult, nil
 	}
-	for key, target := range map[string]*string{"status": &q.Status, "owner_role_key": &q.OwnerRoleKey, "attention": &q.Attention} {
+	for key, target := range map[string]*string{"status": &q.Status, "owner_role_key": &q.OwnerRoleKey, "attention": &q.Attention, "sort_direction": &q.SortDirection} {
 		*target, errResult = getOptionalWorkflowTaskBoardString(pm, key, 64)
 		if errResult != nil {
 			return id, errResult, nil

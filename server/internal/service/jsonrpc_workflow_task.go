@@ -226,7 +226,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := d.requireEffectiveWorkflowWorkbenchRead(ctx); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownWorkflowTaskParams(pm, method, "queue_key", "limit", "offset"); res != nil {
+		if res := rejectUnknownWorkflowTaskParams(pm, method, "queue_key", "sort", "limit", "offset"); res != nil {
 			return id, res, nil
 		}
 		query, queryRes := getWorkflowWorkbenchQuery(pm)
@@ -273,6 +273,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			"owner_role_key",
 			"due",
 			"source_type",
+			"source_section",
 			"period", "date_from", "date_to",
 			"module_key", "stage_key", "chain_key", "assignee",
 			"lane_key",

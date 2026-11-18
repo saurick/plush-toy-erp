@@ -127,7 +127,7 @@ const TASK_STATUS_OPTIONS = Object.freeze([
   })),
 ])
 const DUE_DATE_FILTER_OPTIONS = Object.freeze([
-  { label: '到期日期', value: 'due_at' },
+  { label: '到期日期', value: 'due_at', upcoming: true },
 ])
 const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
@@ -1121,12 +1121,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               value="due_at"
               startValue={dueFrom}
               endValue={dueTo}
-              onStartChange={(value) => {
-                setDueFrom(value)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
-              onEndChange={(value) => {
-                setDueTo(value)
+              onRangeChange={(from, to) => {
+                setDueFrom(from)
+                setDueTo(to)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />

@@ -83,7 +83,7 @@ import {
   PERMISSION_CENTER_ADMIN_DIALOG,
   permissionCenterAdminDialogReducer,
 } from '../../utils/permissionCenterAdminDialog.mjs'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import BusinessForm from '../business-list/BusinessForm.jsx'
 
 export default function PermissionAdminAccounts({
@@ -942,10 +942,10 @@ export default function PermissionAdminAccounts({
             setTablePagination((prev) => ({ ...prev, current: 1 }))
           }}
         />
-        <FilterSelect
+        <FilterChipGroup
+          allowClear
           emptyValue="all"
           label="账号状态"
-          placeholder="账号状态"
           aria-label="账号状态"
           value={adminStatusFilter}
           options={adminStatusOptions}

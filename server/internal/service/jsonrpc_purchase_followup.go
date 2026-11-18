@@ -20,7 +20,7 @@ func (d *jsonrpcDispatcher) handlePurchaseFollowups(ctx context.Context, id stri
 	if res := d.requireCustomerConfigModulesReadable(ctx, "purchase_orders", "purchase_receipts"); res != nil {
 		return id, res, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "kind", "keyword", "confirmation", "start_date", "selected_date", "supplier_id", "order_id", "limit", "offset") {
+	if !sourceOrderAllowsOnly(pm, "kind", "keyword", "confirmation", "start_date", "selected_date", "supplier_id", "order_id", "sales_order_id", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	q := biz.PurchaseFollowupQuery{}
@@ -31,7 +31,7 @@ func (d *jsonrpcDispatcher) handlePurchaseFollowups(ctx context.Context, id stri
 		}
 		*dest = value
 	}
-	for key, dest := range map[string]*int{"supplier_id": &q.SupplierID, "order_id": &q.OrderID, "offset": &q.Offset} {
+	for key, dest := range map[string]*int{"supplier_id": &q.SupplierID, "order_id": &q.OrderID, "sales_order_id": &q.SalesOrderID, "offset": &q.Offset} {
 		value, ok := getOptionalWorkflowTaskBoardInteger(pm, key, 0, 0)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -47,6 +47,14 @@ func (d *jsonrpcDispatcher) handlePurchaseFollowups(ctx context.Context, id stri
 		return id, res, nil
 	}
 	keys := biz.PermissionKeySet(permissions)
+	if q.SalesOrderID > 0 {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "sales_orders"); res != nil {
+			return id, res, nil
+		}
+	}
 	q.Access.Quality = biz.PermissionSetHasAny(keys, biz.PermissionQualityInspectionRead) && d.requireCustomerConfigModulesReadable(ctx, "quality_inspections") == nil
 	q.Access.Commercial = biz.PermissionSetHasAny(keys, biz.PermissionFieldProcurementCommercialRead)
 	q.Access.Finance = q.Access.Quality && q.Access.Commercial && biz.PermissionSetHasAny(keys, biz.PermissionFinancePayableRead) && d.requireCustomerConfigModulesReadable(ctx, "finance") == nil

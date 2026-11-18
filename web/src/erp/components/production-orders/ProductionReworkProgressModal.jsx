@@ -92,9 +92,9 @@ function progressMeta({
   if (compareNumeric20Scale6Values(draftQuantity, '0') > 0) {
     return {
       key: 'completion-draft',
-      label: '成品入库草稿待过账',
+      label: '成品入库待确认',
       color: 'gold',
-      description: '成品入库草稿已生成，待仓库核对数量与库位后过账。',
+      description: '成品入库草稿已生成，待仓库核对数量与库位后确认成品入库。',
       pending: true,
     }
   }

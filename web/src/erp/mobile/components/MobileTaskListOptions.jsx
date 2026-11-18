@@ -1,5 +1,4 @@
-import React, { useId, useState } from 'react'
-import Select from '@/common/components/select/FilterSelect'
+import React, { useState } from 'react'
 import MobileTaskExtraFilters from './MobileTaskExtraFilters.jsx'
 import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
 import MobileFilterChoices from './MobileFilterChoices.jsx'
@@ -27,7 +26,6 @@ export default function MobileTaskListOptions({
   triggerRef,
 }) {
   const [open, setOpen] = useState(false)
-  const sortID = useId()
   return (
     <MobileFilterPopover
       contextLabel={contextLabel}
@@ -41,42 +39,33 @@ export default function MobileTaskListOptions({
       testId="mobile-task-list-filter-trigger"
     >
       {calendarState && (
-      <fieldset role="presentation">
-        <legend>任务截止</legend>
         <MobileFilterChoices
-          label="任务截止筛选"
+          label="任务截止"
+          aria-label="任务截止筛选"
           value={taskCalendarSelectionMode(calendarState.selection)}
           options={TASK_CALENDAR_SELECTION_OPTIONS}
           onChange={(value) => calendarState.change({ selection: value === 'date' ? defaultTaskCalendarDate(calendarState.month) : value })}
         />
-      </fieldset>
       )}
-      <fieldset role="presentation">
-        <legend>任务状态</legend>
-        {calendarState ? <MobileFilterChoices label="任务状态筛选" value={statusKey} options={MOBILE_TASK_STATUS_OPTIONS} onChange={(value) => onChange({ statusKey: value })} /> : <BusinessStatusFilter
-          counts={counts}
-          loading={loading}
-          allLabel="全部状态"
-          aria-label="任务状态筛选"
-          value={statusKey}
-          options={MOBILE_TASK_STATUS_OPTIONS}
-          onChange={(value) => onChange({ sortKey, statusKey: value })}
-        />}
-      </fieldset>
+      {calendarState ? <MobileFilterChoices label="任务状态" aria-label="任务状态筛选" value={statusKey} options={MOBILE_TASK_STATUS_OPTIONS} onChange={(value) => onChange({ statusKey: value })} /> : <BusinessStatusFilter
+        label="任务状态"
+        counts={counts}
+        loading={loading}
+        allLabel="全部状态"
+        aria-label="任务状态筛选"
+        value={statusKey}
+        options={MOBILE_TASK_STATUS_OPTIONS}
+        onChange={(value) => onChange({ sortKey, statusKey: value })}
+      />}
       <MobileTaskExtraFilters options={options} sourceTypes={sourceTypes} showDue={!calendarState} onChange={onChange} />
       {showSort && (
-        <div className="mobile-filter-select-field mobile-filter-sort-field">
-          <label htmlFor={sortID}>任务排序</label>
-          <Select
-            emptyValue="newest"
-            placeholder="任务排序"
-            id={sortID}
-            aria-label="任务排序"
-            value={sortKey}
-            options={MOBILE_TASK_SORT_OPTIONS}
-            onChange={(value) => onChange({ sortKey: value, statusKey })}
-          />
-        </div>
+      <MobileFilterChoices
+        label="任务排序"
+        aria-label="任务排序"
+        value={sortKey || 'newest'}
+        options={MOBILE_TASK_SORT_OPTIONS}
+        onChange={(value) => onChange({ sortKey: value, statusKey })}
+      />
       )}
     </MobileFilterPopover>
   )

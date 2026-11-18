@@ -372,21 +372,21 @@ export default function DevIntegrationPage() {
             <>
               <div className="erp-dev-integration__filters">
                 <div className="erp-dev-integration__filter-controls">
-                  <div className="erp-dev-integration__filter">
-                    <label htmlFor="integration-domain">业务域</label>
-                    <FilterSelect
-                      id="integration-domain"
-                      aria-label="筛选业务域"
-                      allowClear
-                      showSearch
-                      virtual={false}
-                      filterOption={(input, option) => `${option.label} ${option.value}`.toLowerCase().includes(input.toLowerCase())}
-                      value={query.domain || undefined}
-                      placeholder="业务域"
-                      options={[{ label: '全部业务域', value: '' }, ...domains]}
-                      onChange={(domain) => updateFilters({ domain })}
-                    />
-                  </div>
+                  <FilterSelect
+                    label="业务域"
+                    labelPlacement="stacked"
+                    className="erp-dev-integration__filter"
+                    id="integration-domain"
+                    aria-label="筛选业务域"
+                    allowClear
+                    showSearch
+                    virtual={false}
+                    filterOption={(input, option) => `${option.label} ${option.value}`.toLowerCase().includes(input.toLowerCase())}
+                    value={query.domain || undefined}
+                    placeholder="业务域"
+                    options={[{ label: '全部业务域', value: '' }, ...domains]}
+                    onChange={(domain) => updateFilters({ domain })}
+                  />
                   <div className="erp-dev-integration__filter erp-dev-integration__filter--search">
                     <SearchInput
                       id="integration-search"

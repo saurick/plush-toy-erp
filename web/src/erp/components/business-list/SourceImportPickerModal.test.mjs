@@ -310,10 +310,12 @@ test('来源读取失败保留已选快照，恢复前不能导入', async (t) =
   let reloads = 0
   const base = { open: true, title: '来源读取恢复', rows: [{ id: 1, name: '材料样例' }], columns: [{ dataIndex: 'name', title: '材料' }], importText: '加入明细', onReload: () => { reloads++ } }
   await view.render(createElement(Picker, base))
+  assert.match(document.querySelector('.erp-source-import-picker__pagination').textContent, /第 1-1 条 \/ 共 1 条/u)
   await view.act(async () => document.querySelector('tr.ant-table-row input[type="checkbox"]').click())
   const importButton = () => [...document.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === '加入明细')
   assert.equal(importButton().disabled, false)
   await view.render(createElement(Picker, { ...base, loadError: '资料读取失败，请重试' }))
+  assert.match(document.querySelector('.erp-source-import-picker__pagination').textContent, /共 1 条/u, '读取失败保留已知总数')
   assert.equal(importButton().disabled, true)
   assert.equal(Boolean(document.querySelector('[role="alert"]')), true)
   assert.equal(document.querySelector('tr.ant-table-row input[type="checkbox"]').checked, true)
@@ -334,10 +336,14 @@ test('无权限和读取失败不把未知分页归零或自动重新读取', as
   const base = { open: true, title: '权限反馈', rows: [], columns: [], serverPagination: true, current: 2, total: 0, onPageChange: (value) => pages.push(value) }
   await view.render(createElement(Picker, { ...base, loadError: '资料读取失败' }))
   assert.deepEqual(pages, [])
+  assert.equal(Boolean(document.querySelector('.ant-pagination-total-text')), false, '失败且总数未知时不显示零条')
   assert.equal(Boolean(document.querySelector('[data-empty-state="error"]')), true)
   await view.render(createElement(Picker, { ...base, readDenied: true, rows: [{ id: 1, name: '不可见来源' }], columns: [{ dataIndex: 'name', title: '名称' }], total: 100 }))
   assert.deepEqual(pages, [])
   assert.equal(Boolean(document.querySelector('[data-empty-state="denied"]')), true)
   assert.doesNotMatch(document.body.textContent, /不可见来源/u)
   assert.equal(document.querySelectorAll('tr.ant-table-row').length, 0)
+  assert.equal(Boolean(document.querySelector('.ant-pagination-total-text')), false, '无权限时不暴露分页总数')
+  await view.render(createElement(Picker, { ...base, current: 2, pageSize: 1, total: 3, rows: [{ id: 2, name: '可选材料' }], columns: [{ dataIndex: 'name', title: '名称' }] }))
+  assert.match(document.querySelector('.erp-source-import-picker__pagination').textContent, /第 2-2 条 \/ 共 3 条/u, '读取恢复后显示当前页范围与真实总数')
 })

@@ -41,7 +41,7 @@ const mobilePanel = readFileSync(
 const salesDelivery = readFileSync(
   fileURLToPath(
     new URL(
-      '../components/business-visualizations/SalesDeliveryProgress.jsx',
+      '../components/business-visualizations/ProgressDeliveryLines.jsx',
       import.meta.url
     )
   ),
@@ -118,7 +118,7 @@ test('progress lists and details share independently previewable product identit
   )
   assert.match(
     salesDelivery,
-    /<Table\s+className="erp-sales-delivery-table"/u
+    /<table className="erp-progress-table erp-progress-table--delivery"/u
   )
   assert.doesNotMatch(
     [source, mobilePanel, salesDelivery].join('\n'),

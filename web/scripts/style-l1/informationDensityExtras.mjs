@@ -96,6 +96,7 @@ export function createInformationDensityExtras(deps) {
         await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/u }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item[data-page="tasks"]').click()
         await frame.locator('button[data-action="open-task"][data-id="T06"]').waitFor()
         await frame.locator('button[data-action="open-task"][data-id="T06"]').click()
         const detail = frame.locator('.drawer:visible')

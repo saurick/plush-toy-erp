@@ -102,7 +102,10 @@ async function exerciseImportPickerSelectionStability(picker, label) {
   await assertImportPickerStableDuring(picker, `${label}-one-selected`, () => onlySelected.check())
   await expectLocator(picker.locator('.ant-table-row')).toHaveCount(1)
   await onlySelected.uncheck()
-  await picker.getByRole('button', { name: '清空已选', exact: true }).click()
+  const clear = picker.getByRole('button', { name: '清空已选', exact: true })
+  await clear.scrollIntoViewIfNeeded()
+  await assertImportPickerStableDuring(picker, `${label}-clear-selection`, () => clear.click())
+  await body.evaluate((node, top) => { node.scrollTop = top }, scrollTop)
   await assertImportPickerStableLayout(picker, before, `${label}-cleared`)
   await body.evaluate((node) => { node.scrollTop = 0 })
 }
@@ -196,6 +199,12 @@ b = cell.getBoundingClientRect()
 }
 
 export async function assertImportFilterPrompt(page, picker, name, placeholder, emptyOptions = []) {
+  const choices = picker.getByRole('group', { name, exact: true })
+  if (await choices.count()) {
+    assert.equal(await choices.locator('[aria-pressed="true"]').innerText(), '不限')
+    assert.equal(await choices.getByRole('combobox').count(), 0)
+    return
+  }
   const input = page.getByRole('combobox', { name, exact: true })
   const control = picker.locator('.ant-select').filter({ has: input })
   assert.equal(await control.locator('.ant-select-selection-placeholder').innerText(), placeholder)

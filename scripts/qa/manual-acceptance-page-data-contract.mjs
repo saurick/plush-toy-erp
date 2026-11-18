@@ -79,7 +79,6 @@ const PRINT_SUPPORT_DATASET = Object.freeze({
 
 export const MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS = Object.freeze({
   validAccountLogins: "valid-account-logins",
-  bossDashboardActiveTasks: "boss-dashboard-active-tasks",
   mobileTaskTotal: "mobile-task-total",
   catalogPrintTemplates: "catalog-print-templates",
 });
@@ -118,7 +117,6 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "audit-events": "role",
   "valid-account-logins": "role",
   "boss-dashboard-tasks": "task",
-  "boss-dashboard-active-tasks": "task",
   "mobile-task-total": "task",
   "catalog-print-templates": "catalog",
   "business-progress": "facts",
@@ -240,12 +238,10 @@ function targetEvidence(item) {
   }
   if (item.key === "global-dashboard") {
     return {
-      probeIds: [MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.bossDashboardActiveTasks],
-      actualProbeId:
-        MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.bossDashboardActiveTasks,
+      probeIds: ["sales-orders"],
+      actualProbeId: "sales-orders",
       browserRequired: true,
-      reason:
-        "工作台只显示老板账号当前可见且未结束的本批事项；不把九岗位合计或已办任务冒充首页可见数量，卡片跳转和页面显示仍需页面确认。",
+      reason: "销售订单读取证明本批来源数量，工作台汇总按实际显示的不同订单号核对。",
     };
   }
   if (item.key === "task-board") {

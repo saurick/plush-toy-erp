@@ -4,6 +4,7 @@ import { createBusinessToolbarCompositionScenarios } from './businessToolbarComp
 import { selectWarehouseView } from './warehouseNavigationActions.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { openBusinessTableTool } from './businessTableTools.mjs'
 
 export function createInventoryPresentationScenarios(deps) {
   const {
@@ -19,6 +20,43 @@ export function createInventoryPresentationScenarios(deps) {
     customerRuntimeEffectiveSession,
   } = deps
   return [
+    {
+      name: 'warehouse-direct-operation-filters',
+      path: '/erp/warehouse/inventory?workspace=operations',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const type = page.getByRole('group', { name: '作业类型', exact: true })
+        const status = page.getByRole('group', { name: '作业状态', exact: true })
+        await type.waitFor()
+        await status.waitFor()
+        for (const width of [1440, 820, 390]) {
+          await page.setViewportSize({ width, height: 900 })
+          for (const group of [type, status]) {
+            const size = await group.evaluate((node) => ({ width: node.clientWidth, content: node.scrollWidth }))
+            assert(size.content <= size.width + 1, JSON.stringify(size))
+          }
+          await assertNoHorizontalOverflow(page, `库存作业直接筛选 ${width}`)
+        }
+        const choose = async (group, label, predicate) => {
+          const [request] = await Promise.all([
+            page.waitForRequest((request) => {
+              if (!request.url().endsWith('/rpc/inventory') || request.method() !== 'POST') return false
+              const { method, params } = request.postDataJSON()
+              return method === 'list_inventory_operations' && predicate(params)
+            }),
+            group.getByRole('button', { name: label, exact: true }).click(),
+          ])
+          assert.equal(request.postDataJSON().params.offset || 0, 0, '改变筛选回到第一页')
+        }
+        await choose(type, '库存调拨', (params) => params.operation_type === 'TRANSFER')
+        await choose(status, '草稿', (params) => params.operation_type === 'TRANSFER' && params.status === 'DRAFT')
+        await choose(type, '不限', (params) => !params.operation_type && params.status === 'DRAFT')
+        await choose(status, '不限', (params) => !params.operation_type && !params.status)
+        await page.screenshot({ path: path.join(outputDir, 'warehouse-direct-operation-filters.png') })
+      },
+    },
     ...createBusinessToolbarCompositionScenarios(deps),
     ...createWarehouseEntryStabilityScenarios(deps),
     {
@@ -57,7 +95,7 @@ export function createInventoryPresentationScenarios(deps) {
       verify: async (page) => {
         const selector = '.erp-business-module-view-tabs'
         const navigation = page.locator(selector)
-        await navigation.getByRole('tab', { name: '销售出货', exact: true, selected: true }).waitFor()
+        await navigation.getByRole('tab', { name: '出货单', exact: true, selected: true }).waitFor()
         assert.deepEqual(await navigation.getByRole('tab').allTextContents(), ['销售出货', '生产领料', '委外发料', '库存预留'])
         const style = await navigation.evaluate((root) => {
           const tab = getComputedStyle(root.querySelector('[aria-selected="true"]'))
@@ -68,11 +106,11 @@ export function createInventoryPresentationScenarios(deps) {
         assert.match(style.marker, /-2px/u)
         const motion = await verifySlidingMotion(page, assert, selector, 1)
         await verifySlidingMotion(page, assert, selector, 0, true)
-        await navigation.getByRole('tab', { name: '销售出货', exact: true }).focus()
+        await navigation.getByRole('tab', { name: '出货单', exact: true }).focus()
         await page.keyboard.press('End')
         await navigation.getByRole('tab', { name: '库存预留', selected: true }).waitFor()
         await page.keyboard.press('Home')
-        await navigation.getByRole('tab', { name: '销售出货', selected: true }).waitFor()
+        await navigation.getByRole('tab', { name: '出货单', selected: true }).waitFor()
         await page.keyboard.press('ArrowRight')
         await navigation.getByRole('tab', { name: '生产领料', selected: true }).waitFor()
         assert.equal(await navigation.getByRole('tab', { selected: true }).getAttribute('tabindex'), '0')
@@ -209,7 +247,7 @@ export function createInventoryPresentationScenarios(deps) {
         await selectWarehouseView(page, '采购收货')
         assert.equal(await search.inputValue(), '采购核对', '往返分类保留所属页面搜索')
         await primary.getByRole('tab', { name: '库存作业', exact: true }).click()
-        await page.getByRole('combobox', { name: '作业类型', exact: true }).waitFor()
+        await page.getByRole('group', { name: '作业类型', exact: true }).waitFor()
         assert.equal(await secondary.count(), 0, '库存作业不显示库存查询分类')
         for (const width of [1920, 1366, 820, 390]) {
           await page.setViewportSize({ width, height: 1080 })
@@ -223,12 +261,10 @@ export function createInventoryPresentationScenarios(deps) {
           return method === 'list_inventory_operations' && predicate(params)
         })
         const typeRead = readOperation((params) => params.operation_type === 'TRANSFER')
-        await page.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '作业类型', exact: true }) }).locator('.ant-select-selector').click()
-        await page.locator('.ant-select-dropdown:visible').getByText('库存调拨', { exact: true }).click()
+        await page.getByRole('group', { name: '作业类型', exact: true }).getByRole('button', { name: '库存调拨', exact: true }).click()
         await typeRead
         const statusRead = readOperation((params) => params.operation_type === 'TRANSFER' && params.status === 'DRAFT')
-        await page.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '作业状态', exact: true }) }).locator('.ant-select-selector').click()
-        await page.locator('.ant-select-dropdown:visible').getByText('草稿', { exact: true }).click()
+        await page.getByRole('group', { name: '作业状态', exact: true }).getByRole('button', { name: '草稿', exact: true }).click()
         await statusRead
         const allCreatorsRead = readOperation((params) => params.status === 'DRAFT' && !params.created_by)
         await page.getByRole('checkbox', { name: '仅看我创建', exact: true }).uncheck()
@@ -642,17 +678,37 @@ export function createInventoryPresentationScenarios(deps) {
         await quantity.and(page.locator('[aria-sort="descending"]')).waitFor()
         await readAfter(balances, (p) => !p.sort_by && !p.sort_direction && p.keyword === 'SORT', () => quantity.click())
         await page.waitForFunction(() => !document.querySelector('[data-business-view-panel="balances"]:not([hidden]) th[aria-sort]'))
+        await openBusinessTableTool(page, '列设置')
+        const columnSettings = page.getByRole('dialog', { name: /^列设置/u })
+        for (const name of ['库存项', '存货类型']) {
+          await columnSettings.getByRole('checkbox', { name, exact: true }).check()
+        }
+        await columnSettings.getByRole('button', { name: '完成', exact: true }).click()
+        await columnSettings.waitFor({ state: 'hidden' })
         for (const [name, field] of [
+          ['库存项', 'registration_order'],
+          ['存货类型', 'stock_kind'],
+          ['材料 / 产品', 'subject_code'],
+          ['产品规格', 'sku_code'],
+          ['仓库', 'warehouse_name'],
+          ['批次', 'lot_no'],
+          ['单位', 'unit_name'],
+          ['已预留', 'active_reserved_quantity'],
+          [/未预留数量/u, 'available_quantity'],
           ['材料可领用', 'issuable_quantity'],
           [/受限库存/u, 'restricted_quantity'],
+          ['待成品检验', 'pending_inspection_quantity'],
+          ['待查货包装', 'pending_packaging_quantity'],
           ['可发货数量', 'ready_to_ship_quantity'],
         ]) {
-          const header = panel.getByRole('columnheader', { name })
-          await readAfter(balances, (p) => p.sort_by === field && p.sort_direction === 'asc' && p.offset === 0, () => header.click())
+          const header = panel.getByRole('columnheader', { name, exact: typeof name === 'string' })
+          await readAfter(balances, (p) => p.sort_by === field && p.sort_direction === 'asc' && p.offset === 0 && p.keyword === 'SORT', () => header.press('Enter'))
           await header.and(page.locator('[aria-sort="ascending"]')).waitFor()
         }
-        const pending = panel.getByRole('columnheader', { name: '待成品检验', exact: true })
-        assert.equal(await pending.locator('.ant-table-column-sorter').count(), 0)
+        assert.equal(await panel.locator('thead th.ant-table-selection-column .ant-table-column-sorter').count(), 0)
+        const rowCheckbox = panel.locator('.ant-table-tbody tr[data-row-key]').first().getByRole('checkbox')
+        await rowCheckbox.check()
+        assert.equal(await rowCheckbox.isChecked(), true)
         await assertNoHorizontalOverflow(page, 'warehouse-inventory-server-table-sort')
       },
     },

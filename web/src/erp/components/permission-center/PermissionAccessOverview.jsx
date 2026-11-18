@@ -21,7 +21,7 @@ import {
   getPermissionPageEntry,
   groupPermissionPages,
 } from '../../utils/permissionNavigation.mjs'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 
 const ROLE_PAGE_ACCESS_FILTERS = {
   ALL: 'all',
@@ -234,10 +234,10 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
         />
       ) : null}
       <div className="erp-role-effective-access__toolbar">
-        <FilterSelect
+        <FilterChipGroup
+          allowClear
           emptyValue="all"
           label="业务模块"
-          placeholder="业务模块"
           aria-label="筛选业务模块"
           value={selectedModule}
           onChange={setModuleFilter}

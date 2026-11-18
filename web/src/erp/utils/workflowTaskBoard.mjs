@@ -1,4 +1,5 @@
-import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+import { businessDocumentSectionOptions, getBusinessDocumentSectionKey, getBusinessDocumentTypeKey } from '../config/businessModules.mjs'
+import { WorkflowTaskBoardSort, WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
 import { isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
@@ -84,10 +85,26 @@ export function getWorkflowTaskBoardDueOptions(lane = 'all') {
 }
 
 export const TASK_BOARD_SORT_OPTIONS = Object.freeze([
-  { value: 'smart', label: '智能优先' },
-  { value: 'due_soon', label: '最早到期' },
-  { value: 'newest', label: '最近创建' },
+  { value: WorkflowTaskBoardSort.SMART, label: '智能优先' },
+  { value: WorkflowTaskBoardSort.DUE_SOON, label: '最早到期' },
+  { value: WorkflowTaskBoardSort.NEWEST, label: '最近创建' },
+  { value: WorkflowTaskBoardSort.TIME_ASC, label: '任务时间从早到晚' },
+  { value: WorkflowTaskBoardSort.TIME_DESC, label: '任务时间从晚到早' },
 ])
+
+const taskTimeSortKeys = { ascend: WorkflowTaskBoardSort.TIME_ASC, descend: WorkflowTaskBoardSort.TIME_DESC }
+
+export function workflowTaskTimeColumnSort(sort, tooltip) {
+  return {
+    sorter: true,
+    sortOrder: Object.keys(taskTimeSortKeys).find((direction) => taskTimeSortKeys[direction] === sort) || null,
+    showSorterTooltip: { title: tooltip },
+  }
+}
+
+export function readWorkflowTaskTimeSort(sorter) {
+  return taskTimeSortKeys[sorter?.order] || ''
+}
 
 export const TASK_BOARD_FOCUS_PAGE_SIZE = WorkCenterPaginationPolicy.defaultPageSize
 export const TASK_BOARD_PAGE_SIZE_OPTIONS = Object.freeze([TASK_BOARD_FOCUS_PAGE_SIZE, 50, WorkCenterPaginationPolicy.maxPageSize])
@@ -105,6 +122,7 @@ export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   role: 'all',
   due: 'all',
   sourceType: 'all',
+  sourceSection: 'all',
   lane: 'all',
   sort: 'smart',
   mode: 'all',
@@ -152,6 +170,7 @@ const FILTER_QUERY_KEYS = Object.freeze({
   role: 'role',
   due: 'due',
   sourceType: 'source',
+  sourceSection: 'source_section',
   lane: 'lane',
   sort: 'sort',
   page: 'page',
@@ -171,6 +190,7 @@ const DUE_FILTER_VALUES = new Set(
 )
 const LANE_FILTER_VALUES = new Set(['all', ...WORKFLOW_TASK_BOARD_LANE_KEYS])
 const SORT_VALUES = new Set(TASK_BOARD_SORT_OPTIONS.map((item) => item.value))
+const SOURCE_SECTION_FILTER_VALUES = new Set(['all', ...businessDocumentSectionOptions().map(({ value }) => value)])
 
 const TASK_STATUS_META = Object.freeze({
   [WorkflowTaskStatus.READY]: { label: '可执行', color: 'blue' },
@@ -304,6 +324,10 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
     ? 'finished'
     : requestedLane
   const due = normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES)
+  const sourceType = getBusinessDocumentTypeKey(normalizeFilterValue(filters.sourceType))
+  const sourceSection = sourceType === 'all'
+    ? normalizeKnownFilterValue(filters.sourceSection, SOURCE_SECTION_FILTER_VALUES)
+    : getBusinessDocumentSectionKey(sourceType) || 'all'
   return {
     ...normalizeTaskDiscoveryFilters(filters, { includeStage: true }),
     ...(lane === 'finished' && isWorkflowHistoryDateFilter(filters) && filters.period ? { period: filters.period, dateFrom: filters.dateFrom || '', dateTo: filters.dateTo || '' } : {}),
@@ -319,7 +343,8 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
     )
       ? due
       : 'all',
-    sourceType: normalizeFilterValue(filters.sourceType),
+    sourceType,
+    sourceSection,
     lane,
     sort: normalizeKnownFilterValue(filters.sort, SORT_VALUES, 'smart'),
     mode,
@@ -338,6 +363,7 @@ export function hasActiveWorkflowTaskBoardFilters(filters = {}) {
     normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role ||
     normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due ||
     normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType ||
+    normalized.sourceSection !== DEFAULT_TASK_BOARD_FILTERS.sourceSection ||
     normalized.mode !== DEFAULT_TASK_BOARD_FILTERS.mode
   )
 }
@@ -350,7 +376,7 @@ export function workflowTaskBoardExtraFilterCount(filters = {}, { calendar = fal
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status,
     normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role,
     !calendar && normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due,
-    normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType,
+    normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType || normalized.sourceSection !== DEFAULT_TASK_BOARD_FILTERS.sourceSection,
   ].filter(Boolean).length
 }
 
@@ -369,6 +395,7 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
     role: params.get(FILTER_QUERY_KEYS.role),
     due: params.get(FILTER_QUERY_KEYS.due),
     sourceType: params.get(FILTER_QUERY_KEYS.sourceType),
+    sourceSection: params.get(FILTER_QUERY_KEYS.sourceSection),
     lane: params.get(FILTER_QUERY_KEYS.lane),
     sort: params.get(FILTER_QUERY_KEYS.sort),
     mode: params.get(FILTER_QUERY_KEYS.mode),
@@ -408,6 +435,9 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   }
   if (normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType) {
     params.set(FILTER_QUERY_KEYS.sourceType, normalized.sourceType)
+  }
+  if (normalized.sourceSection !== DEFAULT_TASK_BOARD_FILTERS.sourceSection) {
+    params.set(FILTER_QUERY_KEYS.sourceSection, normalized.sourceSection)
   }
   if (normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane) {
     params.set(FILTER_QUERY_KEYS.lane, normalized.lane)
@@ -451,6 +481,9 @@ export function buildWorkflowTaskBoardRequest(filters = {}, { calendar = false }
   }
   if (normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType) {
     params.source_type = normalized.sourceType
+  }
+  if (normalized.sourceSection !== DEFAULT_TASK_BOARD_FILTERS.sourceSection) {
+    params.source_section = normalized.sourceSection
   }
   if (!calendar) {
     params.lane_key = normalized.lane
@@ -550,15 +583,5 @@ export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
     requestedPage: normalizedFilters.page,
     page: Math.min(normalizedFilters.page, pageCount),
     pageCount,
-    sourceTypes: Array.isArray(normalizedResponse.source_types)
-      ? normalizedResponse.source_types
-          .map((sourceType) => String(sourceType || '').trim())
-          .filter(Boolean)
-      : [],
-    ownerRoleKeys: Array.isArray(normalizedResponse.owner_role_keys)
-      ? normalizedResponse.owner_role_keys
-          .map((roleKey) => String(roleKey || '').trim())
-          .filter(Boolean)
-      : [],
   }
 }

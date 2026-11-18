@@ -1,13 +1,22 @@
 import React from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Card } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import { BusinessOperationPanel } from '../business-list/BusinessListLayout.jsx'
 import Select from '@/common/components/select/AppSelect'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
 import SalesOrderSummaryPanel from './SalesOrderSummaryPanel.jsx'
 import EngineeringMaterialSummaryPanel from './EngineeringMaterialSummaryPanel.jsx'
+import FinancePaymentSummaryPanel from './FinancePaymentSummaryPanel.jsx'
 import './workbenchSummaries.css'
+
+const summaryPanels = {
+  'sales-orders': SalesOrderSummaryPanel,
+  materials: EngineeringMaterialSummaryPanel,
+  payments: FinancePaymentSummaryPanel,
+}
 
 function SummaryTypeControl({ options, selected, onChange }) {
   return (
@@ -36,6 +45,7 @@ export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
     options[0]?.value
   if (!options.length) return null
   const accessKey = workflowTaskAdminAccessRequestIdentity(adminProfile)
+  const Panel = summaryPanels[selected]
   const summaryTypeControl = (
     <SummaryTypeControl
       inline
@@ -50,19 +60,19 @@ export default function WorkbenchSummaries({ options, refreshRevision = 0 }) {
   )
   return (
     <section
-      className="erp-business-page-layout erp-workbench-summaries"
+      className="erp-business-toolbar-workspace erp-workbench-summaries"
       aria-label="工作台汇总"
+      data-page-table-region
       data-table-scroll-scope
     >
-      {!selected ? <>{summaryTypeControl}<Empty description="请选择汇总类型" /></> : selected === 'sales-orders' ? (
-        <SalesOrderSummaryPanel
-          key={`sales:${accessKey}`}
-          refreshRevision={refreshRevision}
-          summaryTypeControl={summaryTypeControl}
-        />
+      {!Panel ? (
+        <>
+          <BusinessOperationPanel compact filters={summaryTypeControl} />
+          <Card><Empty description="请选择汇总类型" /></Card>
+        </>
       ) : (
-        <EngineeringMaterialSummaryPanel
-          key={`materials:${accessKey}`}
+        <Panel
+          key={`${selected}:${accessKey}`}
           refreshRevision={refreshRevision}
           summaryTypeControl={summaryTypeControl}
         />

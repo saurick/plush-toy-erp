@@ -130,6 +130,9 @@ func (r *inventoryRepo) CreateFinishedGoodsQualityInspectionDraft(ctx context.Co
 		}
 		return nil, originalErr
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -1781,6 +1784,12 @@ func validateFinishedGoodsQualityInspectionLot(lot *ent.InventoryLot, productID 
 
 func getLockedQualityInspection(ctx context.Context, tx *inventoryDBTx, inspectionID int) (*ent.QualityInspection, error) {
 	if tx.dialect == dialect.Postgres {
+		// Decisions on different lots of one shipment must serialize with release
+		// and each other before recalculating the sales task's quality blocker.
+		if _, err := tx.sqlTx.ExecContext(ctx, `SELECT s.id FROM shipments s JOIN quality_inspections q
+ ON q.source_type=$1 AND q.source_id=s.id WHERE q.id=$2 FOR UPDATE OF s`, biz.QualityInspectionSourceShipment, inspectionID); err != nil {
+			return nil, err
+		}
 		var id int
 		if err := tx.sqlTx.QueryRowContext(ctx, `SELECT id FROM quality_inspections WHERE id = $1 FOR UPDATE`, inspectionID).Scan(&id); err != nil {
 			if errors.Is(err, stdsql.ErrNoRows) {

@@ -252,8 +252,8 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
               />
             </div>
             <div className="erp-chain-design__role-filter">
-              <label htmlFor={`${legendId}-role`}>岗位高亮</label>
               <FilterSelect
+                label="岗位高亮"
                 id={`${legendId}-role`}
                 aria-label="岗位高亮"
                 placeholder="全链路视角"

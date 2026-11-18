@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 
 import test from 'node:test'
+import { purchaseFactActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
 import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
@@ -121,9 +122,11 @@ test('purchase receipt drafts have a truthful no-inventory cancellation exit', (
     source,
     /\['DRAFT', 'POSTED'\]\.includes\(selectedRow\.status\)/u
   )
-  assert.match(source, /采购入库草稿已作废，未更新库存/u)
+  const cancellation = purchaseFactActionPresentation('receipt', { status: 'DRAFT' }, 'cancel')
+  assert.match(cancellation.success, /草稿已作废，库存未发生变动/u)
   assert.match(source, /草稿作废不更新库存/u)
-  assert.match(source, /确认作废采购入库草稿/u)
+  assert.equal(cancellation.label, '作废材料入库草稿')
+  assert.match(source, /purchaseFactActionPresentation\('receipt', selectedRow, 'cancel'\)\.title/u)
 })
 
 test('purchase receipt quantity display and sorting use exact numeric helpers', () => {

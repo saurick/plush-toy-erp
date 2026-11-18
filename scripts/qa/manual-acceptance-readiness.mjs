@@ -3137,58 +3137,6 @@ function taskGroupCoverageSummary(mobileResults, catalogScenarioDigest) {
   };
 }
 
-function bossDashboardActiveResult(bossResult) {
-  const daily = Array.isArray(bossResult?.dailyTaskCodes);
-  const terminalStatuses = new Set(daily ? ["DONE", "REJECTED", "WITHDRAWN", "CANCELLED"] : ["DONE", "REJECTED"]);
-  const expectedCounts = daily ? bossResult.requiredStatusCounts : taskStatusCountsForRole("boss");
-  const expectedMinimum = Object.entries(expectedCounts).reduce(
-    (sum, [status, count]) =>
-      terminalStatuses.has(status) ? sum : sum + Number(count || 0),
-    0,
-  );
-  const statusCounts = Object.fromEntries(
-    Object.entries(bossResult?.statusCounts || {}).filter(
-      ([status]) => !terminalStatuses.has(status),
-    ),
-  );
-  const actual = Object.values(statusCounts).reduce(
-    (sum, count) => sum + Number(count || 0),
-    0,
-  );
-  const sourceProven = daily ? bossResult.batchEvidence === "exact_references" : bossResult?.batchEvidence === "exact_task_codes";
-  const passed =
-    bossResult?.status === "pass" && sourceProven && actual === expectedMinimum;
-  return {
-    id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.bossDashboardActiveTasks,
-    status: passed ? "pass" : sourceProven ? "fail" : "not_proven",
-    expectedMinimum,
-    expectedExact: expectedMinimum,
-    actual: sourceProven ? actual : null,
-    returned: bossResult?.returned ?? 0,
-    statusField: "task_status_key",
-    statusCounts,
-    statusKinds: Object.keys(statusCounts).length,
-    requiredStatuses: Object.keys(expectedCounts).filter(
-      (status) => !terminalStatuses.has(status),
-    ),
-    missingStatuses: [],
-    enoughRecords: passed,
-    enoughStatuses: passed,
-    enoughSecondaryKinds: true,
-    batchEvidence: sourceProven ? bossResult.batchEvidence : "not_proven",
-    ...(daily ? { dailyTaskCodes: bossResult.dailyOpenTaskCodes } : {}),
-    exactSourceType: sourceProven ? bossResult.exactSourceType : null,
-    exactSourceID: sourceProven ? bossResult.exactSourceID : null,
-    exactTaskCodePrefix: sourceProven ? bossResult.exactTaskCodePrefix : null,
-    exactOwnerRoleKey: sourceProven ? bossResult.exactOwnerRoleKey : null,
-    exactTaskGroup: sourceProven ? bossResult.exactTaskGroup : null,
-    notProvenReason: sourceProven
-      ? null
-      : "未提供老板岗位本批任务，不能证明工作台当前事项。",
-    error: null,
-  };
-}
-
 function catalogPrintTemplateResult(plan) {
   const actual = plan.targets.filter(
     (item) => item.catalogGroup === "printPreviewPages",
@@ -3586,11 +3534,6 @@ export async function verifyManualAcceptanceReadiness(
     : taskGroupCoverageSummary(mobileResults, plan.reportInputs.taskReport?.taskGroupCoverageDigest || null);
   const totalResult = mobileTotalResult(mobileResults, daily);
   resultById.set(totalResult.id, totalResult);
-  const activeBossResult = bossDashboardActiveResult({
-    ...plan.probes.find((probe) => probe.id === "boss-dashboard-tasks"),
-    ...resultById.get("boss-dashboard-tasks"),
-  });
-  resultById.set(activeBossResult.id, activeBossResult);
   const printCatalogResult = catalogPrintTemplateResult(plan);
   resultById.set(printCatalogResult.id, printCatalogResult);
 
@@ -3620,7 +3563,6 @@ export async function verifyManualAcceptanceReadiness(
   const probes = [
     ...rawResults.map(({ probe, result }) => sanitizeProbe(probe, result)),
     loginResult,
-    activeBossResult,
     totalResult,
     printCatalogResult,
   ];

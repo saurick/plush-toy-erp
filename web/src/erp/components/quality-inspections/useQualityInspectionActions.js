@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { requireSourceActionRecord } from '../../utils/sourceBusinessAction.mjs'
 import {
   cancelQualityInspection,
   createQualityInspectionDraft,
@@ -99,8 +100,8 @@ export default function useQualityInspectionActions({
       mutationInFlight.current = true
       setSaving(true)
       try {
-        const nextInspection = await action({ id: inspection.id })
-        setSelectedRow(nextInspection || inspection)
+        const nextInspection = requireSourceActionRecord(await action({ id: inspection.id }), inspection.id)
+        setSelectedRow(nextInspection)
         reportBusinessResult(successText, nextInspection)
         message.success(successText)
         await loadRows()
@@ -155,13 +156,13 @@ export default function useQualityInspectionActions({
         params = buildDecisionParams(inspection.id, values)
         successText = '质量检验已取消'
       }
-      const nextInspection = await action(params)
+      const nextInspection = requireSourceActionRecord(await action(params), inspection.id)
       const attachmentSaved =
         (await inspectionAttachmentRef.current?.flushPendingAttachments(
           nextInspection?.id || inspection.id
         )) !== false
-      setSelectedRow(nextInspection || inspection)
-      reportBusinessResult(successText, nextInspection || inspection)
+      setSelectedRow(nextInspection)
+      reportBusinessResult(successText, nextInspection)
       message.success(
         attachmentSaved ? successText : `${successText}，未上传的附件请重新选择`
       )

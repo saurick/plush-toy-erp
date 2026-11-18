@@ -24,6 +24,8 @@ import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator
 import { formatPurchaseReceiptQuantityTotal } from '../../utils/purchaseReceiptDecimal.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 
+import { purchaseFactActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
+
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
   POSTED: '已过账',
@@ -159,6 +161,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
     async ({ kind, action, record }) => {
       if (!record?.id || actionInFlightRef.current) return
       const key = `${kind}:${action}:${record.id}`
+      const presentation = purchaseFactActionPresentation(kind, record, action)
       const params = {
         id: record.id,
         customer_key: customerKey || undefined,
@@ -185,19 +188,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
           error.isInvalidResponse = true
           throw error
         }
-        message.success(
-          action === 'post'
-            ? kind === 'return'
-              ? '采购退货已确认'
-              : '入库调整已确认'
-            : record?.status === 'DRAFT'
-              ? kind === 'return'
-                ? '采购退货草稿已作废，未更新库存'
-                : '入库调整草稿已作废，未更新库存'
-              : kind === 'return'
-                ? '采购退货已取消，库存已恢复到退货前'
-                : '入库调整已取消，库存已恢复到调整前'
-        )
+        message.success(presentation.success)
         await loadRecords()
         await onChanged?.()
       } catch (error) {
@@ -209,7 +200,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
           message.error(
             getActionErrorMessage(
               error,
-              action === 'post' ? '确认业务记录' : '取消业务记录'
+              presentation.label
             )
           )
         }
@@ -230,6 +221,8 @@ export default function PurchaseReceiptExceptionRecordsModal({
       key: 'actions',
       width: 240,
       render: (_, record) => {
+        const postPresentation = purchaseFactActionPresentation(kind, record)
+        const cancelPresentation = purchaseFactActionPresentation(kind, record, 'cancel')
         if (record?.status === 'DRAFT') {
           if (!permissions.post && !permissions.cancel) {
             return <span>待确认</span>
@@ -238,13 +231,10 @@ export default function PurchaseReceiptExceptionRecordsModal({
             <Space size="small">
               {permissions.post ? (
                 <Popconfirm
-                  title={
-                    kind === 'return'
-                      ? '确认这笔退货？确认后相应库存会同步扣减。'
-                      : '确认这笔入库调整？确认后库存数量会按调整内容同步更新。'
-                  }
-                  okText="确认"
-                  cancelText="取消"
+                  title={postPresentation.title}
+                  description={postPresentation.description}
+                  okText={postPresentation.label}
+                  cancelText="返回"
                   onConfirm={() => runAction({ kind, action: 'post', record })}
                 >
                   <Button
@@ -253,15 +243,16 @@ export default function PurchaseReceiptExceptionRecordsModal({
                     loading={savingKey === `${kind}:post:${record.id}`}
                     disabled={Boolean(savingKey)}
                   >
-                    确认
+                    {postPresentation.label}
                   </Button>
                 </Popconfirm>
               ) : null}
               {permissions.cancel ? (
                 <Popconfirm
-                  title="确认作废草稿？草稿尚未确认，不会变更库存。"
-                  okText="确认作废"
-                  cancelText="暂不作废"
+                  title={cancelPresentation.title}
+                  description={cancelPresentation.description}
+                  okText={cancelPresentation.label}
+                  cancelText="返回"
                   onConfirm={() =>
                     runAction({ kind, action: 'cancel', record })
                   }
@@ -274,7 +265,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
                     loading={savingKey === `${kind}:cancel:${record.id}`}
                     disabled={Boolean(savingKey)}
                   >
-                    作废草稿
+                    {cancelPresentation.label}
                   </Button>
                 </Popconfirm>
               ) : null}
@@ -285,9 +276,10 @@ export default function PurchaseReceiptExceptionRecordsModal({
           if (!permissions.cancel) return <span>已确认</span>
           return (
             <Popconfirm
-              title="确认取消？取消后库存会恢复到这笔操作前。"
-              okText="确认取消"
-              cancelText="暂不取消"
+              title={cancelPresentation.title}
+              description={cancelPresentation.description}
+              okText={cancelPresentation.label}
+              cancelText="返回"
               onConfirm={() => runAction({ kind, action: 'cancel', record })}
             >
               <Button
@@ -298,7 +290,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
                 loading={savingKey === `${kind}:cancel:${record.id}`}
                 disabled={Boolean(savingKey)}
               >
-                取消并恢复库存
+                {cancelPresentation.label}
               </Button>
             </Popconfirm>
           )

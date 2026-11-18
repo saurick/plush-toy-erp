@@ -47,6 +47,9 @@
   justify-content: center;
   align-items: center;
 }
+.mobile-progress-controls > .erp-sliding-segmented {
+  margin-block-start: 6px;
+}
 .mobile-progress-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -118,6 +121,9 @@
   padding: var(--erp-work-item-padding) var(--erp-work-item-padding) 4px;
   color: inherit;
   text-align: left;
+}
+.mobile-progress-card-main :is(button, a[href]) {
+  pointer-events: auto;
 }
 .mobile-progress-card-identity {
   display: grid;

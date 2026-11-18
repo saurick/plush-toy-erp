@@ -399,36 +399,27 @@ function MobileTrackingContent({
             onReset={resetFilters}
           >
             {!source ? (
-              <fieldset role="presentation">
-                <legend>跟踪范围</legend>
-                <MobileFilterChoices
-                  label="跟踪范围"
-                  value={scope}
-                  options={TRACKING_SCOPE_OPTIONS}
-                  onChange={changeScope}
-                />
-              </fieldset>
+              <MobileFilterChoices
+                label="跟踪范围"
+                value={scope}
+                options={TRACKING_SCOPE_OPTIONS}
+                onChange={changeScope}
+              />
             ) : null}
-            <fieldset role="presentation">
-              <legend>当前岗位</legend>
-              <MobileFilterChoices
-                label="当前岗位"
-                value={query.owner_role_key}
-                disabled={query.status === 'completed'}
-                options={TRACKING_ROLE_OPTIONS}
-                onChange={(owner_role_key) => updateQuery({ owner_role_key })}
-              />
-            </fieldset>
-            <fieldset role="presentation">
-              <legend>关注事项</legend>
-              <MobileFilterChoices
-                label="关注事项"
-                value={query.attention}
-                disabled={query.status === 'completed'}
-                options={TRACKING_ATTENTION_OPTIONS}
-                onChange={(attention) => updateQuery({ attention })}
-              />
-            </fieldset>
+            <MobileFilterChoices
+              label="当前岗位"
+              value={query.owner_role_key}
+              disabled={query.status === 'completed'}
+              options={TRACKING_ROLE_OPTIONS}
+              onChange={(owner_role_key) => updateQuery({ owner_role_key })}
+            />
+            <MobileFilterChoices
+              label="关注事项"
+              value={query.attention}
+              disabled={query.status === 'completed'}
+              options={TRACKING_ATTENTION_OPTIONS}
+              onChange={(attention) => updateQuery({ attention })}
+            />
           </MobileFilterPopover>
 
         </div>

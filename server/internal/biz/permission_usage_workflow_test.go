@@ -32,8 +32,8 @@ func TestWorkflowTaskUpdateUsageIncludesEveryUpdateAction(t *testing.T) {
 	}
 }
 
-func TestWorkflowWorkbenchRoleTaskUsageRequiresBothReadPermissions(t *testing.T) {
-	const method = "list_workbench_role_tasks"
+func TestTaskBoardRiskUsageRequiresBothReadPermissions(t *testing.T) {
+	const method = "get_workbench"
 	for _, permissionKey := range []string{
 		PermissionERPWorkbenchRead,
 		PermissionWorkflowTaskRead,
@@ -48,7 +48,7 @@ func TestWorkflowWorkbenchRoleTaskUsageRequiresBothReadPermissions(t *testing.T)
 				if backendMethod.Domain != "workflow" || backendMethod.Method != method {
 					continue
 				}
-				if surface.PageKey != "global-dashboard" {
+				if surface.PageKey != "task-board" {
 					t.Fatalf("%q is attached to unexpected page %q for %q", method, surface.PageKey, permissionKey)
 				}
 				found = true

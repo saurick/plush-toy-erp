@@ -4,13 +4,13 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import Select from '@/common/components/select/AppSelect'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../../utils/moduleTableColumns.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   getBusinessStatistics,
@@ -33,7 +33,7 @@ import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import WorkflowTaskPagination from '../workflow/WorkflowTaskPagination.jsx'
 import { BusinessViewSurface } from './BusinessVisualizationFrame.jsx'
 import '../../styles/app/business-statistics.css'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 
 const clearGroup = {
   group_key: '',
@@ -279,12 +279,21 @@ export default function useBusinessStatistics({
   const bodyRef = useRef(null)
   const backRef = useRef(null)
   const drillOrigin = useRef('')
+  const sortHeaderIndex = useRef(null)
   const tableSticky = useMemo(() => ({ getContainer: () => bodyRef.current }), [])
   const data =
     active && state?.key === requestKey && state?.profile === adminProfile
       ? state.data
       : null
   const board = groupKey ? null : data
+  useEffect(() => {
+    if (error || !active || groupKey) sortHeaderIndex.current = null
+    if (!board || sortHeaderIndex.current === null) return
+    if (document.activeElement === document.body) {
+      bodyRef.current?.querySelector('.erp-statistics-table thead tr')?.cells[sortHeaderIndex.current]?.focus({ preventScroll: true })
+    }
+    sortHeaderIndex.current = null
+  }, [active, board, error, groupKey])
   const ages = query.report === 'receivables'
   const statusLabels = {
     ...STATISTICS_STATUSES,
@@ -462,26 +471,25 @@ export default function useBusinessStatistics({
   const endDate = query.period === 'custom' ? query.date_to : board?.date_to || ''
   const updatePeriod = (period, from = '', to = '') =>
     update({ period, stfrom: from, stto: to, ...clearGroup })
-  const changeDate = (field, value) =>
-    update((current) => ({
-      period: (value || current.get(field === 'stfrom' ? 'stto' : 'stfrom')) ? 'custom' : 'all',
-      [field]: value,
-      ...clearGroup,
-    }))
   const product = query.group_by === 'product'
   const sortOptions = [
-    { value: 'count:desc', label: ages ? '未结笔数降序' : '订单数降序' },
-    { value: 'overdue:desc', label: ages ? '逾期笔数降序' : '逾期单数降序' },
-    { value: 'name:asc', label: '名称升序' },
-    ...(canSortAmount ? [{ value: 'amount:desc', label: '金额降序' }] : []),
-  ]
+    ['count', ages ? '未结笔数' : '订单数', 'desc'],
+    ['overdue', ages ? '逾期笔数' : '逾期单数', 'desc'],
+    ['name', '名称', 'asc'],
+    ...(canSortAmount ? [['amount', '金额', 'desc']] : []),
+  ].map(([field, label, defaultDirection]) => {
+    const direction = query.sort === field ? query.direction : defaultDirection
+    return { value: `${field}:${direction}`, label: label + (direction === 'asc' ? '升序' : '降序') }
+  })
+  const sortFields = { name: 'name', count: 'count', overdue: 'overdue', ...(canSortAmount ? { [ages ? 'balance' : 'amount']: 'amount' } : {}) }
   const currentSort = `${query.sort}:${query.direction}`
+  const tableSort = params.has('sort') ? { sort_by: query.sort, sort_direction: query.direction } : null
   const filters = (
     <div className="erp-statistics-filters" role="group" aria-label="统计筛选">
       {!ages && (
-        <Select
+        <FilterChipGroup
+          label="汇总维度"
           allowClear={false /* 不可清空：汇总必须选择客户或产品。 */}
-          presentation="compact"
           className="erp-business-filter-control"
           aria-label="汇总维度"
           value={query.group_by}
@@ -494,11 +502,11 @@ export default function useBusinessStatistics({
       )}
       {!ages && (
         <div className="erp-statistics-delivery-period" role="group" aria-label="订单交期">
-          <FilterSelect
+          <FilterChipGroup
+            allowClear
             className="erp-business-filter-control"
             emptyValue="all"
             label="订单交期"
-            placeholder="全部交期"
             aria-label="交期范围"
             value={query.period}
             options={[
@@ -514,18 +522,17 @@ export default function useBusinessStatistics({
           />
           {query.period === 'custom' && (
             <DateRangeFilter
+              customOnly
               startValue={startDate}
               endValue={endDate}
               inputReadOnly={false}
-              onStartChange={(value) => changeDate('stfrom', value)}
-              onEndChange={(value) => changeDate('stto', value)}
+              onRangeChange={(from, to) => updatePeriod(from || to ? 'custom' : 'all', from, to)}
             />
           )}
         </div>
       )}
-      <Select
+      <FilterChipGroup
         allowClear={false /* 不可清空：金额统计必须明确单一币种。 */}
-        presentation="compact"
         className="erp-business-filter-control erp-statistics-currency"
         label="币种"
         aria-label="统计币种"
@@ -543,13 +550,11 @@ export default function useBusinessStatistics({
         maxLength={100}
         onSearch={(sq) => update({ sq, ...clearGroup })}
       />
-      <Select
+      <FilterChipGroup
         allowClear={false /* 不可清空：默认排序为单数或笔数降序。 */}
-        presentation="compact"
         className="erp-business-filter-control erp-statistics-sort"
         label="排序"
         aria-label="统计排序"
-        placeholder="选择排序"
         value={sortOptions.some(({ value }) => value === currentSort) ? currentSort : undefined}
         options={sortOptions}
         onChange={(value) => {
@@ -671,6 +676,7 @@ export default function useBusinessStatistics({
     {
       title: query.group_by === 'product' ? '产品' : '客户',
       key: 'name',
+      dataIndex: 'name',
       width: 260,
       render: (_, row) => (
         <Button
@@ -687,6 +693,7 @@ export default function useBusinessStatistics({
     {
       title: ages ? '未结笔数' : '订单数',
       key: 'count',
+      dataIndex: 'count',
       align: 'right',
       width: 90,
       render: (_, row) => valueLink(row, 'count'),
@@ -697,6 +704,7 @@ export default function useBusinessStatistics({
       {
         title: `未结金额 · ${query.currency}`,
         key: 'balance',
+        dataIndex: 'balance',
         align: 'right',
         width: 155,
         render: (_, row) => valueLink(row, 'balance', true),
@@ -720,6 +728,7 @@ export default function useBusinessStatistics({
         ['unknown', '待核对'],
       ].map(([key, title]) => ({
         key,
+        dataIndex: key,
         title,
         align: 'right',
         width: 105,
@@ -731,6 +740,7 @@ export default function useBusinessStatistics({
         {
           title: `${query.group_by === 'product' ? '货品' : '订单'}金额 · ${query.currency}`,
           key: 'amount',
+          dataIndex: 'amount',
           align: 'right',
           width: 170,
           render: (_, row) => number(row.amount, true),
@@ -901,10 +911,10 @@ export default function useBusinessStatistics({
                 <strong className="erp-statistics-source-title">
                   {sourceTitle}
                 </strong>
-                <FilterSelect
+                <FilterChipGroup
+                  allowClear
                   className="erp-statistics-source-filter"
                   label="来源状态"
-                  placeholder="全部来源状态"
                   aria-label="来源状态"
                   emptyValue="all"
                   value={sourceFilter}
@@ -981,7 +991,12 @@ export default function useBusinessStatistics({
                   size="small"
                   bordered
                   rowKey={groupKey ? 'id' : 'key'}
-                  columns={groupKey ? sourceColumns : summaryColumns}
+                  columns={groupKey ? sourceColumns : applyBusinessServerColumnSorters(summaryColumns, sortFields, tableSort)}
+                  onChange={(_page, _filters, sorter) => {
+                    sortHeaderIndex.current = document.activeElement?.closest('.erp-statistics-table th')?.cellIndex ?? null
+                    const next = readBusinessServerTableSort(sorter, sortFields)
+                    update({ sort: next?.sort_by, direction: next?.sort_direction })
+                  }}
                   dataSource={groupKey ? data.rows : board.groups}
                   pagination={false}
                   scroll={{ x: 'max-content' }}

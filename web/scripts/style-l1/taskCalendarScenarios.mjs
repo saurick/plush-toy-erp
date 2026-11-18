@@ -43,6 +43,40 @@ async function verifyCalendarAlignment(calendar, assert) {
   return geometry
 }
 
+async function verifyCalendarScroll(calendar, assert, { monthSticks, headingSticks }) {
+  const layout = await calendar.evaluate(async (root) => {
+    const scroller = root.closest('[data-testid="mobile-role-scroll"], .erp-admin-content')
+    const month = root.querySelector('.workflow-task-calendar__month')
+    const heading = root.querySelector('.workflow-task-calendar__heading')
+    const firstTask = root.querySelector('.workflow-task-calendar__task')
+    const initialScroll = scroller.scrollTop
+    const scroll = async (top) => {
+      scroller.scrollTo({ top, behavior: 'instant' })
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    }
+    try {
+      await scroll(1000)
+      const firstTop = firstTask.getBoundingClientRect().top
+      await scroll(1300)
+      const viewport = scroller.getBoundingClientRect()
+      const monthBox = month.getBoundingClientRect()
+      const headingBox = heading.getBoundingClientRect()
+      return {
+        taskTravel: firstTop - firstTask.getBoundingClientRect().top,
+        monthVisible: monthBox.top >= viewport.top - 1 && monthBox.bottom <= viewport.bottom + 1,
+        monthAbove: monthBox.bottom <= viewport.top,
+        headingVisible: headingBox.top >= viewport.top - 1 && headingBox.bottom <= viewport.bottom + 1,
+        headingAbove: headingBox.bottom <= viewport.top,
+      }
+    } finally {
+      await scroll(initialScroll)
+    }
+  })
+  assert(Math.abs(layout.taskTravel - 300) <= 1, '主滚动区向下滚动时任务卡同步移动')
+  assert(monthSticks ? layout.monthVisible : layout.monthAbove, '月历在高双栏完整可见，在矮屏和单栏随任务滚走')
+  assert(headingSticks ? layout.headingVisible : layout.headingAbove, '日期摘要在桌面双栏保持可见，在单栏随任务滚走')
+}
+
 export function createTaskCalendarScenarios(deps) {
   const { assert, path, outputDir } = deps
   const mobileBase = mobileTaskListOptionsScenario(deps)
@@ -218,6 +252,14 @@ revision,
           await filters.getByRole('button', { name: '收起', exact: true }).click()
         }
         assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30)
+        await verifyCalendarScroll(calendar, assert, { monthSticks: !mobile, headingSticks: !mobile })
+        if (!mobile && themeMode === 'light') {
+          await page.setViewportSize({ width: 1280, height: 700 })
+          await verifyCalendarScroll(calendar, assert, { monthSticks: false, headingSticks: true })
+          await page.setViewportSize({ width: 760, height: 900 })
+          await verifyCalendarScroll(calendar, assert, { monthSticks: false, headingSticks: false })
+          await page.setViewportSize(viewport)
+        }
         const monthBefore = await calendar.locator('.workflow-task-calendar__month').boundingBox()
         const emptyDay = calendar.locator('button[data-date][aria-label$="，0 项待办"]').first()
         const emptySelection = await emptyDay.getAttribute('data-date')
@@ -441,11 +483,6 @@ revision,
           await verifyMobileNavigationMotion(page, assert, switcher, 1, true)
         }
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
-        if (!mobile) {
-          await page.goto(new URL('/erp/dashboard', page.url()).href)
-          await page.getByRole('button', { name: '待办日历', exact: true }).click()
-          await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
-        }
         assert(calls.every((q) => mobile ? q.method === 'list_role_tasks' && q.role_key === 'engineering' && q.view_key === 'todo' : q.method === 'get_task_board' && q.todo_only === true), 'both views preserve their original server scope')
         await calendar.getByRole('button', { name: '今天', exact: true }).click()
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
@@ -546,7 +583,7 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
       await calendar.getByRole('button', { name: /^2026-11-01/ }).waitFor()
       await calendar.getByRole('button', { name: '今天', exact: true }).click()
       await frame.locator('.nav-item[data-page="dashboard"]').click()
-      await frame.getByRole('button', { name: '待办日历', exact: true }).click()
+      await frame.locator('.nav-item[data-page="tasks"]').click()
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
       await page.screenshot({ path: path.join(outputDir, 'task-calendar-design-desktop-4k.png') })
       await page.goto(new URL('/__dev/ui-design?page=mobile-tasks', page.url()).href)

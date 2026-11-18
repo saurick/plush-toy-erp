@@ -14,7 +14,7 @@ type PurchaseFollowupAccess struct {
 
 type PurchaseFollowupQuery struct {
 	Kind, Keyword, Confirmation, StartDate, SelectedDate string
-	SupplierID, OrderID, Limit, Offset                   int
+	SupplierID, OrderID, SalesOrderID, Limit, Offset     int
 	WarehouseScope                                       WarehouseDataScope
 	SnapshotAt                                           time.Time
 	Access                                               PurchaseFollowupAccess
@@ -68,7 +68,7 @@ func (uc *PurchaseOrderUsecase) ListPurchaseFollowups(ctx context.Context, q Pur
 	if q.Limit == 0 {
 		q.Limit = 25
 	}
-	if q.Limit < 1 || q.Limit > 200 || q.Offset < 0 || q.OrderID < 0 || q.SupplierID < 0 || len([]rune(q.Keyword)) > 100 {
+	if q.Limit < 1 || q.Limit > 200 || q.Offset < 0 || q.OrderID < 0 || q.SalesOrderID < 0 || q.SupplierID < 0 || len([]rune(q.Keyword)) > 100 {
 		return nil, ErrBadParam
 	}
 	if q.Confirmation != "all" && q.Confirmation != "confirmed" && q.Confirmation != "unconfirmed" {

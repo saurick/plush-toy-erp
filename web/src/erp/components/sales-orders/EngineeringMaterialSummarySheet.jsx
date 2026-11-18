@@ -8,7 +8,7 @@ import {
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
-import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
+import { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
 import {
   BusinessHelpLabel,
   BusinessPageHelpTrigger,
@@ -278,13 +278,10 @@ export default function EngineeringMaterialSummarySheet({
             key={product.sales_order_item_id}
             className="erp-material-product"
           >
-            <WorkflowTaskProductImage
-              item={{
-                kind: 'product',
-                productID: product.product_id,
-                imageAttachmentID: product.sample_image_attachment_id,
-                name: product.product_name,
-              }}
+            <ProductThumbnail
+              productId={product.product_id}
+              name={product.product_name}
+              code={product.product_code}
             />
             <div className="erp-material-product__identity">
               <h3>{product.product_name || '产品名称未记录'}</h3>

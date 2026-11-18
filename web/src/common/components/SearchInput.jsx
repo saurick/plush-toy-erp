@@ -20,6 +20,7 @@ const SearchInput = forwardRef(
     {
       allowClear = false,
       defaultValue,
+      initialDraft,
       className = '',
       placeholder = '搜索关键词',
       searchHint,
@@ -35,6 +36,7 @@ const SearchInput = forwardRef(
   ) => {
     const search = useSubmittedSearch({
       value: restProps.value ?? defaultValue,
+      initialDraft,
       onSearch,
       resetKey,
     })

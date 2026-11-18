@@ -23,8 +23,9 @@ export function FinanceCreditEditor({
   submitCredit,
 }) {
   const isCreatingCredit = creditOpen !== 'reverse'
-
   const CreditEditor = isCreatingCredit ? BusinessFormPage : BusinessFormModal
+  const reversalFieldClass = isCreatingCredit ? undefined : 'erp-business-action-form__field--full'
+  const reasonLabel = isCreatingCredit ? '原因' : '冲回原因'
 
   return (
     <CreditEditor
@@ -80,6 +81,7 @@ export function FinanceCreditEditor({
         ) : null}
         <Form.Item
           name="credit_note_no"
+          className={reversalFieldClass}
           label={creditOpen === 'reverse' ? '冲销单号' : '红冲单号'}
           rules={[{ required: true, whitespace: true, message: '请填写单号' }]}
         >
@@ -104,8 +106,9 @@ export function FinanceCreditEditor({
         ) : null}
         <Form.Item
           name="reason"
-          label="原因"
-          rules={[{ required: true, whitespace: true, message: '请填写原因' }]}
+          className={reversalFieldClass}
+          label={reasonLabel}
+          rules={[{ required: true, whitespace: true, message: `请填写${reasonLabel}` }]}
         >
           <Input.TextArea rows={3} maxLength={255} showCount />
         </Form.Item>

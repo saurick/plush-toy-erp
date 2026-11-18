@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { operationalFactActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
@@ -56,8 +57,8 @@ test('production facts load the exact draft before opening the shared editor', (
 })
 
 test('finance cancellation requires a bounded business reason and sends it to the canonical action', () => {
-  assert.match(source, /'作废财务草稿'/)
-  assert.match(source, /'取消财务记录'/)
+  assert.equal(operationalFactActionPresentation('finance', { fact_type: 'PAYABLE', status: 'DRAFT' }, 'cancel').label, '作废应付账款草稿')
+  assert.equal(operationalFactActionPresentation('finance', { fact_type: 'PAYABLE', status: 'POSTED' }, 'cancel').label, '取消应付账款')
   assert.match(source, /<label htmlFor="operational-fact-cancel-reason">业务原因<\/label>/u)
   assert.match(source, /id="operational-fact-cancel-reason"[\s\S]*?placeholder="填写业务原因"/u)
   assert.match(source, /maxLength=\{255\}/)
@@ -72,10 +73,10 @@ test('draft facts can exit without pretending an inventory reversal happened', (
     source,
     /\['DRAFT', 'POSTED'\]\.includes\(activeSelectedRow\.status\)/u
   )
-  assert.match(source, /草稿尚未过账，不会变更库存/u)
-  assert.match(source, /草稿尚未确认，作废不会生成过账或库存变更/u)
+  assert.match(operationalFactActionPresentation('production', { fact_type: 'MATERIAL_ISSUE', status: 'DRAFT' }, 'cancel').description, /草稿尚未生效，作废不会改变库存/u)
+  assert.match(operationalFactActionPresentation('finance', { fact_type: 'PAYABLE', status: 'DRAFT' }, 'cancel').description, /作废不会产生正式财务结果或库存变动/u)
   assert.match(source, /const cancelButtonLabel/u)
-  assert.match(source, /'作废草稿'/u)
+  assert.match(source, /cancelPresentation\?\.label/u)
   assert.match(source, /'取消'/u)
   assert.match(source, />\s*\{cancelButtonLabel\}\s*</u)
 })
@@ -86,9 +87,9 @@ test('production completion actions use warehouse inbound permission and busines
   assert.match(source, /const canPostSelected/u)
   assert.match(source, /const canCancelSelected/u)
   assert.match(source, /只有仓库岗位可以核对并确认成品入库/u)
-  assert.match(source, /确认实收并增加成品库存/u)
-  assert.match(source, /作废完工报告/u)
-  assert.match(source, /撤销成品入库/u)
+  assert.match(operationalFactActionPresentation('production', { fact_type: 'FINISHED_GOODS_RECEIPT' }).title, /确认实收并增加成品库存/u)
+  assert.equal(operationalFactActionPresentation('production', { fact_type: 'FINISHED_GOODS_RECEIPT', status: 'DRAFT' }, 'cancel').label, '作废完工报告')
+  assert.equal(operationalFactActionPresentation('production', { fact_type: 'FINISHED_GOODS_RECEIPT', status: 'POSTED' }, 'cancel').label, '撤销成品入库')
 })
 
 test('finance draft actions fail closed when a historical row lacks a formal source', () => {
@@ -110,7 +111,7 @@ test('production and outsourcing historical drafts fail closed without source co
     source,
     /const sourceBoundDraftTransitionBlocked\s*=\s*[\s\S]*\['production', 'outsourcing'\]\.includes\(currentActiveKey\)[\s\S]*hasRequiredOperationalFactDraftSource/u
   )
-  assert.match(source, /该历史草稿缺少可核对来源，不能过账或作废/u)
+  assert.match(source, /该历史草稿缺少可核对来源，不能确认或作废/u)
   assert.ok(
     (source.match(/sourceBoundDraftTransitionBlocked \|\|/gu)?.length || 0) >=
       4,
@@ -144,24 +145,23 @@ test('finance page derives projection, permission and settlement from the filter
   assert.match(source, /financeSettlementAction\.label/u)
   assert.match(
     source,
-    /currentActiveKey === 'finance'[\s\S]*runRowAction\(activeConfig, activeSelectedRow, 'post', '确认'\)/u
+    /currentActiveKey === 'finance'[\s\S]*runRowAction\(activeConfig, activeSelectedRow, 'post', postButtonLabel\)/u
   )
   assert.doesNotMatch(source, /确认结清当前财务记录/u)
   assert.doesNotMatch(source, /activeConfig\.initialValues/u)
 })
 
 test('post-success refresh failure is not reported as a failed cancellation', () => {
-  assert.match(mutations, /已完成，请稍后刷新查看最新结果/)
+  assert.match(mutations, /\$\{successText\}，请稍后刷新查看最新结果/)
   assert.match(mutations, /return false/)
   assert.match(mutations, /return true/)
 })
 
-test('only posted rework feedback explains the atomic exception handoff', () => {
-  assert.match(
-    mutations,
-    /currentActiveKey === 'production'[\s\S]{0,180}actionKey === 'post'[\s\S]{0,180}row\.fact_type[\s\S]{0,180}'REWORK'/u
-  )
-  assert.match(mutations, /返工记录已过账，返工补制批次和生产异常任务已生成/u)
+test('only confirmed rework feedback explains the atomic exception handoff', () => {
+  assert.match(mutations, /operationalFactActionPresentation\(currentActiveKey, row, actionKey\)\.success/u)
+  const record = { fact_type: 'REWORK', status: 'DRAFT' }
+  assert.match(operationalFactActionPresentation('production', record).success, /返工补制批次和生产异常任务已生成/u)
+  assert.doesNotMatch(operationalFactActionPresentation('production', record, 'cancel').success, /生产异常任务已生成/u)
   assert.doesNotMatch(mutations, /发起生产异常/u)
 })
 
@@ -241,7 +241,7 @@ test('production rework uses a source-bound retry-safe command and rereads unkno
     productionActions,
     /findProductionReworkResult\(currentFacts, attempt\.params\)/u
   )
-  assert.match(productionActions, /已重新读取并确认返工草稿，请核对后过账/u)
+  assert.match(productionActions, /已重新读取并确认返工草稿，请核对后确认返工/u)
   assert.match(productionActions, /setProductionReworkContext\(null\)/u)
   assert.match(source, /<ProductionReworkModal/u)
 })

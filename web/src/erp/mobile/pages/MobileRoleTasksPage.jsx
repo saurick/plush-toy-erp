@@ -1182,7 +1182,8 @@ export default function MobileRoleTasksPage() {
   )
 
   const handleSelectTaskID = useCallback(
-    (taskID, { linked = false } = {}) => {
+    async (taskID, { linked = false } = {}) => {
+      if (selectedTaskID !== taskID && taskFormLeaveGuard.current && !(await taskFormLeaveGuard.current())) return
       setTaskFormMode(false)
       setTaskFormReceipt(null)
       setSelectedLinkedTaskID(linked ? taskID : null)
@@ -1205,7 +1206,7 @@ export default function MobileRoleTasksPage() {
         pushMobileTaskScreen({ screen: 'detail', taskID, linked })
       }
     },
-    [activeTaskViewKey, clearActionReceipt, pushMobileTaskScreen]
+    [activeTaskViewKey, clearActionReceipt, pushMobileTaskScreen, selectedTaskID]
   )
 
   const materialDraftRef = useRef(initialHistoryState[MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY] || null)
@@ -1411,10 +1412,8 @@ export default function MobileRoleTasksPage() {
       currentTaskScreenRef.current = 'detail'
     })
   }, [flushMobileTaskDraftHistory, handleScreenBack])
-  const handleReceiptBackToList = useCallback(() => {
+  const handleReceiptBackToList = useCallback(async () => {
     restoreListStateRef.current = true
-    receiptDetailSnapshotRef.current = null
-    setReceiptDetailSnapshot(null)
     if (typeof window !== 'undefined') {
       const depth = Number(
         window.history.state?.[MOBILE_TASK_HISTORY_DEPTH_KEY] || 0
@@ -1424,6 +1423,9 @@ export default function MobileRoleTasksPage() {
         return
       }
     }
+    if (taskFormLeaveGuard.current && !(await taskFormLeaveGuard.current())) return
+    receiptDetailSnapshotRef.current = null
+    setReceiptDetailSnapshot(null)
     clearActionReceipt()
     setTaskFormReceipt(null)
     setTaskFormMode(false)

@@ -20,7 +20,7 @@ export const SHIPMENT_STATUS_OPTIONS = [
 ]
 
 export const SHIPMENT_DATE_FILTER_OPTIONS = [
-  { label: '计划出货日期', value: 'planned_ship_at' },
+  { label: '计划出货日期', value: 'planned_ship_at', upcoming: true },
   { label: '实际出货日期', value: 'shipped_at' },
 ]
 

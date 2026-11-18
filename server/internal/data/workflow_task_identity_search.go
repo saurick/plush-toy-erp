@@ -21,23 +21,31 @@ type workflowIdentitySearchSource struct {
 	additional                                            []string
 }
 
-var workflowIdentitySearchSources = []workflowIdentitySearchSource{
-	{kind: "sales_order", types: []any{"sales_order", "sales-orders", "project-orders"}, table: "sales_order_items", sourceColumn: "sales_order_id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", headerTable: "sales_orders", headerNo: "order_no"},
-	{kind: "purchase_order", types: []any{"purchase_order", "purchase-order", "accessories-purchase"}, table: "purchase_order_items", sourceColumn: "purchase_order_id", materialColumn: "material_id", materialName: "material_name_snapshot", materialCode: "material_code_snapshot", additional: []string{"product_name_snapshot", "product_no_snapshot", "product_order_no_snapshot"}, headerTable: "purchase_orders", headerNo: "purchase_order_no"},
-	{kind: "outsourcing_order", types: []any{"outsourcing_order", "outsourcing-order", "processing-contracts"}, table: "outsourcing_order_items", sourceColumn: "outsourcing_order_id", productColumn: "product_id", materialColumn: "material_id", productName: "product_name_snapshot", productCode: "product_no_snapshot", materialName: "material_name_snapshot", materialCode: "material_code_snapshot", additional: []string{"product_order_no_snapshot"}, headerTable: "outsourcing_orders", headerNo: "outsourcing_order_no"},
-	{kind: "production_order", types: []any{"production_order", "production-order", "production-orders"}, table: "production_order_items", sourceColumn: "production_order_id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id", headerTable: "production_orders", headerNo: "order_no"},
-	{kind: "production_wip_batch", types: []any{"production_wip_batch"}, table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
-	{kind: "production_packaging_confirmation", types: []any{"production_packaging_confirmation"}, table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
-	{kind: "outsourcing_fact", types: []any{"outsourcing_fact"}, table: "outsourcing_facts", sourceColumn: "id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", additional: []string{"fact_no"}},
-	{kind: "finance_payment", types: []any{"finance_payment"}, table: "finance_payments", sourceColumn: "id", additional: []string{"payment_no"}},
-	{kind: "purchase_receipt", types: []any{"purchase_receipt", "purchase-receipt", "inbound"}, table: "purchase_receipt_items", sourceColumn: "receipt_id", materialColumn: "material_id", headerTable: "purchase_receipts", headerNo: "receipt_no"},
-	{kind: "shipment", types: []any{"shipment", "shipments"}, table: "shipment_items", sourceColumn: "shipment_id", productColumn: "product_id", salesItemColumn: "sales_order_item_id", headerTable: "shipments", headerNo: "shipment_no"},
-	{kind: "bom_header", types: []any{"bom_header", "material-bom"}, table: "bom_headers", sourceColumn: "id", productColumn: "product_id", additional: []string{"source_order_no"}},
-	{kind: "quality_inspection", types: []any{"quality_inspection", "quality-inspection", "quality-inspections"}, table: "quality_inspections", sourceColumn: "id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", additional: []string{"inspection_no"}},
-	{kind: "production_fact", types: []any{"production_fact", "production-fact", "production-progress"}, table: "production_facts", sourceColumn: "id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", additional: []string{"fact_no"}},
-	{kind: "inventory_operation", types: []any{"inventory_operation"}, table: "inventory_operation_items", sourceColumn: "operation_id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", headerTable: "inventory_operations", headerNo: "operation_no"},
-	{kind: "production_exception_decision", types: []any{"production_exception_decision"}, table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
-}
+var workflowIdentitySearchSources = func() []workflowIdentitySearchSource {
+	sources := []workflowIdentitySearchSource{
+		{kind: "sales_order", table: "sales_order_items", sourceColumn: "sales_order_id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", headerTable: "sales_orders", headerNo: "order_no"},
+		{kind: "purchase_order", table: "purchase_order_items", sourceColumn: "purchase_order_id", materialColumn: "material_id", materialName: "material_name_snapshot", materialCode: "material_code_snapshot", additional: []string{"product_name_snapshot", "product_no_snapshot", "product_order_no_snapshot"}, headerTable: "purchase_orders", headerNo: "purchase_order_no"},
+		{kind: "outsourcing_order", table: "outsourcing_order_items", sourceColumn: "outsourcing_order_id", productColumn: "product_id", materialColumn: "material_id", productName: "product_name_snapshot", productCode: "product_no_snapshot", materialName: "material_name_snapshot", materialCode: "material_code_snapshot", additional: []string{"product_order_no_snapshot"}, headerTable: "outsourcing_orders", headerNo: "outsourcing_order_no"},
+		{kind: "production_order", table: "production_order_items", sourceColumn: "production_order_id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id", headerTable: "production_orders", headerNo: "order_no"},
+		{kind: "production_wip_batch", table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
+		{kind: "production_packaging_confirmation", table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
+		{kind: "outsourcing_fact", table: "outsourcing_facts", sourceColumn: "id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", additional: []string{"fact_no"}},
+		{kind: "finance_payment", table: "finance_payments", sourceColumn: "id", additional: []string{"payment_no"}},
+		{kind: "purchase_receipt", table: "purchase_receipt_items", sourceColumn: "receipt_id", materialColumn: "material_id", headerTable: "purchase_receipts", headerNo: "receipt_no"},
+		{kind: "shipment", table: "shipment_items", sourceColumn: "shipment_id", productColumn: "product_id", salesItemColumn: "sales_order_item_id", headerTable: "shipments", headerNo: "shipment_no"},
+		{kind: "bom_header", table: "bom_headers", sourceColumn: "id", productColumn: "product_id", additional: []string{"source_order_no"}},
+		{kind: "quality_inspection", table: "quality_inspections", sourceColumn: "id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", additional: []string{"inspection_no"}},
+		{kind: "production_fact", table: "production_facts", sourceColumn: "id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", additional: []string{"fact_no"}},
+		{kind: "inventory_operation", table: "inventory_operation_items", sourceColumn: "operation_id", productColumn: "subject_id", materialColumn: "subject_id", subjectColumn: "subject_type", headerTable: "inventory_operations", headerNo: "operation_no"},
+		{kind: "production_exception_decision", table: "production_order_items", sourceColumn: "id", productColumn: "product_id", productName: "product_name_snapshot", productCode: "product_code_snapshot", salesItemColumn: "sales_order_item_id"},
+	}
+	for i := range sources {
+		for _, source := range biz.WorkflowDocumentSourceTypes(sources[i].kind) {
+			sources[i].types = append(sources[i].types, source)
+		}
+	}
+	return sources
+}()
 
 func workflowIdentitySnapshotSearch(item *entsql.SelectTable, snapshot string, master string, keyword string) *entsql.Predicate {
 	if snapshot == "" {

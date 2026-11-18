@@ -27,6 +27,8 @@ export function workflowTaskEntryNavigation(task, entryPath, returnPath, adminID
   const returnListState = typeof window === 'undefined' ? null : Object.fromEntries(
     Object.entries(window.history.state || {}).filter(([key]) => key.startsWith('mobileRoleTasks') && !/(Draft|Reason|Quantity)$/u.test(key))
   )
+  const progressOrigin = typeof window !== 'undefined' && window.history.state?.usr?.progressOrigin
+  const origin = progressOrigin && progressOrigin.adminID === adminID && returnPath.startsWith('/erp/task-board?') ? { progressOrigin } : {}
   const returnContext = { taskID: task.id, adminID, returnSource, returnPath, returnPosition, returnListState }
   if (typeof window !== 'undefined') {
     const state = window.history.state || {}
@@ -42,6 +44,7 @@ usr: {
     entryPath,
     returnPath,
     adminID,
+    ...origin,
     returnSource,
     returnPosition,
     returnListState,
@@ -78,6 +81,7 @@ export function workflowTaskReturnNavigation(navigation, historyIndex, roleKey =
     options: { ...(businessReceipt ? { replace: true } : {}),
 state: {
       clearWorkflowTaskNavigation: true,
+      ...(navigation?.progressOrigin ? { progressOrigin: navigation.progressOrigin } : {}),
       workflowTaskReturn: { taskID, adminID, returnSource, returnPath, returnPosition, returnListState: returnListState ? { ...returnListState, mobileRoleTasksDepth: 0 } : null, businessReceipt },
     } } }
 }

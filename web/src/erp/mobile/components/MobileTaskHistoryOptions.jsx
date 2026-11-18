@@ -21,18 +21,16 @@ export default function MobileTaskHistoryOptions({ options, onChange, sourceType
       testId="mobile-history-filter-trigger"
       onReset={onReset}
     >
-      <fieldset role="presentation">
-        <legend>处理结果</legend>
-        <BusinessStatusFilter
-          counts={counts}
-          loading={loading}
-          allLabel="全部结果"
-          aria-label="处理结果筛选"
-          value={statusKey}
-          options={WORKFLOW_HISTORY_STATUS_OPTIONS}
-          onChange={(value) => onChange({ statusKey: value })}
-        />
-      </fieldset>
+      <BusinessStatusFilter
+        label="处理结果"
+        counts={counts}
+        loading={loading}
+        allLabel="全部结果"
+        aria-label="处理结果筛选"
+        value={statusKey}
+        options={WORKFLOW_HISTORY_STATUS_OPTIONS}
+        onChange={(value) => onChange({ statusKey: value })}
+      />
       <MobileTaskExtraFilters options={options} sourceTypes={sourceTypes} history onChange={onChange} />
     </MobileFilterPopover>
   )

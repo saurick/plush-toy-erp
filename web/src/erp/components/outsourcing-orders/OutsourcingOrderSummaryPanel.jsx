@@ -23,6 +23,7 @@ import {
   SearchInput,
   SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
+import { OUTSOURCING_ORDER_DATE_FILTER_OPTIONS } from './outsourcingOrderPageConfig.mjs'
 import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
 import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'
@@ -323,15 +324,11 @@ export default forwardRef((
             />
             <DateRangeFilter
               value={filters.date_field}
-              options={[
-                { value: 'order_date', label: '下单日期' },
-                { value: 'expected_return_date', label: '预计回货日期' },
-              ]}
+              options={OUTSOURCING_ORDER_DATE_FILTER_OPTIONS}
               onTypeChange={(date) => update({ date })}
               startValue={filters.date_from?.slice(0, 10) || ''}
               endValue={filters.date_to?.slice(0, 10) || ''}
-              onStartChange={(from) => update({ from })}
-              onEndChange={(to) => update({ to })}
+              onRangeChange={(from, to) => update({ from, to })}
             />
           </>
         }

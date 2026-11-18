@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isCompleteDateRange, selectDateRangeDay } from './filterDateRange.mjs'
+import { dateFilterPresets, isCompleteDateRange, selectDateRangeDay } from './filterDateRange.mjs'
 import { isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
 import { progressQueryFromURL } from './businessProgress.mjs'
 
@@ -37,4 +37,20 @@ test('进度两端共用日期恢复规则，拒绝不存在日期及倒置范�
     assert.equal(query.date_from, '')
     assert.equal(query.date_to, '')
   }
+})
+
+test('时间范围包含当天，跨月、跨年和闰日仍覆盖约定的自然日数', () => {
+  const ranges = (date, upcoming) => Object.fromEntries(dateFilterPresets(upcoming, date)
+    .filter((option) => option.value !== 'custom')
+    .map(({ value, from, to }) => [value, [from, to]]))
+  assert.deepEqual(ranges('2026-01-01', true), {
+    '': ['', ''],
+    today: ['2026-01-01', '2026-01-01'],
+    '7d': ['2025-12-26', '2026-01-01'],
+    '30d': ['2025-12-03', '2026-01-01'],
+    next7d: ['2026-01-01', '2026-01-07'],
+  })
+  const history = ranges('2024-03-01', false)
+  assert.deepEqual(history['7d'], ['2024-02-24', '2024-03-01'])
+  assert.equal(history.next7d, undefined)
 })

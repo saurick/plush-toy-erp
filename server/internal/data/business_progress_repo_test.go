@@ -14,6 +14,102 @@ import (
 	"server/internal/data/model/ent"
 )
 
+func TestBusinessProgressDeliveryLinesUsePostedFactsAndParentScope(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderRepoTest(t, "progress_delivery_lines")
+	now := time.Date(2026, 11, 15, 4, 0, 0, 0, time.UTC)
+	so := f.client.SalesOrder.Query().OnlyX(ctx)
+	f.client.SalesOrder.UpdateOneID(so.ID).SetLifecycleStatus("active").SetPlannedDeliveryDate(now.AddDate(0, 0, -2)).SaveX(ctx)
+	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetProductNameSnapshot("交付小熊").SaveX(ctx)
+	unit := f.client.Unit.Create().SetCode("SET-DELIVERY").SetName("套").SaveX(ctx)
+	rabbit := f.client.SalesOrderItem.Create().SetSalesOrderID(so.ID).SetLineNo(2).SetProductID(f.productID).
+		SetProductNameSnapshot("交付挂兔").SetCustomerProductNo("RABBIT-02").SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(8)).
+		SetPlannedDeliveryDate(now.AddDate(0, 0, 3)).SaveX(ctx)
+	closed := f.client.SalesOrder.Create().SetOrderNo("SO-PROGRESS-CLOSED").SetCustomerID(so.CustomerID).SetOrderDate(now).
+		SetLifecycleStatus("closed").SetPlannedDeliveryDate(now.AddDate(0, 0, -4)).SaveX(ctx)
+	f.client.SalesOrderItem.Create().SetSalesOrderID(closed.ID).SetLineNo(1).SetProductID(f.productID).
+		SetUnitID(f.unitID).SetOrderedQuantity(decimal.NewFromInt(8)).SaveX(ctx)
+	w := createTestProductWarehouse(t, ctx, f.client, "DELIVERY-LINES-WH")
+	for _, ship := range []struct {
+		no, status string
+		item, unit int
+		quantity   int64
+	}{
+		{"LINE-POSTED", "SHIPPED", f.salesItemID, f.unitID, 6},
+		{"LINE-CANCELED", "CANCELLED", f.salesItemID, f.unitID, 19},
+		{"LINE-COMPLETE", "SHIPPED", rabbit.ID, unit.ID, 8},
+	} {
+		header := f.client.Shipment.Create().SetShipmentNo(ship.no).SetSalesOrderID(so.ID).
+			SetStatus(ship.status).SetIdempotencyKey(ship.no).SaveX(ctx)
+		f.client.ShipmentItem.Create().SetShipmentID(header.ID).SetSalesOrderItemID(ship.item).
+			SetProductID(f.productID).SetWarehouseID(w.ID).SetUnitID(ship.unit).SetQuantity(decimal.NewFromInt(ship.quantity)).SaveX(ctx)
+	}
+	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
+	q := biz.BusinessProgressQuery{View: "orders", Display: "lines", SnapshotAt: now, Limit: 1,
+		Access: biz.BusinessProgressAccess{Sales: true}, ID: so.ID, CustomerID: so.CustomerID}
+	read := func(query biz.BusinessProgressQuery) *biz.BusinessProgressBoard {
+		t.Helper()
+		result, err := uc.List(ctx, query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	first := read(q)
+	if first.Total != 2 || first.Counts.Overdue != 1 || first.Counts.Delivery.Delivered != 1 || len(first.Rows) != 1 {
+		t.Fatalf("counts must precede pagination and keep the shipped sibling: %+v", first)
+	}
+	row := first.Rows[0]
+	for _, field := range []string{biz.BusinessProgressSortDueDate, biz.BusinessProgressSortProduct, biz.BusinessProgressSortOrderNo} {
+		ordered := q
+		ordered.SortBy, ordered.SortDirection = field, "desc"
+		firstID, secondID := rabbit.ID, f.salesItemID
+		if field == biz.BusinessProgressSortOrderNo {
+			firstID, secondID = f.salesItemID, rabbit.ID
+		}
+		for offset, want := range []int{firstID, secondID} {
+			ordered.Offset = offset
+			got := read(ordered)
+			if got.Total != first.Total || len(got.Rows) != 1 || got.Rows[0].ID != want {
+				t.Fatalf("line sort=%s offset=%d want=%d rows=%+v", field, offset, want, got.Rows)
+			}
+		}
+	}
+	if row.Line == nil || row.Line.OrderID != so.ID || row.Line.DeliveryStatus != "overdue" ||
+		row.DueDate != "2026-11-13" || row.ShippedQuantity == nil || *row.ShippedQuantity != "6" ||
+		row.Line.RemainingQuantity == nil || *row.Line.RemainingQuantity != "14" {
+		t.Fatalf("unexpected partial shipment: %+v line=%+v", row, row.Line)
+	}
+	q.Offset = 1
+	second := read(q)
+	if len(second.Rows) != 1 || second.Rows[0].ID != rabbit.ID || second.Rows[0].Unit != "套" || second.Rows[0].DueDate != "2026-11-18" {
+		t.Fatalf("line date and unit must stay independent: %+v", second.Rows)
+	}
+	q.Offset, q.DateFrom, q.DateTo = 0, "2026-11-17", "2026-11-19"
+	dateFiltered := read(q)
+	if dateFiltered.Total != 1 || len(dateFiltered.Rows) != 1 || dateFiltered.Rows[0].ID != rabbit.ID {
+		t.Fatalf("date range must use the line delivery date: %+v", dateFiltered)
+	}
+	q.DateFrom, q.DateTo, q.Keyword = "", "", "RABBIT-02"
+	found := read(q)
+	if found.Total != 1 || len(found.Rows) != 1 || found.Rows[0].ID != rabbit.ID {
+		t.Fatalf("search must match the selected line, not sibling lines: %+v", found)
+	}
+	q.Keyword, q.ID, q.Scope, q.DeliveryStatus = "", 0, "all", "closed"
+	history := read(q)
+	if history.Total != 1 || len(history.Rows) != 1 || history.Rows[0].Line.OrderID != closed.ID || history.Counts.Overdue != 1 {
+		t.Fatalf("closed and unfulfilled is separate from the overdue filter: %+v", history)
+	}
+	bad := f.client.Shipment.Create().SetShipmentNo("LINE-UNKNOWN").SetSalesOrderID(so.ID).SetStatus("SHIPPED").SetIdempotencyKey("LINE-UNKNOWN").SaveX(ctx)
+	f.client.ShipmentItem.Create().SetShipmentID(bad.ID).SetProductID(f.productID).SetWarehouseID(w.ID).
+		SetUnitID(f.unitID).SetQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+	q.ID, q.DeliveryStatus = so.ID, "unknown"
+	unknown := read(q)
+	if unknown.Total != 2 || len(unknown.Rows) != 1 || unknown.Rows[0].ShippedQuantity != nil || unknown.Rows[0].Line.RemainingQuantity != nil {
+		t.Fatalf("missing shipment linkage must never read as zero: %+v", unknown)
+	}
+}
+
 func TestBusinessProgressBlockedPriorityBeforePaginationRespectsVisibility(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "progress_priority")
@@ -34,6 +130,18 @@ func TestBusinessProgressBlockedPriorityBeforePaginationRespectsVisibility(t *te
 	second, err := uc.List(ctx, q)
 	if err != nil || len(second.Rows) != 1 || second.Rows[0].ID != overdue.ID || second.Rows[0].Blocked {
 		t.Fatalf("pagination must keep priority and hide inaccessible tasks: %+v %v", second, err)
+	}
+	undated := f.client.SalesOrder.Create().SetOrderNo("SO-UNDATED").SetCustomerID(overdue.CustomerID).SetOrderDate(now).SetLifecycleStatus("active").SaveX(ctx)
+	for direction, ids := range map[string][]int{"asc": {overdue.ID, future.ID, undated.ID}, "desc": {future.ID, overdue.ID, undated.ID}} {
+		sorted := q
+		sorted.SortBy, sorted.SortDirection = biz.BusinessProgressSortDueDate, direction
+		for offset, want := range ids {
+			sorted.Offset = offset
+			board, err := uc.List(ctx, sorted)
+			if err != nil || board.Total != len(ids) || board.Counts.Blocked != 1 || len(board.Rows) != 1 || board.Rows[0].ID != want {
+				t.Fatalf("direction=%s offset=%d want=%d board=%v err=%v", direction, offset, want, board, err)
+			}
+		}
 	}
 	q.Offset, q.Access.Tasks, q.TaskVisibility = 0, false, nil
 	withoutTasks, err := uc.List(ctx, q)
@@ -414,13 +522,23 @@ func TestBusinessProgressOwnerChoicesRespectSourceAndTaskVisibility(t *testing.T
 			t.Fatalf("owner=%s board=%+v err=%v", name, board, err)
 		}
 	}
+	q.Display, q.OwnerName = "lines", "李华"
+	board, err := uc.List(ctx, q)
+	if err != nil || board.Total == 0 {
+		t.Fatalf("lines=%+v err=%v", board, err)
+	}
+	for _, line := range board.Rows {
+		if line.Line.OrderID != first.ID {
+			t.Fatal(line)
+		}
+	}
 	q.Access.Tasks = false
 	q.TaskVisibility = nil
 	names, err = uc.Owners(ctx, q)
 	if err != nil || !slices.Equal(names.Names, []string{"李华", "李华明"}) {
 		t.Fatal(names, err)
 	}
-	q.View, q.OwnerName = "production", ""
+	q.View, q.Display, q.OwnerName = "production", "", ""
 	q.Access = biz.BusinessProgressAccess{Production: true}
 	names, err = uc.Owners(ctx, q)
 	if err != nil || len(names.Names) != 0 {

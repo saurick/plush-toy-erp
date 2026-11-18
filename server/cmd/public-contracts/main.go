@@ -526,6 +526,9 @@ func collectCatalog(root string, review bool) (catalog, error) {
 		}
 	}
 	for _, source := range []struct{ path, prefix, export string }{
+		{"biz/workflow_task_board.go", "WorkflowTaskBoardSort", "WorkflowTaskBoardSort"},
+		{"biz/business_progress.go", "BusinessProgressSort", "BusinessProgressSort"},
+		{"biz/sales_order_summary.go", "WorkbenchSummarySort", "WorkbenchSummarySort"},
 		{"biz/warehouse_production_work.go", "WarehouseProductionKind", "WarehouseProductionKind"},
 		{"biz/warehouse_production_work.go", "WarehouseProductionStage", "WarehouseProductionStage"},
 		{"biz/bom_source_snapshot.go", "BOMLossSource", "BOMLossSource"},

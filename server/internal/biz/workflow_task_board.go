@@ -16,6 +16,8 @@ const (
 	WorkflowTaskBoardSortSmart      = "smart"
 	WorkflowTaskBoardSortDueSoon    = "due_soon"
 	WorkflowTaskBoardSortNewest     = "newest"
+	WorkflowTaskBoardSortTimeAsc    = "time_asc"
+	WorkflowTaskBoardSortTimeDesc   = "time_desc"
 
 	WorkflowTaskBoardDueWindow    = 24 * time.Hour
 	workflowTaskBoardDefaultLimit = WorkCenterDefaultLimit
@@ -56,9 +58,11 @@ func ValidWorkflowTaskListFilters(due, sourceType string) bool {
 }
 
 var workflowTaskBoardSortKeys = map[string]struct{}{
-	WorkflowTaskBoardSortSmart:   {},
-	WorkflowTaskBoardSortDueSoon: {},
-	WorkflowTaskBoardSortNewest:  {},
+	WorkflowTaskBoardSortSmart:    {},
+	WorkflowTaskBoardSortDueSoon:  {},
+	WorkflowTaskBoardSortNewest:   {},
+	WorkflowTaskBoardSortTimeAsc:  {},
+	WorkflowTaskBoardSortTimeDesc: {},
 }
 
 func WorkflowTaskBoardLaneKeys() []string {
@@ -143,6 +147,7 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	query.OwnerRoleKey = strings.ToLower(NormalizeRoleKey(query.OwnerRoleKey))
 	query.Due = strings.TrimSpace(query.Due)
 	query.SourceType = strings.TrimSpace(query.SourceType)
+	query.SourceSection = strings.TrimSpace(query.SourceSection)
 	query.LaneKey = strings.TrimSpace(query.LaneKey)
 	query.Sort = strings.TrimSpace(query.Sort)
 	query.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(query.VisibleOwnerRoleKeys)
@@ -157,6 +162,12 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	}
 	if query.SourceType == "all" {
 		query.SourceType = ""
+	}
+	if query.SourceSection == "all" {
+		query.SourceSection = ""
+	}
+	if !validWorkflowDocumentSectionFilter(query.SourceSection, query.SourceType) {
+		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
 	if query.Status == "" {
 		query.Status = "all"

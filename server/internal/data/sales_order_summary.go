@@ -3,15 +3,81 @@ package data
 import (
 	"context"
 
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"server/internal/biz"
+	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/unit"
 )
 
 var _ biz.SalesOrderSummaryRepo = (*salesOrderRepo)(nil)
+
+// Sales summaries are ordered at line grain. Each key below uses the value
+// displayed on that line, including inherited dates and posted shipment facts.
+func salesOrderSummaryOrder(filter biz.SalesOrderSummaryFilter) salesorderitem.OrderOption {
+	if filter.SortBy == "" {
+		return salesorderitem.BySalesOrderField(salesorder.FieldOrderDate, sql.OrderDesc())
+	}
+	return func(s *sql.Selector) {
+		order := sql.Table(salesorder.Table)
+		orderColumn := func(field string) string {
+			s.Join(order).On(s.C(salesorderitem.FieldSalesOrderID), order.C(salesorder.FieldID))
+			return order.C(field)
+		}
+		nullIfEmpty := func(column string) string { return "NULLIF(" + column + ",'')" }
+		var value string
+		switch filter.SortBy {
+		case biz.WorkbenchSummarySortCustomerName:
+			value = nullIfEmpty(orderColumn(salesorder.FieldCustomerSnapshot) + "->>'name'")
+		case biz.WorkbenchSummarySortOrderNo, biz.WorkbenchSummarySortOrderDate:
+			value = orderColumn(filter.SortBy)
+		case biz.WorkbenchSummarySortCustomerOrderNo, biz.WorkbenchSummarySortSalesOwner, biz.WorkbenchSummarySortCurrency:
+			value = nullIfEmpty(orderColumn(filter.SortBy))
+		case biz.WorkbenchSummarySortPlannedDeliveryDate:
+			value = "COALESCE(" + s.C(salesorderitem.FieldPlannedDeliveryDate) + "," + orderColumn(salesorder.FieldPlannedDeliveryDate) + ")"
+		case biz.WorkbenchSummarySortProduct:
+			value = "COALESCE(" + nullIfEmpty(s.C(salesorderitem.FieldRequestedProductName)) + "," + nullIfEmpty(s.C(salesorderitem.FieldProductNameSnapshot)) + ")"
+		case biz.WorkbenchSummarySortUnitName:
+			u := sql.Table(unit.Table)
+			s.Join(u).On(s.C(salesorderitem.FieldUnitID), u.C(unit.FieldID))
+			value = u.C(unit.FieldName)
+		case biz.WorkbenchSummarySortDesigner:
+			bom := sql.Table(bomheader.Table)
+			s.LeftJoin(bom).On(s.C(salesorderitem.FieldBomID), bom.C(bomheader.FieldID))
+			value = nullIfEmpty(bom.C(bomheader.FieldDesigner))
+		case biz.WorkbenchSummarySortOrderedQuantity, biz.WorkbenchSummarySortSampleQuantity, biz.WorkbenchSummarySortUnitPrice:
+			value = "CAST(" + s.C(filter.SortBy) + " AS NUMERIC)"
+		case biz.WorkbenchSummarySortProductionQuantity:
+			value = s.C(salesorderitem.FieldOrderedQuantity) + "+" + s.C(salesorderitem.FieldPreShipmentSampleQuantity)
+		case biz.WorkbenchSummarySortUnshippedQuantity:
+			quantity, corrupt := shipmentSourceLineChecks(s)
+			maxFn := "GREATEST"
+			if s.Dialect() == dialect.SQLite {
+				maxFn = "MAX"
+			}
+			s.AppendSelectExprAs(sql.ExprFunc(func(b *sql.Builder) {
+				b.WriteString("CASE WHEN ").Join(sql.Exists(corrupt)).WriteString(" THEN NULL ELSE " + maxFn + "(0,").
+					Ident(s.C(salesorderitem.FieldOrderedQuantity)).WriteString("-").
+					Wrap(func(b *sql.Builder) { b.Join(quantity) }).WriteString(") END")
+			}), "summary_remaining")
+			value = "summary_remaining"
+		case biz.WorkbenchSummarySortLifecycleStatus:
+			// Keep the header state together and compare line state within it.
+			value = orderColumn(salesorder.FieldLifecycleStatus) + " || ':' || " + s.C(salesorderitem.FieldLineStatus)
+		case biz.WorkbenchSummarySortCustomerProductNo, biz.WorkbenchSummarySortOrderCategory, biz.WorkbenchSummarySortNote, biz.WorkbenchSummarySortProcessRequirement:
+			value = nullIfEmpty(s.C(filter.SortBy))
+		}
+		direction := " ASC"
+		if filter.SortDirection == "desc" {
+			direction = " DESC"
+		}
+		s.OrderExpr(sql.Expr(value + direction + " NULLS LAST"))
+	}
+}
 
 func (r *salesOrderRepo) ListSalesOrderSummary(ctx context.Context, filter biz.SalesOrderSummaryFilter) ([]*biz.SalesOrderSummaryRow, int, error) {
 	query := r.data.postgres.SalesOrderItem.Query()
@@ -71,7 +137,7 @@ func (r *salesOrderRepo) ListSalesOrderSummary(ctx context.Context, filter biz.S
 		return nil, 0, err
 	}
 	rows, err := query.WithSalesOrder().WithUnit().
-		Order(salesorderitem.BySalesOrderField(salesorder.FieldOrderDate, sql.OrderDesc()), salesorderitem.BySalesOrderID(sql.OrderDesc()),
+		Order(salesOrderSummaryOrder(filter), salesorderitem.BySalesOrderID(sql.OrderDesc()),
 			sourceDocumentItemOrder(salesorderitem.FieldDisplayOrder, salesorderitem.FieldLineNo, salesorderitem.FieldID)).
 		Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {

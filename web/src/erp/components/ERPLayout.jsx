@@ -38,6 +38,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Dropdown, Grid, Layout, Menu, Space, Tag, Tooltip, Typography } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import WorkflowTaskBusinessWorkspace from './workflow/WorkflowTaskBusinessWorkspace.jsx'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
@@ -107,6 +108,7 @@ import { buildRoleGuidedNavigation } from '../config/roleGuidedNavigation.mjs'
 import {
   getUtilityNavigationSections,
   getNavigationSections,
+  navigationItemRegistry,
   getProductCoreNavigationSections,
 } from '../config/seedData.mjs'
 import { getEffectiveSession } from '../api/customerConfigApi.mjs'
@@ -922,10 +924,18 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     customerNavigationPresentation === 'role_guided' &&
     !isSuperAdmin &&
     !shouldUseProductCoreNavigation
-  const sidebarVisibleSections = useMemo(
-    () => getSidebarNavigationSections(visibleSections),
-    [visibleSections]
+  const useTaskHome = !shouldUseProductCoreNavigation && !isLocalCustomerDesktopPreview &&
+    !getWorkbenchSummaryOptions(adminProfile).length &&
+    visibleSections.some(({ items }) => items.some(({ key }) => key === 'task-board'))
+  const desktopEntrySections = useMemo(
+    () => useTaskHome
+      ? visibleSections.map((section) => ({
+          ...section, items: section.items.filter(({ key }) => key !== 'global-dashboard'),
+        })).filter(({ items }) => items.length)
+      : visibleSections,
+    [visibleSections, useTaskHome]
   )
+  const sidebarVisibleSections = useMemo(() => getSidebarNavigationSections(desktopEntrySections), [desktopEntrySections])
   const moduleSidebarSections = useMemo(
     () => projectBusinessModuleSections(sidebarVisibleSections),
     [sidebarVisibleSections]
@@ -957,8 +967,9 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     () =>
       resolveDesktopHomeEntry({
         navigationSections: sidebarVisibleSections,
+        ...(useTaskHome ? { fallbackEntry: navigationItemRegistry['task-board'] } : {}),
       }),
-    [sidebarVisibleSections]
+    [sidebarVisibleSections, useTaskHome]
   )
   const visibleMenuPaths = useMemo(
     () =>
@@ -1001,6 +1012,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
   )
 
   const currentPageShouldRedirect = useMemo(() => {
+    if (useTaskHome && location.pathname === '/erp/dashboard') return true
     if (currentEntry?.access === 'history') {
       return !profileLoading && !visibleSections.some((section) =>
         section.items.some((item) => item.path === currentEntry.path)
@@ -1022,6 +1034,8 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
       currentNavigationMatched: currentNavigationEntry.matched,
     })
   }, [
+    useTaskHome,
+    location.pathname,
     profileLoading,
     adminProfile,
     allowedMenuPaths,
@@ -1042,7 +1056,9 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     ) {
       return
     }
-    const fallbackPath = visibleSections[0]?.items[0]?.path || ''
+    const fallbackPath = useTaskHome && location.pathname === '/erp/dashboard'
+      ? '/erp/task-board?mode=todo'
+      : visibleSections[0]?.items[0]?.path || ''
     if (fallbackPath && fallbackPath !== location.pathname) {
       navigate(fallbackPath, { replace: true })
     }
@@ -1051,6 +1067,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
     customerRuntimeGate,
     location.pathname,
     navigate,
+    useTaskHome,
     visibleSections,
   ])
 
@@ -1413,7 +1430,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
             aria-label={`返回首页：${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
             title={`返回${desktopHomeEntry.label || DEFAULT_DESKTOP_ENTRY.label}`}
             data-testid="desktop-home-entry"
-            onClick={() => handleNavigate(desktopHomeEntry.path)}
+            onClick={() => handleNavigate(useTaskHome ? '/erp/task-board?mode=todo' : desktopHomeEntry.path)}
           >
             <div className="erp-admin-brand__logo">
               <span className="erp-admin-brand__logo-mark">
@@ -1545,7 +1562,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
       ))
 
   const resolveSplitPage = useCallback((pathname) => {
-    const resolved = resolveCurrentNavigationEntry({ navigationSections: visibleSections, locationPath: pathname })
+    const resolved = resolveCurrentNavigationEntry({ navigationSections: desktopEntrySections, locationPath: pathname })
     const guarded = shouldGuardCustomerBusinessPageRuntime({
       effectiveSessionDiagnostic,
       isCustomerBusinessDataPage: isCustomerBusinessDataPageKey(resolved.pageKey),
@@ -1556,7 +1573,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
       entry: resolved.entry,
       guarded: guarded ? <ProductCoreCapabilityReview currentEntry={resolved.entry} /> : null,
     }
-  }, [visibleSections, effectiveSessionDiagnostic, isLocalCustomerDesktopPreview])
+  }, [desktopEntrySections, effectiveSessionDiagnostic, isLocalCustomerDesktopPreview])
 
   if (profileLoading && !adminProfile) {
     return (
@@ -1688,7 +1705,7 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
                 leftGuard={pageLeaveGuard}
                 leftRefresh={pageRefreshHandler}
                 renderPage={renderSplitPage}
-                sections={visibleSections}
+                sections={desktopEntrySections}
                 resolvePage={resolveSplitPage}
                 onRightLocationChange={setSplitRightLocation}
                 taskWorkspace={WorkflowTaskBusinessWorkspace}

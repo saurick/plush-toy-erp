@@ -1,8 +1,42 @@
 import assert from 'node:assert/strict'
+import { expect } from 'playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
-import { styleRpcResult } from './rpcMockResult.mjs'
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
+async function verifyCreditReversal(page, screenshotPath) {
+  await page.getByRole('row').filter({ hasText: 'CR-NAV-901' }).click()
+  const reverse = page.getByRole('button', { name: '冲回当前调整', exact: true })
+  if (!(await reverse.isVisible())) {
+    await page.getByRole('button', { name: /^更多操作，共/u }).click()
+  }
+  await reverse.click()
+  const dialog = page.getByRole('dialog', { name: /^冲回账款调整/u })
+  const number = dialog.getByRole('textbox', { name: '冲销单号' })
+  assert.match(await number.inputValue(), /^CR-REV-/u)
+  await waitForFiniteAnimations(page)
+  const fields = await dialog.locator('form').evaluate((form) => ({
+    width: form.getBoundingClientRect().width,
+    rows: Array.from(form.querySelectorAll('.ant-form-item'), (item) =>
+      item.getBoundingClientRect().toJSON()
+    ),
+  }))
+  const [numberRow, reasonRow] = fields.rows
+  assert(reasonRow.top >= numberRow.bottom, JSON.stringify(fields))
+  for (const row of fields.rows) {
+    assert(Math.abs(row.width - fields.width) <= 1, JSON.stringify(fields))
+  }
+  await page.screenshot({ path: screenshotPath })
+  const reason = dialog.getByRole('textbox', { name: '冲回原因' })
+  await dialog.getByRole('button', { name: '确认冲销' }).click()
+  const required = dialog.getByText('请填写冲回原因', { exact: true })
+  await required.waitFor()
+  await reason.fill('原调整金额录错')
+  await required.waitFor({ state: 'hidden' })
+  await dialog.getByRole('button', { name: /取\s*消/u }).click()
+  await dialog.waitFor({ state: 'hidden' })
+}
 
 export function createFinanceWorkspaceScenarios({
   customerRuntimeEffectiveSession,
@@ -37,6 +71,75 @@ export function createFinanceWorkspaceScenarios({
     ],
   }
   return [
+    {
+      name: 'finance-payment-summary-menu',
+      path: '/erp/finance/payments',
+      auth: 'admin',
+      effectiveSession,
+      viewport: { width: 1280, height: 720 },
+      beforeNavigate: async (page) => {
+        const groups = [
+          { currency: 'HKD', direction: 'RECEIPT', status: 'POSTED', count: 1, amount: '5', unitAmount: '5' },
+          { currency: 'CNY', direction: 'DISBURSEMENT', status: 'DRAFT', count: 1, amount: '2.123456', unitAmount: '2.123456' },
+          { currency: 'CNY', direction: 'RECEIPT', status: 'POSTED', count: 51, amount: '63.75', unitAmount: '1.25' },
+        ]
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'list_finance_payments') return route.fallback()
+          const totals = groups.filter((g) => !params.status || g.status === params.status)
+            .map(({ currency, direction, status, count, amount }) => ({ currency, direction, status, count, amount }))
+          const payments = groups.flatMap((g) => Array.from({ length: g.count }, () => g))
+            .map((g, i) => ({ id: i + 1, payment_no: `PAY-SUM-${i + 1}`, amount: g.unitAmount, status: g.status, direction: g.direction, currency: g.currency }))
+            .filter((row) => !params.status || row.status === params.status)
+          const data = { ...stylePaginatedRpcData(payments, 'payments', params), status_counts: { DRAFT: 1, POSTED: 52 } }
+          if (params.include_totals) data.totals = totals
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(data) } })
+        })
+      },
+      verify: async (page) => {
+        const tools = page.getByRole('button', { name: '表格工具', exact: true })
+        const dialog = page.getByRole('dialog', { name: '金额汇总', exact: true })
+        const openSummary = async () => {
+          await tools.click()
+          const menu = page.getByRole('menu').filter({ hasText: '导出筛选结果' })
+          await expect(menu.getByRole('menuitem')).toHaveText(['查看金额汇总', '导出筛选结果', '列设置'])
+          await menu.getByRole('menuitem', { name: /查看金额汇总/u }).click()
+          await expect(dialog).toBeVisible()
+          await waitForFiniteAnimations(page)
+        }
+        const record = page.getByRole('row').filter({ hasText: 'PAY-SUM-53' })
+        await page.locator('.ant-pagination-item-2:visible').click()
+        await record.click()
+        await expect(page.getByLabel('收付款筛选汇总')).toHaveCount(0)
+        await openSummary()
+        await expect(dialog).toContainText('全部页 · 共 53 笔')
+        await expect(dialog.locator('tr[data-row-key="CNY:RECEIPT:POSTED"] td')).toHaveText(['CNY', '收款', '已入账', '51', '63.75'])
+        await expect(dialog.locator('tr[data-row-key="CNY:DISBURSEMENT:DRAFT"] td')).toHaveText(['付款', '待审批', '1', '2.123456'])
+        await expect(dialog.locator('tr[data-row-key="HKD:RECEIPT:POSTED"] td')).toHaveText(['HKD', '收款', '已入账', '1', '5.00'])
+        await page.setViewportSize({ width: 390, height: 660 })
+        await waitForFiniteAnimations(page)
+        const bounds = await dialog.boundingBox()
+        assert(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 391)
+        await expect(dialog.getByRole('columnheader', { name: '金额', exact: true })).toBeInViewport()
+        await page.setViewportSize({ width: 1280, height: 720 })
+        await waitForFiniteAnimations(page)
+        await page.keyboard.press('Escape')
+        await expect(dialog).toBeHidden()
+        await expect(tools).toBeFocused()
+        await expect(page.locator('.ant-pagination-item-active:visible')).toHaveAttribute('title', '2')
+        await expect(record.getByRole('radio')).toBeChecked()
+        await page.getByRole('button', { name: /^待审批，共/u }).click()
+        await openSummary()
+        await expect(dialog).toContainText('待审批 · 全部页 · 共 1 笔')
+        await expect(dialog.locator('tbody tr[data-row-key]')).toHaveCount(1)
+        await dialog.getByRole('button', { name: /Close|关闭/u }).click()
+        await page.getByRole('button', { name: /^已取消，共/u }).click()
+        await openSummary()
+        await expect(dialog).toContainText('当前筛选下没有可汇总的金额')
+        await expect(dialog).not.toContainText('2.123456')
+        await assertNoHorizontalOverflow(page, 'finance-payment-summary-menu')
+      },
+    },
     ...[1920, 390].map((width) => ({
       name: `finance-workspace-navigation-${width}`,
       path: '/erp/finance/payments',
@@ -179,6 +282,9 @@ export function createFinanceWorkspaceScenarios({
           )
           measurements.push({ label, ...geometry })
           await assertNoHorizontalOverflow(page)
+          if (label === '账款调整') {
+            await verifyCreditReversal(page, `${outputDir}/finance-credit-reversal-${width}.png`)
+          }
         }
         if (width === 1920) {
           await verifyMobileNavigationMotion(

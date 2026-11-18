@@ -100687,6 +100687,10 @@ type SalesOrderMutation struct {
 	op                        Op
 	typ                       string
 	id                        *int
+	create_idempotency_key    *string
+	create_intent_hash        *string
+	create_actor_id           *int
+	addcreate_actor_id        *int
 	order_no                  *string
 	currency                  *string
 	customer_order_no         *string
@@ -100832,6 +100836,174 @@ func (m *SalesOrderMutation) IDs(ctx context.Context) ([]int, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
+}
+
+// SetCreateIdempotencyKey sets the "create_idempotency_key" field.
+func (m *SalesOrderMutation) SetCreateIdempotencyKey(s string) {
+	m.create_idempotency_key = &s
+}
+
+// CreateIdempotencyKey returns the value of the "create_idempotency_key" field in the mutation.
+func (m *SalesOrderMutation) CreateIdempotencyKey() (r string, exists bool) {
+	v := m.create_idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateIdempotencyKey returns the old "create_idempotency_key" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldCreateIdempotencyKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateIdempotencyKey: %w", err)
+	}
+	return oldValue.CreateIdempotencyKey, nil
+}
+
+// ClearCreateIdempotencyKey clears the value of the "create_idempotency_key" field.
+func (m *SalesOrderMutation) ClearCreateIdempotencyKey() {
+	m.create_idempotency_key = nil
+	m.clearedFields[salesorder.FieldCreateIdempotencyKey] = struct{}{}
+}
+
+// CreateIdempotencyKeyCleared returns if the "create_idempotency_key" field was cleared in this mutation.
+func (m *SalesOrderMutation) CreateIdempotencyKeyCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldCreateIdempotencyKey]
+	return ok
+}
+
+// ResetCreateIdempotencyKey resets all changes to the "create_idempotency_key" field.
+func (m *SalesOrderMutation) ResetCreateIdempotencyKey() {
+	m.create_idempotency_key = nil
+	delete(m.clearedFields, salesorder.FieldCreateIdempotencyKey)
+}
+
+// SetCreateIntentHash sets the "create_intent_hash" field.
+func (m *SalesOrderMutation) SetCreateIntentHash(s string) {
+	m.create_intent_hash = &s
+}
+
+// CreateIntentHash returns the value of the "create_intent_hash" field in the mutation.
+func (m *SalesOrderMutation) CreateIntentHash() (r string, exists bool) {
+	v := m.create_intent_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateIntentHash returns the old "create_intent_hash" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldCreateIntentHash(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateIntentHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateIntentHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateIntentHash: %w", err)
+	}
+	return oldValue.CreateIntentHash, nil
+}
+
+// ClearCreateIntentHash clears the value of the "create_intent_hash" field.
+func (m *SalesOrderMutation) ClearCreateIntentHash() {
+	m.create_intent_hash = nil
+	m.clearedFields[salesorder.FieldCreateIntentHash] = struct{}{}
+}
+
+// CreateIntentHashCleared returns if the "create_intent_hash" field was cleared in this mutation.
+func (m *SalesOrderMutation) CreateIntentHashCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldCreateIntentHash]
+	return ok
+}
+
+// ResetCreateIntentHash resets all changes to the "create_intent_hash" field.
+func (m *SalesOrderMutation) ResetCreateIntentHash() {
+	m.create_intent_hash = nil
+	delete(m.clearedFields, salesorder.FieldCreateIntentHash)
+}
+
+// SetCreateActorID sets the "create_actor_id" field.
+func (m *SalesOrderMutation) SetCreateActorID(i int) {
+	m.create_actor_id = &i
+	m.addcreate_actor_id = nil
+}
+
+// CreateActorID returns the value of the "create_actor_id" field in the mutation.
+func (m *SalesOrderMutation) CreateActorID() (r int, exists bool) {
+	v := m.create_actor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateActorID returns the old "create_actor_id" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldCreateActorID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateActorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateActorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateActorID: %w", err)
+	}
+	return oldValue.CreateActorID, nil
+}
+
+// AddCreateActorID adds i to the "create_actor_id" field.
+func (m *SalesOrderMutation) AddCreateActorID(i int) {
+	if m.addcreate_actor_id != nil {
+		*m.addcreate_actor_id += i
+	} else {
+		m.addcreate_actor_id = &i
+	}
+}
+
+// AddedCreateActorID returns the value that was added to the "create_actor_id" field in this mutation.
+func (m *SalesOrderMutation) AddedCreateActorID() (r int, exists bool) {
+	v := m.addcreate_actor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCreateActorID clears the value of the "create_actor_id" field.
+func (m *SalesOrderMutation) ClearCreateActorID() {
+	m.create_actor_id = nil
+	m.addcreate_actor_id = nil
+	m.clearedFields[salesorder.FieldCreateActorID] = struct{}{}
+}
+
+// CreateActorIDCleared returns if the "create_actor_id" field was cleared in this mutation.
+func (m *SalesOrderMutation) CreateActorIDCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldCreateActorID]
+	return ok
+}
+
+// ResetCreateActorID resets all changes to the "create_actor_id" field.
+func (m *SalesOrderMutation) ResetCreateActorID() {
+	m.create_actor_id = nil
+	m.addcreate_actor_id = nil
+	delete(m.clearedFields, salesorder.FieldCreateActorID)
 }
 
 // SetOrderNo sets the "order_no" field.
@@ -102485,7 +102657,16 @@ func (m *SalesOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderMutation) Fields() []string {
-	fields := make([]string, 0, 30)
+	fields := make([]string, 0, 33)
+	if m.create_idempotency_key != nil {
+		fields = append(fields, salesorder.FieldCreateIdempotencyKey)
+	}
+	if m.create_intent_hash != nil {
+		fields = append(fields, salesorder.FieldCreateIntentHash)
+	}
+	if m.create_actor_id != nil {
+		fields = append(fields, salesorder.FieldCreateActorID)
+	}
 	if m.order_no != nil {
 		fields = append(fields, salesorder.FieldOrderNo)
 	}
@@ -102584,6 +102765,12 @@ func (m *SalesOrderMutation) Fields() []string {
 // schema.
 func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 	switch name {
+	case salesorder.FieldCreateIdempotencyKey:
+		return m.CreateIdempotencyKey()
+	case salesorder.FieldCreateIntentHash:
+		return m.CreateIntentHash()
+	case salesorder.FieldCreateActorID:
+		return m.CreateActorID()
 	case salesorder.FieldOrderNo:
 		return m.OrderNo()
 	case salesorder.FieldCustomerID:
@@ -102653,6 +102840,12 @@ func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
+	case salesorder.FieldCreateIdempotencyKey:
+		return m.OldCreateIdempotencyKey(ctx)
+	case salesorder.FieldCreateIntentHash:
+		return m.OldCreateIntentHash(ctx)
+	case salesorder.FieldCreateActorID:
+		return m.OldCreateActorID(ctx)
 	case salesorder.FieldOrderNo:
 		return m.OldOrderNo(ctx)
 	case salesorder.FieldCustomerID:
@@ -102722,6 +102915,27 @@ func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Val
 // type.
 func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 	switch name {
+	case salesorder.FieldCreateIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateIdempotencyKey(v)
+		return nil
+	case salesorder.FieldCreateIntentHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateIntentHash(v)
+		return nil
+	case salesorder.FieldCreateActorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateActorID(v)
+		return nil
 	case salesorder.FieldOrderNo:
 		v, ok := value.(string)
 		if !ok {
@@ -102940,6 +103154,9 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *SalesOrderMutation) AddedFields() []string {
 	var fields []string
+	if m.addcreate_actor_id != nil {
+		fields = append(fields, salesorder.FieldCreateActorID)
+	}
 	if m.addpayment_term_days != nil {
 		fields = append(fields, salesorder.FieldPaymentTermDays)
 	}
@@ -102957,6 +103174,8 @@ func (m *SalesOrderMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *SalesOrderMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case salesorder.FieldCreateActorID:
+		return m.AddedCreateActorID()
 	case salesorder.FieldPaymentTermDays:
 		return m.AddedPaymentTermDays()
 	case salesorder.FieldVersion:
@@ -102972,6 +103191,13 @@ func (m *SalesOrderMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *SalesOrderMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case salesorder.FieldCreateActorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCreateActorID(v)
+		return nil
 	case salesorder.FieldPaymentTermDays:
 		v, ok := value.(int)
 		if !ok {
@@ -103001,6 +103227,15 @@ func (m *SalesOrderMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *SalesOrderMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(salesorder.FieldCreateIdempotencyKey) {
+		fields = append(fields, salesorder.FieldCreateIdempotencyKey)
+	}
+	if m.FieldCleared(salesorder.FieldCreateIntentHash) {
+		fields = append(fields, salesorder.FieldCreateIntentHash)
+	}
+	if m.FieldCleared(salesorder.FieldCreateActorID) {
+		fields = append(fields, salesorder.FieldCreateActorID)
+	}
 	if m.FieldCleared(salesorder.FieldCustomerOrderNo) {
 		fields = append(fields, salesorder.FieldCustomerOrderNo)
 	}
@@ -103081,6 +103316,15 @@ func (m *SalesOrderMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *SalesOrderMutation) ClearField(name string) error {
 	switch name {
+	case salesorder.FieldCreateIdempotencyKey:
+		m.ClearCreateIdempotencyKey()
+		return nil
+	case salesorder.FieldCreateIntentHash:
+		m.ClearCreateIntentHash()
+		return nil
+	case salesorder.FieldCreateActorID:
+		m.ClearCreateActorID()
+		return nil
 	case salesorder.FieldCustomerOrderNo:
 		m.ClearCustomerOrderNo()
 		return nil
@@ -103155,6 +103399,15 @@ func (m *SalesOrderMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *SalesOrderMutation) ResetField(name string) error {
 	switch name {
+	case salesorder.FieldCreateIdempotencyKey:
+		m.ResetCreateIdempotencyKey()
+		return nil
+	case salesorder.FieldCreateIntentHash:
+		m.ResetCreateIntentHash()
+		return nil
+	case salesorder.FieldCreateActorID:
+		m.ResetCreateActorID()
+		return nil
 	case salesorder.FieldOrderNo:
 		m.ResetOrderNo()
 		return nil

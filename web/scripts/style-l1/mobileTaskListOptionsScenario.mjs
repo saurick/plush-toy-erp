@@ -9,17 +9,7 @@ import {
 import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 
 export async function chooseMobileFilterOption(control, label) {
-  const select = control.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
-  if (label === '最近进入') {
-    const clear = select.locator('.ant-select-clear')
-    if (await clear.count()) {
-      await select.hover()
-      await clear.click()
-    }
-    return
-  }
-  await select.locator('.ant-select-selector').click()
-  await control.page().locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
+  await control.getByRole('button', { name: label, exact: true }).click()
 }
 
 export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
@@ -211,7 +201,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       }
       const chooseFilter = async (dropdown, label) => {
         const sort = { 最近进入: 'newest', 截止最早: 'due', 等待最久: 'oldest' }[label]
-        if (sort) await chooseMobileFilterOption(dropdown.getByRole('combobox', { name: '任务排序', exact: true }), label)
+        if (sort) await chooseMobileFilterOption(dropdown.getByRole('group', { name: '任务排序', exact: true }), label)
         else await dropdown.getByText(label, { exact: true }).click()
         assert(await dropdown.isVisible(), '即时筛选保持浮层打开，允许连续切换')
         await dropdown
@@ -233,7 +223,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await deadlineFilters.getByRole('group', { name: '截止时间', exact: true }).getByRole('button', { name: '未设置到期', exact: true }).click()
       assert.equal(await page.getByTestId('mobile-role-filter-overdue').getAttribute('aria-pressed'), 'false', '具体截止条件替换超时快捷范围')
       await page.waitForFunction(() => document.querySelector('[data-testid="mobile-task-list-range"]')?.textContent.includes('共 13 项'))
-      const sourceOption = deadlineFilters.getByRole('group', { name: '来源单据', exact: true }).getByRole('button', { name: '来源待核对', exact: true })
+      const sourceOption = deadlineFilters.getByRole('group', { name: '单据类型', exact: true }).getByRole('button', { name: '来源待核对', exact: true })
       await sourceOption.waitFor({ timeout: 5000 })
       await Promise.all([
         page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_role_tasks' && request.postDataJSON()?.params.due === 'noDue' && request.postDataJSON()?.params.source_type === 'style_task'),
@@ -244,7 +234,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await chooseFilter(await openFilters(), '全部截止时间')
       await waitFirst(97063)
       const sourceFilters = await openFilters()
-      await sourceFilters.getByRole('group', { name: '来源单据', exact: true }).getByRole('button', { name: '全部', exact: true }).click()
+      await sourceFilters.getByRole('group', { name: '单据类型', exact: true }).getByRole('button', { name: '全部', exact: true }).click()
       await sourceFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
       await waitFirst(97063)
       assert.match(await range.innerText(), /共 64 项/u)
@@ -311,7 +301,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
 
       for (const fromField of [false, true]) {
         const escapeDropdown = await openFilters()
-        if (fromField) await escapeDropdown.getByRole('combobox', { name: '任务排序', exact: true }).focus()
+        if (fromField) await escapeDropdown.getByRole('group', { name: '任务排序', exact: true }).getByRole('button', { name: '最近进入', exact: true }).focus()
         await page.keyboard.press('Escape')
         await escapeDropdown.waitFor({ state: 'hidden' })
         await page.waitForFunction(
@@ -328,14 +318,14 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
 
       const immediateDropdown = await openFilters()
       assert.equal(await immediateDropdown.locator('details').count(), 0, '手机常用条件保持直接可见')
-      assert.equal(await immediateDropdown.locator('.ant-select').count(), 1, '少量来源直接点选，仅次要排序使用单行选择')
+      assert.equal(await immediateDropdown.locator('.ant-select').count(), 0, '固定来源、状态与任务排序均直接点选')
       const controls = await immediateDropdown.locator('.mobile-filter-options .erp-filter-chip').evaluateAll((nodes) => nodes.map((node) => ({ height: node.getBoundingClientRect().height, overflow: node.scrollWidth - node.clientWidth })))
       for (const label of ['任务状态筛选', '截止时间']) await immediateDropdown.getByRole('group', { name: label, exact: true }).waitFor()
-      await immediateDropdown.getByRole('combobox', { name: '任务排序', exact: true }).waitFor()
+      await immediateDropdown.getByRole('group', { name: '任务排序', exact: true }).waitFor()
       assert(controls.length > 0 && controls.every(({ height, overflow }) => height >= 44 && overflow <= 1), JSON.stringify(controls))
-      await chooseMobileFilterOption(immediateDropdown.getByRole('combobox', { name: '任务排序', exact: true }), '截止最早')
+      await chooseMobileFilterOption(immediateDropdown.getByRole('group', { name: '任务排序', exact: true }), '截止最早')
       assert(await immediateDropdown.isVisible(), '点选立即生效且保留筛选面板')
-      await chooseMobileFilterOption(immediateDropdown.getByRole('combobox', { name: '任务排序', exact: true }), '最近进入')
+      await chooseMobileFilterOption(immediateDropdown.getByRole('group', { name: '任务排序', exact: true }), '最近进入')
       await chooseFilter(immediateDropdown, '等待最久')
       await waitFirst(97001)
       assert.equal(

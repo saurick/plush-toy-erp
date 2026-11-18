@@ -2,14 +2,7 @@ import {
   OperationalFactStatus,
   ProductionWIPStatus,
   QualityInspectionStatus,
-  SalesOrderItemStatus,
-  SalesOrderStatus,
 } from '../../common/consts/statuses.generated.mjs'
-import {
-  normalizeNumeric20Scale6,
-  numeric20Scale6Units,
-  compareNumeric20Scale6Values,
-} from './numeric20Scale6.mjs'
 import {
   productionWipStatusMeta,
   productionWipQualityInspectionMeta,
@@ -46,112 +39,8 @@ function dayDistance(fromDateKey, toDateKey) {
   return Math.round((to - from) / DAY_MS)
 }
 
-function unixDateKey(value) {
-  return unixToDateInputValue(value)
-}
-
 function normalizedText(value, fallback = '') {
   return String(value ?? '').trim() || fallback
-}
-
-function salesDeliveryStatus(row, today) {
-  if (row.lineStatus === SalesOrderItemStatus.CANCELED || row.lifecycleStatus === SalesOrderStatus.CANCELED) {
-    return { key: 'cancelled', label: '已取消', rank: 7 }
-  }
-  if (!row.progressKnown) {
-    return { key: 'unknown', label: '进度待核对', rank: 4 }
-  }
-  if (compareNumeric20Scale6Values(row.remaining, '0') <= 0) {
-    return { key: 'delivered', label: '已交付', rank: 6 }
-  }
-  if (row.lifecycleStatus === SalesOrderStatus.CLOSED || row.lineStatus === SalesOrderItemStatus.CLOSED) {
-    return { key: 'closed', label: '已关闭未交完', rank: 1 }
-  }
-  if (!row.deliveryDate) {
-    return { key: 'unscheduled', label: '未排交期', rank: 3 }
-  }
-  const days = dayDistance(today, row.deliveryDate)
-  if (days !== null && days < 0) {
-    return {
-      key: 'overdue',
-      label: `逾期 ${Math.abs(days)} 天`,
-      rank: 0,
-    }
-  }
-  if (days !== null && days <= 7) {
-    return {
-      key: 'dueSoon',
-      label: days === 0 ? '今天到期' : `${days} 天后到期`,
-      rank: 2,
-    }
-  }
-  return { key: 'inProgress', label: '交付中', rank: 5 }
-}
-
-export function buildSalesDeliveryModel(items = [], options = {}) {
-  const today = options.today || currentBusinessDate()
-  const rows = (Array.isArray(items) ? items : []).map((item) => {
-    const ordered = normalizeNumeric20Scale6(item?.ordered_quantity) || null
-    const shipped = normalizeNumeric20Scale6(item?.shipped_quantity) || null
-    const remaining = normalizeNumeric20Scale6(item?.unshipped_quantity) || null
-    const progressKnown =
-      ordered !== null &&
-      compareNumeric20Scale6Values(ordered, '0') > 0 &&
-      shipped !== null &&
-      remaining !== null
-    const row = {
-      id: Number(item?.id || 0),
-      salesOrderID: Number(item?.sales_order_id || 0),
-      productID: Number(item?.product_id || 0),
-      orderNo: normalizedText(item?.order_no, '销售订单未编号'),
-      customerName: normalizedText(item?.customer_name, '客户未填写'),
-      productName: normalizedText(
-        item?.requested_product_name || item?.product_name_snapshot,
-        '产品未填写'
-      ),
-      customerProductNo: normalizedText(item?.customer_product_no),
-      unitName: normalizedText(item?.unit_name, '单位'),
-      deliveryDate: unixDateKey(item?.planned_delivery_date),
-      lifecycleStatus: normalizedText(item?.lifecycle_status).toLowerCase(),
-      lineStatus: normalizedText(item?.line_status).toLowerCase(),
-      ordered,
-      shipped,
-      remaining,
-      progressKnown,
-      percent: progressKnown
-        ? clampPercent(
-            Number(
-              (BigInt(numeric20Scale6Units(shipped)) * 10000n) /
-                BigInt(numeric20Scale6Units(ordered))
-            ) / 100
-          )
-        : null,
-    }
-    return { ...row, status: salesDeliveryStatus(row, today) }
-  })
-
-  rows.sort((left, right) => {
-    const rank = left.status.rank - right.status.rank
-    if (rank !== 0) return rank
-    const leftDate = left.deliveryDate || '9999-12-31'
-    const rightDate = right.deliveryDate || '9999-12-31'
-    if (leftDate !== rightDate) return leftDate.localeCompare(rightDate)
-    return left.orderNo.localeCompare(right.orderNo, 'zh-CN')
-  })
-
-  return {
-    rows,
-    counts: {
-      total: rows.length,
-      overdue: rows.filter((row) => row.status.key === 'overdue').length,
-      dueSoon: rows.filter((row) => row.status.key === 'dueSoon').length,
-      unknown: rows.filter((row) => row.status.key === 'unknown').length,
-      closed: rows.filter((row) => row.status.key === 'closed').length,
-      unscheduled: rows.filter((row) => row.status.key === 'unscheduled')
-        .length,
-      delivered: rows.filter((row) => row.status.key === 'delivered').length,
-    },
-  }
 }
 
 export function moveBusinessDate(dateKey, delta) {
@@ -179,23 +68,25 @@ export function paginateVisualizationRows(
   }
 }
 
-function financeDueStatus(row, today) {
-  if (row.status === OperationalFactStatus.CANCELLED) {
+function financeDueStatus(row, dueDate, today) {
+  const status = normalizedText(row.status).toUpperCase()
+  if (status === OperationalFactStatus.CANCELLED) {
     return { key: 'cancelled', label: '已取消', rank: 6 }
   }
-  if (row.outstanding === null || row.amount === null || !row.currency) {
+  const outstanding = decimalNumber(row.outstanding_amount)
+  if (outstanding === null || decimalNumber(row.amount) === null || !normalizedText(row.currency)) {
     return { key: 'unknown', label: '金额待核对', rank: 2 }
   }
-  if (row.status === OperationalFactStatus.SETTLED || row.outstanding === 0) {
+  if (status === OperationalFactStatus.SETTLED || outstanding === 0) {
     return { key: 'settled', label: '已结清', rank: 5 }
   }
-  if (row.status === OperationalFactStatus.DRAFT) {
+  if (status === OperationalFactStatus.DRAFT) {
     return { key: 'draft', label: '草稿待过账', rank: 4 }
   }
-  if (!row.dueDate) {
+  if (!dueDate) {
     return { key: 'unscheduled', label: '未填到期日', rank: 2 }
   }
-  const days = dayDistance(today, row.dueDate)
+  const days = dayDistance(today, dueDate)
   if (days !== null && days < 0) {
     return {
       key: 'overdue',
@@ -218,19 +109,8 @@ export function buildFinanceDueModel(facts = [], options = {}) {
   const rows = (Array.isArray(facts) ? facts : [])
     .filter((item) => ['RECEIVABLE', 'PAYABLE'].includes(item?.fact_type))
     .map((item) => {
-      const row = {
-        id: Number(item?.id || 0),
-        factNo: normalizedText(item?.fact_no, '财务记录未编号'),
-        factType: normalizedText(item?.fact_type),
-        typeLabel: item?.fact_type === 'PAYABLE' ? '应付' : '应收',
-        status: normalizedText(item?.status).toUpperCase(),
-        sourceNo: normalizedText(item?.source_no, '来源单据已关联'),
-        amount: decimalNumber(item?.amount),
-        outstanding: decimalNumber(item?.outstanding_amount),
-        currency: normalizedText(item?.currency),
-        dueDate: unixDateKey(item?.due_at),
-      }
-      return { ...row, dueStatus: financeDueStatus(row, today) }
+      const dueDate = unixToDateInputValue(item.due_at)
+      return { ...item, dueDate, dueStatus: financeDueStatus(item, dueDate, today) }
     })
 
   rows.sort((left, right) => {
@@ -240,7 +120,7 @@ export function buildFinanceDueModel(facts = [], options = {}) {
       right.dueDate || '9999-12-31'
     )
     if (dateOrder !== 0) return dateOrder
-    return left.factNo.localeCompare(right.factNo, 'zh-CN')
+    return normalizedText(left.fact_no).localeCompare(normalizedText(right.fact_no), 'zh-CN')
   })
 
   return {
@@ -255,6 +135,17 @@ export function buildFinanceDueModel(facts = [], options = {}) {
       settled: rows.filter((row) => row.dueStatus.key === 'settled').length,
     },
   }
+}
+
+export function financeDueFilterOptions(counts) {
+  return [
+    { value: 'all', label: '全部', count: counts.total },
+    { value: 'overdue', label: '逾期未结', count: counts.overdue },
+    { value: 'dueSoon', label: '7 天内到期', count: counts.dueSoon },
+    { value: 'unknown', label: '金额待核对', count: counts.unknown, additional: counts.unknown === 0 },
+    { value: 'unscheduled', label: '未填到期日', count: counts.unscheduled, additional: counts.unscheduled === 0 },
+    { value: 'settled', label: '已结清（含未结金额为零）', count: counts.settled, additional: true },
+  ]
 }
 
 export function buildInventoryDistributionModel(distribution = []) {

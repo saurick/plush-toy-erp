@@ -1417,6 +1417,10 @@ func (r *serviceSalesOrderRepo) SaveSalesOrderWithItems(context.Context, int, *b
 	return nil, biz.ErrBadParam
 }
 
+func (r *serviceSalesOrderRepo) ResolveSalesOrderCreateReplay(context.Context, *biz.SalesOrderMutation) (*biz.SalesOrderWithItems, bool, error) {
+	return nil, false, nil
+}
+
 func (r *serviceSalesOrderRepo) CustomerIsActive(context.Context, int) (bool, error) {
 	return false, biz.ErrBadParam
 }

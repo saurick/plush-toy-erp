@@ -92,7 +92,7 @@ export default function ProductionReworkModal({
         message={
           editing
             ? '返工产品、仓库、单位、批次和来源保持不变；可修正业务编号、数量、时间和原因。'
-            : '返工产品、仓库、单位和批次由原完工记录确定；返工草稿过账后才会更新对应库存记录。'
+            : '返工产品、仓库、单位和批次由原完工记录确定；使用“确认返工”后才会更新对应库存记录。'
         }
       />
       <Descriptions

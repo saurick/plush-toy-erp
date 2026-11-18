@@ -1,5 +1,27 @@
 import { useLayoutEffect, useRef } from 'react'
 
+function measureScrollableTab(container, item) {
+  const strip = container.getBoundingClientRect()
+  const tab = item.getBoundingClientRect()
+  const style = getComputedStyle(container)
+  const stripWidth = parseFloat(style.width)
+  const scaleX = strip.width / stripWidth
+  const scaleY = strip.height / parseFloat(style.height)
+  if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || !scaleX || !scaleY) return null
+
+  // Preserve fractional positions in local CSS pixels, even inside a scaled
+  // surface. Rounding the position and width separately can create overflow.
+  const borderLeft = parseFloat(style.borderLeftWidth)
+  const visibleWidth = stripWidth - borderLeft - parseFloat(style.borderRightWidth)
+  const left = (tab.left - strip.left) / scaleX - borderLeft
+  const top = (tab.top - strip.top) / scaleY - parseFloat(style.borderTopWidth)
+  const width = tab.width / scaleX
+  const { scrollLeft, scrollTop } = container
+  if (left < 0) container.scrollLeft = scrollLeft + left
+  else if (left + width > visibleWidth) container.scrollLeft = scrollLeft + left + width - visibleWidth
+  return [scrollLeft + left, scrollTop + top, width, tab.height / scaleY]
+}
+
 // Keep the indicator in its own layout coordinates, including inside opening
 // modals. Retargeting a CSS transition preserves its current visual position.
 export default function useSlidingIndicator({
@@ -29,18 +51,13 @@ export default function useSlidingIndicator({
         return
       }
 
-      const geometry = [
+      const geometry = (revealSelected && measureScrollableTab(container, item)) || [
         item.offsetLeft,
         item.offsetTop,
         item.offsetWidth,
         item.offsetHeight,
       ]
       const geometryKey = geometry.join(',')
-      if (revealSelected) {
-        const right = item.offsetLeft + item.offsetWidth
-        if (item.offsetLeft < container.scrollLeft) container.scrollLeft = item.offsetLeft
-        else if (right > container.scrollLeft + container.clientWidth) container.scrollLeft = right - container.clientWidth
-      }
       const snap = !previousItem || previousItem === item
       previousItem = item
       if (previousGeometry === geometryKey) return

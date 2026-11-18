@@ -11,6 +11,43 @@ import { createTaskTrackingFilterScenarios } from './taskTrackingFilterScenarios
 import { workflowExceptionScenario } from './workflowExceptionScenario.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
+async function assertDocumentFilterLayout(page, filters, assert, change) {
+  await waitForFiniteAnimations(page)
+  const monitor = await filters.evaluateHandle((panel) => {
+    const nodes = [
+      panel,
+      ...panel.querySelectorAll('[role="tab"], [role="tabpanel"], [aria-label="任务排序"], [aria-label="负责岗位"], footer button'),
+      document.querySelector('.erp-task-board-filters [aria-haspopup="dialog"]'),
+      document.querySelector('.erp-task-board-filters .erp-business-operation-panel__search'),
+    ]
+    const boxes = nodes.map((node) => node.getBoundingClientRect())
+    let frame
+    let failure
+    const sample = () => {
+      for (const [index, node] of nodes.entries()) {
+        const box = node.getBoundingClientRect()
+        const delta = Math.max(...['x', 'y', 'width', 'height'].map((key) => Math.abs(box[key] - boxes[index][key])))
+        if (!node.isConnected || delta > 1) {
+          failure = { control: node.getAttribute('aria-label') || node.textContent.trim().slice(0, 12), connected: node.isConnected, delta }
+          return
+        }
+      }
+      frame = requestAnimationFrame(sample)
+    }
+    sample()
+    return () => { cancelAnimationFrame(frame); return failure }
+  })
+  let movement
+  try {
+    await change()
+    await waitForFiniteAnimations(page)
+  } finally {
+    movement = await monitor.evaluate((stop) => stop())
+    await monitor.dispose()
+  }
+  assert.equal(movement, undefined, `单据筛选切换期间控件应留在原位：${JSON.stringify(movement)}`)
+}
+
 async function assertNarrowScreenAccountAccess(page) {
   await page.getByRole('button', { name: '打开导航菜单', exact: true }).click()
   const navigation = page.locator('.erp-admin-drawer')
@@ -2263,13 +2300,43 @@ export function createDashboardTaskScenarios({
         )
         await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
         const extraFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        for (const label of ['任务状态', '截止时间', '来源单据']) {
+        for (const label of ['任务状态', '截止时间', '单据类型']) {
           await extraFilters.getByText(label, { exact: true }).waitFor()
         }
         assert.equal(await extraFilters.getByLabel('负责岗位', { exact: true }).count(), 0)
         assert.equal(await extraFilters.getByRole('combobox', { name: '办理事项', exact: true }).count(), 0)
         assert.equal(new URL(page.url()).searchParams.has('task_group'), false)
         await page.getByText('第 1-20 条 / 共 43 条', { exact: true }).waitFor()
+        const documents = extraFilters.locator('.workflow-task-document-filter')
+        const moduleTabs = documents.getByRole('tablist', { name: '单据所属业务模块' })
+        const documentTypes = documents.getByRole('group', { name: '单据类型', exact: true })
+        assert.equal(await documents.getByRole('combobox').count(), 0)
+        await moduleTabs.getByRole('tab', { name: '采购管理', exact: true }).click()
+        await page.getByText('第 1-20 条 / 共 23 条', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('source_section'), 'purchase')
+        assert.equal(new URL(page.url()).searchParams.has('source'), false)
+        assert.equal(await documentTypes.getByRole('button').count(), 2)
+        await extraFilters.getByRole('button', { name: '收起', exact: true }).click()
+        await page.getByRole('button', { name: '下一页', exact: true }).click()
+        await page.getByText('第 21-23 条 / 共 23 条', { exact: true }).waitFor()
+        await page.reload()
+        await page.getByText('第 21-23 条 / 共 23 条', { exact: true }).waitFor()
+        await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
+        assert.equal(await moduleTabs.getByRole('tab', { name: '采购管理', exact: true }).getAttribute('aria-selected'), 'true')
+        await documentTypes.getByRole('button', { name: '采购收货单', exact: true }).click()
+        await page.getByText('第 1-20 条 / 共 23 条', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('source'), 'purchase_receipt')
+        await moduleTabs.getByRole('tab', { name: '委外管理', exact: true }).click()
+        await page.getByText('第 1-20 条 / 共 20 条', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.has('source'), false)
+        assert.equal(new URL(page.url()).searchParams.has('page'), false)
+        const compactSize = await documents.evaluate((node) => ({ height: node.getBoundingClientRect().height, width: node.clientWidth, scrollWidth: node.scrollWidth }))
+        assert(compactSize.height <= 140 && compactSize.scrollWidth <= compactSize.width + 1, `两级筛选必须保持紧凑且不溢出: ${JSON.stringify(compactSize)}`)
+        await page.screenshot({ path: path.resolve(outputDir, 'erp-task-board-document-module-filter.png') })
+        await extraFilters.getByRole('button', { name: /清空筛选/ }).click()
+        await page.getByText('第 1-20 条 / 共 43 条', { exact: true }).waitFor()
+        assert.equal(new URL(page.url()).searchParams.has('source_section'), false)
+        assert.equal(await moduleTabs.getByRole('tab', { name: '全部模块', exact: true }).getAttribute('aria-selected'), 'true')
         await extraFilters.getByRole('button', { name: '收起', exact: true }).click()
         const search = page.getByRole('textbox', { name: /可搜索/ })
         await search.fill('材料入库')
@@ -2296,6 +2363,120 @@ export function createDashboardTaskScenarios({
             'erp-task-board-single-role-scope-desktop.png'
           ),
         })
+      },
+    },
+    {
+      name: 'erp-task-board-document-types-desktop',
+      path: '/erp/task-board',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      workflowTaskFixtures: [
+        'sales_order', 'engineering_material_request', 'purchase_order', 'purchase_receipt',
+        'purchase_rejection_disposition', 'outsourcing_order', 'outsourcing_fact',
+        'production_order', 'production_wip_batch', 'production_fact',
+        'production_exception_decision', 'production_packaging_confirmation',
+        'inventory_operation', 'quality_inspection', 'shipment', 'finance_payment',
+      ].map((source, index) => ({
+        id: 9500 + index, task_code: `STYLE-DOCUMENT-${index}`, task_name: `单据筛选回归 ${index}`,
+        task_group: 'trial_warehouse_work', source_type: source, source_id: index + 1,
+        source_no: `STYLE-DOCUMENT-${index}`, owner_role_key: index % 2 ? 'warehouse' : 'quality', task_status_key: 'ready', version: 1, payload: {},
+      })),
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByText('第 1-16 条 / 共 16 条', { exact: true }).waitFor()
+        await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
+        const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+        const documents = filters.locator('.workflow-task-document-filter')
+        const modules = documents.getByRole('tablist', { name: '单据所属业务模块' })
+        const types = documents.getByRole('group', { name: '单据类型', exact: true })
+        assert.equal(await modules.getByRole('tab').count(), 10)
+        assert.equal(await types.getByRole('button').count(), 17)
+        const originalModules = await modules.elementHandle()
+        const quality = modules.getByRole('tab', { name: '质检管理', exact: true })
+        const production = modules.getByRole('tab', { name: '生产管理', exact: true })
+        const reset = filters.getByRole('button', { name: '清空筛选', exact: true })
+        const result = (count) => page.getByText(`第 1-${count} 条 / 共 ${count} 条`, { exact: true }).waitFor()
+        await assertDocumentFilterLayout(page, filters, assert, async () => {
+          let release
+          const held = new Promise((resolve) => { release = resolve })
+          const holdQuality = async (route) => {
+            if (route.request().postDataJSON()?.params?.source_section === 'quality') await held
+            await route.fallback()
+          }
+          await page.route('**/rpc/workflow', holdQuality)
+          try {
+            await quality.click()
+            await page.locator('.erp-task-board-lanes[aria-busy="true"]').waitFor()
+            assert.equal(await modules.getByRole('tab').count(), 10)
+            assert.equal(await quality.getAttribute('aria-selected'), 'true')
+            assert.deepEqual(await types.getByRole('button').allTextContents(), ['不限', '质量检验记录'])
+            assert.equal(await filters.getByRole('group', { name: '负责岗位', exact: true }).isVisible(), true)
+          } finally {
+            release()
+            await page.unroute('**/rpc/workflow', holdQuality)
+          }
+          await result(1)
+          await types.getByRole('button', { name: '质量检验记录' }).click()
+          await page.waitForURL((url) => url.searchParams.get('source') === 'quality_inspection')
+          await filters.getByRole('button', { name: '已超时', exact: true }).click()
+          await page.getByText('当前范围暂无匹配任务', { exact: true }).waitFor()
+          await reset.click()
+          await result(16)
+          // The final choice in the full catalogue must remain reachable in the scrollable list.
+          const lastType = types.getByRole('button').last()
+          const name = await lastType.textContent()
+          await lastType.click()
+          await types.getByRole('button', { name, exact: true, pressed: true }).waitFor()
+          await production.click()
+          await result(5)
+        })
+        assert.equal(await types.getByRole('button').count(), 6)
+        assert.equal(await modules.evaluate((node, before) => node === before, originalModules), true)
+        for (const width of [1440, 1024, 800]) {
+          await page.setViewportSize({ width, height: 900 })
+          await waitForFiniteAnimations(page)
+          const size = await documents.evaluate((node) => {
+            const title = node.querySelector('legend').getBoundingClientRect()
+            const modules = node.querySelector('[role="tablist"]').getBoundingClientRect()
+            const firstType = node.querySelector('[role="tabpanel"] button').getBoundingClientRect()
+            const sortTitle = node.nextElementSibling.querySelector('legend').getBoundingClientRect()
+            return {
+              height: node.getBoundingClientRect().height,
+              width: node.clientWidth,
+              scrollWidth: node.scrollWidth,
+              titleOffset: title.left - sortTitle.left,
+              moduleInset: modules.left - title.left,
+              typeInset: firstType.left - title.left,
+              rowGap: firstType.top - modules.bottom,
+            }
+          })
+          assert(Math.abs(size.titleOffset) <= 1 && Math.abs(size.moduleInset - 12) <= 1 && Math.abs(size.typeInset - 12) <= 1 && Math.abs(size.rowGap - 6) <= 1,
+            `单据模块与类型应在同级标题下统一缩进 12px，组内间距 6px：${JSON.stringify(size)}`)
+          assert(size.height <= 190 && size.scrollWidth <= size.width + 1, `完整模块列表应横排且保持紧凑: ${JSON.stringify(size)}`)
+          await assertDocumentFilterLayout(page, filters, assert, async () => {
+            await reset.click()
+            await result(16)
+            await production.click()
+            await result(5)
+          })
+          await assertNoHorizontalOverflow(page)
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: path.resolve(outputDir, 'erp-task-board-compact-document-types-dark.png') })
+        await reset.click()
+        await page.getByText('第 1-16 条 / 共 16 条', { exact: true }).waitFor()
+        assert.equal(await types.getByRole('button').count(), 17)
+        const all = modules.getByRole('tab', { name: '全部模块', exact: true })
+        await all.press('End')
+        await modules.getByRole('tab', { name: '财务管理', selected: true }).waitFor()
+        await page.keyboard.press('Home')
+        await modules.getByRole('tab', { name: '全部模块', selected: true }).waitFor()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
+        assert.equal(await page.locator('.erp-task-board-filters [aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
+        await originalModules.dispose()
       },
     },
     ...createBusinessStatisticsScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir }),
@@ -2468,7 +2649,7 @@ export function createDashboardTaskScenarios({
         await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
         const extraFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         await extraFilters.waitFor({ state: 'visible' })
-        for (const label of ['任务状态', '截止时间', '来源单据']) {
+        for (const label of ['任务状态', '截止时间', '单据类型']) {
           await extraFilters.getByText(label, { exact: true }).waitFor()
         }
         await assertNoHorizontalOverflow(

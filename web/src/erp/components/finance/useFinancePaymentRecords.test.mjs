@@ -27,7 +27,7 @@ test('收付款筛选传到服务端，失败时不保留上一筛选的金额�
   assert.deepEqual([query.currency, query.kind, query.counterparty_type, query.counterparty_id, query.date_from, query.date_to, query.include_totals], ['USD', 'ADVANCE', 'CUSTOMER', 3, '2026-09-01', '2026-09-30', true])
   fail = true
   await act(async () => controls.setPaymentFilters({ currency: 'CNY' }))
-  assert.deepEqual(controls.paymentTotals, [])
+  assert.equal(controls.paymentTotals, null)
   assert.deepEqual(controls.payments, [])
   assert.equal(controls.paymentTotal, 0)
 })

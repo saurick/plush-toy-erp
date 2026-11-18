@@ -6,6 +6,7 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertTableSemanticAlignment } from './businessTableAssertions.mjs'
 import { createMaterialSummaryScenarios } from './materialSummaryScenarios.mjs'
+import { workbenchPaymentSummaryScenario } from './workbenchPaymentSummaryScenario.mjs'
 
 const baseActions = ['erp.workbench.read', 'workflow.task.read']
 const salesActions = ['sales_order.read', 'sales_order_item.read']
@@ -17,27 +18,46 @@ export function createWorkbenchSummaryScenarios({
   customerRuntimeEffectiveSession,
   outputDir,
 }) {
+  async function verifySummaryPanels(region) {
+    const geometry = await region.evaluate((node) => {
+      const header = node.closest('[aria-label="工作台"]').querySelector('.erp-business-page-header-card')
+      const toolbar = node.querySelector('.erp-business-operation-panel')
+      const results = toolbar.nextElementSibling
+      const [head, bar, body] = [header, toolbar, results].map((el) => el.getBoundingClientRect())
+      const gap = body.top - bar.bottom
+      const between = document.elementFromPoint(bar.left + bar.width / 2, bar.bottom + gap / 2)
+      return {
+        gap,
+        pageGap: Number.parseFloat(getComputedStyle(node).getPropertyValue('--erp-page-gap')),
+        aligned: [bar, body].every((box) => Math.abs(box.left - head.left) <= 1 && Math.abs(box.right - head.right) <= 1),
+        pageVisibleBetweenPanels: Boolean(between && !between.closest('.ant-card')),
+      }
+    })
+    assert(geometry.aligned && geometry.pageVisibleBetweenPanels && geometry.gap > 0 && Math.abs(geometry.gap - geometry.pageGap) <= 1,
+      `汇总的筛选栏和结果面板与页头对齐，中间露出页面底色：${JSON.stringify(geometry)}`)
+  }
+
   const fixtureRows = Array.from({ length: 21 }, (_, index) => ({
     id: index + 1,
     sales_order_id: 100 + index,
     order_no: `SO-SUM-${index + 1}`,
     customer_id: index === 20 ? 42 : 7,
     customer_name: index === 20 ? '模拟筛选客户' : '模拟普通客户',
-    order_date: 1788883200,
+    order_date: 1788883200 + index * 86400,
     planned_delivery_date: 1789747200,
     requested_product_name: `模拟产品 ${index + 1}`,
     customer_product_no: `STYLE-${index + 1}`,
     product_id: null,
     product_image_attachment_id: null,
     order_category: 'NEW',
-    ordered_quantity: '100',
+    ordered_quantity: String(100 + index),
     pre_shipment_sample_quantity: '2',
-    production_quantity: '102',
+    production_quantity: String(102 + index),
     unshipped_quantity: '60',
     unit_name: '只',
     sales_owner: index === 20 ? '历史跟单' : '历史跟单甲',
-    lifecycle_status: 'active',
-    line_status: 'open',
+    lifecycle_status: index === 0 ? 'canceled' : 'active',
+    line_status: index === 0 ? 'canceled' : 'open',
     designer: null,
     unit_price: '12.5',
     currency: 'CNY',
@@ -72,6 +92,13 @@ export function createWorkbenchSummaryScenarios({
         calls = []
         failNext = false
         failOptionRead = mode === 'sales'
+        if (mode === 'none') {
+          page.on('request', (request) => {
+            if (request.url().endsWith('/rpc/operational_fact') && request.postDataJSON()?.method === 'list_finance_payments') {
+              calls.push('list_finance_payments')
+            }
+          })
+        }
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
           if (
@@ -132,6 +159,18 @@ export function createWorkbenchSummaryScenarios({
                 }
                 return copy
               })
+            if (params.sort_by) {
+              rows.sort((a, b) => {
+                const field = params.sort_by
+                const numeric = ['order_date', 'planned_delivery_date', 'ordered_quantity', 'production_quantity', 'pre_shipment_sample_quantity', 'unshipped_quantity', 'unit_price'].includes(field)
+                const read = (row) => field === 'product' ? row.requested_product_name || row.product_name_snapshot : row[field]
+                const left = read(a)
+                const right = read(b)
+                if (left == null || right == null) return Number(left == null) - Number(right == null)
+                const comparison = numeric ? Number(left) - Number(right) : String(left).localeCompare(String(right), 'zh-CN')
+                return comparison * (params.sort_direction === 'asc' ? 1 : -1)
+              })
+            }
             data = stylePaginatedRpcData(rows, 'items', params)
           } else if (method === 'list_engineering_material_requests') {
             data = {
@@ -149,6 +188,11 @@ export function createWorkbenchSummaryScenarios({
               total: 1,
               page: 1,
               limit: 20,
+            }
+            if (mode === 'materials' && !params.keyword) {
+              data.items.unshift({ ...data.items[0], id: 52, order_no: 'SO-MATERIAL-NEW', submitted_at: '2026-09-16T08:00:00Z' })
+              if (params.sort_direction === 'asc') data.items.reverse()
+              data.total = data.items.length
             }
           } else {
             data = {
@@ -176,32 +220,22 @@ export function createWorkbenchSummaryScenarios({
         })
       },
       verify: async (page) => {
-        await page.locator('[aria-label="工作台任务筛选"]').waitFor()
-        assert.equal(calls.length, 0, '默认待办不预取汇总')
-        assert.equal(
-          await page.locator('aside a[href="/erp/material-summary"]').count(),
-          0
-        )
+        assert.equal(await page.getByLabel('工作台视图').count(), 0)
         if (mode === 'none') {
-          assert.equal(
-            await page
-              .getByLabel('工作台视图')
-              .getByText('业务汇总', { exact: true })
-              .count(),
-            0
-          )
+          await page.getByText('当前岗位没有可查看的业务汇总', { exact: true }).waitFor()
+          assert.equal(calls.length, 0)
+          await page.goto(new URL('/erp/dashboard?summary=payments', page.url()).href, { waitUntil: 'domcontentloaded' })
+          await page.getByText('当前岗位没有可查看的业务汇总', { exact: true }).waitFor()
+          assert.equal(calls.length, 0)
           await assertNoHorizontalOverflow(page)
           return
         }
-        await page
-          .getByLabel('工作台视图')
-          .getByText('业务汇总', { exact: true })
-          .click()
         const region = page.getByRole('region', { name: '工作台汇总' })
         await region.locator('.erp-workbench-summaries__heading > *').waitFor()
         if (mode === 'both') {
           await region.locator('.erp-workbench-summaries__heading .ant-select-clear').click()
           await region.getByText('请选择汇总类型', { exact: true }).waitFor()
+          await verifySummaryPanels(region)
           assert.equal(new URL(page.url()).searchParams.get('summary'), '')
           assert.equal(await region.locator('table').count(), 0)
           await page.reload()
@@ -210,20 +244,7 @@ export function createWorkbenchSummaryScenarios({
           await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click()
           await region.locator('.ant-table-tbody').waitFor()
         }
-        const headingInset = await region.evaluate((node) => {
-          const surface = node.getBoundingClientRect()
-          const heading = node
-            .querySelector('.erp-workbench-summaries__heading > *')
-            .getBoundingClientRect()
-          return {
-            left: heading.left - surface.left,
-            top: heading.top - surface.top,
-          }
-        })
-        assert.ok(
-          headingInset.left >= 11.5 && headingInset.top >= 9.5,
-          `汇总标题或选择器保留左上间距 ${JSON.stringify(headingInset)}`
-        )
+        await verifySummaryPanels(region)
         if (mode === 'both') {
           const toolbarGeometry = await region
             .locator('.erp-business-operation-panel__command')
@@ -259,6 +280,12 @@ export function createWorkbenchSummaryScenarios({
             .getByRole('heading', { name: '材料汇总', exact: true })
             .waitFor()
           await region.getByText('SO-MATERIAL-SUM', { exact: true }).waitFor()
+          const submitted = region.locator('th.ant-table-column-has-sorters:visible').filter({ hasText: '提交时间' }).first()
+          await submitted.press('Enter')
+          await page.waitForFunction(() => document.querySelector('.erp-workbench-summaries tr[data-row-key]')?.dataset.rowKey === '51')
+          assert.equal(calls.at(-1).params.sort_by, 'submitted_at')
+          await submitted.press('Enter')
+          await page.waitForFunction(() => document.querySelector('.erp-workbench-summaries tr[data-row-key]')?.dataset.rowKey === '52')
           assert.equal(
             await region.getByRole('combobox', { name: '汇总类型' }).count(),
             0
@@ -420,6 +447,16 @@ export function createWorkbenchSummaryScenarios({
         const dateRange = filterDialog.locator(
           '.erp-business-date-range-filter'
         )
+        await waitForFiniteAnimations(page)
+        const dateTitle = dateRange.getByText('日期类型', { exact: true })
+        await dateTitle.waitFor({ state: 'visible', timeout: 2000 })
+        const statusBox = await filterDialog.getByRole('group', { name: '订单状态', exact: true }).boundingBox()
+        const titleBox = await dateTitle.boundingBox()
+        const typesBox = await dateRange.getByRole('group', { name: '日期类型', exact: true }).boundingBox()
+        assert(statusBox && titleBox && typesBox && titleBox.y > statusBox.y + statusBox.height && typesBox.y >= titleBox.y + titleBox.height, `日期类型标题位于订单状态下方、类型按钮上方: ${JSON.stringify({ statusBox, titleBox, typesBox })}`)
+        assert.equal(await filterDialog.locator('.erp-business-filter-field--choices .erp-business-date-range-filter').count(), 0, '日期范围不嵌套在订单状态组内')
+        await dateRange.getByRole('button', { name: '自定义日期', exact: true }).click()
+        await filterDialog.screenshot({ path: path.join(outputDir, `${name}-date-filter-groups.png`) })
         assert.deepEqual(
           await dateRange
             .locator('.erp-business-date-input')
@@ -443,6 +480,21 @@ export function createWorkbenchSummaryScenarios({
           shorterPage: true,
         })
         assert.equal(calls.at(-1).params.offset, 20)
+        const orderDate = region.locator('th.ant-table-column-has-sorters:visible').filter({ hasText: '下单日期' }).first()
+        await orderDate.press('Enter')
+        await region.locator('tr[data-row-key="1"]').waitFor()
+        assert.equal(calls.at(-1).params.offset, 0)
+        await orderDate.press('Enter')
+        await page.waitForFunction(() => document.querySelector('.erp-workbench-summaries tr[data-row-key]')?.dataset.rowKey === '21')
+        const [sortedDownload] = await Promise.all([
+          page.waitForEvent('download'),
+          region.getByRole('button', { name: '导出当前筛选', exact: true }).click(),
+        ])
+        const exported = await fs.readFile(await sortedDownload.path(), 'utf8')
+        assert.deepEqual([...exported.matchAll(/SO-SUM-(\d+)/gu)].map((match) => Number(match[1])), Array.from({ length: 21 }, (_, index) => 21 - index))
+        assert.equal(calls.at(-1).params.sort_direction, 'desc')
+        await orderDate.press('Enter')
+        await region.locator('tr[data-row-key="1"]').waitFor()
         await filterTrigger.click()
         await pick(customer, '客户旧名', '模拟筛选客户')
         await region.getByText('模拟产品 1', { exact: true }).waitFor({ state: 'hidden' })
@@ -488,15 +540,7 @@ export function createWorkbenchSummaryScenarios({
         await pick(customer, '筛选', '模拟筛选客户')
         await filterDialog.getByRole('button', { name: '收起', exact: true }).click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
-        await page
-          .getByLabel('工作台视图')
-          .getByText('待办', { exact: true })
-          .click()
-        await page.locator('[aria-label="工作台任务筛选"]').waitFor()
-        await page
-          .getByLabel('工作台视图')
-          .getByText('业务汇总', { exact: true })
-          .click()
+        await page.reload()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         await filterTrigger.click()
         await filterDialog.locator('.ant-select-selection-item').getByText('模拟筛选客户', { exact: true }).waitFor()
@@ -517,7 +561,7 @@ export function createWorkbenchSummaryScenarios({
           .click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         await filterTrigger.click()
-        await selectControl(customer).locator('.ant-select-selector').click()
+        await customer.press('ArrowDown')
         const beforeTyping = calls.length
         await customer.fill('没有这家客户')
         await page.locator('.ant-select-dropdown:visible').getByText('没有匹配的选项').waitFor()
@@ -559,6 +603,7 @@ export function createWorkbenchSummaryScenarios({
             .getByText('材料汇总', { exact: true })
             .click()
           await region.getByText('SO-MATERIAL-SUM', { exact: true }).waitFor()
+          await verifySummaryPanels(region)
           await region
             .getByRole('button', { name: '查看材料汇总', exact: true })
             .click()
@@ -586,7 +631,7 @@ export function createWorkbenchSummaryScenarios({
           )
           assert.match(
             await calculationBasis.textContent(),
-            /提交审批时会冻结本次订单、BOM.*后续资料变更不会自动改写/u
+            /自动送审时会冻结本次订单、BOM.*后续资料变更不会自动改写/u
           )
           assert.equal(calls.at(-1).method, 'get_engineering_material_request')
           assert.equal(calls.at(-1).params.request_id, 51)
@@ -607,6 +652,73 @@ export function createWorkbenchSummaryScenarios({
     return result
   }
   return [
+    {
+      ...makeScenario('erp-workbench-summary-column-edges', [...salesActions, 'field.sales_commercial.read', 'field.finance_settlement.read'], 'sales'),
+      path: '/erp/dashboard?view=summary',
+      viewport: { width: 1920, height: 1028 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const table = page.locator('.erp-workbench-summaries .app-table')
+        await table.locator('tr[data-row-key="1"]').waitFor()
+        const heads = table.locator('.ant-table-header th:not(.ant-table-cell-scrollbar)')
+        assert.equal(await heads.count(), 16)
+        const leadingColumns = ['订单编号', '客户', '产品名称', '客户款号', '计划交付日期', '订单数量', '未出货数', '单位', '订单状态']
+        const headerLabels = () => heads.locator('.ant-table-column-title').allInnerTexts()
+        assert.deepEqual((await headerLabels()).slice(0, leadingColumns.length), leadingColumns)
+        assert.equal(await table.locator('.ant-table-header th.ant-table-column-has-sorters').count(), await heads.count())
+        const quantity = heads.filter({ hasText: '订单数量' })
+        for (const [direction, id] of [['asc', '1'], ['desc', '21'], [undefined, '1']]) {
+          const read = page.waitForResponse((res) => {
+            if (!res.url().endsWith('/rpc/sales_order')) return false
+            const body = res.request().postDataJSON()
+            return body.method === 'list_sales_order_summary' && body.params.sort_direction === direction
+          })
+          await quantity.press('Enter')
+          await read
+          await page.waitForFunction((key) => document.querySelector('.erp-workbench-summaries tr[data-row-key]')?.dataset.rowKey === key, id)
+          assert.equal(await quantity.getAttribute('aria-sort'), { asc: 'ascending', desc: 'descending' }[direction] || null)
+        }
+        for (const fraction of [0, 0.5, 1, 0]) {
+          const geometry = await table.evaluate(async (root, position) => {
+            const header = root.querySelector('.ant-table-header')
+            const body = root.querySelector('.ant-table-body')
+            const extent = (node) => node.scrollWidth - node.clientWidth
+            body.scrollLeft = Math.round(extent(body) * position)
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+            const heads = [...header.querySelectorAll('th:not(.ant-table-cell-scrollbar)')]
+            const cells = [...body.querySelector('tr[data-row-key]').cells]
+            return {
+              bodyRange: extent(body),
+              headRange: extent(header),
+              bodyLeft: body.scrollLeft,
+              headLeft: header.scrollLeft,
+              edges: heads.map((th, i) => {
+                const head = th.getBoundingClientRect()
+                const cell = cells[i].getBoundingClientRect()
+                return Math.max(Math.abs(head.left - cell.left), Math.abs(head.right - cell.right))
+              }),
+            }
+          }, fraction)
+          assert(geometry.bodyRange > 0 && geometry.edges.every((delta) => delta <= 1), JSON.stringify(geometry))
+          if (fraction === 1) assert(Math.abs(geometry.bodyRange - geometry.headRange) <= 1, JSON.stringify(geometry))
+        }
+        const defaultHeaders = await headerLabels()
+        await page.getByRole('button', { name: '列设置', exact: true }).click()
+        const settings = page.getByRole('dialog', { name: /^列设置/u })
+        await settings.getByRole('button', { name: '下单日期 移到最前' }).click()
+        await settings.getByRole('checkbox', { name: '客户款号', exact: true }).uncheck()
+        await settings.getByRole('button', { name: /^完\s*成$/u }).click()
+        await settings.waitFor({ state: 'hidden' })
+        await page.reload()
+        await table.locator('tr[data-row-key="1"]').waitFor()
+        assert.deepEqual(await headerLabels(), ['下单日期', ...defaultHeaders.filter((label) => !['下单日期', '客户款号'].includes(label))])
+        await page.getByRole('button', { name: '列设置', exact: true }).click()
+        await settings.getByRole('button', { name: '恢复默认', exact: true }).click()
+        await settings.getByRole('button', { name: /^完\s*成$/u }).click()
+        await settings.waitFor({ state: 'hidden' })
+        assert.deepEqual(await headerLabels(), defaultHeaders)
+      },
+    },
     makeScenario(
       'erp-workbench-summaries-desktop',
       [
@@ -618,6 +730,7 @@ export function createWorkbenchSummaryScenarios({
       ],
       'both'
     ),
+    makeScenario('erp-workbench-summary-sales-light', salesActions, 'sales'),
     makeScenario(
       'erp-workbench-summary-sales-limited-dark',
       salesActions,
@@ -630,6 +743,7 @@ export function createWorkbenchSummaryScenarios({
       'materials'
     ),
     makeScenario('erp-workbench-summary-unrelated-role', [], 'none'),
+    workbenchPaymentSummaryScenario(customerRuntimeEffectiveSession),
     ...createMaterialSummaryScenarios({
       assert,
       outputDir,

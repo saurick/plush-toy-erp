@@ -7,7 +7,7 @@ export const commandCenterGroups = Object.freeze([
         label: '工作台',
         shortLabel: '工作台',
         path: '/erp/dashboard',
-        description: '集中查看今日待办、阻塞事项、业务概况和常用入口。',
+        description: '查看获准的销售订单、材料和收付款汇总。',
       },
       {
         key: 'task-board',

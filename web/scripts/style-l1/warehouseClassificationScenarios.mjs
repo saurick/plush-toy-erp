@@ -1,6 +1,7 @@
 import { expect } from 'playwright/test'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
+import { assertControlCursor } from './controlAffordanceAssertions.mjs'
 
 export function createWarehouseClassificationScenarios(deps) {
   let calls; let warehouses; let
@@ -325,7 +326,9 @@ materials
         await modal.locator('.ant-pagination-prev button').click()
         await expect(modal.getByRole('button', { name: '编辑', exact: true })).toBeDisabled()
         const long = modal.getByRole('radio', { name: `选择仓库 WH-EXTRA-0 · ${'模拟长名称仓库'.repeat(16)}`, exact: true })
-        await long.locator('xpath=ancestor::tr').getByRole('cell').last().click()
+        const warehouseCell = long.locator('xpath=ancestor::tr').getByRole('cell').last()
+        await assertControlCursor(warehouseCell, 'pointer')
+        await warehouseCell.click()
         await expect(long).toBeChecked()
         const geometry = await modal.evaluate((node) => ({ width: node.clientWidth, scrollWidth: node.scrollWidth, toolbarWidth: node.querySelector('.erp-maintenance-selection-bar').clientWidth, toolbarScrollWidth: node.querySelector('.erp-maintenance-selection-bar').scrollWidth }))
         deps.assert(geometry.scrollWidth <= geometry.width + 1 && geometry.toolbarScrollWidth <= geometry.toolbarWidth + 1, `长选中名称不得撑宽维护弹窗 ${JSON.stringify(geometry)}`)

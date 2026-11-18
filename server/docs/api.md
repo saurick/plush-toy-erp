@@ -60,9 +60,22 @@ HTTP 路由：
 
 ## 工作中心分页
 
-工作台队列、任务管理分类列表、进度看板和流转记录默认每页 20 条，桌面可选 20 / 50 / 100 条。共享默认值与上限来自 `internal/biz/work_center_pagination.go`，Web 消费生成的 `WorkCenterPaginationPolicy`。
+任务管理风险队列、任务管理分类列表、进度看板和流转记录默认每页 20 条，桌面可选 20 / 50 / 100 条。共享默认值与上限来自 `internal/biz/work_center_pagination.go`，Web 消费生成的 `WorkCenterPaginationPolicy`。
+
+电脑端任务管理的“风险任务”以 `workflow.get_workbench(queue_key=risk)` 读取原责任与监督范围内未结束的风险事项，工作台汇总直接读取获准的销售订单或工程用料接口。
 
 `workflow.get_workbench/get_task_board` 将超上限的正整数截为 100；`workflow.list_tracking` 与 `business.list_progress` 拒绝超过 100 的请求。原有参数合法性、权限、筛选、总数与稳定排序规则继续生效。
+
+工作中心在当前可见范围内先排序再分页，同值以稳定的记录标识定序。各列表省略排序参数时沿用原有队列或风险顺序。
+
+| 列表 | 可选排序 |
+| --- | --- |
+| `workflow.get_workbench`、`workflow.get_task_board` | `sort=time_asc / time_desc` 对应从早到晚、从晚到早。待办和受阻任务使用截止时间，已结束任务使用实际结束时间。缺值在两个方向都排最后。 |
+| `workflow.list_tracking` | `sort_direction=asc / desc` 按流程或独立任务的发起时间排序，默认最近发起在前。 |
+| `business.list_progress` | 同时传入 `sort_by` 和 `sort_direction=asc / desc`。订单与生产总览可以按 `order_no` 或 `due_date` 排序，交付明细还支持 `product`。缺少交期或计划结束日期的记录排最后。 |
+| `sales_order.list_sales_order_summary` | `sort_by` 取销售汇总列键，`sort_direction` 取 `asc / desc`，两个参数成对传入。支持下单和计划交付日期、客户、订单及客户单号、客户款号、产品名称（`product`）、订单数、船头版数、生产数、单位、未出货数、跟单业务人员、单价、币种、订单状态，以及列设置中的类别、设计师、备注、工艺。单价沿用销售商业字段权限，币种同时要求财务结算字段权限。数量和单价按显示数值比较，缺值排末尾。未出货数只计算已出货事实，来源不一致时保留缺值。列表与完整导出共用排序。 |
+| `sales_order.list_engineering_material_requests` | `sort_by=order_no / submitted_at` 与 `sort_direction=asc / desc` 成对传入，按提交快照的订单号或提交时间排序。`products` 保留提交时的产品名称；有 `product.read` 时，`product_refs` 返回本次提交中按产品 ID 去重的款式及其提交名称、编号。列表和详情通过产品图片接口读取当前主图与相册，缺少产品 ID 时只展示名称。 |
+
 
 任务概览显式请求每类 2 条；日历每批 30 条、手机连续加载每批 20 条，业务统计保留自身分页配置。选项表示单次读取范围，不代表总数据量限制或生产容量验证。
 
@@ -90,7 +103,7 @@ HTTP 路由：
 | `purchase_order / get_purchase_order` | 仅 `id`；必填 JSON 正整数，拒绝小数、数值字符串、布尔值、`null`、不安全整数与未知字段 | 有效内部会话与 `purchase_order.read`；返回 `purchase_order` | 只读，可重试；不能通过附加 actor、角色或客户键选择范围 | [HTTP 消费者](../internal/data/source_document_integration_consumers_postgres_test.go)、[接口合同](../internal/service/jsonrpc_purchase_order_test.go) |
 | `outsourcing_order / get_outsourcing_order` | 仅 `id`；必填 JSON 正整数，拒绝小数、数值字符串、布尔值、`null`、不安全整数与未知字段 | 有效内部会话与 `outsourcing_order.read`；返回 `outsourcing_order` | 只读，可重试；不能通过附加 actor、角色或客户键选择范围 | [接口合同](../internal/service/jsonrpc_outsourcing_order_test.go) |
 | `sales_order / cancel_sales_order` | `id, expected_version, idempotency_key, reason`；可选 `customer_key` 仅选择当前部署配置。ID / 版本为正整数；原因去首尾空白后必填，最多 255 字；键去首尾空白后必填，最多 128 字节 | `sales_order.cancel`、当前销售模块门禁；actor 注入当前身份；返回 `sales_order` | 原版本、键、意图与 actor 的重放复用持久回执；同键改意图或 actor 冲突，新键使用过期版本冲突；返回所属订单投影，不承诺所有字段永久冻结 | [参数与授权](../internal/service/jsonrpc_integration_boundary_test.go)、[并发与回放](../internal/data/source_order_lifecycle_replay_postgres_test.go)、[HTTP 消费者](../internal/data/source_document_integration_consumers_postgres_test.go) |
-| `sales_order / save_sales_order_with_items` | 整单与 `items`；更新须带读取到的 `id / expected_version`，明细 `id` 沿用原值。数量、单价、金额为十进制字符串；`note=""` 清空意见 | 销售订单创建或更新能力及当前模块门禁；返回 `sales_order / sales_order_items` | 版本 CAS 防止覆盖；校对意见不是库存、出货或财务事实；冲突后重新读取并人工核对 | [下游闭环](../internal/data/source_document_integration_chains_postgres_test.go)、[校对与残值](../internal/data/source_document_integration_consumers_postgres_test.go) |
+| `sales_order / save_sales_order_with_items` | 整单与 `items`；自动编号新建须带稳定 `idempotency_key`；更新须带读取到的 `id / expected_version`，明细 `id` 沿用原值。数量、单价、金额为十进制字符串；`note=""` 清空意见 | 销售订单创建或更新能力及当前模块门禁；返回 `sales_order / sales_order_items` | 创建按同键、同经办人、同内容恢复原订单；不同意图冲突；更新用版本 CAS 防止覆盖；校对意见不是库存、出货或财务事实 | [创建与重试](../internal/data/sales_order_create_idempotency_test.go)、[下游闭环](../internal/data/source_document_integration_chains_postgres_test.go)、[校对与残值](../internal/data/source_document_integration_consumers_postgres_test.go) |
 
 **出货与财务**
 
@@ -495,9 +508,14 @@ super admin 当前保留查看和催办类诊断边界，但不通过普通任�
 
 `get_task_board` 是 `workflow.task.read` 下的任务看板只读投影。它在同一查询快照中先应用 owner role / assignee 可见性与关键词、状态、到期、来源筛选，再返回全量 `total`、互斥的 `actionable / exception / due / finished` 计数和有界分页。
 
-`source_types` 是稳定的来源候选 facet，只受任务可见性与显式 owner role 范围约束，不受当前关键词、状态、到期或来源值影响，避免选中来源后下拉候选塌缩。`exception` 包含阻塞任务以及待处理的异常决策与处置任务；`done / rejected / withdrawn` 都不进入 due 且不可再操作，只读归入 `finished`，其中撤回与人工退回使用不同文案。
 
-`lane_key=all` 返回一栏完整范围的分页列表，栏内 `total` 等于顶层 `total`；`todo_only=true` 限于当前责任范围的未结束任务，其他分类入口沿用同一筛选与权限。默认每页 20 条，最多 100 条，`limit / offset` 在数据库查询中生效，支持 `smart / due_soon / newest` 排序与稳定 ID 次序；不会先截取各分类再拼接。具体分类只返回该分类分页，不改变完整 `total / counts / source_types`。未指定 `lane_key` 的分类汇总读取仍按每栏预算返回，日历使用独立查询且不带 `lane_key / sort`。未知状态会 fail closed，不会被静默漏计。
+任务列表的 `source_type` 选择关联业务对象类型。分类及其现有来源标识由 `workflow_task_catalog.json.documents` 统一定义；`get_task_board`、`list_role_tasks` 与 `list_workbench_role_tasks` 在权限范围内按同一分类的全部来源标识查询，再计数、排序和分页。例如 `production_fact / production-fact / production-progress` 都指向生产记录，选中任一成员均查询该分类；`source_types` 只返回一次规范分类标识。审批、确认、执行等具体动作保留在任务标题中，不作为单据类型。原任务的来源、主键、状态与事实记录不改写；`list_tasks(source_type, source_id)` 的精确来源定位合同保持不变。
+
+`get_task_board` 的 `source_section` 按单据所属业务模块查询，该归属由 `workflow_task_catalog.json.documents[].section_key` 定义；它与任务办理环节的 `module_key` 不同。选择模块时查询该模块全部单据类型的来源标识，在数据库中过滤后计数、排序、分页，日历沿用相同条件；若同时指定 `source_type`，必须属于所选模块，否则拒绝请求。
+
+`source_types` 是稳定的来源候选 facet，只受任务可见性与显式 owner role 范围约束，不受当前关键词、状态、到期或来源值影响，避免选中来源后候选塌缩。`exception` 包含阻塞任务以及待处理的异常决策与处置任务；`done / rejected / withdrawn` 都不进入 due 且不可再操作，只读归入 `finished`，其中撤回与人工退回使用不同文案。
+
+`lane_key=all` 返回一栏完整范围的分页列表，栏内 `total` 等于顶层 `total`；`todo_only=true` 限于当前责任范围的未结束任务，其他分类入口沿用同一筛选与权限。默认每页 20 条，最多 100 条，`limit / offset` 在数据库查询中生效，支持 `smart / due_soon / newest / time_asc / time_desc` 排序与稳定 ID 次序；不会先截取各分类再拼接。具体分类只返回该分类分页，不改变完整 `total / counts / source_types`。未指定 `lane_key` 的分类汇总读取仍按每栏预算返回，日历使用独立查询且不带 `lane_key / sort`。未知状态会 fail closed，不会被静默漏计。
 
 任务返回值包含内部并发字段 `version`；`complete_task_action / block_task_action / reject_task_action / urge_task` 必须提交正整数 `expected_version` 和顶层 `idempotency_key`。
 
@@ -1130,7 +1148,14 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 
 `inventory` JSON-RPC 域只读返回库存余额、批次和流水，并支持按显式 `product_sku_id` 筛选。
 
-库存余额的 `sort_by` 支持 `subject_code`（材料或产品编号）、`warehouse_name`（仓库名称）、`lot_no`（批次号）、`quantity`（账面数量）、`issuable_quantity`（材料可领用）、`restricted_quantity`（受限库存）和 `ready_to_ship_quantity`（可发货数量）；后三者同单位内比较，不适用的存货排最后，零值参与排序。库存批次支持 `lot_no` 和 `received_at`（接收日期）。指定字段时 `sort_direction` 可为 `asc` 或 `desc`，省略方向按降序。省略字段与方向时维持最近更新优先；不支持的字段、方向或只指定方向返回参数错误。排序在仓库权限和筛选之后、分页之前执行；无值排最后，同值按记录 ID 倒序。库存流水仍按发生时间倒序。
+库存余额的 `sort_by` 支持：
+
+| 比较内容 | 排序字段 |
+| --- | --- |
+| 档案与记录 | `registration_order`（库存项登记顺序）、`stock_kind`（主料、辅料、包材、其他材料、待分类、成品）、`subject_code`（材料或产品编号）、`sku_code`（产品规格编号）、`warehouse_name`（仓库名称）、`lot_no`（批次号）、`unit_name`（单位名称） |
+| 数量 | `quantity`（账面数量）、`active_reserved_quantity`（已预留）、`available_quantity`（未预留）、`issuable_quantity`（材料可领用）、`restricted_quantity`（受限库存）、`pending_inspection_quantity`（待成品检验）、`pending_packaging_quantity`（待查货包装）、`ready_to_ship_quantity`（可发货数量） |
+
+`sku_code` 还需 `product_sku.read`。数量按单位分组、组内按数值比较；零值参与排序。排序在仓库权限和筛选之后、分页之前执行；缺值或不适用的值排最后，同值按记录 ID 倒序。库存批次支持 `lot_no` 和 `received_at`（接收日期）。指定字段时 `sort_direction` 可为 `asc` 或 `desc`，省略方向按降序；省略字段与方向时维持最近更新优先。不支持的字段、方向或只指定方向返回参数错误。库存流水仍按发生时间倒序。
 
 产品库存 grain 当前为产品 + 可选 SKU + 仓库 + 单位 + 可选批次；`inventory_lots / inventory_txns / inventory_balances`、生产 / 委外事实、出货和预留共用这一粒度，扣减、冲正、可用量和幂等匹配都不能跨 SKU。
 
@@ -1145,17 +1170,21 @@ ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable
 | `get_progress` | 查看业务进度 | 读取业务进度详情，供业务核对。 |
 | `get_receivable_statistics` | 查看应收统计 | 读取应收统计详情，供业务核对。 |
 | `list_delivery_statistics_sources` | 查询交付统计来源 | 读取交付统计来源，供列表查询、引用和追溯。 |
-| `list_progress_owner_options` | 查询进度负责人名单 | 列出当前视图有权查看的业务负责人和待办处理人。 |
 | `list_progress` | 查询业务进度列表 | 读取业务进度列表，供列表查询、引用和追溯。 |
+| `list_progress_owner_options` | 查询进度负责人名单 | 列出当前视图有权查看的业务负责人和待办处理人。 |
+| `list_progress_tasks` | 查询本单关联任务 | 按当前账号、单据、任务状态和负责岗位分页查询。 |
 | `list_receivable_statistics_sources` | 查询应收统计来源 | 读取应收统计来源，供列表查询、引用和追溯。 |
 
-只读入口 `list_progress / get_progress` 要求 `erp.business_dashboard.read`，复用现有销售订单、生产明细、WIP、生产事实、正式出货及 Workflow；没有看板事实表。工作台仍使用 `erp.workbench.read`。旧模块数量接口 `dashboard_stats` 已退出。
+只读入口 `list_progress / get_progress / list_progress_tasks` 要求 `erp.business_dashboard.read`，复用现有销售订单、生产明细、WIP、生产事实、正式出货及 Workflow；没有看板事实表。工作台仍使用 `erp.workbench.read`。旧模块数量接口 `dashboard_stats` 已退出。
 
 | 方法 | 参数与返回 |
 | --- | --- |
+| `list_progress` | `view=orders/production`、`scope=active/all/ended`、`due_status=all/overdue/due_soon/undated`，可组合 `blocked_only` 和生产视图的 `unlinked_only`。选择人员时用 `owner_name` 按完整姓名精确匹配。支持 `keyword/owner/date_from/date_to`；`limit` 默认 20、最大 100，`offset` 最大 1,000,000。订单视图可传 `id` 精确限定销售单、`customer_id` 按客户筛选。 |
+| `get_progress` | 必填正整数 `id` 和对应 `view`；返回 `row/sections/has_more/task_total/snapshot_at/access`。非任务分类最多 100 条。关联任务返回按受阻、待办优先的第一页（20 项）和本单可见总数 `task_total`；无任务可见权时不返回任务分类。 |
 | `list_progress_owner_options` | 按 `view=orders/production` 返回该视图有权查看的业务负责人和未结束待办处理人姓名，跨全部结果去重。名单先限定单据来源和任务可见范围。 |
-| `list_progress` | `view=orders/production`，`scope=active/all/ended`，`risk=all/overdue/due_soon/blocked/undated/unlinked`；选择人员时用 `owner_name` 按完整姓名精确匹配。支持 `keyword/owner/date_from/date_to`，`limit` 默认 20、最大 100，`offset` 最大 1,000,000。返回 `rows/total/counts/snapshot_at/access`。日期为 `YYYY-MM-DD`，非法枚举、额外参数与反向日期范围拒绝。 |
-| `get_progress` | 必填正整数 `id` 和对应 `view`；返回 `row/sections/has_more/snapshot_at/access`。产品明细、生产单、工序批次、领料、关联任务各最多 100 条；`has_more` 提示到来源页继续查看，不能把截断数据当作全量。 |
+| `list_progress_tasks` | `view=orders/production`、本单 `id`、`task_status=all/open/ended`、可选 `owner_role_key`、`limit/offset`（默认 20 / 0，单次最多 100）。要求对应单据和任务查看权限。返回 `rows/total`，先限定正式来源和责任可见范围，再筛选与分页；任务 `number` 为公开任务号，`id` 用于打开准确任务。 |
+
+订单视图传 `display=lines` 时，每行是一条销售明细，`rows[].id` 为明细标识，`rows[].line.sales_order_id` 用于打开同一单的完整进度。明细沿用所选订单范围，每行使用自身交期，缺失时采用单头交期。快捷筛选改用 `delivery_status=all/overdue/closed/due_soon/undated/unknown/delivered`，`counts` 和 `total` 按明细计数；`counts.delivery` 补充关闭未交完、待核对和已交付的条数。7 天内包含当天。关联待核对或已取消时，剩余待交不显示为零。此展示参数只用于列表，不传入 `get_progress`。
 
 进度行的 `product/product_id` 指向按显示名称稳定排序后的首款代表产品，`product_count` 保留整单款数；首款缺少正式产品关联时 `product_id=0`。列表图片继续通过 `attachment.list_product_image_references` 与缩略图下载按需读取，进度响应不携带图片二进制；读取图片仍要求 `product.read`。
 
@@ -1460,7 +1489,11 @@ SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_pro
 
 `sales_order` JSON-RPC 域承载销售订单 Source Document / Business Commitment 主路径。订单表单只通过 `save_sales_order_with_items` 聚合写入，草稿更新使用 `id + DRAFT + version` CAS。
 
-新建时 `order_no` 可省略或传空字符串，由保存事务按 `order_date` 的日期分配 `SO-YYYYMMDD-NNN`，序号至少三位。关闭、取消及页面筛选外的订单仍占用编号。手工编号重复时拒绝，更新时编号不得为空；`null`、数值、布尔值等非字符串无效。编号分配与订单及明细一起提交，失败一起回滚。新建请求不是可无条件重放的命令；页面遇到保存结果未知时保留表单并阻止连续再次创建，须返回列表核对。
+新建时 `order_no` 可省略或传空字符串，由保存事务按 `order_date` 的日期分配 `SO-YYYYMMDD-NNN`，序号至少三位。关闭、取消及页面筛选外的订单仍占用编号。手工编号重复时拒绝，更新时编号不得为空；`null`、数值、布尔值等非字符串无效。编号分配与订单、明细和创建凭据一起提交，失败一起回滚。
+
+自动编号新建必须传 `idempotency_key`（去除首尾空白后 1–128 字节的字符串；不接受空值、null 或其他类型）。服务端绑定当前登录经办人和规范化的完整单头、明细摘要。同键、同人、同内容并发或超时重试返回同一订单的当前状态和明细，不再次发号或建单；同键换人或改内容返回 `40920`。每次请求仍执行当前登录、创建权限及模块门禁，重放不会重新执行创建时的主数据启用检查，也不会恢复已经取消的订单。更新禁止携带创建键，继续使用 `expected_version`。显式编号创建可携带创建键；现有批量导入可继续依靠来源编号唯一约束及完整内容核对。
+
+页面保存期间拦截连续点击；超时或结果未知后保留原请求并冻结表单，“核对保存结果”重发原键和原内容。当前页面关闭、重开表单保留该请求；后续核对失败也不丢弃它。订单确认后才上传附件。刷新、离开页面或换端不会恢复该前端记录，应先核对原订单；JSON-RPC `id` 只关联响应，不替代业务创建键。
 
 `list_sales_order_summary` 的可选 `customer_id` 按客户身份精确筛选（省略或 `0` 表示不过滤），与订单列表一致；独立的 `customer` 字符串用于客户名称快照文字搜索，两者同时提供时取交集。客户更名、同名或旧快照缺失不影响 `customer_id` 的结果。
 
@@ -1500,7 +1533,7 @@ approval 完成后自动执行 `sales_order.activate_after_approval`，在同一
 
 `update_purchase_order_delivery` 复用上述版本和幂等合同，要求 `purchase.order.read + purchase.order.update`，仅允许 `approved`。每行只接受 `id / expected_arrival_date`，拒绝传入单价（包括 `null`）；缺价仍保持缺价，已知价格与收货快照不变。事务写入独立的 `update_delivery` 回执，不作为晚补价确认依据。
 
-`list_purchase_followups` 要求采购订单读取及收货读取（或仓库入库读取）权限，相关模块须可读。参数为 `kind`、`keyword`、`supplier_id`、`order_id`、`confirmation=all|confirmed|unconfirmed`、`start_date`、`selected_date`、`limit`（默认 25，最多 200）和 `offset`。日历日期使用 `YYYY-MM-DD`，以服务端上海业务日判定逾期和含今天的七天窗口。`kind` 可为 `all / overdue / due_soon / unscheduled / scheduled / period / date / pending_inspection / rejected / ready_inbound / missing_price / unsettled`。`period` 为 `start_date` 起 14 天，`date` 必须提供 `selected_date`。
+`list_purchase_followups` 要求采购订单读取及收货读取（或仓库入库读取）权限，相关模块须可读。参数为 `kind`、`keyword`、`supplier_id`、`order_id`、`sales_order_id`（需销售单读取权限，按工程用料来源限定采购单，计数、日历及分页同范围）、`confirmation=all|confirmed|unconfirmed`、`start_date`、`selected_date`、`limit`（默认 25，最多 200）和 `offset`。日历日期使用 `YYYY-MM-DD`，以服务端上海业务日判定逾期和含今天的七天窗口。`kind` 可为 `all / overdue / due_soon / unscheduled / scheduled / period / date / pending_inspection / rejected / ready_inbound / missing_price / unsettled`。`period` 为 `start_date` 起 14 天，`date` 必须提供 `selected_date`。
 
 返回 `rows / total / counts / days / as_of_date / access / limit / offset`。计数、日历和分页在同一只读快照内完成；`counts` 是相同查询范围、未应用 `kind` 筛选的事项数，`total` 为当前筛选总数，日历按采购明细计数。明细交期优先，其次供应商确认交期、整单预计日期。只有已审核、未关闭且尚需到货的明细参与提醒，已入库数量（含有效数量调整）和未入库但仍占用收货额度的登记数量均扣除；草稿、取消、已关闭及全部到货不产生逾期。退货不自动重开采购额度，拒收处置后的剩余采购额度沿用收货进度规则。
 
@@ -3038,7 +3071,7 @@ start 成功不等于任一 Fact 已写入；旧 `start_material_supply_process`
 
 真实出货 / 取消冲正会把来源业务投影继续推进到 `shipped / cancelled`，生产订单关闭 / 取消和返工事实取消同理推进到 `closed / cancelled`；这些来源投影不改写既有 task status。
 
-存量 `RELEASED` 生产订单与 `POSTED REWORK` 返工事实的缺失任务使用 `server/cmd/backfill-workflow-source-tasks` 受控修复，不属于 JSON-RPC API。命令默认事务 dry-run，apply 要求精确确认数据库名；它只依来源事实重算履约待办，`DRAFT` 出货单仅生成准备任务，不推断曾经提交或批准。具体命令见 [来源任务修复](runtime.md#来源任务修复)。
+存量 `RELEASED` 生产订单与 `POSTED REWORK` 返工事实的缺失任务使用 `server/cmd/backfill-workflow-source-tasks` 受控修复，不属于 JSON-RPC API。命令默认事务 dry-run，apply 要求精确确认数据库名；它只依来源事实重算履约待办，`DRAFT` 出货单生成业务准备任务，仍待处理的有效出货前检验补齐品质待办，不推断曾经提交或批准。具体命令见 [来源任务修复](runtime.md#来源任务修复)。
 
 ## 已退出运行时的旧接口
 
@@ -10334,18 +10367,21 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `blocked_only` | boolean | 条件必填（blocked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:50`。 |
-| `date_from` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `date_to` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `due_status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "id", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
-| `keyword` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_business_progress.go:55`。 |
-| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:58`。 |
-| `owner` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `scope` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `unlinked_only` | boolean | 条件必填（unlinked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:50`。 |
-| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
+| `blocked_only` | boolean | 条件必填（blocked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:70`。 |
+| `customer_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "customer_id", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:89`。 |
+| `date_from` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `date_to` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `delivery_status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `display` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `due_status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:84`。 |
+| `keyword` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_business_progress.go:75`。 |
+| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:78`。 |
+| `owner` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `scope` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `unlinked_only` | boolean | 条件必填（unlinked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:70`。 |
+| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -10372,89 +10408,106 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.access` | object | 依据：`server/internal/biz/business_progress.go:115`。 |
+| `result.data.access` | object | 依据：`server/internal/biz/business_progress.go:141`。 |
 
 **`access`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.access.production` | boolean | 依据：`server/internal/biz/business_progress.go:13`。 |
-| `result.data.access.sales` | boolean | 依据：`server/internal/biz/business_progress.go:12`。 |
-| `result.data.access.tasks` | boolean | 依据：`server/internal/biz/business_progress.go:14`。 |
-| `result.data.access.wip` | boolean | 依据：`server/internal/biz/business_progress.go:15`。 |
+| `result.data.access.production` | boolean | 依据：`server/internal/biz/business_progress.go:19`。 |
+| `result.data.access.sales` | boolean | 依据：`server/internal/biz/business_progress.go:18`。 |
+| `result.data.access.tasks` | boolean | 依据：`server/internal/biz/business_progress.go:20`。 |
+| `result.data.access.wip` | boolean | 依据：`server/internal/biz/business_progress.go:21`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.has_more` | object &#124; null | 依据：`server/internal/biz/business_progress.go:113`。 |
-| `result.data.row` | object &#124; null | 依据：`server/internal/biz/business_progress.go:111`。 |
+| `result.data.has_more` | object &#124; null | 依据：`server/internal/biz/business_progress.go:139`。 |
+| `result.data.row` | object &#124; null | 依据：`server/internal/biz/business_progress.go:137`。 |
 
 **`row`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.row.active` | boolean | 依据：`server/internal/biz/business_progress.go:51`。 |
-| `result.data.row.attention_owner` | string | 依据：`server/internal/biz/business_progress.go:80`。 |
-| `result.data.row.attention_reason` | string | 依据：`server/internal/biz/business_progress.go:79`。 |
-| `result.data.row.attention_role` | string | 依据：`server/internal/biz/business_progress.go:81`。 |
-| `result.data.row.attention_task` | string | 依据：`server/internal/biz/business_progress.go:78`。 |
-| `result.data.row.attention_task_id` | integer | 依据：`server/internal/biz/business_progress.go:77`。 |
-| `result.data.row.blocked` | boolean | 依据：`server/internal/biz/business_progress.go:54`。 |
-| `result.data.row.blocked_tasks` | integer | 依据：`server/internal/biz/business_progress.go:75`。 |
-| `result.data.row.completed_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:59`。 |
-| `result.data.row.current_operation` | string | 依据：`server/internal/biz/business_progress.go:60`。 |
-| `result.data.row.customer` | string | 依据：`server/internal/biz/business_progress.go:42`。 |
-| `result.data.row.delivery_known` | boolean | 依据：`server/internal/biz/business_progress.go:62`。 |
-| `result.data.row.due_date` | string | 依据：`server/internal/biz/business_progress.go:49`。 |
-| `result.data.row.due_soon` | boolean | 依据：`server/internal/biz/business_progress.go:53`。 |
-| `result.data.row.engineering_ready` | integer | 依据：`server/internal/biz/business_progress.go:64`。 |
-| `result.data.row.engineering_total` | integer | 依据：`server/internal/biz/business_progress.go:63`。 |
+| `result.data.row.active` | boolean | 依据：`server/internal/biz/business_progress.go:75`。 |
+| `result.data.row.attention_owner` | string | 依据：`server/internal/biz/business_progress.go:104`。 |
+| `result.data.row.attention_reason` | string | 依据：`server/internal/biz/business_progress.go:103`。 |
+| `result.data.row.attention_role` | string | 依据：`server/internal/biz/business_progress.go:105`。 |
+| `result.data.row.attention_task` | string | 依据：`server/internal/biz/business_progress.go:102`。 |
+| `result.data.row.attention_task_id` | integer | 依据：`server/internal/biz/business_progress.go:101`。 |
+| `result.data.row.blocked` | boolean | 依据：`server/internal/biz/business_progress.go:78`。 |
+| `result.data.row.blocked_tasks` | integer | 依据：`server/internal/biz/business_progress.go:99`。 |
+| `result.data.row.completed_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:83`。 |
+| `result.data.row.current_operation` | string | 依据：`server/internal/biz/business_progress.go:84`。 |
+| `result.data.row.customer` | string | 依据：`server/internal/biz/business_progress.go:66`。 |
+| `result.data.row.delivery_known` | boolean | 依据：`server/internal/biz/business_progress.go:86`。 |
+| `result.data.row.due_date` | string | 依据：`server/internal/biz/business_progress.go:73`。 |
+| `result.data.row.due_soon` | boolean | 依据：`server/internal/biz/business_progress.go:77`。 |
+| `result.data.row.engineering_ready` | integer | 依据：`server/internal/biz/business_progress.go:88`。 |
+| `result.data.row.engineering_total` | integer | 依据：`server/internal/biz/business_progress.go:87`。 |
 
 **`row`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.row.id` | integer | 依据：`server/internal/biz/business_progress.go:38`。 |
-| `result.data.row.in_progress_batches` | integer | 依据：`server/internal/biz/business_progress.go:69`。 |
-| `result.data.row.material_pending` | integer | 依据：`server/internal/biz/business_progress.go:68`。 |
-| `result.data.row.material_total` | integer | 依据：`server/internal/biz/business_progress.go:67`。 |
-| `result.data.row.open_tasks` | integer | 依据：`server/internal/biz/business_progress.go:74`。 |
-| `result.data.row.operation_count` | integer | 依据：`server/internal/biz/business_progress.go:61`。 |
-| `result.data.row.order_no` | string | 依据：`server/internal/biz/business_progress.go:40`。 |
-| `result.data.row.ordered_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:57`。 |
-| `result.data.row.outsourced_batches` | integer | 依据：`server/internal/biz/business_progress.go:70`。 |
-| `result.data.row.overdue` | boolean | 依据：`server/internal/biz/business_progress.go:52`。 |
-| `result.data.row.planned_batches` | integer | 依据：`server/internal/biz/business_progress.go:73`。 |
-| `result.data.row.product` | string | 依据：`server/internal/biz/business_progress.go:43`。 |
-| `result.data.row.product_count` | integer | 依据：`server/internal/biz/business_progress.go:44`。 |
-| `result.data.row.product_id` | integer | 依据：`server/internal/biz/business_progress.go:47`。 |
-| `result.data.row.product_match_count` | integer | 依据：`server/internal/biz/business_progress.go:46`。 |
-| `result.data.row.product_type_count` | integer | 依据：`server/internal/biz/business_progress.go:45`。 |
+| `result.data.row.id` | integer | 依据：`server/internal/biz/business_progress.go:62`。 |
+| `result.data.row.in_progress_batches` | integer | 依据：`server/internal/biz/business_progress.go:93`。 |
+| `result.data.row.line` | object &#124; null | 依据：`server/internal/biz/business_progress.go:106`。 |
+
+**`row.line`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.row.line.customer_product_no` | string | 依据：`server/internal/biz/business_progress.go:56`。 |
+| `result.data.row.line.delivery_status` | string | 依据：`server/internal/biz/business_progress.go:57`。 |
+| `result.data.row.line.line_no` | integer | 依据：`server/internal/biz/business_progress.go:55`。 |
+| `result.data.row.line.remaining_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:58`。 |
+| `result.data.row.line.sales_order_id` | integer | 依据：`server/internal/biz/business_progress.go:54`。 |
+
+**`row`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.row.material_pending` | integer | 依据：`server/internal/biz/business_progress.go:92`。 |
+| `result.data.row.material_total` | integer | 依据：`server/internal/biz/business_progress.go:91`。 |
+| `result.data.row.open_tasks` | integer | 依据：`server/internal/biz/business_progress.go:98`。 |
+| `result.data.row.operation_count` | integer | 依据：`server/internal/biz/business_progress.go:85`。 |
+| `result.data.row.order_no` | string | 依据：`server/internal/biz/business_progress.go:64`。 |
+| `result.data.row.ordered_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:81`。 |
+| `result.data.row.outsourced_batches` | integer | 依据：`server/internal/biz/business_progress.go:94`。 |
+| `result.data.row.overdue` | boolean | 依据：`server/internal/biz/business_progress.go:76`。 |
+| `result.data.row.planned_batches` | integer | 依据：`server/internal/biz/business_progress.go:97`。 |
+| `result.data.row.product` | string | 依据：`server/internal/biz/business_progress.go:67`。 |
+| `result.data.row.product_count` | integer | 依据：`server/internal/biz/business_progress.go:68`。 |
+| `result.data.row.product_id` | integer | 依据：`server/internal/biz/business_progress.go:71`。 |
+| `result.data.row.product_match_count` | integer | 依据：`server/internal/biz/business_progress.go:70`。 |
+| `result.data.row.product_type_count` | integer | 依据：`server/internal/biz/business_progress.go:69`。 |
+| `result.data.row.production_closed` | integer | 依据：`server/internal/biz/business_progress.go:90`。 |
+| `result.data.row.production_orders` | integer | 依据：`server/internal/biz/business_progress.go:89`。 |
 
 **`row`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.row.production_closed` | integer | 依据：`server/internal/biz/business_progress.go:66`。 |
-| `result.data.row.production_orders` | integer | 依据：`server/internal/biz/business_progress.go:65`。 |
-| `result.data.row.rejected_batches` | integer | 依据：`server/internal/biz/business_progress.go:72`。 |
-| `result.data.row.sales_owner` | string | 依据：`server/internal/biz/business_progress.go:48`。 |
-| `result.data.row.shipped_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:58`。 |
-| `result.data.row.status` | string | 依据：`server/internal/biz/business_progress.go:41`。 |
-| `result.data.row.unassigned_tasks` | integer | 依据：`server/internal/biz/business_progress.go:76`。 |
-| `result.data.row.unit` | string | 依据：`server/internal/biz/business_progress.go:56`。 |
-| `result.data.row.unlinked` | boolean | 依据：`server/internal/biz/business_progress.go:55`。 |
-| `result.data.row.updated_at` | string | 依据：`server/internal/biz/business_progress.go:50`。 |
-| `result.data.row.view` | string | 依据：`server/internal/biz/business_progress.go:39`。 |
-| `result.data.row.waiting_batches` | integer | 依据：`server/internal/biz/business_progress.go:71`。 |
+| `result.data.row.rejected_batches` | integer | 依据：`server/internal/biz/business_progress.go:96`。 |
+| `result.data.row.sales_owner` | string | 依据：`server/internal/biz/business_progress.go:72`。 |
+| `result.data.row.shipped_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:82`。 |
+| `result.data.row.status` | string | 依据：`server/internal/biz/business_progress.go:65`。 |
+| `result.data.row.unassigned_tasks` | integer | 依据：`server/internal/biz/business_progress.go:100`。 |
+| `result.data.row.unit` | string | 依据：`server/internal/biz/business_progress.go:80`。 |
+| `result.data.row.unlinked` | boolean | 依据：`server/internal/biz/business_progress.go:79`。 |
+| `result.data.row.updated_at` | string | 依据：`server/internal/biz/business_progress.go:74`。 |
+| `result.data.row.view` | string | 依据：`server/internal/biz/business_progress.go:63`。 |
+| `result.data.row.waiting_batches` | integer | 依据：`server/internal/biz/business_progress.go:95`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sections` | object &#124; null | 依据：`server/internal/biz/business_progress.go:112`。 |
-| `result.data.snapshot_at` | string | 依据：`server/internal/biz/business_progress.go:114`。 |
+| `result.data.sections` | object &#124; null | 依据：`server/internal/biz/business_progress.go:138`。 |
+| `result.data.snapshot_at` | string | 依据：`server/internal/biz/business_progress.go:140`。 |
+| `result.data.task_total` | integer | 依据：`server/internal/biz/business_progress.go:136`。 |
 
 ```json
 {
@@ -10518,7 +10571,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
         "waiting_batches": 1
       },
       "sections": {},
-      "snapshot_at": "2026-10-19T07:16:23.192414Z"
+      "snapshot_at": "2026-10-19T07:16:23.192414Z",
+      "task_total": 0
     }
   }
 }
@@ -10890,19 +10944,29 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `blocked_only` | boolean | 条件必填（blocked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:50`。 |
-| `date_from` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `date_to` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `due_status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "id", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
-| `keyword` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_business_progress.go:55`。 |
-| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:58`。 |
-| `owner` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `owner_name` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "owner_name", 128)`。 依据：`server/internal/service/jsonrpc_business_progress.go:35`。 |
-| `scope` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
-| `unlinked_only` | boolean | 条件必填（unlinked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:50`。 |
-| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
+| `blocked_only` | boolean | 条件必填（blocked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:70`。 |
+| `customer_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "customer_id", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:89`。 |
+| `date_from` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `date_to` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `delivery_status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `display` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `due_status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "id", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:82`。 |
+| `keyword` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_business_progress.go:75`。 |
+| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:78`。 |
+| `owner` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `owner_name` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "owner_name", 128)`。 依据：`server/internal/service/jsonrpc_business_progress.go:47`。 |
+| `scope` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+| `sort_by` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "sort_by", 32)`。 依据：`server/internal/service/jsonrpc_business_progress.go:51`。 |
+| `sort_direction` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "sort_direction", 4)`。 依据：`server/internal/service/jsonrpc_business_progress.go:55`。 |
+
+**顶层字段（续）**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `unlinked_only` | boolean | 条件必填（unlinked_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:70`。 |
+| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -10911,7 +10975,13 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "jsonrpc": "2.0",
   "method": "list_progress",
   "params": {
-    "owner_name": "模拟业务员"
+    "display": "lines",
+    "id": 31,
+    "owner_name": "模拟业务员",
+    "scope": "all",
+    "sort_by": "due_date",
+    "sort_direction": "asc",
+    "view": "orders"
   },
   "id": "rpc-demo-business.list_progress"
 }
@@ -10929,106 +10999,136 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.access` | object | 依据：`server/internal/biz/business_progress.go:89`。 |
+| `result.data.access` | object | 依据：`server/internal/biz/business_progress.go:114`。 |
 
 **`access`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.access.production` | boolean | 依据：`server/internal/biz/business_progress.go:13`。 |
-| `result.data.access.sales` | boolean | 依据：`server/internal/biz/business_progress.go:12`。 |
-| `result.data.access.tasks` | boolean | 依据：`server/internal/biz/business_progress.go:14`。 |
-| `result.data.access.wip` | boolean | 依据：`server/internal/biz/business_progress.go:15`。 |
+| `result.data.access.production` | boolean | 依据：`server/internal/biz/business_progress.go:19`。 |
+| `result.data.access.sales` | boolean | 依据：`server/internal/biz/business_progress.go:18`。 |
+| `result.data.access.tasks` | boolean | 依据：`server/internal/biz/business_progress.go:20`。 |
+| `result.data.access.wip` | boolean | 依据：`server/internal/biz/business_progress.go:21`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.counts` | object | 依据：`server/internal/biz/business_progress.go:87`。 |
+| `result.data.counts` | object | 依据：`server/internal/biz/business_progress.go:112`。 |
 
 **`counts`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.counts.blocked` | integer | 依据：`server/internal/biz/business_progress.go:32`。 |
-| `result.data.counts.due_soon` | integer | 依据：`server/internal/biz/business_progress.go:31`。 |
-| `result.data.counts.overdue` | integer | 依据：`server/internal/biz/business_progress.go:30`。 |
-| `result.data.counts.total` | integer | 依据：`server/internal/biz/business_progress.go:29`。 |
-| `result.data.counts.undated` | integer | 依据：`server/internal/biz/business_progress.go:33`。 |
-| `result.data.counts.unlinked` | integer | 依据：`server/internal/biz/business_progress.go:34`。 |
+| `result.data.counts.blocked` | integer | 依据：`server/internal/biz/business_progress.go:41`。 |
+| `result.data.counts.delivery` | object &#124; null | 依据：`server/internal/biz/business_progress.go:44`。 |
+
+**`counts.delivery`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.counts.delivery.closed` | integer | 依据：`server/internal/biz/business_progress.go:48`。 |
+| `result.data.counts.delivery.delivered` | integer | 依据：`server/internal/biz/business_progress.go:50`。 |
+| `result.data.counts.delivery.unknown` | integer | 依据：`server/internal/biz/business_progress.go:49`。 |
+
+**`counts`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.counts.due_soon` | integer | 依据：`server/internal/biz/business_progress.go:40`。 |
+| `result.data.counts.overdue` | integer | 依据：`server/internal/biz/business_progress.go:39`。 |
+| `result.data.counts.total` | integer | 依据：`server/internal/biz/business_progress.go:38`。 |
+| `result.data.counts.undated` | integer | 依据：`server/internal/biz/business_progress.go:42`。 |
+| `result.data.counts.unlinked` | integer | 依据：`server/internal/biz/business_progress.go:43`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.rows` | array &#124; null | 依据：`server/internal/biz/business_progress.go:85`。 |
-| `result.data.rows[]` | object &#124; null | 依据：`server/internal/biz/business_progress.go:85`。 |
+| `result.data.rows` | array &#124; null | 依据：`server/internal/biz/business_progress.go:110`。 |
+| `result.data.rows[]` | object &#124; null | 依据：`server/internal/biz/business_progress.go:110`。 |
 
 **`rows[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.rows[].active` | boolean | 依据：`server/internal/biz/business_progress.go:51`。 |
-| `result.data.rows[].attention_owner` | string | 依据：`server/internal/biz/business_progress.go:80`。 |
-| `result.data.rows[].attention_reason` | string | 依据：`server/internal/biz/business_progress.go:79`。 |
-| `result.data.rows[].attention_role` | string | 依据：`server/internal/biz/business_progress.go:81`。 |
-| `result.data.rows[].attention_task` | string | 依据：`server/internal/biz/business_progress.go:78`。 |
-| `result.data.rows[].attention_task_id` | integer | 依据：`server/internal/biz/business_progress.go:77`。 |
-| `result.data.rows[].blocked` | boolean | 依据：`server/internal/biz/business_progress.go:54`。 |
-| `result.data.rows[].blocked_tasks` | integer | 依据：`server/internal/biz/business_progress.go:75`。 |
-| `result.data.rows[].completed_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:59`。 |
-| `result.data.rows[].current_operation` | string | 依据：`server/internal/biz/business_progress.go:60`。 |
-| `result.data.rows[].customer` | string | 依据：`server/internal/biz/business_progress.go:42`。 |
-| `result.data.rows[].delivery_known` | boolean | 依据：`server/internal/biz/business_progress.go:62`。 |
-| `result.data.rows[].due_date` | string | 依据：`server/internal/biz/business_progress.go:49`。 |
-| `result.data.rows[].due_soon` | boolean | 依据：`server/internal/biz/business_progress.go:53`。 |
-| `result.data.rows[].engineering_ready` | integer | 依据：`server/internal/biz/business_progress.go:64`。 |
-| `result.data.rows[].engineering_total` | integer | 依据：`server/internal/biz/business_progress.go:63`。 |
+| `result.data.rows[].active` | boolean | 依据：`server/internal/biz/business_progress.go:75`。 |
+| `result.data.rows[].attention_owner` | string | 依据：`server/internal/biz/business_progress.go:104`。 |
+| `result.data.rows[].attention_reason` | string | 依据：`server/internal/biz/business_progress.go:103`。 |
+| `result.data.rows[].attention_role` | string | 依据：`server/internal/biz/business_progress.go:105`。 |
+| `result.data.rows[].attention_task` | string | 依据：`server/internal/biz/business_progress.go:102`。 |
+| `result.data.rows[].attention_task_id` | integer | 依据：`server/internal/biz/business_progress.go:101`。 |
+| `result.data.rows[].blocked` | boolean | 依据：`server/internal/biz/business_progress.go:78`。 |
+| `result.data.rows[].blocked_tasks` | integer | 依据：`server/internal/biz/business_progress.go:99`。 |
+| `result.data.rows[].completed_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:83`。 |
+| `result.data.rows[].current_operation` | string | 依据：`server/internal/biz/business_progress.go:84`。 |
+| `result.data.rows[].customer` | string | 依据：`server/internal/biz/business_progress.go:66`。 |
+| `result.data.rows[].delivery_known` | boolean | 依据：`server/internal/biz/business_progress.go:86`。 |
+| `result.data.rows[].due_date` | string | 依据：`server/internal/biz/business_progress.go:73`。 |
+| `result.data.rows[].due_soon` | boolean | 依据：`server/internal/biz/business_progress.go:77`。 |
+| `result.data.rows[].engineering_ready` | integer | 依据：`server/internal/biz/business_progress.go:88`。 |
+| `result.data.rows[].engineering_total` | integer | 依据：`server/internal/biz/business_progress.go:87`。 |
 
 **`rows[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.rows[].id` | integer | 依据：`server/internal/biz/business_progress.go:38`。 |
-| `result.data.rows[].in_progress_batches` | integer | 依据：`server/internal/biz/business_progress.go:69`。 |
-| `result.data.rows[].material_pending` | integer | 依据：`server/internal/biz/business_progress.go:68`。 |
-| `result.data.rows[].material_total` | integer | 依据：`server/internal/biz/business_progress.go:67`。 |
-| `result.data.rows[].open_tasks` | integer | 依据：`server/internal/biz/business_progress.go:74`。 |
-| `result.data.rows[].operation_count` | integer | 依据：`server/internal/biz/business_progress.go:61`。 |
-| `result.data.rows[].order_no` | string | 依据：`server/internal/biz/business_progress.go:40`。 |
-| `result.data.rows[].ordered_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:57`。 |
-| `result.data.rows[].outsourced_batches` | integer | 依据：`server/internal/biz/business_progress.go:70`。 |
-| `result.data.rows[].overdue` | boolean | 依据：`server/internal/biz/business_progress.go:52`。 |
-| `result.data.rows[].planned_batches` | integer | 依据：`server/internal/biz/business_progress.go:73`。 |
-| `result.data.rows[].product` | string | 依据：`server/internal/biz/business_progress.go:43`。 |
-| `result.data.rows[].product_count` | integer | 依据：`server/internal/biz/business_progress.go:44`。 |
-| `result.data.rows[].product_id` | integer | 依据：`server/internal/biz/business_progress.go:47`。 |
-| `result.data.rows[].product_match_count` | integer | 依据：`server/internal/biz/business_progress.go:46`。 |
-| `result.data.rows[].product_type_count` | integer | 依据：`server/internal/biz/business_progress.go:45`。 |
+| `result.data.rows[].id` | integer | 依据：`server/internal/biz/business_progress.go:62`。 |
+| `result.data.rows[].in_progress_batches` | integer | 依据：`server/internal/biz/business_progress.go:93`。 |
+| `result.data.rows[].line` | object &#124; null | 依据：`server/internal/biz/business_progress.go:106`。 |
+
+**`rows[].line`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.rows[].line.customer_product_no` | string | 依据：`server/internal/biz/business_progress.go:56`。 |
+| `result.data.rows[].line.delivery_status` | string | 依据：`server/internal/biz/business_progress.go:57`。 |
+| `result.data.rows[].line.line_no` | integer | 依据：`server/internal/biz/business_progress.go:55`。 |
+| `result.data.rows[].line.remaining_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:58`。 |
+| `result.data.rows[].line.sales_order_id` | integer | 依据：`server/internal/biz/business_progress.go:54`。 |
+
+**`rows[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.rows[].material_pending` | integer | 依据：`server/internal/biz/business_progress.go:92`。 |
+| `result.data.rows[].material_total` | integer | 依据：`server/internal/biz/business_progress.go:91`。 |
+| `result.data.rows[].open_tasks` | integer | 依据：`server/internal/biz/business_progress.go:98`。 |
+| `result.data.rows[].operation_count` | integer | 依据：`server/internal/biz/business_progress.go:85`。 |
+| `result.data.rows[].order_no` | string | 依据：`server/internal/biz/business_progress.go:64`。 |
+| `result.data.rows[].ordered_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:81`。 |
+| `result.data.rows[].outsourced_batches` | integer | 依据：`server/internal/biz/business_progress.go:94`。 |
+| `result.data.rows[].overdue` | boolean | 依据：`server/internal/biz/business_progress.go:76`。 |
+| `result.data.rows[].planned_batches` | integer | 依据：`server/internal/biz/business_progress.go:97`。 |
+| `result.data.rows[].product` | string | 依据：`server/internal/biz/business_progress.go:67`。 |
+| `result.data.rows[].product_count` | integer | 依据：`server/internal/biz/business_progress.go:68`。 |
+| `result.data.rows[].product_id` | integer | 依据：`server/internal/biz/business_progress.go:71`。 |
+| `result.data.rows[].product_match_count` | integer | 依据：`server/internal/biz/business_progress.go:70`。 |
+| `result.data.rows[].product_type_count` | integer | 依据：`server/internal/biz/business_progress.go:69`。 |
+| `result.data.rows[].production_closed` | integer | 依据：`server/internal/biz/business_progress.go:90`。 |
+| `result.data.rows[].production_orders` | integer | 依据：`server/internal/biz/business_progress.go:89`。 |
 
 **`rows[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.rows[].production_closed` | integer | 依据：`server/internal/biz/business_progress.go:66`。 |
-| `result.data.rows[].production_orders` | integer | 依据：`server/internal/biz/business_progress.go:65`。 |
-| `result.data.rows[].rejected_batches` | integer | 依据：`server/internal/biz/business_progress.go:72`。 |
-| `result.data.rows[].sales_owner` | string | 依据：`server/internal/biz/business_progress.go:48`。 |
-| `result.data.rows[].shipped_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:58`。 |
-| `result.data.rows[].status` | string | 依据：`server/internal/biz/business_progress.go:41`。 |
-| `result.data.rows[].unassigned_tasks` | integer | 依据：`server/internal/biz/business_progress.go:76`。 |
-| `result.data.rows[].unit` | string | 依据：`server/internal/biz/business_progress.go:56`。 |
-| `result.data.rows[].unlinked` | boolean | 依据：`server/internal/biz/business_progress.go:55`。 |
-| `result.data.rows[].updated_at` | string | 依据：`server/internal/biz/business_progress.go:50`。 |
-| `result.data.rows[].view` | string | 依据：`server/internal/biz/business_progress.go:39`。 |
-| `result.data.rows[].waiting_batches` | integer | 依据：`server/internal/biz/business_progress.go:71`。 |
+| `result.data.rows[].rejected_batches` | integer | 依据：`server/internal/biz/business_progress.go:96`。 |
+| `result.data.rows[].sales_owner` | string | 依据：`server/internal/biz/business_progress.go:72`。 |
+| `result.data.rows[].shipped_quantity` | string &#124; null | 依据：`server/internal/biz/business_progress.go:82`。 |
+| `result.data.rows[].status` | string | 依据：`server/internal/biz/business_progress.go:65`。 |
+| `result.data.rows[].unassigned_tasks` | integer | 依据：`server/internal/biz/business_progress.go:100`。 |
+| `result.data.rows[].unit` | string | 依据：`server/internal/biz/business_progress.go:80`。 |
+| `result.data.rows[].unlinked` | boolean | 依据：`server/internal/biz/business_progress.go:79`。 |
+| `result.data.rows[].updated_at` | string | 依据：`server/internal/biz/business_progress.go:74`。 |
+| `result.data.rows[].view` | string | 依据：`server/internal/biz/business_progress.go:63`。 |
+| `result.data.rows[].waiting_batches` | integer | 依据：`server/internal/biz/business_progress.go:95`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.snapshot_at` | string | 依据：`server/internal/biz/business_progress.go:88`。 |
-| `result.data.total` | integer | 依据：`server/internal/biz/business_progress.go:86`。 |
+| `result.data.snapshot_at` | string | 依据：`server/internal/biz/business_progress.go:113`。 |
+| `result.data.total` | integer | 依据：`server/internal/biz/business_progress.go:111`。 |
 
 ```json
 {
@@ -11039,28 +11139,85 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "message": "OK",
     "data": {
       "access": {
-        "production": true,
-        "sales": false,
+        "production": false,
+        "sales": true,
         "tasks": false,
         "wip": false
       },
       "counts": {
         "blocked": 0,
+        "delivery": {
+          "closed": 0,
+          "delivered": 0,
+          "unknown": 0
+        },
         "due_soon": 0,
-        "overdue": 0,
-        "total": 0,
+        "overdue": 1,
+        "total": 1,
         "undated": 0,
         "unlinked": 0
       },
-      "rows": [],
+      "rows": [
+        {
+          "active": true,
+          "attention_owner": "",
+          "attention_reason": "",
+          "attention_role": "",
+          "attention_task": "",
+          "attention_task_id": 0,
+          "blocked": false,
+          "blocked_tasks": 0,
+          "completed_quantity": null,
+          "current_operation": "",
+          "customer": "模拟客户",
+          "delivery_known": true,
+          "due_date": "2026-10-17",
+          "due_soon": false,
+          "engineering_ready": 0,
+          "engineering_total": 0,
+          "id": 101,
+          "in_progress_batches": 0,
+          "line": {
+            "customer_product_no": "BEAR-DEMO",
+            "delivery_status": "overdue",
+            "line_no": 1,
+            "remaining_quantity": "72",
+            "sales_order_id": 31
+          },
+          "material_pending": 0,
+          "material_total": 0,
+          "open_tasks": 0,
+          "operation_count": 0,
+          "order_no": "SO-DEMO-0031",
+          "ordered_quantity": "120",
+          "outsourced_batches": 0,
+          "overdue": true,
+          "planned_batches": 0,
+          "product": "云朵小熊",
+          "product_count": 1,
+          "product_id": 7,
+          "production_closed": 0,
+          "production_orders": 0,
+          "rejected_batches": 0,
+          "sales_owner": "",
+          "shipped_quantity": "48",
+          "status": "active",
+          "unassigned_tasks": 0,
+          "unit": "只",
+          "unlinked": false,
+          "updated_at": "",
+          "view": "orders",
+          "waiting_batches": 0
+        }
+      ],
       "snapshot_at": "2026-10-19T07:16:23.192414Z",
-      "total": 0
+      "total": 1
     }
   }
 }
 ```
 
-样例依据：[TestBusinessProgressJSONRPCPermissionsAndValidation](../internal/service/jsonrpc_business_progress_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+样例依据：当前参数解析、DTO 与成功返回映射；业务执行仍需有效引用、当前版本及所属状态条件。
 
 #### 查询进度负责人名单 `business.list_progress_owner_options`
 
@@ -11070,7 +11227,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
+| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -11097,8 +11254,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.names` | array &#124; null | 依据：`server/internal/biz/business_progress.go:119`。 |
-| `result.data.names[]` | string | 依据：`server/internal/biz/business_progress.go:119`。 |
+| `result.data.names` | array &#124; null | 依据：`server/internal/biz/business_progress.go:150`。 |
+| `result.data.names[]` | string | 依据：`server/internal/biz/business_progress.go:150`。 |
 
 ```json
 {
@@ -11117,6 +11274,95 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 ```
 
 样例依据：[TestBusinessProgressOwnerOptionsRPC](../internal/service/jsonrpc_business_progress_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
+
+#### 查询本单关联任务 `business.list_progress_tasks`
+
+##### 请求参数
+
+**顶层字段**
+
+| 字段 | 类型 | 必填条件 | 说明 |
+| --- | --- | --- | --- |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_business_progress.go:84`。 |
+| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_business_progress.go:75`。 |
+| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_business_progress.go:78`。 |
+| `owner_role_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "owner_role_key", 64)`。 依据：`server/internal/service/jsonrpc_business_progress.go:41`。 |
+| `task_status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "task_status", 20)`。 依据：`server/internal/service/jsonrpc_business_progress.go:38`。 |
+| `view` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_business_progress.go:61`。 |
+
+对象引用、权限、状态和并发版本由后端校验。
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "list_progress_tasks",
+  "params": {
+    "id": 2,
+    "limit": 20,
+    "offset": 0,
+    "owner_role_key": "quality",
+    "task_status": "open",
+    "view": "orders"
+  },
+  "id": "rpc-demo-business.list_progress_tasks"
+}
+```
+
+##### 返回结果
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.code` | integer | 成功为 0；错误复用正式码表。 |
+| `result.message` | string | 业务结果提示。 |
+| `result.data` | object / null | 当前方法的返回内容。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.rows` | array &#124; null | 依据：`server/internal/biz/business_progress.go:145`。 |
+| `result.data.rows[]` | object | 依据：`server/internal/biz/business_progress.go:145`。 |
+
+**`rows[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.rows[].date` | string | 依据：`server/internal/biz/business_progress.go:127`。 |
+| `result.data.rows[].id` | integer | 依据：`server/internal/biz/business_progress.go:120`。 |
+| `result.data.rows[].kind` | string | 依据：`server/internal/biz/business_progress.go:121`。 |
+| `result.data.rows[].label` | string | 依据：`server/internal/biz/business_progress.go:123`。 |
+| `result.data.rows[].note` | string | 依据：`server/internal/biz/business_progress.go:130`。 |
+| `result.data.rows[].number` | string | 依据：`server/internal/biz/business_progress.go:122`。 |
+| `result.data.rows[].owner` | string | 依据：`server/internal/biz/business_progress.go:128`。 |
+| `result.data.rows[].parent_id` | integer | 依据：`server/internal/biz/business_progress.go:132`。 |
+| `result.data.rows[].product_id` | integer | 依据：`server/internal/biz/business_progress.go:131`。 |
+| `result.data.rows[].quantity` | string | 依据：`server/internal/biz/business_progress.go:125`。 |
+| `result.data.rows[].role` | string | 依据：`server/internal/biz/business_progress.go:129`。 |
+| `result.data.rows[].status` | string | 依据：`server/internal/biz/business_progress.go:124`。 |
+| `result.data.rows[].unit` | string | 依据：`server/internal/biz/business_progress.go:126`。 |
+
+**顶层字段**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.total` | integer | 依据：`server/internal/biz/business_progress.go:146`。 |
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "rpc-demo-business.list_progress_tasks",
+  "result": {
+    "code": 0,
+    "message": "OK",
+    "data": {
+      "rows": [],
+      "total": 0
+    }
+  }
+}
+```
+
+样例依据：[TestBusinessProgressTaskPageRPC](../internal/service/jsonrpc_business_progress_test.go) 的隔离夹具成功调用，按当前后端字段结构核对；不代表该接口全部业务条件已验证。
 
 #### 查询应收统计来源 `business.list_receivable_statistics_sources`
 
@@ -32610,13 +32856,13 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -32842,17 +33088,17 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
-| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
-| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
-| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:134`。 |
-| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
-| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:127`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:139`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:140`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:133`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -32861,7 +33107,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "jsonrpc": "2.0",
   "method": "list_inventory_balances",
   "params": {
-    "sort_by": "ready_to_ship_quantity",
+    "sort_by": "available_quantity",
     "sort_direction": "desc",
     "subject_id": 1,
     "subject_type": "PRODUCT",
@@ -32883,44 +33129,44 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_balances` | array | 依据：`server/internal/service/jsonrpc_inventory.go:65`。 |
-| `result.data.inventory_balances[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:263`。 |
+| `result.data.inventory_balances` | array | 依据：`server/internal/service/jsonrpc_inventory.go:71`。 |
+| `result.data.inventory_balances[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:269`。 |
 
 **`inventory_balances[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_balances[].active_reserved_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:275`。 |
-| `result.data.inventory_balances[].available_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:276`。 |
-| `result.data.inventory_balances[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:266`。 |
-| `result.data.inventory_balances[].issuable_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:277`。 |
-| `result.data.inventory_balances[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:272`。 |
-| `result.data.inventory_balances[].lot_status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:279`。 |
-| `result.data.inventory_balances[].pending_inspection_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:280`。 |
-| `result.data.inventory_balances[].pending_packaging_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:281`。 |
-| `result.data.inventory_balances[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:270`。 |
-| `result.data.inventory_balances[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:274`。 |
-| `result.data.inventory_balances[].ready_to_ship_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:282`。 |
-| `result.data.inventory_balances[].restricted_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:278`。 |
-| `result.data.inventory_balances[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:268`。 |
-| `result.data.inventory_balances[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:269`。 |
-| `result.data.inventory_balances[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:267`。 |
-| `result.data.inventory_balances[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:273`。 |
+| `result.data.inventory_balances[].active_reserved_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:281`。 |
+| `result.data.inventory_balances[].available_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:282`。 |
+| `result.data.inventory_balances[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:272`。 |
+| `result.data.inventory_balances[].issuable_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:283`。 |
+| `result.data.inventory_balances[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:278`。 |
+| `result.data.inventory_balances[].lot_status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:285`。 |
+| `result.data.inventory_balances[].pending_inspection_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:286`。 |
+| `result.data.inventory_balances[].pending_packaging_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:287`。 |
+| `result.data.inventory_balances[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:276`。 |
+| `result.data.inventory_balances[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:280`。 |
+| `result.data.inventory_balances[].ready_to_ship_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:288`。 |
+| `result.data.inventory_balances[].restricted_quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:284`。 |
+| `result.data.inventory_balances[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:274`。 |
+| `result.data.inventory_balances[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:275`。 |
+| `result.data.inventory_balances[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:273`。 |
+| `result.data.inventory_balances[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:279`。 |
 
 **`inventory_balances[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_balances[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:283`。 |
-| `result.data.inventory_balances[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:271`。 |
+| `result.data.inventory_balances[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:289`。 |
+| `result.data.inventory_balances[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:277`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:67`。 |
-| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:68`。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:66`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:73`。 |
+| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:74`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:72`。 |
 
 ```json
 {
@@ -32972,22 +33218,22 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:145`。 |
-| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:149`。 |
-| `ids` | array | 可选 | 解析器 `optionalReferenceIDs`；调用 `optionalReferenceIDs(pm, "ids")`。 依据：`server/internal/service/jsonrpc_inventory.go:141`。 |
+| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:151`。 |
+| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:155`。 |
+| `ids` | array | 可选 | 解析器 `optionalReferenceIDs`；调用 `optionalReferenceIDs(pm, "ids")`。 依据：`server/internal/service/jsonrpc_inventory.go:147`。 |
 | `ids[]` | integer | 条件必填（ids 有值） | 解析器 `productionOrderJSONSafeInt`；调用 `productionOrderJSONSafeInt(value)`。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_reference_ids.go:17`。 |
 | `include_status_counts` | boolean &#124; null | 可选 | 解析器 `getOptionalJSONRPCBool`；调用 `getOptionalJSONRPCBool(params, "include_status_counts")`。 依据：`server/internal/service/jsonrpc_business_status_counts.go:7`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:161`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:167`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
-| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:158`。 |
-| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:164`。 |
-| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:165`。 |
-| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:160`。 |
-| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:156`。 |
-| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:157`。 |
-| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:155`。 |
-| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:159`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:164`。 |
+| `sort_by` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_by")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:170`。 |
+| `sort_direction` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "sort_direction")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:171`。 |
+| `status` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "status")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:166`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:162`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:163`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:161`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:165`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -33021,46 +33267,46 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_lots` | array | 依据：`server/internal/service/jsonrpc_inventory.go:93`。 |
-| `result.data.inventory_lots[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:297`。 |
+| `result.data.inventory_lots` | array | 依据：`server/internal/service/jsonrpc_inventory.go:99`。 |
+| `result.data.inventory_lots[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:303`。 |
 
 **`inventory_lots[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_lots[].color_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:307`。 |
-| `result.data.inventory_lots[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:317`。 |
-| `result.data.inventory_lots[].dye_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:308`。 |
-| `result.data.inventory_lots[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:300`。 |
-| `result.data.inventory_lots[].lot_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:305`。 |
-| `result.data.inventory_lots[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:304`。 |
-| `result.data.inventory_lots[].production_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:309`。 |
-| `result.data.inventory_lots[].received_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:316`。 |
-| `result.data.inventory_lots[].status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:310`。 |
-| `result.data.inventory_lots[].status_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:312`。 |
-| `result.data.inventory_lots[].status_changed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:314`。 |
-| `result.data.inventory_lots[].status_changed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:315`。 |
-| `result.data.inventory_lots[].status_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:313`。 |
-| `result.data.inventory_lots[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:302`。 |
-| `result.data.inventory_lots[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:303`。 |
-| `result.data.inventory_lots[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:301`。 |
+| `result.data.inventory_lots[].color_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:313`。 |
+| `result.data.inventory_lots[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:323`。 |
+| `result.data.inventory_lots[].dye_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:314`。 |
+| `result.data.inventory_lots[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:306`。 |
+| `result.data.inventory_lots[].lot_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:311`。 |
+| `result.data.inventory_lots[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:310`。 |
+| `result.data.inventory_lots[].production_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:315`。 |
+| `result.data.inventory_lots[].received_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:322`。 |
+| `result.data.inventory_lots[].status` | string | 依据：`server/internal/service/jsonrpc_inventory.go:316`。 |
+| `result.data.inventory_lots[].status_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:318`。 |
+| `result.data.inventory_lots[].status_changed_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:320`。 |
+| `result.data.inventory_lots[].status_changed_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:321`。 |
+| `result.data.inventory_lots[].status_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:319`。 |
+| `result.data.inventory_lots[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:308`。 |
+| `result.data.inventory_lots[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:309`。 |
+| `result.data.inventory_lots[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:307`。 |
 
 **`inventory_lots[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_lots[].supplier_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:306`。 |
-| `result.data.inventory_lots[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:318`。 |
-| `result.data.inventory_lots[].version` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:311`。 |
+| `result.data.inventory_lots[].supplier_lot_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:312`。 |
+| `result.data.inventory_lots[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:324`。 |
+| `result.data.inventory_lots[].version` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:317`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:95`。 |
-| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:96`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:101`。 |
+| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:102`。 |
 | `result.data.status_counts` | object &#124; null | 后端返回映射。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:94`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:100`。 |
 
 ```json
 {
@@ -33247,20 +33493,20 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:172`。 |
-| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:176`。 |
-| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:190`。 |
+| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_inventory.go:178`。 |
+| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_inventory.go:182`。 |
+| `keyword` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "keyword")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:196`。 |
 | `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", biz.BusinessListDefaultLimit)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:283`。 |
-| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:186`。 |
+| `lot_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "lot_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:192`。 |
 | `offset` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "offset", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_params.go:295`。 |
-| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:184`。 |
-| `source_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "source_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:189`。 |
-| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:188`。 |
-| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:182`。 |
-| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:183`。 |
-| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:181`。 |
-| `txn_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "txn_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:187`。 |
-| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:185`。 |
+| `product_sku_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "product_sku_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:190`。 |
+| `source_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "source_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:195`。 |
+| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:194`。 |
+| `stock_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "stock_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:188`。 |
+| `subject_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "subject_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:189`。 |
+| `subject_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "subject_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:187`。 |
+| `txn_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "txn_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_inventory.go:193`。 |
+| `warehouse_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "warehouse_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_inventory.go:191`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -33293,49 +33539,49 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_txns` | array | 依据：`server/internal/service/jsonrpc_inventory.go:115`。 |
-| `result.data.inventory_txns[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:332`。 |
+| `result.data.inventory_txns` | array | 依据：`server/internal/service/jsonrpc_inventory.go:121`。 |
+| `result.data.inventory_txns[]` | object | 依据：`server/internal/service/jsonrpc_inventory.go:338`。 |
 
 **`inventory_txns[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_txns[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:355`。 |
-| `result.data.inventory_txns[].created_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:356`。 |
-| `result.data.inventory_txns[].direction` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:343`。 |
-| `result.data.inventory_txns[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:335`。 |
-| `result.data.inventory_txns[].idempotency_key` | string | 依据：`server/internal/service/jsonrpc_inventory.go:352`。 |
-| `result.data.inventory_txns[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:341`。 |
-| `result.data.inventory_txns[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:357`。 |
-| `result.data.inventory_txns[].occurred_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:354`。 |
-| `result.data.inventory_txns[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:339`。 |
-| `result.data.inventory_txns[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:344`。 |
-| `result.data.inventory_txns[].reversal_of_txn_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:353`。 |
-| `result.data.inventory_txns[].source_document_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:349`。 |
-| `result.data.inventory_txns[].source_document_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:348`。 |
-| `result.data.inventory_txns[].source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:350`。 |
-| `result.data.inventory_txns[].source_line_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:351`。 |
-| `result.data.inventory_txns[].source_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:347`。 |
+| `result.data.inventory_txns[].created_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:361`。 |
+| `result.data.inventory_txns[].created_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:362`。 |
+| `result.data.inventory_txns[].direction` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:349`。 |
+| `result.data.inventory_txns[].id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:341`。 |
+| `result.data.inventory_txns[].idempotency_key` | string | 依据：`server/internal/service/jsonrpc_inventory.go:358`。 |
+| `result.data.inventory_txns[].lot_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:347`。 |
+| `result.data.inventory_txns[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:363`。 |
+| `result.data.inventory_txns[].occurred_at` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:360`。 |
+| `result.data.inventory_txns[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:345`。 |
+| `result.data.inventory_txns[].quantity` | string | 依据：`server/internal/service/jsonrpc_inventory.go:350`。 |
+| `result.data.inventory_txns[].reversal_of_txn_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:359`。 |
+| `result.data.inventory_txns[].source_document_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:355`。 |
+| `result.data.inventory_txns[].source_document_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:354`。 |
+| `result.data.inventory_txns[].source_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:356`。 |
+| `result.data.inventory_txns[].source_line_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_inventory.go:357`。 |
+| `result.data.inventory_txns[].source_no` | string | 依据：`server/internal/service/jsonrpc_inventory.go:353`。 |
 
 **`inventory_txns[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.inventory_txns[].source_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:346`。 |
-| `result.data.inventory_txns[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:337`。 |
-| `result.data.inventory_txns[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:338`。 |
-| `result.data.inventory_txns[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:336`。 |
-| `result.data.inventory_txns[].txn_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:342`。 |
-| `result.data.inventory_txns[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:345`。 |
-| `result.data.inventory_txns[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:340`。 |
+| `result.data.inventory_txns[].source_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:352`。 |
+| `result.data.inventory_txns[].stock_category` | string | 依据：`server/internal/service/jsonrpc_inventory.go:343`。 |
+| `result.data.inventory_txns[].subject_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:344`。 |
+| `result.data.inventory_txns[].subject_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:342`。 |
+| `result.data.inventory_txns[].txn_type` | string | 依据：`server/internal/service/jsonrpc_inventory.go:348`。 |
+| `result.data.inventory_txns[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:351`。 |
+| `result.data.inventory_txns[].warehouse_id` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:346`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:117`。 |
-| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:118`。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:116`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:123`。 |
+| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_inventory.go:124`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_inventory.go:122`。 |
 
 ```json
 {
@@ -55007,6 +55253,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", 25, 1)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:42`。 |
 | `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, key, 0, 0)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:35`。 |
 | `order_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, key, 0, 0)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:35`。 |
+| `sales_order_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, key, 0, 0)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:35`。 |
 | `selected_date` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:28`。 |
 | `start_date` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 100)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:28`。 |
 | `supplier_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, key, 0, 0)`。 依据：`server/internal/service/jsonrpc_purchase_followup.go:35`。 |
@@ -58445,49 +58692,49 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:294`。 |
+| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:303`。 |
 
 **`sales_order`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:326`。 |
-| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
-| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:322`。 |
-| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:321`。 |
-| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:323`。 |
-| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:324`。 |
-| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:327`。 |
-| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
-| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
-| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
-| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:319`。 |
-| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
-| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
-| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
-| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:320`。 |
-| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
+| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:358`。 |
+| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
+| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
+| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
+| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
+| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
+| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
+| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
+| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
+| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:357`。 |
+| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
+| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
+| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
 
 **`sales_order`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
-| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
-| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
-| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
-| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
-| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
-| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
-| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
-| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
-| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
-| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
-| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
-| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
-| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
-| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
-| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
+| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
+| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
+| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
+| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
+| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:355`。 |
+| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:356`。 |
+| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:352`。 |
+| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:353`。 |
+| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:354`。 |
+| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
+| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
+| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
+| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:359`。 |
+| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:351`。 |
 
 ```json
 {
@@ -58581,49 +58828,49 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:294`。 |
+| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:303`。 |
 
 **`sales_order`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:326`。 |
-| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
-| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:322`。 |
-| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:321`。 |
-| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:323`。 |
-| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:324`。 |
-| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:327`。 |
-| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
-| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
-| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
-| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:319`。 |
-| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
-| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
-| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
-| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:320`。 |
-| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
+| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:358`。 |
+| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
+| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
+| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
+| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
+| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
+| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
+| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
+| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
+| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:357`。 |
+| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
+| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
+| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
 
 **`sales_order`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
-| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
-| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
-| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
-| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
-| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
-| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
-| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
-| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
-| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
-| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
-| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
-| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
-| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
-| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
-| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
+| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
+| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
+| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
+| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
+| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:355`。 |
+| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:356`。 |
+| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:352`。 |
+| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:353`。 |
+| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:354`。 |
+| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
+| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
+| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
+| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:359`。 |
+| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:351`。 |
 
 ```json
 {
@@ -58718,55 +58965,55 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.sales_orders` | array | 依据：`server/internal/service/jsonrpc_sales_order_export.go:56`。 |
-| `result.data.sales_orders[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:316`。 |
+| `result.data.sales_orders[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
 
 **`sales_orders[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_orders[].contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:326`。 |
-| `result.data.sales_orders[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
-| `result.data.sales_orders[].currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:322`。 |
-| `result.data.sales_orders[].customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:321`。 |
-| `result.data.sales_orders[].customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:323`。 |
-| `result.data.sales_orders[].customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:324`。 |
-| `result.data.sales_orders[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:327`。 |
-| `result.data.sales_orders[].engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
-| `result.data.sales_orders[].freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
-| `result.data.sales_orders[].goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
-| `result.data.sales_orders[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:319`。 |
+| `result.data.sales_orders[].contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
+| `result.data.sales_orders[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:358`。 |
+| `result.data.sales_orders[].currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
+| `result.data.sales_orders[].customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
+| `result.data.sales_orders[].customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
+| `result.data.sales_orders[].customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
+| `result.data.sales_orders[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
+| `result.data.sales_orders[].engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_orders[].freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_orders[].goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
+| `result.data.sales_orders[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
 | `result.data.sales_orders[].item_count` | integer | 后端返回映射。 |
-| `result.data.sales_orders[].lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
-| `result.data.sales_orders[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
-| `result.data.sales_orders[].order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
-| `result.data.sales_orders[].order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:320`。 |
+| `result.data.sales_orders[].lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
+| `result.data.sales_orders[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:357`。 |
+| `result.data.sales_orders[].order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
+| `result.data.sales_orders[].order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
 
 **`sales_orders[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_orders[].order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
-| `result.data.sales_orders[].payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
-| `result.data.sales_orders[].payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
-| `result.data.sales_orders[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
-| `result.data.sales_orders[].price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
-| `result.data.sales_orders[].quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
-| `result.data.sales_orders[].sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
-| `result.data.sales_orders[].settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
-| `result.data.sales_orders[].settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
-| `result.data.sales_orders[].settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
-| `result.data.sales_orders[].settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
-| `result.data.sales_orders[].settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
-| `result.data.sales_orders[].tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
-| `result.data.sales_orders[].tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
-| `result.data.sales_orders[].tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
-| `result.data.sales_orders[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_orders[].order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
+| `result.data.sales_orders[].payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_orders[].payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
+| `result.data.sales_orders[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
+| `result.data.sales_orders[].price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
+| `result.data.sales_orders[].quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
+| `result.data.sales_orders[].sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
+| `result.data.sales_orders[].settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:355`。 |
+| `result.data.sales_orders[].settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:356`。 |
+| `result.data.sales_orders[].settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:352`。 |
+| `result.data.sales_orders[].settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:353`。 |
+| `result.data.sales_orders[].settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:354`。 |
+| `result.data.sales_orders[].tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
+| `result.data.sales_orders[].tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
+| `result.data.sales_orders[].tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
+| `result.data.sales_orders[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:359`。 |
 
 **`sales_orders[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_orders[].version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_orders[].version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:351`。 |
 
 **顶层字段**
 
@@ -59157,7 +59404,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid &#124;&#124; !jsonRPCParamsAllowed(pm, "id")”。 依据：`server/internal/service/jsonrpc_sales_order_document.go:55`。 |
+| `id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid &#124;&#124; !jsonRPCParamsAllowed(pm, "id")”。 依据：`server/internal/service/jsonrpc_sales_order_document.go:62`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -59184,49 +59431,49 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:294`。 |
+| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:303`。 |
 
 **`sales_order`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:326`。 |
-| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
-| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:322`。 |
-| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:321`。 |
-| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:323`。 |
-| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:324`。 |
-| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:327`。 |
-| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
-| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
-| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
-| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:319`。 |
-| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
-| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
-| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
-| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:320`。 |
-| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
+| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:358`。 |
+| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
+| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
+| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
+| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
+| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
+| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
+| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
+| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
+| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:357`。 |
+| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
+| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
+| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
 
 **`sales_order`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
-| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
-| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
-| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
-| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
-| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
-| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
-| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
-| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
-| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
-| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
-| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
-| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
-| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
-| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
-| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
+| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
+| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
+| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
+| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
+| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:355`。 |
+| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:356`。 |
+| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:352`。 |
+| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:353`。 |
+| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:354`。 |
+| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
+| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
+| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
+| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:359`。 |
+| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:351`。 |
 
 ```json
 {
@@ -59289,6 +59536,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `keyword` | string | 条件必填（keyword 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_engineering_material_request.go:69`。 |
 | `limit` | integer | 条件必填（limit 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, key)`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_engineering_material_request.go:60`。 |
 | `page` | integer | 条件必填（page 有值） | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, key)`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_engineering_material_request.go:60`。 |
+| `sort_by` | string | 条件必填（sort_by 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_engineering_material_request.go:69`。 |
+| `sort_direction` | string | 条件必填（sort_direction 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_engineering_material_request.go:69`。 |
 | `status` | string | 条件必填（status 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_engineering_material_request.go:69`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
@@ -59301,6 +59550,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "keyword": "order",
     "limit": 10,
     "page": 2,
+    "sort_by": "submitted_at",
+    "sort_direction": "asc",
     "status": "APPROVED"
   },
   "id": "rpc-demo-sales_order.list_engineering_material_requests"
@@ -59348,27 +59599,42 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items` | array &#124; null | 依据：`server/internal/biz/engineering_material_list.go:28`。 |
-| `result.data.items[]` | object &#124; null | 依据：`server/internal/biz/engineering_material_list.go:28`。 |
+| `result.data.items` | array &#124; null | 依据：`server/internal/biz/engineering_material_list.go:31`。 |
+| `result.data.items[]` | object &#124; null | 依据：`server/internal/biz/engineering_material_list.go:31`。 |
 
 **`items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items[].id` | integer | 依据：`server/internal/biz/engineering_material_list.go:18`。 |
-| `result.data.items[].order_no` | string | 依据：`server/internal/biz/engineering_material_list.go:20`。 |
-| `result.data.items[].order_status` | string | 依据：`server/internal/biz/engineering_material_list.go:21`。 |
-| `result.data.items[].products` | array &#124; null | 依据：`server/internal/biz/engineering_material_list.go:22`。 |
-| `result.data.items[].products[]` | string | 依据：`server/internal/biz/engineering_material_list.go:22`。 |
-| `result.data.items[].sales_order_id` | integer | 依据：`server/internal/biz/engineering_material_list.go:19`。 |
-| `result.data.items[].status` | string | 依据：`server/internal/biz/engineering_material_list.go:23`。 |
-| `result.data.items[].submitted_at` | string | 依据：`server/internal/biz/engineering_material_list.go:24`。 |
+| `result.data.items[].id` | integer | 依据：`server/internal/biz/engineering_material_list.go:20`。 |
+| `result.data.items[].order_no` | string | 依据：`server/internal/biz/engineering_material_list.go:22`。 |
+| `result.data.items[].order_status` | string | 依据：`server/internal/biz/engineering_material_list.go:23`。 |
+| `result.data.items[].product_refs` | array &#124; null | 依据：`server/internal/biz/engineering_material_list.go:25`。 |
+| `result.data.items[].product_refs[]` | object | 依据：`server/internal/biz/engineering_material_list.go:25`。 |
+
+**`items[].product_refs[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.items[].product_refs[].product_code` | string | 依据：`server/internal/biz/document_product_preview.go:27`。 |
+| `result.data.items[].product_refs[].product_id` | integer | 依据：`server/internal/biz/document_product_preview.go:25`。 |
+| `result.data.items[].product_refs[].product_name` | string | 依据：`server/internal/biz/document_product_preview.go:26`。 |
+
+**`items[]`**
+
+| 返回字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `result.data.items[].products` | array &#124; null | 依据：`server/internal/biz/engineering_material_list.go:24`。 |
+| `result.data.items[].products[]` | string | 依据：`server/internal/biz/engineering_material_list.go:24`。 |
+| `result.data.items[].sales_order_id` | integer | 依据：`server/internal/biz/engineering_material_list.go:21`。 |
+| `result.data.items[].status` | string | 依据：`server/internal/biz/engineering_material_list.go:26`。 |
+| `result.data.items[].submitted_at` | string | 依据：`server/internal/biz/engineering_material_list.go:27`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.total` | integer | 依据：`server/internal/biz/engineering_material_list.go:29`。 |
+| `result.data.total` | integer | 依据：`server/internal/biz/engineering_material_list.go:32`。 |
 
 ```json
 {
@@ -59378,8 +59644,27 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "code": 0,
     "message": "OK",
     "data": {
-      "items": [],
-      "total": 0
+      "items": [
+        {
+          "id": 3,
+          "order_no": "ORDER-7",
+          "order_status": "active",
+          "product_refs": [
+            {
+              "product_code": "BEAR-9",
+              "product_id": 9,
+              "product_name": "模拟小熊"
+            }
+          ],
+          "products": [
+            "模拟小熊"
+          ],
+          "sales_order_id": 7,
+          "status": "APPROVED",
+          "submitted_at": "2026-09-15T08:00:00Z"
+        }
+      ],
+      "total": 11
     }
   }
 }
@@ -59428,46 +59713,46 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `result.data.limit` | number | 依据：`server/internal/service/jsonrpc_sales_order_item.go:33`。 |
 | `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_sales_order_item.go:34`。 |
 | `result.data.sales_order_items` | array | 依据：`server/internal/service/jsonrpc_sales_order_item.go:31`。 |
-| `result.data.sales_order_items[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:368`。 |
+| `result.data.sales_order_items[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:377`。 |
 
 **`sales_order_items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order_items[].amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:394`。 |
-| `result.data.sales_order_items[].bom_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:384`。 |
-| `result.data.sales_order_items[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:391`。 |
-| `result.data.sales_order_items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:398`。 |
-| `result.data.sales_order_items[].customer_product_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:376`。 |
-| `result.data.sales_order_items[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:385`。 |
-| `result.data.sales_order_items[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:371`。 |
-| `result.data.sales_order_items[].import_source` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:383`。 |
-| `result.data.sales_order_items[].line_no` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:373`。 |
-| `result.data.sales_order_items[].line_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:396`。 |
-| `result.data.sales_order_items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:397`。 |
-| `result.data.sales_order_items[].order_category` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:377`。 |
-| `result.data.sales_order_items[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:392`。 |
-| `result.data.sales_order_items[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:395`。 |
-| `result.data.sales_order_items[].pre_shipment_sample_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:378`。 |
-| `result.data.sales_order_items[].process_requirement` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:382`。 |
+| `result.data.sales_order_items[].amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:403`。 |
+| `result.data.sales_order_items[].bom_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:393`。 |
+| `result.data.sales_order_items[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:400`。 |
+| `result.data.sales_order_items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:407`。 |
+| `result.data.sales_order_items[].customer_product_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:385`。 |
+| `result.data.sales_order_items[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:394`。 |
+| `result.data.sales_order_items[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:380`。 |
+| `result.data.sales_order_items[].import_source` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:392`。 |
+| `result.data.sales_order_items[].line_no` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:382`。 |
+| `result.data.sales_order_items[].line_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:405`。 |
+| `result.data.sales_order_items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:406`。 |
+| `result.data.sales_order_items[].order_category` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:386`。 |
+| `result.data.sales_order_items[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:401`。 |
+| `result.data.sales_order_items[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:404`。 |
+| `result.data.sales_order_items[].pre_shipment_sample_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:387`。 |
+| `result.data.sales_order_items[].process_requirement` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:391`。 |
 
 **`sales_order_items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order_items[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:389`。 |
-| `result.data.sales_order_items[].product_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:374`。 |
-| `result.data.sales_order_items[].product_image_attachment_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:386`。 |
-| `result.data.sales_order_items[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:390`。 |
-| `result.data.sales_order_items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:387`。 |
-| `result.data.sales_order_items[].production_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:379`。 |
-| `result.data.sales_order_items[].requested_product_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:375`。 |
-| `result.data.sales_order_items[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:372`。 |
-| `result.data.sales_order_items[].shipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:380`。 |
-| `result.data.sales_order_items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:388`。 |
-| `result.data.sales_order_items[].unit_price` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:393`。 |
-| `result.data.sales_order_items[].unshipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:381`。 |
-| `result.data.sales_order_items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:399`。 |
+| `result.data.sales_order_items[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:398`。 |
+| `result.data.sales_order_items[].product_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:383`。 |
+| `result.data.sales_order_items[].product_image_attachment_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:395`。 |
+| `result.data.sales_order_items[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:399`。 |
+| `result.data.sales_order_items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:396`。 |
+| `result.data.sales_order_items[].production_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:388`。 |
+| `result.data.sales_order_items[].requested_product_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:384`。 |
+| `result.data.sales_order_items[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:381`。 |
+| `result.data.sales_order_items[].shipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:389`。 |
+| `result.data.sales_order_items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:397`。 |
+| `result.data.sales_order_items[].unit_price` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:402`。 |
+| `result.data.sales_order_items[].unshipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:390`。 |
+| `result.data.sales_order_items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:408`。 |
 
 **顶层字段**
 
@@ -59534,18 +59819,20 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer` | string | 条件必填（customer 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:42`。 |
-| `customer_id` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(pm, "customer_id")`。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:59`。 |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:17`。 |
-| `date_field` | string | 条件必填（date_field 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:42`。 |
-| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:63`。 |
-| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:67`。 |
-| `keyword` | string | 条件必填（keyword 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:42`。 |
-| `lifecycle_status` | string | 条件必填（lifecycle_status 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:42`。 |
-| `limit` | number | 条件必填（limit 有值） | 拒绝条件：“!ok &#124;&#124; value < 0 &#124;&#124; value > 10000000 &#124;&#124; value != float64(int(value))”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:51`。 |
-| `offset` | number | 条件必填（offset 有值） | 拒绝条件：“!ok &#124;&#124; value < 0 &#124;&#124; value > 10000000 &#124;&#124; value != float64(int(value))”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:51`。 |
-| `sales_owner` | string | 条件必填（sales_owner 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:42`。 |
-| `sales_owner_name` | string | 条件必填（sales_owner_name 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:42`。 |
+| `customer` | string | 条件必填（customer 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
+| `customer_id` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(pm, "customer_id")`。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:72`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:18`。 |
+| `date_field` | string | 条件必填（date_field 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
+| `date_from` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_from")`。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:76`。 |
+| `date_to` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDateFilter`；调用 `getOptionalJSONRPCDateFilter(pm, "date_to")`。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:80`。 |
+| `keyword` | string | 条件必填（keyword 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
+| `lifecycle_status` | string | 条件必填（lifecycle_status 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
+| `limit` | number | 条件必填（limit 有值） | 拒绝条件：“!ok &#124;&#124; value < 0 &#124;&#124; value > 10000000 &#124;&#124; value != float64(int(value))”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:64`。 |
+| `offset` | number | 条件必填（offset 有值） | 拒绝条件：“!ok &#124;&#124; value < 0 &#124;&#124; value > 10000000 &#124;&#124; value != float64(int(value))”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:64`。 |
+| `sales_owner` | string | 条件必填（sales_owner 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
+| `sales_owner_name` | string | 条件必填（sales_owner_name 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
+| `sort_by` | string | 条件必填（sort_by 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
+| `sort_direction` | string | 条件必填（sort_direction 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:43`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -59555,7 +59842,9 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "method": "list_sales_order_summary",
   "params": {
     "customer_id": 42,
-    "sales_owner_name": "模拟跟单员"
+    "sales_owner_name": "模拟跟单员",
+    "sort_by": "customer_name",
+    "sort_direction": "asc"
   },
   "id": "rpc-demo-sales_order.list_sales_order_summary"
 }
@@ -59573,29 +59862,29 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:90`。 |
-| `result.data.items[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:368`。 |
+| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:103`。 |
+| `result.data.items[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:377`。 |
 
 **`items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items[].amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:394`。 |
-| `result.data.items[].bom_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:384`。 |
-| `result.data.items[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:391`。 |
-| `result.data.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:398`。 |
+| `result.data.items[].amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:403`。 |
+| `result.data.items[].bom_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:393`。 |
+| `result.data.items[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:400`。 |
+| `result.data.items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:407`。 |
 | `result.data.items[].currency` | string | 后端返回映射。 |
 | `result.data.items[].customer_name` | json | 后端返回映射。 |
 | `result.data.items[].customer_order_no` | string &#124; null | 后端返回映射。 |
-| `result.data.items[].customer_product_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:376`。 |
-| `result.data.items[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:385`。 |
-| `result.data.items[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:371`。 |
-| `result.data.items[].import_source` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:383`。 |
+| `result.data.items[].customer_product_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:385`。 |
+| `result.data.items[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:394`。 |
+| `result.data.items[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:380`。 |
+| `result.data.items[].import_source` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:392`。 |
 | `result.data.items[].lifecycle_status` | string | 后端返回映射。 |
-| `result.data.items[].line_no` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:373`。 |
-| `result.data.items[].line_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:396`。 |
-| `result.data.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:397`。 |
-| `result.data.items[].order_category` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:377`。 |
+| `result.data.items[].line_no` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:382`。 |
+| `result.data.items[].line_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:405`。 |
+| `result.data.items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:406`。 |
+| `result.data.items[].order_category` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:386`。 |
 
 **`items[]`（续）**
 
@@ -59603,38 +59892,38 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | --- | --- | --- |
 | `result.data.items[].order_date` | integer | 后端返回映射。 |
 | `result.data.items[].order_no` | string | 后端返回映射。 |
-| `result.data.items[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:392`。 |
-| `result.data.items[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:395`。 |
-| `result.data.items[].pre_shipment_sample_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:378`。 |
-| `result.data.items[].process_requirement` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:382`。 |
-| `result.data.items[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:389`。 |
-| `result.data.items[].product_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:374`。 |
-| `result.data.items[].product_image_attachment_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:386`。 |
-| `result.data.items[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:390`。 |
-| `result.data.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:387`。 |
-| `result.data.items[].production_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:379`。 |
-| `result.data.items[].requested_product_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:375`。 |
-| `result.data.items[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:372`。 |
+| `result.data.items[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:401`。 |
+| `result.data.items[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:404`。 |
+| `result.data.items[].pre_shipment_sample_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:387`。 |
+| `result.data.items[].process_requirement` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:391`。 |
+| `result.data.items[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:398`。 |
+| `result.data.items[].product_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:383`。 |
+| `result.data.items[].product_image_attachment_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:395`。 |
+| `result.data.items[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:399`。 |
+| `result.data.items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:396`。 |
+| `result.data.items[].production_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:388`。 |
+| `result.data.items[].requested_product_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:384`。 |
+| `result.data.items[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:381`。 |
 | `result.data.items[].sales_owner` | string &#124; null | 后端返回映射。 |
-| `result.data.items[].shipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:380`。 |
+| `result.data.items[].shipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:389`。 |
 
 **`items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:388`。 |
+| `result.data.items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:397`。 |
 | `result.data.items[].unit_name` | string | 后端返回映射。 |
-| `result.data.items[].unit_price` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:393`。 |
-| `result.data.items[].unshipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:381`。 |
-| `result.data.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:399`。 |
+| `result.data.items[].unit_price` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:402`。 |
+| `result.data.items[].unshipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:390`。 |
+| `result.data.items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:408`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:90`。 |
-| `result.data.offset` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:90`。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:90`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:103`。 |
+| `result.data.offset` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:103`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:103`。 |
 
 ```json
 {
@@ -59702,7 +59991,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:17`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_summary.go:18`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -59727,25 +60016,25 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.customers` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:33`。 |
-| `result.data.customers[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:30`。 |
+| `result.data.customers` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:34`。 |
+| `result.data.customers[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:31`。 |
 
 **`customers[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.customers[].code` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:30`。 |
-| `result.data.customers[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:30`。 |
-| `result.data.customers[].name` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:30`。 |
-| `result.data.customers[].previous_names` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:30`。 |
-| `result.data.customers[].previous_names[]` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:30`。 |
+| `result.data.customers[].code` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:31`。 |
+| `result.data.customers[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:31`。 |
+| `result.data.customers[].name` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:31`。 |
+| `result.data.customers[].previous_names` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:31`。 |
+| `result.data.customers[].previous_names[]` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:31`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_owners` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:33`。 |
-| `result.data.sales_owners[]` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:33`。 |
+| `result.data.sales_owners` | array | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:34`。 |
+| `result.data.sales_owners[]` | string | 依据：`server/internal/service/jsonrpc_sales_order_summary.go:34`。 |
 
 ```json
 {
@@ -59822,65 +60111,65 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_sales_order_document.go:86`。 |
-| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_sales_order_document.go:87`。 |
-| `result.data.sales_orders` | array | 依据：`server/internal/service/jsonrpc_sales_order_document.go:84`。 |
-| `result.data.sales_orders[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:316`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_sales_order_document.go:93`。 |
+| `result.data.offset` | number | 依据：`server/internal/service/jsonrpc_sales_order_document.go:94`。 |
+| `result.data.sales_orders` | array | 依据：`server/internal/service/jsonrpc_sales_order_document.go:91`。 |
+| `result.data.sales_orders[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
 
 **`sales_orders[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_orders[].contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:326`。 |
-| `result.data.sales_orders[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
-| `result.data.sales_orders[].currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:322`。 |
-| `result.data.sales_orders[].customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:321`。 |
-| `result.data.sales_orders[].customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:323`。 |
-| `result.data.sales_orders[].customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:324`。 |
-| `result.data.sales_orders[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:327`。 |
-| `result.data.sales_orders[].engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
-| `result.data.sales_orders[].freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
-| `result.data.sales_orders[].goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
-| `result.data.sales_orders[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:319`。 |
+| `result.data.sales_orders[].contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
+| `result.data.sales_orders[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:358`。 |
+| `result.data.sales_orders[].currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
+| `result.data.sales_orders[].customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
+| `result.data.sales_orders[].customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
+| `result.data.sales_orders[].customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
+| `result.data.sales_orders[].delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
+| `result.data.sales_orders[].engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_orders[].freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_orders[].goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
+| `result.data.sales_orders[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
 | `result.data.sales_orders[].item_count` | integer | 后端返回映射。 |
-| `result.data.sales_orders[].lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
-| `result.data.sales_orders[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
-| `result.data.sales_orders[].order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
-| `result.data.sales_orders[].order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:320`。 |
+| `result.data.sales_orders[].lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
+| `result.data.sales_orders[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:357`。 |
+| `result.data.sales_orders[].order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
+| `result.data.sales_orders[].order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
 
 **`sales_orders[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_orders[].order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
-| `result.data.sales_orders[].payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
-| `result.data.sales_orders[].payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
-| `result.data.sales_orders[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
-| `result.data.sales_orders[].price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
-| `result.data.sales_orders[].quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
-| `result.data.sales_orders[].sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
-| `result.data.sales_orders[].settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
-| `result.data.sales_orders[].settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
-| `result.data.sales_orders[].settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
-| `result.data.sales_orders[].settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
-| `result.data.sales_orders[].settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
-| `result.data.sales_orders[].tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
-| `result.data.sales_orders[].tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
-| `result.data.sales_orders[].tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
-| `result.data.sales_orders[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_orders[].order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
+| `result.data.sales_orders[].payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_orders[].payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
+| `result.data.sales_orders[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
+| `result.data.sales_orders[].price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
+| `result.data.sales_orders[].quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
+| `result.data.sales_orders[].sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
+| `result.data.sales_orders[].settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:355`。 |
+| `result.data.sales_orders[].settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:356`。 |
+| `result.data.sales_orders[].settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:352`。 |
+| `result.data.sales_orders[].settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:353`。 |
+| `result.data.sales_orders[].settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:354`。 |
+| `result.data.sales_orders[].tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
+| `result.data.sales_orders[].tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
+| `result.data.sales_orders[].tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
+| `result.data.sales_orders[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:359`。 |
 
 **`sales_orders[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_orders[].version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_orders[].version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:351`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `result.data.status_counts` | object &#124; null | 后端返回映射。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_sales_order_document.go:85`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_sales_order_document.go:92`。 |
 
 ```json
 {
@@ -60023,64 +60312,65 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `contact_snapshot` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "contact_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:67`。 |
-| `currency` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "currency")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:63`。 |
+| `contact_snapshot` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "contact_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:76`。 |
+| `currency` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "currency")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:72`。 |
 | `customer_id` | integer | 必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "customer_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!valid”。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:31`。 |
-| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_document.go:29`。 |
-| `customer_order_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "customer_order_no")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:64`。 |
-| `customer_snapshot` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "customer_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:65`。 |
-| `delivery_snapshot` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "delivery_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:68`。 |
-| `expected_version` | integer | 条件必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_document.go:35`。 |
-| `freight_terms` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "freight_terms")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:74`。 |
-| `id` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(pm, "id")`。 依据：`server/internal/service/jsonrpc_sales_order_document.go:18`。 |
-| `items` | array &#124; null | 可选 | 由后端实际解析读取；嵌套字段和数组按所属解析器校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:152`。 |
-| `items[]` | object | 条件必填（items 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:158`。 |
+| `customer_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "customer_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_document.go:30`。 |
+| `customer_order_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "customer_order_no")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:73`。 |
+| `customer_snapshot` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "customer_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:74`。 |
+| `delivery_snapshot` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "delivery_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:77`。 |
+| `expected_version` | integer | 条件必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "expected_version")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_document.go:36`。 |
+| `freight_terms` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "freight_terms")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:83`。 |
+| `id` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(pm, "id")`。 依据：`server/internal/service/jsonrpc_sales_order_document.go:19`。 |
+| `idempotency_key` | string | 条件必填（idempotency_key 有值） | 拒绝条件：“!valid &#124;&#124; strings.TrimSpace(value) == "" &#124;&#124; len(strings.TrimSpace(value)) > 128”。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:46`。 |
+| `items` | array &#124; null | 可选 | 由后端实际解析读取；嵌套字段和数组按所属解析器校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:161`。 |
+| `items[]` | object | 条件必填（items 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:167`。 |
 
 **`items[]`**
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `items[].amount` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "amount")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:111`。 |
-| `items[].color_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "color_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:131`。 |
-| `items[].customer_product_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "customer_product_no")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:123`。 |
-| `items[].id` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(itemMap, "id")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:166`。 |
-| `items[].import_source` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "import_source")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:126`。 |
-| `items[].line_no` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "line_no", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:121`。 |
-| `items[].note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "note")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:136`。 |
-| `items[].order_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "order_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:124`。 |
-| `items[].ordered_quantity` | string | 条件必填（items 有值） | 解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "ordered_quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:103`。 |
-| `items[].planned_delivery_date` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "planned_delivery_date")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:115`。 |
-| `items[].pre_shipment_sample_quantity` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "pre_shipment_sample_quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:99`。 |
-| `items[].process_requirement` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "process_requirement")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:125`。 |
-| `items[].product_code_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "product_code_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:129`。 |
-| `items[].product_id` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "product_id")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:91`。 |
-| `items[].product_name_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "product_name_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:130`。 |
-| `items[].product_sku_id` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "product_sku_id")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:95`。 |
+| `items[].amount` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "amount")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:120`。 |
+| `items[].color_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "color_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:140`。 |
+| `items[].customer_product_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "customer_product_no")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:132`。 |
+| `items[].id` | integer | 可选 | 解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(itemMap, "id")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:175`。 |
+| `items[].import_source` | object &#124; null | 按业务条件 | 解析器 `getMap`；调用 `getMap(pm, "import_source")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:135`。 |
+| `items[].line_no` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "line_no", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:130`。 |
+| `items[].note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "note")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:145`。 |
+| `items[].order_category` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "order_category")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:133`。 |
+| `items[].ordered_quantity` | string | 条件必填（items 有值） | 解析器 `getRequiredJSONRPCNumeric20Scale6`；调用 `getRequiredJSONRPCNumeric20Scale6(pm, "ordered_quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:112`。 |
+| `items[].planned_delivery_date` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "planned_delivery_date")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:124`。 |
+| `items[].pre_shipment_sample_quantity` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "pre_shipment_sample_quantity")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:108`。 |
+| `items[].process_requirement` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "process_requirement")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:134`。 |
+| `items[].product_code_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "product_code_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:138`。 |
+| `items[].product_id` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "product_id")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:100`。 |
+| `items[].product_name_snapshot` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "product_name_snapshot")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:139`。 |
+| `items[].product_sku_id` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "product_sku_id")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:104`。 |
 
 **`items[]`（续）**
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `items[].requested_product_name` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "requested_product_name")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:122`。 |
-| `items[].sales_order_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "sales_order_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:120`。 |
-| `items[].unit_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "unit_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:128`。 |
-| `items[].unit_price` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "unit_price")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:107`。 |
+| `items[].requested_product_name` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "requested_product_name")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:131`。 |
+| `items[].sales_order_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "sales_order_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:129`。 |
+| `items[].unit_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "unit_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:137`。 |
+| `items[].unit_price` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "unit_price")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:116`。 |
 
 **顶层字段**
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "note")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:78`。 |
+| `note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "note")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:87`。 |
 | `order_date` | integer &#124; string | 必填 | 解析器 `getRequiredJSONRPCTime`；调用 `getRequiredJSONRPCTime(pm, "order_date")`。 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:40`。 |
-| `order_no` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "order_no")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:61`。 |
-| `payment_method` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "payment_method")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:69`。 |
-| `payment_term_days` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:44`。 |
-| `planned_delivery_date` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "planned_delivery_date")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:48`。 |
-| `price_condition_note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "price_condition_note")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:71`。 |
-| `quoted_freight_amount` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "quoted_freight_amount")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:56`。 |
-| `sales_owner` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "sales_owner")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:66`。 |
-| `tax_mode` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "tax_mode")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:72`。 |
-| `tax_rate` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "tax_rate")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:52`。 |
+| `order_no` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "order_no")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:70`。 |
+| `payment_method` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "payment_method")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:78`。 |
+| `payment_term_days` | integer &#124; null | 可选 | 解析器 `getOptionalJSONRPCNonNegativeInt`；调用 `getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:52`。 |
+| `planned_delivery_date` | integer &#124; string &#124; null | 可选 | 解析器 `getOptionalJSONRPCTime`；调用 `getOptionalJSONRPCTime(pm, "planned_delivery_date")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:56`。 |
+| `price_condition_note` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "price_condition_note")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:80`。 |
+| `quoted_freight_amount` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "quoted_freight_amount")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:64`。 |
+| `sales_owner` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "sales_owner")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:75`。 |
+| `tax_mode` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "tax_mode")`。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:81`。 |
+| `tax_rate` | string &#124; null | 可选 | 解析器 `getOptionalJSONRPCDecimalString`；调用 `getOptionalJSONRPCDecimalString(pm, "tax_rate")`。 十进制字符串，保留精度；不以 JSON 浮点数代替。 依据：`server/internal/service/jsonrpc_sales_order_shared.go:60`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -60096,6 +60386,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "currency": "USD",
     "customer_id": 1,
     "freight_terms": "INCLUDED",
+    "idempotency_key": "sales-order-example-create",
     "order_date": "2026-05-31",
     "order_no": "SO001",
     "payment_method": "30天月结",
@@ -60120,95 +60411,95 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:309`。 |
+| `result.data.sales_order` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:318`。 |
 
 **`sales_order`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:326`。 |
-| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
-| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:322`。 |
-| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:321`。 |
-| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:323`。 |
-| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:324`。 |
-| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:327`。 |
-| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
-| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
-| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
-| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:319`。 |
-| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
-| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
-| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
-| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:320`。 |
-| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.contact_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:335`。 |
+| `result.data.sales_order.created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:358`。 |
+| `result.data.sales_order.currency` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
+| `result.data.sales_order.customer_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
+| `result.data.sales_order.customer_order_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
+| `result.data.sales_order.customer_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:333`。 |
+| `result.data.sales_order.delivery_snapshot` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
+| `result.data.sales_order.engineering_material_status` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
+| `result.data.sales_order.freight_terms` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.goods_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
+| `result.data.sales_order.id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
+| `result.data.sales_order.lifecycle_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:349`。 |
+| `result.data.sales_order.note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:357`。 |
+| `result.data.sales_order.order_date` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
+| `result.data.sales_order.order_no` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
+| `result.data.sales_order.order_total` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
 
 **`sales_order`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:328`。 |
-| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:329`。 |
-| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
-| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:330`。 |
-| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
-| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:325`。 |
-| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:346`。 |
-| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:347`。 |
-| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
-| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:344`。 |
-| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
-| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:336`。 |
-| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:331`。 |
-| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:332`。 |
-| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:350`。 |
-| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:342`。 |
+| `result.data.sales_order.payment_method` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:337`。 |
+| `result.data.sales_order.payment_term_days` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:338`。 |
+| `result.data.sales_order.planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:348`。 |
+| `result.data.sales_order.price_condition_note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:339`。 |
+| `result.data.sales_order.quoted_freight_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:343`。 |
+| `result.data.sales_order.sales_owner` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:334`。 |
+| `result.data.sales_order.settled_at` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:355`。 |
+| `result.data.sales_order.settled_by` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:356`。 |
+| `result.data.sales_order.settlement_action` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:352`。 |
+| `result.data.sales_order.settlement_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:353`。 |
+| `result.data.sales_order.settlement_reason` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:354`。 |
+| `result.data.sales_order.tax_amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:345`。 |
+| `result.data.sales_order.tax_mode` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:340`。 |
+| `result.data.sales_order.tax_rate` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:341`。 |
+| `result.data.sales_order.updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:359`。 |
+| `result.data.sales_order.version` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:351`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order_items` | array | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:310`。 |
-| `result.data.sales_order_items[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:368`。 |
+| `result.data.sales_order_items` | array | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:319`。 |
+| `result.data.sales_order_items[]` | object | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:377`。 |
 
 **`sales_order_items[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order_items[].amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:394`。 |
-| `result.data.sales_order_items[].bom_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:384`。 |
-| `result.data.sales_order_items[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:391`。 |
-| `result.data.sales_order_items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:398`。 |
-| `result.data.sales_order_items[].customer_product_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:376`。 |
-| `result.data.sales_order_items[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:385`。 |
-| `result.data.sales_order_items[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:371`。 |
-| `result.data.sales_order_items[].import_source` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:383`。 |
-| `result.data.sales_order_items[].line_no` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:373`。 |
-| `result.data.sales_order_items[].line_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:396`。 |
-| `result.data.sales_order_items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:397`。 |
-| `result.data.sales_order_items[].order_category` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:377`。 |
-| `result.data.sales_order_items[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:392`。 |
-| `result.data.sales_order_items[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:395`。 |
-| `result.data.sales_order_items[].pre_shipment_sample_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:378`。 |
-| `result.data.sales_order_items[].process_requirement` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:382`。 |
+| `result.data.sales_order_items[].amount` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:403`。 |
+| `result.data.sales_order_items[].bom_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:393`。 |
+| `result.data.sales_order_items[].color_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:400`。 |
+| `result.data.sales_order_items[].created_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:407`。 |
+| `result.data.sales_order_items[].customer_product_no` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:385`。 |
+| `result.data.sales_order_items[].designer` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:394`。 |
+| `result.data.sales_order_items[].id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:380`。 |
+| `result.data.sales_order_items[].import_source` | object &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:392`。 |
+| `result.data.sales_order_items[].line_no` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:382`。 |
+| `result.data.sales_order_items[].line_status` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:405`。 |
+| `result.data.sales_order_items[].note` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:406`。 |
+| `result.data.sales_order_items[].order_category` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:386`。 |
+| `result.data.sales_order_items[].ordered_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:401`。 |
+| `result.data.sales_order_items[].planned_delivery_date` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:404`。 |
+| `result.data.sales_order_items[].pre_shipment_sample_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:387`。 |
+| `result.data.sales_order_items[].process_requirement` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:391`。 |
 
 **`sales_order_items[]`（续）**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.sales_order_items[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:389`。 |
-| `result.data.sales_order_items[].product_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:374`。 |
-| `result.data.sales_order_items[].product_image_attachment_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:386`。 |
-| `result.data.sales_order_items[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:390`。 |
-| `result.data.sales_order_items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:387`。 |
-| `result.data.sales_order_items[].production_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:379`。 |
-| `result.data.sales_order_items[].requested_product_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:375`。 |
-| `result.data.sales_order_items[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:372`。 |
-| `result.data.sales_order_items[].shipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:380`。 |
-| `result.data.sales_order_items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:388`。 |
-| `result.data.sales_order_items[].unit_price` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:393`。 |
-| `result.data.sales_order_items[].unshipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:381`。 |
-| `result.data.sales_order_items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:399`。 |
+| `result.data.sales_order_items[].product_code_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:398`。 |
+| `result.data.sales_order_items[].product_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:383`。 |
+| `result.data.sales_order_items[].product_image_attachment_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:395`。 |
+| `result.data.sales_order_items[].product_name_snapshot` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:399`。 |
+| `result.data.sales_order_items[].product_sku_id` | integer &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:396`。 |
+| `result.data.sales_order_items[].production_quantity` | string | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:388`。 |
+| `result.data.sales_order_items[].requested_product_name` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:384`。 |
+| `result.data.sales_order_items[].sales_order_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:381`。 |
+| `result.data.sales_order_items[].shipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:389`。 |
+| `result.data.sales_order_items[].unit_id` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:397`。 |
+| `result.data.sales_order_items[].unit_price` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:402`。 |
+| `result.data.sales_order_items[].unshipped_quantity` | string &#124; null | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:390`。 |
+| `result.data.sales_order_items[].updated_at` | integer | 依据：`server/internal/service/jsonrpc_sales_order_shared.go:408`。 |
 
 ```json
 {
@@ -61151,22 +61442,22 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `assignee_id` | integer | 按业务条件 | 解析器 `getWorkflowPositiveIntPtr`；调用 `getWorkflowPositiveIntPtr(pm, "assignee_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:475`。 |
-| `business_status_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "business_status_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:470`。 |
-| `due_at` | integer &#124; null | 可选 | 解析器 `getWorkflowUnixTimePtr`；调用 `getWorkflowUnixTimePtr(pm, "due_at")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:444`。 |
-| `idempotency_key` | string | 必填 | 拒绝条件：“!ok &#124;&#124; strings.TrimSpace(idempotencyKey) == ""”。 依据：`server/internal/service/jsonrpc_workflow_task.go:429`。 |
-| `owner_pool_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "owner_pool_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:473`。 |
-| `owner_role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:472`。 |
-| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:436`。 |
+| `assignee_id` | integer | 按业务条件 | 解析器 `getWorkflowPositiveIntPtr`；调用 `getWorkflowPositiveIntPtr(pm, "assignee_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:476`。 |
+| `business_status_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "business_status_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:471`。 |
+| `due_at` | integer &#124; null | 可选 | 解析器 `getWorkflowUnixTimePtr`；调用 `getWorkflowUnixTimePtr(pm, "due_at")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:445`。 |
+| `idempotency_key` | string | 必填 | 拒绝条件：“!ok &#124;&#124; strings.TrimSpace(idempotencyKey) == ""”。 依据：`server/internal/service/jsonrpc_workflow_task.go:430`。 |
+| `owner_pool_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "owner_pool_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:474`。 |
+| `owner_role_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "owner_role_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:473`。 |
+| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:437`。 |
 | `priority` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(m, "priority", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_shared.go:396`。 |
-| `required_capability_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "required_capability_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:474`。 |
-| `source_id` | integer | 条件必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "source_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validSourceID”。 依据：`server/internal/service/jsonrpc_workflow_task.go:451`。 |
-| `source_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "source_no")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:469`。 |
-| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:467`。 |
-| `task_code` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_code")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:464`。 |
-| `task_group` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_group")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:465`。 |
-| `task_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:466`。 |
-| `task_status_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_status_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:471`。 |
+| `required_capability_key` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "required_capability_key")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:475`。 |
+| `source_id` | integer | 条件必填 | 解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "source_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!validSourceID”。 依据：`server/internal/service/jsonrpc_workflow_task.go:452`。 |
+| `source_no` | string &#124; null | 可选 | 解析器 `getWorkflowStringPtr`；调用 `getWorkflowStringPtr(pm, "source_no")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:470`。 |
+| `source_type` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "source_type")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:468`。 |
+| `task_code` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_code")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:465`。 |
+| `task_group` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_group")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:466`。 |
+| `task_name` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_name")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:467`。 |
+| `task_status_key` | string &#124; null | 按业务条件 | 解析器 `getString`；调用 `getString(pm, "task_status_key")`。 缺失或 null 读取为空字符串；非字符串沿当前解析器转换，业务必填与枚举在调用链校验。 依据：`server/internal/service/jsonrpc_workflow_task.go:472`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -61202,7 +61493,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:486`。 |
+| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:487`。 |
 
 **`task`**
 
@@ -62204,33 +62495,34 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `approval_only` | boolean | 条件必填（approval_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:53`。 |
+| `approval_only` | boolean | 条件必填（approval_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:57`。 |
 | `assignee` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 64)`。 依据：`server/internal/service/jsonrpc_workflow_task_role_view.go:367`。 |
 | `calendar_month` | string | 条件必填（任一 calendar_selection 有值 / calendar_offset 有值 / calendar_revision 有值） | 拒绝条件：“!monthOK &#124;&#124; !selectionOK &#124;&#124; !offsetOK &#124;&#124; (hasRevision && !revisionOK)”。 依据：`server/internal/service/jsonrpc_workflow_task_calendar.go:18`。 |
 | `calendar_offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "calendar_offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task_calendar.go:20`。 |
 | `calendar_revision` | string | 可选 | 由后端实际解析读取；嵌套字段和数组按所属解析器校验。 依据：`server/internal/service/jsonrpc_workflow_task_calendar.go:21`。 |
 | `calendar_selection` | string | 条件必填（任一 calendar_month 有值 / calendar_offset 有值 / calendar_revision 有值） | 拒绝条件：“!monthOK &#124;&#124; !selectionOK &#124;&#124; !offsetOK &#124;&#124; (hasRevision && !revisionOK)”。 依据：`server/internal/service/jsonrpc_workflow_task_calendar.go:19`。 |
 | `chain_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 64)`。 依据：`server/internal/service/jsonrpc_workflow_task_role_view.go:367`。 |
-| `date_from` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 10)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:80`。 |
-| `date_to` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 10)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:80`。 |
+| `date_from` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 10)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:84`。 |
+| `date_to` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 10)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:84`。 |
 | `due` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "due", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:35`。 |
 | `keyword` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "keyword", 200)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:23`。 |
-| `lane_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "lane_key", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:43`。 |
-| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:67`。 |
+| `lane_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "lane_key", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:47`。 |
+| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:71`。 |
 | `module_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 64)`。 依据：`server/internal/service/jsonrpc_workflow_task_role_view.go:367`。 |
-| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:74`。 |
+| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:78`。 |
 | `owner_role_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "owner_role_key", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:31`。 |
 
 **顶层字段（续）**
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `period` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 10)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:80`。 |
-| `sort` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "sort", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:47`。 |
+| `period` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 10)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:84`。 |
+| `sort` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "sort", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:51`。 |
+| `source_section` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "source_section", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:43`。 |
 | `source_type` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "source_type", 64)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:39`。 |
 | `stage_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 64)`。 依据：`server/internal/service/jsonrpc_workflow_task_role_view.go:367`。 |
 | `status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "status", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:27`。 |
-| `todo_only` | boolean | 条件必填（todo_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:61`。 |
+| `todo_only` | boolean | 条件必填（todo_only 有值） | 拒绝条件：“!ok”。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:65`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -62243,7 +62535,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "lane_key": "all",
     "limit": 20,
     "offset": 20,
-    "sort": "newest",
+    "sort": "time_asc",
+    "source_section": "production",
     "todo_only": true
   },
   "id": "rpc-demo-workflow.get_task_board"
@@ -62262,7 +62555,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.assignees` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:219`。 |
+| `result.data.assignees` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:229`。 |
 | `result.data.assignees[]` | object | 依据：`server/internal/service/jsonrpc_workflow_task_role_view.go:382`。 |
 
 **`assignees[]`**
@@ -62399,32 +62692,32 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.counts` | object | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:210`。 |
+| `result.data.counts` | object | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:220`。 |
 
 **`counts`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.counts.actionable` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:211`。 |
-| `result.data.counts.due` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:213`。 |
-| `result.data.counts.exception` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:212`。 |
-| `result.data.counts.finished` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:214`。 |
+| `result.data.counts.actionable` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:221`。 |
+| `result.data.counts.due` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:223`。 |
+| `result.data.counts.exception` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:222`。 |
+| `result.data.counts.finished` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:224`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.lanes` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:216`。 |
-| `result.data.lanes[]` | object | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:199`。 |
+| `result.data.lanes` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:226`。 |
+| `result.data.lanes[]` | object | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:209`。 |
 
 **`lanes[]`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.lanes[].key` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:200`。 |
-| `result.data.lanes[].limit` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:202`。 |
-| `result.data.lanes[].offset` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:203`。 |
-| `result.data.lanes[].tasks` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:204`。 |
+| `result.data.lanes[].key` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:210`。 |
+| `result.data.lanes[].limit` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:212`。 |
+| `result.data.lanes[].offset` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:213`。 |
+| `result.data.lanes[].tasks` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:214`。 |
 | `result.data.lanes[].tasks[]` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_shared.go:109`。 |
 
 **`lanes[].tasks[]`**
@@ -62526,18 +62819,18 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.lanes[].total` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:201`。 |
+| `result.data.lanes[].total` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:211`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.owner_role_keys` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:218`。 |
-| `result.data.owner_role_keys[]` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:218`。 |
-| `result.data.snapshot_at` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:208`。 |
-| `result.data.source_types` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:217`。 |
-| `result.data.source_types[]` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:217`。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:209`。 |
+| `result.data.owner_role_keys` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:228`。 |
+| `result.data.owner_role_keys[]` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:228`。 |
+| `result.data.snapshot_at` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:218`。 |
+| `result.data.source_types` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:227`。 |
+| `result.data.source_types[]` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:227`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:219`。 |
 
 ```json
 {
@@ -62910,7 +63203,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `task_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "task_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:383`。 |
+| `task_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "task_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:384`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -62937,7 +63230,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.process_context` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:415`。 |
+| `result.data.process_context` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:416`。 |
 
 **`process_context`**
 
@@ -63495,9 +63788,10 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:153`。 |
-| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:160`。 |
-| `queue_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "queue_key", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:143`。 |
+| `limit` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:162`。 |
+| `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:169`。 |
+| `queue_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "queue_key", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:148`。 |
+| `sort` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "sort", 32)`。 依据：`server/internal/service/jsonrpc_workflow_task_board.go:158`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -63508,7 +63802,8 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
   "params": {
     "limit": 8,
     "offset": 0,
-    "queue_key": "actionable"
+    "queue_key": "actionable",
+    "sort": "time_desc"
   },
   "id": "rpc-demo-workflow.get_workbench"
 }
@@ -63526,21 +63821,21 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.counts` | object | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:182`。 |
+| `result.data.counts` | object | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:192`。 |
 
 **`counts`**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.counts.actionable` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:183`。 |
-| `result.data.counts.approval` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:185`。 |
-| `result.data.counts.risk` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:184`。 |
+| `result.data.counts.actionable` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:193`。 |
+| `result.data.counts.approval` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:195`。 |
+| `result.data.counts.risk` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:194`。 |
 
 **顶层字段**
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:181`。 |
+| `result.data.items` | array | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:191`。 |
 | `result.data.items[]` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_shared.go:109`。 |
 
 **`items[]`**
@@ -63642,11 +63937,11 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:179`。 |
-| `result.data.offset` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:180`。 |
-| `result.data.queue_key` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:177`。 |
-| `result.data.snapshot_at` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:176`。 |
-| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:178`。 |
+| `result.data.limit` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:189`。 |
+| `result.data.offset` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:190`。 |
+| `result.data.queue_key` | string | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:187`。 |
+| `result.data.snapshot_at` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:186`。 |
+| `result.data.total` | integer | 依据：`server/internal/service/jsonrpc_workflow_task_board.go:188`。 |
 
 ```json
 {
@@ -64324,10 +64619,10 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `before_event_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "before_event_id", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task.go:342`。 |
-| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:341`。 |
-| `scope` | string | 条件必填（scope 有值） | 拒绝条件：“!ok &#124;&#124; (value != "task" && value != "flow")”。 依据：`server/internal/service/jsonrpc_workflow_task.go:334`。 |
-| `task_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "task_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:340`。 |
+| `before_event_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "before_event_id", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_task.go:343`。 |
+| `limit` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "limit", 50)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:342`。 |
+| `scope` | string | 条件必填（scope 有值） | 拒绝条件：“!ok &#124;&#124; (value != "task" && value != "flow")”。 依据：`server/internal/service/jsonrpc_workflow_task.go:335`。 |
+| `task_id` | integer &#124; null | 按业务条件 | 解析器 `getInt`；调用 `getInt(pm, "task_id", 0)`。 缺失、null 或非数值使用调用处默认值；JSON 数值沿当前整数读取规则处理。 依据：`server/internal/service/jsonrpc_workflow_task.go:341`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
 
@@ -64633,6 +64928,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 | `offset` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_tracking.go:87`。 |
 | `owner_role_key` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 64)`。 依据：`server/internal/service/jsonrpc_workflow_tracking.go:60`。 |
 | `scope` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "scope", 16)`。 依据：`server/internal/service/jsonrpc_workflow_tracking.go:44`。 |
+| `sort_direction` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 64)`。 依据：`server/internal/service/jsonrpc_workflow_tracking.go:60`。 |
 | `source_id` | integer | 可选 | 解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "source_id", 0, 0)`。 依据：`server/internal/service/jsonrpc_workflow_tracking.go:79`。 |
 | `source_type` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, "source_type", 64)`。 依据：`server/internal/service/jsonrpc_workflow_tracking.go:55`。 |
 | `status` | string | 可选 | 解析器 `getOptionalWorkflowTaskBoardString`；调用 `getOptionalWorkflowTaskBoardString(pm, key, 64)`。 依据：`server/internal/service/jsonrpc_workflow_tracking.go:60`。 |
@@ -64651,6 +64947,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
     "offset": 24,
     "owner_role_key": "engineering",
     "scope": "participated",
+    "sort_direction": "asc",
     "source_type": "sales_order",
     "status": "active"
   },
@@ -65867,11 +66164,11 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 字段 | 类型 | 必填条件 | 说明 |
 | --- | --- | --- | --- |
-| `action` | string | 必填 | 拒绝条件：“!actionExists &#124;&#124; !actionIsString &#124;&#124; action != strings.TrimSpace(action) &#124;&#124; !biz.IsValidWorkflowTaskUrgeAction(action)”。 依据：`server/internal/service/jsonrpc_workflow_task.go:540`。 |
+| `action` | string | 必填 | 拒绝条件：“!actionExists &#124;&#124; !actionIsString &#124;&#124; action != strings.TrimSpace(action) &#124;&#124; !biz.IsValidWorkflowTaskUrgeAction(action)”。 依据：`server/internal/service/jsonrpc_workflow_task.go:541`。 |
 | `expected_version` | integer | 必填 | 解析器 `getRequiredWorkflowPositiveInteger`；调用 `getRequiredWorkflowPositiveInteger(pm, "expected_version", "任务版本信息缺失或已失效，请刷新后重试")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task_action.go:389`。 |
 | `idempotency_key` | string | 必填 | 拒绝条件：“!exists &#124;&#124; !ok”。 拒绝条件：“key == "" &#124;&#124; utf8.RuneCountInString(key) > 128”。 依据：`server/internal/service/jsonrpc_workflow_task_action.go:394`。 |
-| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:564`。 |
-| `reason` | string | 可选 | 解析器 `getOptionalWorkflowString`；调用 `getOptionalWorkflowString(pm, "reason")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:544`。 |
+| `payload` | object &#124; null | 可选 | 解析器 `getWorkflowPayload`；调用 `getWorkflowPayload(pm, "payload")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:565`。 |
+| `reason` | string | 可选 | 解析器 `getOptionalWorkflowString`；调用 `getOptionalWorkflowString(pm, "reason")`。 依据：`server/internal/service/jsonrpc_workflow_task.go:545`。 |
 | `task_id` | integer | 必填 | 解析器 `getRequiredWorkflowPositiveInteger`；调用 `getRequiredWorkflowPositiveInteger(pm, "task_id", "task_id 必须是大于 0 的安全整数")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 依据：`server/internal/service/jsonrpc_workflow_task_action.go:385`。 |
 
 对象引用、权限、状态和并发版本由后端校验。
@@ -65912,7 +66209,7 @@ Web 对受控业务码优先展示经过技术信息过滤的具体中文原因�
 
 | 返回字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:592`。 |
+| `result.data.task` | object &#124; null | 依据：`server/internal/service/jsonrpc_workflow_task.go:593`。 |
 
 **`task`**
 

@@ -62,6 +62,13 @@ test('独立分页与表格分页共用范围、翻页和禁用行为，固定�
     assert.equal(container.querySelector('[aria-label="上一页"]').disabled, false)
     assert.equal(container.querySelector('[aria-label="下一页"]').disabled, false)
 
+    await render(kind, { showTotal: undefined })
+    assert.match(container.querySelector('.ant-pagination-total-text').textContent, /第 1-10 条 \/ 共 61 条/u, '未指定总数格式时沿用共享默认值')
+    await render(kind, { showTotal: false })
+    assert.equal(Boolean(container.querySelector('.ant-pagination-total-text')), false, '未知总数可显式隐藏，不能显示为零')
+    await render(kind, { showTotal: (total) => `已找到 ${total} 项` })
+    assert.equal(container.querySelector('.ant-pagination-total-text').textContent, '已找到 61 项', '调用方的总数格式继续生效')
+
     await render(kind, { total: 0 })
     if (kind === 'standalone') {
       assert.match(container.textContent, /第 0-0 条 \/ 共 0 条/u)

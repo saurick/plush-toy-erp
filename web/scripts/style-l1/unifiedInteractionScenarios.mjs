@@ -1,4 +1,7 @@
+import { readFile } from 'node:fs/promises'
+import { createDeliveryBoardScenarios } from './deliveryBoardScenarios.mjs'
 import { assertProductionRecordTabMotion, createProductionTabStabilityScenarios } from './productionTabStabilityScenarios.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { moveBusinessDate } from '../../src/erp/utils/businessVisualizationModels.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
@@ -48,8 +51,15 @@ async function closeAppearanceNavigation(page) {
   }
 }
 
+async function firstDueCell(panel, label) {
+  const header = panel.getByRole('columnheader', { name: label, exact: true }).first()
+  const column = await header.evaluate((cell) => cell.cellIndex)
+  return panel.locator('tbody tr[data-row-key]').first().getByRole('cell').nth(column)
+}
+
 async function assertVisualStatuses(panel, assert) {
-  const statuses = await panel.locator('.erp-business-visual-status').evaluateAll((nodes) => nodes.map((node) => {
+  await waitForFiniteAnimations(panel.page())
+  const statuses = await panel.evaluate((root) => Array.from(root.querySelectorAll('.erp-business-visual-status'), (node) => {
     const style = getComputedStyle(node)
     return {
       label: node.textContent.trim(),
@@ -83,9 +93,6 @@ export function createUnifiedInteractionScenarios({
     viewport: { width: 1440, height: 900 },
   }
   let purchaseArrivalFail = false
-  let recoveryMode
-  let releaseRecovery
-  let recoveryRequested
   const scenarios = [
     ...createProductionTabStabilityScenarios({ common, outputDir, assertNoHorizontalOverflow, clickERPThemeOption }),
     {
@@ -210,186 +217,7 @@ export function createUnifiedInteractionScenarios({
           .waitFor()
       },
     },
-    {
-      ...common,
-      name: 'sales-delivery-context-filters',
-      path: '/erp/sales/project-orders/sales-orders',
-      viewport: { width: 1920, height: 1080 },
-      deviceScaleFactor: 2,
-      beforeNavigate: async (page) => {
-        const orders = Array.from({ length: 40 }, (_, index) => ({
-          id: index + 1,
-          order_no: `SO-FILTER-${String(index + 1).padStart(3, '0')}`,
-          customer_snapshot: { name: '交付筛选验证客户' },
-          lifecycle_status: index % 2 ? 'active' : 'draft',
-          version: 1,
-          item_count: 2,
-        }))
-        const details = orders.flatMap((order, index) => [0, 1].map((line) => ({
-          ...order,
-          id: index * 2 + line + 1,
-          sales_order_id: order.id,
-          customer_name: order.customer_snapshot.name,
-          requested_product_name: `交付产品 ${line + 1}`,
-          ordered_quantity: '100',
-          shipped_quantity: '40',
-          unshipped_quantity: '60',
-          unit_name: '只',
-          planned_delivery_date: unix(moveBusinessDate(today, line ? 3 : -2)),
-          line_status: 'open',
-        })))
-        await page.route('**/rpc/sales_order', async (route) => {
-          const { id, method, params = {} } = route.request().postDataJSON()
-          if (method === 'list_sales_orders') {
-            const counted = orders.filter((order) => !params.keyword || order.order_no.includes(params.keyword))
-            const selected = counted.filter((order) => !params.lifecycle_status || order.lifecycle_status === params.lifecycle_status)
-            return respond(route, id, {
-              ...stylePaginatedRpcData(selected, 'sales_orders', params),
-              status_counts: Object.fromEntries(['draft', 'active'].map((status) => [status, counted.filter((order) => order.lifecycle_status === status).length])),
-            })
-          }
-          if (method === 'list_sales_order_summary') {
-            const selected = details.filter((row) => (!params.keyword || row.order_no.includes(params.keyword)) && (!params.lifecycle_status || row.lifecycle_status === params.lifecycle_status))
-            return respond(route, id, stylePaginatedRpcData(selected, 'items', params))
-          }
-          return route.fallback()
-        })
-      },
-      verify: async (page) => {
-        const operation = page.locator('.erp-business-operation-panel')
-        const orderFilters = page.getByRole('group', { name: '销售订单状态', exact: true })
-        await orderFilters.getByRole('button', { name: '草稿，共 20 张', exact: true }).click()
-        await page.getByText('交付进度', { exact: true }).click()
-        const deliveryFilters = page.getByRole('group', { name: '交付情况', exact: true })
-        const panel = page.getByRole('region', { name: '销售交付进度', exact: true })
-        await deliveryFilters.getByRole('button', { name: '全部明细，共 40 条', exact: true }).waitFor()
-        await panel.locator('tbody tr[data-row-key]').first().waitFor()
-        assert.equal(await orderFilters.count(), 0, '交付视图不再同时展示订单状态快捷筛选')
-        assert.equal(await operation.getByRole('group', { name: '快捷筛选', exact: true }).count(), 1)
-        assert.equal(await panel.locator('.erp-business-visual-frame__heading').count(), 0)
-        await operation.getByRole('button', { name: '清除订单状态：草稿', exact: true }).waitFor()
-        await panel.locator('.ant-pagination-item-2').click()
-        await page.getByText('订单列表', { exact: true }).click()
-        await page.getByText('交付进度', { exact: true }).click()
-        await panel.locator('.ant-pagination-item-2.ant-pagination-item-active').waitFor()
-        await operation.getByRole('button', { name: /^筛选/u }).click()
-        const filterDialog = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        await filterDialog.getByRole('group', { name: '订单状态', exact: true }).getByRole('button', { name: '已生效', exact: true }).click()
-        await filterDialog.getByRole('button', { name: '完成', exact: true }).click()
-        await operation.getByRole('button', { name: '清除订单状态：已生效', exact: true }).waitFor()
-        await panel.locator('.ant-pagination-item-1.ant-pagination-item-active').waitFor()
-        await deliveryFilters.getByRole('button', { name: '逾期，共 20 条', exact: true }).click()
-        await operation.getByRole('button', { name: '清空筛选', exact: true }).click()
-        await deliveryFilters.getByRole('button', { name: '逾期，共 40 条', exact: true }).waitFor()
-        assert.equal(await deliveryFilters.getByRole('button', { name: /^逾期/u }).getAttribute('aria-pressed'), 'true', '清空额外条件保留交付快捷筛选')
-        assert.equal(await operation.getByRole('button', { name: /^清除订单状态/u }).count(), 0)
-        await panel.locator('.ant-pagination-item-2').click()
-        const search = operation.getByRole('textbox')
-        await search.fill('SO-FILTER-003')
-        await search.press('Enter')
-        await deliveryFilters.getByRole('button', { name: '全部明细，共 2 条', exact: true }).waitFor()
-        await panel.locator('.ant-pagination-item-1.ant-pagination-item-active').waitFor()
-        assert.equal(await panel.locator('tbody tr[data-row-key]').count(), 1, '搜索与逾期条件取交集')
-        await search.fill('')
-        await search.press('Enter')
-        await deliveryFilters.getByRole('button', { name: '逾期，共 40 条', exact: true }).click()
-        assert.equal(await deliveryFilters.getByRole('button', { name: /^全部明细/u }).getAttribute('aria-pressed'), 'true', '再次点击已选快捷条件恢复全部明细')
-        await operation.getByRole('button', { name: /^筛选/u }).click()
-        await filterDialog.getByRole('group', { name: '订单状态', exact: true }).getByRole('button', { name: '草稿', exact: true }).click()
-        await filterDialog.getByRole('button', { name: '完成', exact: true }).click()
-        await deliveryFilters.getByRole('button', { name: '全部明细，共 40 条', exact: true }).waitFor()
-        await operation.getByRole('button', { name: '清除订单状态：草稿', exact: true }).click()
-        await deliveryFilters.getByRole('button', { name: '全部明细，共 80 条', exact: true }).waitFor()
-        await page.screenshot({ path: `${outputDir}/sales-delivery-filters-4k.png` })
-        for (const width of [1440, 820, 390]) {
-          await page.setViewportSize({ width, height: 900 })
-          await assertNoHorizontalOverflow(page, `sales-delivery-filters-${width}`)
-        }
-      },
-    },
-    {
-      ...common,
-      name: 'unified-sales-loading-error-recovery',
-      path: '/erp/sales/project-orders/sales-orders',
-      beforeNavigate: async (page) => {
-        recoveryMode = 'loading'
-        recoveryRequested = false
-        const ready = new Promise((resolve) => {
-          releaseRecovery = resolve
-        })
-        await page.route('**/rpc/sales_order', async (route) => {
-          const { id, method, params = {} } = route.request().postDataJSON()
-          if (method !== 'list_sales_order_summary') return route.fallback()
-          recoveryRequested = true
-          if (recoveryMode === 'loading') {
-            await ready
-            return route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id,
-                result: { code: 50000, message: '暂时无法读取交付进度' },
-              }),
-            })
-          }
-          return respond(
-            route,
-            id,
-            stylePaginatedRpcData(
-              recoveryMode === 'empty' ? [] : rows.slice(0, 3),
-              'items',
-              params
-            )
-          )
-        })
-      },
-      verify: async (page) => {
-        await page
-          .getByRole('heading', { name: '销售订单', exact: true })
-          .waitFor()
-        await page.getByText('交付进度', { exact: true }).click()
-        const panel = page.getByRole('region', { name: '销售交付进度' })
-        await panel.getByRole('status').waitFor()
-        assert.equal(recoveryRequested, true)
-        const deliveryFilters = page.getByRole('group', { name: '交付情况', exact: true })
-        const count = deliveryFilters.locator('.erp-filter-chip__count').first()
-        assert.equal(
-          await count.textContent(),
-          '—',
-          '读取中不应显示虚假的零条统计'
-        )
-        await captureBusinessView(page, panel, 'sales-loading', 1440, outputDir)
-        releaseRecovery()
-        await panel.getByRole('button', { name: '重新加载' }).waitFor()
-        assert.equal(
-          await count.textContent(),
-          '—',
-          '读取失败不能等同于零条记录'
-        )
-        await captureBusinessView(page, panel, 'sales-error', 1440, outputDir)
-        recoveryMode = 'empty'
-        await panel.getByRole('button', { name: '重新加载' }).click()
-        await panel.getByText('当前筛选暂无数据', { exact: true }).waitFor()
-        assert.equal(await count.textContent(), '0 条')
-        await captureBusinessView(page, panel, 'sales-empty', 1440, outputDir)
-        recoveryMode = 'data'
-        await page.getByRole('button', { name: '刷新当前页' }).click()
-        await panel.locator('.erp-sales-delivery-table tbody tr[data-row-key]').first().waitFor()
-        assert.equal(await page.locator('.erp-business-operation-panel__selection').count(), 0)
-        assert.equal(await page.getByRole('button', { name: /列设置|新建订单/ }).count(), 0)
-        assert.equal(await panel.locator('.erp-business-visual-frame__heading').count(), 0, '表格上方不再重复放交付快捷筛选')
-        assert.match(await deliveryFilters.textContent(), /全部明细.*条/u)
-        assert.equal(await count.textContent(), '3 条')
-        await captureBusinessView(
-          page,
-          panel,
-          'sales-recovered',
-          1440,
-          outputDir
-        )
-      },
-    },
+    ...createDeliveryBoardScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir }),
     {
       ...common,
       name: 'unified-purchase-line-save',
@@ -460,230 +288,6 @@ export function createUnifiedInteractionScenarios({
         assert.equal(params.items[0].id, 1)
         assert.ok(!params.items[1].id)
         await editor.waitFor({ state: 'hidden' })
-      },
-    },
-    {
-      ...common,
-      name: 'unified-sales-interactions',
-      path: '/erp/sales/project-orders/sales-orders',
-      viewport: { width: 1920, height: 1080 },
-      deviceScaleFactor: 2,
-      beforeNavigate: async (page) => {
-        const deliveryRows = rows.map((row, index) => ({
-          ...row,
-          product_id: 7,
-          ...(index === 4 ? {
-            customer_name: '交付交互验证客户（毛绒玩具礼品定制与海外业务分公司）',
-            requested_product_name: '可拆卸服装长名称毛绒玩具组合套装（含礼盒与多语言包装）',
-            customer_product_no: 'CUSTOMER-PLUSH-TOY-GIFT-2026-EXPORT-0005',
-          } : {}),
-        }))
-        await page.route('**/rpc/attachment', async (route) => {
-          const { id, method, params = {} } = route.request().postDataJSON()
-          if (method === 'list_product_image_references') {
-            return respond(route, id, { images: (params.product_ids || []).map((product_id) => ({ product_id, image_attachment_id: 8801 })) })
-          }
-          if (method === 'list_attachments' && params.owner_type === 'product' && params.owner_id === 7) {
-            return respond(route, id, { attachments: [{ id: 8801, owner_type: 'product', owner_id: 7, attachment_type: 'product_image', slot_key: 'primary', mime_type: 'image/png' }] })
-          }
-          return route.fallback()
-        })
-        await page.route('**/rpc/sales_order', async (route) => {
-          const { id, method, params = {} } = route.request().postDataJSON()
-          if (method === 'list_sales_order_summary')
-            { return respond(
-              route,
-              id,
-              stylePaginatedRpcData(deliveryRows, 'items', params)
-            ) }
-          if (method === 'get_sales_order')
-            { return respond(route, id, {
-              sales_order: {
-                ...deliveryRows.find((row) => row.id === params.id),
-                customer_snapshot: { name: '交互验证客户' },
-                version: 1,
-              },
-            }) }
-          return route.fallback()
-        })
-      },
-      verify: async (page) => {
-        await page
-          .getByRole('heading', { name: '销售订单', exact: true })
-          .waitFor()
-        await assertBusinessViewMotion(page, 'sales-view', outputDir)
-        await page.getByText('交付进度', { exact: true }).click()
-        const panel = page.getByRole('region', { name: '销售交付进度' })
-        const deliveryFilters = page.getByRole('group', { name: '交付情况', exact: true })
-        await panel.locator('.erp-sales-delivery-table tbody tr[data-row-key]').first().waitFor()
-        await assertVisualStatuses(panel, assert)
-        const table = panel.locator('.erp-sales-delivery-table')
-        assert.deepEqual(await table.locator('thead th').allTextContents(), ['订单 / 客户', '产品', '交付日期', '出货进度', '剩余待交', '交付状态'])
-        const first = table.locator('tbody tr[data-row-key]').first()
-        const geometry = await first.evaluate((row) => ({
-          height: row.getBoundingClientRect().height,
-          progressWidth: row.querySelector('.erp-sales-delivery-progress').getBoundingClientRect().width,
-          imageWidth: row.querySelector('.erp-task-product-image').getBoundingClientRect().width,
-        }))
-        assert.ok(geometry.height <= 90, `交付行沿用紧凑表格密度：${JSON.stringify(geometry)}`)
-        assert.ok(geometry.progressWidth <= 220, '进度条保持短列内展示')
-        assert.equal(geometry.imageWidth, 48, '保留共享产品缩略图尺寸')
-        await page.screenshot({ path: `${outputDir}/sales-delivery-table-4k.png` })
-        const picture = first.getByRole('button', { name: /查看.*大图/u })
-        await picture.click()
-        const preview = page.locator('.erp-task-image-preview .ant-image-preview')
-        await preview.waitFor()
-        const previewImage = preview.locator('.erp-task-image-preview__stage img')
-        await previewImage.waitFor()
-        await previewImage.evaluate((image) => image.decode())
-        assert.equal(await page.getByRole('dialog', { name: '销售订单详情' }).count(), 0, '图片预览不误开订单')
-        await page.keyboard.press('Escape')
-        await preview.waitFor({ state: 'hidden' })
-        assert.equal(await picture.evaluate((node) => node === document.activeElement), true)
-        const progress = first.getByRole('button', { name: /出货进度$/u })
-        await progress.focus()
-        await page.getByText('完成比例 40%', { exact: true }).waitFor()
-        await progress.press('Escape')
-        assert.equal(await progress.getAttribute('aria-expanded'), 'false')
-        const orderLink = first.getByRole('button', { name: /^打开销售订单/u })
-        await orderLink.click()
-        const orderDetails = page.getByRole('dialog', { name: '销售订单详情' })
-        await orderDetails.waitFor()
-        await orderDetails.getByRole('button', { name: /^关\s*闭$/u }).click()
-        await orderDetails.waitFor({ state: 'hidden' })
-        assert.equal(await orderLink.evaluate((node) => node === document.activeElement), true)
-        assert.equal(
-          await panel.locator('.erp-sales-delivery-table tbody tr[data-row-key]').count(),
-          25
-        )
-        await panel.locator('.ant-pagination-item-2').click()
-        const firstRow = await panel
-          .locator('.erp-sales-delivery-table tbody tr[data-row-key]')
-          .first()
-          .textContent()
-        await page.getByText('订单列表', { exact: true }).click()
-        await page.getByText('交付进度', { exact: true }).click()
-        await panel.locator('.erp-sales-delivery-table tbody tr[data-row-key]').first().waitFor()
-        assert.equal(
-          await panel
-            .locator('.erp-sales-delivery-table tbody tr[data-row-key]')
-            .first()
-            .textContent(),
-          firstRow
-        )
-        await deliveryFilters.getByRole('button', { name: /^待核对/ }).click()
-        assert.equal(await panel.locator('.ant-progress').count(), 0)
-        assert.equal(
-          await panel.locator('.erp-sales-delivery-table tbody tr[data-row-key]').count(),
-          25
-        )
-        await deliveryFilters.getByRole('button', { name: /^逾期/ }).click()
-        const orderNo = await panel
-          .locator('.erp-sales-delivery-order button')
-          .first()
-          .textContent()
-        await panel.locator('.erp-sales-delivery-table tbody tr[data-row-key]').first().dblclick()
-        const dialog = page.getByRole('dialog')
-        await dialog.waitFor()
-        assert.ok((await dialog.textContent()).includes(orderNo))
-        await dialog.getByRole('button', { name: /^关\s*闭$/ }).click()
-        await dialog.waitFor({ state: 'hidden' })
-        assert.equal(
-          await panel
-            .locator('.erp-sales-delivery-table tbody tr[data-row-key]')
-            .first()
-            .evaluate((element) => element.contains(document.activeElement)),
-          true
-        )
-        assert.equal(
-          await deliveryFilters
-            .getByRole('button', { name: /^逾期/ })
-            .getAttribute('aria-pressed'),
-          'true'
-        )
-        await panel
-          .locator('.erp-sales-delivery-table tbody tr[data-row-key]')
-          .last()
-          .scrollIntoViewIfNeeded()
-        const scrollTop = await panel.evaluate(
-          (element) => element.closest('.erp-admin-content').scrollTop
-        )
-        assert.ok(scrollTop > 0)
-        await page.getByRole('menuitem', { name: /采购管理/ }).click()
-        await page
-          .getByRole('heading', { name: '采购订单', exact: true })
-          .waitFor()
-        await page.goBack()
-        await panel.locator('.erp-sales-delivery-table tbody tr[data-row-key]').first().waitFor()
-        await page.waitForFunction(
-          (top) =>
-            Math.abs(
-              document.querySelector('.erp-admin-content').scrollTop - top
-            ) < 2,
-          scrollTop
-        )
-        assert.equal(
-          await deliveryFilters
-            .getByRole('button', { name: /^逾期/ })
-            .getAttribute('aria-pressed'),
-          'true'
-        )
-        for (const width of [1440, 768, 390]) {
-          await page.setViewportSize({ width, height: 900 })
-          await assertNoHorizontalOverflow(page, `sales-${width}`)
-          const longRow = panel.locator('tbody tr[data-row-key]').filter({ hasText: '可拆卸服装长名称毛绒玩具组合套装' })
-          const overflow = await longRow.locator('td').evaluateAll((cells) => cells.map((cell) => cell.scrollWidth - cell.clientWidth))
-          assert.ok(overflow.length === 6 && overflow.every((value) => value <= 1), `长名称保持在所属列内：${JSON.stringify({ width, overflow })}`)
-          await captureBusinessView(page, panel, 'sales-view', width, outputDir)
-        }
-        await clickERPThemeOption(page, '暗色')
-        await closeAppearanceNavigation(page)
-        await assertNoHorizontalOverflow(page, 'sales-dark')
-        await assertVisualStatuses(panel, assert)
-        await captureBusinessView(
-          page,
-          panel,
-          'sales-view-dark',
-          390,
-          outputDir
-        )
-      },
-    },
-    {
-      ...common,
-      name: 'sales-delivery-order-focus',
-      path: '/erp/sales/project-orders/sales-orders',
-      beforeNavigate: async (page) => {
-        await page.route('**/rpc/sales_order', async (route) => {
-          const { id, method, params = {} } = route.request().postDataJSON()
-          if (method === 'list_sales_order_summary') return respond(route, id, stylePaginatedRpcData(rows.slice(0, 1), 'items', params))
-          if (method === 'get_sales_order') return respond(route, id, { sales_order: { ...rows[0], customer_snapshot: { name: '交互验证客户' }, version: 1 } })
-          return route.fallback()
-        })
-      },
-      verify: async (page) => {
-        await page.getByRole('heading', { name: '销售订单', exact: true }).waitFor()
-        await page.getByRole('tab', { name: '交付进度', exact: true }).click()
-        const row = page.locator('.erp-sales-delivery-table tbody tr[data-row-key]').first()
-        const order = row.getByRole('button', { name: /^打开销售订单/u })
-        const details = page.getByRole('dialog', { name: '销售订单详情' })
-        await order.click()
-        await details.waitFor()
-        await details.getByRole('button', { name: /^关\s*闭$/u }).click()
-        await details.waitFor({ state: 'hidden' })
-        assert.equal(await order.evaluate((node) => node === document.activeElement), true, '鼠标打开详情后返回订单号')
-        await order.press('Enter')
-        await details.waitFor()
-        await details.getByRole('button', { name: /^关\s*闭$/u }).click()
-        await details.waitFor({ state: 'hidden' })
-        await page.waitForFunction(() => document.activeElement?.matches('.erp-sales-delivery-order button'))
-        assert.equal(await order.evaluate((node) => node === document.activeElement), true, '键盘打开详情后返回订单号')
-        await row.locator('td').nth(2).dblclick()
-        await details.waitFor()
-        await details.getByRole('button', { name: /^关\s*闭$/u }).click()
-        await details.waitFor({ state: 'hidden' })
-        await page.waitForFunction(() => document.activeElement?.matches('.erp-sales-delivery-order button'))
-        assert.equal(await order.evaluate((node) => node === document.activeElement), true, '双击明细后返回同一订单号')
       },
     },
     {
@@ -769,8 +373,7 @@ export function createUnifiedInteractionScenarios({
         assert.equal(await page.getByRole('button', { name: '表格工具', exact: true }).count(), 0)
         assert.equal(await panel.getByRole('button', { name: /^全部\s*500/ }).getAttribute('aria-pressed'), 'true')
         await page.screenshot({ path: `${outputDir}/purchase-arrival-default-4k.png`, fullPage: false })
-        await panel.getByRole('combobox', { name: '交期来源', exact: true }).click()
-        await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '供应商确认交期' }).click()
+        await panel.getByRole('group', { name: '交期来源', exact: true }).getByRole('button', { name: '供应商确认交期', exact: true }).click()
         await panel.getByRole('button', { name: /^全部\s*250/ }).waitFor()
         assert.ok((await panel.locator('.erp-arrival-calendar__detail-head').innerText()).includes('250 项'))
         const [download] = await Promise.all([
@@ -899,31 +502,33 @@ export function createUnifiedInteractionScenarios({
             id: row.id,
             fact_no: `${params.fact_type}-UI-${row.id}`,
             fact_type: params.fact_type,
-            status: 'POSTED',
+            status: index === 499 ? 'SETTLED' : 'POSTED',
+            counterparty_type: params.fact_type === 'RECEIVABLE' ? 'CUSTOMER' : 'SUPPLIER',
+            counterparty_id: 1,
             version: 1,
             source_type: 'SHIPMENT',
             source_id: 1,
             source_no: 'SH-STYLE-L1',
             amount: '100',
-            outstanding_amount: index % 5 ? '60' : null,
+            outstanding_amount: index >= 498 ? '0' : index % 5 ? '60' : null,
             currency: index % 2 ? 'USD' : 'CNY',
             due_at: unix(moveBusinessDate(today, index % 2 ? -2 : 3)),
           }))
-          return respond(
-            route,
-            id,
-            stylePaginatedRpcData(facts, 'finance_facts', params)
-          )
+          const matching = params.status ? facts.filter((fact) => fact.status === params.status) : facts
+          return respond(route, id, {
+            ...stylePaginatedRpcData(matching, 'finance_facts', params),
+            status_counts: { POSTED: 499, SETTLED: 1 },
+          })
         })
       },
       verify: async (page) => {
         await expectHeading(page, '财务管理')
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         const toolbar = page.locator('.erp-business-operation-panel__command')
-        const assertToolbarLayout = async (width) => {
-          const layout = await toolbar.evaluate((element) => {
+        const assertToolbarLayout = async (width, groupLabel) => {
+          const layout = await toolbar.evaluate((element, label) => {
             const view = element.querySelector('[aria-label="查询视图"]')
-            const statuses = element.querySelector('[aria-label="单据状态"]')
+            const statuses = element.querySelector(`[aria-label="${label}"]`)
             if (!view || !statuses) return null
             const box = (node) => {
               const { x, y, width, height, right, bottom } = node.getBoundingClientRect()
@@ -938,7 +543,7 @@ export function createUnifiedInteractionScenarios({
               dividerHeight: parseFloat(divider.height),
               statusOverflow: statuses.scrollWidth - statuses.clientWidth,
             }
-          })
+          }, groupLabel)
           assert.ok(layout, '账款视图和状态须在同一工具栏内')
           assert.equal(layout.dividerWidth, 1, '视图与状态之间保留细竖线')
           assert.ok(layout.dividerHeight >= 16, '竖线分组应可见')
@@ -951,36 +556,70 @@ export function createUnifiedInteractionScenarios({
             assert.ok(layout.statuses.y >= layout.view.bottom, '窄屏状态组应自然换到下一行')
           }
         }
-        await assertToolbarLayout(1440)
+        await assertToolbarLayout(1440, '单据状态')
         const postedStatus = toolbar.getByRole('button', { name: /^已过账，/u })
         await postedStatus.click()
         await assertBusinessViewMotion(page, 'finance-view', outputDir)
-        assert.equal(await postedStatus.getAttribute('aria-pressed'), 'true', '切换视图应保留状态筛选')
-        await toolbar.getByRole('button', { name: /^不限状态，/u }).click()
-        await page.getByText('到期顺序', { exact: true }).click()
+        const dueChoices = toolbar.getByRole('group', { name: '到期情况', exact: true })
         const panel = page.getByRole('region', { name: '财务到期顺序' })
-        await panel.locator('.erp-finance-due-list__row').first().waitFor()
+        const filters = page.getByRole('dialog', { name: '筛选条件' })
+        const clearStatus = toolbar.getByRole('button', { name: '清除单据状态：已过账' })
+        await dueChoices.getByRole('button', { name: /^全部\s*499$/u }).waitFor()
+        assert.equal(await clearStatus.isVisible(), true)
+        assert.equal(await postedStatus.count(), 0)
+        assert.equal(await panel.locator('.erp-business-visual-frame__heading').count(), 0)
+        assert.equal(await dueChoices.getByRole('button', { name: /^未填到期日|^已结清/u }).count(), 0)
+        await toolbar.getByRole('button', { name: '筛选，已应用 1 项' }).click()
+        await filters.getByRole('button', { name: /^已结清（含未结金额为零）\s*1$/u }).click()
+        await filters.getByRole('button', { name: '收起' }).click()
+        await panel.locator('tbody tr[data-row-key]').filter({ hasText: 'RECEIVABLE-UI-499' }).waitFor()
+        assert.equal(await panel.locator('tbody tr[data-row-key]').count(), 1)
+        await clearStatus.click()
+        await dueChoices.getByRole('button', { name: /^已结清（含未结金额为零）\s*2$/u }).waitFor()
+        assert.equal(await panel.locator('tbody tr[data-row-key]').count(), 2)
+        await toolbar.getByRole('button', { name: '筛选，已应用 1 项' }).click()
+        await filters.getByRole('button', { name: /^未填到期日\s*0$/u }).click()
+        await filters.getByRole('button', { name: '收起' }).click()
+        await panel.getByText('当前筛选暂无数据').waitFor()
+        await toolbar.getByRole('button', { name: '清空筛选' }).click()
+        await dueChoices.getByRole('button', { name: /^全部\s*500$/u, pressed: true }).waitFor()
+        await panel.locator('tbody tr[data-row-key]').first().waitFor()
         await assertVisualStatuses(panel, assert)
+        assert.equal(await (await firstDueCell(panel, '客户')).textContent(), '暗色客户')
+        assert.match(await (await firstDueCell(panel, '到期情况')).textContent(), /逾期/u)
         assert.equal(
-          await panel.locator('.erp-finance-due-list__row').count(),
+          await panel.locator('tbody tr[data-row-key]').count(),
           25
         )
-        await panel.getByRole('button', { name: /^金额待核对/ }).click()
-        assert.equal(
-          await panel
-            .locator('.erp-finance-due-list__amount')
-            .nth(2)
-            .textContent(),
-          '未结金额—'
-        )
+        await dueChoices.getByRole('button', { name: /^金额待核对/ }).click()
+        await toolbar.getByRole('button', { name: '筛选', exact: true }).click()
+        await filters.getByRole('group', { name: '单据状态' }).getByRole('button', { name: /^已过账，/u }).click()
+        await filters.getByRole('button', { name: '收起' }).click()
+        await clearStatus.waitFor()
+        await toolbar.getByRole('button', { name: '清空筛选' }).click()
+        await clearStatus.waitFor({ state: 'hidden' })
+        await dueChoices.getByRole('button', { name: /^金额待核对\s*100$/u, pressed: true }).waitFor()
+        await panel.locator('tbody tr[data-row-key]').first().waitFor()
+        assert.equal(await (await firstDueCell(panel, '未结金额')).textContent(), '—')
+        await toolbar.getByRole('button', { name: '表格工具', exact: true }).click()
+        const [download] = await Promise.all([
+          page.waitForEvent('download'),
+          page.getByRole('menuitem', { name: /导出筛选结果/u }).click(),
+        ])
+        const csv = await readFile(await download.path(), 'utf8')
+        const [, ...exportedRows] = csv.trim().split(/\r?\n/u)
+        assert.equal(exportedRows.length, 100, '导出包含所有匹配账款')
+        assert.ok(exportedRows.every((row) => row.includes('金额待核对') && row.includes('暗色客户')))
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应付', exact: true }).click()
         await expectHeading(page, '财务管理')
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应付', exact: true, selected: true }).waitFor()
         await page.getByText('到期顺序', { exact: true }).click()
-        await panel.locator('.erp-finance-due-list__row').first().waitFor()
-        await assertToolbarLayout(1440)
+        await panel.locator('tbody tr[data-row-key]').first().waitFor()
+        await assertToolbarLayout(1440, '到期情况')
+        assert.equal(await (await firstDueCell(panel, '供应商')).textContent(), '样式供应商')
+        assert.match(await (await firstDueCell(panel, '到期情况')).textContent(), /逾期/u)
         assert.equal(
-          await panel
+          await dueChoices
             .getByRole('button', { name: /^全部/ })
             .getAttribute('aria-pressed'),
           'true'
@@ -988,18 +627,18 @@ export function createUnifiedInteractionScenarios({
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true }).click()
         await expectHeading(page, '财务管理')
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
-        await panel.locator('.erp-finance-due-list__row').first().waitFor()
+        await panel.locator('tbody tr[data-row-key]').first().waitFor()
         assert.equal(
-          await panel
+          await dueChoices
             .getByRole('button', { name: /^金额待核对/ })
             .getAttribute('aria-pressed'),
           'true'
         )
         const selectedFactNo = await panel
-          .locator('.erp-finance-due-list__row strong')
+          .locator('[data-copyable-column="fact_no"] .erp-business-table-copyable-cell__content')
           .first()
           .textContent()
-        await panel.locator('.erp-finance-due-list__row').first().click()
+        await panel.locator('tbody tr[data-row-key]').first().click()
         const details = page.getByRole('dialog')
         await details
           .getByRole('button', { name: '查看来源单据', exact: true })
@@ -1013,7 +652,7 @@ export function createUnifiedInteractionScenarios({
         await expectHeading(page, '财务管理')
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         assert.equal(
-          await panel
+          await dueChoices
             .getByRole('button', { name: /^金额待核对/ })
             .getAttribute('aria-pressed'),
           'true'
@@ -1021,7 +660,7 @@ export function createUnifiedInteractionScenarios({
         for (const width of [1440, 768, 390]) {
           await page.setViewportSize({ width, height: 900 })
           await assertNoHorizontalOverflow(page, `finance-${width}`)
-          await assertToolbarLayout(width)
+          await assertToolbarLayout(width, '到期情况')
           await captureBusinessView(
             page,
             panel,
@@ -1029,13 +668,7 @@ export function createUnifiedInteractionScenarios({
             width,
             outputDir
           )
-          assert.equal(
-            await panel
-              .locator('.erp-finance-due-list__amount')
-              .nth(2)
-              .isVisible(),
-            true
-          )
+          assert.equal(await (await firstDueCell(panel, '未结金额')).isVisible(), true)
         }
         await clickERPThemeOption(page, '暗色')
         await closeAppearanceNavigation(page)
@@ -1126,15 +759,24 @@ export function createUnifiedInteractionScenarios({
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: tabName, exact: true, selected: true }).waitFor()
         await page.getByText('到期顺序', { exact: true }).click()
         const panel = page.getByRole('region', { name: '财务到期顺序', exact: true })
-        await panel.locator('.erp-finance-due-list__row').first().waitFor()
-        const filter = panel.getByRole('button', { name: /^金额待核对/u })
+        await panel.locator('tbody tr[data-row-key]').first().waitFor()
+        const dueFilters = page.getByRole('group', { name: '到期情况', exact: true })
+        for (const [choice, status] of [[/^逾期未结/u, /逾期/u], [/^7 天内到期/u, /天后到期/u]]) {
+          await dueFilters.getByRole('button', { name: choice }).click()
+          const labels = await panel.locator('tbody tr[data-row-key] .erp-business-visual-status').allTextContents()
+          assert.equal(labels.length, 25)
+          assert.ok(labels.every((item) => status.test(item)), `${tabName}到期筛选与每行状态一致`)
+        }
+        const filter = dueFilters.getByRole('button', { name: /^金额待核对/u })
         await filter.click()
         await panel.locator('.ant-pagination-item-2').click()
         await panel.locator('.ant-pagination-item-2.ant-pagination-item-active').waitFor()
-        const factNo = await panel.locator('.erp-finance-due-list__row strong').first().textContent()
+        const factNo = await panel.locator('[data-copyable-column="fact_no"] .erp-business-table-copyable-cell__content').first().textContent()
         const financeURL = page.url()
         for (const immediate of [true, false]) {
-          await panel.locator('.erp-finance-due-list__row').first().click()
+          const row = panel.locator('tbody tr[data-row-key]').first()
+          if (immediate) await row.press('Enter')
+          else await row.click()
           const details = page.getByRole('dialog')
           await details.getByText(factNo, { exact: true }).waitFor()
           await details.getByRole('button', { name: '查看来源单据', exact: true }).click()
@@ -1149,7 +791,7 @@ export function createUnifiedInteractionScenarios({
           await expectHeading(page, '财务管理')
           assert.equal(await filter.getAttribute('aria-pressed'), 'true', `${tabName}返回保留金额筛选`)
           await panel.locator('.ant-pagination-item-2.ant-pagination-item-active').waitFor()
-          assert.equal(await panel.locator('.erp-finance-due-list__row strong').first().textContent(), factNo, `${tabName}返回保留页码与记录`)
+          assert.equal(await panel.locator('[data-copyable-column="fact_no"] .erp-business-table-copyable-cell__content').first().textContent(), factNo, `${tabName}返回保留页码与记录`)
         }
         await page.screenshot({ path: `${outputDir}/finance-source-return-${tabName}.png`, fullPage: false })
       }
@@ -1161,7 +803,7 @@ export function createUnifiedInteractionScenarios({
       await expectHeading(page, '财务管理')
       await page.getByText('到期顺序', { exact: true }).click()
       const panel = page.getByRole('region', { name: '财务到期顺序', exact: true })
-      await panel.locator('.erp-finance-due-list__row').first().waitFor()
+      await panel.locator('tbody tr[data-row-key]').first().waitFor()
       await assertVisualStatuses(panel, assert)
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 900 })
@@ -1169,12 +811,12 @@ export function createUnifiedInteractionScenarios({
         await assertVisualStatuses(panel, assert)
         await captureBusinessView(page, panel, 'finance-status', width, outputDir)
       }
-      await panel.getByRole('button', { name: /^金额待核对/u }).click()
+      await page.getByRole('group', { name: '到期情况', exact: true }).getByRole('button', { name: /^金额待核对/u }).click()
       await panel.locator('.erp-business-visual-status--unknown').first().waitFor()
-      assert.equal(await panel.locator('.erp-finance-due-list__amount').nth(2).textContent(), '未结金额—')
+      assert.equal(await (await firstDueCell(panel, '未结金额')).textContent(), '—')
       await clickERPThemeOption(page, '暗色')
       await closeAppearanceNavigation(page)
-      await panel.getByRole('button', { name: /^全部/u }).click()
+      await page.getByRole('group', { name: '到期情况', exact: true }).getByRole('button', { name: /^全部/u }).click()
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 900 })
         await assertVisualStatuses(panel, assert)

@@ -10,18 +10,18 @@ export function createWorkCenterPaginationScenarios(deps) {
     task_code: `STYLE-PAGINATION-${index}`,
     task_name: `核对出货资料与数量 ${index + 1}`,
     source_no: `SHIP-PAGINATION-${index}`,
-    due_at: null,
+    due_at: index === 0 ? null : Date.UTC(2099, 0, index + 1) / 1000,
   }))
-  return ['tasks', 'workbench'].map((kind) => ({
+  return ['tasks', 'risk'].map((kind) => ({
     ...base,
     name: `work-center-pagination-${kind}`,
-    path: kind === 'workbench' ? '/erp/dashboard' : '/erp/task-board?mode=todo&lane=actionable',
+    path: kind === 'risk' ? '/erp/task-board?view=risk' : '/erp/task-board?mode=todo&lane=actionable',
     effectiveSession: { ...base.effectiveSession, actions: [...base.effectiveSession.actions, 'erp.workbench.read'] },
-    workflowTaskFixtures: tasks,
+    workflowTaskFixtures: kind === 'risk' ? tasks.map((task) => ({ ...task, urge_count: 1 })) : tasks,
     verify: async (page) => {
       const rows = page.locator('.ant-table-tbody tr[data-row-key]')
       const pager = page.locator('.erp-task-pagination')
-      const method = kind === 'workbench' ? 'get_workbench' : 'get_task_board'
+      const method = kind === 'risk' ? 'get_workbench' : 'get_task_board'
       const readPage = (limit, offset) => page.waitForResponse((response) => {
         if (!response.url().endsWith('/rpc/workflow')) return false
         const body = response.request().postDataJSON()
@@ -38,12 +38,29 @@ export function createWorkCenterPaginationScenarios(deps) {
         await options.filter({ hasText: new RegExp(`^${size}\\s`, 'u') }).click()
       }
       await assertRows(20)
+      const originalID = await rows.first().getAttribute('data-task-id')
+      const nextPage = readPage(20, 20)
+      await pager.getByRole('button', { name: '下一页', exact: true }).click()
+      await nextPage
+      await pager.getByText('第 21-40 条 / 共 105 条', { exact: true }).waitFor()
+      const header = page.locator('.erp-work-center-table th.ant-table-column-has-sorters:visible').filter({ hasText: '任务时间' }).first()
+      for (const [direction, sortKey, expectedID] of [
+        ['ascending', 'time_asc', 94001], ['descending', 'time_desc', 94104], [null, kind === 'tasks' ? 'smart' : undefined, originalID],
+      ]) {
+        const read = readPage(20, 0)
+        await header.press('Enter')
+        const response = await read
+        assert.equal(response.request().postDataJSON().params.sort, sortKey)
+        await page.waitForFunction((id) => document.querySelector('.erp-work-center-table tr[data-task-id]')?.dataset.taskId === id, String(expectedID))
+        await pager.getByText('第 1-20 条 / 共 105 条', { exact: true }).waitFor()
+        assert.equal(await header.getAttribute('aria-sort'), direction)
+      }
       for (const size of [50, 100]) {
         const read = readPage(size, 0)
         await selectSize(size)
         const response = await (await read).json()
         assert.equal(response.result.code, 0)
-        const data = kind === 'workbench' ? response.result.data : response.result.data.lanes[0]
+        const data = kind === 'risk' ? response.result.data : response.result.data.lanes[0]
         assert.equal(data.total, 105)
         assert.equal(data.limit, size)
         assert.equal(data.offset, 0)

@@ -12,6 +12,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 	ctx context.Context,
 	method, id string,
 	pm map[string]any,
+	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "save_sales_order_with_items":
@@ -42,6 +43,12 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 			return id, invalidParamResult(), nil
 		}
 		in.ExpectedVersion = expectedVersion
+		if _, present := pm["idempotency_key"]; orderID > 0 && present {
+			return id, invalidParamResult(), nil
+		}
+		if orderID == 0 {
+			in.ActorID = actorID
+		}
 		items, ok := salesOrderItemSaveMutationsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil

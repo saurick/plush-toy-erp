@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { operationalFactActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -356,7 +357,7 @@ export function useProductionFactActions({
         context.action ===
           OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION
           ? '待入库草稿已保存，请由仓库核对后确认成品入库'
-          : '生产草稿已保存，请核对后再过账'
+          : `生产草稿已保存，请核对后${operationalFactActionPresentation('production', context.record).label}`
       )
       await loadRows('production')
     } catch (error) {
@@ -535,8 +536,8 @@ export function useProductionFactActions({
       setProductionReworkContext(null)
       message.success(
         confirmedByReread
-          ? '已重新读取并确认返工草稿，请核对后过账'
-          : '返工草稿已生成，请核对后过账'
+          ? '已重新读取并确认返工草稿，请核对后确认返工'
+          : '返工草稿已生成，请核对后确认返工'
       )
       resetPaginationForKey('production')
     } finally {

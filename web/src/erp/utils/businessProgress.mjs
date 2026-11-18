@@ -1,4 +1,5 @@
 import { parseDateInputValue } from './dateRange.mjs'
+import { BusinessProgressSort } from '../../common/consts/statuses.generated.mjs'
 import { normalizeWorkflowTaskPageSize, getWorkflowTaskOwnerRoleLabel } from './workflowTaskBoard.mjs'
 import { getWorkflowTaskDisplayName } from './processRuntimePresentation.mjs'
 import { formatBusinessDate } from './businessDate.mjs'
@@ -81,7 +82,8 @@ function validRow(row) {
     (row.delivery_known || row.shipped_quantity === null)
   )
 }
-export function requireProgressBoard(value) {
+export function requireProgressBoard(value, display) {
+  const lines = display === 'lines'
   if (
     !validEnvelope(value) ||
     !Array.isArray(value.rows) ||
@@ -92,11 +94,26 @@ export function requireProgressBoard(value) {
     value.total > value.counts.total ||
     value.rows.length > value.total ||
     !value.rows.every(validRow) ||
+    (lines && (!value.access.sales || !['closed', 'unknown', 'delivered'].every(
+      (key) => integer(value.counts.delivery?.[key])
+    ))) ||
+    !value.rows.every((row) => lines
+      ? row.view === 'orders' && validProgressLine(row.line)
+      : row.line === undefined) ||
     new Set(value.rows.map((row) => row.id)).size !== value.rows.length
   ) {
     throw invalid()
   }
   return value
+}
+
+function validProgressLine(line) {
+  return Boolean(line &&
+    integer(line.sales_order_id) && line.sales_order_id > 0 &&
+    integer(line.line_no) && line.line_no > 0 &&
+    typeof line.customer_product_no === 'string' &&
+    decimal(line.remaining_quantity) &&
+    ['overdue', 'due_soon', 'undated', 'closed', 'unknown', 'delivered', 'open', 'canceled'].includes(line.delivery_status))
 }
 
 export function progressProductLabel(row) {
@@ -117,43 +134,26 @@ export function progressIdentityPresentation(row) {
     customer: row.customer?.trim() || (row.unlinked ? '含未关联销售明细' : '客户未填写'),
   }
 }
+function validProgressRecord(row) {
+  return row && integer(row.id) && row.id > 0 && integer(row.parent_id) &&
+    ['kind', 'number', 'label', 'status', 'quantity', 'unit', 'date', 'owner', 'role', 'note']
+      .every((field) => typeof row[field] === 'string')
+}
+
+export function requireProgressTaskPage(value) {
+  if (!integer(value?.total) || !Array.isArray(value.rows) || value.rows.length > 100 ||
+      value.rows.length > value.total || !value.rows.every((row) => validProgressRecord(row) && row.kind === 'task') ||
+      new Set(value.rows.map((row) => row.id)).size !== value.rows.length) throw invalid()
+  return value
+}
+
 export function requireProgressDetail(value) {
-  if (
-    !validEnvelope(value) ||
-    !validRow(value.row) ||
-    !value.sections ||
-    !value.has_more
-  ) {
-    throw invalid()
-  }
+  if (!validEnvelope(value) || !validRow(value.row) || !value.sections || !value.has_more || !integer(value.task_total)) throw invalid()
   for (const [key, rows] of Object.entries(value.sections)) {
-    if (
-      !['lines', 'production', 'materials', 'batches', 'tasks'].includes(key) ||
-      !Array.isArray(rows) ||
-      rows.length > 100 ||
-      !rows.every(
-        (row) =>
-          row &&
-          integer(row.id) &&
-          row.id > 0 &&
-          integer(row.parent_id) &&
-          [
-            'kind',
-            'number',
-            'label',
-            'status',
-            'quantity',
-            'unit',
-            'date',
-            'owner',
-            'role',
-            'note',
-          ].every((field) => typeof row[field] === 'string')
-      )
-    ) {
-      throw invalid()
-    }
+    if (!['lines', 'production', 'materials', 'batches', 'tasks'].includes(key) || !Array.isArray(rows) ||
+        rows.length > 100 || !rows.every(validProgressRecord)) throw invalid()
   }
+  if (value.access.tasks) requireProgressTaskPage({ rows: value.sections.tasks, total: value.task_total })
   return value
 }
 
@@ -168,6 +168,16 @@ export const PROGRESS_DUE_OPTIONS = [
   { value: 'overdue', label: '已逾期' },
   { value: 'due_soon', label: '7天内到期' },
   { value: 'undated', label: '未定交期' },
+]
+
+export const PROGRESS_DELIVERY_STATUS_OPTIONS = [
+  { value: 'all', label: '全部明细' },
+  { value: 'overdue', label: '逾期' },
+  { value: 'closed', label: '关闭未交完' },
+  { value: 'due_soon', label: '7 天内' },
+  { value: 'undated', label: '未排交期' },
+  { value: 'unknown', label: '待核对' },
+  { value: 'delivered', label: '已交付' },
 ]
 
 export function progressDueOptions(scope) {
@@ -185,6 +195,9 @@ export function progressExtraFilters(query) {
     },
     query.due_status === 'undated' && {
       key: 'due_status', label: '未定交期', clear: { due_status: 'all' },
+    },
+    query.customer_id && {
+      key: 'customer', label: '已选客户', clear: { customer_id: '' },
     },
     query.unlinked_only && {
       key: 'unlinked_only', label: '仅看未关联销售', clear: { unlinked_only: false },
@@ -211,6 +224,7 @@ export function progressFilterReset(query) {
     unlinked_only: false,
     owner: '',
     owner_name: '',
+    customer_id: '',
     from: '',
     to: '',
   }
@@ -234,14 +248,28 @@ export function progressQueryFromURL(params) {
       Number.parseInt(params.get('page'), 10) || 1
     )
   )
-  const view = allowed('view', ['orders', 'production'], '')
+  const positiveID = (key) => {
+    const raw = params.get(key)
+    const id = /^\d+$/u.test(raw || '') ? Number(raw) : 0
+    return Number.isSafeInteger(id) && id > 0 ? id : 0
+  }
+  const id = positiveID('sales_order_id')
+  const customerID = positiveID('customer_id')
+  const display = allowed('display', ['lines'], '')
+  const view = allowed('view', ['orders', 'production'], id || display || customerID ? 'orders' : '')
+  const lines = view === 'orders' && display === 'lines'
+  const sortBy = allowed('sort_by', [
+    BusinessProgressSort.ORDER_NO, BusinessProgressSort.DUE_DATE, ...(lines ? [BusinessProgressSort.PRODUCT] : []),
+  ], '')
+  const direction = allowed('sort_direction', ['asc', 'desc'], '')
+  const deliveryStatus = allowed('delivery_status', PROGRESS_DELIVERY_STATUS_OPTIONS.map(({ value }) => value), 'all')
   const scope = allowed('scope', ['active', 'all', 'ended'], 'active')
   const requestedDue = allowed(
     'due_status',
     PROGRESS_DUE_OPTIONS.map(({ value }) => value),
     'all'
   )
-  const dueStatus = progressDueOptions(scope).some(({ value }) => value === requestedDue)
+  const dueStatus = !lines && progressDueOptions(scope).some(({ value }) => value === requestedDue)
     ? requestedDue
     : 'all'
   return {
@@ -253,19 +281,36 @@ export function progressQueryFromURL(params) {
     unlinked_only: view === 'production' && params.get('unlinked_only') === 'true',
     owner: params.get('owner_name') ? '' : (params.get('owner') || '').slice(0, 100),
     ...(params.get('owner_name') ? { owner_name: params.get('owner_name') } : {}),
-    date_from: dueStatus === 'undated' || reversed ? '' : date('from'),
-    date_to: dueStatus === 'undated' || reversed ? '' : date('to'),
+    date_from: dueStatus === 'undated' || lines && deliveryStatus === 'undated' || reversed ? '' : date('from'),
+    date_to: dueStatus === 'undated' || lines && deliveryStatus === 'undated' || reversed ? '' : date('to'),
     limit,
     offset: (page - 1) * limit,
+    ...(id && view === 'orders' ? { id } : {}),
+    ...(customerID && view === 'orders' ? { customer_id: customerID } : {}),
+    ...(lines ? { display, delivery_status: deliveryStatus } : {}),
+    ...(sortBy && direction ? { sort_by: sortBy, sort_direction: direction } : {}),
   }
 }
 
 function normalizeProgressFilterParams(params) {
   const next = new URLSearchParams(params)
   const query = progressQueryFromURL(next)
+  if (!query.sort_by) {
+    next.delete('sort_by')
+    next.delete('sort_direction')
+  }
   next.set('scope', query.scope)
   next.set('due_status', query.due_status)
   next.delete('risk')
+  if (query.display) {
+    next.set('display', query.display)
+    next.set('delivery_status', query.delivery_status)
+  } else {
+    next.delete('display')
+    next.delete('delivery_status')
+  }
+  if (!query.id) next.delete('sales_order_id')
+  if (!query.customer_id) next.delete('customer_id')
   for (const key of ['blocked_only', 'unlinked_only']) {
     if (query[key]) next.set(key, 'true')
     else next.delete(key)
@@ -293,6 +338,9 @@ export function withProgressFilters(params, changes) {
     next.get('due_status') === 'undated'
   ) {
     next.set('due_status', 'all')
+  }
+  if ((changes.from || changes.to) && changes.delivery_status !== 'undated' && next.get('delivery_status') === 'undated') {
+    next.set('delivery_status', 'all')
   }
   return normalizeProgressFilterParams(next)
 }
@@ -337,6 +385,19 @@ export function progressDue(row, snapshotAt) {
   if (row.overdue) return { label: Number.isFinite(days) && days < 0 ? `逾期 ${-days} 天` : '已逾期', date, tone: 'danger' }
   if (row.due_soon) return { label: days === 0 ? '今天到期' : Number.isFinite(days) && days > 0 ? `还有 ${days} 天` : '7天内到期', date, tone: 'warning' }
   return { label: '按交期跟进', date, tone: '' }
+}
+
+export function progressLineStatus(row, snapshotAt) {
+  const key = row.line.delivery_status
+  if (key === 'overdue' || key === 'due_soon') {
+    return { key: key === 'due_soon' ? 'dueSoon' : key, label: progressDue(row, snapshotAt).label }
+  }
+  if (key === 'closed') return { key, label: '已关闭未交完' }
+  if (key === 'unknown') return { key, label: '进度待核对' }
+  if (key === 'delivered') return { key, label: '已交付' }
+  if (key === 'open') return { key: 'inProgress', label: '交付中' }
+  if (key === 'canceled') return { key: 'cancelled', label: '已取消' }
+  return { key: 'unscheduled', label: '未排交期' }
 }
 
 export function progressAttention(row, access, roleLabel = (key) => getWorkflowTaskOwnerRoleLabel({ owner_role_key: key })) {
@@ -546,7 +607,7 @@ export function progressMetricDetails(row, key, access = {}) {
 
 export function progressSourcePath(record, view = 'orders') {
   if (record.kind === 'task') {
-    return `/erp/task-board?q=${encodeURIComponent(record.number)}&status=all`
+    return `/erp/task-board?task_id=${record.id}`
   }
   if (record.kind === 'sales_line') {
     return `/erp/sales/project-orders/sales-orders?sales_order_id=${record.parent_id}`

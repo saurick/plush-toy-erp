@@ -81,6 +81,7 @@ export function createFilterConflictScenarios(deps) {
     if (phone) await assertMobileFilterDensity({ assert, dialog: filters })
     if (phone) assert.equal(await filters.getByRole('textbox').count(), 0, '手机进度不要求输入姓名')
     else {
+      await filters.getByRole('combobox', { name: '客户', exact: true }).waitFor()
       const owner = filters.getByRole('combobox', { name: '处理人或业务负责人', exact: true })
       assert.equal(await filters.getByRole('button', { name: '搜索', exact: true }).count(), 0)
       await owner.press('ArrowDown')
@@ -201,6 +202,7 @@ export function createFilterConflictScenarios(deps) {
   const progress = {
     ...desktop,
     name: 'erp-progress-filter-conflicts',
+    effectiveSession: { ...desktop.effectiveSession, actions: [...desktop.effectiveSession.actions, 'customer.read'] },
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
     verify: verifyProgress(false, 'erp-progress'),
@@ -228,6 +230,17 @@ export function createFilterConflictScenarios(deps) {
       if (phone) await toolbar.getByRole('button', { name: /筛选流程/ }).click()
       else await toolbar.getByRole('button', { name: /^筛选/ }).click()
       await waitForFilters(page, filters)
+      if (phone) {
+        const titles = await filters.locator('.erp-filter-field > legend').allTextContents()
+        assert(titles.includes('当前岗位') && titles.includes('关注事项'), '手机筛选自行提供各组标题')
+        const option = await filters.getByRole('group', { name: '当前岗位', exact: true }).getByRole('button', { name: '工程', exact: true }).elementHandle()
+        const original = await option.evaluate((node) => node.querySelector('.erp-filter-chip__label').textContent)
+        await option.evaluate((node) => { node.querySelector('.erp-filter-chip__label').textContent = '订单与材料协同负责人'.repeat(8) })
+        const geometry = await option.evaluate((node) => ({ width: node.clientWidth, content: node.scrollWidth, height: node.clientHeight }))
+        assert(geometry.content <= geometry.width + 1 && geometry.height > 44, `长筛选文字在控件内换行: ${JSON.stringify(geometry)}`)
+        await filters.screenshot({ path: path.join(outputDir, `${base.name}-long-filter-label.png`) })
+        await option.evaluate((node, text) => { node.querySelector('.erp-filter-chip__label').textContent = text }, original)
+      }
       await choose(page, filters, '当前岗位', '工程')
       await Promise.all([
         page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.status === 'completed'),
@@ -279,16 +292,22 @@ export function createFilterConflictScenarios(deps) {
     verify: async (page) => {
       const root = page.getByRole('region', { name: '控件设计', exact: true })
       await root.getByRole('navigation', { name: '控件设计目录' }).getByRole('button', { name: /筛选与搜索/ }).click()
-      await root.getByRole('button', { name: /^已逾期/ }).click()
-      await root.getByRole('button', { name: '筛选', exact: true }).click()
+      const risks = root.getByRole('group', { name: '演示风险筛选', exact: true })
+      await risks.getByRole('button', { name: /^已逾期/ }).click()
+      await root.getByRole('button', { name: '筛选演示', exact: true }).click()
       const range = page.getByLabel('演示记录范围', { exact: true })
       await range.getByText('已结束', { exact: true }).click()
-      assert.equal(await root.getByRole('button', { name: /^已逾期/ }).isDisabled(), true)
-      assert.equal(await root.getByRole('button', { name: /^已结束/ }).getAttribute('aria-pressed'), 'true')
+      assert.equal(await range.getByRole('button', { name: '已结束', exact: true }).getAttribute('aria-pressed'), 'true')
+      await page.getByRole('button', { name: '关闭筛选', exact: true }).click()
+      await page.getByRole('dialog', { name: '筛选演示', exact: true }).waitFor({ state: 'hidden' })
+      assert.equal(await risks.getByRole('button', { name: /^已逾期/ }).isDisabled(), true)
+      assert.equal(await risks.getByRole('button', { name: /^已结束/ }).getAttribute('aria-pressed'), 'true')
       await root.getByText('SO-DEMO-04', { exact: true }).waitFor()
+      await root.getByRole('button', { name: /^筛选演示/ }).click()
       await page.getByRole('button', { name: '重置筛选', exact: true }).click()
-      await root.getByRole('heading', { name: '筛选与搜索', exact: true }).click()
-      assert.equal(await root.getByRole('button', { name: /^未结束/ }).getAttribute('aria-pressed'), 'true')
+      await page.getByRole('button', { name: '关闭筛选', exact: true }).click()
+      await page.getByRole('dialog', { name: '筛选演示', exact: true }).waitFor({ state: 'hidden' })
+      assert.equal(await risks.getByRole('button', { name: /^未结束/ }).getAttribute('aria-pressed'), 'true')
       await assertNoHorizontalOverflow(page, '控件筛选示例')
     },
   }
@@ -362,6 +381,12 @@ export function createFilterConflictScenarios(deps) {
         await waitForFilters(page, filters)
       }
       const readDates = () => Promise.all([from.inputValue(), to.inputValue()])
+      const assertDatesCleared = async () => {
+        const periods = filters.getByRole('group', { name: '时间范围', exact: true })
+        await periods.getByRole('button', { name: '不限', exact: true, pressed: true }).waitFor()
+        assert.equal(await from.count(), 0)
+        assert.equal(await to.count(), 0)
+      }
       await openFilters()
       assert.equal(await start.getAttribute('aria-pressed'), 'true')
       assert.equal(await trigger.getAttribute('aria-label'), '筛选，已应用 1 项')
@@ -398,15 +423,58 @@ export function createFilterConflictScenarios(deps) {
         waitForQuery((params) => params.date_field === 'planned_start_at' && !params.date_from && !params.date_to),
         filters.getByRole('button', { name: '清空筛选', exact: true }).click(),
       ])
-      assert.deepEqual(await readDates(), ['', ''])
+      await assertDatesCleared()
       assert.equal(await start.getAttribute('aria-pressed'), 'true')
       assert.equal(await trigger.getAttribute('aria-label'), '筛选')
 
       await page.setViewportSize({ width: 1440, height: 900 })
       await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', { waitUntil: 'domcontentloaded' })
       await openFilters()
-      await filters.getByRole('combobox', { name: '日期类型', exact: true }).waitFor()
-      assert.equal(await types.count(), 0, '销售订单仍用共享日期下拉')
+      assert.equal(await filters.getByRole('combobox', { name: '日期类型', exact: true }).count(), 0, '销售订单日期类型直接展开')
+      const orderDate = types.getByRole('button', { name: '下单日期', exact: true })
+      const deliveryDate = types.getByRole('button', { name: '计划交付日期', exact: true })
+      assert.equal(await orderDate.getAttribute('aria-pressed'), 'true')
+      await filters.getByRole('button', { name: '自定义日期', exact: true }).click()
+      await from.click()
+      const salesDateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell-in-view:not(.ant-picker-cell-disabled)').nth(7)
+      const selectedSalesDate = await salesDateCell.getAttribute('title')
+      await salesDateCell.click()
+      const salesDates = await readDates()
+      assert(salesDates[0], '选择的日期立即回填')
+      const [salesResponse] = await Promise.all([
+        page.waitForResponse((response) => {
+          if (!response.url().endsWith('/rpc/sales_order')) return false
+          const { method, params } = response.request().postDataJSON() || {}
+          return method === 'list_sales_orders' && params.date_field === 'planned_delivery_date'
+        }),
+        deliveryDate.press('Space'),
+      ])
+      const salesParams = salesResponse.request().postDataJSON().params
+      assert.equal(salesParams.date_from, selectedSalesDate, '切换日期类型按业务日期合同保留原范围')
+      assert.equal(salesParams.offset ?? 0, 0)
+      assert.equal(await deliveryDate.getAttribute('aria-pressed'), 'true')
+      assert.deepEqual(await readDates(), salesDates)
+      const assertDateRows = async () => {
+        const typeBox = await types.boundingBox()
+        const rangeBox = await filters.locator('.erp-business-date-range-filter__range').boundingBox()
+        assert(typeBox && rangeBox && rangeBox.y >= typeBox.y + typeBox.height, '日期类型与起止日期分行，不挤在同一行')
+        assert.equal(await types.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true, '日期类型完整显示')
+        assert.equal(await filters.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true)
+      }
+      await assertDateRows()
+      await page.setViewportSize({ width: 3840, height: 2160 })
+      await waitForFiniteAnimations(page)
+      await assertDateRows()
+      await page.screenshot({ path: path.join(outputDir, 'sales-order-date-type-filter-desktop.png') })
+      await filters.screenshot({ path: path.join(outputDir, 'sales-order-date-type-filter-panel.png') })
+      await page.setViewportSize({ width: 390, height: 844 })
+      await assertDateRows()
+      await assertNoHorizontalOverflow(page, '销售订单日期筛选窄屏')
+      await page.screenshot({ path: path.join(outputDir, 'sales-order-date-type-filter-narrow.png') })
+      await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
+      await assertDatesCleared()
+      assert.equal(await orderDate.getAttribute('aria-pressed'), 'true')
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选')
     },
   }
   const lifecycle = [
@@ -504,6 +572,17 @@ export function createFilterConflictScenarios(deps) {
       const dates = page.getByRole('dialog', { name: '选择处理日期范围', exact: true })
       await trigger.click()
       await waitForFilters(page, filters)
+      const sortChoices = filters.getByRole('group', { name: '任务排序', exact: true })
+      assert.deepEqual(await sortChoices.getByRole('button').allTextContents(), ['智能优先', '最早到期', '最近创建'])
+      assert.equal(await sortChoices.getByRole('button', { name: '智能优先', exact: true }).getAttribute('aria-pressed'), 'true')
+      assert.equal(await filters.getByRole('combobox', { name: '任务排序', exact: true }).count(), 0)
+      const person = filters.getByRole('combobox', { name: '办理人', exact: true })
+      assert.equal(await person.count(), 1, '动态办理人名单保留下拉搜索')
+      await sortChoices.getByRole('button', { name: '最近创建', exact: true }).click()
+      await page.waitForURL((url) => url.searchParams.get('sort') === 'newest')
+      assert.equal(await filters.isVisible(), true)
+      await sortChoices.getByRole('button', { name: '智能优先', exact: true }).click()
+      await page.waitForURL((url) => !url.searchParams.has('sort') || url.searchParams.get('sort') === 'smart')
       await choose(page, filters, '处理时间', '自定义日期')
       await dates.waitFor()
       await filters.waitFor({ state: 'hidden' })

@@ -19,8 +19,8 @@ import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessProgress } from '../../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
-import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
-import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
+import ProgressRelatedTasks from './ProgressRelatedTasks.jsx'
+import { canReadPurchaseFollowups, salesPurchaseFollowupPath } from '../../utils/purchaseFollowup.mjs'
 import MobileDetailHeader from '../../mobile/components/MobileDetailHeader.jsx'
 import MobileProgressSummary from '../../mobile/components/MobileProgressSummary.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
@@ -198,10 +198,14 @@ export default function BusinessProgressDrawer({
         contextRef.current.get(requestKey)?.scrolls?.[activeTab] ??
         selection?.detailScroll?.[activeTab] ??
         0
+      if (activeTab === 'lines' && selection?.lineID && !selection?.detailScroll?.lines) {
+        recordsRef.current.querySelector(`[data-progress-detail-line="${selection.lineID}"]`)?.scrollIntoView({ block: 'nearest' })
+      }
     }
-  }, [data, activeTab, requestKey, selection?.detailScroll])
-  const rememberSelection = () =>
-    onRememberContext?.({
+  }, [data, activeTab, requestKey, selection?.detailScroll, selection?.lineID])
+  const currentContext = (extra = {}) => ({
+      taskQuery: contextRef.current.get(requestKey)?.taskQuery || selection?.taskQuery,
+      ...extra,
       section: activeTab,
       productionOpen,
       detailScroll: {
@@ -210,13 +214,24 @@ export default function BusinessProgressDrawer({
         [activeTab]: recordsRef.current?.scrollTop || 0,
       },
     })
+  const rememberSelection = () => onRememberContext?.(currentContext())
+  const openTask = (record, taskQuery) => {
+    const context = currentContext({ taskQuery, focusTaskID: record.id })
+    rememberContext({ taskQuery })
+    if (mobile) {
+      onRememberContext?.(context)
+      onOpenTask(record.id)
+    } else {
+      onNavigate(progressSourcePath(record), context)
+    }
+  }
   const sourcePath = data ? progressSourcePath(data.row, data.row.view) : ''
   const sourceAction =
     !mobile && sourcePath && canOpen(sourcePath) ? (
       <Button
         icon={<ArrowRightOutlined />}
         aria-label="打开原单"
-        onClick={() => onNavigate(sourcePath)}
+        onClick={() => onNavigate(sourcePath, currentContext())}
       >
         打开原单
       </Button>
@@ -231,6 +246,9 @@ export default function BusinessProgressDrawer({
       }
     >
       <Button onClick={onClose}>返回进度</Button>
+      {!mobile && data?.row.view === 'orders' && canReadPurchaseFollowups(adminProfile) && canOpen(salesPurchaseFollowupPath(data.row.id)) && (
+        <Button onClick={() => onNavigate(salesPurchaseFollowupPath(data.row.id), currentContext())}>本单采购跟进</Button>
+      )}
       {!mobile && sourceAction}
     </div>
   )
@@ -272,17 +290,24 @@ export default function BusinessProgressDrawer({
         size: 'localAction',
       }
   const renderRecords = (section) => {
+    if (section === 'tasks') {
+      return <ProgressRelatedTasks
+        key={requestKey}
+        detail={data}
+        mobile={mobile}
+        scrollRef={recordsRef}
+        saved={contextRef.current.get(requestKey)?.taskQuery || selection?.taskQuery}
+        focusTaskID={selection?.focusTaskID}
+        onRemember={(taskQuery) => rememberContext({ taskQuery })}
+        onOpen={(mobile ? Boolean(onOpenTask) : canOpen('/erp/task-board')) ? openTask : undefined}
+      />
+    }
     const records = sectionRecords(section)
     return (
       <>
         {section === 'materials' && (
           <p className="erp-progress-hint">
             按已登记领料与计划用量核对。尚未领齐不代表库存缺料；采购到货需到相关业务中核对。
-          </p>
-        )}
-        {section === 'tasks' && (
-          <p className="erp-progress-hint">
-            仅显示当前账号可见的关联任务。任务完成不代表已经生产、入库或出货。
           </p>
         )}
         {records.length === 0 ? (
@@ -296,15 +321,12 @@ export default function BusinessProgressDrawer({
             const path = progressSourcePath(record, selection?.view)
             const productLine =
               record.kind === 'sales_line' || record.kind === 'production_line'
-            const recordTitle =
-              record.kind === 'task'
-                ? getWorkflowTaskDisplayName({
-                    task_name: record.label,
-                  })
-                : record.label || record.number
+            const recordTitle = record.label || record.number
             return (
               <article
                 className="erp-progress-record"
+                data-progress-detail-line={productLine ? record.id : undefined}
+                data-progress-line-selected={productLine && record.id === selection?.lineID ? true : undefined}
                 key={`${record.kind}:${record.id}`}
               >
                 <div className="erp-progress-record-main">
@@ -326,14 +348,6 @@ export default function BusinessProgressDrawer({
                       : ''}
                   </span>
                   {record.note && <p>{record.note}</p>}
-                  {record.kind === 'task' && (
-                    <span>
-                      {record.owner || '未分配处理人'} ·{' '}
-                      {getWorkflowTaskOwnerRoleLabel({
-                        owner_role_key: record.role,
-                      })}
-                    </span>
-                  )}
                   {record.date && (
                     <span>
                       {record.kind === 'batch' ? '更新 ' : '日期 '}
@@ -357,21 +371,10 @@ export default function BusinessProgressDrawer({
                     <Button
                       type="link"
                       size="small"
-                      onClick={() => onNavigate(path)}
+                      onClick={() => onNavigate(path, currentContext())}
                       aria-label={`查看 ${record.number || record.label}`}
                     >
                       查看 <ArrowRightOutlined />
-                    </Button>
-                  )}
-                  {mobile && record.kind === 'task' && onOpenTask && (
-                    <Button
-                      onClick={() => {
-                        rememberSelection()
-                        onOpenTask(record.id)
-                      }}
-                      aria-label={`查看任务 ${record.number || record.label}`}
-                    >
-                      查看任务
                     </Button>
                   )}
                   {mobile &&

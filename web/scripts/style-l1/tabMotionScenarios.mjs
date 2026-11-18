@@ -69,6 +69,48 @@ async function assertTaskTabPointerAndFocus(root) {
   assert(focus.offset <= -focus.width, `焦点框保持在滚动页签内: ${JSON.stringify(focus)}`)
 }
 
+async function assertOptionTabsOnlyScrollWhenNeeded(page, tabs) {
+  await page.addStyleTag({ content: `
+    #option-tabs > [role='tablist'] { width: calc(2 * 129.625px); }
+    #option-tabs [role='tab'] { flex: 0 0 129.625px; }
+    #option-tabs [role='tab']:disabled { display: none; }
+  ` })
+  const first = tabs.getByRole('tab', { name: '逐项查看', exact: true })
+  const last = tabs.getByRole('tab', { name: '整张汇总表对照', exact: true })
+  const measure = () => tabs.evaluate((strip) => ({
+    width: strip.clientWidth,
+    scrollWidth: strip.scrollWidth,
+    scrollLeft: strip.scrollLeft,
+    right: strip.getBoundingClientRect().right,
+    selectedRight: strip.querySelector('[aria-selected="true"]').getBoundingClientRect().right,
+  }))
+  const assertFits = async () => {
+    const fit = await measure()
+    assert(fit.selectedRight <= fit.right, `两个页签的布局应能放下: ${JSON.stringify(fit)}`)
+    assert.equal(fit.scrollWidth, fit.width, '下划线不能撑大页签的滚动范围')
+    assert.equal(fit.scrollLeft, 0, '放得下时页签不横移')
+  }
+
+  await first.press('End')
+  await last.and(tabs.locator('[aria-selected="true"]:focus-visible')).waitFor()
+  await assertFits()
+
+  const frame = page.locator('#option-tabs')
+  await last.press('Home')
+  await frame.evaluate((element) => { element.style.width = '160px' })
+  await first.press('End')
+  await last.and(tabs.locator('[aria-selected="true"]:focus-visible')).waitFor()
+  const narrow = await measure()
+  assert(narrow.scrollWidth > narrow.width && narrow.scrollLeft > 0, '放不下时保留横滑并带入末项')
+  assert(narrow.selectedRight <= narrow.right + 1, '键盘切换后末项完整可见')
+  await last.press('Home')
+  assert.equal((await measure()).scrollLeft, 0, '可以用键盘返回首项')
+
+  await frame.evaluate((element) => { element.style.width = '' })
+  await first.press('End')
+  await assertFits()
+}
+
 async function sampleMotion(
   page,
   id,
@@ -492,6 +534,7 @@ export function createTabMotionScenarios({ outputDir }) {
           'reduced motion must disable shared Tabs sliding'
         )
         await verifyMobileNavigationMotion(page, assert, '#option-tabs .erp-sliding-tab-list', 1, true)
+        if (mode === 'light') await assertOptionTabsOnlyScrollWhenNeeded(page, optionTabs)
         await writeFile(
           path.join(outputDir, `global-tab-sliding-${mode}-frames.json`),
           JSON.stringify(motionEvidence, null, 2)
@@ -655,7 +698,7 @@ export function createTabMotionScenarios({ outputDir }) {
           assert.equal(await sampleRows.count(), 3)
           await sampleSearch.fill('布偶熊')
           await sampleSearch.press('Enter')
-          await controls.getByRole('button', { name: '筛选', exact: true }).click()
+          await controls.getByRole('button', { name: '筛选演示', exact: true }).click()
           const range = page.getByLabel('演示记录范围', { exact: true })
           await assertFilterAffordance(range.getByRole('button'))
           await range.getByText('全部记录', { exact: true }).click()
@@ -663,7 +706,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await page.getByRole('button', { name: '重置筛选', exact: true }).click()
           assert.equal(await sampleSearch.inputValue(), '布偶熊')
           assert.equal(await sampleRows.count(), 1)
-          await controls.getByRole('heading', { name: '筛选与搜索', exact: true }).click()
+          await page.getByRole('button', { name: '关闭筛选', exact: true }).click()
           await sampleSearch.fill('')
           await sampleSearch.press('Enter')
           await chooseTheme('深色')

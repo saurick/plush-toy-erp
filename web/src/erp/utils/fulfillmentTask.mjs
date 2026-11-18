@@ -1,5 +1,6 @@
 const SOURCE_TYPES = Object.freeze({
   shipment_execute: 'shipment',
+  shipment_quality: 'quality_inspection',
   purchase_arrival: 'purchase_order',
   receipt_quality: 'quality_inspection',
   receipt_inbound: 'purchase_receipt',

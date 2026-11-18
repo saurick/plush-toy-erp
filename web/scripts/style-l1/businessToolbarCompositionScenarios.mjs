@@ -172,7 +172,7 @@ effectiveSession: session,
 deviceScaleFactor: 2,
       verify: async (page) => {
         const navigation = page.getByRole('tablist', { name: '出库办理分类', exact: true })
-        await navigation.getByRole('tab', { name: '销售出货', selected: true, exact: true }).waitFor()
+        await navigation.getByRole('tab', { name: '出货单', selected: true, exact: true }).waitFor()
         await navigation.evaluate((element) => { window.__toolbarFormNavigation = element })
         await page.getByRole('button', { name: '新建出货单' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')

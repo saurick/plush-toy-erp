@@ -17,6 +17,7 @@ const (
 
 type WorkflowWorkbenchQuery struct {
 	QueueKey                 string
+	Sort                     string
 	Limit                    int
 	Offset                   int
 	VisibilityScope          *WorkflowTaskVisibilityScope
@@ -79,6 +80,9 @@ func normalizeWorkflowWorkbenchQuery(query WorkflowWorkbenchQuery) (WorkflowWork
 	query.RiskVisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.RiskVisibilityScope)
 	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
 	if _, ok := (WorkflowWorkbenchCounts{}).QueueTotal(query.QueueKey); !ok {
+		return WorkflowWorkbenchQuery{}, ErrBadParam
+	}
+	if query.Sort != "" && query.Sort != WorkflowTaskBoardSortTimeAsc && query.Sort != WorkflowTaskBoardSortTimeDesc {
 		return WorkflowWorkbenchQuery{}, ErrBadParam
 	}
 	if query.Limit <= 0 {

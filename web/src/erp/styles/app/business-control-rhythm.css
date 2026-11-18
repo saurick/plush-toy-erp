@@ -11,11 +11,6 @@
   height: var(--erp-business-control-height);
 }
 
-.erp-business-date-range-filter__type.ant-select,
-:where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
-  height: var(--erp-business-control-height);
-}
-
 .erp-business-action-form :where(.ant-select-multiple),
 :where(.erp-business-action-form) .ant-select-multiple .ant-select-selector {
   height: auto;

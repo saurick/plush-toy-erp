@@ -1,0 +1,26 @@
+.workflow-task-document-filter {
+  flex-basis: 100%;
+}
+
+.workflow-task-document-filter__modules,
+.workflow-task-document-filter__types {
+  margin-inline-start: 12px;
+}
+
+.workflow-task-document-filter__modules {
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  overflow: visible;
+}
+
+.workflow-task-document-filter__types {
+  --workflow-document-options-height: calc(2 * max(32px, var(--erp-touch-target, 0px)) + 6px);
+  max-block-size: var(--workflow-document-options-height);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* With multiple modules, reserve the same two rows for every selection. */
+.workflow-task-document-filter:has([role='tab']:nth-child(3)) .workflow-task-document-filter__types {
+  block-size: var(--workflow-document-options-height);
+}

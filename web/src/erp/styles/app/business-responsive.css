@@ -394,15 +394,6 @@ body
   align-self: flex-start;
 }
 
-.erp-business-filter-panel
-  .erp-business-filter-control.ant-select
-  .ant-select-selector,
-.erp-business-filter-panel
-  .erp-business-filter-control.ant-select
-  .ant-select-selection-search-input {
-  cursor: pointer;
-}
-
 @media screen and (max-width: 520px) {
   .erp-business-column-order-modal__row {
     grid-template-columns: 48px minmax(0, 1fr);
@@ -709,19 +700,7 @@ body
 
   .erp-business-date-range-filter {
     min-width: 0;
-    height: auto;
-    flex-direction: column;
-    align-items: stretch;
     max-width: none;
-  }
-
-  .erp-business-date-range-filter__type.ant-select,
-  .erp-business-date-range-filter__type-label,
-  :where(.erp-business-date-range-filter__type.ant-select)
-    .ant-select-selector {
-    width: 100%;
-    min-width: 0;
-    flex-basis: auto;
   }
 
   .erp-business-date-range-filter__range {

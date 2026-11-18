@@ -188,7 +188,7 @@ export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, ass
     verify: async (page) => {
       const results = []
       for (const [route, selector, labels] of [
-        ['/erp/dashboard', '.erp-business-page-header-card', ['待办', '业务汇总']],
+        ['/erp/dashboard', '.erp-business-page-header-card', []],
         ['/erp/task-board?mode=todo', '.erp-task-management-header', ['待我处理', '待我审批', '流程跟踪']],
         ['/erp/business-dashboard', '.erp-business-page-header-card', ['订单交付', '生产执行', '经营统计']],
         ['/erp/production/progress', '.erp-business-module-header', ['生产订单', '生产执行', '生产记录', '异常处理']],
@@ -197,6 +197,10 @@ export function createPageHeaderScenarios({ customerRuntimeEffectiveSession, ass
         ['/erp/help-center', '.erp-help-navigation-header', ['操作图解', '业务使用手册']],
       ]) {
         await page.goto(new URL(route, page.url()).href)
+        if (route === '/erp/dashboard') {
+          await page.getByRole('region', { name: '工作台汇总' }).waitFor()
+          assert.equal(await page.locator(selector).getByRole('tab').count(), 0)
+        }
         for (const label of labels) {
           const tab = page.getByRole('tab', { name: label, exact: true })
           await tab.waitFor()

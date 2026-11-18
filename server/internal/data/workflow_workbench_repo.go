@@ -62,10 +62,14 @@ func loadWorkflowWorkbench(ctx context.Context, client *ent.Client, query biz.Wo
 	if !ok {
 		return nil, biz.ErrBadParam
 	}
+	direction := entsql.OrderAsc()
+	if query.Sort == biz.WorkflowTaskBoardSortTimeDesc {
+		direction = entsql.OrderDesc()
+	}
 	rows, err := client.WorkflowTask.Query().
 		Where(predicates[query.QueueKey]).
 		Order(
-			workflowtask.ByDueAt(entsql.OrderAsc(), entsql.OrderNullsLast()),
+			workflowtask.ByDueAt(direction, entsql.OrderNullsLast()),
 			workflowtask.ByTaskName(entsql.OrderAsc()),
 			workflowtask.ByID(entsql.OrderDesc()),
 		).

@@ -66,7 +66,7 @@ export default function useFinancePaymentRecords({
   const [referenceLoading, setReferenceLoading] = useState(false)
 
   const [paymentTotal, setPaymentTotal] = useState(0)
-  const [paymentTotals, setPaymentTotals] = useState([])
+  const [paymentTotals, setPaymentTotals] = useState(null)
   const [paymentFilters, setPaymentFilters] = useBusinessPageState('paymentFilters', {})
 
   const [paymentStatusCounts, setPaymentStatusCounts] = useState(null)
@@ -158,7 +158,7 @@ export default function useFinancePaymentRecords({
     const request = beginLatestRequest('finance-payment-list')
     setTableLoading((current) => ({ ...current, payments: true }))
     setPaymentStatusCounts(null)
-    setPaymentTotals([])
+    setPaymentTotals(null)
     try {
       const result = await listFinancePayments(
         compactParams({
@@ -178,7 +178,7 @@ export default function useFinancePaymentRecords({
       setPayments(nextRows)
       setDisplayedSort(recordSort)
       setPaymentTotal(Number(result?.total || 0))
-      setPaymentTotals(Array.isArray(result?.totals) ? result.totals : [])
+      setPaymentTotals(Array.isArray(result?.totals) ? result.totals : null)
       setPaymentStatusCounts(resolveBusinessStatusCounts(result))
       setCurrentPayment((current) =>
         current?.id

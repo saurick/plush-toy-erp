@@ -44,9 +44,7 @@ import {
   evaluateBusinessDashboardEvidence,
   browserProjectionBaselineProven,
   evaluateBusinessDashboardCurrentBatchEvidence,
-  evaluateDashboardTaskCurrentBatchEvidence,
   evaluateFinanceFieldBrowserEvidence,
-  evaluateGlobalDashboardEvidence,
   evaluatePrintPreviewEvidence,
   evaluatePrintSourceMinimumEvidence,
   evaluateShipmentReleaseEvidence,
@@ -2885,13 +2883,6 @@ test("mobile current-batch proof requires an exact role source and a visible cur
 });
 
 test("dashboard data evidence fails closed for empty or unavailable sources", () => {
-  const global = evaluateGlobalDashboardEvidence(
-    ["今天要办，12 项，先处理", "风险提醒，8 项，请关注"],
-    5,
-    20,
-  );
-  assert.equal(global.minimumSatisfied, true);
-
   const requirements = [
     { key: "customers", label: "客户", minimumRecords: 60 },
     { key: "shipments", label: "出货单", minimumRecords: 45 },
@@ -2911,140 +2902,6 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
       .minimumSatisfied,
     false,
   );
-});
-
-test("dashboard task evidence binds the visible page to the exact current batch", () => {
-  const currentBatch = {
-    dataStatus: "pass",
-    actual: 18,
-    probes: [
-      {
-        id: "boss-dashboard-tasks",
-        status: "pass",
-        batchEvidence: "exact_task_codes",
-        exactSourceType: TASK_SOURCE_TYPE,
-        exactSourceID: 202607165,
-        exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
-        exactOwnerRoleKey: "boss",
-        exactTaskGroup: null,
-      },
-    ],
-  };
-  const base = {
-    status: "minimum_proven",
-    observedTotal: 79,
-    minimumSatisfied: true,
-  };
-  const exactTaskCodes = Array.from(
-    { length: 18 },
-    (_, index) => `YS-V9-LD-${String(index + 1).padStart(2, "0")}`,
-  );
-  const currentPageTaskCodes = exactTaskCodes.slice(0, 8);
-  assert.equal(
-    evaluateDashboardTaskCurrentBatchEvidence({
-      evidence: base,
-      currentBatch,
-      roleKey: "boss",
-      visibleTaskCodes: ["YS-V9-LD-01"],
-      currentBatchTaskCodes: currentPageTaskCodes,
-    }).minimumSatisfied,
-    true,
-  );
-  const longLivedPrefix = "YS-WB4-LD";
-  assert.equal(
-    evaluateDashboardTaskCurrentBatchEvidence({
-      evidence: base,
-      currentBatch: {
-        ...currentBatch,
-        probes: [
-          {
-            ...currentBatch.probes[0],
-            exactTaskCodePrefix: longLivedPrefix,
-          },
-        ],
-      },
-      roleKey: "boss",
-      taskCodePrefix: longLivedPrefix,
-      visibleTaskCodes: [`${longLivedPrefix}-01`],
-      currentBatchTaskCodes: Array.from(
-        { length: 18 },
-        (_, index) =>
-          `${longLivedPrefix}-${String(index + 1).padStart(2, "0")}`,
-      ),
-    }).minimumSatisfied,
-    true,
-  );
-  assert.equal(
-    evaluateDashboardTaskCurrentBatchEvidence({
-      evidence: base,
-      currentBatch,
-      roleKey: "boss",
-      visibleTaskCodes: ["OLD-LD-01"],
-      currentBatchTaskCodes: currentPageTaskCodes,
-    }).minimumSatisfied,
-    false,
-  );
-  assert.equal(
-    evaluateDashboardTaskCurrentBatchEvidence({
-      evidence: base,
-      currentBatch,
-      roleKey: "boss",
-      visibleTaskCodes: ["YS-V9-LD-01"],
-      currentBatchTaskCodes: [],
-    }).minimumSatisfied,
-    false,
-  );
-
-  const exceptionBatch = {
-    dataStatus: "pass",
-    actual: 4,
-    probes: [
-      {
-        id: "production-exception-active-tasks",
-        status: "pass",
-        batchEvidence: "exact_task_codes",
-        exactSourceType: TASK_SOURCE_TYPE,
-        exactSourceID: 202607165,
-        exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.production,
-        exactOwnerRoleKey: "production",
-        exactTaskGroup: "production_exception",
-      },
-    ],
-  };
-  const exceptionCodes = [
-    "YS-V9-SC-01",
-    "YS-V9-SC-02",
-    "YS-V9-SC-03",
-    "YS-V9-SC-04",
-  ];
-  assert.equal(
-    evaluateDashboardTaskCurrentBatchEvidence({
-      evidence: base,
-      currentBatch: exceptionBatch,
-      roleKey: "production",
-      taskGroup: "production_exception",
-      visibleTaskCodes: ["YS-V9-SC-01"],
-      currentBatchTaskCodes: exceptionCodes,
-    }).minimumSatisfied,
-    true,
-  );
-  for (const invalidCodes of [
-    [],
-    [...exceptionCodes, "YS-V9-SC-05"],
-    [exceptionCodes[0], exceptionCodes[0], ...exceptionCodes.slice(2)],
-  ]) {
-    assert.equal(
-      evaluateDashboardTaskCurrentBatchEvidence({
-        evidence: base,
-        currentBatch: exceptionBatch,
-        roleKey: "production",
-        taskGroup: "production_exception",
-        visibleTaskCodes: ["YS-V9-SC-01"],
-        currentBatchTaskCodes: invalidCodes,
-      }).minimumSatisfied,
-      false,
-    );
-  }
 });
 
 test("progress evidence binds counts and exact visible orders to current-batch sources", () => {

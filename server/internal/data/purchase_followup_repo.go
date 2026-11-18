@@ -211,6 +211,17 @@ func purchaseFollowupQuery(q biz.PurchaseFollowupQuery, sqlDialect string) (stri
 	if q.OrderID > 0 {
 		conditions = append(conditions, "order_id="+bind(q.OrderID))
 	}
+	if q.SalesOrderID > 0 {
+		salesID := bind(q.SalesOrderID)
+		conditions = append(conditions, `order_id IN (SELECT p.id FROM purchase_orders p
+ JOIN engineering_material_requests m ON m.id=p.engineering_material_request_id WHERE m.sales_order_id=`+salesID+`)`,
+			// A receipt-level payable reminder covers every line. Never attribute
+			// a mixed or unlinked receipt to the first order in its aggregate.
+			`(source_type<>'purchase_receipt' OR line_id<>0 OR NOT EXISTS (
+ SELECT 1 FROM purchase_receipt_items ri LEFT JOIN purchase_order_items pi ON pi.id=ri.purchase_order_item_id
+ LEFT JOIN purchase_orders po ON po.id=pi.purchase_order_id LEFT JOIN engineering_material_requests em ON em.id=po.engineering_material_request_id
+ WHERE ri.receipt_id=candidates.source_id AND (em.sales_order_id IS NULL OR em.sales_order_id<>`+salesID+`)))`)
+	}
 	if q.Keyword != "" {
 		param := bind("%" + strings.ToLower(strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(q.Keyword)) + "%")
 		conditions = append(conditions, "LOWER(source_no || ' ' || order_no || ' ' || supplier_name || ' ' || material_code || ' ' || material_name) LIKE "+param+" ESCAPE '\\'")

@@ -166,7 +166,6 @@ export default function PurchaseOrderOperationPanel({
             loading={statusLoading}
             exact={exactStatusContext}
             aria-label="采购订单状态"
-            className="erp-business-filter-control--status"
             value={status}
             options={filterLifecycleStatusOptions(
               PURCHASE_ORDER_STATUS_OPTIONS,
@@ -202,19 +201,16 @@ export default function PurchaseOrderOperationPanel({
             }}
             startValue={dateFilterStart}
             endValue={dateFilterEnd}
-            onStartChange={(value) => {
+            onRangeChange={(from, to) => {
+              setDateFilterStart(from)
+              setDateFilterEnd(to)
               resetPagination()
-              setDateFilterStart(value)
-            }}
-            onEndChange={(value) => {
-              resetPagination()
-              setDateFilterEnd(value)
             }}
           />
           <SelectFilter
             emptyValue="updated_at:desc"
             aria-label="排序方式"
-            className="erp-business-filter-control--sort"
+            purpose="sort"
             value={sortValue}
             options={PURCHASE_ORDER_SORT_OPTIONS}
             onChange={(value) => {

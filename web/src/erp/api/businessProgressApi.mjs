@@ -5,6 +5,7 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
   requireProgressBoard,
   requireProgressDetail,
+  requireProgressTaskPage,
 } from '../utils/businessProgress.mjs'
 
 const rpc = new JsonRpc({
@@ -15,7 +16,7 @@ const rpc = new JsonRpc({
 
 export async function listBusinessProgress(params = {}, options = {}) {
   const result = await rpc.call(RpcMethod.business.LIST_PROGRESS, params, options)
-  return requireProgressBoard(result?.data)
+  return requireProgressBoard(result?.data, params.display)
 }
 
 export async function listBusinessProgressOwners(view, options = {}) {
@@ -30,4 +31,9 @@ export async function listBusinessProgressOwners(view, options = {}) {
 export async function getBusinessProgress(params, options = {}) {
   const result = await rpc.call(RpcMethod.business.GET_PROGRESS, params, options)
   return requireProgressDetail(result?.data)
+}
+
+export async function listBusinessProgressTasks(params, options = {}) {
+  const result = await rpc.call(RpcMethod.business.LIST_PROGRESS_TASKS, params, options)
+  return requireProgressTaskPage(result?.data)
 }

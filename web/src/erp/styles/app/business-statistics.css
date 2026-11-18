@@ -32,19 +32,16 @@
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
 }
 .erp-statistics-delivery-period {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
   gap: 8px;
-}
-.erp-statistics-delivery-period > .ant-select {
-  min-width: 154px;
 }
 .erp-statistics-delivery-period > .erp-business-date-range-filter {
   flex: 0 1 360px;

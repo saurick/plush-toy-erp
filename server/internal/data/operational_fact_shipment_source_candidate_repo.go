@@ -176,6 +176,17 @@ func (r *operationalFactRepo) ListShipmentSourceOrderOptions(ctx context.Context
 // loadShipmentSourceLineQuantities, including corruption of any line under the
 // same shipped header; drafts and cancelled shipments never consume quantity.
 func shipmentSourceSelectablePredicate(s *sql.Selector) *sql.Predicate {
+	quantity, corrupt := shipmentSourceLineChecks(s)
+	return sql.And(
+		sql.EQ(s.C(salesorderitem.FieldLineStatus), biz.SalesOrderItemStatusOpen),
+		sql.P(func(b *sql.Builder) {
+			b.Wrap(func(b *sql.Builder) { b.Join(quantity) }).WriteOp(sql.OpLT).Ident(s.C(salesorderitem.FieldOrderedQuantity))
+		}),
+		sql.Not(sql.Exists(corrupt)),
+	)
+}
+
+func shipmentSourceLineChecks(s *sql.Selector) (quantity, corrupt *sql.Selector) {
 	lines := sql.Table(shipmentitem.Table).As("source_ship_line")
 	headers := sql.Table(shipment.Table).As("source_ship_header")
 	sources := sql.Table(salesorderitem.Table).As("source_ship_order_line")
@@ -184,9 +195,9 @@ func shipmentSourceSelectablePredicate(s *sql.Selector) *sql.Predicate {
 			Join(headers).On(lines.C(shipmentitem.FieldShipmentID), headers.C(shipment.FieldID)).
 			Where(sql.EQ(headers.C(shipment.FieldStatus), biz.ShipmentStatusShipped))
 	}
-	quantity := shipped().Select("COALESCE(" + sql.Sum(lines.C(shipmentitem.FieldQuantity)) + ", 0)").
+	quantity = shipped().Select("COALESCE(" + sql.Sum(lines.C(shipmentitem.FieldQuantity)) + ", 0)").
 		Where(sql.ColumnsEQ(lines.C(shipmentitem.FieldSalesOrderItemID), s.C(salesorderitem.FieldID)))
-	corrupt := shipped().Select(lines.C(shipmentitem.FieldID)).
+	corrupt = shipped().Select(lines.C(shipmentitem.FieldID)).
 		LeftJoin(sources).On(lines.C(shipmentitem.FieldSalesOrderItemID), sources.C(salesorderitem.FieldID)).
 		Where(sql.Or(
 			sql.And(sql.ColumnsEQ(lines.C(shipmentitem.FieldSalesOrderItemID), s.C(salesorderitem.FieldID)),
@@ -194,13 +205,7 @@ func shipmentSourceSelectablePredicate(s *sql.Selector) *sql.Predicate {
 			sql.And(sql.ColumnsEQ(headers.C(shipment.FieldSalesOrderID), s.C(salesorderitem.FieldSalesOrderID)),
 				sql.Or(sql.IsNull(lines.C(shipmentitem.FieldSalesOrderItemID)), sql.ColumnsNEQ(sources.C(salesorderitem.FieldSalesOrderID), headers.C(shipment.FieldSalesOrderID)))),
 		))
-	return sql.And(
-		sql.EQ(s.C(salesorderitem.FieldLineStatus), biz.SalesOrderItemStatusOpen),
-		sql.P(func(b *sql.Builder) {
-			b.Wrap(func(b *sql.Builder) { b.Join(quantity) }).WriteOp(sql.OpLT).Ident(s.C(salesorderitem.FieldOrderedQuantity))
-		}),
-		sql.Not(sql.Exists(corrupt)),
-	)
+	return quantity, corrupt
 }
 
 func shipmentSourceCandidateFromEnt(

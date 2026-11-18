@@ -23,10 +23,11 @@ function renderPaginationItem(_page, type, element, disabled) {
 
 export function resolveAppPagination(pagination, compact = false) {
   if (pagination === false) return false
+  const { showTotal = formatPaginationTotal } = pagination || {}
   return {
-    showTotal: formatPaginationTotal,
     itemRender: (page, type, element) => renderPaginationItem(page, type, element, pagination?.disabled),
     ...pagination,
+    showTotal,
     size: 'small',
     simple: pagination?.simple ?? (compact ? { readOnly: true } : false),
     className: ['app-pagination', pagination?.className].filter(Boolean).join(' '),

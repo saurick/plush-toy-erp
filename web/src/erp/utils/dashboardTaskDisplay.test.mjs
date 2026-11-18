@@ -17,11 +17,11 @@ test('standalone task has no fabricated business source', () => {
 const INTENT_HASH = 'b'.repeat(64)
 
 test('dashboardTaskDisplay: 任务来源类型使用业务可读标签', () => {
-  assert.equal(getWorkflowTaskSourceTypeLabel('inbound'), '入库任务')
+  assert.equal(getWorkflowTaskSourceTypeLabel('inbound'), '采购收货单')
   assert.equal(getWorkflowTaskSourceTypeLabel('project-orders'), '销售订单')
   assert.equal(getWorkflowTaskSourceTypeLabel('production-orders'), '生产订单')
   assert.equal(getWorkflowTaskSourceTypeLabel('production_order'), '生产订单')
-  assert.equal(getWorkflowTaskSourceTypeLabel('bom_header'), '工程资料')
+  assert.equal(getWorkflowTaskSourceTypeLabel('bom_header'), '物料清单（BOM）')
   assert.equal(
     getWorkflowTaskSourceTypeLabel('production-scheduling'),
     '排产确认'
@@ -39,15 +39,15 @@ test('dashboardTaskDisplay: 任务来源类型使用业务可读标签', () => {
   assert.equal(getWorkflowTaskSourceTypeLabel('purchase_order'), '采购订单')
   assert.equal(
     getWorkflowTaskSourceTypeLabel('finance_payment'),
-    '收付款与核销'
+    '收付款单'
   )
   assert.equal(
     getWorkflowTaskSourceTypeLabel('inventory_operation'),
-    '库存调整'
+    '库存作业单'
   )
   assert.equal(
     getWorkflowTaskSourceTypeLabel('production_exception_decision'),
-    '生产异常处置'
+    '生产异常处置单'
   )
   assert.equal(getWorkflowTaskSourceTypeLabel('unknown_source_key'), '来源待核对')
   assert.equal(getWorkflowTaskSourceTypeLabel('', '全部模块'), '全部模块')

@@ -6,6 +6,7 @@ import (
 	"server/internal/errcode"
 	"strings"
 	"testing"
+	"time"
 )
 
 type engineeringMaterialJSONRPCRepo struct {
@@ -17,7 +18,11 @@ type engineeringMaterialJSONRPCRepo struct {
 
 func (r *engineeringMaterialJSONRPCRepo) ListEngineeringMaterialRequests(_ context.Context, filter biz.EngineeringMaterialListFilter) (*biz.EngineeringMaterialList, error) {
 	r.list = &filter
-	return &biz.EngineeringMaterialList{Items: []*biz.EngineeringMaterialListItem{}, Total: 0}, nil
+	item := &biz.EngineeringMaterialListItem{ID: 3, SalesOrderID: 7, OrderNo: "ORDER-7", OrderStatus: biz.SalesOrderStatusActive, Status: biz.MaterialRequestApproved, SubmittedAt: time.Date(2026, 9, 15, 8, 0, 0, 0, time.UTC), Products: []string{"模拟小熊"}}
+	if filter.IncludeProductRefs {
+		item.ProductRefs = []biz.DocumentProductIdentity{{ProductID: 9, ProductName: "模拟小熊", ProductCode: "BEAR-9"}}
+	}
+	return &biz.EngineeringMaterialList{Items: []*biz.EngineeringMaterialListItem{item}, Total: 11}, nil
 }
 
 func TestEngineeringMaterialListJSONRPCRequiresSourceReadAndValidFilters(t *testing.T) {
@@ -27,7 +32,8 @@ func TestEngineeringMaterialListJSONRPCRequiresSourceReadAndValidFilters(t *test
 		params      map[string]any
 		allowed     bool
 	}{
-		{"workbench and source reads", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{"keyword": "order", "page": 2, "limit": 10, "status": "APPROVED"}, true},
+		{"workbench and source reads", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{"keyword": "order", "page": 2, "limit": 10, "status": "APPROVED", "sort_by": "submitted_at", "sort_direction": "asc"}, true},
+		{"with product references", []string{biz.PermissionERPWorkbenchRead, biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead, biz.PermissionProductRead}, map[string]any{"keyword": "order", "page": 2, "limit": 10, "status": "APPROVED", "sort_by": "submitted_at", "sort_direction": "asc"}, true},
 		{"missing workbench read", []string{biz.PermissionEngineeringMaterialRead, biz.PermissionSalesOrderRead}, map[string]any{}, false},
 		{"missing material read", []string{biz.PermissionSalesOrderRead}, map[string]any{}, false},
 		{"missing order read", []string{biz.PermissionEngineeringMaterialRead}, map[string]any{}, false},
@@ -42,6 +48,12 @@ func TestEngineeringMaterialListJSONRPCRequiresSourceReadAndValidFilters(t *test
 			repo := &engineeringMaterialJSONRPCRepo{stubSalesOrderJSONRPCRepo: base}
 			d.salesOrderUC = biz.NewSalesOrderUsecase(repo)
 			_, result, err := d.handleSalesOrder(workflowJSONRPCAdminContext(), "list_engineering_material_requests", "list", mustJSONRPCStruct(t, tc.params))
+			if tc.allowed && (repo.list == nil || repo.list.SortBy != biz.WorkbenchSummarySortSubmittedAt || repo.list.SortDirection != "asc") {
+				t.Fatalf("list sort=%+v", repo.list)
+			}
+			if tc.allowed && repo.list.IncludeProductRefs != (tc.name == "with product references") {
+				t.Fatalf("unexpected product access: %+v", repo.list)
+			}
 			if err != nil || (result.Code == errcode.OK.Code) != tc.allowed || (repo.list != nil) != tc.allowed {
 				t.Fatalf("result: %+v error: %v filter: %+v", result, err, repo.list)
 			}

@@ -15,10 +15,6 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-workflow-tracking-panel .erp-task-table-row {
-  cursor: pointer;
-}
-
 .erp-workflow-tracking-title {
   display: grid;
   gap: 4px;

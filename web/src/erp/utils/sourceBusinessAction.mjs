@@ -93,6 +93,13 @@ export function sourceBusinessActionNo(prefix, sourceNo, idempotencyKey) {
   return `${normalizedPrefix}-${normalizedSource.slice(0, sourceBudget)}-${suffix}`
 }
 
+export function requireSourceActionRecord(record, expectedID) {
+  if (!Number.isSafeInteger(expectedID) || expectedID <= 0 || record?.id !== expectedID) {
+    throw Object.assign(new Error('操作结果暂未核对，请刷新单据后确认'), { isInvalidResponse: true })
+  }
+  return record
+}
+
 export function isSourceBusinessActionResultUnknown(error) {
   const httpStatus = Number(error?.httpStatus || 0)
   return Boolean(

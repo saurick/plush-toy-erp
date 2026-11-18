@@ -1,8 +1,12 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Alert, Button } from 'antd'
+import { CalculatorOutlined } from '@ant-design/icons'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import { financePaymentActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 
 import FinanceWorkspace from '../components/finance/FinanceWorkspace.jsx'
+import FinancePaymentTotalsModal from '../components/finance/FinancePaymentTotalsModal.jsx'
 import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import {
   BUSINESS_CURRENCY_OPTIONS,
@@ -74,6 +78,12 @@ import {
 import { FinancePaymentDetails } from '../components/finance/FinancePaymentDetails.jsx'
 
 const PAYMENT_SORT_FIELDS = { payment_no: 'payment_no', amount: 'amount', occurred_at: 'occurred_at' }
+const PAYMENT_KIND_FILTERS = [
+  { value: '', label: '全部用途' },
+  { value: FinancePaymentKind.SETTLEMENT, label: '结算款' },
+  { value: FinancePaymentKind.ADVANCE, label: '预收 / 预付' },
+  { value: FinancePaymentKind.REFUND, label: '退款' },
+]
 
 export default function FinancePaymentsPage() {
   return (
@@ -98,6 +108,7 @@ function FinancePaymentRecords() {
   const [loading, setLoading] = useState(false)
 
   const [paymentDetail, setPaymentDetail] = useState(null)
+  const [totalsOpen, setTotalsOpen] = useState(false)
 
   // 未确认的提交尝试归页面持有，关闭表单后仍可恢复。
   const localAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
@@ -235,13 +246,14 @@ function FinancePaymentRecords() {
 
   const {
     tableColumns: paymentTableColumns,
+    visibleColumns: taskDetailColumns,
     exportColumns: paymentExportColumns,
     openColumnOrder: openPaymentColumnOrder,
     columnOrderModal: paymentColumnOrderModal,
   } = useBusinessColumnOrder({
     adminProfile,
     moduleKey: FINANCE_PAYMENT_COLUMN_ORDER_KEY,
-    moduleTitle: '收付款与核销 / 收付款记录',
+    moduleTitle: getBusinessDocumentTitle('finance_payment'),
     columns: paymentColumns,
   })
   const sortedPaymentColumns = useMemo(
@@ -265,6 +277,11 @@ function FinancePaymentRecords() {
     setPaymentFilters((current) => ({ ...current, ...patch }))
     setPaymentPagination((current) => ({ ...current, current: 1 }))
   }
+  const partyFilters = [
+    { value: '', label: '全部往来方' },
+    ...customers.map((item) => ({ value: `CUSTOMER:${item.id}`, label: `客户 · ${item.name}` })),
+    ...suppliers.map((item) => ({ value: `SUPPLIER:${item.id}`, label: `供应商 · ${item.name}` })),
+  ]
   const paymentActionAvailability = {
     allocation: resolveFinancePaymentActionAvailability({
       action: 'allocation',
@@ -336,7 +353,6 @@ function FinancePaymentRecords() {
               aria-label="收付款状态"
               counts={paymentStatusCounts}
               loading={tableLoading.payments}
-              className="erp-business-filter-control--status"
               value={paymentStatusFilter}
               options={PAYMENT_STATUS_OPTIONS}
               onChange={(value) => {
@@ -359,12 +375,7 @@ function FinancePaymentRecords() {
             <SelectFilter
               aria-label="款项用途筛选"
               value={paymentFilters.kind || ''}
-              options={[
-                { value: '', label: '全部用途' },
-                { value: 'SETTLEMENT', label: '结算款' },
-                { value: 'ADVANCE', label: '预收 / 预付' },
-                { value: 'REFUND', label: '退款' },
-              ]}
+              options={PAYMENT_KIND_FILTERS}
               onChange={(value) => changePaymentFilter({ kind: value })}
             />
             <SelectFilter
@@ -372,17 +383,7 @@ function FinancePaymentRecords() {
               showSearch
               optionFilterProp="label"
               value={paymentFilters.party || ''}
-              options={[
-                { value: '', label: '全部往来方' },
-                ...customers.map((item) => ({
-                  value: `CUSTOMER:${item.id}`,
-                  label: `客户 · ${item.name}`,
-                })),
-                ...suppliers.map((item) => ({
-                  value: `SUPPLIER:${item.id}`,
-                  label: `供应商 · ${item.name}`,
-                })),
-              ]}
+              options={partyFilters}
               onChange={(value) => changePaymentFilter({ party: value })}
             />
             <DateRangeFilter
@@ -390,10 +391,7 @@ function FinancePaymentRecords() {
               value="occurred"
               startValue={paymentFilters.dateFrom}
               endValue={paymentFilters.dateTo}
-              onStartChange={(value) =>
-                changePaymentFilter({ dateFrom: value })
-              }
-              onEndChange={(value) => changePaymentFilter({ dateTo: value })}
+              onRangeChange={(dateFrom, dateTo) => changePaymentFilter({ dateFrom, dateTo })}
             />
             <SelectFilter
               aria-label="收付款方向"
@@ -412,6 +410,12 @@ function FinancePaymentRecords() {
         }
         actions={
           <BusinessListToolbarActions
+            dialogItems={[{
+              key: 'payment-totals',
+              icon: <CalculatorOutlined />,
+              label: '查看金额汇总',
+              onClick: () => setTotalsOpen(true),
+            }]}
             onExport={exportPaymentRows}
             exportDisabled={
               tableLoading.payments ||
@@ -515,7 +519,7 @@ function FinancePaymentRecords() {
                   FinancePaymentKind.ADVANCE,
                   FinancePaymentKind.REFUND,
                 ].includes(currentPayment?.kind)
-                  ? '确认实际收付'
+                  ? financePaymentActionPresentation(currentPayment, 'post', { cashOnly: true }).label
                   : currentPayment?.status === FinancePaymentStatus.POSTED
                     ? '抵扣应收 / 应付'
                     : '选择应收 / 应付核销'}
@@ -587,7 +591,7 @@ function FinancePaymentRecords() {
                 disabled={paymentActionAvailability.cancel.disabled}
                 onClick={openCancel}
               >
-                核对并取消
+                {financePaymentActionPresentation(currentPayment, 'cancel').label}
               </Button>
             </BusinessActionTooltip>
           ) : null}
@@ -609,7 +613,7 @@ function FinancePaymentRecords() {
                   setReverseOpen(true)
                 }}
               >
-                冲销收付款
+                {financePaymentActionPresentation(currentPayment, 'reverse').label}
               </Button>
             </BusinessActionTooltip>
           ) : null}
@@ -666,6 +670,7 @@ function FinancePaymentRecords() {
         rowKey="id"
         loading={tableLoading.payments}
         columns={sortedPaymentColumns}
+        taskDetailColumns={taskDetailColumns}
         onChange={handleTableChange}
         dataSource={payments}
         pagination={createBusinessTablePagination({
@@ -686,18 +691,26 @@ function FinancePaymentRecords() {
         onOpenRecord={(record) => setPaymentDetail(record)}
         emptyDescription="暂无收付款记录"
       />
-      {!outletContext?.taskBusiness && paymentTotals.length ? (
-        <p className="erp-business-inline-note" aria-label="收付款筛选汇总">
-          筛选合计（含全部分页）：
-          {paymentTotals
-            .map(
-              (item) =>
-                `${item.currency} ${item.direction === 'RECEIPT' ? '收款' : '付款'} · ${PAYMENT_STATUS_META[item.status]?.[0] || item.status} ${item.amount}（${item.count} 笔）`
-            )
-            .join('；')}
-        </p>
-      ) : null}
       {paymentColumnOrderModal}
+      {!outletContext?.taskBusiness && (
+        <FinancePaymentTotalsModal
+          open={totalsOpen}
+          onClose={() => setTotalsOpen(false)}
+          loading={tableLoading.payments}
+          totals={paymentTotals}
+          total={paymentTotal}
+          filterLabels={[
+            paymentKeyword.trim(),
+            paymentFilters.currency,
+            paymentDirectionFilter && PAYMENT_DIRECTION_OPTIONS.find((option) => option.value === paymentDirectionFilter)?.label,
+            PAYMENT_STATUS_META[paymentStatusFilter]?.[0],
+            paymentFilters.kind && PAYMENT_KIND_FILTERS.find((option) => option.value === paymentFilters.kind)?.label,
+            paymentFilters.party && partyFilters.find((option) => option.value === paymentFilters.party)?.label,
+            paymentFilters.dateFrom && `自 ${paymentFilters.dateFrom}`,
+            paymentFilters.dateTo && `至 ${paymentFilters.dateTo}`,
+          ]}
+        />
+      )}
 
       <FinancePaymentEditor
         accountSuggestions={payments.map((item) => item.account_ref)}
@@ -737,6 +750,7 @@ function FinancePaymentRecords() {
       />
 
       <FinancePaymentCancelModal
+        currentPayment={currentPayment}
         loading={loading}
         cancelOpen={cancelOpen}
         setCancelOpen={setCancelOpen}
@@ -745,6 +759,7 @@ function FinancePaymentRecords() {
       />
 
       <FinancePaymentReversalModal
+        currentPayment={currentPayment}
         loading={loading}
         reverseOpen={reverseOpen}
         setReverseOpen={setReverseOpen}

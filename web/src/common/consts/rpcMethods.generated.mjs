@@ -96,6 +96,7 @@ export const RpcMethod = Object.freeze({
     LIST_DELIVERY_STATISTICS_SOURCES: 'list_delivery_statistics_sources',
     LIST_PROGRESS: 'list_progress',
     LIST_PROGRESS_OWNER_OPTIONS: 'list_progress_owner_options',
+    LIST_PROGRESS_TASKS: 'list_progress_tasks',
     LIST_RECEIVABLE_STATISTICS_SOURCES: 'list_receivable_statistics_sources',
   }),
   customer_config: Object.freeze({

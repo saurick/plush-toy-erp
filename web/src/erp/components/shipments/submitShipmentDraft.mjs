@@ -89,7 +89,7 @@ export async function submitShipmentDraft({
       await submitShipmentFinanceApprovalProcess({ id: savedShipment.id, shipment_no: savedShipment.shipment_no })
       approvalSubmitted = true
       closeShipmentModal()
-      reportBusinessResult('出货草稿已保存，审批已提交', savedShipment)
+      await reportBusinessResult('出货草稿已保存，审批已提交', { id: savedShipment.id, shipment_no: savedShipment.shipment_no }, getShipment)
       await loadRows()
       return
     }

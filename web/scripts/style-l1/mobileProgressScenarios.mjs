@@ -19,9 +19,9 @@ import { createMobileTaskBlockerScenarios } from './mobileTaskBlockerScenarios.m
 import { createMobileCardFooterScenarios } from './mobileCardFooterScenarios.mjs'
 
 async function assertMobileDetailSurface(root, assert) {
-  await root.locator('.mobile-task-flow-back').click({ trial: true })
+  await root.page().locator('.mobile-task-flow-header:visible .mobile-task-flow-back').click({ trial: true })
   const geometry = await root.evaluate((node) => {
-    const header = node.querySelector('.mobile-task-flow-header')
+    const header = (node.closest('.mobile-task-step-panels') || node).querySelector('.mobile-task-flow-header')
     const main = node.querySelector('.mobile-detail-content')
     const footer = node.querySelector('.mobile-role-action-bar')
     const title = header?.querySelector('h1')
@@ -48,9 +48,8 @@ async function assertMobileDetailSurface(root, assert) {
       overflow: main ? main.scrollWidth - main.clientWidth : 0,
       height: window.innerHeight,
       smallTargets: [
-        ...node.querySelectorAll(
-          '.mobile-task-flow-back, .mobile-role-action-bar button'
-        ),
+        ...header.querySelectorAll('.mobile-task-flow-back'),
+        ...node.querySelectorAll('.mobile-role-action-bar button'),
       ]
         .filter((button) => button.getBoundingClientRect().height < 44)
         .map((button) => button.textContent),
@@ -152,7 +151,7 @@ export function createMobileProgressScenarios({
   customerRuntimeEffectiveSession,
   outputDir,
 }) {
-  const scenarios = ['boss', 'pmc', 'warehouse'].map((role) => {
+  const scenarios = [['boss', false], ['pmc', false], ['warehouse', false], ['boss', true]].map(([role, deliveryOnly]) => {
     let fail = false
     let failDetail = false
     let longDetail = false
@@ -184,7 +183,7 @@ export function createMobileProgressScenarios({
         : []),
     ]
     return {
-      name: `mobile-progress-${role}`,
+      name: deliveryOnly ? 'mobile-delivery-board' : `mobile-progress-${role}`,
       path: `/m/${role}/tasks`,
       auth: 'admin',
       customerKey: 'yoyoosun',
@@ -346,6 +345,13 @@ export function createMobileProgressScenarios({
         })
         await page.route('**/rpc/business', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
+          if (method === 'list_progress_tasks' && longDetail && params.offset === 20) {
+            calls.push({ method, params })
+            const sample = progressFixtureData(params, { detail: true }).sections.tasks[0]
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: {
+              total: 21, rows: [{ ...sample, id: 101, number: 'TASK-NEXT-101', label: '工程资料' }],
+            } } } })
+          }
           if (!['list_progress', 'get_progress'].includes(method)) {
             return route.fallback()
           }
@@ -359,6 +365,7 @@ export function createMobileProgressScenarios({
           const data = progressFixtureData(params, {
             detail: method === 'get_progress',
           })
+          if (deliveryOnly && method === 'get_progress') data.sections.lines[0].id = 101
           data.access.tasks = !hideTaskAccess
           for (const row of method === 'get_progress'
             ? [data.row]
@@ -406,13 +413,18 @@ export function createMobileProgressScenarios({
           if (method === 'get_progress' && longDetail) {
             const record = data.sections.production[0]
             data.sections.production = Array.from({ length: 12 }, (_, index) => ({ ...record, id: 100 + index, number: `MO-LONG-${index + 1}` }))
-            data.sections.tasks[0].note = '这是一条用于验证长任务返回位置的模拟说明。'.repeat(80)
+            const firstTask = data.sections.tasks[0]
+            data.sections.tasks = [firstTask, ...Array.from({ length: 19 }, (_, i) => ({ ...firstTask, id: 210 + i, label: `查看 ${i + 1} 批确认记录`, number: `TASK-BATCH-${i + 1}`, note: '' }))]
+            firstTask.note = '这是一条用于验证长任务返回位置的模拟说明。'.repeat(80)
+            data.task_total = 21
+            data.has_more.tasks = true
           }
           if (method === 'get_progress' && sparseDetail) {
             data.sections.production = []
             data.sections.batches = []
             data.sections.materials = []
             data.sections.tasks = []
+            data.task_total = 0
           }
           return route.fulfill({
             contentType: 'application/json',
@@ -482,6 +494,28 @@ export function createMobileProgressScenarios({
           calls[0].params.view,
           role === 'pmc' ? 'production' : 'orders'
         )
+        if (deliveryOnly) {
+          const switcher = panel.locator('[aria-label="交付查看方式"]')
+          await switcher.getByText('产品明细', { exact: true }).click()
+          const line = panel.locator('.mobile-progress-card').first()
+          const openLine = line.getByRole('button', { name: /SO-0001.*第 1 行进度/u })
+          await openLine.waitFor()
+          assert.match(await line.textContent(), /剩余待交.*72 只/u)
+          assert(calls.some(({ params }) => params.display === 'lines'))
+          await line.getByRole('button', { name: /查看.+大图/u }).click()
+          await page.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+          await openLine.click()
+          const drawer = page.locator('.erp-progress-drawer--mobile')
+          await drawer.locator('[data-progress-line-selected]').waitFor()
+          assert.equal(calls.findLast(({ method }) => method === 'get_progress').params.id, 1)
+          await drawer.getByLabel('返回进度', { exact: true }).click()
+          await openLine.waitFor()
+          await assertNoHorizontalOverflow(page, 'mobile-delivery-board')
+          await page.screenshot({ path: path.join(outputDir, 'mobile-delivery-board.png') })
+          await switcher.getByText('整单', { exact: true }).click()
+          await panel.getByRole('button', { name: '查看 SO-0001 进度', exact: true }).waitFor()
+          return
+        }
         const firstCardImage = panel.locator('.mobile-progress-card').first().locator('.erp-product-identity img')
         const missing = panel.locator('.mobile-progress-card').filter({ hasText: `${prefix}-0005` })
         for (const label of ['产品名称未填写', '未定交期', '业务负责人未提供']) await missing.getByText(label, { exact: true }).waitFor()
@@ -697,7 +731,7 @@ export function createMobileProgressScenarios({
         await directTask
           .getByRole('heading', { name: '工程资料', exact: true })
           .waitFor()
-        await directTask
+        await page.locator('.mobile-task-flow-header:visible')
           .getByRole('button', { name: '返回进度', exact: true })
           .waitFor()
         if (role === 'pmc') {
@@ -715,7 +749,7 @@ export function createMobileProgressScenarios({
         await page.screenshot({
           path: path.join(outputDir, `mobile-progress-${role}-direct-task.png`),
         })
-        await directTask
+        await page.locator('.mobile-task-flow-header:visible')
           .getByRole('button', { name: '返回进度', exact: true })
           .click()
         await singleEntry.waitFor()
@@ -928,7 +962,7 @@ export function createMobileProgressScenarios({
               return { text: button.textContent, top: box.top, height: box.height, width: box.width }
             }),
             steps: [
-              ...root.querySelectorAll('.mobile-task-flow-step__title'),
+              ...(root.closest('.mobile-task-step-panels') || root).querySelectorAll('.mobile-task-flow-header .mobile-task-flow-step__title'),
             ].map((node) => node.textContent),
           }
         })
@@ -1079,6 +1113,17 @@ export function createMobileProgressScenarios({
         await page.goBack()
         await drawer.getByRole('tab', { name: '任务', exact: true, selected: true }).waitFor()
         await page.waitForFunction((top) => Math.abs(document.querySelector('.erp-progress-drawer--mobile .erp-progress-detail-scroll').scrollTop - top) <= 1, longDetailScrollTop)
+        const scroll = drawer.locator('.erp-progress-detail-scroll')
+        await scroll.evaluate((node) => { node.scrollTop = node.scrollHeight })
+        const nextTask = drawer.getByRole('button', { name: '查看任务 TASK-NEXT-101', exact: true })
+        await nextTask.scrollIntoViewIfNeeded()
+        const appendedTop = await scroll.evaluate((node) => node.scrollTop)
+        await nextTask.click()
+        await page.getByTestId('mobile-task-detail-screen').getByRole('heading', { name: '工程资料', exact: true }).waitFor()
+        await page.goBack()
+        await nextTask.waitFor()
+        await page.waitForFunction((top) => Math.abs(document.querySelector('.erp-progress-drawer--mobile .erp-progress-detail-scroll').scrollTop - top) <= 1, appendedTop)
+
         await drawer
           .getByRole('tab', { name: '生产', exact: true })
           .click()

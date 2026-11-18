@@ -92,6 +92,15 @@ func TestWorkflowWorkbenchReturnsExactCountsAndOnlyTheRequestedPage(t *testing.T
 	if page.Items[0].TaskCode != "SALES-ACTION-1" || page.Items[1].TaskCode != "SALES-ACTION-2" {
 		t.Fatalf("actionable order=%v,%v", page.Items[0].TaskCode, page.Items[1].TaskCode)
 	}
+	sorted := query
+	sorted.Sort, sorted.Limit = biz.WorkflowTaskBoardSortTimeDesc, 1
+	for offset, code := range []string{"SALES-ACTION-2", "SALES-ACTION-1", "SALES-APPROVAL"} {
+		sorted.Offset = offset
+		result, err := repo.GetWorkflowWorkbench(ctx, sorted)
+		if err != nil || result.Counts != wantCounts || len(result.Items) != 1 || result.Items[0].TaskCode != code {
+			t.Fatalf("sorted workbench offset=%d want=%s result=%v err=%v", offset, code, result, err)
+		}
+	}
 
 	query.QueueKey = biz.WorkflowWorkbenchQueueRisk
 	query.Limit = 8

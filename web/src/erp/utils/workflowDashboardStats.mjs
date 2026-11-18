@@ -67,42 +67,6 @@ export function getWorkflowWorkbenchRoleKeys(adminProfile = {}) {
   ]
 }
 
-export function getWorkflowWorkbenchScopeKey(
-  adminProfile = {},
-  roleKeys = getWorkflowWorkbenchRoleKeys(adminProfile)
-) {
-  const customerKey = String(
-    adminProfile?.effective_session?.customer?.key || ''
-  ).trim()
-  const configRevision = String(
-    adminProfile?.effective_session?.config_revision || ''
-  ).trim()
-  const normalizedRoleKeys = [...new Set(roleKeys)].sort()
-  return JSON.stringify([customerKey, configRevision, normalizedRoleKeys])
-}
-
-export function createWorkflowWorkbenchSnapshot(
-  scopeKey = '',
-  { tasks = [], riskTaskIDs = [], approvalTaskIDs = [] } = {}
-) {
-  return {
-    scopeKey: String(scopeKey || ''),
-    tasks: Array.isArray(tasks) ? tasks : [],
-    riskTaskIDs: new Set(
-      riskTaskIDs instanceof Set ? riskTaskIDs : riskTaskIDs
-    ),
-    approvalTaskIDs: new Set(
-      approvalTaskIDs instanceof Set ? approvalTaskIDs : approvalTaskIDs
-    ),
-  }
-}
-
-export function readWorkflowWorkbenchSnapshot(snapshot, scopeKey = '') {
-  const normalizedScopeKey = String(scopeKey || '')
-  if (snapshot?.scopeKey === normalizedScopeKey) return snapshot
-  return createWorkflowWorkbenchSnapshot(normalizedScopeKey)
-}
-
 function normalizeTaskStatusKey(task = {}) {
   return String(task.task_status_key || '').trim()
 }

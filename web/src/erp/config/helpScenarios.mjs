@@ -286,7 +286,7 @@ const financeScenarios = {
   '/erp/finance/reconciliation': pageScenario('reconciliation', [
     ['查询期间对账', '财务', ['finance']],
     ['生成单笔对账草稿', '财务', ['finance']],
-    ['核对并过账', '财务', ['finance']],
+    ['核对并确认账款', '财务', ['finance']],
     ['完成核对', '财务', ['finance']],
   ]),
 }

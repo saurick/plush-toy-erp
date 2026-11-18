@@ -83,7 +83,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       const chooseTaskFilter = async (label, sort = false) => {
         const dropdown = await openTaskFilters()
         if (sort) {
-          await chooseMobileFilterOption(dropdown.getByRole('combobox', { name: '任务排序', exact: true }), label)
+          await chooseMobileFilterOption(dropdown.getByRole('group', { name: '任务排序', exact: true }), label)
         } else {
           await dropdown.getByText(label, { exact: true }).click()
         }

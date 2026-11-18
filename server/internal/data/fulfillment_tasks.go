@@ -107,6 +107,8 @@ func syncFulfillmentTask(ctx context.Context, client *ent.Client, kind string, i
 func fulfillmentInspectionTask(ctx context.Context, client *ent.Client, row *ent.QualityInspection) error {
 	kind := ""
 	switch optionalStringValueOrEmpty(row.SourceType) {
+	case biz.QualityInspectionSourceShipment:
+		kind = "shipment_quality"
 	case biz.QualityInspectionSourcePurchaseReceipt:
 		kind = "receipt_quality"
 	case biz.QualityInspectionSourceProductionWIP:
@@ -208,6 +210,17 @@ func syncQualityHandoffs(ctx context.Context, client *ent.Client, inspectionID i
 	}
 	if err := fulfillmentInspectionTask(ctx, client, row); err != nil {
 		return err
+	}
+	if optionalStringValueOrEmpty(row.SourceType) == biz.QualityInspectionSourceShipment && row.SourceID != nil {
+		shipment, err := client.Shipment.Get(ctx, *row.SourceID)
+		if err != nil {
+			return err
+		}
+		full, err := shipmentWithItems(ctx, client, shipment)
+		if err != nil {
+			return err
+		}
+		return syncShipmentHandoff(ctx, client, full, optionalIntValueOrZero(row.InspectorID))
 	}
 	if row.PurchaseReceiptID != nil {
 		return syncPurchaseReceiptHandoffs(ctx, client, *row.PurchaseReceiptID)

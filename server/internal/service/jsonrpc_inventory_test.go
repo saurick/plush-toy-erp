@@ -176,7 +176,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 	for _, tc := range []struct {
 		method, field, direction string
 	}{
-		{"list_inventory_balances", "available_quantity", "asc"},
+		{"list_inventory_balances", "pending_quality_quantity", "asc"},
 		{"list_inventory_balances", "quantity", "sideways"},
 		{"list_inventory_balances", "", "asc"},
 		{"list_inventory_lots", "quantity", "desc"},
@@ -190,6 +190,16 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 				t.Fatalf("expected invalid inventory sort, got %v, %v", res, err)
 			}
 		})
+	}
+	skuSort := mustJSONRPCStruct(t, map[string]any{"sort_by": "sku_code", "sort_direction": "asc"})
+	_, deniedSort, err := j.handleInventory(adminCtx, "list_inventory_balances", "sku-sort-denied", skuSort)
+	if err != nil || deniedSort == nil || deniedSort.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected SKU sorting to require SKU read permission, got %v, %v", deniedSort, err)
+	}
+	jWithSKURead := newInventoryJSONRPCTestData(data, workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWarehouseInventoryRead, biz.PermissionProductSKURead))
+	_, allowedSort, err := jWithSKURead.handleInventory(adminCtx, "list_inventory_balances", "sku-sort-allowed", skuSort)
+	if err != nil || allowedSort == nil || allowedSort.Code != errcode.OK.Code {
+		t.Fatalf("expected SKU sorting to work for an authorized reader, got %v, %v", allowedSort, err)
 	}
 
 	if _, err := j.inventoryUC.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
@@ -234,6 +244,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		"subject_type": biz.InventorySubjectProduct,
 		"subject_id":   float64(fixtures.productID),
 		"warehouse_id": float64(fixtures.productWarehouseID),
+		"sort_by":      "available_quantity",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)

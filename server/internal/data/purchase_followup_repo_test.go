@@ -9,6 +9,8 @@ import (
 	"github.com/shopspring/decimal"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/purchaseorderitem"
 )
 
 func followupQuery() biz.PurchaseFollowupQuery {
@@ -159,6 +161,31 @@ func assertPurchaseFollowupDates(t *testing.T, data *Data, client *ent.Client, f
 	out, err = uc.ListPurchaseFollowups(t.Context(), q)
 	if err != nil || out.Total != 0 {
 		t.Fatalf("draft and closed lines excluded: %+v %v", out, err)
+	}
+}
+
+func TestPurchaseFollowupsScopeByEngineeringOrder(t *testing.T) {
+	f := openProductionOrderRepoTest(t, "followup_engineering_scope")
+	ctx := t.Context()
+	sales := f.client.SalesOrder.Query().OnlyX(ctx)
+	request := f.client.EngineeringMaterialRequest.Query().OnlyX(ctx)
+	fixtures := inventoryTestFixtures{unitID: f.unitID, materialID: f.materialID}
+	linked := f.client.PurchaseOrderItem.Query().Where(purchaseorderitem.HasPurchaseOrderWith(purchaseorder.EngineeringMaterialRequestID(request.ID))).OnlyX(ctx)
+	unlinked := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, f.client, fixtures, "FOLLOWUP-OTHER", decimal.NewFromInt(1))
+	for _, id := range []int{linked.ID, unlinked.ID} {
+		f.client.PurchaseOrderItem.UpdateOneID(id).ClearUnitPrice().ClearAmount().SaveX(ctx)
+	}
+	q := followupQuery()
+	q.SalesOrderID, q.Kind = sales.ID, "missing_price"
+	uc := biz.NewPurchaseOrderUsecase(NewPurchaseOrderRepo(f.data, log.NewStdLogger(io.Discard)))
+	out, err := uc.ListPurchaseFollowups(ctx, q)
+	if err != nil || out.Total != 1 || out.Counts["missing_price"] != 1 || out.Rows[0].OrderID != linked.PurchaseOrderID {
+		t.Fatalf("scoped purchase followup=%+v err=%v", out, err)
+	}
+	q.SalesOrderID = sales.ID + 1
+	out, err = uc.ListPurchaseFollowups(ctx, q)
+	if err != nil || out.Total != 0 || len(out.Counts) != 0 || len(out.Days) != 0 {
+		t.Fatalf("unlinked scope broadened: %+v %v", out, err)
 	}
 }
 

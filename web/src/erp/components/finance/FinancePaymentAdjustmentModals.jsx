@@ -3,6 +3,7 @@ import { Form, Input } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 
 import { FinanceAllocationStatus } from '../../../common/consts/statuses.generated.mjs'
+import { financePaymentActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import BusinessForm from '../business-list/BusinessForm.jsx'
@@ -63,6 +64,7 @@ export function FinanceAllocationReversalModal({
   )
 }
 export function FinancePaymentCancelModal({
+  currentPayment,
   loading,
   cancelOpen,
   setCancelOpen,
@@ -71,11 +73,11 @@ export function FinancePaymentCancelModal({
 }) {
   return (
     <BusinessFormModal
-      title="取消收付款"
+      title={financePaymentActionPresentation(currentPayment, 'cancel').label}
       size="confirm"
-      description="取消不会删除收付款记录；已发生的流程效果仍保留恢复审计。"
+      description={financePaymentActionPresentation(currentPayment, 'cancel').description}
       open={cancelOpen}
-      okText="确认取消"
+      okText={financePaymentActionPresentation(currentPayment, 'cancel').label}
       cancelText="返回"
       okButtonProps={{ danger: true }}
       confirmLoading={loading}
@@ -105,6 +107,7 @@ export function FinancePaymentCancelModal({
   )
 }
 export function FinancePaymentReversalModal({
+  currentPayment,
   loading,
   reverseOpen,
   setReverseOpen,
@@ -113,11 +116,11 @@ export function FinancePaymentReversalModal({
 }) {
   return (
     <BusinessFormModal
-      title="冲销收付款"
+      title={financePaymentActionPresentation(currentPayment, 'reverse').label}
       size="confirm"
-      description="冲销会恢复原核销金额并保留原收付款及核销记录。"
+      description={financePaymentActionPresentation(currentPayment, 'reverse').description}
       open={reverseOpen}
-      okText="确认冲销"
+      okText={financePaymentActionPresentation(currentPayment, 'reverse').label}
       cancelText="返回"
       okButtonProps={{ danger: true }}
       confirmLoading={loading}

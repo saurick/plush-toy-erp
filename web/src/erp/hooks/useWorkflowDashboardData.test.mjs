@@ -4,25 +4,24 @@ import test from 'node:test'
 import { createReactTestHarness } from '../../../scripts/test/reactRuntime.mjs'
 import { installRpcCallHarness } from '../../../scripts/test/rpcApiTestHarness.mjs'
 
-const workbenchRequest = Object.freeze({
-  queue_key: 'actionable',
+const riskRequest = Object.freeze({
+  queue_key: 'risk',
   limit: 1,
   offset: 0,
 })
 const taskBoardRequest = Object.freeze({ limit: 1, offset: 0 })
 
 function workbenchPage(params, id = params.offset + 1) {
-  const risk = params.queue_key === 'risk'
   return {
     code: 0,
     data: {
       snapshot_at: 1_720_000_000,
       queue_key: params.queue_key,
-      total: risk ? 1 : 2,
+      total: 2,
       limit: params.limit,
       offset: params.offset,
-      items: [{ id, version: 1, task_status_key: risk ? 'blocked' : 'ready' }],
-      counts: { actionable: 2, risk: 1, approval: 0 },
+      items: [{ id, version: 1, task_status_key: 'blocked' }],
+      counts: { actionable: 0, risk: 2, approval: 0 },
     },
   }
 }
@@ -66,7 +65,7 @@ async function dashboardHarness(t, handler) {
     return createElement(
       'output',
       { 'aria-busy': current.loading },
-      current.workbenchResponseState?.response?.items
+      current.riskResponseState?.response?.items
         .map((item) => item.id)
         .join(',')
     )
@@ -81,16 +80,15 @@ async function dashboardHarness(t, handler) {
       view.render(
         createElement(Consumer, {
           scopeKey: 'scope-a',
-          workbenchRequest,
+          riskRequest,
           taskBoardRequest,
-          isTaskBoardView: false,
           ...props,
         })
       ),
   }
 }
 
-test('workbench requests one bounded page and retains settled rows until the next page arrives', async (t) => {
+test('risk tasks request one bounded page and retains settled rows until the next page arrives', async (t) => {
   let complete
   const view = await dashboardHarness(t, (_method, params) =>
     params.offset === 0
@@ -103,12 +101,12 @@ test('workbench requests one bounded page and retains settled rows until the nex
   await view.flush()
   assert.deepEqual(
     view.calls.map(({ method, params }) => ({ method, params })),
-    [{ method: 'get_workbench', params: workbenchRequest }]
+    [{ method: 'get_workbench', params: riskRequest }]
   )
-  assert.equal(view.current.workbenchCountsState.counts.actionable, 2)
+  assert.equal(view.current.riskResponseState.response.total, 2)
   assert.equal(view.container.textContent, '1')
   await view.renderQuery({
-    workbenchRequest: { ...workbenchRequest, offset: 1 },
+    riskRequest: { ...riskRequest, offset: 1 },
   })
   assert.equal(view.current.loading, true)
   assert.equal(view.container.textContent, '1')
@@ -118,7 +116,7 @@ test('workbench requests one bounded page and retains settled rows until the nex
   assert.equal(view.container.textContent, '2')
 })
 
-test('a queue switch clears unrelated rows and a scope switch rejects a late response', async (t) => {
+test('a scope switch clears settled risk rows and rejects an older page response', async (t) => {
   const pending = []
   const view = await dashboardHarness(t, (_method, params) =>
     view.calls.length === 1
@@ -129,23 +127,23 @@ test('a queue switch clears unrelated rows and a scope switch rejects a late res
   )
   await view.renderQuery()
   await view.flush()
-  const riskRequest = { queue_key: 'risk', limit: 1, offset: 0 }
-  await view.renderQuery({ workbenchRequest: riskRequest })
-  assert.equal(view.current.workbenchResponseState.response, null)
-  await view.renderQuery({ scopeKey: 'scope-b', workbenchRequest: riskRequest })
-  assert.equal(view.current.workbenchCountsState, null)
+  const nextRequest = { ...riskRequest, offset: 1 }
+  await view.renderQuery({ riskRequest: nextRequest })
+  assert.equal(view.current.riskResponseState.response.offset, 0)
+  await view.renderQuery({ scopeKey: 'scope-b', riskRequest: nextRequest })
+  assert.equal(view.current.riskResponseState?.response ?? null, null)
   assert.equal(view.calls[1].init.signal.aborted, true)
   await view.act(async () => pending[0]())
   await view.flush()
   assert.equal(view.current.loading, true)
-  assert.equal(view.current.workbenchCountsState, null)
+  assert.equal(view.current.riskResponseState?.response ?? null, null)
   await view.act(async () => pending[1]())
   await view.flush()
-  assert.equal(view.current.workbenchResponseState.scopeKey, 'scope-b')
-  assert.equal(view.current.workbenchResponseState.response.queue_key, 'risk')
+  assert.equal(view.current.riskResponseState.scopeKey, 'scope-b')
+  assert.equal(view.current.riskResponseState.response.queue_key, 'risk')
 })
 
-test('a failed workbench page retains its settled rows and pagination until retry succeeds', async (t) => {
+test('a failed risk page retains its settled rows and pagination until retry succeeds', async (t) => {
   let fail = true
   const view = await dashboardHarness(t, (_method, params) => {
     if (params.offset === 1 && fail) throw new Error('offline')
@@ -153,28 +151,26 @@ test('a failed workbench page retains its settled rows and pagination until retr
   })
   await view.renderQuery()
   await view.flush()
-  await view.renderQuery({ workbenchRequest: { ...workbenchRequest, offset: 1 } })
+  await view.renderQuery({ riskRequest: { ...riskRequest, offset: 1 } })
   await view.flush()
   assert.equal(view.current.loading, false)
-  assert(view.current.workbenchResponseState.error)
-  assert.equal(view.current.workbenchResponseState.response.offset, 0)
-  assert.equal(view.current.workbenchResponseState.response.limit, 1)
+  assert(view.current.riskResponseState.error)
+  assert.equal(view.current.riskResponseState.response.offset, 0)
+  assert.equal(view.current.riskResponseState.response.limit, 1)
   assert.equal(view.container.textContent, '1')
 
   fail = false
   await view.act(async () => view.current.reloadTaskData())
   await view.flush()
-  assert.equal(view.current.workbenchResponseState.error, '')
-  assert.equal(view.current.workbenchResponseState.response.offset, 1)
+  assert.equal(view.current.riskResponseState.error, '')
+  assert.equal(view.current.riskResponseState.response.offset, 1)
   assert.equal(view.container.textContent, '2')
 })
 
-test('preview and alternate views suspend task reads and resume through the same loader', async (t) => {
+test('tracking views suspend task reads and resume through the same loader', async (t) => {
   const view = await dashboardHarness(t, (_method, params) =>
     workbenchPage(params)
   )
-  await view.renderQuery({ productCorePreview: true })
-  assert.equal(view.calls.length, 0)
   await view.renderQuery({ suspended: true })
   assert.equal(view.calls.length, 0)
   await view.renderQuery()
@@ -192,9 +188,9 @@ test('a failed read exposes a business error and an explicit retry recovers', as
   await view.renderQuery()
   await view.flush()
   assert.equal(view.current.loading, false)
-  assert.ok(view.current.workbenchResponseState.error)
+  assert.ok(view.current.riskResponseState.error)
   assert.equal(
-    view.current.workbenchResponseState.error.includes(
+    view.current.riskResponseState.error.includes(
       'private transport detail'
     ),
     false
@@ -203,8 +199,8 @@ test('a failed read exposes a business error and an explicit retry recovers', as
   await view.act(async () =>
     assert.equal(await view.current.reloadTaskData(), true)
   )
-  assert.equal(view.current.workbenchResponseState.error, '')
-  assert.equal(view.current.workbenchResponseState.response.items[0].id, 1)
+  assert.equal(view.current.riskResponseState.error, '')
+  assert.equal(view.current.riskResponseState.response.items[0].id, 1)
 })
 
 test('task board responses and summary counts stay scoped to the current identity', async (t) => {
@@ -217,16 +213,57 @@ test('task board responses and summary counts stay scoped to the current identit
           complete = () => resolve(response)
         })
   })
-  await view.renderQuery({ isTaskBoardView: true })
+  await view.renderQuery({ riskRequest: null })
   await view.flush()
   assert.equal(view.calls[0].method, 'get_task_board')
   assert.equal(view.current.taskBoardSummaryState.scopeKey, 'scope-a')
-  await view.renderQuery({ isTaskBoardView: true, scopeKey: 'scope-b' })
+  await view.renderQuery({ riskRequest: null, scopeKey: 'scope-b' })
   assert.equal(view.current.taskBoardSummaryState, null)
+  assert.equal(view.current.taskBoardFilterOptions, null)
   assert.equal(view.current.taskBoardResponseState.response, null)
   await view.act(async () => complete())
   await view.flush()
   assert.equal(view.current.taskBoardSummaryState.scopeKey, 'scope-b')
+})
+
+test('任务单据查询只复用同一可见范围的筛选候选，结果随新请求更新', async (t) => {
+  let reply
+  const view = await dashboardHarness(t, (_method, params) => new Promise((resolve) => {
+    reply = (sourceTypes, count = 0) => {
+      const result = taskBoardPage(params, count)
+      Object.assign(result.data, {
+        source_types: sourceTypes,
+        owner_role_keys: ['warehouse', 'quality'],
+        assignees: [{ id: 7, name: '模拟办理人' }],
+      })
+      resolve(result)
+    }
+  }))
+  const query = (filters) => view.renderQuery({
+    riskRequest: null,
+    taskBoardRequest: { ...taskBoardRequest, ...filters },
+  })
+  const respond = (types, count) => view.act(async () => reply(types, count))
+  await query({})
+  const sources = ['purchase_receipt', 'quality_inspection']
+  await respond(sources, 1)
+  await query({ source_section: 'quality' })
+  assert.equal(view.current.taskBoardResponseState.response, null)
+  assert.notEqual(view.current.taskBoardSummaryState.requestKey, view.current.taskBoardSummaryRequestKey)
+  assert.deepEqual(view.current.taskBoardFilterOptions, {
+    sourceTypes: sources,
+    ownerRoleKeys: ['warehouse', 'quality'],
+    assignees: [{ id: 7, name: '模拟办理人' }],
+  })
+  await respond(['purchase_receipt'])
+  assert.equal(view.current.taskBoardResponseState.response.total, 0)
+  assert.deepEqual(view.current.taskBoardFilterOptions.sourceTypes, ['purchase_receipt'])
+  for (const scope of [{ owner_role_key: 'quality' }, { todo_only: true }, { approval_only: true }]) {
+    await query(scope)
+    assert.equal(view.current.taskBoardFilterOptions, null)
+    await respond([])
+    assert.deepEqual(view.current.taskBoardFilterOptions.sourceTypes, [])
+  }
 })
 
 test('task board pagination preserves the query summary while the new lane page is pending', async (t) => {
@@ -238,12 +275,12 @@ test('task board pagination preserves the query summary while the new lane page 
           complete = () => resolve(taskBoardPage(params, 1))
         })
   )
-  await view.renderQuery({ isTaskBoardView: true })
+  await view.renderQuery({ riskRequest: null })
   await view.flush()
   assert.equal(view.current.taskBoardSummaryState.response.counts.actionable, 1)
   const summaryKey = view.current.taskBoardSummaryRequestKey
   await view.renderQuery({
-    isTaskBoardView: true,
+    riskRequest: null,
     taskBoardRequest: { ...taskBoardRequest, offset: 1 },
   })
   assert.equal(view.current.loading, true)
@@ -268,7 +305,7 @@ test('task board refresh retains settled rows and replaces them after the respon
           complete = () => resolve(taskBoardPage(params, 0))
         })
   )
-  await view.renderQuery({ isTaskBoardView: true })
+  await view.renderQuery({ riskRequest: null })
   await view.flush()
   let refresh
   await view.act(() => {
@@ -298,15 +335,15 @@ test('task board search changes clear old rows and ignore a superseded response'
           )
         )
   )
-  await view.renderQuery({ isTaskBoardView: true })
+  await view.renderQuery({ riskRequest: null })
   await view.flush()
   await view.renderQuery({
-    isTaskBoardView: true,
+    riskRequest: null,
     taskBoardRequest: { ...taskBoardRequest, keyword: '旧条件' },
   })
   assert.equal(view.current.taskBoardResponseState.response, null)
   await view.renderQuery({
-    isTaskBoardView: true,
+    riskRequest: null,
     taskBoardRequest: { ...taskBoardRequest, keyword: '新条件' },
   })
   assert.equal(view.calls[1].init.signal.aborted, true)

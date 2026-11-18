@@ -312,6 +312,9 @@ const commonSamplePresentationDependencies = [
   "web/src/common/components/overlay/OverlayScopeContext.mjs",
   "web/src/common/components/navigation/FilterChip.jsx",
   "web/src/common/components/navigation/FilterChipGroup.jsx",
+  "web/src/common/components/navigation/FilterField.jsx",
+  "web/src/common/components/navigation/filterField.css",
+  "web/src/common/components/select/filterSelectOptions.mjs",
   "web/src/common/components/navigation/SlidingSegmented.jsx",
   "web/src/common/components/navigation/SlidingTabList.jsx",
   "web/src/common/components/navigation/useSlidingIndicator.js",
@@ -417,7 +420,11 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/components/DevControlStandards.jsx",
-    new Set(["utils/businessProgress.mjs"]),
+    new Set([
+      "utils/businessProgress.mjs",
+      "mobile/components/MobileFilterPopover.jsx",
+      "mobile/components/MobileFilterChoices.jsx",
+    ]),
   ],
   [
     "web/src/dev-workbench/components/flow-state/BusinessChainInstanceView.jsx",
@@ -710,6 +717,8 @@ function assertBusinessSamplePresentationGraph(readSource = read) {
     "utils/businessFormSnapshot.mjs",
     "utils/businessFormSections.mjs",
     "utils/dateRange.mjs",
+    "utils/filterDateRange.mjs",
+    "utils/businessDate.mjs",
     "utils/modalSizes.mjs",
     "utils/referenceSelectOptions.mjs",
     "utils/historySourceSelectOptions.mjs",
@@ -972,16 +981,31 @@ test("typography samples only reuse the presentation-only cell stack", () => {
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/components/business-list/BusinessCellStack.jsx"), false);
 });
 
-test("date input samples keep shared pickers free of business dependencies", () => {
+test("date and mobile filter samples keep shared controls free of business I/O", () => {
+  const mobileSample = "web/src/dev-workbench/components/DevControlStandards.jsx";
+  for (const component of ["MobileFilterPopover", "MobileFilterChoices"]) {
+    const specifier = `@/erp/mobile/components/${component}.jsx`;
+    assert.equal(isAllowedERPImport(mobileSample, specifier), true);
+    assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", specifier), false);
+  }
   const dependencies = new Map([
     ["web/src/erp/components/business-list/BusinessDateInputs.jsx", new Set([
-      "react", "antd", "@ant-design/icons", "../../utils/dateRange.mjs",
-      "@/common/components/select/AppSelect",
-      "@/common/components/navigation/FilterChipGroup.jsx",
+      "react", "antd", "@ant-design/icons", "../../utils/dateRange.mjs", "../../utils/filterDateRange.mjs",
+      "@/common/components/navigation/FilterChipGroup.jsx", "@/common/components/navigation/FilterField.jsx",
+    ])],
+    ["web/src/erp/utils/filterDateRange.mjs", new Set(["./businessDate.mjs", "./dateRange.mjs"])],
+    ["web/src/erp/utils/businessDate.mjs", new Set()],
+    ["web/src/erp/mobile/components/MobileFilterPopover.jsx", new Set([
+      "react", "react-dom", "antd", "@ant-design/icons", "./mobileFilterPopover.css",
+    ])],
+    ["web/src/erp/mobile/components/MobileFilterChoices.jsx", new Set([
+      "react", "@/common/components/navigation/FilterChipGroup.jsx", "@/common/components/navigation/FilterField.jsx", "./mobileFilterPopover.css",
     ])],
     ["web/src/common/components/navigation/FilterChipGroup.jsx", new Set([
-      "react", "./FilterChip.jsx",
+      "react", "./FilterChip.jsx", "./FilterField.jsx", "../select/filterSelectOptions.mjs",
     ])],
+    ["web/src/common/components/navigation/FilterField.jsx", new Set(["react", "./filterField.css"])],
+    ["web/src/common/components/select/filterSelectOptions.mjs", new Set()],
     ["web/src/common/components/navigation/FilterChip.jsx", new Set([
       "react", "@ant-design/icons",
     ])],

@@ -57,7 +57,13 @@ func (d *jsonrpcDispatcher) handleInventory(
 		if scopeResult != nil {
 			return id, scopeResult, nil
 		}
-		items, total, err := d.inventoryUC.ListInventoryBalancesForAccess(ctx, inventoryBalanceFilterFromParams(pm), scope)
+		filter := inventoryBalanceFilterFromParams(pm)
+		if filter.SortBy == biz.InventorySortSKUCode {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKURead); res != nil {
+				return id, res, nil
+			}
+		}
+		items, total, err := d.inventoryUC.ListInventoryBalancesForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}

@@ -18,10 +18,10 @@ import {
 } from '@/common/consts/errorCodes'
 import { listBusinessProgress } from '../../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
-import BusinessProgressFilterFields, { ProgressDueFilters, ProgressBlockedFilter } from '../../components/business-visualizations/BusinessProgressFilters.jsx'
+import BusinessProgressFilterFields, { ProgressDueFilters, ProgressBlockedFilter, ProgressDeliveryFilters, ProgressDeliverySwitch } from '../../components/business-visualizations/BusinessProgressFilters.jsx'
 import BusinessProgressDrawer from '../../components/business-visualizations/BusinessProgressDrawer'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
-import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention } from '../../components/business-visualizations/ProgressCompactContent.jsx'
+import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus } from '../../components/business-visualizations/ProgressCompactContent.jsx'
 import {
   progressQueryFromURL,
   progressExtraFilters,
@@ -97,6 +97,7 @@ export default function MobileProgressPanel({
     [values]
   )
   const queryKey = JSON.stringify(query)
+  const lines = query.display === 'lines'
   const data =
     result?.key === queryKey && result?.scope === scopeKey ? result.data : null
   const hasMore = Boolean(data && !endReached && data.rows.length < data.total)
@@ -329,7 +330,7 @@ export default function MobileProgressPanel({
   const open = (row, section = null) => {
     remember()
     setSuppressDetailOpenMotion(false)
-    const next = { id: row.id, view: row.view, orderNo: row.order_no, section }
+    const next = { id: row.line?.sales_order_id || row.id, lineID: row.line ? row.id : undefined, view: row.view, orderNo: row.order_no, section }
     window.history.pushState(
       {
         ...window.history.state,
@@ -362,7 +363,8 @@ export default function MobileProgressPanel({
     if (key === 'due_status') return `交期：${label}`
     return label
   })
-  const filtered = values.q || filterCount > 0 || query.due_status !== 'all' || query.blocked_only
+  const filtered = values.q || filterCount > 0 || query.due_status !== 'all' ||
+    lines && query.delivery_status !== 'all' || query.blocked_only
   const filterCounts = loading ? undefined : counts
   return (
     <section
@@ -412,6 +414,7 @@ export default function MobileProgressPanel({
               onReset={() => update(progressFilterReset(query))}
             >
               <BusinessProgressFilterFields
+                adminProfile={adminProfile}
                 compact
                 query={query}
                 counts={filterCounts}
@@ -420,17 +423,32 @@ export default function MobileProgressPanel({
               />
             </MobileFilterPopover>
           </div>
+          {query.view === 'orders' && (
+            <ProgressDeliverySwitch
+              query={query}
+              onChange={(display) => update({
+                display: display === 'lines' ? 'lines' : '',
+                due_status: '',
+                delivery_status: '',
+                blocked_only: '',
+              })}
+            />
+          )}
           <HorizontalScroll
             className="mobile-progress-risks"
             role="group"
             aria-label="进度快捷筛选"
           >
-            <ProgressDueFilters
-              compact
-              query={query}
-              counts={filterCounts}
-              onChange={update}
-            />
+            {lines ? (
+              <ProgressDeliveryFilters query={query} counts={filterCounts} onChange={update} />
+            ) : (
+              <ProgressDueFilters
+                compact
+                query={query}
+                counts={filterCounts}
+                onChange={update}
+              />
+            )}
             <ProgressBlockedFilter
               compact
               query={query}
@@ -468,6 +486,24 @@ export default function MobileProgressPanel({
             aria-busy={loading || loadingMore}
           >
             {data?.rows.map((row) => {
+              if (row.line) { return (
+                <article key={row.id} className="mobile-progress-card">
+                  <WorkflowTaskCard
+                    className="mobile-progress-card-selection"
+                    contentClassName="mobile-progress-card-main"
+                    label={`查看 ${row.order_no} · ${row.product} · 第 ${row.line.line_no} 行进度`}
+                    onOpen={() => open(row, 'lines')}
+                  >
+                    <span className="mobile-progress-card-identity">
+                      <ProgressLineProduct row={row} />
+                      <ProgressLineStatus row={row} snapshotAt={data.snapshot_at} />
+                    </span>
+                    <span className="erp-progress-reference">{row.order_no} · {row.customer || '客户未填写'}</span>
+                    <span>交付日期 {row.due_date || '未排交期'} · 剩余待交 <ProgressLineRemaining row={row} /></span>
+                    <ProgressDelivery row={row} showProgress />
+                  </WorkflowTaskCard>
+                </article>
+              ) }
               const taskSummary = mobileProgressTaskSummary(row, roleLabel)
               const directTaskID = onOpenTask ? taskSummary.taskID : null
               return (
@@ -562,8 +598,8 @@ export default function MobileProgressPanel({
         </Spin>
         {data ? (
           <div className="mobile-progress-range" role="status">
-            已显示 {data.rows.length} / 共 {data.total} 张
-            {query.view === 'orders' ? '订单' : '生产单'}
+            已显示 {data.rows.length} / 共 {data.total}
+            {lines ? ' 条交付明细' : query.view === 'orders' ? ' 张订单' : ' 张生产单'}
           </div>
         ) : null}
         <MobileBackToTop enabled={active && !selection} />

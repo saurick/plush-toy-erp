@@ -24,6 +24,7 @@ func TestSalesOrderSummaryUsesShippedFactsAndPreservesUnknownBalance(t *testing.
 	f.createShipmentItem(t, "SHIP-SUM-POSTED", biz.ShipmentStatusShipped, order.ID, line.ID, 4)
 	uc := biz.NewSalesOrderUsecase(NewSalesOrderRepo(&Data{postgres: f.client}, log.NewStdLogger(io.Discard)))
 	filter := biz.SalesOrderSummaryFilter{SalesOrderFilter: biz.SalesOrderFilter{Keyword: order.OrderNo, Limit: 20, LifecycleScope: "all"}}
+	filter.SortBy, filter.SortDirection = biz.WorkbenchSummarySortUnshippedQuantity, "desc"
 	rows, _, err := uc.ListSalesOrderSummary(ctx, filter)
 	if err != nil || len(rows) != 1 || rows[0].Item.ShippedQuantity.String() != "4" || rows[0].Item.UnshippedQuantity.String() != "6" {
 		t.Fatalf("draft shipment changed balance: %+v %v", rows, err)
@@ -34,6 +35,22 @@ func TestSalesOrderSummaryUsesShippedFactsAndPreservesUnknownBalance(t *testing.
 	if err != nil || len(rows) != 1 || rows[0].Item.UnshippedQuantity != nil || rows[0].Item.ShippedQuantity != nil {
 		t.Fatalf("ambiguous source must not invent a balance: %+v %v", rows, err)
 	}
+	knownOrder := f.createOrder(t, "SO-SUM-KNOWN", biz.SalesOrderStatusActive)
+	small := f.createOrderItem(t, knownOrder.ID, 1, "open", 9)
+	large := f.createOrderItem(t, knownOrder.ID, 2, "open", 20)
+	f.createShipmentItem(t, "SHIP-SUM-OVER", biz.ShipmentStatusShipped, knownOrder.ID, small.ID, 10)
+	filter.Keyword, filter.Limit = "", 1
+	for direction, ids := range map[string][]int{"asc": {small.ID, large.ID, line.ID}, "desc": {large.ID, small.ID, line.ID}} {
+		filter.SortDirection = direction
+		for offset, want := range ids {
+			filter.Offset = offset
+			page, total, err := uc.ListSalesOrderSummary(ctx, filter)
+			if err != nil || total != 3 || len(page) != 1 || page[0].Item.ID != want {
+				t.Fatalf("remaining %s offset=%d want=%d rows=%v err=%v", direction, offset, want, page, err)
+			}
+		}
+	}
+
 }
 
 func TestSalesOrderSummaryRowsFiltersAndSourceDisplay(t *testing.T) {
@@ -87,6 +104,36 @@ func TestSalesOrderSummaryRowsFiltersAndSourceDisplay(t *testing.T) {
 		t.Fatalf("second page: %+v %d %v", rows, total, err)
 	}
 	base.Offset = 0
+	client.SalesOrderItem.UpdateOneID(older.Items[0].ID).SetUnitPrice(decimal.RequireFromString("2.75")).ExecX(ctx)
+	client.SalesOrderItem.UpdateOneID(older.Items[1].ID).SetUnitPrice(decimal.RequireFromString("12.25")).ExecX(ctx)
+	for _, tc := range []struct {
+		field, direction string
+		ids              []int
+	}{
+		{biz.WorkbenchSummarySortOrderNo, "asc", []int{newer.Items[0].ID, older.Items[0].ID, older.Items[1].ID}},
+		{biz.WorkbenchSummarySortUnshippedQuantity, "asc", []int{older.Items[0].ID, older.Items[1].ID, newer.Items[0].ID}},
+		{biz.WorkbenchSummarySortOrderedQuantity, "desc", []int{newer.Items[0].ID, older.Items[1].ID, older.Items[0].ID}},
+		{biz.WorkbenchSummarySortProductionQuantity, "asc", []int{older.Items[0].ID, older.Items[1].ID, newer.Items[0].ID}},
+		{biz.WorkbenchSummarySortUnitPrice, "desc", []int{older.Items[1].ID, older.Items[0].ID, newer.Items[0].ID}},
+		{biz.WorkbenchSummarySortUnitPrice, "asc", []int{older.Items[0].ID, older.Items[1].ID, newer.Items[0].ID}},
+		{biz.WorkbenchSummarySortSalesOwner, "asc", []int{older.Items[0].ID, older.Items[1].ID, newer.Items[0].ID}},
+		{biz.WorkbenchSummarySortProcessRequirement, "asc", []int{older.Items[0].ID, newer.Items[0].ID, older.Items[1].ID}},
+
+		{biz.WorkbenchSummarySortCustomerProductNo, "desc", []int{older.Items[0].ID, newer.Items[0].ID, older.Items[1].ID}},
+		{biz.WorkbenchSummarySortOrderDate, "asc", []int{older.Items[0].ID, older.Items[1].ID, newer.Items[0].ID}},
+		{biz.WorkbenchSummarySortPlannedDeliveryDate, "asc", []int{older.Items[0].ID, older.Items[1].ID, newer.Items[0].ID}},
+		{biz.WorkbenchSummarySortPlannedDeliveryDate, "desc", []int{older.Items[1].ID, older.Items[0].ID, newer.Items[0].ID}},
+	} {
+		sorted := base
+		sorted.SortBy, sorted.SortDirection, sorted.Limit = tc.field, tc.direction, 1
+		for offset, want := range tc.ids {
+			sorted.Offset = offset
+			page, total, err := uc.ListSalesOrderSummary(ctx, sorted)
+			if err != nil || total != 3 || len(page) != 1 || page[0].Item.ID != want {
+				t.Fatalf("sort=%s %s offset=%d want=%d rows=%v err=%v", tc.field, tc.direction, offset, want, page, err)
+			}
+		}
+	}
 	for _, tc := range []struct {
 		name      string
 		change    func(*biz.SalesOrderSummaryFilter)

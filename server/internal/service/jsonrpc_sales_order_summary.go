@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -33,17 +34,29 @@ func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, method,
 			"customers": customers, "sales_owners": toAnySliceString(options.SalesOwners),
 		})}, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "customer_id", "customer", "sales_owner", "sales_owner_name", "lifecycle_status", "date_field", "date_from", "date_to", "limit", "offset") {
+	if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "customer_id", "customer", "sales_owner", "sales_owner_name", "lifecycle_status", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	filter := biz.SalesOrderSummaryFilter{SalesOrderFilter: biz.SalesOrderFilter{Limit: 20, LifecycleScope: "all"}}
-	for key, target := range map[string]*string{"keyword": &filter.Keyword, "customer": &filter.Customer, "sales_owner": &filter.SalesOwner, "sales_owner_name": &filter.SalesOwnerName, "lifecycle_status": &filter.LifecycleStatus, "date_field": &filter.DateField} {
+	for key, target := range map[string]*string{"keyword": &filter.Keyword, "customer": &filter.Customer, "sales_owner": &filter.SalesOwner, "sales_owner_name": &filter.SalesOwnerName, "lifecycle_status": &filter.LifecycleStatus, "date_field": &filter.DateField, "sort_by": &filter.SortBy, "sort_direction": &filter.SortDirection} {
 		if raw, exists := pm[key]; exists {
 			value, ok := raw.(string)
 			if !ok {
 				return id, invalidParamResult(), nil
 			}
 			*target = value
+		}
+	}
+	// Sorting must enforce the same field access as the returned sales rows.
+	switch strings.TrimSpace(filter.SortBy) {
+	case biz.WorkbenchSummarySortCurrency:
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFieldFinanceSettlementRead); res != nil {
+			return id, res, nil
+		}
+		fallthrough
+	case biz.WorkbenchSummarySortUnitPrice:
+		if res := d.RequireAdminPermission(ctx, biz.PermissionFieldSalesCommercialRead); res != nil {
+			return id, res, nil
 		}
 	}
 	for key, target := range map[string]*int{"limit": &filter.Limit, "offset": &filter.Offset} {

@@ -24,6 +24,8 @@
 - `dev*` 文件只服务 `/__dev` 本地开发态入口，不进入正式 ERP 菜单、seedData、RBAC 或生产构建。测试数据准备只通过 loopback Bridge 的固定 profile 编排既有 seed / 验收入口，不接任意 shell、SQL、DSN、后端地址或正式业务菜单。
 - 配置文件里的测试通常锁住展示合同和入口边界，不证明目标环境 release evidence、真实账号 RBAC 或客户验收完成。
 
+业务对象类型、名称与所属模块来自 `server/internal/biz/workflow_task_catalog.json.documents` 的同源生成目录，由 `businessModules.mjs` 统一接入：菜单标签由页面 `title` 派生，列表标题、任务关联信息和“单据类型”选项复用 `getBusinessDocumentTitle()`；`section_key` 对应既有业务菜单分组，任务筛选复用其顺序和名称。入库办理等汇总入口内的具体记录使用各自登记的名称；打印模板名称沿用纸面合同。
+
 ## 打印模板说明
 
 打印中心以一句用途、正式纸面缩略图和三条分区说明展示五种模板。`printTemplates.mjs` 的 `summary` 提供用途，`guide` 的每项包含 `title`、`description` 和定位正式纸面区域的 `selector`；编号由同一数组生成，不另维护示意图字段或图片。

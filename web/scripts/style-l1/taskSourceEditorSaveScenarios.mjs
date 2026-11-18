@@ -112,9 +112,17 @@ reads
         page.setDefaultTimeout(10000)
         await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
         const steps = page.getByRole('tablist', { name: '任务处理步骤', exact: true })
+        const sourceInfo = page.getByTestId('workflow-task-business-information').getByTestId('mobile-task-business-source')
+        await sourceInfo.waitFor()
+        if (definition.source === 'outsourcing_order') {
+          await sourceInfo.getByText('模拟委托单位', { exact: true }).waitFor()
+          await sourceInfo.locator('[data-field-key="buyer-contact"]').getByText('模拟联系人', { exact: true }).waitFor()
+        }
+        assert.equal(await page.getByRole('dialog').filter({ visible: true }).count(), 1, `${definition.source} 预加载只保留任务抽屉`)
         await steps.getByRole('tab').nth(1).click()
         const editor = page.locator('[data-business-form-page]').filter({ has: page.getByRole('heading', { name: definition.title, exact: true }) }).last()
         await editor.waitFor()
+        assert.equal(await page.getByRole('dialog').filter({ visible: true }).count(), 1, `${definition.source} 办理复用同一任务抽屉`)
         await page.waitForFunction((title) => [...document.querySelectorAll('[data-business-form-page]')].some((node) => node.getAttribute('aria-label') === title && node.getAttribute('aria-busy') === 'false'), definition.title)
         await assertBusinessFormNavigationSurface(page, editor)
         await writeFile(path.join(outputDir, `source-${definition.source}-initial.json`), JSON.stringify({ original, reads, fields: await editor.locator('input,textarea').evaluateAll((nodes) => nodes.map((node) => ({ id: node.id, value: node.value, disabled: node.disabled }))) }, null, 2))
@@ -168,8 +176,10 @@ reads
           assert.equal(stored[definition.source === 'production_order' ? 'status' : 'lifecycle_status'], definition.source === 'production_order' ? 'RELEASED' : 'submitted')
           if (definition.source === 'outsourcing_order') {
             await actionHost.getByRole('button', { name: '确认下单', exact: true }).click()
-            await page.locator('.ant-modal-confirm').filter({ hasText: '确认下单' }).getByRole('button', { name: '确认下单', exact: true }).click()
-            await page.waitForFunction(() => !document.querySelector('.ant-btn-loading'))
+            const confirmOrder = page.locator('.ant-modal-confirm').filter({ hasText: '确认下单' })
+            await confirmOrder.getByRole('button', { name: '确认下单', exact: true }).click()
+            await confirmOrder.waitFor({ state: 'hidden' })
+            await actionHost.getByRole('button', { name: '确认下单', exact: true }).waitFor({ state: 'hidden' })
             assert.equal(writes[2].method, 'confirm_outsourcing_order')
             assert.equal(stored.lifecycle_status, 'confirmed')
           }

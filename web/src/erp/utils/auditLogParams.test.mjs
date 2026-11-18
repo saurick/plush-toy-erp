@@ -49,3 +49,10 @@ test('auditLogParams: preserves explicit timestamps without adding day boundarie
   assert.equal(params.created_from, '2026-09-26T09:30:00+08:00')
   assert.equal(params.created_to, '2026-09-26T10:30:00+08:00')
 })
+
+test('auditLogParams: queries a family of records with individual event keys', () => {
+  assert.deepEqual(
+    buildAuditLogParams({ source: 'workflow', eventType: 'process_instance_created' }),
+    { limit: 20, offset: 0, source: 'workflow', event_type: 'process_instance_created' }
+  )
+})

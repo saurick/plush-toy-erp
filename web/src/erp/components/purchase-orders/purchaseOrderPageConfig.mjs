@@ -33,7 +33,7 @@ export const PURCHASE_ORDER_SORT_OPTIONS = [
 
 export const PURCHASE_ORDER_DATE_FILTER_OPTIONS = [
   { label: '下单日期', value: 'purchase_date' },
-  { label: '预计到货日期', value: 'expected_arrival_date' },
+  { label: '预计到货日期', value: 'expected_arrival_date', upcoming: true },
 ]
 
 export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [

@@ -35,6 +35,8 @@ export function normalizeMobileProgressQuery(values, defaultView) {
     due_status: query.due_status,
     blocked_only: query.blocked_only,
     unlinked_only: query.unlinked_only,
+    ...(query.display ? { display: query.display, delivery_status: query.delivery_status } : {}),
+    ...(query.customer_id ? { customer_id: query.customer_id } : {}),
     // Appended batches are reloaded from the first page when returning.
     page: 1,
   }

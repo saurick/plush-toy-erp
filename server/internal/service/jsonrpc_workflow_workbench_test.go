@@ -72,6 +72,7 @@ func TestWorkflowWorkbenchReturnsOneBoundedSnapshotForProjectedRoles(t *testing.
 	dispatcher, repo := workflowWorkbenchTestDispatcher(admin, customerConfigUC)
 	params := mustJSONRPCStruct(t, map[string]any{
 		"queue_key": biz.WorkflowWorkbenchQueueActionable,
+		"sort":      biz.WorkflowTaskBoardSortTimeDesc,
 		"limit":     float64(100),
 		"offset":    float64(0),
 	})
@@ -86,7 +87,7 @@ func TestWorkflowWorkbenchReturnsOneBoundedSnapshotForProjectedRoles(t *testing.
 		t.Fatalf("workbench result=%#v err=%v", result, err)
 	}
 	query := repo.workbenchQuery
-	if query.QueueKey != biz.WorkflowWorkbenchQueueActionable || query.Limit != 100 || query.Offset != 0 || query.SnapshotAt.IsZero() {
+	if query.QueueKey != biz.WorkflowWorkbenchQueueActionable || query.Sort != biz.WorkflowTaskBoardSortTimeDesc || query.Limit != 100 || query.Offset != 0 || query.SnapshotAt.IsZero() {
 		t.Fatalf("workbench query=%#v", query)
 	}
 	if query.VisibilityScope == nil || query.RiskVisibilityScope == nil {

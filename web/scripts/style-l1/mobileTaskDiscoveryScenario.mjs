@@ -105,14 +105,14 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       await open()
       for (const label of ['业务模块', '业务流程', '业务环节', '办理人']) assert.equal(await dialog.getByText(label, { exact: true }).count(), 0)
       await assertMobileFilterDensity({ assert, dialog })
-      await select(dialog, '来源单据', '销售订单')
+      await select(dialog, '单据类型', '销售订单')
       await close()
-      await page.waitForFunction(() => document.querySelector('[data-testid="mobile-task-list-filter-trigger"]')?.getAttribute('title') === '来源单据：销售订单')
+      await page.waitForFunction(() => document.querySelector('[data-testid="mobile-task-list-filter-trigger"]')?.getAttribute('title') === '单据类型：销售订单')
       assert(reads.some(({ method, params }) => method === 'list_role_tasks' && params.source_type === 'sales_order' && !params.assignee))
       await open()
       await Promise.all([
         page.waitForResponse((response) => response.url().endsWith('/rpc/workflow') && response.request().postDataJSON()?.method === 'list_role_tasks' && !response.request().postDataJSON()?.params.source_type),
-        select(dialog, '来源单据', '全部'),
+        select(dialog, '单据类型', '全部'),
       ])
       await close()
       assert.equal(reads.findLast(({ method }) => method === 'list_role_tasks').params.source_type || '', '')
@@ -261,7 +261,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       for (const width of [320, 390, 430]) {
         await page.setViewportSize({ width, height: 844 })
         await open()
-        await select(dialog, '来源单据', '销售订单')
+        await select(dialog, '单据类型', '销售订单')
         await assertMobileFilterDensity({ assert, dialog })
         const boxes = await dialog.evaluate((el) => ({
           left: el.getBoundingClientRect().left,

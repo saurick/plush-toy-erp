@@ -42,7 +42,7 @@ const navItemRegistry = {
     label: '工作台',
     path: '/erp/dashboard',
     shortLabel: '工作台',
-    description: '聚合今日待办、阻塞交接、当前处理和业务状态摘要。',
+    description: '按岗位权限查看销售订单、材料和收付款汇总。',
   },
   'task-board': {
     key: 'task-board',

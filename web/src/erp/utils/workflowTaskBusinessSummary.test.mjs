@@ -39,3 +39,25 @@ test('long receipts bound their rendered rows without hiding the confirmed row c
   assert.equal(summary.items.length, 20)
   assert.equal(summary.itemCount, 500)
 })
+
+test('质检任务回执从正式判定区分不合格和让步接收', () => {
+  for (const [status, result, label] of [['PASSED', 'PASS', '合格'], ['PASSED', 'CONCESSION', '让步接收'], ['REJECTED', 'REJECT', '不合格']]) {
+    const summary = workflowTaskBusinessSummary({ inspection_no: 'QC-031', status, result, decision_note: '按本批检验记录判定' })
+    const fields = Object.fromEntries(summary.fields.map((field) => [field.label, field.value]))
+    assert.equal(fields['检验结论'], label)
+    assert.equal(fields['判定意见'], '按本批检验记录判定')
+    assert.equal(fields['业务状态'], status === 'REJECTED' ? '不合格' : '合格')
+  }
+  const pending = workflowTaskBusinessSummary({ inspection_no: 'QC-032', status: 'SUBMITTED' })
+  assert.deepEqual(pending.fields, [{ label: '业务状态', value: '已提交' }])
+})
+
+test('异常处置回执分别读取审批结论、实际执行状态与原因', () => {
+  const record = { decision_no: 'PE-7', status: 'APPROVED', approved_quantity: '12', decision_reason: '同意报废' }
+  for (const [execution_status, expected] of [['PENDING', '待业务办理'], ['APPLIED', '业务已执行'], ['REVERSED', '业务已冲正']]) {
+    const { fields } = workflowTaskBusinessSummary({ ...record, execution_status })
+    assert.deepEqual(Object.fromEntries(fields.map(({ label, value }) => [label, value])), {
+      审批状态: '已批准', 业务状态: expected, 批准数量: '12', 审批意见: '同意报废',
+    })
+  }
+})

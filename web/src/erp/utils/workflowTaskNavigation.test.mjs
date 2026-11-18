@@ -54,6 +54,22 @@ test('task navigation keeps account, source record and original history when ret
   }
 })
 
+test('从进度任务打开来源并提交后，保留同账号原看板的历史位置', () => {
+  const progressOrigin = { adminID: 9, index: 3 }
+  const history = { state: { idx: 4, usr: { progressOrigin } }, replaceState(next) { this.state = next } }
+  const previous = globalThis.window
+  globalThis.window = { history }
+  try {
+    const open = (id) => workflowTaskEntryNavigation({ id: 42 }, '/erp/warehouse/shipments?shipment_id=7', '/erp/task-board?task_id=42', id).state.workflowTaskNavigation
+    const back = workflowTaskReturnNavigation({ ...open(9), businessReceipt: { message: '保存成功' } }, 5)
+    assert.deepEqual(back.options.state.progressOrigin, progressOrigin)
+    assert.equal(open(10).progressOrigin, undefined)
+  } finally {
+    if (previous === undefined) delete globalThis.window
+    else globalThis.window = previous
+  }
+})
+
 test('mobile document targets stay in task management and recover without a history index', () => {
   const path = mobileBusinessPath('/erp/production/orders?production_order_id=7', 'warehouse')
   assert.equal(path, '/m/warehouse/tasks')

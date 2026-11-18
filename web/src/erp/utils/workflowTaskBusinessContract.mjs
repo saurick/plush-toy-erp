@@ -7,6 +7,7 @@ const contracts = {
   engineering_data: ['engineering'],
   engineering_material_revision: ['engineering-material'],
   handoff_shipment_execute: ['shipment-edit', 'shipment-release', 'shipment-ship'],
+  handoff_shipment_quality: ['submit', 'pass', 'reject'],
   handoff_purchase_arrival: ['generate-inbound'],
   handoff_receipt_replacement: ['quality-disposition'],
   handoff_receipt_quality: ['submit', 'pass', 'reject'],

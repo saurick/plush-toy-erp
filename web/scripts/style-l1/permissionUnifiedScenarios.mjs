@@ -493,8 +493,7 @@ export function createPermissionUnifiedScenarios({
         assert.equal(await frame.getByRole('combobox', { name: '岗位导航排列方式' }).count(), 0)
         assert.equal(await frame.getByRole('button', { name: '保存岗位设置', exact: true }).isDisabled(), true)
         await frame.getByRole('tab', { name: '页面访问', exact: true }).click()
-        await chooseSelectOption(frame
-          .getByRole('combobox', { name: '筛选业务模块' }), '财务管理')
+        await frame.getByRole('group', { name: '筛选业务模块' }).getByRole('button', { name: /^财务管理/u }).click()
         assert.equal(
           await frame
             .locator(

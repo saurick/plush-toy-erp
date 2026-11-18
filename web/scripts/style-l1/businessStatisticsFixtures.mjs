@@ -271,24 +271,12 @@ export function statisticsFixtureData(
         ...metrics(records, ages, restricted),
       }
     })
-    .sort((a, b) =>
-      params.sort === 'name'
-        ? a.name.localeCompare(b.name, 'zh-CN')
-        : b[
-            params.sort === 'amount'
-              ? ages
-                ? 'balance'
-                : 'amount'
-              : params.sort || 'count'
-          ] -
-          a[
-            params.sort === 'amount'
-              ? ages
-                ? 'balance'
-                : 'amount'
-              : params.sort || 'count'
-          ]
-    )
+    .sort((a, b) => {
+      const nameOrder = a.name.localeCompare(b.name, 'zh-CN')
+      const field = ages && params.sort === 'amount' ? 'balance' : params.sort || 'count'
+      const order = field === 'name' ? nameOrder : a[field] - b[field]
+      return (params.direction === 'asc' ? order : -order) || nameOrder || a.key.localeCompare(b.key)
+    })
   return {
     ...meta,
     report: ages ? 'receivables' : 'delivery',

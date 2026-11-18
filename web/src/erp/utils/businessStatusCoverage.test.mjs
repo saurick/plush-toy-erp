@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Linter } from 'eslint'
 import { readContractSource } from '../../../scripts/test/publicContractSource.mjs'
+import { QUALITY_STATUS_OPTIONS } from './qualityInspectionLabels.mjs'
 import * as contracts from '../../common/consts/statuses.generated.mjs'
 
 function presentationKeys(relative, name) {
@@ -39,7 +40,6 @@ for (const [file, name, ...domains] of [
   ['./masterDataOrderView.mjs', 'OUTSOURCING_ORDER_ITEM_STATUS_LABELS', 'OutsourcingOrderItemStatus'],
   ['./masterDataOrderView.mjs', 'SOURCE_DOCUMENT_ITEM_STATUS_TONES', 'SalesOrderItemStatus', 'PurchaseOrderItemStatus', 'OutsourcingOrderItemStatus'],
   ['./productionOrderModel.mjs', 'PRODUCTION_ORDER_STATUS_META', 'ProductionOrderStatus'],
-  ['./businessVisualizationModels.mjs', 'PRODUCTION_ORDER_STATUS_META', 'ProductionOrderStatus'],
   ['./productionWipModel.mjs', 'PRODUCTION_WIP_STATUS_META', 'ProductionWIPStatus'],
   ['./productionWipModel.mjs', 'PRODUCTION_WIP_QUALITY_STATUS_META', 'QualityInspectionStatus'],
   ['./processRuntimePresentation.mjs', 'PROCESS_STATUS_LABELS', 'ProcessStatus'],
@@ -54,8 +54,7 @@ for (const [file, name, ...domains] of [
   ['../components/inventory/inventoryLedgerPresentation.jsx', 'LOT_STATUS_LABELS', 'InventoryLotStatus'],
   ['../components/inventory/inventoryLedgerPresentation.jsx', 'LOT_STATUS_COLORS', 'InventoryLotStatus'],
   ['../pages/PurchaseReceiptsPage.jsx', 'STATUS_OPTIONS', 'PurchaseReceiptStatus'],
-  ['../components/quality-inspections/qualityInspectionColumns.jsx', 'QUALITY_STATUS_OPTIONS', 'QualityInspectionStatus'],
-  ['../components/quality-inspections/qualityInspectionColumns.jsx', 'QUALITY_STATUS_LABELS', 'QualityInspectionStatus'],
+  ['./qualityInspectionLabels.mjs', 'QUALITY_STATUS_LABELS', 'QualityInspectionStatus'],
   ['../components/operational-facts/operationalFactPageConfig.mjs', 'STATUS_OPTIONS', 'OperationalFactStatus', 'ShipmentStatus', 'StockReservationStatus'],
 ]) { test(`business status coverage: ${file} ${name} follows ${domains.join(', ')}`, () => {
   const actual = presentationKeys(file, name)
@@ -63,3 +62,8 @@ for (const [file, name, ...domains] of [
   const expected = [...new Set(domains.flatMap((domain) => Object.values(contracts[domain])))].sort()
   assert.deepEqual(actual.sort(), expected, `${name}: update presentation when the domain changes`)
 }) }
+
+test('quality inspection filters cover every public status once and preserve the unfiltered choice', () => {
+  assert.deepEqual(QUALITY_STATUS_OPTIONS.map(({ value }) => value).sort(), ['', ...Object.values(contracts.QualityInspectionStatus)].sort())
+  assert(QUALITY_STATUS_OPTIONS.every(({ label }) => typeof label === 'string' && label.length > 0))
+})

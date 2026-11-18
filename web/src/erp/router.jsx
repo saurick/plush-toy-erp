@@ -42,6 +42,7 @@ const WorkflowTaskLinkEntryPage = lazyRoute(() => import('./pages/WorkflowTaskLi
 const BusinessDashboardPage = lazyRoute(
   () => import('./pages/BusinessDashboardPage')
 )
+const WorkbenchPage = lazyRoute(() => import('./pages/WorkbenchPage'))
 const DashboardPage = lazyRoute(() => import('./pages/DashboardPage'))
 const PrintCenterPage = lazyRoute(() => import('./pages/PrintCenterPage'))
 const PrintTemplatePreviewPage = lazyRoute(
@@ -419,8 +420,8 @@ function renderSplitPage(location, context) {
 function desktopPageRoutes() {
   return (
     <>
-      <Route path="dashboard" element={<DashboardPage initialView="workbench" />} />
-      <Route path="task-board" element={<DashboardPage initialView="task-board" />} />
+      <Route path="dashboard" element={<WorkbenchPage />} />
+      <Route path="task-board" element={<DashboardPage />} />
       {businessTaskRoutes()}
       <Route path="help-center" element={<HelpCenterPage />} />
     </>

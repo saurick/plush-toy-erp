@@ -423,7 +423,7 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 		},
 		{
 			key:         "finance-payments",
-			label:       "收付款核销",
+			label:       "收付款单",
 			path:        "/erp/finance/payments",
 			permissions: []string{PermissionFinancePaymentRead},
 		},

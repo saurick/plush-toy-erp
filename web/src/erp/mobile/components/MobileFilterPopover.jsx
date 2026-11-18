@@ -49,9 +49,10 @@ export default function MobileFilterPopover({
         event.preventDefault()
         event.stopPropagation()
         onOpenChange(false)
+        trigger.current?.focus({ preventScroll: true })
       }
     },
-    [onOpenChange, open]
+    [onOpenChange, open, trigger]
   )
   useEffect(() => {
     if (!open) return undefined

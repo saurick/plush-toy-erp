@@ -42,7 +42,8 @@ func (r *businessStatisticsRepo) deliveryQuery(q biz.BusinessStatisticsQuery) (s
 	day, soon := bind(local.Format("2006-01-02")), bind(local.AddDate(0, 0, 6).Format("2006-01-02"))
 	date := progressDateSQL("b.due_at", r.reader.data.sqlDialect)
 	cte += `, delivery AS (
- SELECT b.*,s.customer_id,c.name AS customer_name,s.currency,s.order_total,` + date + ` AS due_date,
+ SELECT b.id,b.order_no,b.customer,b.sales_owner,b.delivery_known,
+ s.customer_id,c.name AS customer_name,s.currency,s.order_total,` + date + ` AS due_date,
  CASE WHEN b.delivery_known=0 THEN 'unknown'
  WHEN NOT EXISTS(SELECT 1 FROM sales_lines l WHERE l.sales_order_id=b.id AND l.shipped_quantity<l.ordered_quantity) THEN 'done'
  WHEN b.active=1 THEN 'pending' ELSE 'closed' END AS delivery_status

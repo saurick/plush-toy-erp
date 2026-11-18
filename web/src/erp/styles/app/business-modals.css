@@ -541,10 +541,6 @@
   min-width: 0;
 }
 
-.erp-source-import-picker .ant-table-row:not(.erp-source-import-picker__row--disabled) {
-  cursor: pointer;
-}
-
 .erp-source-import-picker__row--disabled {
   color: var(--erp-source-import-disabled-text, #98a2b3);
   background: var(--erp-source-import-disabled-bg, #f8fafc);
@@ -1901,10 +1897,6 @@
   flex-wrap: wrap;
   min-width: 0;
   gap: 4px;
-}
-
-.erp-role-effective-access__toolbar > .ant-select {
-  min-width: 180px;
 }
 
 .erp-role-effective-access__filters {

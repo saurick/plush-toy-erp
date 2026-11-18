@@ -1,5 +1,5 @@
 import React from 'react'
-import { getBusinessModule } from '../config/businessModules.mjs'
+import { getBusinessModule, getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import { OperationalFactWorkspace } from './OperationalFactsPage.jsx'
 import FinanceWorkspace from '../components/finance/FinanceWorkspace.jsx'
 
@@ -9,7 +9,7 @@ const PAGE_CONFIGS = Object.freeze({
     enabledViews: ['production'],
     viewOverrides: {
       production: {
-        title: '生产记录 / 成品入库',
+        title: getBusinessDocumentTitle('production_fact'),
       },
     },
   },

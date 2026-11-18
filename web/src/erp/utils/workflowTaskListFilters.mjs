@@ -1,3 +1,5 @@
+import { getBusinessDocumentTypeKey } from '../config/businessModules.mjs'
+
 export const WORKFLOW_TASK_DUE_OPTIONS = Object.freeze([
   { value: 'all', label: '全部截止时间' },
   { value: 'overdue', label: '已超时' },
@@ -14,7 +16,7 @@ export function normalizeTaskListFilters(value = {}) {
     ...(typeof value.sourceType === 'string' &&
     value.sourceType.trim() &&
     value.sourceType !== 'all'
-      ? { sourceType: value.sourceType.trim().slice(0, 64) }
+      ? { sourceType: getBusinessDocumentTypeKey(value.sourceType.trim().slice(0, 64)) }
       : {}),
   }
 }

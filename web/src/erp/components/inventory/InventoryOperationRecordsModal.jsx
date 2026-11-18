@@ -11,7 +11,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { listInventoryOperations } from '../../api/inventoryApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { BusinessDataTable, BusinessOperationPanel } from '../business-list/BusinessListLayout.jsx'
 
 const TYPE_LABELS = Object.freeze({
@@ -23,7 +23,7 @@ const TYPE_LABELS = Object.freeze({
 const STATUS_LABELS = Object.freeze({
   [InventoryOperationStatus.DRAFT]: '草稿',
   [InventoryOperationStatus.SUBMITTED]: '待审批',
-  [InventoryOperationStatus.APPROVED]: '已批准待过账',
+  [InventoryOperationStatus.APPROVED]: '已批准待执行',
   [InventoryOperationStatus.REJECTED]: '已驳回',
   [InventoryOperationStatus.POSTED]: '已过账',
   [InventoryOperationStatus.CANCELLED]: '已取消',
@@ -235,25 +235,23 @@ export default function InventoryOperationRecordsModal({
 
   const filters = (
     <>
-      <FilterSelect
+      <FilterChipGroup
+        allowClear
         label="作业类型"
-        placeholder="作业类型"
         aria-label="作业类型"
         value={operationType}
         options={TYPE_OPTIONS}
-        style={{ width: 180 }}
         onChange={(value) => {
             setOperationType(value)
             setPagination((current) => ({ ...current, current: 1 }))
           }}
       />
-      <FilterSelect
+      <FilterChipGroup
+        allowClear
         label="作业状态"
-        placeholder="作业状态"
         aria-label="作业状态"
         value={status}
         options={STATUS_OPTIONS}
-        style={{ width: 180 }}
         onChange={(value) => {
             setStatus(value)
             setPagination((current) => ({ ...current, current: 1 }))

@@ -7,6 +7,12 @@ export const BOMLossSource = Object.freeze({
   UNRESOLVED: 'unresolved',
 })
 
+export const BusinessProgressSort = Object.freeze({
+  DUE_DATE: 'due_date',
+  ORDER_NO: 'order_no',
+  PRODUCT: 'product',
+})
+
 export const FinanceAdjustmentDirection = Object.freeze({
   DECREASE: 'DECREASE',
   INCREASE: 'INCREASE',
@@ -257,6 +263,30 @@ export const WarehouseProductionStage = Object.freeze({
   RETURN: 'AWAITING_RETURN',
 })
 
+export const WorkbenchSummarySort = Object.freeze({
+  CURRENCY: 'currency',
+  CUSTOMER_NAME: 'customer_name',
+  CUSTOMER_ORDER_NO: 'customer_order_no',
+  CUSTOMER_PRODUCT_NO: 'customer_product_no',
+  DESIGNER: 'designer',
+  LIFECYCLE_STATUS: 'lifecycle_status',
+  NOTE: 'note',
+  ORDER_CATEGORY: 'order_category',
+  ORDER_DATE: 'order_date',
+  ORDER_NO: 'order_no',
+  ORDERED_QUANTITY: 'ordered_quantity',
+  PLANNED_DELIVERY_DATE: 'planned_delivery_date',
+  PROCESS_REQUIREMENT: 'process_requirement',
+  PRODUCT: 'product',
+  PRODUCTION_QUANTITY: 'production_quantity',
+  SALES_OWNER: 'sales_owner',
+  SAMPLE_QUANTITY: 'pre_shipment_sample_quantity',
+  SUBMITTED_AT: 'submitted_at',
+  UNIT_NAME: 'unit_name',
+  UNIT_PRICE: 'unit_price',
+  UNSHIPPED_QUANTITY: 'unshipped_quantity',
+})
+
 export const WorkflowBusinessStatus = Object.freeze({
   BLOCKED: 'blocked',
   CANCELLED: 'cancelled',
@@ -278,6 +308,14 @@ export const WorkflowBusinessStatus = Object.freeze({
   SHIPPING_RELEASED: 'shipping_released',
   WAREHOUSE_INBOUND_PENDING: 'warehouse_inbound_pending',
   WAREHOUSE_PROCESSING: 'warehouse_processing',
+})
+
+export const WorkflowTaskBoardSort = Object.freeze({
+  DUE_SOON: 'due_soon',
+  NEWEST: 'newest',
+  SMART: 'smart',
+  TIME_ASC: 'time_asc',
+  TIME_DESC: 'time_desc',
 })
 
 export const WorkflowTaskStatus = Object.freeze({

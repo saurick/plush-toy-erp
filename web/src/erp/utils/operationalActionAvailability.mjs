@@ -93,7 +93,7 @@ export function resolveFinancePaymentActionAvailability({
         relevant: [FinancePaymentStatus.DRAFT, FinancePaymentStatus.APPROVED].includes(status),
         applicable: [FinancePaymentStatus.DRAFT, FinancePaymentStatus.APPROVED].includes(status),
         busy,
-        unavailableReason: '只有尚未过账的收付款可以核对取消',
+        unavailableReason: '只有尚未入账的收付款可以核对取消',
         busyReason: '当前操作完成后可核对取消',
       })
     case 'reverse':

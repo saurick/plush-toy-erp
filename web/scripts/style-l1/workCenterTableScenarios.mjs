@@ -76,6 +76,36 @@ async function verifyTaskViewKeyboardRecovery(page, assert) {
   assert.deepEqual(await rows.evaluateAll((nodes) => nodes.map((node) => node.dataset.rowKey)), originalRows, '列表刷新后恢复同一页记录')
 }
 
+async function verifySeparatedPanels(page, assert) {
+  await page.locator('.erp-admin-content').evaluate((node) => { node.scrollTop = 0 })
+  const metrics = await page.locator('.erp-work-center-results').evaluate((results) => {
+    const region = results.closest('[data-page-table-region]')
+    const toolbar = region.querySelector('[data-page-table-toolbar]')
+    const toolbarPanel = toolbar.matches('.ant-card') ? toolbar : toolbar.querySelector('.ant-card')
+    const toolbarRect = toolbarPanel.getBoundingClientRect()
+    const resultsRect = results.getBoundingClientRect()
+    const gap = resultsRect.top - toolbarRect.bottom
+    const gapElement = document.elementFromPoint(resultsRect.left + resultsRect.width / 2, toolbarRect.bottom + gap / 2)
+    return {
+      gap,
+      expectedGap: parseFloat(getComputedStyle(region).getPropertyValue('--erp-page-gap')),
+      gapBackground: getComputedStyle(gapElement).backgroundColor,
+      gapInsideCard: Boolean(gapElement.closest('.ant-card')),
+      leftDifference: Math.abs(resultsRect.left - toolbarRect.left),
+      rightDifference: Math.abs(resultsRect.right - toolbarRect.right),
+      borders: [toolbarPanel, results].map((node) => ({
+        width: parseFloat(getComputedStyle(node).borderTopWidth),
+        radius: parseFloat(getComputedStyle(node).borderTopLeftRadius),
+      })),
+    }
+  })
+  assert(metrics.gap > 0 && Math.abs(metrics.gap - metrics.expectedGap) <= 1, `查询与结果沿用业务页间距：${JSON.stringify(metrics)}`)
+  assert.equal(metrics.gapInsideCard, false, '分区间隙不应留在同一张卡片内')
+  assert.equal(metrics.gapBackground, 'rgba(0, 0, 0, 0)', '分区间隙透出页面底色')
+  assert(metrics.leftDifference <= 1 && metrics.rightDifference <= 1, `查询与结果边缘对齐：${JSON.stringify(metrics)}`)
+  assert(metrics.borders.every((border) => border.width > 0 && border.radius > 0), '查询与结果分别保留面板边框与圆角')
+}
+
 async function verifyStickyTable(page, assert) {
   await page.locator('.erp-work-center-table .ant-table-sticky-holder').waitFor()
   await page.locator('.erp-admin-content').evaluate((node) => { node.scrollTop = 260 })
@@ -97,7 +127,7 @@ async function verifyStickyTable(page, assert) {
     const region = table.closest('[data-page-table-region]')
     const toolbar = region.querySelector('[data-page-table-toolbar]')
     const root = region.closest('.erp-admin-content')
-    const card = table.closest('.erp-dashboard-card')
+    const card = table.closest('.erp-work-center-results')
     const body = table.querySelector('.ant-table-body')
     const cells = [...body.querySelector('tr.ant-table-row').cells].map((node) => node.getBoundingClientRect())
     const headers = [...table.querySelectorAll('.ant-table-sticky-holder th')].map((node) => node.getBoundingClientRect())
@@ -135,21 +165,22 @@ export function createWorkCenterTableScenarios(deps) {
     source_no: `SHIP-TABLE-${index}`,
     due_at: null,
   }))
-  const taskScenarios = ['tasks-light', 'tasks-dark', 'workbench'].map((kind) => ({
+  const taskScenarios = ['tasks-light', 'tasks-dark', 'risk'].map((kind) => ({
     ...base,
     name: `work-center-table-${kind}`,
-    path: kind === 'workbench' ? '/erp/dashboard' : '/erp/task-board?mode=todo&lane=actionable',
+    path: kind === 'risk' ? '/erp/task-board?view=risk' : '/erp/task-board?mode=todo&lane=actionable',
     themeMode: kind === 'tasks-dark' ? 'dark' : 'light',
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
     effectiveSession: { ...base.effectiveSession, actions: [...base.effectiveSession.actions, 'erp.workbench.read'] },
-    workflowTaskFixtures: tasks,
+    workflowTaskFixtures: kind === 'risk' ? tasks.map((task) => ({ ...task, urge_count: 1 })) : tasks,
     verify: async (page) => {
       const rows = page.locator('.erp-work-center-table tr[data-row-key]')
       await rows.first().waitFor()
       const pager = page.locator('.erp-task-pagination')
       await pager.getByText('第 1-20 条 / 共 105 条', { exact: true }).waitFor()
       assert.equal(await rows.count(), 20)
+      await verifySeparatedPanels(page, assert)
       for (const size of [50, 100]) {
         let releaseRead
         const heldRead = new Promise((resolve) => { releaseRead = resolve })
@@ -158,7 +189,7 @@ export function createWorkCenterTableScenarios(deps) {
           if (body?.method === 'get_workbench' && body.params?.limit === 50) await heldRead
           return route.fallback()
         }
-        const holdRead = kind === 'workbench' && size === 50
+        const holdRead = kind === 'risk' && size === 50
         if (holdRead) await page.route('**/rpc/workflow', delayWorkbenchRead)
         await pager.locator('.ant-select-selector').click()
         const options = page.locator('.ant-select-dropdown:visible .ant-select-item-option-content')
@@ -174,7 +205,7 @@ export function createWorkCenterTableScenarios(deps) {
         const read = page.waitForRequest((request) => {
           if (!request.url().endsWith('/rpc/workflow')) return false
           const body = request.postDataJSON()
-          return body?.method === (kind === 'workbench' ? 'get_workbench' : 'get_task_board') && body.params.limit === size && body.params.offset === 0
+          return body?.method === (kind === 'risk' ? 'get_workbench' : 'get_task_board') && body.params.limit === size && body.params.offset === 0
         })
         await page.locator('.ant-select-dropdown:visible').getByText(`${size} 条/页`, { exact: true }).click()
         await read
@@ -202,11 +233,11 @@ export function createWorkCenterTableScenarios(deps) {
       await page.locator('.ant-select-dropdown:visible').getByText('20 条/页', { exact: true }).click()
       await pager.getByText('第 1-20 条 / 共 105 条', { exact: true }).waitFor()
       assert.equal(await pager.getByRole('button', { name: '上一页', exact: true }).isDisabled(), true)
-      if (kind === 'tasks-light' || kind === 'workbench') {
+      if (kind === 'tasks-light' || kind === 'risk') {
         let failNext = true
         const rejectReadOnce = async (route) => {
           const body = route.request().postDataJSON()
-          if (failNext && body?.method === (kind === 'workbench' ? 'get_workbench' : 'get_task_board') && body.params?.limit === 50) {
+          if (failNext && body?.method === (kind === 'risk' ? 'get_workbench' : 'get_task_board') && body.params?.limit === 50) {
             failNext = false
             return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: RpcErrorCode.INTERNAL, message: '任务列表暂时无法读取', data: {} } } })
           }
@@ -215,9 +246,9 @@ export function createWorkCenterTableScenarios(deps) {
         await page.route('**/rpc/workflow', rejectReadOnce)
         await pager.locator('.ant-select-selector').click()
         await page.locator('.ant-select-dropdown:visible').getByText('50 条/页', { exact: true }).click()
-        await page.locator('.ant-alert').filter({ hasText: kind === 'workbench' ? '工作台任务加载失败' : '任务管理加载失败' }).waitFor()
+        await page.locator('.ant-alert').filter({ hasText: kind === 'risk' ? '风险任务加载失败' : '任务管理加载失败' }).waitFor()
         await pager.getByRole('status').getByText('任务加载失败', { exact: true }).waitFor()
-        if (kind === 'workbench') {
+        if (kind === 'risk') {
           assert.equal(await rows.count(), 20, '失败保留上次成功读取的记录')
           assert.equal(await pager.locator('.ant-select-selection-item').innerText(), '20 条/页')
         }
@@ -229,7 +260,7 @@ export function createWorkCenterTableScenarios(deps) {
         await page.locator('.ant-select-dropdown:visible').getByText('20 条/页', { exact: true }).click()
         await pager.getByText('第 1-20 条 / 共 105 条', { exact: true }).waitFor()
       }
-      if (kind !== 'workbench') {
+      if (kind !== 'risk') {
         const sameRow = await page.locator('.erp-task-board-controls').evaluate((node) => {
           const toggle = node.querySelector('[aria-label="待办显示方式"]').getBoundingClientRect()
           const search = node.querySelector('.erp-business-operation-panel__search').getBoundingClientRect()
@@ -237,24 +268,29 @@ export function createWorkCenterTableScenarios(deps) {
         })
         assert(sameRow, '列表与日历应和搜索同排')
       }
+      await verifySeparatedPanels(page, assert)
+      await waitForFiniteAnimations(page)
       await page.screenshot({ path: path.join(outputDir, `work-center-table-${kind}-top.png`) })
       await verifyStickyTable(page, assert)
       await page.screenshot({ path: path.join(outputDir, `work-center-table-${kind}-scrolled.png`) })
       await page.setViewportSize({ width: 900, height: 760 })
+      await verifySeparatedPanels(page, assert)
       await verifyStickyTable(page, assert)
       await page.locator('.erp-work-center-table .ant-table-body').evaluate((node) => { node.scrollLeft = node.scrollWidth })
       await verifyStickyTable(page, assert)
       await page.setViewportSize({ width: 700, height: 800 })
       await page.locator('.erp-work-center-table .ant-table-sticky-holder').waitFor({ state: 'detached' })
+      await verifySeparatedPanels(page, assert)
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
       await page.setViewportSize({ width: 1920, height: 440 })
       await page.locator('.erp-work-center-table .ant-table-sticky-holder').waitFor({ state: 'detached' })
       await page.setViewportSize({ width: 1920, height: 1080 })
       await page.locator('.erp-admin-content').evaluate((node) => { node.scrollTop = 0 })
-      if (kind !== 'workbench') {
+      if (kind !== 'risk') {
         const switchSelector = '[aria-label="待办显示方式"]'
         await verifyMobileNavigationMotion(page, assert, switchSelector, 1)
         await page.locator('.workflow-task-calendar').waitFor()
+        await verifySeparatedPanels(page, assert)
         await verifyMobileNavigationMotion(page, assert, switchSelector, 0, true)
         await verifyStickyTable(page, assert)
         await verifyTaskViewKeyboardRecovery(page, assert)
@@ -288,11 +324,12 @@ current_tasks: [],
             process_key: '',
 source_id: index + 1,
 display_context: null,
-            started_at: 1791367200,
+            started_at: 1791367200 - index,
 updated_at: 1791367300,
 completed_at: 1791367300,
             resolution_kind: null,
           }))
+          if (params.sort_direction === 'asc') items.reverse()
           return route.fulfill({ json: { jsonrpc: '2.0',
 id,
 result: { code: 0,
@@ -307,6 +344,16 @@ offset: params.offset || 0,
       },
       verify: async (page) => {
         await page.locator('.erp-work-center-table tr[data-row-key]').first().waitFor()
+        const header = page.locator('.erp-work-center-table th.ant-table-column-has-sorters:visible').filter({ hasText: '发起时间' }).first()
+        for (const [direction, id] of [['ascending', 95044], ['descending', 95000], [null, 95000]]) {
+          const read = page.waitForResponse((response) => response.url().endsWith('/rpc/workflow') && response.request().postDataJSON()?.method === 'list_tracking')
+          await header.press('Enter')
+          const { params } = (await read).request().postDataJSON()
+          assert.equal(params.sort_direction, direction ? (direction === 'ascending' ? 'asc' : 'desc') : undefined)
+          await page.waitForFunction((key) => document.querySelector('.erp-work-center-table tr[data-row-key]')?.dataset.rowKey === key, `task:${id}`)
+          assert.equal(await header.getAttribute('aria-sort'), direction)
+        }
+        await verifySeparatedPanels(page, assert)
         await page.screenshot({ path: path.join(outputDir, 'work-center-tracking-toolbar.png') })
         const toolbarGeometry = await page.locator('.erp-dashboard-task-board-card').evaluate((node) => {
           const views = node.querySelector('[aria-label="跟踪内容"]').getBoundingClientRect()
@@ -320,6 +367,7 @@ offset: params.offset || 0,
         const tabs = '.erp-task-tracking-views'
         await verifyMobileNavigationMotion(page, assert, tabs, 1)
         await page.locator('.workflow-exceptions__item').first().waitFor()
+        await verifySeparatedPanels(page, assert)
         const exceptionGeometry = await page.locator('.erp-task-tracking-toolbar').evaluate((node) => {
           const controls = ['[aria-label="跟踪内容"]', '[aria-label="异常处理状态"]', '.workflow-exceptions__query']
           return controls.map((selector) => { const box = node.querySelector(selector).getBoundingClientRect(); return box.top + box.height / 2 })
@@ -345,6 +393,24 @@ offset: params.offset || 0,
       name: 'work-center-table-progress',
       verify: async (page) => {
         await page.locator('.erp-progress-table tbody tr').first().waitFor()
+        const table = page.locator('.erp-progress-table')
+        await page.locator('.erp-task-pagination').getByRole('button', { name: '下一页' }).click()
+        await table.locator('tr[data-progress-order-id="25"]').waitFor()
+        await table.getByRole('button', { name: '按订单号升序排列' }).press('Enter')
+        await table.locator('tbody tr:first-child[data-progress-order-id="1"]').waitFor()
+        const orderHead = table.locator('th').first()
+        const headBox = await orderHead.boundingBox()
+        await orderHead.click({ position: { x: headBox.width - 6, y: headBox.height / 2 } })
+        await table.locator('tbody tr:first-child[data-progress-order-id="25"]').waitFor()
+        assert.equal(await table.locator('th[aria-sort="descending"]').count(), 1)
+        await table.getByRole('button', { name: '查看 SO-0025 完整进度' }).click()
+        const detail = page.getByRole('dialog')
+        await detail.getByRole('button', { name: '返回进度', exact: true }).click()
+        await table.locator('tbody tr:first-child[data-progress-order-id="25"]').waitFor()
+        assert.equal(await table.locator('th[aria-sort="descending"]').count(), 1)
+        await table.getByRole('button', { name: '恢复默认排序' }).press('Enter')
+        await table.locator('tbody tr:first-child[data-progress-order-id="1"]').waitFor()
+        assert.equal(await table.locator('th[aria-sort]').count(), 0)
         await page.setViewportSize({ width: 1440, height: 600 })
         await page.locator('.erp-progress-list').evaluate((node) => { node.scrollTop = node.scrollHeight })
         const metrics = await page.locator('.erp-progress-list').evaluate((node) => ({
@@ -353,6 +419,17 @@ offset: params.offset || 0,
           scrollTop: node.scrollTop,
         }))
         assert(metrics.scrollTop > 0 && Math.abs(metrics.top - metrics.heading) <= 1, JSON.stringify(metrics))
+        await page.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await table.getByRole('button', { name: '按计划结束升序排列' }).press('Enter')
+        await table.locator('tbody tr:first-child[data-progress-order-id="1"]').waitFor()
+        await table.getByRole('button', { name: '按计划结束降序排列' }).press('Enter')
+        await table.locator('tbody tr:first-child[data-progress-order-id="24"]').waitFor()
+        await page.getByRole('tab', { name: '订单交付', exact: true }).click()
+        await table.locator('tbody tr:first-child[data-progress-order-id="1"]').waitFor()
+        assert.equal(await table.locator('th[aria-sort]').count(), 0)
+        await page.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await table.locator('tbody tr:first-child[data-progress-order-id="24"]').waitFor()
+        assert.equal(await table.locator('th[aria-sort="descending"]').innerText(), '计划结束')
       },
     },
     {
@@ -362,6 +439,16 @@ offset: params.offset || 0,
       deviceScaleFactor: 2,
       verify: async (page) => {
         const frame = page.frameLocator('iframe')
+        await frame.getByRole('button', { name: '工作台', exact: true }).click()
+        await frame.locator('#dashboard-summary-search').waitFor()
+        const submitted = frame.getByRole('button', { name: '提交时间', exact: true })
+        const firstRequest = frame.locator('.summary-table tbody tr').first().locator('td').first()
+        const original = await firstRequest.textContent()
+        await submitted.press('Enter')
+        assert.notEqual(await firstRequest.textContent(), original)
+        await submitted.press('Enter')
+        await submitted.press('Enter')
+        assert.equal(await firstRequest.textContent(), original)
         await frame.getByRole('button', { name: '任务管理', exact: true }).click()
         await frame.locator('[data-action="board-mode"][data-value="todo"]').click()
         const toggle = frame.locator('.task-calendar-switch')
@@ -380,6 +467,17 @@ offset: params.offset || 0,
         await toggle.getByRole('button', { name: '列表', exact: true }).click()
         await frame.locator('.task-board-table').waitFor()
         assert.equal(await toggle.getAttribute('data-stable-control'), 'work-center')
+        const sortButton = frame.locator('[data-action="work-center-sort"][data-scope="tasks"]')
+        const taskOrder = () => frame.locator('.task-board-table tbody tr[data-id]').evaluateAll((nodes) => nodes.map((row) => row.dataset.id))
+        const originalOrder = await taskOrder()
+        await sortButton.press('Enter')
+        assert.equal(await sortButton.locator('..').getAttribute('aria-sort'), 'ascending')
+        const earliest = await taskOrder()
+        await sortButton.press('Enter')
+        assert.equal(await sortButton.locator('..').getAttribute('aria-sort'), 'descending')
+        assert.notDeepEqual(await taskOrder(), earliest)
+        await sortButton.press('Enter')
+        assert.deepEqual(await taskOrder(), originalOrder)
         await frame.locator('[data-action="board-mode"][data-value="tracking"]').click()
         const trackingViews = frame.locator('.task-tracking-tabs')
         await trackingViews.evaluate((node) => { node.dataset.stableControl = 'tracking-toolbar' })

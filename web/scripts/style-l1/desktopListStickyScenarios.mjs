@@ -207,7 +207,7 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
   const statistics = createBusinessStatisticsScenarios(deps)[0]
   const workCenter = createWorkCenterTableScenarios({ ...deps, path })
   const fixtures = {
-    'global-dashboard': workCenter.find(({ name }) => name === 'work-center-table-workbench'),
+    'global-dashboard': summaries,
     'task-board': workCenter.find(({ name }) => name === 'work-center-table-tasks-light'),
     'task-tracking': workCenter.find(({ name }) => name === 'work-center-table-tracking'),
     'outsourcing-items': outsourcing,

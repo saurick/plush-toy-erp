@@ -56,6 +56,21 @@ func IDLTE(id int) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldLTE(FieldID, id))
 }
 
+// CreateIdempotencyKey applies equality check predicate on the "create_idempotency_key" field. It's identical to CreateIdempotencyKeyEQ.
+func CreateIdempotencyKey(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIntentHash applies equality check predicate on the "create_intent_hash" field. It's identical to CreateIntentHashEQ.
+func CreateIntentHash(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCreateIntentHash, v))
+}
+
+// CreateActorID applies equality check predicate on the "create_actor_id" field. It's identical to CreateActorIDEQ.
+func CreateActorID(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCreateActorID, v))
+}
+
 // OrderNo applies equality check predicate on the "order_no" field. It's identical to OrderNoEQ.
 func OrderNo(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldOrderNo, v))
@@ -189,6 +204,206 @@ func CreatedAt(v time.Time) predicate.SalesOrder {
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldUpdatedAt, v))
+}
+
+// CreateIdempotencyKeyEQ applies the EQ predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyNEQ applies the NEQ predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyIn applies the In predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldCreateIdempotencyKey, vs...))
+}
+
+// CreateIdempotencyKeyNotIn applies the NotIn predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldCreateIdempotencyKey, vs...))
+}
+
+// CreateIdempotencyKeyGT applies the GT predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyGTE applies the GTE predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyLT applies the LT predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyLTE applies the LTE predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyContains applies the Contains predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyHasPrefix applies the HasPrefix predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyHasSuffix applies the HasSuffix predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyIsNil applies the IsNil predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldCreateIdempotencyKey))
+}
+
+// CreateIdempotencyKeyNotNil applies the NotNil predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldCreateIdempotencyKey))
+}
+
+// CreateIdempotencyKeyEqualFold applies the EqualFold predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyContainsFold applies the ContainsFold predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIntentHashEQ applies the EQ predicate on the "create_intent_hash" field.
+func CreateIntentHashEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashNEQ applies the NEQ predicate on the "create_intent_hash" field.
+func CreateIntentHashNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashIn applies the In predicate on the "create_intent_hash" field.
+func CreateIntentHashIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldCreateIntentHash, vs...))
+}
+
+// CreateIntentHashNotIn applies the NotIn predicate on the "create_intent_hash" field.
+func CreateIntentHashNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldCreateIntentHash, vs...))
+}
+
+// CreateIntentHashGT applies the GT predicate on the "create_intent_hash" field.
+func CreateIntentHashGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashGTE applies the GTE predicate on the "create_intent_hash" field.
+func CreateIntentHashGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashLT applies the LT predicate on the "create_intent_hash" field.
+func CreateIntentHashLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashLTE applies the LTE predicate on the "create_intent_hash" field.
+func CreateIntentHashLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashContains applies the Contains predicate on the "create_intent_hash" field.
+func CreateIntentHashContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashHasPrefix applies the HasPrefix predicate on the "create_intent_hash" field.
+func CreateIntentHashHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashHasSuffix applies the HasSuffix predicate on the "create_intent_hash" field.
+func CreateIntentHashHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashIsNil applies the IsNil predicate on the "create_intent_hash" field.
+func CreateIntentHashIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldCreateIntentHash))
+}
+
+// CreateIntentHashNotNil applies the NotNil predicate on the "create_intent_hash" field.
+func CreateIntentHashNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldCreateIntentHash))
+}
+
+// CreateIntentHashEqualFold applies the EqualFold predicate on the "create_intent_hash" field.
+func CreateIntentHashEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashContainsFold applies the ContainsFold predicate on the "create_intent_hash" field.
+func CreateIntentHashContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldCreateIntentHash, v))
+}
+
+// CreateActorIDEQ applies the EQ predicate on the "create_actor_id" field.
+func CreateActorIDEQ(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldCreateActorID, v))
+}
+
+// CreateActorIDNEQ applies the NEQ predicate on the "create_actor_id" field.
+func CreateActorIDNEQ(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldCreateActorID, v))
+}
+
+// CreateActorIDIn applies the In predicate on the "create_actor_id" field.
+func CreateActorIDIn(vs ...int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldCreateActorID, vs...))
+}
+
+// CreateActorIDNotIn applies the NotIn predicate on the "create_actor_id" field.
+func CreateActorIDNotIn(vs ...int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldCreateActorID, vs...))
+}
+
+// CreateActorIDGT applies the GT predicate on the "create_actor_id" field.
+func CreateActorIDGT(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldCreateActorID, v))
+}
+
+// CreateActorIDGTE applies the GTE predicate on the "create_actor_id" field.
+func CreateActorIDGTE(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldCreateActorID, v))
+}
+
+// CreateActorIDLT applies the LT predicate on the "create_actor_id" field.
+func CreateActorIDLT(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldCreateActorID, v))
+}
+
+// CreateActorIDLTE applies the LTE predicate on the "create_actor_id" field.
+func CreateActorIDLTE(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldCreateActorID, v))
+}
+
+// CreateActorIDIsNil applies the IsNil predicate on the "create_actor_id" field.
+func CreateActorIDIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldCreateActorID))
+}
+
+// CreateActorIDNotNil applies the NotNil predicate on the "create_actor_id" field.
+func CreateActorIDNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldCreateActorID))
 }
 
 // OrderNoEQ applies the EQ predicate on the "order_no" field.

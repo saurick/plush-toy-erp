@@ -551,7 +551,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await page.getByRole('tab', { name: '采购收货', exact: true, selected: true }).waitFor()
+        await page.getByRole('tab', { name: '采购收货单', exact: true, selected: true }).waitFor()
         await selectRow(page, 'PR-STYLE-L1')
         await clickSelectionAction(page, '生成应付')
         const modal = await assertFinanceSourceModal(page, {
@@ -1073,20 +1073,20 @@ export function createFinanceBusinessSourceScenarios(deps) {
           })
         },
         verify: async (page) => {
-          await expectHeading(page, '应收管理')
+          await page.locator('.erp-business-module-header').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
           await selectRow(page, 'AR-DRAFT-CANCEL-L1')
           await page
             .locator('button:visible')
-            .filter({ hasText: '作废草稿' })
+            .filter({ hasText: '作废应收账款草稿' })
             .first()
             .click()
           const modal = page
-            .getByRole('dialog', { name: '作废财务草稿' })
+            .getByRole('dialog', { name: '作废应收账款草稿' })
             .last()
           await modal.waitFor({ state: 'visible', timeout: 10_000 })
-          await expectText(page, '作废不会生成过账或库存变更')
+          await expectText(page, '作废不会产生正式财务结果或库存变动')
           await modal
-            .getByPlaceholder('请填写客户、供应商或账款调整的业务原因')
+            .getByPlaceholder('填写业务原因')
             .fill('来源出货资料修正')
           const cancellationResponse = page.waitForResponse((response) => {
             if (
@@ -1102,10 +1102,10 @@ export function createFinanceBusinessSourceScenarios(deps) {
           })
           const successNotice = page
             .locator('.ant-message-notice')
-            .filter({ hasText: '作废财务草稿已完成' })
+            .filter({ hasText: '应收账款草稿已作废' })
             .last()
           await modal
-            .getByRole('button', { name: '确认取消', exact: true })
+            .getByRole('button', { name: '作废应收账款草稿', exact: true })
             .click()
           const response = await cancellationResponse
           const responseBody = await response.json()

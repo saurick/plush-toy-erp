@@ -3,6 +3,8 @@ import { Button } from 'antd'
 import Drawer from '@/common/components/drawer/AppDrawer.jsx'
 import BusinessRecordDetails from '../business-list/BusinessRecordDetails.jsx'
 import BusinessCopyButton from '../business-list/BusinessCopyButton.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import './productionRecords.css'
 
 export default function ProductionRecordDrawer({
@@ -13,27 +15,11 @@ export default function ProductionRecordDrawer({
   columns,
   summary,
   actions,
+  loading = false,
 }) {
-  return (
-    <Drawer
-      rootClassName="erp-production-record-drawer"
-      title={title}
-      open={open}
-      onClose={onClose}
-      closable={Boolean(onClose)}
-      maskClosable={Boolean(onClose)}
-      keyboard={Boolean(onClose)}
-      width="min(640px, 100vw)"
-      destroyOnHidden
-      footer={
-        <div className="erp-production-record-drawer__actions">
-          {actions}
-          <Button disabled={!onClose} onClick={onClose}>
-            返回列表
-          </Button>
-        </div>
-      }
-    >
+  const taskBusiness = useBusinessPageContext()?.taskBusiness
+  const content = (
+    <>
       <section
         className="erp-production-record-drawer__summary"
         aria-label="当前事项与下一步"
@@ -57,6 +43,42 @@ export default function ProductionRecordDrawer({
         record={record}
         column={{ xs: 1, sm: 2, md: 2, lg: 2, xl: 2, xxl: 2 }}
       />
+    </>
+  )
+  if (taskBusiness) {
+    return (
+      <BusinessFormPage
+        open={open}
+        title={title}
+        confirmLoading={loading}
+        footer={actions}
+        onCancel={onClose}
+      >
+        {content}
+      </BusinessFormPage>
+    )
+  }
+  return (
+    <Drawer
+      rootClassName="erp-production-record-drawer"
+      title={title}
+      open={open}
+      onClose={onClose}
+      closable={Boolean(onClose) && !loading}
+      maskClosable={Boolean(onClose) && !loading}
+      keyboard={Boolean(onClose) && !loading}
+      width="min(640px, 100vw)"
+      destroyOnHidden
+      footer={
+        <div className="erp-production-record-drawer__actions">
+          {actions}
+          <Button disabled={!onClose || loading} onClick={onClose}>
+            返回列表
+          </Button>
+        </div>
+      }
+    >
+      {content}
     </Drawer>
   )
 }

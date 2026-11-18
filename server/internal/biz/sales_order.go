@@ -119,6 +119,9 @@ type SalesOrderItem struct {
 }
 
 type SalesOrderMutation struct {
+	IdempotencyKey      string
+	CreateIntentHash    string
+	ActorID             int
 	ExpectedVersion     int
 	OrderNo             string
 	CustomerID          int
@@ -211,6 +214,7 @@ type SalesOrderRepo interface {
 	UpdateSalesOrderItemStatus(ctx context.Context, id int, lineStatus string) (*SalesOrderItem, error)
 	ListSalesOrderItems(ctx context.Context, filter SalesOrderItemFilter) ([]*SalesOrderItem, int, error)
 	SaveSalesOrderWithItems(ctx context.Context, id int, order *SalesOrderMutation, items []*SalesOrderItemSaveMutation) (*SalesOrderWithItems, error)
+	ResolveSalesOrderCreateReplay(ctx context.Context, order *SalesOrderMutation) (*SalesOrderWithItems, bool, error)
 
 	CustomerIsActive(ctx context.Context, id int) (bool, error)
 	ProductIsActive(ctx context.Context, id int) (bool, error)
@@ -436,17 +440,10 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 			return nil, ErrSourceOrderStateInvalid
 		}
 	}
-	if id == 0 {
-		order.ExpectedVersion = 0
-	}
 	normalizedOrder, err := normalizeSalesOrderMutation(*order, id == 0)
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateCustomerActive(ctx, normalizedOrder.CustomerID); err != nil {
-		return nil, err
-	}
-
 	normalizedItems := make([]*SalesOrderItemSaveMutation, 0, len(items))
 	seenIDs := map[int]struct{}{}
 	for _, item := range items {
@@ -488,9 +485,6 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 		if err := validateOptionalDateNotBefore(normalizedOrder.OrderDate, normalizedItem.PlannedDeliveryDate); err != nil {
 			return nil, err
 		}
-		if err := uc.validateProductAndUnitActive(ctx, normalizedItem.ProductID, normalizedItem.ProductSkuID, normalizedItem.UnitID); err != nil {
-			return nil, err
-		}
 		normalizedItems = append(normalizedItems, &SalesOrderItemSaveMutation{
 			ID:                     item.ID,
 			SalesOrderItemMutation: normalizedItem,
@@ -511,6 +505,22 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 		return nil, err
 	}
 
+	if err := prepareSalesOrderCreateIntent(id, &normalizedOrder, normalizedItems); err != nil {
+		return nil, err
+	}
+	if id == 0 && normalizedOrder.IdempotencyKey != "" {
+		if replay, found, err := uc.repo.ResolveSalesOrderCreateReplay(ctx, &normalizedOrder); err != nil || found {
+			return replay, err
+		}
+	}
+	if err := uc.validateCustomerActive(ctx, normalizedOrder.CustomerID); err != nil {
+		return nil, err
+	}
+	for _, item := range normalizedItems {
+		if err := uc.validateProductAndUnitActive(ctx, item.ProductID, item.ProductSkuID, item.UnitID); err != nil {
+			return nil, err
+		}
+	}
 	return uc.repo.SaveSalesOrderWithItems(ctx, id, &normalizedOrder, normalizedItems)
 }
 
@@ -726,7 +736,7 @@ func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMut
 	return in, nil
 }
 
-func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
+func normalizeSalesOrderFilterConditions(in SalesOrderFilter) (SalesOrderFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	in.LifecycleStatus = strings.ToLower(strings.TrimSpace(in.LifecycleStatus))
 	var scopeOK bool
@@ -762,6 +772,18 @@ func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
 		return SalesOrderFilter{}, ErrBadParam
 	}
+	in.Limit = NormalizeBusinessListLimit(in.Limit)
+	if in.Offset < 0 {
+		in.Offset = 0
+	}
+	return in, nil
+}
+
+func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
+	in, err := normalizeSalesOrderFilterConditions(in)
+	if err != nil {
+		return SalesOrderFilter{}, err
+	}
 	switch in.SortBy {
 	case "":
 		in.SortBy = "updated_at"
@@ -775,10 +797,6 @@ func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
 	case "asc", "desc":
 	default:
 		return SalesOrderFilter{}, ErrBadParam
-	}
-	in.Limit = NormalizeBusinessListLimit(in.Limit)
-	if in.Offset < 0 {
-		in.Offset = 0
 	}
 	return in, nil
 }

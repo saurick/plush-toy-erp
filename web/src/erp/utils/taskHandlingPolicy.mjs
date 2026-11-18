@@ -68,6 +68,7 @@ const stageKinds = {
     'finished_goods_inbound',
     'purchase_count',
     'incoming_quality',
+    'shipment_quality',
     'material_inbound',
     'finished_inbound',
     'packaging',

@@ -14,6 +14,7 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionexceptiondecision"
@@ -24,6 +25,8 @@ import (
 	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
@@ -42,32 +45,10 @@ type workflowDisplaySource struct {
 }
 
 func workflowDisplaySourceKind(value string) string {
-	switch value {
-	case biz.WorkflowMaterialRequestSourceType:
-		return value
-	case "sales_order", "sales-orders", "project-orders":
-		return "sales_order"
-	case "purchase_order", "purchase-order", "accessories-purchase":
-		return "purchase_order"
-	case "outsourcing_order", "outsourcing-order", "processing-contracts":
-		return "outsourcing_order"
-	case "production_order", "production-order", "production-orders":
-		return "production_order"
-	case "purchase_receipt", "purchase-receipt", "inbound":
-		return "purchase_receipt"
-	case "shipment", "shipments":
-		return "shipment"
-	case "production_fact", "production-fact", "production-progress":
-		return "production_fact"
-	case "quality_inspection", "quality-inspection", "quality-inspections":
-		return "quality_inspection"
-	case "production_exception_decision", "production_wip_batch", "production_packaging_confirmation", "outsourcing_fact", "finance_payment", "inventory_operation":
-		return value
-	case "bom_header", "material-bom":
-		return "bom_header"
-	default:
-		return ""
+	if document, ok := biz.WorkflowDocumentTypeFor(value); ok {
+		return document.Key
 	}
+	return ""
 }
 
 func displayString(value *string) string {
@@ -401,6 +382,48 @@ func loadWorkflowDisplaySources(ctx context.Context, client *ent.Client, kind st
 		}
 	case "finance_payment":
 		return loadWorkflowFinancePaymentDisplaySources(ctx, client, ids)
+	case "outsourcing_return_disposition":
+		rows, err := client.OutsourcingReturnDisposition.Query().Where(outsourcingreturndisposition.IDIn(ids...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		factIDs := make([]int, 0, len(rows))
+		for _, row := range rows {
+			factIDs = append(factIDs, row.OutsourcingReturnFactID)
+		}
+		facts, err := loadWorkflowDisplaySources(ctx, client, "outsourcing_fact", factIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			source := facts[row.OutsourcingReturnFactID]
+			source.no = row.DispositionNo
+			out[row.ID] = source
+		}
+	case "purchase_rejection_disposition":
+		rows, err := client.PurchaseRejectionDisposition.Query().Where(purchaserejectiondisposition.IDIn(ids...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		itemIDs := make([]int, 0, len(rows))
+		for _, row := range rows {
+			itemIDs = append(itemIDs, row.PurchaseReceiptItemID)
+		}
+		items, err := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.IDIn(itemIDs...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		materials := make(map[int]int, len(items))
+		for _, item := range items {
+			materials[item.ID] = item.MaterialID
+		}
+		for _, row := range rows {
+			source := workflowDisplaySource{no: row.DispositionNo}
+			if materialID := materials[row.PurchaseReceiptItemID]; materialID > 0 {
+				source.items = []workflowDisplayRef{{kind: "material", id: materialID}}
+			}
+			out[row.ID] = source
+		}
 	case "purchase_receipt":
 		rows, err := client.PurchaseReceipt.Query().Where(purchasereceipt.IDIn(ids...)).WithItems(func(q *ent.PurchaseReceiptItemQuery) { q.Order(ent.Asc("id")) }).All(ctx)
 		if err != nil {

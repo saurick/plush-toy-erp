@@ -51,7 +51,8 @@ export default function PaymentMethodManager({ onClose, onChanged, onCreated, in
   const editorKey = editor ? editor.item?.id ?? 'new' : null
   const navigationLocked = busy || editor !== null || deleteTarget !== null
   const selectedItem = selection?.key === requestKey ? current.items.find((item) => item.id === selection.id) : null
-  const recordLocked = navigationLocked || loading || Boolean(readError) || !selectedItem
+  const selectionLocked = navigationLocked || loading || Boolean(readError)
+  const recordLocked = selectionLocked || !selectedItem
   const showPager = offset > 0 || current.hasMore
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export default function PaymentMethodManager({ onClose, onChanged, onCreated, in
 
   const refresh = () => { setSelection(null); setRevision((value) => value + 1) }
   const selectItem = (item) => {
-    if (navigationLocked || loading || readError) return
+    if (selectionLocked) return
     setSelection(item ? { id: item.id, key: requestKey } : null)
     setActionError('')
   }
@@ -213,7 +214,7 @@ export default function PaymentMethodManager({ onClose, onChanged, onCreated, in
           {readError ? <Alert type="error" showIcon message={readError} action={<Button size="small" disabled={busy || loading} onClick={refresh}>重试</Button>} /> : null}
           {actionError ? <Alert type="error" showIcon message={actionError} /> : null}
           <div className="erp-payment-method-manager__list" aria-busy={loading}>
-            <Table rowKey="id" size="small" columns={COLUMNS} dataSource={current.items} pagination={false} rowSelection={{ type: 'radio', columnTitle: null, selectedRowKeys: selectedItem ? [selectedItem.id] : [], getCheckboxProps: (item) => ({ disabled: navigationLocked || loading || Boolean(readError), 'aria-label': `选择 ${item.method}` }), onChange: (_keys, selectedRows) => selectItem(selectedRows[0] || null) }} rowClassName={(item) => `erp-payment-method-manager__row${selectedItem?.id === item.id ? ' ant-table-row-selected' : ''}`} onRow={(item) => ({ onClick: () => selectItem(item) })} locale={{ emptyText: initialLoading || readError ? null : <Empty description={keyword ? '没有匹配的付款方式' : view === 'inactive' ? '没有停用的付款方式' : '暂无付款方式，可点击新增'} /> }} />
+            <Table rowKey="id" size="small" columns={COLUMNS} dataSource={current.items} pagination={false} rowSelection={{ type: 'radio', columnTitle: null, selectedRowKeys: selectedItem ? [selectedItem.id] : [], getCheckboxProps: (item) => ({ disabled: selectionLocked, 'aria-label': `选择 ${item.method}` }), onChange: (_keys, selectedRows) => selectItem(selectedRows[0] || null) }} rowClassName={(item) => `erp-payment-method-manager__row${selectedItem?.id === item.id ? ' ant-table-row-selected' : ''}`} onRow={selectionLocked ? undefined : (item) => ({ onClick: () => selectItem(item) })} locale={{ emptyText: initialLoading || readError ? null : <Empty description={keyword ? '没有匹配的付款方式' : view === 'inactive' ? '没有停用的付款方式' : '暂无付款方式，可点击新增'} /> }} />
             {initialLoading ? <Space className="erp-payment-method-manager__loading" role="status"><Spin size="small" />正在读取</Space> : null}
           </div>
         </div>

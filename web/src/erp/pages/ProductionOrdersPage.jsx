@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import { documentProductGalleryColumn } from '../components/business-list/BusinessDocumentProductGallery.jsx'
 import { DOCUMENT_PRODUCT_SOURCES } from '../utils/businessProductGallery.mjs'
 import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
@@ -176,8 +177,8 @@ const DEFAULT_QUERY = Object.freeze({
   page_size: DEFAULT_BUSINESS_PAGE_SIZE,
 })
 const PRODUCTION_DATE_FILTER_OPTIONS = [
-  { value: 'planned_start_at', label: '计划开始' },
-  { value: 'planned_end_at', label: '计划结束' },
+  { value: 'planned_start_at', label: '计划开始', upcoming: true },
+  { value: 'planned_end_at', label: '计划结束', upcoming: true },
 ]
 const PRODUCTION_SORT_FIELDS = {
   order_no: 'order_no',
@@ -1156,11 +1157,11 @@ export default function ProductionOrdersPage() {
       materialIssueContextRequestRef.current += 1
       setMaterialIssueOpen(false)
       setMaterialIssueContext(EMPTY_MATERIAL_ISSUE_CONTEXT)
-      reportBusinessResult('领料草稿已生成，待核对并过账')
+      reportBusinessResult('领料草稿已生成，待核对并确认领料出库')
       message.success(
         confirmedByReread
-          ? '已重新读取并确认领料草稿，请到生产记录核对并过账'
-          : '领料记录草稿已生成，请到生产记录核对并过账'
+          ? '已重新读取并确认领料草稿，请到生产记录核对并确认领料出库'
+          : '领料记录草稿已生成，请到生产记录核对并确认领料出库'
       )
     } finally {
       materialIssueInFlightRef.current = false
@@ -1410,7 +1411,7 @@ export default function ProductionOrdersPage() {
       } catch (error) {
         message.warning(getActionErrorMessage(error, '刷新成品收仓结果'))
       }
-      reportBusinessResult('成品收仓草稿已生成，待核对并过账', result)
+      reportBusinessResult('成品收仓草稿已生成，待仓库核对并确认成品入库', result)
       completionContextRequestRef.current += 1
       setProductionRouteOpen(false)
       setCompletionOpen(false)
@@ -1637,7 +1638,7 @@ export default function ProductionOrdersPage() {
     () => [...documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.PRODUCTION_ORDER, adminProfile, { showIdentity: true }), ...columns],
     [adminProfile, columns]
   )
-  const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
+  const { tableColumns, visibleColumns: taskDetailColumns, exportColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
       moduleKey: 'production-orders',
@@ -1691,7 +1692,7 @@ export default function ProductionOrdersPage() {
   if (!canRead) {
     return (
       <BusinessPageLayout>
-        <PageHeaderCard title="生产订单" />
+        <PageHeaderCard title={getBusinessDocumentTitle('production_order')} />
         <Alert
           type="warning"
           showIcon
@@ -1705,7 +1706,7 @@ export default function ProductionOrdersPage() {
     <BusinessPageLayout>
       <PageHeaderCard
         helpKey="production-orders"
-        title="生产订单"
+        title={getBusinessDocumentTitle('production_order')}
       />
       <BusinessOperationPanel
         showSelection
@@ -1745,17 +1746,13 @@ export default function ProductionOrdersPage() {
             />
             <DateRangeFilter
               options={PRODUCTION_DATE_FILTER_OPTIONS}
-              typePresentation="inline"
               value={query.date_field}
               startValue={query.date_from}
               endValue={query.date_to}
               onTypeChange={(value) =>
                 writeQuery({ date_field: value, page: 1 })
               }
-              onStartChange={(value) =>
-                writeQuery({ date_from: value, page: 1 })
-              }
-              onEndChange={(value) => writeQuery({ date_to: value, page: 1 })}
+              onRangeChange={(from, to) => writeQuery({ date_from: from, date_to: to, page: 1 })}
             />
           </>
         }
@@ -2109,6 +2106,7 @@ export default function ProductionOrdersPage() {
         loading={loading}
         rowKey="id"
         columns={sortedColumns}
+        taskDetailColumns={taskDetailColumns}
         dataSource={orders}
         onChange={handleTableChange}
         rowSelection={{

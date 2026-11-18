@@ -343,7 +343,7 @@ test("desktop workbench uses a bounded snapshot while mobile tasks keep role-tas
   );
   assert.match(
     dashboardSource,
-    /const workbenchResult = await getWorkflowWorkbench\(workbenchRequest,\s*\{\s*signal: request\.signal,\s*\}\)/u,
+    /const riskResult = await getWorkflowWorkbench\(riskRequest,\s*\{\s*signal: request\.signal,\s*\}\)/u,
   );
   assert.doesNotMatch(
     dashboardSource,
@@ -372,7 +372,7 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
   const actionDrawerSource = readFileSync(actionDrawerPath, "utf8");
   const taskBoardSource = readFileSync(taskBoardPath, "utf8");
 
-  assert.match(dashboardSource, /getWorkflowTaskOwnerRoleLabel\(record\)/u);
+  assert.match(readFileSync(path.join(erpSourceRoot, "components/workflow/WorkflowDashboardViews.jsx"), "utf8"), /buildWorkflowTaskResponsibilityItems\(task\)/u);
   assert(
     !dashboardSource.includes("getWorkflowTaskAllowedActionModes"),
     "dashboard must not use local workflow action fallback as executable button proof; backend explain projection controls task actions",
@@ -903,12 +903,12 @@ test("sales order page keeps write buttons behind projected actions", () => {
     "sales order modal must receive projected write permissions",
   );
   assert(
-    modalSource.includes("canUpload={canUpdateOrder || canCreateOrder}") &&
-      modalSource.includes("canWithdraw={canUpdateOrder}") &&
-      modalSource.includes("canCreateItem={canCreateItem}") &&
-      modalSource.includes("canUpdateItem={canUpdateItem}") &&
-      modalSource.includes("canCancelItem={canCancelItem}"),
-    "sales order modal must pass projected permissions to attachments and order lines",
+    /canUpload=\{\s*!createResultUnknown && \(canUpdateOrder \|\| canCreateOrder\)\s*\}/u.test(modalSource) &&
+      modalSource.includes("canWithdraw={!createResultUnknown && canUpdateOrder}") &&
+      modalSource.includes("canCreateItem={!createResultUnknown && canCreateItem}") &&
+      modalSource.includes("canUpdateItem={!createResultUnknown && canUpdateItem}") &&
+      modalSource.includes("canCancelItem={!createResultUnknown && canCancelItem}"),
+    "sales order attachments and lines require projected permissions and a resolved create result",
   );
   assert(
     formSource.includes("disabled={!canCreateItem}") &&

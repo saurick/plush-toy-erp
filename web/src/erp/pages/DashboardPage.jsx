@@ -1,6 +1,4 @@
 import React, {
-  lazy,
-  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -8,48 +6,39 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { CalendarOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Tag } from 'antd'
 import {
   useLocation,
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { businessDocumentTypeOptions } from '../config/businessModules.mjs'
 import {
   TaskBoardSearch,
   TaskBoardProgressRail,
-  ProductCoreDashboard,
-  TaskTitleEntry,
   TaskLane,
-  WorkbenchQueueEmpty,
   getWorkflowTaskStableKey,
-  openTaskTableRow,
 } from '../components/workflow/WorkflowDashboardViews.jsx'
 import { WORKFLOW_HISTORY_PERIOD_OPTIONS } from '../utils/workflowRoleTaskHistory.mjs'
 import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
 import WorkflowTaskLinkDrawer from '../components/workflow/WorkflowTaskLinkDrawer.jsx'
+import WorkflowExactTaskEntry from '../components/workflow/WorkflowExactTaskEntry.jsx'
 import WorkflowTaskDiscoveryFilters from '../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
+import WorkflowTaskDocumentFilter from '../components/workflow/WorkflowTaskDocumentFilter.jsx'
 import WorkflowTaskCalendar from '../components/workflow/WorkflowTaskCalendar.jsx'
 import useWorkflowTaskCalendarView from '../hooks/useWorkflowTaskCalendarView.js'
-import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import WorkflowExceptionPanel from '../components/workflow/WorkflowExceptionPanel.jsx'
 import { TRACKING_VIEW_OPTIONS } from '../utils/workflowTrackingFilters.mjs'
 import useReturnedWorkflowTask from '../hooks/useReturnedWorkflowTask.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 
-import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
-import Table from '@/common/components/table/AppTable'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import WorkflowTaskActionDrawer from '../components/workflow/WorkflowTaskActionDrawer.jsx'
 import { TASK_ACTION_META, getWorkflowTaskActionMeta } from '../utils/workflowTaskActionPresentation.mjs'
-import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
-import { WorkflowTaskSource } from '../components/workflow/WorkflowTaskCopy.jsx'
-import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
-import WorkflowTaskStatusTag from '../components/workflow/WorkflowTaskStatusTag.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import WorkflowTrackingPanel from '../components/workflow/WorkflowTrackingPanel.jsx'
 
@@ -71,10 +60,9 @@ import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js
 import useWorkflowTaskAssignmentAccess from '../hooks/useWorkflowTaskAssignmentAccess.js'
 import useWorkflowDashboardData from '../hooks/useWorkflowDashboardData.js'
 import {
-  getWorkflowTaskSourceTypeLabel,
   resolveWorkflowTaskEntryPath,
 } from '../utils/dashboardTaskDisplay.mjs'
-import { getWorkflowWorkbenchScopeKey } from '../utils/workflowDashboardStats.mjs'
+import { workflowTaskAdminAccessRequestIdentity } from '../utils/workflowTaskActionAccess.mjs'
 import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
 import { buildDesktopWorkflowTaskActionParams } from '../utils/desktopWorkflowTaskAction.mjs'
@@ -85,7 +73,6 @@ import {
   verifyNewWorkflowTaskMutationAttempt,
 } from '../utils/workflowTaskMutation.mjs'
 import {
-  TASK_BOARD_FOCUS_PAGE_SIZE,
   TASK_BOARD_SORT_OPTIONS,
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
@@ -93,10 +80,7 @@ import {
   getWorkflowTaskBoardRequestKey,
   getWorkflowTaskBoardStatusOptions,
   getWorkflowTaskBoardDueOptions,
-  getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
-  getWorkflowTaskReasonMeta,
-  getWorkflowTaskStatusRiskTags,
   workflowTaskBoardExtraFilterCount,
   normalizeWorkflowTaskPageSize,
   readWorkflowTaskBoardFiltersFromSearch,
@@ -117,19 +101,6 @@ import {
   getWorkflowApprovalInboxCapabilityKeys,
 } from '../utils/workflowApprovalInbox.mjs'
 
-const { Text } = Typography
-
-const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
-  { key: 'actionable', label: '待我处理', hint: '当前可推进' },
-  {
-    key: 'approval',
-    label: '待我审批',
-    hint: '当前审批事项',
-    requiresApproval: true,
-  },
-  { key: 'risk', label: '阻塞/逾期', hint: '先补原因' },
-])
-
 const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
   {
     label: '待我处理',
@@ -139,11 +110,11 @@ const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
     label: '待我审批',
     value: 'approval',
   },
+  { label: '风险任务', value: 'risk' },
   { label: '全部任务', value: 'all' },
   { label: '流程跟踪', value: 'tracking' },
 ])
 
-const WORKBENCH_QUEUE_PAGE_SIZE = TASK_BOARD_FOCUS_PAGE_SIZE
 const TASK_BOARD_PAGE_SCROLL_GAP = 12
 
 function scrollTaskListToStart(lanesElement) {
@@ -164,28 +135,13 @@ function scrollTaskListToStart(lanesElement) {
 }
 
 function buildSourceOptions(values = []) {
-  const sourceTypes = [
-    ...new Set(
-      (values || [])
-        .map((sourceType) => String(sourceType || '').trim())
-        .filter(Boolean)
-    ),
-  ].sort((left, right) => left.localeCompare(right))
-
   return [
-    { value: 'all', label: '全部业务' },
-    ...sourceTypes.map((sourceType) => ({
-      value: sourceType,
-      label: getWorkflowTaskSourceTypeLabel(sourceType),
-    })),
+    { value: 'all', label: '全部单据类型' },
+    ...businessDocumentTypeOptions(values),
   ]
 }
 
-const WorkbenchSummaries = lazy(
-  () => import('../components/workbench/WorkbenchSummaries.jsx')
-)
-
-export default function DashboardPage({ initialView = 'workbench' }) {
+export default function DashboardPage() {
   const taskFocusScopeRef = useRef(null)
 
   useEffect(() => {
@@ -220,7 +176,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setTaskFiltersOpen(false)
     setHistoryDateOpen(true)
   }
-  const [summaryRefreshRevision, setSummaryRefreshRevision] = useState(0)
   const taskViewsRef = useRef(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [returnedBusinessTask, setReturnedBusinessTask] = useState(null)
@@ -237,17 +192,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   selectedTaskRef.current = selectedTask
   const sharedLinkAutoRef = useRef('')
   const [sharedHandlingID, setSharedHandlingID] = useState(null)
-  const activeView = initialView
-  const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
-  const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
-  const [workbenchQueuePageSize, setWorkbenchQueuePageSize] = useState(
-    WORKBENCH_QUEUE_PAGE_SIZE
-  )
   const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
     useState(0)
   const taskBoardLanesRef = useRef(null)
-  const workbenchListRef = useRef(null)
-  const pendingWorkbenchPageScrollRef = useRef(null)
   const pendingTaskBoardPageScrollRef = useRef(null)
   const pendingTaskBoardTransitionRequestKeyRef = useRef('')
   const mutationAttemptsRef = useRef(null)
@@ -268,28 +215,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [adminProfile]
   )
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
-  const effectiveSessionCustomerKey =
-    typeof adminProfile?.effective_session?.customer?.key === 'string'
-      ? adminProfile.effective_session.customer.key.trim()
-      : ''
-  const shouldShowProductCoreDashboard =
-    initialView === 'workbench' &&
-    adminProfile?.is_super_admin === true &&
-    !effectiveSessionCustomerKey
-  const summaryOptions = getWorkbenchSummaryOptions(adminProfile)
-  const summaryOpen =
-    initialView === 'workbench' &&
-    !shouldShowProductCoreDashboard &&
-    summaryOptions.length > 0 &&
-    searchParams.get('view') === 'summary'
-  const workbenchSticky = useBusinessListStickyHeader(
-    workbenchListRef,
-    initialView === 'workbench' && !summaryOpen && !shouldShowProductCoreDashboard,
-  )
+  const canViewRisk = hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ) &&
+    hasActionPermission(adminProfile, PermissionCode.ERP_WORKBENCH_READ)
+  const riskView = canViewRisk && searchParams.get('view') === 'risk'
   const workflowWorkbenchScopeKey = useMemo(
     () =>
       JSON.stringify([
-        getWorkflowWorkbenchScopeKey(adminProfile),
+        workflowTaskAdminAccessRequestIdentity(adminProfile),
         workflowApprovalInboxCapabilityKeys,
       ]),
     [adminProfile, workflowApprovalInboxCapabilityKeys]
@@ -308,16 +240,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         : requestedFilters,
     [canViewApprovalInbox, requestedFilters]
   )
-  const isTaskBoardView = initialView === 'task-board'
+  const exactTask = searchParams.get('task_id')
+  const progressOrigin = location.state?.progressOrigin
+  const fromProgress = exactTask !== null && Boolean(adminProfile.id) && progressOrigin?.adminID === adminProfile.id
   const calendarView =
-    isTaskBoardView &&
-    filters.mode === 'todo' &&
+    !riskView && filters.mode === 'todo' &&
     calendarState.layout === 'calendar'
-  const exceptionsView =
-    isTaskBoardView && searchParams.get('view') === 'exceptions'
+  const exceptionsView = searchParams.get('view') === 'exceptions'
   const trackingScope =
-    isTaskBoardView &&
-    ['started', 'participated', 'visible'].includes(
+    !riskView && ['started', 'participated', 'visible'].includes(
       searchParams.get('tracking')
     )
       ? searchParams.get('tracking')
@@ -329,14 +260,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => buildWorkflowTaskBoardRequest(filters),
     [filters]
   )
-  const workbenchRequest = useMemo(
-    () => ({
-      queue_key: workbenchQueueKey,
-      limit: workbenchQueuePageSize,
-      offset: (workbenchQueuePage - 1) * workbenchQueuePageSize,
-    }),
-    [workbenchQueueKey, workbenchQueuePage, workbenchQueuePageSize]
-  )
+  const riskRequest = useMemo(() => riskView ? ({
+    queue_key: 'risk',
+    ...(['time_asc', 'time_desc'].includes(filters.sort) ? { sort: filters.sort } : {}),
+    limit: filters.pageSize,
+    offset: (filters.page - 1) * filters.pageSize,
+  }) : null, [riskView, filters.page, filters.pageSize, filters.sort])
+
   const preserveTaskBoardTransitionHeight = useCallback(
     (nextRequest = taskBoardRequest) => {
       pendingTaskBoardTransitionRequestKeyRef.current =
@@ -354,28 +284,25 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
   const {
     loading,
-    workbenchResponseState,
-    workbenchCountsState,
+    riskResponseState,
     taskBoardResponseState,
     taskBoardSummaryState,
+    taskBoardFilterOptions,
     taskBoardRequestKey,
     taskBoardSummaryRequestKey,
-    workbenchRequestKey,
+    riskRequestKey,
     reloadTaskData,
   } = useWorkflowDashboardData({
     scopeKey: workflowWorkbenchScopeKey,
     taskBoardRequest,
-    workbenchRequest,
-    isTaskBoardView,
-    productCorePreview: shouldShowProductCoreDashboard,
-    suspended: Boolean(summaryOpen || trackingScope || exceptionsView),
+    riskRequest,
+    suspended: Boolean(trackingScope || exceptionsView),
     onBeforeTaskBoardLoad: preserveTaskBoardTransitionHeight,
   })
 
   useEffect(() => {
-    if (calendarView || shouldShowProductCoreDashboard) return outletContext?.registerPageRefresh?.(null)
+    if (calendarView) return outletContext?.registerPageRefresh?.(null)
     return outletContext?.registerPageRefresh?.(() => {
-      if (summaryOpen) setSummaryRefreshRevision((value) => value + 1)
       if (trackingScope || exceptionsView)
         { setTrackingRefresh((value) => value + 1) }
       return reloadTaskData()
@@ -383,26 +310,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [
     reloadTaskData,
     outletContext,
-    summaryOpen,
     trackingScope,
     exceptionsView,
     calendarView,
-    shouldShowProductCoreDashboard,
   ])
 
   useEffect(() => {
+    const deniedRisk = !canViewRisk && searchParams.get('view') === 'risk'
     const deniedApproval = !canViewApprovalInbox && requestedFilters.mode === 'approval'
     const retiredFilters = searchParams.has('module_key') || searchParams.has('chain_key') || searchParams.has('task_group') ||
       (filters.lane === 'finished' && searchParams.has('due'))
-    if (!isTaskBoardView || (!deniedApproval && !retiredFilters)) return
-    setSearchParams(
-      writeWorkflowTaskBoardFiltersToSearch(searchParams, filters),
-      { replace: true }
-    )
+    if (!deniedApproval && !retiredFilters && !deniedRisk) return
+    const next = writeWorkflowTaskBoardFiltersToSearch(searchParams, filters)
+    if (deniedRisk) next.delete('view')
+    setSearchParams(next, { replace: true })
   }, [
     canViewApprovalInbox,
+    canViewRisk,
     filters,
-    isTaskBoardView,
     requestedFilters.mode,
     searchParams,
     setSearchParams,
@@ -415,10 +340,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const taskBoardResponse = useMemo(
     () =>
       resolveWorkflowTaskBoardResponseState(
-        taskBoardResponseState,
+        riskView ? null : taskBoardResponseState,
         taskBoardRequest
       ),
-    [taskBoardRequest, taskBoardResponseState]
+    [riskView, taskBoardRequest, taskBoardResponseState]
   )
   const taskBoardLoadError =
     taskBoardResponseState?.requestKey === taskBoardRequestKey
@@ -439,12 +364,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const taskBoardCounts =
     taskBoardSummaryResponse?.counts || taskBoardModel.counts
   const taskBoardInitialLoading =
-    isTaskBoardView &&
     !taskBoardHasLoaded &&
     !taskBoardResponse &&
     !taskBoardLoadError
   const taskBoardUpdating =
-    isTaskBoardView &&
     taskBoardHasLoaded &&
     (loading || !taskBoardResponse) &&
     !taskBoardLoadError
@@ -462,23 +385,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const sourceOptions = useMemo(
     () =>
       buildSourceOptions([
-        ...(taskBoardSummaryResponse?.source_types ||
-          taskBoardModel.sourceTypes),
+        ...(taskBoardFilterOptions?.sourceTypes || []),
         filters.sourceType === 'all' ? '' : filters.sourceType,
       ]),
-    [
-      filters.sourceType,
-      taskBoardModel.sourceTypes,
-      taskBoardSummaryResponse?.source_types,
-    ]
+    [filters.sourceType, taskBoardFilterOptions?.sourceTypes]
   )
   const roleOptions = useMemo(
-    () =>
-      buildWorkflowTaskBoardRoleOptions(
-        taskBoardSummaryResponse?.owner_role_keys ||
-          taskBoardModel.ownerRoleKeys
-      ),
-    [taskBoardModel.ownerRoleKeys, taskBoardSummaryResponse?.owner_role_keys]
+    () => buildWorkflowTaskBoardRoleOptions(taskBoardFilterOptions?.ownerRoleKeys),
+    [taskBoardFilterOptions?.ownerRoleKeys]
   )
   const statusOptions = getWorkflowTaskBoardStatusOptions(
     filters.lane,
@@ -493,7 +407,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       !taskBoardReady ||
       location.state?.workflowTaskReturn ||
       filters.role === 'all' ||
-      taskBoardModel.ownerRoleKeys.includes(filters.role)
+      roleOptions.some((option) => option.value === filters.role)
     ) {
       return
     }
@@ -509,7 +423,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     filters,
     searchParams,
     setSearchParams,
-    taskBoardModel.ownerRoleKeys,
+    roleOptions,
     taskBoardReady,
     location.state,
   ])
@@ -596,87 +510,34 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     taskBoardResponse,
   ])
 
-  const workbenchResponse =
-    workbenchResponseState?.scopeKey === workflowWorkbenchScopeKey &&
-    workbenchResponseState?.response?.queue_key === workbenchQueueKey
-      ? workbenchResponseState.response
-      : null
-  const workbenchLoadError =
-    workbenchResponseState?.scopeKey === workflowWorkbenchScopeKey &&
-    workbenchResponseState?.requestKey === workbenchRequestKey
-      ? workbenchResponseState.error
-      : ''
-  const workbenchCounts =
-    workbenchCountsState?.scopeKey === workflowWorkbenchScopeKey
-      ? workbenchCountsState.counts
-      : null
-  const visibleWorkbenchQueueOptions = useMemo(
-    () =>
-      WORKBENCH_QUEUE_OPTIONS.filter(
-        (option) => !option.requiresApproval || canViewApprovalInbox
-      ),
-    [canViewApprovalInbox]
-  )
-  const workbenchQueueTotal = Number(workbenchCounts?.[workbenchQueueKey] || 0)
-  const activeWorkbenchQueueOption =
-    visibleWorkbenchQueueOptions.find(
-      (option) => option.key === workbenchQueueKey
-    ) || visibleWorkbenchQueueOptions[0]
-  const fallbackWorkbenchQueueOption =
-    visibleWorkbenchQueueOptions.find(
-      (option) =>
-        option.key !== workbenchQueueKey &&
-        Number(workbenchCounts?.[option.key] || 0) > 0
-    ) || null
-  const workbenchQueuePageCount = Math.max(
-    1,
-    Math.ceil(workbenchQueueTotal / workbenchQueuePageSize)
-  )
-  const displayedWorkbenchQueuePageSize = workbenchResponse?.limit || workbenchQueuePageSize
-  const activeWorkbenchQueuePage = workbenchResponse
-    ? Math.floor(workbenchResponse.offset / displayedWorkbenchQueuePageSize) + 1
-    : Math.min(workbenchQueuePage, workbenchQueuePageCount)
-  const workbenchQueuePageTasks = useMemo(
-    () => workbenchResponse?.items || [],
-    [workbenchResponse]
-  )
-  useLayoutEffect(() => {
-    const pending = pendingWorkbenchPageScrollRef.current
-    if (!pending || loading || !workbenchResponse || workbenchLoadError) return
-    if (
-      pending.queue !== workbenchQueueKey ||
-      pending.page !== workbenchQueuePage ||
-      pending.pageSize !== workbenchQueuePageSize ||
-      workbenchResponse.offset !== workbenchRequest.offset ||
-      workbenchResponse.limit !== workbenchRequest.limit
-    ) {
-      return
-    }
-    scrollTaskListToStart(workbenchListRef.current)
-    pendingWorkbenchPageScrollRef.current = null
-  }, [
-    loading,
-    workbenchLoadError,
-    workbenchQueueKey,
-    workbenchQueuePage,
-    workbenchQueuePageSize,
-    workbenchRequest,
-    workbenchResponse,
-  ])
+  const riskResponse = riskView ? riskResponseState?.response : null
+  const riskError = riskResponseState?.requestKey === riskRequestKey ? riskResponseState.error : ''
   useEffect(() => {
-    if (
-      !workbenchResponse ||
-      workbenchResponse.offset !== workbenchRequest.offset ||
-      workbenchResponse.limit !== workbenchRequest.limit ||
-      workbenchQueuePage <= workbenchQueuePageCount
-    ) {
-      return
-    }
-    if (pendingWorkbenchPageScrollRef.current) {
-      pendingWorkbenchPageScrollRef.current.page = workbenchQueuePageCount
-    }
-    setWorkbenchQueuePage(workbenchQueuePageCount)
-  }, [workbenchQueuePage, workbenchQueuePageCount, workbenchRequest, workbenchResponse])
+    if (!riskResponse || riskResponseState.requestKey !== riskRequestKey ||
+        riskResponse.offset !== riskRequest.offset || riskResponse.limit !== riskRequest.limit) return
+    const lastPage = Math.max(1, Math.ceil(riskResponse.total / riskResponse.limit))
+    if (filters.page > lastPage) { setSearchParams(writeWorkflowTaskBoardFiltersToSearch(searchParams, {
+      ...filters, page: lastPage,
+    }), { replace: true }) }
+  }, [riskResponse, riskResponseState, riskRequestKey, riskRequest, filters, searchParams, setSearchParams])
+
+  const riskListRef = useRef(null)
+  const pendingRiskPage = useRef(null)
+  useLayoutEffect(() => {
+    if (!riskView || riskError) pendingRiskPage.current = null
+    if (!riskResponse || loading || pendingRiskPage.current !== riskResponse.offset ||
+        riskResponse.limit !== riskRequest.limit || riskResponse.offset !== riskRequest.offset) return
+    scrollTaskListToStart(riskListRef.current)
+    pendingRiskPage.current = null
+  }, [riskView, riskError, riskResponse, riskRequest, loading])
+
+  const selectRiskPage = (page, pageSize) => {
+    pendingRiskPage.current = (page - 1) * pageSize
+    setSearchParams(writeWorkflowTaskBoardFiltersToSearch(searchParams, {
+      ...filters, page, pageSize,
+    }), { replace: true })
+  }
+
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedTask,
@@ -724,18 +585,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [actionDrawerAccess.allowedModes, assignmentAccess.can_reassign]
   )
 
-  useEffect(() => {
-    if (
-      visibleWorkbenchQueueOptions.some(
-        (option) => option.key === workbenchQueueKey
-      )
-    ) {
-      return
-    }
-    setWorkbenchQueueKey('actionable')
-    setWorkbenchQueuePage(1)
-  }, [visibleWorkbenchQueueOptions, workbenchQueueKey])
-
   const updateFilter = (key, value) => {
     const nextFilters = {
       ...filters,
@@ -743,9 +592,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       page: 1,
     }
     pendingTaskBoardPageScrollRef.current = null
-    preserveTaskBoardTransitionHeight(
-      buildWorkflowTaskBoardRequest(nextFilters)
-    )
+    if (!riskView) preserveTaskBoardTransitionHeight(buildWorkflowTaskBoardRequest(nextFilters))
     setSearchParams(
       writeWorkflowTaskBoardFiltersToSearch(searchParams, nextFilters),
       { replace: true }
@@ -785,16 +632,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     if (trackingScope || exceptionsView) {
       if (trackingScope) views.tracking = trackingScope
       views.trackingView = exceptionsView ? 'exceptions' : 'tracking'
-    } else views.filters[filters.mode] = filters
+    } else views.filters[riskView ? 'risk' : filters.mode] = filters
     if (view === 'tracking' && restoreTrackingView) view = views.trackingView
     const isTrackingView = view === 'tracking' || view === 'exceptions'
     const next = isTrackingView
       ? new URLSearchParams(searchParams)
       : writeWorkflowTaskBoardFiltersToSearch(
           searchParams,
-          views.filters[view] || { mode: view }
+          views.filters[view] || { mode: view === 'risk' ? 'all' : view }
         )
-    if (view === 'exceptions') next.set('view', 'exceptions')
+    if (view === 'exceptions' || view === 'risk') next.set('view', view)
     else next.delete('view')
     if (isTrackingView) next.set('tracking', views.tracking)
     else next.delete('tracking')
@@ -881,36 +728,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }
 
-  const openProductCoreEntry = useCallback(
-    (path) => {
-      if (path) {
-        navigate(path)
-      }
-    },
-    [navigate]
-  )
-
-  const selectWorkbenchQueue = useCallback((queueKey) => {
-    pendingWorkbenchPageScrollRef.current = null
-    setWorkbenchQueueKey(queueKey)
-    setWorkbenchQueuePage(1)
-  }, [])
-
-  const selectWorkbenchQueuePage = (
-    page,
-    pageSize = displayedWorkbenchQueuePageSize
-  ) => {
-    const nextPageSize = normalizeWorkflowTaskPageSize(pageSize)
-    if (nextPageSize !== displayedWorkbenchQueuePageSize) page = 1
-    pendingWorkbenchPageScrollRef.current = {
-      queue: workbenchQueueKey,
-      page,
-      pageSize: nextPageSize,
-    }
-    setWorkbenchQueuePage(page)
-    setWorkbenchQueuePageSize(nextPageSize)
-  }
-
   const openTaskDrawer = (task, mode = '') => {
     if (actionSaving) return
     const nextMode = TASK_ACTION_META[mode] ? mode : ''
@@ -928,7 +745,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   })
   useLayoutEffect(() => {
     const position = pendingReturnPosition.current
-    if (!position || loading || !taskBoardReady) return
+    if (!position || loading || !(riskView ? riskResponse : taskBoardReady)) return
     const container = document.querySelector('.erp-admin-content')
     const row = container?.querySelector(`[data-task-id="${returnedBusinessTask?.task.id}"]`)
     if (!container) return
@@ -936,19 +753,30 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ? position.scrollTop
       : container.scrollTop + row.getBoundingClientRect().top - container.getBoundingClientRect().top - position.rowOffset
     pendingReturnPosition.current = null
-  }, [loading, taskBoardReady, taskBoardModel, returnedBusinessTask])
+  }, [loading, riskView, riskResponse, taskBoardReady, taskBoardModel, returnedBusinessTask])
 
-  const closeTaskDrawer = () => {
-    if (actionSaving || materialSaving) return
-    if (materialLeaveGuardRef.current) {
-      materialLeaveGuardRef.current(() => setSelectedTask(null))
-      return
-    }
+  const leaveSelectedTask = () => {
     setSelectedTask(null)
     setActionMode('')
     setActionReason('')
     setAssignmentTarget(undefined)
     setActionReceipt(null)
+    if (fromProgress) {
+      const currentIndex = window.history.state?.idx
+      const delta = Number.isSafeInteger(currentIndex) && Number.isSafeInteger(progressOrigin.index) && progressOrigin.index < currentIndex
+        ? progressOrigin.index - currentIndex : -1
+      navigate(delta)
+    }
+    else if (exactTask !== null) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('task_id')
+      setSearchParams(next, { replace: true })
+    }
+  }
+  const closeTaskDrawer = () => {
+    if (actionSaving || materialSaving) return
+    if (materialLeaveGuardRef.current) materialLeaveGuardRef.current(leaveSelectedTask)
+    else leaveSelectedTask()
   }
 
   const changeTaskActionMode = (nextMode) => {
@@ -1012,10 +840,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       if (getWorkflowTaskStableKey(selectedTaskRef.current) !== taskIdentity) {
         return false
       }
-      setSelectedTask(null)
-      setActionMode('')
-      setActionReason('')
-      setAssignmentTarget(undefined)
+      leaveSelectedTask()
       return true
     }
     try {
@@ -1120,347 +945,135 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }
 
-  const workbenchTaskColumns = [
-    {
-      align: 'left',
-      title: '任务与关联内容',
-      dataIndex: 'task_name',
-      render: (_, record) => (
-        <div className="erp-workbench-task-cell">
-          <WorkflowTaskIdentity
-            task={record}
-            compact
-            layout="table"
-            showTaskName
-            source={<WorkflowTaskSource task={record} showUnavailable={false} />}
-            renderCompactTitle={() => (
-              <TaskTitleEntry task={record} onOpenTask={openTaskDrawer} compact />
-            )}
-          />
-          {getWorkflowTaskReason(record) ? (
-            <Text
-              type={
-                record.task_status_key === 'blocked' ? 'danger' : 'secondary'
-              }
-            >
-              {getWorkflowTaskReasonMeta(record).label}：
-              {getWorkflowTaskReason(record)}
-            </Text>
-          ) : null}
-        </div>
-      ),
-    },
-    {
-      align: 'left',
-      title: '状态 / 风险',
-      key: 'task_priority',
-      width: 132,
-      render: (_, record) => {
-        return (
-          <Space
-            className="erp-workbench-task-status-risk"
-            size={[4, 4]}
-            style={{ width: '100%' }}
-            wrap
-          >
-            {getWorkflowTaskStatusRiskTags(record).map((tag) => (
-              <WorkflowTaskStatusTag
-                key={tag.key}
-                color={tag.color}
-                tone={tag.key === 'status' ? record.task_status_key : tag.key}
-                style={{ marginInlineEnd: 0 }}
-              >
-                {tag.label}
-              </WorkflowTaskStatusTag>
-            ))}
-          </Space>
-        )
-      },
-    },
-    {
-      title: '负责',
-      key: 'owner_role',
-      width: 90,
-      render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
-    },
-    {
-      align: 'left',
-      title: '任务时间',
-      key: 'timing',
-      width: 210,
-      render: (_, record) => <WorkflowTaskTiming task={record} />,
-    },
-  ]
-
   return (
-    <section
-      ref={taskFocusScopeRef}
-      aria-label={activeView === 'task-board' ? '任务管理' : '工作台'}
-      className="erp-dashboard-page erp-command-center-page"
-    >
-      <div
-        hidden
-        aria-hidden="true"
-        data-testid="dashboard-workflow-task-evidence"
-      >
-        {workbenchQueuePageTasks.map((task) => (
-          <span
-            key={task.id || task.task_code}
-            data-task-code={task.task_code || undefined}
-            data-task-group={task.task_group || undefined}
-            data-task-terminal={String(isTerminalWorkflowTask(task))}
-          />
-        ))}
-      </div>
-      {shouldShowProductCoreDashboard ? (
-        <>
-          <PageHeaderCard compact title="工作台" />
-          <ProductCoreDashboard onNavigate={openProductCoreEntry} />
-        </>
-      ) : null}
-
-      {!shouldShowProductCoreDashboard && activeView === 'workbench' ? (
-        <div className="erp-workbench-layout">
-          <PageHeaderCard
-            compact
-            title="工作台"
-            viewSwitch={
-              summaryOptions.length > 0 ? (
-                <SlidingTabList
-                  aria-label="工作台视图"
-                  value={summaryOpen ? 'summary' : 'tasks'}
-                  options={[
-                    { value: 'tasks', label: '待办' },
-                    { value: 'summary', label: '业务汇总' },
-                  ]}
-                  onChange={(value) => {
-                    const next = new URLSearchParams(searchParams)
-                    if (value === 'summary') next.set('view', 'summary')
-                    else next.delete('view')
-                    setSearchParams(next, { replace: true })
-                  }}
-                />
-              ) : null
-            }
-          />
-          <Card
-            className="erp-dashboard-card erp-workbench-command-card"
-            data-page-table-region
-            data-table-scroll-scope
-            variant="borderless"
-          >
-            <div className="erp-workbench-command">
-              {summaryOpen ? (
-                <Suspense fallback={<div role="status">正在加载汇总…</div>}>
-                  <WorkbenchSummaries
-                    options={summaryOptions}
-                    refreshRevision={summaryRefreshRevision}
-                  />
-                </Suspense>
-              ) : (
-                <>
-                  <div className="erp-workbench-queue-heading" data-page-table-toolbar>
-                    <div
-                      className="erp-workbench-queue-filter-strip"
-                      aria-label="工作台任务筛选"
-                    >
-                      {visibleWorkbenchQueueOptions.map((option) => {
-                        const count = workbenchCounts?.[option.key]
-                        const countReady = Number.isSafeInteger(count)
-                        const active = option.key === workbenchQueueKey
-                        return (
-                          <button
-                            key={option.key}
-                            type="button"
-                            className={[
-                              'erp-workbench-queue-filter',
-                              active
-                                ? 'erp-workbench-queue-filter--active'
-                                : '',
-                              option.key === 'risk' && countReady && count > 0
-                                ? 'erp-workbench-queue-filter--danger'
-                                : '',
-                            ]
-                              .filter(Boolean)
-                              .join(' ')}
-                            aria-pressed={active}
-                            aria-label={
-                              countReady
-                                ? `${option.label}，${count} 项，${option.hint}`
-                                : `${option.label}，数量读取中，${option.hint}`
-                            }
-                            onClick={() => selectWorkbenchQueue(option.key)}
-                          >
-                            <span>{option.label}</span>
-                            <strong>{countReady ? count : '—'}</strong>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <Button
-                      type="text"
-                      aria-label="待办日历"
-                      icon={<CalendarOutlined aria-hidden />}
-                      onClick={() =>
-                        navigate('/erp/task-board?mode=todo&layout=calendar')
-                      }
-                    >
-                      待办日历
-                    </Button>
-                    <span data-table-scroll-toolbar />
-                  </div>
-
-                  <div className="erp-workbench-main-grid">
-                    <section
-                      ref={workbenchListRef}
-                      className="erp-workbench-panel erp-workbench-queue-panel"
-                      aria-label="优先处理"
-                      aria-busy={loading}
-                    >
-                      {workbenchLoadError ? (
-                        <Alert
-                          type="error"
-                          showIcon
-                          message="工作台任务加载失败"
-                          description={workbenchLoadError}
-                          action={
-                            <Button size="small" onClick={reloadTaskData}>
-                              重新加载
-                            </Button>
-                          }
-                        />
-                      ) : null}
-                      <Table
-                        className="erp-work-center-table"
-                        sticky={workbenchSticky}
-                        scrollToolbar
-                        size="small"
-                        rowKey={(record) => record.id || record.task_code}
-                        columns={workbenchTaskColumns}
-                        dataSource={workbenchQueuePageTasks}
-                        loading={{ spinning: loading, delay: 120 }}
-                        pagination={false}
-                        scroll={{ x: 680 }}
-                        rowClassName="erp-task-table-row"
-                        onRow={(record) => ({
-                          'data-task-id': record.id,
-                          'data-task-code': record.task_code || undefined,
-                          'data-task-group': record.task_group || undefined,
-                          onClick: (event) =>
-                            openTaskTableRow(event, record, openTaskDrawer),
-                        })}
-                        locale={{
-                          emptyText: (
-                            <WorkbenchQueueEmpty
-                              activeOption={activeWorkbenchQueueOption}
-                              fallbackOption={fallbackWorkbenchQueueOption}
-                              onSwitchQueue={selectWorkbenchQueue}
-                            />
-                          ),
-                        }}
-                      />
-                    </section>
-                  </div>
-                  {workbenchCounts ? (
-                    <WorkflowTaskPagination
-                      total={workbenchQueueTotal}
-                      current={activeWorkbenchQueuePage}
-                      pageSize={displayedWorkbenchQueuePageSize}
-                      loading={loading}
-                      error={Boolean(workbenchLoadError)}
-                      onChange={selectWorkbenchQueuePage}
-                    />
-                  ) : null}
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
-      ) : null}
-
-      {activeView === 'task-board' ? (
-        <>
-          <PageHeaderCard
-            compact
-            title="任务管理"
-            className="erp-task-management-header erp-task-management-scope"
-            viewSwitch={
-              <SlidingTabList
-                className="erp-task-board-scope-filter"
-                aria-label="任务范围"
-                value={
-                  exceptionsView || trackingScope ? 'tracking' : filters.mode
+    <section ref={taskFocusScopeRef} aria-label="任务管理" className="erp-dashboard-page erp-command-center-page">
+      <PageHeaderCard
+        compact
+        title="任务管理"
+        className="erp-task-management-header erp-task-management-scope"
+        viewSwitch={
+          <SlidingTabList
+            className="erp-task-board-scope-filter"
+            aria-label="任务范围"
+            value={
+                  exceptionsView || trackingScope ? 'tracking' : riskView ? 'risk' : filters.mode
                 }
-                options={TASK_BOARD_SCOPE_OPTIONS.filter(
+            options={TASK_BOARD_SCOPE_OPTIONS.filter(
                   (option) =>
-                    canViewApprovalInbox || option.value !== 'approval'
+                    (canViewApprovalInbox || option.value !== 'approval') && (canViewRisk || option.value !== 'risk')
                 )}
-                onChange={(view) => selectTaskView(view, true)}
-              />
-            }
+            onChange={(view) => selectTaskView(view, true)}
           />
-          <Card
-            className="erp-dashboard-card erp-dashboard-task-board-card"
-            data-page-table-region
-            data-table-scroll-scope
-            variant="borderless"
-            loading={
-              !trackingScope && !exceptionsView && taskBoardInitialLoading
             }
-            style={
-              !trackingScope &&
+      />
+      <div
+        className="erp-dashboard-task-board-card"
+        data-page-table-region
+        data-table-scroll-scope
+        style={
+              !riskView && !trackingScope &&
               !exceptionsView &&
               taskBoardTransitionMinHeight > 0
                 ? { minHeight: taskBoardTransitionMinHeight }
                 : undefined
             }
-          >
-            {exceptionsView || trackingScope ? (
+      >
+        {riskView ? (
+          <div className="erp-dashboard-block" ref={riskListRef}>
+            <div data-page-table-toolbar>
+              <BusinessOperationPanel
+                compact
+                filters={<SelectFilter
+                  purpose="sort"
+                  emptyValue="smart"
+                  aria-label="风险任务排序"
+                  value={filters.sort}
+                  options={[
+                    { value: 'smart', label: '默认排序' },
+                    { value: 'time_asc', label: '截止时间从早到晚' },
+                    { value: 'time_desc', label: '截止时间从晚到早' },
+                  ]}
+                  onChange={(sort) => updateFilter('sort', sort)}
+                />}
+              />
+            </div>
+            <Card className="erp-business-data-table-card erp-work-center-results">
+              {riskError ? <Alert
+                type="error"
+                showIcon
+                message="风险任务加载失败"
+                description={riskError}
+                action={<Button onClick={reloadTaskData}>重新加载</Button>}
+              /> : null}
+              <TaskLane
+                lane={{ key: 'risk', title: '风险任务', tasks: riskResponse?.items || [] }}
+                sort={riskResponse ? riskResponseState.sort : ''}
+                onOpenTask={openTaskDrawer}
+                loading={loading}
+                onSort={(sort) => updateFilter('sort', sort || 'smart')}
+              />
+              <WorkflowTaskPagination
+                total={riskResponse?.total || 0}
+                current={riskResponse ? Math.floor(riskResponse.offset / riskResponse.limit) + 1 : filters.page}
+                pageSize={riskResponse?.limit || filters.pageSize}
+                loading={loading}
+                error={Boolean(riskError)}
+                onChange={selectRiskPage}
+              />
+            </Card>
+          </div>
+            ) : !trackingScope && !exceptionsView && taskBoardInitialLoading ? (
+              <Card className="erp-business-data-table-card" loading />
+            ) : exceptionsView || trackingScope ? (
               <div className="erp-dashboard-block">
-                <div className="erp-task-tracking-toolbar" data-page-table-toolbar>
-                  <div className="erp-business-operation-panel__view-switch">
-                    <SlidingTabList
-                      className="erp-task-tracking-views"
-                      aria-label="跟踪内容"
-                      value={exceptionsView ? 'exceptions' : 'tracking'}
-                      options={TRACKING_VIEW_OPTIONS}
-                      onChange={selectTaskView}
-                    />
+                <Card className="erp-business-operation-panel" data-page-table-toolbar>
+                  <div className="erp-task-tracking-toolbar">
+                    <div className="erp-business-operation-panel__view-switch">
+                      <SlidingTabList
+                        className="erp-task-tracking-views"
+                        aria-label="跟踪内容"
+                        value={exceptionsView ? 'exceptions' : 'tracking'}
+                        options={TRACKING_VIEW_OPTIONS}
+                        onChange={selectTaskView}
+                      />
+                    </div>
+                    <div className="erp-task-tracking-toolbar__controls" ref={setTrackingToolbarContainer} />
                   </div>
-                  <div className="erp-task-tracking-toolbar__controls" ref={setTrackingToolbarContainer} />
-                </div>
-                {trackingToolbarContainer && (exceptionsView ? (
-                  <WorkflowExceptionPanel
-                    key={workflowWorkbenchScopeKey}
-                    toolbarContainer={trackingToolbarContainer}
-                    profile={adminProfile}
-                    onOpenTask={openTaskDrawer}
-                    refreshKey={trackingRefresh}
-                    initialQuery={
-                      exceptionQueryRef.current?.scope ===
-                      workflowWorkbenchScopeKey
-                        ? exceptionQueryRef.current.query
-                        : {}
-                    }
-                    onQueryChange={(query) => {
-                      exceptionQueryRef.current = {
-                        scope: workflowWorkbenchScopeKey,
-                        query,
+                </Card>
+                <Card className="erp-business-data-table-card erp-work-center-results">
+                  {trackingToolbarContainer && (exceptionsView ? (
+                    <WorkflowExceptionPanel
+                      key={workflowWorkbenchScopeKey}
+                      toolbarContainer={trackingToolbarContainer}
+                      profile={adminProfile}
+                      onOpenTask={openTaskDrawer}
+                      refreshKey={trackingRefresh}
+                      initialQuery={
+                        exceptionQueryRef.current?.scope ===
+                        workflowWorkbenchScopeKey
+                          ? exceptionQueryRef.current.query
+                          : {}
                       }
-                    }}
-                  />
-                ) : (
-                  <WorkflowTrackingPanel
-                    key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
-                    toolbarContainer={trackingToolbarContainer}
-                    scope={trackingScope}
-                    onScopeChange={selectTrackingScope}
-                    sessionKey={workflowWorkbenchScopeKey}
-                    refreshKey={trackingRefresh}
-                    onOpenTask={openTaskDrawer}
-                    taskHandlingOpen={Boolean(selectedTask)}
-                  />
-                ))}
+                      onQueryChange={(query) => {
+                        exceptionQueryRef.current = {
+                          scope: workflowWorkbenchScopeKey,
+                          query,
+                        }
+                      }}
+                    />
+                  ) : (
+                    <WorkflowTrackingPanel
+                      key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
+                      toolbarContainer={trackingToolbarContainer}
+                      scope={trackingScope}
+                      onScopeChange={selectTrackingScope}
+                      sessionKey={workflowWorkbenchScopeKey}
+                      refreshKey={trackingRefresh}
+                      onOpenTask={openTaskDrawer}
+                      taskHandlingOpen={Boolean(selectedTask)}
+                    />
+                  ))}
+                </Card>
               </div>
             ) : (
               <div className="erp-dashboard-block">
@@ -1518,8 +1131,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                               updateFilter('keyword', keyword)
                             }
                           />
+                          <WorkflowTaskDocumentFilter
+                            section={filters.sourceSection}
+                            value={filters.sourceType}
+                            options={sourceOptions}
+                            onChange={updateFilter}
+                          />
                           {!calendarView ? (
                             <SelectFilter
+                              purpose="sort"
                               emptyValue="smart"
                               aria-label="任务排序"
                               value={filters.sort}
@@ -1530,10 +1150,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           <WorkflowTaskDiscoveryFilters
                             value={filters}
                             profile={adminProfile}
-                            people={
-                              taskBoardSummaryResponse?.assignees ||
-                              taskBoardResponse?.assignees
-                            }
+                            people={taskBoardFilterOptions?.assignees || []}
                             onChange={(next) => updateFilter(next)}
                           />
                           {roleOptions.length > 1 ? (
@@ -1602,81 +1219,74 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             options={dueOptions}
                             onChange={(value) => updateFilter('due', value)}
                           />}
-                          <SelectFilter
-                            aria-label="来源单据"
-                            emptyValue="all"
-                            value={filters.sourceType}
-                            options={sourceOptions}
-                            onChange={(value) =>
-                              updateFilter('sourceType', value)
-                            }
-                          />
                         </>
                       }
 
                     />
                   </div>
                 </div>
-                {calendarView ? (
-                  <WorkflowTaskCalendar
-                    state={calendarState}
-                    query={buildWorkflowTaskBoardRequest({
-                      ...filters,
-                      lane: 'all',
-                      due: 'all',
-                      page: 1,
-                    }, { calendar: true })}
-                    scopeKey={workflowWorkbenchScopeKey}
-                    refreshKey={trackingRefresh}
-                    onOpenTask={openTaskDrawer}
-                  />
-                ) : taskBoardLoadError ? (
-                  <Alert
-                    type="error"
-                    showIcon
-                    message="任务管理加载失败"
-                    description={taskBoardLoadError}
-                    action={
-                      <Button onClick={reloadTaskData}>重新加载</Button>
-                    }
-                  />
-                ) : (
-                  <div>
-                    <div
-                      ref={taskBoardLanesRef}
-                      className="erp-task-board-lanes erp-task-board-lanes--focused"
-                      aria-label="任务管理分类"
-                      aria-busy={taskBoardUpdating}
-                    >
-                      {taskLanes.map((lane) => (
-                        <TaskLane
-                          key={lane.key}
-                          keyword={filters.keyword}
-                          lane={lane}
-                          loading={taskBoardUpdating}
-                          onOpenTask={openTaskDrawer}
-                        />
-                      ))}
+                <Card className="erp-business-data-table-card erp-work-center-results">
+                  {calendarView ? (
+                    <WorkflowTaskCalendar
+                      state={calendarState}
+                      query={buildWorkflowTaskBoardRequest({
+                        ...filters,
+                        lane: 'all',
+                        due: 'all',
+                        page: 1,
+                      }, { calendar: true })}
+                      scopeKey={workflowWorkbenchScopeKey}
+                      refreshKey={trackingRefresh}
+                      onOpenTask={openTaskDrawer}
+                    />
+                  ) : taskBoardLoadError ? (
+                    <Alert
+                      type="error"
+                      showIcon
+                      message="任务管理加载失败"
+                      description={taskBoardLoadError}
+                      action={
+                        <Button onClick={reloadTaskData}>重新加载</Button>
+                      }
+                    />
+                  ) : (
+                    <div>
+                      <div
+                        ref={taskBoardLanesRef}
+                        className="erp-task-board-lanes erp-task-board-lanes--focused"
+                        aria-label="任务管理分类"
+                        aria-busy={taskBoardUpdating}
+                      >
+                        {taskLanes.map((lane) => (
+                          <TaskLane
+                            key={lane.key}
+                            keyword={filters.keyword}
+                            lane={lane}
+                            sort={filters.sort}
+                            onSort={(sort) => updateFilter('sort', sort || 'smart')}
+                            loading={taskBoardUpdating}
+                            onOpenTask={openTaskDrawer}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {!calendarView ? (
-                  <WorkflowTaskPagination
-                    total={taskBoardVisibleCount}
-                    current={
-                      taskBoardReady ? taskBoardModel.page : filters.page
-                    }
-                    pageSize={filters.pageSize}
-                    loading={taskBoardUpdating}
-                    error={Boolean(taskBoardLoadError)}
-                    onChange={selectTaskBoardPage}
-                  />
-                ) : null}
+                  )}
+                  {!calendarView ? (
+                    <WorkflowTaskPagination
+                      total={taskBoardVisibleCount}
+                      current={
+                        taskBoardReady ? taskBoardModel.page : filters.page
+                      }
+                      pageSize={filters.pageSize}
+                      loading={taskBoardUpdating}
+                      error={Boolean(taskBoardLoadError)}
+                      onChange={selectTaskBoardPage}
+                    />
+                  ) : null}
+                </Card>
               </div>
             )}
-          </Card>
-        </>
-      ) : null}
+      </div>
 
       <WorkflowTaskLinkDrawer
         profile={adminProfile}
@@ -1687,10 +1297,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           openTaskDrawer(task)
         }}
       />
+      {exactTask !== null && adminProfile.id && !readWorkflowTaskReturn(location.state, adminProfile.id) && (
+        <WorkflowExactTaskEntry
+          key={`${adminProfile.id}:${workflowWorkbenchScopeKey}:${exactTask}`}
+          value={exactTask}
+          profile={adminProfile}
+          onClose={closeTaskDrawer}
+          onOpen={openTaskDrawer}
+        />
+      )}
       <WorkflowTaskActionDrawer
         startHandling={sharedHandlingID === selectedTask?.id}
         closeLabel={
-          exceptionsView
+          fromProgress ? '返回进度看板' : exceptionsView
             ? exceptionQueryRef.current?.query?.view === 'tasks'
               ? '返回关联待办'
               : '返回异常跟踪'

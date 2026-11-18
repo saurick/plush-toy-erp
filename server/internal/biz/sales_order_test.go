@@ -152,6 +152,10 @@ func (s *salesOrderRepoStub) SaveSalesOrderWithItems(_ context.Context, id int, 
 	}, nil
 }
 
+func (s *salesOrderRepoStub) ResolveSalesOrderCreateReplay(context.Context, *SalesOrderMutation) (*SalesOrderWithItems, bool, error) {
+	return nil, false, nil
+}
+
 func (s *salesOrderRepoStub) CustomerIsActive(_ context.Context, id int) (bool, error) {
 	active, ok := s.customerActive[id]
 	if !ok {

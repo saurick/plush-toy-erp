@@ -36,6 +36,7 @@ import { filterSelectOptions, isEmptyFilterValue } from '@/common/components/sel
 import Table, { TABLE_SELECTION_COLUMN_WIDTH } from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import FilterField from '@/common/components/navigation/FilterField.jsx'
 import BusinessSwitchContent from '../BusinessSwitchContent.jsx'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
 import './businessFilterChoices.css'
@@ -864,6 +865,7 @@ export function BusinessFilterPanel({
 
 export function SearchInput({
   value,
+  inputRef,
   onSearch,
   placeholder = '搜索关键词',
   searchHint,
@@ -872,6 +874,7 @@ export function SearchInput({
 }) {
   return (
     <SharedSearchInput
+      ref={inputRef}
       allowClear
       className={joinClassNames(
         'erp-business-filter-control erp-business-filter-control--search',
@@ -891,18 +894,22 @@ export function SelectFilter({
   onChange,
   options,
   placeholder,
+  label,
+  purpose = 'filter',
   mode,
   allowClear = true,
   emptyValue = '',
   maxTagCount,
   className = '',
+  id,
+  style,
   onOpenChange,
   onMouseDownCapture,
   ...restProps
 }) {
   const selectRef = React.useRef(null)
   const inFilterPanel = React.useContext(BusinessFilterPanelContext)
-  const filterLabel = restProps['aria-label'] || placeholder || '筛选条件'
+  const filterLabel = label || restProps['aria-label'] || placeholder || '筛选条件'
   const scrollMobileSelectIntoView = React.useCallback((element) => {
     if (
       typeof window !== 'undefined' &&
@@ -941,18 +948,18 @@ export function SelectFilter({
     [onOpenChange, scrollMobileSelectIntoView]
   )
 
-  if (inFilterPanel && shouldUseDirectFilterChoices({ options, mode, allowClear, className, ...restProps })) {
-    const choices = allowClear
+  if (shouldUseDirectFilterChoices({ options, mode, allowClear, ...restProps })) {
+    const clearable = allowClear && purpose !== 'sort'
+    const choices = clearable
       ? [{ value: emptyValue, label: '不限' }, ...filterSelectOptions(options, emptyValue)]
       : options
     return (
-      <fieldset role="presentation" className="erp-business-filter-field erp-business-filter-field--choices" disabled={restProps.disabled || restProps.loading}>
-        <legend>{filterLabel}</legend>
+      <FilterField label={filterLabel} id={id} style={style} className={joinClassNames('erp-business-filter-field--choices', className)} disabled={restProps.disabled || restProps.loading}>
         <div className="erp-business-filter-choices" role="group" aria-label={filterLabel}>
           {choices.map((option) => (
             <FilterChip
               key={option.value ?? '__all'}
-              selected={(allowClear && isEmptyFilterValue(value, emptyValue) ? emptyValue : value) === option.value}
+              selected={(isEmptyFilterValue(value, emptyValue) ? emptyValue : value) === option.value}
               disabled={restProps.disabled || restProps.loading || option.disabled}
               help={option.help ? (
                 <BusinessHelpLabel
@@ -968,7 +975,7 @@ export function SelectFilter({
             </FilterChip>
           ))}
         </div>
-      </fieldset>
+      </FilterField>
     )
   }
   const SelectControl = allowClear ? FilterSelect : Select
@@ -976,7 +983,10 @@ export function SelectFilter({
     <SelectControl
       ref={selectRef}
       {...(allowClear ? { emptyValue } : {})}
-      label={inFilterPanel ? undefined : filterLabel}
+      label={inFilterPanel ? false : filterLabel}
+      id={id}
+      style={inFilterPanel ? undefined : style}
+      aria-label={restProps['aria-label'] || filterLabel}
       className={joinClassNames(
         'erp-business-filter-control erp-business-filter-control--select erp-business-filter-control--compact-select',
         className
@@ -996,10 +1006,9 @@ export function SelectFilter({
     />
   )
   return inFilterPanel ? (
-    <label className="erp-business-filter-field">
-      <span>{filterLabel}</span>
+    <FilterField label={filterLabel} style={style}>
       {select}
-    </label>
+    </FilterField>
   ) : select
 }
 
@@ -1670,7 +1679,6 @@ export function useBusinessTableRecordOpen({ dataSource, rowKey, onRow, onOpenRe
       const userDoubleClick = rowProps.onDoubleClick
       return {
         ...rowProps,
-        style: { cursor: 'pointer', ...(rowProps.style || {}) },
         title: rowProps.title || '单击选中，双击打开',
         onDoubleClick: (event) => {
           rowClickOriginRef.current = null

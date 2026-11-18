@@ -6768,8 +6768,48 @@ func init() {
 	runtimemarker.UpdateDefaultUpdatedAt = runtimemarkerDescUpdatedAt.UpdateDefault.(func() time.Time)
 	salesorderFields := schema.SalesOrder{}.Fields()
 	_ = salesorderFields
+	// salesorderDescCreateIdempotencyKey is the schema descriptor for create_idempotency_key field.
+	salesorderDescCreateIdempotencyKey := salesorderFields[0].Descriptor()
+	// salesorder.CreateIdempotencyKeyValidator is a validator for the "create_idempotency_key" field. It is called by the builders before save.
+	salesorder.CreateIdempotencyKeyValidator = func() func(string) error {
+		validators := salesorderDescCreateIdempotencyKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(create_idempotency_key string) error {
+			for _, fn := range fns {
+				if err := fn(create_idempotency_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// salesorderDescCreateIntentHash is the schema descriptor for create_intent_hash field.
+	salesorderDescCreateIntentHash := salesorderFields[1].Descriptor()
+	// salesorder.CreateIntentHashValidator is a validator for the "create_intent_hash" field. It is called by the builders before save.
+	salesorder.CreateIntentHashValidator = func() func(string) error {
+		validators := salesorderDescCreateIntentHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(create_intent_hash string) error {
+			for _, fn := range fns {
+				if err := fn(create_intent_hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// salesorderDescCreateActorID is the schema descriptor for create_actor_id field.
+	salesorderDescCreateActorID := salesorderFields[2].Descriptor()
+	// salesorder.CreateActorIDValidator is a validator for the "create_actor_id" field. It is called by the builders before save.
+	salesorder.CreateActorIDValidator = salesorderDescCreateActorID.Validators[0].(func(int) error)
 	// salesorderDescOrderNo is the schema descriptor for order_no field.
-	salesorderDescOrderNo := salesorderFields[0].Descriptor()
+	salesorderDescOrderNo := salesorderFields[3].Descriptor()
 	// salesorder.OrderNoValidator is a validator for the "order_no" field. It is called by the builders before save.
 	salesorder.OrderNoValidator = func() func(string) error {
 		validators := salesorderDescOrderNo.Validators
@@ -6787,11 +6827,11 @@ func init() {
 		}
 	}()
 	// salesorderDescCustomerID is the schema descriptor for customer_id field.
-	salesorderDescCustomerID := salesorderFields[1].Descriptor()
+	salesorderDescCustomerID := salesorderFields[4].Descriptor()
 	// salesorder.CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
 	salesorder.CustomerIDValidator = salesorderDescCustomerID.Validators[0].(func(int) error)
 	// salesorderDescCurrency is the schema descriptor for currency field.
-	salesorderDescCurrency := salesorderFields[2].Descriptor()
+	salesorderDescCurrency := salesorderFields[5].Descriptor()
 	// salesorder.DefaultCurrency holds the default value on creation for the currency field.
 	salesorder.DefaultCurrency = salesorderDescCurrency.Default.(string)
 	// salesorder.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
@@ -6811,35 +6851,35 @@ func init() {
 		}
 	}()
 	// salesorderDescCustomerOrderNo is the schema descriptor for customer_order_no field.
-	salesorderDescCustomerOrderNo := salesorderFields[3].Descriptor()
+	salesorderDescCustomerOrderNo := salesorderFields[6].Descriptor()
 	// salesorder.CustomerOrderNoValidator is a validator for the "customer_order_no" field. It is called by the builders before save.
 	salesorder.CustomerOrderNoValidator = salesorderDescCustomerOrderNo.Validators[0].(func(string) error)
 	// salesorderDescSalesOwner is the schema descriptor for sales_owner field.
-	salesorderDescSalesOwner := salesorderFields[5].Descriptor()
+	salesorderDescSalesOwner := salesorderFields[8].Descriptor()
 	// salesorder.SalesOwnerValidator is a validator for the "sales_owner" field. It is called by the builders before save.
 	salesorder.SalesOwnerValidator = salesorderDescSalesOwner.Validators[0].(func(string) error)
 	// salesorderDescPaymentMethod is the schema descriptor for payment_method field.
-	salesorderDescPaymentMethod := salesorderFields[8].Descriptor()
+	salesorderDescPaymentMethod := salesorderFields[11].Descriptor()
 	// salesorder.PaymentMethodValidator is a validator for the "payment_method" field. It is called by the builders before save.
 	salesorder.PaymentMethodValidator = salesorderDescPaymentMethod.Validators[0].(func(string) error)
 	// salesorderDescPaymentTermDays is the schema descriptor for payment_term_days field.
-	salesorderDescPaymentTermDays := salesorderFields[9].Descriptor()
+	salesorderDescPaymentTermDays := salesorderFields[12].Descriptor()
 	// salesorder.PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
 	salesorder.PaymentTermDaysValidator = salesorderDescPaymentTermDays.Validators[0].(func(int) error)
 	// salesorderDescPriceConditionNote is the schema descriptor for price_condition_note field.
-	salesorderDescPriceConditionNote := salesorderFields[10].Descriptor()
+	salesorderDescPriceConditionNote := salesorderFields[13].Descriptor()
 	// salesorder.PriceConditionNoteValidator is a validator for the "price_condition_note" field. It is called by the builders before save.
 	salesorder.PriceConditionNoteValidator = salesorderDescPriceConditionNote.Validators[0].(func(string) error)
 	// salesorderDescTaxMode is the schema descriptor for tax_mode field.
-	salesorderDescTaxMode := salesorderFields[11].Descriptor()
+	salesorderDescTaxMode := salesorderFields[14].Descriptor()
 	// salesorder.TaxModeValidator is a validator for the "tax_mode" field. It is called by the builders before save.
 	salesorder.TaxModeValidator = salesorderDescTaxMode.Validators[0].(func(string) error)
 	// salesorderDescFreightTerms is the schema descriptor for freight_terms field.
-	salesorderDescFreightTerms := salesorderFields[13].Descriptor()
+	salesorderDescFreightTerms := salesorderFields[16].Descriptor()
 	// salesorder.FreightTermsValidator is a validator for the "freight_terms" field. It is called by the builders before save.
 	salesorder.FreightTermsValidator = salesorderDescFreightTerms.Validators[0].(func(string) error)
 	// salesorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	salesorderDescLifecycleStatus := salesorderFields[20].Descriptor()
+	salesorderDescLifecycleStatus := salesorderFields[23].Descriptor()
 	// salesorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	salesorder.DefaultLifecycleStatus = salesorderDescLifecycleStatus.Default.(string)
 	// salesorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -6859,37 +6899,37 @@ func init() {
 		}
 	}()
 	// salesorderDescVersion is the schema descriptor for version field.
-	salesorderDescVersion := salesorderFields[21].Descriptor()
+	salesorderDescVersion := salesorderFields[24].Descriptor()
 	// salesorder.DefaultVersion holds the default value on creation for the version field.
 	salesorder.DefaultVersion = salesorderDescVersion.Default.(int)
 	// salesorder.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	salesorder.VersionValidator = salesorderDescVersion.Validators[0].(func(int) error)
 	// salesorderDescSettlementAction is the schema descriptor for settlement_action field.
-	salesorderDescSettlementAction := salesorderFields[22].Descriptor()
+	salesorderDescSettlementAction := salesorderFields[25].Descriptor()
 	// salesorder.SettlementActionValidator is a validator for the "settlement_action" field. It is called by the builders before save.
 	salesorder.SettlementActionValidator = salesorderDescSettlementAction.Validators[0].(func(string) error)
 	// salesorderDescSettlementMode is the schema descriptor for settlement_mode field.
-	salesorderDescSettlementMode := salesorderFields[23].Descriptor()
+	salesorderDescSettlementMode := salesorderFields[26].Descriptor()
 	// salesorder.SettlementModeValidator is a validator for the "settlement_mode" field. It is called by the builders before save.
 	salesorder.SettlementModeValidator = salesorderDescSettlementMode.Validators[0].(func(string) error)
 	// salesorderDescSettlementReason is the schema descriptor for settlement_reason field.
-	salesorderDescSettlementReason := salesorderFields[24].Descriptor()
+	salesorderDescSettlementReason := salesorderFields[27].Descriptor()
 	// salesorder.SettlementReasonValidator is a validator for the "settlement_reason" field. It is called by the builders before save.
 	salesorder.SettlementReasonValidator = salesorderDescSettlementReason.Validators[0].(func(string) error)
 	// salesorderDescSettledBy is the schema descriptor for settled_by field.
-	salesorderDescSettledBy := salesorderFields[26].Descriptor()
+	salesorderDescSettledBy := salesorderFields[29].Descriptor()
 	// salesorder.SettledByValidator is a validator for the "settled_by" field. It is called by the builders before save.
 	salesorder.SettledByValidator = salesorderDescSettledBy.Validators[0].(func(int) error)
 	// salesorderDescNote is the schema descriptor for note field.
-	salesorderDescNote := salesorderFields[27].Descriptor()
+	salesorderDescNote := salesorderFields[30].Descriptor()
 	// salesorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	salesorder.NoteValidator = salesorderDescNote.Validators[0].(func(string) error)
 	// salesorderDescCreatedAt is the schema descriptor for created_at field.
-	salesorderDescCreatedAt := salesorderFields[28].Descriptor()
+	salesorderDescCreatedAt := salesorderFields[31].Descriptor()
 	// salesorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	salesorder.DefaultCreatedAt = salesorderDescCreatedAt.Default.(func() time.Time)
 	// salesorderDescUpdatedAt is the schema descriptor for updated_at field.
-	salesorderDescUpdatedAt := salesorderFields[29].Descriptor()
+	salesorderDescUpdatedAt := salesorderFields[32].Descriptor()
 	// salesorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	salesorder.DefaultUpdatedAt = salesorderDescUpdatedAt.Default.(func() time.Time)
 	// salesorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

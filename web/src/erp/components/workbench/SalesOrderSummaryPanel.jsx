@@ -18,11 +18,13 @@ import {
   SearchInput,
   SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
+import { SALES_ORDER_DATE_FILTER_OPTIONS } from '../sales-orders/salesOrderPageConfig.mjs'
 import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import SalesOrderSummaryPartyFilters from './SalesOrderSummaryPartyFilters.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
 import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../../utils/moduleTableColumns.mjs'
 import {
   hasActionPermission,
   unixToDateInputValue,
@@ -31,6 +33,7 @@ import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import {
   readSalesSummaryFilters,
   SALES_SUMMARY_STATUSES,
+  SALES_SUMMARY_SORT_FIELDS,
   updateSummarySearch,
 } from '../../utils/workbenchSummary.mjs'
 
@@ -86,14 +89,6 @@ export default function SalesOrderSummaryPanel({
   const columns = useMemo(
     () => [
       {
-        title: '下单日期',
-        dataIndex: 'order_date',
-        width: 120,
-        render: dateLabel,
-        exportValue: (row) => unixToDateInputValue(row.order_date),
-      },
-      { align: 'left', title: '客户', dataIndex: 'customer_name', width: 150 },
-      {
         title: '订单编号',
         dataIndex: 'order_no',
         width: 180,
@@ -110,22 +105,11 @@ export default function SalesOrderSummaryPanel({
           </Button>
         ),
       },
-      {
-        title: '客户订单号',
-        dataIndex: 'customer_order_no',
-        width: 160,
-        render: valueOrDash,
-      },
-      {
-        title: '客户款号',
-        dataIndex: 'customer_product_no',
-        width: 160,
-        render: valueOrDash,
-      },
+      { align: 'left', title: '客户', dataIndex: 'customer_name', width: 150 },
       {
         align: 'left',
         title: '产品名称',
-        key: 'product',
+        dataIndex: 'product',
         width: 220,
         render: (_, row) => (
           <span className="erp-workbench-summaries__product">
@@ -144,10 +128,51 @@ export default function SalesOrderSummaryPanel({
         exportValue: (record) => productName(record, { emptyText: '' }),
       },
       {
+        title: '客户款号',
+        dataIndex: 'customer_product_no',
+        width: 160,
+        render: valueOrDash,
+      },
+      {
+        title: '计划交付日期',
+        dataIndex: 'planned_delivery_date',
+        width: 140,
+        render: dateLabel,
+        exportValue: (row) => unixToDateInputValue(row.planned_delivery_date),
+      },
+      {
         title: '订单数量',
         dataIndex: 'ordered_quantity',
         width: 110,
         align: 'right',
+      },
+      {
+        title: '未出货数',
+        dataIndex: 'unshipped_quantity',
+        width: 110,
+        align: 'right',
+        render: valueOrDash,
+      },
+      { title: '单位', dataIndex: 'unit_name', width: 80 },
+      {
+        title: '订单状态',
+        dataIndex: 'lifecycle_status',
+        width: 110,
+        render: (_, row) => <Tag>{statusLabel(row)}</Tag>,
+        exportValue: statusLabel,
+      },
+      {
+        title: '下单日期',
+        dataIndex: 'order_date',
+        width: 120,
+        render: dateLabel,
+        exportValue: (row) => unixToDateInputValue(row.order_date),
+      },
+      {
+        title: '客户订单号',
+        dataIndex: 'customer_order_no',
+        width: 160,
+        render: valueOrDash,
       },
       {
         title: '船头版',
@@ -160,21 +185,6 @@ export default function SalesOrderSummaryPanel({
         dataIndex: 'production_quantity',
         width: 110,
         align: 'right',
-      },
-      { title: '单位', dataIndex: 'unit_name', width: 80 },
-      {
-        title: '计划交付日期',
-        dataIndex: 'planned_delivery_date',
-        width: 140,
-        render: dateLabel,
-        exportValue: (row) => unixToDateInputValue(row.planned_delivery_date),
-      },
-      {
-        title: '未出货数',
-        dataIndex: 'unshipped_quantity',
-        width: 110,
-        align: 'right',
-        render: valueOrDash,
       },
       {
         title: '跟单业务人员',
@@ -231,13 +241,6 @@ export default function SalesOrderSummaryPanel({
         width: 220,
         render: valueOrDash,
       },
-      {
-        title: '订单状态',
-        dataIndex: 'lifecycle_status',
-        width: 110,
-        render: (_, row) => <Tag>{statusLabel(row)}</Tag>,
-        exportValue: statusLabel,
-      },
     ],
     [adminProfile, navigate]
   )
@@ -288,15 +291,11 @@ export default function SalesOrderSummaryPanel({
             />
             <DateRangeFilter
               value={filters.date_field}
-              options={[
-                { value: 'order_date', label: '下单日期' },
-                { value: 'planned_delivery_date', label: '计划交付日期' },
-              ]}
+              options={SALES_ORDER_DATE_FILTER_OPTIONS}
               onTypeChange={(date) => update({ date })}
               startValue={filters.date_from?.slice(0, 10) || ''}
               endValue={filters.date_to?.slice(0, 10) || ''}
-              onStartChange={(from) => update({ from })}
-              onEndChange={(to) => update({ to })}
+              onRangeChange={(from, to) => update({ from, to })}
             />
           </>
         }
@@ -345,7 +344,10 @@ export default function SalesOrderSummaryPanel({
       ) : (
         <BusinessDataTable
           rowKey="id"
-          columns={tableColumns}
+          columns={applyBusinessServerColumnSorters(tableColumns, SALES_SUMMARY_SORT_FIELDS, filters)}
+          onChange={(_pagination, _filters, sorter, extra) => {
+            if (extra.action === 'sort') update(readBusinessServerTableSort(sorter, SALES_SUMMARY_SORT_FIELDS) || { sort_by: '', sort_direction: '' })
+          }}
           dataSource={result.items}
           loading={loading}
           emptyDescription="暂无符合条件的销售订单明细"

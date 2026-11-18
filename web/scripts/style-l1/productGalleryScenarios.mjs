@@ -29,7 +29,9 @@ function images(productID) {
 
 async function installGalleryFixture(page) {
   page.__galleryProbe = { calls: [], failOriginal: false, failMetadata: false, holdProduct: 0, release: null }
-  const currentImages = (productID) => images(productID).filter((image) => !page.__galleryProbe.clearImages && (!page.__galleryProbe.onlySecondary || image.slot_key === 'secondary'))
+  const currentImages = (productID) => images(productID)
+    .filter((image) => !page.__galleryProbe.clearImages && (!page.__galleryProbe.onlySecondary || image.slot_key === 'secondary'))
+    .map((image) => page.__galleryProbe.replacePrimary && image.id === 8101 ? { ...image, id: 8103 } : image)
   await page.route('**/rpc/**', async (route) => {
     const body = route.request().postDataJSON()
     const { method, params = {}, id } = body
@@ -48,11 +50,18 @@ async function installGalleryFixture(page) {
       data = { attachments: currentImages(params.owner_id) }
       code = probe.failMetadata ? 50000 : 0
     } else if (method === 'download_attachment' && Number(params.id) >= 8101 && Number(params.id) <= 8201) {
-      const attachment = [1, 2].flatMap(images).find((image) => image.id === params.id)
+      const attachment = [1, 2].flatMap(currentImages).find((image) => image.id === params.id)
       if (!attachment) return route.fallback()
       if (!params.variant && probe.holdProduct === attachment.owner_id) await new Promise((resolve) => { probe.release = resolve; probe.onHold?.() })
       code = !params.variant && probe.failOriginal ? 50000 : 0
       data = { attachment: { ...attachment, content_base64: photograph } }
+    } else if (method === 'list_engineering_material_requests') {
+      const submission = (id, linked) => ({
+        id, sales_order_id: 1, order_no: 'SO-GALLERY-001', order_status: 'active', status: id === 51 ? 'REJECTED' : 'SUBMITTED',
+        submitted_at: '2026-09-15T08:00:00Z', products: linked.map((product) => product.name),
+        product_refs: linked.map((product) => ({ product_id: product.id, product_name: product.name, product_code: product.code })),
+      })
+      data = { total: 2, items: [submission(52, [products[1], products[2]]), submission(51, products.slice(0, 2))] }
     } else if (method === 'list_progress') {
       data = progressFixtureData(params)
       data.rows = data.rows.map((row) => row.id === 1 ? { ...row, order_no: 'SO-GALLERY-001', product: names[0], product_id: 1, product_count: 3, product_type_count: 3 } : row)
@@ -153,6 +162,48 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
     ['shipment', '/erp/warehouse/shipments'],
   ]
   return [
+    {
+      ...common, name: 'product-gallery-material-submissions', path: '/erp/dashboard?summary=materials', viewport: { width: 1440, height: 900 },
+      async verify(page) {
+        const region = page.getByRole('region', { name: '工作台汇总' })
+        const row = (id) => region.locator(`tr[data-row-key="${id}"]`)
+        await row(51).getByText(names.slice(0, 2).join('、'), { exact: true }).waitFor()
+        await row(52).getByText(names.slice(1).join('、'), { exact: true }).waitFor()
+        assert.deepEqual(await region.locator('.ant-table-header th:not(.ant-table-cell-scrollbar)').allInnerTexts(), ['订单号', '产品', '审批状态', '提交时间', '操作'])
+        for (const [id, firstImage, secondProduct] of [[51, 8101, products[1]], [52, 8201, products[2]]]) {
+          const trigger = row(id).getByRole('button', { name: /2 款产品图片/u })
+          const calls = page.__galleryProbe.calls
+          const start = calls.length
+          await trigger.click()
+          await imageReady(page)
+          const downloads = () => calls.slice(start).filter((call) => call.method === 'download_attachment' && !call.params.variant).map((call) => call.params.id)
+          assert.deepEqual(downloads(), [firstImage])
+          const choices = page.getByRole('group', { name: '切换产品' }).getByRole('button')
+          assert.deepEqual(await choices.locator('.erp-product-gallery-preview__product-name > span').allTextContents(), id === 51 ? names.slice(0, 2) : names.slice(1))
+          if (id === 51) {
+            page.__galleryProbe.replacePrimary = true
+            const replacement = page.waitForResponse((res) => {
+              const body = res.request().method() === 'POST' && res.request().postDataJSON()
+              return body?.method === 'download_attachment' && body.params.id === 8103 && !body.params.variant
+            })
+            await page.evaluate((event) => window.dispatchEvent(new CustomEvent(event, { detail: 1 })), PRODUCT_IMAGES_CHANGED)
+            await replacement
+            await imageReady(page)
+            assert(downloads().includes(8103))
+          }
+          await choices.getByText(secondProduct.name, { exact: true }).click()
+          if (id === 51) {
+            await imageReady(page)
+            assert(downloads().includes(8201))
+          } else {
+            await page.getByText('该产品暂无图片', { exact: true }).waitFor()
+            assert.equal(await page.locator(`${stage} img`).count(), 0)
+          }
+          await closeAndRestore(page, trigger)
+        }
+        assert.equal(page.__galleryProbe.calls.some(({ method }) => ['list_document_product_previews', 'list_sales_order_items'].includes(method)), false)
+      },
+    },
     ...[
       ['blue', 'light'],
       ['purple', 'light'],

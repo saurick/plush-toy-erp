@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Form } from 'antd'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
+import { financePaymentActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 
 import { showPageLoadError } from '../PageLoadFeedback.jsx'
 
@@ -142,6 +143,7 @@ export default function useFinancePaymentAllocation({
   }
 
   const postPayment = async (cashOnly = false) => {
+    const presentation = financePaymentActionPresentation(currentPayment, 'post', { cashOnly })
     const existingCash = currentPayment?.status === FinancePaymentStatus.POSTED
     let values
     try {
@@ -255,10 +257,10 @@ export default function useFinancePaymentAllocation({
       const payment = execution.source_readback
       rememberPayment(payment)
       setAllocationOpen(false)
-      reportBusinessResult(cashOnly ? '实际收付已确认，款项余额已更新' : '收付款已过账并完成核销', payment)
+      reportBusinessResult(presentation.success, payment)
       await loadReferences()
       message.success(
-        cashOnly ? '实际收付已确认，款项余额已更新' : '收付款已过账并完成核销'
+        presentation.success
       )
     } catch (error) {
       if (!existingCash && isSourceBusinessActionResultUnknown(error)) {
@@ -277,12 +279,10 @@ export default function useFinancePaymentAllocation({
             )
           ) {
             setAllocationOpen(false)
-            reportBusinessResult(cashOnly ? '已重新读取实际收付结果' : '已重新读取收付款过账与核销结果', payment)
+            reportBusinessResult(`已重新读取并确认：${presentation.success}`, payment)
             await loadReferences()
             message.success(
-              cashOnly
-                ? '已重新读取实际收付结果'
-                : '已重新读取收付款过账与核销结果'
+              `已重新读取并确认：${presentation.success}`
             )
             return
           }
@@ -297,9 +297,7 @@ export default function useFinancePaymentAllocation({
           error,
           existingCash
             ? '抵扣应收应付'
-            : cashOnly
-              ? '确认实际收付'
-              : '过账并核销收付款'
+            : presentation.label
         )
       )
     } finally {

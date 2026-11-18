@@ -1,3 +1,4 @@
+import { getBusinessDocumentTitle } from '../../config/businessModules.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import {
   createCustomer,
@@ -50,7 +51,7 @@ export const DEFAULT_PLUSH_PROCESS_CATEGORIES = [
 
 export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
   customers: {
-    title: '客户档案',
+    title: getBusinessDocumentTitle('customers'),
     ownerType: 'CUSTOMER',
     entityKey: 'customer',
     recordKey: 'customers',
@@ -74,7 +75,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'CUS',
   },
   suppliers: {
-    title: '供应商与加工厂',
+    title: getBusinessDocumentTitle('suppliers'),
     createTitleLabel: '供应商或加工厂',
     ownerType: 'SUPPLIER',
     entityKey: 'supplier',
@@ -99,7 +100,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'SUP',
   },
   materials: {
-    title: '材料档案',
+    title: getBusinessDocumentTitle('materials'),
     recordKey: 'materials',
     list: listMaterials,
     listAll: listAllMaterials,
@@ -116,7 +117,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'MAT',
   },
   processes: {
-    title: '加工环节',
+    title: getBusinessDocumentTitle('processes'),
     recordKey: 'processes',
     list: listProcesses,
     listAll: listAllProcesses,
@@ -137,7 +138,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
   },
   products: {
-    title: '产品档案',
+    title: getBusinessDocumentTitle('products'),
     recordKey: 'products',
     list: listProducts,
     listAll: listAllProducts,
@@ -155,7 +156,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'PRD',
   },
   product_skus: {
-    title: '产品档案',
+    title: getBusinessDocumentTitle('products'),
     recordKey: 'product_skus',
     list: listProductSKUs,
     listAll: listAllProductSKUs,

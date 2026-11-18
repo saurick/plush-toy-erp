@@ -1,8 +1,6 @@
 import React, { Suspense, useLayoutEffect, useRef, useState } from 'react'
-import { Button, Popover } from 'antd'
+import { Button } from 'antd'
 import {
-  DownOutlined,
-  FilterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -14,6 +12,8 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
+import MobileFilterPopover from '@/erp/mobile/components/MobileFilterPopover.jsx'
+import MobileFilterChoices from '@/erp/mobile/components/MobileFilterChoices.jsx'
 import NavigationCountBadge from '@/common/components/navigation/NavigationCountBadge'
 import SearchInput from '@/common/components/SearchInput'
 import { Loading } from '@/common/components/loading'
@@ -262,7 +262,7 @@ const TOPICS = [
     rules: [
       ['单个日期', 'DateInput', '整框打开日历，选值立即回填，清空后保留空值。'],
       ['日期时间', 'DateTimeInput', '分钟选择即时生效；快捷截止沿用跟进任务的同一构造函数。'],
-      ['起止筛选', 'DateRangeFilter', '范围只绑定一个日期类型；少量短选项可直接点选，切换保留起止值。限制倒置选择，已有倒置值保留错误提示并允许清空。'],
+      ['起止筛选', 'DateRangeFilter', '单字段按业务名称分组，多字段先选日期类型，再点时间范围。计划日期可查未来 7 天；自定义展开起止输入，切换类型保留日期并校验倒置范围。'],
     ],
     checks: ['选择日期和分钟，核对下方值即时变化。', '使用截止快捷项，再切换禁用和错误。', '切换日期类型，查看倒置范围并清空、重置。'],
     componentRefs: ['DateInput', 'DateTimeInput', 'DateRangeFilter'],
@@ -317,7 +317,7 @@ const TOPICS = [
       '输入期间结果不变；提交不存在的关键词后，出现无结果与清除入口。',
       '改变范围再重置：搜索词保持，其他页面条件不变。',
     ],
-    componentRefs: ['FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'Popover'],
+    componentRefs: ['FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'MobileFilterPopover', 'MobileFilterChoices'],
     consumer: { ...TASK_PAGE, task: '组合任务范围与关键词，再清空和返回，核对当前条件及结果。' },
   },
   {
@@ -688,49 +688,24 @@ function FiltersExample() {
         onSearch={setKeyword}
         onFocus={() => setOpen(false)}
       />
-      <Popover
-        trigger="click"
+      <MobileFilterPopover
+        contextLabel="演示"
+        title="演示筛选"
         open={open}
         onOpenChange={setOpen}
-        placement="bottomRight"
-        arrow={false}
-        classNames={{
-          root: 'erp-control-example-popover erp-mobile-controls',
-        }}
-        content={
-          <div className="erp-control-example-options">
-            <fieldset>
-              <legend>演示记录范围</legend>
-              <FilterChipGroup
-                aria-label="演示记录范围"
-                value={scope}
-                onChange={(nextScope) => {
-                  setScope(nextScope)
-                  if (
-                    !demoRiskAvailable(risk, nextScope)
-                  ) setRisk('all')
-                }}
-                options={PROGRESS_SCOPE_OPTIONS}
-              />
-            </fieldset>
-            <Button type="text" block onClick={() => setScope('active')}>
-              重置筛选
-            </Button>
-          </div>
-        }
+        count={scope === 'active' ? 0 : 1}
+        onReset={() => { setScope('active'); setRisk('all') }}
       >
-        <button
-          type="button"
-          className="erp-control-button"
-          aria-expanded={open}
-          data-active={scope !== 'active'}
-        >
-          <FilterOutlined aria-hidden="true" />
-          筛选
-          {scope !== 'active' && <span className="erp-control-count">1</span>}
-          <DownOutlined aria-hidden="true" />
-        </button>
-      </Popover>
+        <MobileFilterChoices
+          label="演示记录范围"
+          value={scope}
+          onChange={(nextScope) => {
+            setScope(nextScope)
+            if (!demoRiskAvailable(risk, nextScope)) setRisk('all')
+          }}
+          options={PROGRESS_SCOPE_OPTIONS}
+        />
+      </MobileFilterPopover>
     </div>
   )
   return (

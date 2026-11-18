@@ -4,11 +4,8 @@ import test from 'node:test'
 import {
   buildWorkflowDashboardStats,
   buildWorkflowTaskAlert,
-  createWorkflowWorkbenchSnapshot,
   getWorkflowWorkbenchRoleKeys,
-  getWorkflowWorkbenchScopeKey,
   getWorkflowTaskDueStatus,
-  readWorkflowWorkbenchSnapshot,
 } from './workflowDashboardStats.mjs'
 import {
   formatWorkflowAlertSource,
@@ -57,57 +54,10 @@ test('workflowDashboardStats: 工作台岗位只读取有效会话真源并拒�
   )
 })
 
-test('workflowDashboardStats: 工作台快照绑定客户、revision 和岗位范围', () => {
-  const adminProfile = {
-    effective_session: {
-      customer: { key: 'customer-a' },
-      config_revision: 'revision-1',
-      roles: ['sales', 'purchase'],
-    },
-  }
-  const scopeKey = getWorkflowWorkbenchScopeKey(adminProfile, [
-    'purchase',
-    'sales',
-  ])
-  const snapshot = createWorkflowWorkbenchSnapshot(scopeKey, {
-    tasks: [{ id: 1 }],
-    riskTaskIDs: [1],
-    approvalTaskIDs: [1],
-  })
-  assert.equal(readWorkflowWorkbenchSnapshot(snapshot, scopeKey), snapshot)
-
-  for (const nextScopeKey of [
-    getWorkflowWorkbenchScopeKey(
-      {
-        effective_session: {
-          ...adminProfile.effective_session,
-          customer: { key: 'customer-b' },
-        },
-      },
-      ['purchase', 'sales']
-    ),
-    getWorkflowWorkbenchScopeKey(
-      {
-        effective_session: {
-          ...adminProfile.effective_session,
-          config_revision: 'revision-2',
-        },
-      },
-      ['purchase', 'sales']
-    ),
-    getWorkflowWorkbenchScopeKey(adminProfile, ['sales']),
-  ]) {
-    const visible = readWorkflowWorkbenchSnapshot(snapshot, nextScopeKey)
-    assert.deepEqual(visible.tasks, [])
-    assert.equal(visible.riskTaskIDs.size, 0)
-    assert.equal(visible.approvalTaskIDs.size, 0)
-  }
-})
-
 test('dashboardTaskDisplay: 看板任务来源回显不直接露出内部来源或英文模块 key', () => {
   const sourceLabel = formatWorkflowTaskSource(
     task({
-      source_type: 'shipping-release',
+      source_type: 'shipment',
       source_id: 9,
       source_no: '',
     })
@@ -118,9 +68,9 @@ test('dashboardTaskDisplay: 看板任务来源回显不直接露出内部来源�
     task: task({ source_id: 12 }),
   })
 
-  assert.equal(sourceLabel, '出货放行 / 已关联业务来源')
+  assert.equal(sourceLabel, '出货单 / 已关联业务来源')
   assert.equal(alertSourceLabel, '委外订单 / 已关联业务来源')
-  assert(!sourceLabel.includes('shipping-release'))
+  assert(!sourceLabel.includes('shipment'))
   assert(!alertSourceLabel.includes('processing-contracts'))
   assert(!sourceLabel.includes('内部来源'))
   assert(!alertSourceLabel.includes('内部来源'))
@@ -131,7 +81,7 @@ test('workflowDashboardStats: alert 暴露业务来源标签而不是内部 sour
     task({
       id: 9,
       task_status_key: 'blocked',
-      source_type: 'shipping-release',
+      source_type: 'shipment',
       source_id: 9,
       source_no: 'TASK-9',
     }),
@@ -148,11 +98,11 @@ test('workflowDashboardStats: alert 暴露业务来源标签而不是内部 sour
     { nowMs: NOW_MS }
   )
 
-  assert.equal(internalTaskNoAlert.source_label, '出货放行 / 已关联业务来源')
+  assert.equal(internalTaskNoAlert.source_label, '出货单 / 已关联业务来源')
   assert.equal(hashIdFallbackAlert.source_label, '委外订单 / 已关联业务来源')
   assert(!internalTaskNoAlert.source_label.includes('TASK-9'))
   assert(!hashIdFallbackAlert.source_label.includes('#10'))
-  assert(!internalTaskNoAlert.source_label.includes('shipping-release'))
+  assert(!internalTaskNoAlert.source_label.includes('shipment'))
   assert(!hashIdFallbackAlert.source_label.includes('processing-contracts'))
 })
 

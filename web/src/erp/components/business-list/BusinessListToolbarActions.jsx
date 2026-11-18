@@ -194,6 +194,7 @@ export function useBusinessColumnOrder({
 }
 
 export function BusinessListToolbarActions({
+  dialogItems = [],
   onExport,
   showExport = true,
   exportDisabled = false,
@@ -209,7 +210,13 @@ export function BusinessListToolbarActions({
   const normalizedColumnReason =
     columnOrderDisabledReason ||
     (columnOrderDisabled ? '当前列表暂不支持列设置' : '')
+  const openDialog = (onOpen) => {
+    // 弹窗关闭时将焦点交还给仍在页面上的工具按钮。
+    triggerRef.current?.focus({ preventScroll: true })
+    onOpen?.()
+  }
   const items = [
+    ...dialogItems.map((item) => ({ ...item, onClick: () => openDialog(item.onClick) })),
     ...(showExport ? [{
       key: 'export',
       icon: <DownloadOutlined />,
@@ -224,11 +231,7 @@ export function BusinessListToolbarActions({
       label: <Tooltip title={normalizedColumnReason}><span>列设置</span></Tooltip>,
       title: normalizedColumnReason,
       disabled: columnOrderDisabled || !onOpenColumnOrder,
-      onClick: () => {
-        // The menu closes before the dialog; return focus to its stable trigger.
-        triggerRef.current?.focus({ preventScroll: true })
-        onOpenColumnOrder?.()
-      },
+      onClick: () => openDialog(onOpenColumnOrder),
     },
   ]
 

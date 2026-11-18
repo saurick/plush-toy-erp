@@ -1,6 +1,7 @@
 import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
 import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 
 export function createSalesOrderDemandEntryVerifier(deps) {
   const {
@@ -482,13 +483,15 @@ export function createSalesOrderDemandEntryScenarios(deps) {
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 3840, height: 2160 },
+      expectedConsoleErrorPatterns: [/net::ERR_TIMED_OUT.*\/rpc\/sales_order/u],
       beforeNavigate: async (page) => {
         regressionState = {
           saves: [],
-          summaries: [],
-          lists: [],
+              lists: [],
           orders: [],
+          receipts: new Map(),
           unknown: false,
+          rejectNext: false,
         }
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
@@ -501,15 +504,13 @@ export function createSalesOrderDemandEntryScenarios(deps) {
                 id,
                 result: {
                   code,
-                  message: code ? '暂时无法确认保存结果' : 'OK',
+                  message: code === RpcErrorCode.PERMISSION_DENIED
+                    ? '权限不足'
+                    : code ? '暂时无法确认保存结果' : 'OK',
                   data,
                 },
               }),
             })
-          if (method === 'list_sales_order_summary') {
-            regressionState.summaries.push(params)
-            return respond(stylePaginatedRpcData([], 'items', params))
-          }
           if (method === 'list_sales_orders') {
             regressionState.lists.push(params)
             return respond(
@@ -522,17 +523,31 @@ export function createSalesOrderDemandEntryScenarios(deps) {
           }
           if (method === 'save_sales_order_with_items') {
             regressionState.saves.push(params)
-            if (regressionState.unknown) return respond({}, 50000)
-            const order = {
+            // Keep the first save pending while the browser dispatches more clicks.
+            await new Promise((resolve) => setTimeout(resolve, 150))
+            if (regressionState.rejectNext) {
+              regressionState.rejectNext = false
+              return respond({}, RpcErrorCode.PERMISSION_DENIED)
+            }
+            const replay = regressionState.receipts.get(params.idempotency_key)
+            const order = replay || {
               ...params,
-              id: 8100 + regressionState.saves.length,
+              id: 8100 + regressionState.orders.length,
               order_no: params.order_no || 'SO-20261026-042',
               version: 1,
               lifecycle_status: 'draft',
               order_date: Date.parse(`${params.order_date}T00:00:00Z`) / 1000,
               item_count: 0,
             }
-            regressionState.orders.push(order)
+            if (!replay) {
+              regressionState.orders.push(order)
+              regressionState.receipts.set(params.idempotency_key, order)
+            }
+            // The server committed, but its response never reached the client.
+            if (regressionState.unknown) {
+              regressionState.unknown = false
+              return route.abort('timedout')
+            }
             return respond({ sales_order: order, sales_order_items: [] })
           }
           if (method === 'get_sales_order') {
@@ -573,16 +588,8 @@ export function createSalesOrderDemandEntryScenarios(deps) {
             .click(),
         ])
         await page.getByRole('button', { name: '收起', exact: true }).click()
-        await page.getByText('交付进度', { exact: true }).click()
-        await page
-          .getByRole('region', { name: '销售交付进度' })
-          .getByText('当前筛选暂无数据', { exact: true })
-          .waitFor()
-        assert.equal(regressionState.summaries.at(-1)?.customer_id, 1)
-        assert.equal(
-          Object.hasOwn(regressionState.summaries.at(-1), 'customer'),
-          false
-        )
+        assert.equal(regressionState.lists.at(-1)?.customer_id, 1)
+        assert.equal(Object.hasOwn(regressionState.lists.at(-1), 'customer'), false)
         await page.getByRole('button', { name: /^筛选，已应用/u }).click()
         const customerSelect = page
           .locator('.ant-select')
@@ -592,17 +599,16 @@ export function createSalesOrderDemandEntryScenarios(deps) {
           page.waitForResponse(
             (response) =>
               response.request().postDataJSON()?.method ===
-                'list_sales_order_summary' &&
+                'list_sales_orders' &&
               !response.request().postDataJSON()?.params?.customer_id
           ),
           customerSelect.locator('.ant-select-clear').click(),
         ])
         assert.equal(
-          Object.hasOwn(regressionState.summaries.at(-1), 'customer_id'),
+          Object.hasOwn(regressionState.lists.at(-1), 'customer_id'),
           false
         )
         await page.getByRole('button', { name: '收起', exact: true }).click()
-        await page.getByText('订单列表', { exact: true }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         const openDraft = async () => {
           await page.getByRole('button', { name: '新建订单' }).click()
@@ -631,9 +637,16 @@ export function createSalesOrderDemandEntryScenarios(deps) {
         await openDraft()
         await editor
           .locator('.erp-business-form-page__footer .ant-btn-primary')
-          .click()
+          .evaluate((button) => {
+            button.click()
+            button.click()
+            button.click()
+          })
         await editor.waitFor({ state: 'hidden' })
         assert.equal(Object.hasOwn(regressionState.saves[0], 'order_no'), false)
+        assert.ok(regressionState.saves[0].idempotency_key)
+        assert.equal(regressionState.saves.length, 1, '连续点击只提交一次')
+        assert.equal(regressionState.orders.length, 1)
         await page
           .getByText('SO-20261026-042', { exact: true })
           .first()
@@ -667,6 +680,10 @@ export function createSalesOrderDemandEntryScenarios(deps) {
           .click()
         await editor.waitFor({ state: 'hidden' })
         assert.equal(regressionState.saves[1].order_no, 'SO-MANUAL-REGRESSION')
+        assert.notEqual(
+          regressionState.saves[1].idempotency_key,
+          regressionState.saves[0].idempotency_key
+        )
         await openDraft()
         regressionState.unknown = true
         await editor
@@ -674,28 +691,64 @@ export function createSalesOrderDemandEntryScenarios(deps) {
           .click()
         await page
           .getByText(
-            '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。',
+            '保存结果尚未确认，请点击“核对保存结果”；将按原内容重试，不会重复创建订单。',
             { exact: true }
           )
           .waitFor()
-        await editor
-          .locator('.erp-business-form-page__footer .ant-btn-primary')
-          .click()
-        await page
-          .getByText(
-            '上次保存结果尚未确认，请先返回列表刷新核对，避免重复创建订单。',
-            { exact: true }
-          )
-          .waitFor()
+        await editor.getByText('上次保存结果待确认', { exact: true }).waitFor()
         assert.equal(
-          regressionState.saves.length,
+          await editor.getByLabel('客户', { exact: true }).isDisabled(),
+          true
+        )
+        assert.equal(
+          await editor
+            .getByLabel('订单号（自动）', { exact: true })
+            .isDisabled(),
+          true
+        )
+        assert.equal(
+          regressionState.orders.length,
           3,
-          '结果未知后再次点击不得重复创建'
+          '超时前服务端已经创建订单'
         )
         await page.screenshot({
           path: path.join(outputDir, 'sales-order-save-unknown.png'),
         })
         await closeBusinessFormPage(page, editor)
+        await page.getByRole('button', { name: '新建订单' }).click()
+        await editor.getByText('上次保存结果待确认', { exact: true }).waitFor()
+        // A definite rejection on a later attempt cannot erase the unknown receipt.
+        regressionState.rejectNext = true
+        await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              response.request().postDataJSON()?.method ===
+              'save_sales_order_with_items'
+          ),
+          editor
+            .getByRole('button', { name: '核对保存结果', exact: true })
+            .click(),
+        ])
+        await page
+          .getByText('权限不足', { exact: true })
+          .waitFor()
+        await editor.getByText('上次保存结果待确认', { exact: true }).waitFor()
+        await editor
+          .getByRole('button', { name: '核对保存结果', exact: true })
+          .click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(regressionState.saves.length, 5)
+        assert.deepEqual(
+          regressionState.saves[3],
+          regressionState.saves[2],
+          '重开后的核对沿用原键和完整内容'
+        )
+        assert.deepEqual(
+          regressionState.saves[4],
+          regressionState.saves[2],
+          '再次重试仍沿用原键和完整内容'
+        )
+        assert.equal(regressionState.orders.length, 3, '超时恢复只取回原订单')
       },
     },
     {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func verifySalesOrderNumbers(t *testing.T, uc *biz.SalesOrderUsecase, repo *sale
 	ctx := context.Background()
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-NUMBER-"+postgresTestSuffix(), true)
 	date := time.Date(2031, 2, 3, 0, 0, 0, 0, time.UTC)
-	input := biz.SalesOrderMutation{CustomerID: customer.ID, OrderDate: date, Currency: biz.FinanceCurrencyCNY,
+	input := biz.SalesOrderMutation{IdempotencyKey: "number-" + postgresTestSuffix(), ActorID: 1, CustomerID: customer.ID, OrderDate: date, Currency: biz.FinanceCurrencyCNY,
 		TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded)}
 	for _, seed := range []struct{ number, status string }{
 		{"SO-20310203-001", biz.SalesOrderStatusDraft},
@@ -46,6 +47,7 @@ func verifySalesOrderNumbers(t *testing.T, uc *biz.SalesOrderUsecase, repo *sale
 		t.Fatal("allocation mutated the caller's draft intent")
 	}
 	manual := input
+	manual.IdempotencyKey = ""
 	manual.OrderNo = "SO-20310203-999"
 	if _, err := uc.CreateSalesOrder(ctx, &manual); err != nil {
 		t.Fatal(err)
@@ -56,7 +58,10 @@ func verifySalesOrderNumbers(t *testing.T, uc *biz.SalesOrderUsecase, repo *sale
 	before := client.SalesOrder.Query().CountX(ctx)
 	// Reach a failure after header insertion to prove allocation and the
 	// aggregate save roll back together.
-	if _, err := repo.SaveSalesOrderWithItems(ctx, 0, &input, []*biz.SalesOrderItemSaveMutation{{ID: 999999}}); !errors.Is(err, biz.ErrSalesOrderItemNotFound) {
+	failed := input
+	failed.IdempotencyKey += "-rollback"
+	failed.CreateIntentHash = strings.Repeat("a", 64)
+	if _, err := repo.SaveSalesOrderWithItems(ctx, 0, &failed, []*biz.SalesOrderItemSaveMutation{{ID: 999999}}); !errors.Is(err, biz.ErrSalesOrderItemNotFound) {
 		t.Fatalf("expected aggregate save failure, got %v", err)
 	}
 	if count := client.SalesOrder.Query().CountX(ctx); count != before {
@@ -67,6 +72,7 @@ func verifySalesOrderNumbers(t *testing.T, uc *biz.SalesOrderUsecase, repo *sale
 		t.Fatalf("rolled back number or three-digit overflow: result=%+v err=%v", next, err)
 	}
 	edit := input
+	edit.IdempotencyKey = ""
 	edit.ExpectedVersion = created.Order.Version
 	if _, err := uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &edit, nil); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("editing must not silently renumber a cleared number: %v", err)
@@ -77,6 +83,7 @@ func verifySalesOrderNumbers(t *testing.T, uc *biz.SalesOrderUsecase, repo *sale
 		t.Fatalf("edit changed number or failed: result=%+v err=%v", updated, err)
 	}
 	input.OrderDate = date.AddDate(0, 0, 1)
+	input.IdempotencyKey += "-next-day"
 	newDay, err := uc.SaveSalesOrderWithItems(ctx, 0, &input, nil)
 	if err != nil || newDay.Order.OrderNo != "SO-20310204-001" {
 		t.Fatalf("new order date must start its own sequence: result=%+v err=%v", newDay, err)
@@ -94,7 +101,7 @@ func TestSalesOrderNumberPostgresConcurrentAllocation(t *testing.T) {
 	results := make(chan *biz.SalesOrderWithItems, writers)
 	errors := make(chan error, writers)
 	var wg sync.WaitGroup
-	for range writers {
+	for index := range writers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -102,6 +109,7 @@ func TestSalesOrderNumberPostgresConcurrentAllocation(t *testing.T) {
 			// Independent repository instances model separate server requests.
 			uc := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 			result, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
+				IdempotencyKey: fmt.Sprintf("concurrent-%d-%d", customer.ID, index), ActorID: 1,
 				CustomerID: customer.ID, OrderDate: time.Date(2031, 3, 4, 0, 0, 0, 0, time.UTC),
 				TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
 			}, nil)

@@ -16,6 +16,7 @@ import {
   resolveOutsourcingReturnQualityGate,
 } from '../../utils/qualityInspectionSourceAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
+import { operationalFactActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { outsourcingTaskFactMatches, outsourcingTaskScope } from '../../utils/outsourcingTaskScope.mjs'
@@ -151,6 +152,8 @@ export default function OutsourcingReturnRecordsModal({
   }, [open, order?.id, orderFacts, taskBusiness])
 
   const selectedStatus = normalizedFactStatus(selected)
+  const postPresentation = operationalFactActionPresentation('outsourcing', selected)
+  const cancelPresentation = operationalFactActionPresentation('outsourcing', selected, 'cancel')
   const selectedDraft = selectedStatus === OperationalFactStatus.DRAFT
   const selectedDraftEditable =
     selectedDraft &&
@@ -256,9 +259,10 @@ export default function OutsourcingReturnRecordsModal({
               type="primary"
               loading={actionLoading === `post:${selected.id}`}
               disabled={loading || actionBusy}
+              title={postPresentation.description}
               onClick={() => onPostFact?.(selected)}
             >
-              过账
+              {postPresentation.label}
             </Button>
           ) : null}
           {selectedDraftEditable ? (
@@ -280,7 +284,7 @@ export default function OutsourcingReturnRecordsModal({
               disabled={loading || actionBusy}
               onClick={() => onCancelFact?.(selected)}
             >
-              作废草稿（库存零变动）
+              {cancelPresentation.label}
             </Button>
           ) : null}
           {selectedPosted && canCancelFact ? (
@@ -292,7 +296,7 @@ export default function OutsourcingReturnRecordsModal({
               disabled={loading || actionBusy}
               onClick={() => onCancelFact?.(selected)}
             >
-              取消过账（恢复至过账前库存）
+              {cancelPresentation.label}
             </Button>
           ) : null}
           {canCreateQualityInspection ? (
@@ -360,7 +364,7 @@ export default function OutsourcingReturnRecordsModal({
       {!taskBusiness ? <Alert
         type="info"
         showIcon
-        message="草稿可编辑、过账或作废，作废草稿不会改变库存；已过账记录取消后恢复至过账前库存。只有已过账的委外回货可发起质检，并在判定合格或让步接收后生成应付。"
+        message="草稿可编辑、确认办理或作废，作废草稿不会改变库存；撤销已确认的发料或回货会恢复本次库存影响。回货入库后可发起质检，判定合格或让步接收后才可生成应付。"
       /> : null}
       {taskBusiness ? (
         <section aria-label="本次委外记录">

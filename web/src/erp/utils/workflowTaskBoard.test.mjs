@@ -29,6 +29,26 @@ import {
 
 const now = Math.floor(Date.now() / 1000)
 
+test('单据模块与类型共用网址状态，整组请求保留分页且清空不残留', () => {
+  const group = readWorkflowTaskBoardFiltersFromSearch('source_section=production&page=2')
+  assert.equal(group.sourceSection, 'production')
+  assert.equal(group.sourceType, 'all')
+  assert.equal(buildWorkflowTaskBoardRequest(group).source_section, 'production')
+  assert.equal(buildWorkflowTaskBoardRequest(group).offset, 20)
+  assert.equal(workflowTaskBoardExtraFilterCount(group), 1)
+  assert.equal(buildWorkflowTaskBoardRequest(group, { calendar: true }).source_section, 'production')
+  const leaf = readWorkflowTaskBoardFiltersFromSearch('source=production-progress&source_section=purchase')
+  assert.equal(leaf.sourceType, 'production_fact')
+  assert.equal(leaf.sourceSection, 'production')
+  assert.equal(workflowTaskBoardExtraFilterCount(leaf), 1)
+  assert.deepEqual(readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', leaf)), leaf)
+  const cleared = writeWorkflowTaskBoardFiltersToSearch('source_section=production&source=production_fact&q=入库', { keyword: '入库' })
+  assert.equal(cleared.has('source'), false)
+  assert.equal(cleared.has('source_section'), false)
+  assert.equal(cleared.get('q'), '入库')
+  assert.equal(readWorkflowTaskBoardFiltersFromSearch('source_section=unknown').sourceSection, 'all')
+})
+
 test('移除的事项条件不恢复、不请求，清理旧链接时保留其他筛选与页码', () => {
   const before = 'q=入库&source=outsourcing_fact&task_group=handoff_outsourcing_inbound&page=2'
   const filters = readWorkflowTaskBoardFiltersFromSearch(before)
@@ -367,14 +387,12 @@ test('workflowTaskBoard: 任务编号缺失时不拼内部 ID', () => {
   assert.equal(getWorkflowTaskCodeLabel({ id: 88 }), '任务已关联')
 })
 
-test('workflowTaskBoard: 全部列表使用全量计数并保留来源和岗位候选', () => {
+test('workflowTaskBoard: 全部列表使用服务端的全量计数与任务行', () => {
   const response = { snapshot_at: now, total: 12, counts: { actionable: 6, exception: 2, due: 3, finished: 1 }, lanes: [{ key: 'all', total: 12, limit: 20, offset: 0, tasks: Array.from({ length: 12 }, (_, index) => ({ id: index + 1, version: 1, task_status_key: index === 11 ? 'done' : 'ready' })) }], source_types: ['inbound', 'project-orders'], owner_role_keys: ['warehouse', 'finance'] }
   const model = buildWorkflowTaskBoardModel(response)
   assert.deepEqual(model.counts, response.counts)
   assert.equal(model.visibleLanes[0].count, 12)
   assert.equal(model.visibleLanes[0].tasks.length, 12)
-  assert.deepEqual(model.sourceTypes, response.source_types)
-  assert.deepEqual(model.ownerRoleKeys, response.owner_role_keys)
 })
 
 test('workflowTaskBoard: 从 URL 读取任务管理筛选并过滤非法值', () => {
@@ -386,7 +404,8 @@ test('workflowTaskBoard: 从 URL 读取任务管理筛选并过滤非法值', ()
     status: 'blocked',
     role: 'warehouse',
     due: 'overdue',
-    sourceType: 'inbound',
+    sourceType: 'purchase_receipt',
+    sourceSection: 'purchase',
     lane: 'all',
     sort: 'smart',
     mode: 'all',
@@ -404,6 +423,7 @@ test('workflowTaskBoard: 从 URL 读取任务管理筛选并过滤非法值', ()
       role: 'all',
       due: 'all',
       sourceType: 'all',
+      sourceSection: 'all',
       lane: 'all',
       sort: 'smart',
       mode: 'all',
@@ -435,7 +455,7 @@ test('workflowTaskBoard: 写入 URL 时保留上下文并规范 lane/page', () =
 
   assert.equal(
     params.toString(),
-    'keep=1&q=%E5%85%A5%E5%BA%93&status=blocked&role=warehouse&source=inbound&lane=exception&sort=newest&page=2'
+    'keep=1&q=%E5%85%A5%E5%BA%93&status=blocked&role=warehouse&source=purchase_receipt&source_section=purchase&lane=exception&sort=newest&page=2'
   )
 
   const cleared = writeWorkflowTaskBoardFiltersToSearch(params, {
@@ -526,7 +546,8 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页二十条计算 off
       status: 'ready',
       owner_role_key: 'warehouse',
       due: 'dueSoon',
-      source_type: 'inbound',
+      source_type: 'purchase_receipt',
+      source_section: 'purchase',
       lane_key: 'due',
       sort: 'due_soon',
       limit: TASK_BOARD_FOCUS_PAGE_SIZE,
@@ -541,6 +562,8 @@ test('workflowTaskBoard: 全部与分类列表均支持排序并复用顶部摘�
     { value: 'smart', label: '智能优先' },
     { value: 'due_soon', label: '最早到期' },
     { value: 'newest', label: '最近创建' },
+    { value: 'time_asc', label: '任务时间从早到晚' },
+    { value: 'time_desc', label: '任务时间从晚到早' },
   ])
   assert.equal(
     readWorkflowTaskBoardFiltersFromSearch('?sort=newest').sort,
@@ -556,6 +579,11 @@ test('workflowTaskBoard: 全部与分类列表均支持排序并复用顶部摘�
   })
   assert.equal(dueRequest.sort, 'due_soon')
   assert.equal(newestRequest.sort, 'newest')
+  for (const sort of ['time_asc', 'time_desc']) {
+    const fromURL = readWorkflowTaskBoardFiltersFromSearch(`?sort=${sort}&page=2`)
+    assert.equal(buildWorkflowTaskBoardRequest(fromURL).sort, sort)
+    assert.equal(buildWorkflowTaskBoardRequest(fromURL, { calendar: true }).sort, undefined)
+  }
   assert.equal(
     getWorkflowTaskBoardSummaryRequestKey(dueRequest),
     getWorkflowTaskBoardSummaryRequestKey(newestRequest)

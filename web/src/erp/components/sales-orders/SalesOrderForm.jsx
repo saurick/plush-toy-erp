@@ -216,6 +216,7 @@ function isOrderLineQuantityValidForUnit(line, quantityField, unitOptions) {
 
 export function SalesOrderFormFields({
   orderID,
+  disabled,
   form,
   itemsSection,
   attachmentPanel,
@@ -277,6 +278,7 @@ export function SalesOrderFormFields({
         >
           <RemoteReferenceSelect
             referenceType="customers"
+            disabled={disabled}
             placeholder="请选择客户"
             allowClear
             showSearch
@@ -313,6 +315,7 @@ export function SalesOrderFormFields({
           ]}
         >
           <DateInput
+            disabled={disabled}
             disabledDate={
               plannedDeliveryDate
                 ? disableOrderDateAfterPlannedDelivery
@@ -333,6 +336,7 @@ export function SalesOrderFormFields({
           ]}
         >
           <DateInput
+            disabled={disabled}
             disabledDate={
               orderDate ? disablePlannedDeliveryBeforeOrderDate : undefined
             }
@@ -418,6 +422,7 @@ export function SalesOrderFormFields({
         </Form.Item>
         <DeliveryAddressFields
           form={form}
+          disabled={disabled}
           description="从客户档案带出后可按本单调整；保存后固定为本单收货信息。"
         />
       </BusinessFormSection>
@@ -435,7 +440,7 @@ export function SalesOrderFormFields({
               field: 'method',
             }),
           ]}
-          inputProps={{ onBlur: onPaymentConditionBlur }}
+          inputProps={{ disabled, onBlur: onPaymentConditionBlur }}
         />
         <Form.Item
           className="erp-business-action-form__field erp-business-action-form__field--short"
@@ -487,7 +492,7 @@ export function SalesOrderFormFields({
           <FieldWithUnitSuffix
             control={
               <InputNumber
-                disabled={!taxMode || taxMode === 'NONE'}
+                disabled={disabled || !taxMode || taxMode === 'NONE'}
                 stringMode
               />
             }
@@ -528,7 +533,7 @@ export function SalesOrderFormFields({
           <FieldWithUnitSuffix
             control={
               <InputNumber
-                disabled={freightTerms !== 'EXCLUDED'}
+                disabled={disabled || freightTerms !== 'EXCLUDED'}
                 stringMode
                 placeholder={
                   freightTerms === 'EXCLUDED' ? '填写另计运费' : '已含在单价'

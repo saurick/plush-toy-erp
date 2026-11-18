@@ -2,7 +2,8 @@ import React from 'react'
 import { CalendarOutlined } from '@ant-design/icons'
 import { Button, DatePicker, Form } from 'antd'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
-import Select from '@/common/components/select/AppSelect'
+import { dateFilterPresets } from '../../utils/filterDateRange.mjs'
+import FilterField from '@/common/components/navigation/FilterField.jsx'
 import {
   DATE_INPUT_DISPLAY_FORMAT,
   DATE_INPUT_VALUE_FORMAT,
@@ -312,19 +313,38 @@ export const DateTimeInput = React.forwardRef((props, ref) => (
 
 export function DateRangeFilter({
   options = [],
-  typePresentation = 'select',
   value,
   onTypeChange,
-  startValue,
-  endValue,
-  onStartChange,
-  onEndChange,
+  startValue = '',
+  endValue = '',
+  onRangeChange,
+  customOnly = false,
+  required = false,
   inputReadOnly,
 }) {
   const hasMultipleDateTypes = options.length > 1
-  const showInlineTypes = hasMultipleDateTypes && typePresentation === 'inline'
-  const selectedDateTypeLabel =
-    options.find((option) => option.value === value)?.label || options[0]?.label
+  const dateType = options.find((option) => option.value === value) || options[0]
+  const label = dateType?.label || '日期范围'
+  const [editingRange, setEditingRange] = React.useState(null)
+  const presets = dateFilterPresets(dateType?.upcoming).filter((option) => !required || option.value)
+  const editing = editingRange?.from === startValue && editingRange?.to === endValue
+  const period = editing ? 'custom' : presets.find(
+    (option) => option.from === startValue && option.to === endValue
+  )?.value ?? 'custom'
+  const showInputs = customOnly || period === 'custom'
+  const selectPeriod = (next) => {
+    if (next === 'custom') {
+      setEditingRange({ from: startValue, to: endValue })
+      return
+    }
+    setEditingRange(null)
+    const { from, to } = dateFilterPresets(dateType?.upcoming).find((option) => option.value === next)
+    onRangeChange(from, to)
+  }
+  const editRange = (from, to) => {
+    setEditingRange(from || to ? { from, to } : null)
+    onRangeChange(from, to)
+  }
   const rangeInvalid = isDateInputRangeReversed(startValue, endValue)
   const startDisabledDate = React.useCallback(
     (current) => isDateInputAfter(current, endValue),
@@ -337,73 +357,59 @@ export function DateRangeFilter({
   return (
     <div
       className={joinClassNames(
-        'erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter',
-        showInlineTypes ? 'erp-business-date-range-filter--inline-types' : '',
+        'erp-business-filter-control erp-business-date-range-filter',
         rangeInvalid ? 'erp-business-date-range-filter--invalid' : ''
       )}
       role="group"
-      aria-label={selectedDateTypeLabel || '日期范围'}
+      aria-label={label}
     >
-      {showInlineTypes ? (
+      {hasMultipleDateTypes ? (
         <FilterChipGroup
-          aria-label="日期类型"
+          label="日期类型"
           options={options}
           value={value}
           onChange={onTypeChange}
         />
-      ) : hasMultipleDateTypes ? (
-        <Select
-          allowClear={false /* 不可清空：起止日期必须绑定明确的日期字段，清除日期范围使用日期输入框。 */}
-          label="日期类型"
-          placeholder="日期类型"
-          className="erp-business-date-range-filter__type"
-          aria-label="日期类型"
-          options={options}
-          value={value || undefined}
-          onChange={onTypeChange}
-          classNames={{
-            popup: { root: 'erp-business-module-select-popup' },
-          }}
-        />
-      ) : selectedDateTypeLabel ? (
-        <span
-          className="erp-business-date-range-filter__type erp-business-date-range-filter__type-label"
-          aria-label="日期类型"
-        >
-          {selectedDateTypeLabel}
-        </span>
       ) : null}
-      <div className="erp-business-date-range-filter__range">
-        {showInlineTypes ? (
+      {customOnly ? <FilterField label={label} /> : (
+        <FilterChipGroup
+          label={hasMultipleDateTypes ? '时间范围' : label}
+          aria-label="时间范围"
+          allowClear={!required}
+          options={presets}
+          value={period}
+          onChange={selectPeriod}
+        />
+      )}
+      {showInputs && (
+        <div className="erp-business-date-range-filter__range">
           <span className="erp-business-date-range-filter__separator" aria-hidden="true">从</span>
-        ) : null}
-        <DateInput
-          aria-label="开始日期"
-          className="erp-business-date-range-filter__date"
-          placeholder="开始日期"
-          status={rangeInvalid ? 'error' : undefined}
-          value={startValue}
-          inputReadOnly={inputReadOnly}
-          disabledDate={endValue ? startDisabledDate : undefined}
-          onChange={onStartChange}
-        />
-        <span
-          className="erp-business-date-range-filter__separator"
-          aria-hidden="true"
-        >
-          至
-        </span>
-        <DateInput
-          aria-label="结束日期"
-          className="erp-business-date-range-filter__date"
-          placeholder="结束日期"
-          status={rangeInvalid ? 'error' : undefined}
-          value={endValue}
-          inputReadOnly={inputReadOnly}
-          disabledDate={startValue ? endDisabledDate : undefined}
-          onChange={onEndChange}
-        />
-      </div>
+          <DateInput
+            aria-label="开始日期"
+            placeholder="开始日期"
+            status={rangeInvalid ? 'error' : undefined}
+            value={startValue}
+            inputReadOnly={inputReadOnly}
+            disabledDate={endValue ? startDisabledDate : undefined}
+            onChange={(from) => editRange(from, endValue)}
+          />
+          <span
+            className="erp-business-date-range-filter__separator"
+            aria-hidden="true"
+          >
+            至
+          </span>
+          <DateInput
+            aria-label="结束日期"
+            placeholder="结束日期"
+            status={rangeInvalid ? 'error' : undefined}
+            value={endValue}
+            inputReadOnly={inputReadOnly}
+            disabledDate={startValue ? endDisabledDate : undefined}
+            onChange={(to) => editRange(startValue, to)}
+          />
+        </div>
+      )}
     </div>
   )
 }

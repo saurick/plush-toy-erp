@@ -51,10 +51,10 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 		if res := d.RequireAdminPermission(ctx, biz.PermissionERPWorkbenchRead); res != nil {
 			return id, res, nil
 		}
-		if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "status", "page", "limit") {
+		if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "status", "sort_by", "sort_direction", "page", "limit") {
 			return id, invalidParamResult(), nil
 		}
-		filter := biz.EngineeringMaterialListFilter{Page: 1, Limit: 20}
+		filter := biz.EngineeringMaterialListFilter{Page: 1, Limit: 20, IncludeProductRefs: d.RequireAdminPermission(ctx, biz.PermissionProductRead) == nil}
 		for key, target := range map[string]*int{"page": &filter.Page, "limit": &filter.Limit} {
 			if _, exists := pm[key]; exists {
 				value, ok := getRequiredJSONRPCPositiveInt(pm, key)
@@ -64,7 +64,7 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 				*target = value
 			}
 		}
-		for key, target := range map[string]*string{"keyword": &filter.Keyword, "status": &filter.Status} {
+		for key, target := range map[string]*string{"keyword": &filter.Keyword, "status": &filter.Status, "sort_by": &filter.SortBy, "sort_direction": &filter.SortDirection} {
 			if raw, exists := pm[key]; exists {
 				value, ok := raw.(string)
 				if !ok {

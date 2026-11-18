@@ -291,7 +291,7 @@ test('shipment edits reload the current page while create-only flows return thei
 test('purchase sort changes reset page one before applying the new server sort', () => {
   const sortControl = sourceSlice(
     purchaseOperationPanelSource,
-    'className="erp-business-filter-control--sort"',
+    'purpose="sort"',
     'actions={'
   )
   assert.match(

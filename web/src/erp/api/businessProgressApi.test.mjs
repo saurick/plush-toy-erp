@@ -26,7 +26,7 @@ async function load(call) {
     )
     .replace(
       /import \{[^}]*\} from '\.\.\/utils\/businessProgress\.mjs'/u,
-      'const {requireProgressBoard,requireProgressDetail}=globalThis.__progressApiContract'
+      'const {requireProgressBoard,requireProgressDetail,requireProgressTaskPage}=globalThis.__progressApiContract'
     )
   return import(
     `data:text/javascript;base64,${Buffer.from(source).toString('base64')}#${Math.random()}`

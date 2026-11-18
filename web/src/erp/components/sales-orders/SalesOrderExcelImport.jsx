@@ -3,7 +3,7 @@ import { UploadOutlined } from '@ant-design/icons'
 import { Space, Typography } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import { customerOption } from '../../utils/referenceSelectOptions.mjs'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import Table from '@/common/components/table/AppTable'
 import SalesOrderBatchImportEditor from './SalesOrderBatchImportEditor.jsx'
 import { SalesOrderImportImage } from './SalesOrderSourceEvidence.jsx'
@@ -330,10 +330,10 @@ export default function SalesOrderExcelImport({
             onChange={setSourceCustomer}
             options={[...new Set(previewOrders.map((order) => order.customer))].map((customer) => ({ value: customer, label: customer || '未填写客户' }))}
           />,
-          <FilterSelect
+          <FilterChipGroup
+            allowClear
             key="review"
             label="核对状态"
-            placeholder="按核对状态筛选"
             emptyValue="all"
             aria-label="订单核对筛选"
             value={reviewOnly ? 'review' : 'all'}

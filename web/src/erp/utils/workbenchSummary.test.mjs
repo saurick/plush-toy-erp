@@ -64,6 +64,18 @@ test('workbench summaries follow effective capabilities for custom and combined 
   assert.deepEqual(getWorkbenchSummaryOptions(null), [])
 })
 
+test('收付款汇总需要工作台和收付款的有效读取权限，单一或组合岗位均可查看', () => {
+  const options = (permissions, effective = permissions, pages = ['global-dashboard']) =>
+    getWorkbenchSummaryOptions({ permissions, effective_session: { actions: effective, pages } }).map((item) => item.value)
+  const finance = ['erp.workbench.read', 'finance.payment.read']
+  assert.deepEqual(options(finance), ['payments'])
+  assert.deepEqual(options([...actions, ...finance]), ['sales-orders', 'materials', 'payments'])
+  assert.deepEqual(options(['finance.payment.read']), [])
+  assert.deepEqual(options(finance, ['erp.workbench.read']), [])
+  assert.deepEqual(options(['erp.workbench.read'], finance), [])
+  assert.deepEqual(options(finance, finance, []), [])
+})
+
 test('switching summary filters preserves workbench and other summary state', () => {
   const params = new URLSearchParams(
     'view=summary&queue=ready&page=3&materials.status=APPROVED&sales.page=4'

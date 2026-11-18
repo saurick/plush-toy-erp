@@ -1,5 +1,5 @@
 import { fulfillmentTaskEntryPath, isFulfillmentTask } from './fulfillmentTask.mjs'
-import { businessModuleDefinitions } from '../config/businessModules.mjs'
+import { businessModuleDefinitions, getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
 import { BUSINESS_ROUTE_PATHS } from './masterDataOrderView.mjs'
 import { routeWithQuery } from './routeQuery.mjs'
@@ -9,43 +9,6 @@ import {
   resolveReadableWorkflowSourceNo,
 } from './workflowDocumentRefs.mjs'
 
-const TASK_SOURCE_TITLE_MAP = new Map([
-  ['engineering_material_request', '工程用料审批'],
-  ['purchase_receipt', '采购收货单'],
-  ['quality_inspection', '质量检验'],
-  ['outsourcing_order', '加工合同'],
-  ['outsourcing_fact', '加工收发记录'],
-  ['production_wip_batch', '生产工序批次'],
-  ['production_packaging_confirmation', '包装版本确认'],
-  ['production_fact', '生产记录'],
-  ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.title]),
-  ['project-orders', '销售订单'],
-  ['sales_order', '销售订单'],
-  ['material-bom', '工程资料'],
-  ['accessories-purchase', '采购订单'],
-  ['purchase_order', '采购订单'],
-  ['processing-contracts', '委外订单'],
-  ['inbound', '入库任务'],
-  ['inventory', '库存任务'],
-  ['inventory_operation', '库存调整'],
-  ['shipping-release', '出货放行'],
-  ['outbound', '出库任务'],
-  ['production-orders', '生产订单'],
-  ['production_order', '生产订单'],
-  ['bom_header', '工程资料'],
-  ['production-scheduling', '排产确认'],
-  ['production-progress', '生产记录'],
-  ['production-exceptions', '异常处理'],
-  ['production_exception_decision', '生产异常处置'],
-  ['quality-inspections', '质量检验'],
-  ['shipment', '出货单'],
-  ['reconciliation', '财务对账'],
-  ['payables', '应付处理'],
-  ['receivables', '应收与开票'],
-  ['invoices', '发票处理'],
-  ['finance_payment', '收付款与核销'],
-  ['shipments', '出货单'],
-])
 const FORMAL_TASK_ENTRY_MODULES = businessModuleDefinitions.filter(
   (moduleItem) => moduleItem.pageKind === 'formal'
 )
@@ -185,11 +148,7 @@ export function getWorkflowTaskSourceTypeLabel(
   sourceType,
   fallback = '来源待核对'
 ) {
-  const normalizedSourceType = String(sourceType || '').trim()
-  if (!normalizedSourceType) {
-    return fallback
-  }
-  return TASK_SOURCE_TITLE_MAP.get(normalizedSourceType) || fallback
+  return getBusinessDocumentTitle(sourceType, fallback)
 }
 
 export function getWorkflowTaskSourceNo(task = {}) {

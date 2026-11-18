@@ -4232,6 +4232,9 @@ var (
 	// SalesOrdersColumns holds the columns for the "sales_orders" table.
 	SalesOrdersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "create_idempotency_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "create_intent_hash", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "create_actor_id", Type: field.TypeInt, Nullable: true},
 		{Name: "order_no", Type: field.TypeString, Size: 64},
 		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
 		{Name: "customer_order_no", Type: field.TypeString, Nullable: true, Size: 128},
@@ -4271,51 +4274,56 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_orders_customers_sales_orders",
-				Columns:    []*schema.Column{SalesOrdersColumns[30]},
+				Columns:    []*schema.Column{SalesOrdersColumns[33]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{
 			{
-				Name:    "salesorder_order_no",
+				Name:    "salesorder_create_idempotency_key",
 				Unique:  true,
 				Columns: []*schema.Column{SalesOrdersColumns[1]},
 			},
 			{
+				Name:    "salesorder_order_no",
+				Unique:  true,
+				Columns: []*schema.Column{SalesOrdersColumns[4]},
+			},
+			{
 				Name:    "salesorder_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[30]},
+				Columns: []*schema.Column{SalesOrdersColumns[33]},
 			},
 			{
 				Name:    "salesorder_customer_order_no",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[3]},
+				Columns: []*schema.Column{SalesOrdersColumns[6]},
 			},
 			{
 				Name:    "salesorder_sales_owner",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[5]},
+				Columns: []*schema.Column{SalesOrdersColumns[8]},
 			},
 			{
 				Name:    "salesorder_payment_method",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[8]},
+				Columns: []*schema.Column{SalesOrdersColumns[11]},
 			},
 			{
 				Name:    "salesorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[20]},
+				Columns: []*schema.Column{SalesOrdersColumns[23]},
 			},
 			{
 				Name:    "salesorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[18]},
+				Columns: []*schema.Column{SalesOrdersColumns[21]},
 			},
 			{
 				Name:    "salesorder_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[19]},
+				Columns: []*schema.Column{SalesOrdersColumns[22]},
 			},
 		},
 	}
@@ -5817,6 +5825,7 @@ func init() {
 	SalesOrdersTable.ForeignKeys[0].RefTable = CustomersTable
 	SalesOrdersTable.Annotation = &entsql.Annotation{}
 	SalesOrdersTable.Annotation.Checks = map[string]string{
+		"sales_orders_create_intent_bundle":       "((create_idempotency_key IS NULL AND create_intent_hash IS NULL AND create_actor_id IS NULL) OR (create_idempotency_key IS NOT NULL AND create_intent_hash IS NOT NULL AND create_actor_id IS NOT NULL AND create_actor_id > 0 AND length(trim(create_idempotency_key)) BETWEEN 1 AND 128 AND length(create_intent_hash) = 64))",
 		"sales_orders_currency_allowed":           "currency IN ('USD', 'CNY', 'HKD')",
 		"sales_orders_freight_terms_allowed":      "freight_terms IS NULL OR freight_terms IN ('INCLUDED', 'EXCLUDED')",
 		"sales_orders_goods_amount_nonnegative":   "goods_amount IS NULL OR goods_amount >= 0",

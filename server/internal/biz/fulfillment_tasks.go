@@ -16,6 +16,7 @@ type FulfillmentTaskSpec struct {
 
 var fulfillmentTaskSpecs = map[string]FulfillmentTaskSpec{
 	"shipment_execute":              {"准备并办理发货", "shipment", SalesRoleKey, PermissionShipmentShip, PermissionShipmentRead, "/erp/warehouse/shipments?shipment_id=%d"},
+	"shipment_quality":              {"办理出货前检验", "quality_inspection", QualityRoleKey, PermissionQualityInspectionUpdate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?quality_inspection_id=%d"},
 	"production_return":             {"登记工序回货", "production_wip_batch", WarehouseRoleKey, PermissionOutsourcingReturnReceiptCreate, PermissionProductionWIPRead, ""},
 	"purchase_arrival":              {"采购到货点数", "purchase_order", WarehouseRoleKey, PermissionPurchaseReceiptCreate, PermissionPurchaseOrderRead, "/erp/purchase/accessories?purchase_order_id=%d"},
 	"receipt_quality":               {"办理来料检验", "quality_inspection", QualityRoleKey, PermissionQualityInspectionUpdate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?quality_inspection_id=%d"},

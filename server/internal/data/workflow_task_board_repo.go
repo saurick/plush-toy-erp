@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
 	"server/internal/biz"
 	corevalue "server/internal/core/value"
@@ -229,6 +228,19 @@ func workflowTaskBoardOrder(sortKey, laneKey string) ([]workflowtask.OrderOption
 			workflowtask.ByCreatedAt(entsql.OrderDesc()),
 			ent.Desc(workflowtask.FieldID),
 		}, nil
+	case biz.WorkflowTaskBoardSortTimeAsc, biz.WorkflowTaskBoardSortTimeDesc:
+		// The list shows the deadline of an open task and the actual end time of a closed task.
+		return []workflowtask.OrderOption{func(s *entsql.Selector) {
+			s.OrderExprFunc(func(b *entsql.Builder) {
+				b.WriteString("CASE WHEN ").Ident(s.C(workflowtask.FieldTaskStatusKey)).
+					WriteString(" IN ('ready','blocked') THEN ").Ident(s.C(workflowtask.FieldDueAt)).
+					WriteString(" ELSE ").Ident(s.C(workflowtask.FieldCompletedAt)).WriteString(" END")
+				if sortKey == biz.WorkflowTaskBoardSortTimeDesc {
+					b.WriteString(" DESC")
+				}
+				b.WriteString(" NULLS LAST")
+			})
+		}, ent.Desc(workflowtask.FieldID)}, nil
 	default:
 		return nil, biz.ErrBadParam
 	}
@@ -279,7 +291,10 @@ func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.Work
 		query = query.Where(workflowTaskKeywordPredicate(filter.Keyword))
 	}
 	if filter.SourceType != "" {
-		query = query.Where(workflowtask.SourceType(filter.SourceType))
+		query = query.Where(workflowtask.SourceTypeIn(biz.WorkflowDocumentSourceTypes(filter.SourceType)...))
+	}
+	if filter.SourceSection != "" {
+		query = query.Where(workflowtask.SourceTypeIn(biz.WorkflowDocumentSectionSourceTypes(filter.SourceSection)...))
 	}
 	statusPredicate, err := workflowTaskBoardStatusFilterPredicate(filter)
 	if err != nil {
@@ -439,11 +454,13 @@ func workflowTaskBoardLaneCount(counts biz.WorkflowTaskBoardCounts, laneKey stri
 
 func normalizeWorkflowTaskBoardSourceTypes(values []string) []string {
 	out := make([]string, 0, len(values))
+	seen := make(map[string]bool, len(values))
 	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value == "" {
+		value = biz.WorkflowDocumentTypeKey(value)
+		if value == "" || seen[value] {
 			continue
 		}
+		seen[value] = true
 		out = append(out, value)
 	}
 	sort.Strings(out)

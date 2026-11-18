@@ -7,6 +7,7 @@ import {
   LinkOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
 import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
@@ -17,6 +18,7 @@ import BusinessStatusFilter from '../components/business-list/BusinessStatusFilt
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
+import { purchaseFactActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import { PurchaseReceiptAdjustmentStatus, PurchaseReceiptStatus, PurchaseReturnStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
@@ -85,6 +87,7 @@ import {
   buildPurchaseReturnFromReceiptPayload,
 } from '../utils/purchaseReceiptExceptionAction.mjs'
 import {
+  requireSourceActionRecord,
   createSourceBusinessActionAttemptStore,
   isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
@@ -668,17 +671,22 @@ export default function PurchaseReceiptsPage() {
   }, [loadRows, loadReferenceOptions, outletContext])
 
   const runReceiptAction = useCallback(
-    async (receipt, action, successText) => {
+    async (receipt, action) => {
       if (!receipt?.id) return
+      const actionKey = action === postPurchaseReceipt ? 'post' : 'cancel'
+      const presentation = purchaseFactActionPresentation('receipt', receipt, actionKey)
       setSaving(true)
       try {
-        const nextReceipt = await action({ id: receipt.id })
-        setSelectedRow(nextReceipt || receipt)
-        reportBusinessResult(action === postPurchaseReceipt && Number(nextReceipt?.pending_inbound_lines) > 0 ? '合格材料已入库，其余明细继续检验或处置' : successText, nextReceipt || receipt)
-        message.success(action === postPurchaseReceipt && Number(nextReceipt?.pending_inbound_lines) > 0 ? '合格材料已入库，其余明细继续检验或处置' : successText)
+        const nextReceipt = requireSourceActionRecord(await action({ id: receipt.id }), receipt.id)
+        setSelectedRow(nextReceipt)
+        const successText = actionKey === 'post'
+          ? purchaseFactActionPresentation('receipt', nextReceipt).success
+          : presentation.success
+        reportBusinessResult(successText, nextReceipt)
+        message.success(successText)
         await loadRows()
       } catch (error) {
-        message.error(getActionErrorMessage(error, successText))
+        message.error(getActionErrorMessage(error, presentation.label))
       } finally {
         setSaving(false)
       }
@@ -1117,7 +1125,7 @@ export default function PurchaseReceiptsPage() {
 
   return (
     <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ suppliers: mergeSuppliers, materials: mergeMaterials, inventory_lots: mergeInventoryLots }} inWorkspace className="erp-purchase-receipts-page">
-      <PageHeaderCard compact helpKey="inbound" title="采购入库" />
+      <PageHeaderCard compact helpKey="inbound" title={getBusinessDocumentTitle('purchase_receipt')} />
       <SourceActionAccessNotice access={receiptSourceAccess} />
       <SourceActionAccessNotice access={payableSourceAccess} />
       <SourceActionAccessNotice access={returnSourceAccess} />
@@ -1152,7 +1160,6 @@ export default function PurchaseReceiptsPage() {
               loading={loading}
               exact={Boolean(routeReceiptID)}
               aria-label="单据状态"
-              className="erp-business-filter-control--status"
               value={statusFilter}
               options={STATUS_OPTIONS}
               onChange={(nextStatus) => {
@@ -1230,12 +1237,9 @@ export default function PurchaseReceiptsPage() {
               }}
               startValue={dateFilterStart}
               endValue={dateFilterEnd}
-              onStartChange={(nextStart) => {
-                setDateFilterStart(nextStart)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
-              onEndChange={(nextEnd) => {
-                setDateFilterEnd(nextEnd)
+              onRangeChange={(from, to) => {
+                setDateFilterStart(from)
+                setDateFilterEnd(to)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
@@ -1476,21 +1480,20 @@ export default function PurchaseReceiptsPage() {
                   : selectedRow.can_post !== true
                     ? '当前没有可入库的合格行，请先完成检验或拒收处置'
                     : saving
-                      ? '当前操作完成后可过账'
+                      ? '当前操作完成后可确认材料入库'
                       : ''
               }
             >
               <Popconfirm
-                title="确认将当前合格且尚未入库的明细入库？"
+                title={purchaseFactActionPresentation('receipt', selectedRow).title}
                 onConfirm={() =>
                   runReceiptAction(
                     selectedRow,
-                    postPurchaseReceipt,
-                    '本次合格材料已入库'
+                    postPurchaseReceipt
                   )
                 }
-                okText="确认"
-                cancelText="取消"
+                okText={purchaseFactActionPresentation('receipt', selectedRow).label}
+                cancelText="返回"
               >
                 <Button
                   data-business-action-key="post"
@@ -1503,7 +1506,7 @@ export default function PurchaseReceiptsPage() {
                     !selectedRow || selectedRow.can_post !== true || saving
                   }
                 >
-                  确认材料入库
+                  {purchaseFactActionPresentation('receipt', selectedRow).label}
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
@@ -1536,24 +1539,18 @@ export default function PurchaseReceiptsPage() {
               }
             >
               <Popconfirm
-                title={
-                  selectedRow?.status === PurchaseReceiptStatus.DRAFT
-                    ? '确认作废采购入库草稿？草稿尚未过账，不会变更库存。'
-                    : '确认取消已过账入库并恢复相应库存？'
-                }
+                title={purchaseFactActionPresentation('receipt', selectedRow, 'cancel').title}
+                description={purchaseFactActionPresentation('receipt', selectedRow, 'cancel').description}
                 onConfirm={() =>
                   runReceiptAction(
                     selectedRow,
                     selectedRow?.status === PurchaseReceiptStatus.DRAFT && canCancelDraft
                       ? cancelPurchaseReceiptDraft
-                      : cancelPurchaseReceipt,
-                    selectedRow?.status === PurchaseReceiptStatus.DRAFT
-                      ? '采购入库草稿已作废，未更新库存'
-                      : '采购入库已取消，库存已恢复'
+                      : cancelPurchaseReceipt
                   )
                 }
-                okText="确认"
-                cancelText="取消"
+                okText={purchaseFactActionPresentation('receipt', selectedRow, 'cancel').label}
+                cancelText="返回"
               >
                 <Button
                   data-business-action-key="cancel"
@@ -1570,7 +1567,7 @@ export default function PurchaseReceiptsPage() {
                     saving
                   }
                 >
-                  {selectedRow?.status === PurchaseReceiptStatus.DRAFT ? '作废草稿' : '取消入库'}
+                  {purchaseFactActionPresentation('receipt', selectedRow, 'cancel').label}
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
@@ -1583,6 +1580,7 @@ export default function PurchaseReceiptsPage() {
         loading={loading}
         dataSource={rows}
         columns={tableColumns}
+        taskDetailColumns={visibleColumns}
         pagination={createBusinessTablePagination({
           pagination,
           total,
@@ -1622,7 +1620,7 @@ export default function PurchaseReceiptsPage() {
         }}
         open={Boolean(detailReceipt)}
         record={detailReceipt}
-        title="采购入库详情"
+        title={`${getBusinessDocumentTitle('purchase_receipt')}详情`}
         onClose={() => setDetailReceipt(null)}
       />
 

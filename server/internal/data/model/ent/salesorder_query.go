@@ -407,12 +407,12 @@ func (_q *SalesOrderQuery) WithStockReservations(opts ...func(*StockReservationQ
 // Example:
 //
 //	var v []struct {
-//		OrderNo string `json:"order_no,omitempty"`
+//		CreateIdempotencyKey string `json:"create_idempotency_key,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.SalesOrder.Query().
-//		GroupBy(salesorder.FieldOrderNo).
+//		GroupBy(salesorder.FieldCreateIdempotencyKey).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *SalesOrderQuery) GroupBy(field string, fields ...string) *SalesOrderGroupBy {
@@ -430,11 +430,11 @@ func (_q *SalesOrderQuery) GroupBy(field string, fields ...string) *SalesOrderGr
 // Example:
 //
 //	var v []struct {
-//		OrderNo string `json:"order_no,omitempty"`
+//		CreateIdempotencyKey string `json:"create_idempotency_key,omitempty"`
 //	}
 //
 //	client.SalesOrder.Query().
-//		Select(salesorder.FieldOrderNo).
+//		Select(salesorder.FieldCreateIdempotencyKey).
 //		Scan(ctx, &v)
 func (_q *SalesOrderQuery) Select(fields ...string) *SalesOrderSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)

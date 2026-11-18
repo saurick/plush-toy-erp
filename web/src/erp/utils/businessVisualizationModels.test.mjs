@@ -4,70 +4,11 @@ import {
   buildFinanceDueModel,
   buildInventoryDistributionModel,
   buildProductionProcessModel,
-  buildSalesDeliveryModel,
   moveBusinessDate,
   paginateVisualizationRows,
 } from './businessVisualizationModels.mjs'
 
 const unix = (date) => Date.parse(`${date}T00:00:00Z`) / 1000
-
-test('sales delivery keeps unknown shipment facts explicit and sorts risks first', () => {
-  const model = buildSalesDeliveryModel(
-    [
-      {
-        id: 1,
-        sales_order_id: 10,
-        product_id: 101,
-        order_no: 'SO-DELIVERED',
-        ordered_quantity: '10',
-        shipped_quantity: '10',
-        unshipped_quantity: '0',
-        planned_delivery_date: unix('2026-09-25'),
-        lifecycle_status: 'active',
-        line_status: 'open',
-        unit_name: '只',
-      },
-      {
-        id: 2,
-        sales_order_id: 11,
-        order_no: 'SO-UNKNOWN',
-        ordered_quantity: '10',
-        shipped_quantity: null,
-        unshipped_quantity: null,
-        planned_delivery_date: unix('2026-09-20'),
-        lifecycle_status: 'active',
-        line_status: 'open',
-        unit_name: '只',
-      },
-      {
-        id: 3,
-        sales_order_id: 12,
-        order_no: 'SO-OVERDUE',
-        ordered_quantity: '10',
-        shipped_quantity: '4',
-        unshipped_quantity: '6',
-        planned_delivery_date: unix('2026-09-20'),
-        lifecycle_status: 'active',
-        line_status: 'open',
-        unit_name: '只',
-      },
-    ],
-    { today: '2026-09-22' }
-  )
-
-  assert.deepEqual(
-    model.rows.map((row) => row.orderNo),
-    ['SO-OVERDUE', 'SO-UNKNOWN', 'SO-DELIVERED']
-  )
-  const unknown = model.rows.find((row) => row.status.key === 'unknown')
-  const overdue = model.rows.find((row) => row.status.key === 'overdue')
-  const delivered = model.rows.find((row) => row.status.key === 'delivered')
-  assert.equal(unknown.percent, null)
-  assert.equal(overdue.percent, 40)
-  assert.equal(delivered.productID, 101)
-  assert.equal(model.counts.overdue, 1)
-  assert.equal(model.counts.delivered, 1)
-})
 
 test('finance due uses outstanding facts without combining currencies', () => {
   const model = buildFinanceDueModel(
@@ -97,10 +38,28 @@ test('finance due uses outstanding facts without combining currencies', () => {
   )
 
   assert.equal(model.rows[0].dueStatus.key, 'overdue')
-  assert.equal(model.rows[0].outstanding, 40)
+  assert.equal(model.rows[0].outstanding_amount, '40')
   assert.equal(model.counts.overdue, 1)
   assert.equal(model.counts.settled, 1)
   assert.equal(Object.hasOwn(model.counts, 'amount'), false)
+})
+
+test('both account types sort the entire due queue before paging, preserving original financial fields', () => {
+  for (const fact_type of ['RECEIVABLE', 'PAYABLE']) {
+    const fact = { fact_type, status: 'POSTED', currency: 'USD', amount: '100.000001', outstanding_amount: '7.123456' }
+    const facts = [
+      ['Z', '2026-09-19'], ['A', '2026-09-23'], ['B', '2026-09-17'], ['A1', '2026-09-19'],
+    ].map(([fact_no, date], index) => ({ ...fact, id: index + 1, fact_no, due_at: unix(date), source_no: 'S-1' }))
+    const model = buildFinanceDueModel(facts, { today: '2026-09-22' })
+    const first = paginateVisualizationRows(model.rows, 1, 2)
+    const second = paginateVisualizationRows(model.rows, 2, 2)
+    assert.deepEqual(first.rows.map((row) => row.fact_no), ['B', 'A1'])
+    assert.deepEqual(second.rows.map((row) => row.fact_no), ['Z', 'A'])
+    assert.equal(first.rows[0].dueStatus.label, '逾期 5 天')
+    assert.equal(second.rows[1].dueStatus.key, 'dueSoon')
+    assert.equal(first.rows[0].outstanding_amount, '7.123456')
+    assert.equal(first.rows[0].source_no, 'S-1')
+  }
 })
 
 test('inventory distribution renders server aggregates without combining quantity units', () => {
@@ -270,7 +229,7 @@ test('finance missing amounts or currency never become zero, settled or overdue'
   assert.equal(model.counts.unknown, 2)
   assert.equal(model.counts.overdue, 0)
   assert.equal(model.counts.settled, 0)
-  assert.equal(model.rows[0].outstanding, null)
+  assert.equal(model.rows[0].outstanding_amount, null)
 })
 
 test('business calendar date movement crosses months and years without local timezone drift', () => {

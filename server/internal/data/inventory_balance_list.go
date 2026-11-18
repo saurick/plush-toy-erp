@@ -12,6 +12,8 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
 )
 
@@ -119,7 +121,23 @@ func inventoryBalanceListPageSQL(ctx context.Context, dialectName string, filter
 
 	field := "updated_at"
 	groupByUnit := false
+	// Paginate at the earliest stage that has the selected sort key.
+	needsReservations, needsReadiness := false, false
 	switch filter.SortBy {
+	case biz.InventorySortRegistrationOrder:
+		field = "id"
+	case biz.InventorySortStockKind:
+		field = "stock_kind_order"
+	case biz.InventorySortSKUCode:
+		sku := d.Table(productsku.Table)
+		scoped.LeftJoin(sku).On(balance.C(inventorybalance.FieldProductSkuID), sku.C(productsku.FieldID))
+		scoped.AppendSelectExprAs(entsql.Expr(sku.C(productsku.FieldSkuCode)), "sku_code")
+		field = "sku_code"
+	case biz.InventorySortUnitName:
+		u := d.Table(unit.Table)
+		scoped.LeftJoin(u).On(balance.C(inventorybalance.FieldUnitID), u.C(unit.FieldID))
+		scoped.AppendSelectExprAs(entsql.Expr("COALESCE(NULLIF(TRIM("+u.C(unit.FieldName)+"), ''), "+u.C(unit.FieldCode)+")"), "unit_name")
+		field = "unit_name"
 	case biz.InventorySortSubjectCode:
 		p := d.Table(product.Table)
 		scoped.LeftJoin(p).OnP(entsql.And(
@@ -137,19 +155,30 @@ func inventoryBalanceListPageSQL(ctx context.Context, dialectName string, filter
 		scoped.AppendSelectExprAs(entsql.Expr(lot.C(inventorylot.FieldLotNo)), "lot_no")
 		field = "lot_no"
 	case biz.InventorySortQuantity:
-		field = "quantity"
+		field, groupByUnit = "quantity", true
+	case biz.InventorySortReserved:
+		field, groupByUnit, needsReservations = "active_reserved_quantity", true, true
+	case biz.InventorySortUnreserved:
+		field, groupByUnit, needsReservations = "available_quantity", true, true
+	case biz.InventorySortPendingInspection:
+		field, groupByUnit, needsReadiness = "pending_inspection_quantity", true, true
+	case biz.InventorySortPendingPackaging:
+		field, groupByUnit, needsReadiness = "pending_packaging_quantity", true, true
 	case biz.InventorySortIssuable:
 		field, groupByUnit = "issuable_quantity", true
 	case biz.InventorySortRestricted:
 		field, groupByUnit = "restricted_quantity", true
 	case biz.InventorySortReadyToShip:
-		field, groupByUnit = "ready_to_ship_quantity", true
+		field, groupByUnit, needsReadiness = "ready_to_ship_quantity", true, true
 	}
 	direction := " DESC"
 	if filter.SortDirection == "asc" {
 		direction = " ASC"
 	}
-	order := field + direction + " NULLS LAST,id DESC"
+	order := field + direction + " NULLS LAST"
+	if field != "id" {
+		order += ",id DESC"
+	}
 	if groupByUnit {
 		order = "CASE WHEN " + field + " IS NULL THEN 1 ELSE 0 END,unit_id," + order
 	}
@@ -157,19 +186,26 @@ func inventoryBalanceListPageSQL(ctx context.Context, dialectName string, filter
 	params := inventorySQLPlaceholders(dialectName, len(args)+2)
 	page := " LIMIT " + params[len(args)] + " OFFSET " + params[len(args)+1]
 	args = append(args, filter.Limit, filter.Offset)
-	// Only shipment readiness needs reservation and receipt aggregates before
-	// paging. Ordinary browsing and the lot-only sorts calculate them for the page.
-	basePage, finalPage := " ORDER BY "+order+page, ""
-	if filter.SortBy == biz.InventorySortReadyToShip {
-		basePage, finalPage = "", page
+	orderPage := " ORDER BY " + order + page
+	stockPage, availablePage, finalPage := "", "", ""
+	switch {
+	case needsReadiness:
+		finalPage = page
+	case needsReservations:
+		availablePage = orderPage
+	default:
+		stockPage = orderPage
 	}
 	return `WITH scoped AS (` + candidateSQL + `), stock AS (
  SELECT scoped.*,
  CASE WHEN subject_type='MATERIAL' THEN CASE WHEN lot_status='ACTIVE' THEN quantity ELSE 0 END END AS issuable_quantity,
- CASE WHEN lot_status<>'ACTIVE' THEN quantity ELSE 0 END AS restricted_quantity
+ CASE WHEN lot_status<>'ACTIVE' THEN quantity ELSE 0 END AS restricted_quantity,
+ CASE WHEN subject_type='PRODUCT' THEN 6 WHEN stock_category='MAIN' THEN 1
+ WHEN stock_category='AUXILIARY' THEN 2 WHEN stock_category='PACKAGING' THEN 3
+ WHEN stock_category='OTHER' THEN 4 ELSE 5 END AS stock_kind_order
  FROM scoped
- ), balances AS (SELECT * FROM stock` + basePage + `),
- ` + inventoryBalanceReservationCTEs("balances") + `, receipts AS (
+ ), candidates AS (SELECT * FROM stock` + stockPage + `),
+ ` + inventoryBalanceReservationCTEs("candidates") + `, balances AS (SELECT * FROM available` + availablePage + `), receipts AS (
  SELECT f.*,b.id AS balance_id FROM balances b JOIN production_facts f
  ON f.subject_id=b.subject_id AND f.warehouse_id=b.warehouse_id AND f.unit_id=b.unit_id
  AND f.product_sku_id IS NOT DISTINCT FROM b.product_sku_id AND f.lot_id IS NOT DISTINCT FROM b.lot_id
@@ -179,17 +215,19 @@ func inventoryBalanceListPageSQL(ctx context.Context, dialectName string, filter
  SELECT balance_id,SUM(inspection_quantity) AS pending_inspection_quantity,
  SUM(packaging_quantity) AS pending_packaging_quantity,MAX(invalid_source) AS invalid_source
  FROM receipt_readiness GROUP BY balance_id
- ), prepared AS (
- SELECT b.*,COALESCE(r.pending_inspection_quantity,0) AS pending_inspection_quantity,
- COALESCE(r.pending_packaging_quantity,0) AS pending_packaging_quantity,COALESCE(r.invalid_source,0) AS invalid_source
- FROM available b LEFT JOIN readiness r ON r.balance_id=b.id
+ ), balance_readiness AS (
+ SELECT b.*,
+ CASE WHEN b.subject_type='PRODUCT' THEN COALESCE(r.pending_inspection_quantity,0) END AS pending_inspection_quantity,
+ CASE WHEN b.subject_type='PRODUCT' THEN COALESCE(r.pending_packaging_quantity,0) END AS pending_packaging_quantity,
+ COALESCE(r.invalid_source,0) AS invalid_source
+ FROM balances b LEFT JOIN readiness r ON r.balance_id=b.id
  ), ranked AS (
- SELECT prepared.*,CASE WHEN subject_type='PRODUCT' THEN
+ SELECT balance_readiness.*,CASE WHEN subject_type='PRODUCT' THEN
  CASE WHEN lot_status='ACTIVE' AND available_quantity>pending_inspection_quantity+pending_packaging_quantity
  THEN available_quantity-pending_inspection_quantity-pending_packaging_quantity ELSE 0 END END AS ready_to_ship_quantity
- FROM prepared
+ FROM balance_readiness
  ) SELECT id,subject_type,subject_id,product_sku_id,warehouse_id,lot_id,unit_id,quantity,updated_at,stock_category,lot_status,
  active_reserved_quantity,available_quantity,COALESCE(issuable_quantity,0),restricted_quantity,
- pending_inspection_quantity,pending_packaging_quantity,COALESCE(ready_to_ship_quantity,0),invalid_source
+ COALESCE(pending_inspection_quantity,0),COALESCE(pending_packaging_quantity,0),COALESCE(ready_to_ship_quantity,0),invalid_source
  FROM ranked ORDER BY ` + order + finalPage, args
 }

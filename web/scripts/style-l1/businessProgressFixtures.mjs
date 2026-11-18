@@ -62,6 +62,20 @@ export function progressFixtureRow(index = 0, view = 'orders') {
   }
 }
 
+function sortedProgressRows(rows, params) {
+  const field = params.sort_by
+  if (!field) return rows
+  return rows.sort((a, b) => {
+    const left = a[field]
+    const right = b[field]
+    const missing = Number(!left) - Number(!right)
+    if (missing) return missing
+    const primary = left.localeCompare(right) * (params.sort_direction === 'desc' ? -1 : 1)
+    if (primary) return primary
+    return a.line ? a.order_no.localeCompare(b.order_no) || a.line.line_no - b.line.line_no || a.id - b.id : b.id - a.id
+  })
+}
+
 export function progressFixtureData(
   params = {},
   { restricted = false, detail = false } = {}
@@ -145,12 +159,57 @@ export function progressFixtureData(
         ],
       })
     }
-    return { row, sections, has_more: {}, snapshot_at, access }
+    return { row, sections, task_total: sections.tasks?.length || 0, has_more: {}, snapshot_at, access }
+  }
+  if (params.display === 'lines') {
+    const base = Array.from({ length: 24 }, (_, i) => {
+      const order = progressFixtureRow(Math.floor(i / 2))
+      const delivery_status = i % 2 ? 'due_soon' : 'overdue'
+      return {
+        ...order,
+        id: 101 + i,
+        product: i % 2 ? '星星挂兔' : order.product,
+        product_count: 1,
+        ordered_quantity: '120',
+        shipped_quantity: i === 4 ? null : i % 2 ? '0' : '48',
+        delivery_known: i !== 4,
+        unit: i % 2 ? '套' : '只',
+        due_date: i % 2 ? '2026-09-26' : '2026-09-22',
+        overdue: i % 2 === 0 && i !== 4,
+        due_soon: i % 2 === 1,
+        line: { sales_order_id: order.id, line_no: i % 2 + 1, customer_product_no: '',
+          delivery_status: i === 4 ? 'unknown' : delivery_status,
+          remaining_quantity: i === 4 ? null : i % 2 ? '120' : '72' },
+      }
+    }).filter((row) =>
+      (!params.id || row.line.sales_order_id === params.id) &&
+      (!params.keyword || [row.product, row.order_no, row.customer].some(s => s.includes(params.keyword)))
+    )
+    const count = (key) => base.filter((row) => row.line.delivery_status === key).length
+    const matched = !params.delivery_status || params.delivery_status === 'all'
+      ? base : base.filter((row) => row.line.delivery_status === params.delivery_status)
+    const offset = params.offset || 0
+    return {
+      snapshot_at,
+      access,
+      total: matched.length,
+      rows: sortedProgressRows(matched, params).slice(offset, offset + (params.limit || 20)),
+      counts: {
+        total: base.length,
+        overdue: count('overdue'),
+        due_soon: count('due_soon'),
+        undated: 0,
+        unlinked: 0,
+        blocked: 0,
+        delivery: { closed: 0, unknown: count('unknown'), delivered: 0 },
+      },
+    }
   }
   const base = Array.from({ length: 25 }, (_, i) =>
     progressFixtureRow(i, view)
   ).filter(
     (row) =>
+      (!params.id || params.id === row.id) &&
       (params.scope === 'all' ||
         (params.scope === 'ended' ? !row.active : row.active)) &&
       (!params.keyword ||
@@ -183,7 +242,7 @@ export function progressFixtureData(
     unlinked: matching({ ...params, unlinked_only: true }).length,
   }
   const matches = matching(params)
-  const rows = matches
+  const rows = sortedProgressRows(matches, params)
     .slice(params.offset || 0, (params.offset || 0) + (params.limit || 20))
     .map((r) =>
       restricted

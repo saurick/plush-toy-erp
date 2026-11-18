@@ -1,3 +1,4 @@
+import { expect } from 'playwright/test'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
 import { assertBusinessFormCorners } from './businessFormCornerAssertions.mjs'
@@ -26,6 +27,7 @@ export function createOutsourcingSourceFactScenarios(deps) {
     lineStatus = 'open',
     retryHandlingRead = false,
     taskEntry = false,
+    taskPost = false,
     viewport,
   }) => {
     const materialIssue = actionType === 'MATERIAL_ISSUE'
@@ -44,13 +46,13 @@ export function createOutsourcingSourceFactScenarios(deps) {
     const task = {
       id: materialIssue ? 991811 : 991812,
       version: 1,
-      task_code: `source-handoff-outsourcing-${materialIssue ? 'issue' : 'return'}-1`,
-      task_name: materialIssue ? '办理本次委外发料' : '办理本次委外回货',
-      task_group: materialIssue ? 'handoff_outsourcing_issue' : 'handoff_outsourcing_return',
+      task_code: `source-handoff-outsourcing-${taskPost ? 'inbound' : materialIssue ? 'issue' : 'return'}-1`,
+      task_name: taskPost ? '确认本次委外回货入库' : materialIssue ? '办理本次委外发料' : '办理本次委外回货',
+      task_group: taskPost ? 'handoff_outsourcing_inbound' : materialIssue ? 'handoff_outsourcing_issue' : 'handoff_outsourcing_return',
       process_instance_id: 991810,
-      source_type: 'outsourcing_order',
+      source_type: taskPost ? 'outsourcing_fact' : 'outsourcing_order',
       source_id: 1,
-      source_no: 'OUT-SOURCE-L1',
+      source_no: taskPost ? 'OUTSOURCE-FACT-L1' : 'OUT-SOURCE-L1',
       task_status_key: 'ready',
       owner_role_key: 'boss',
       created_at: 1_790_085_600,
@@ -59,13 +61,13 @@ export function createOutsourcingSourceFactScenarios(deps) {
         source_task_producer: 'fulfillment.source',
         source_record_id: 1,
         source_task_intent_hash: 'a'.repeat(64),
-        entry_path: '/erp/purchase/processing-contracts?outsourcing_order_id=1',
+        entry_path: taskPost ? '/erp/purchase/processing-contracts?outsourcing_order_id=1&outsourcing_fact_id=1' : '/erp/purchase/processing-contracts?outsourcing_order_id=1',
       },
     }
 
     const scenario = {
       name,
-      path: taskEntry ? '/m/all/tasks' : '/erp/purchase/processing-contracts',
+      path: taskEntry ? viewport.width > 600 ? '/erp/task-board' : '/m/all/tasks' : '/erp/purchase/processing-contracts',
       auth: 'admin',
       viewport,
       workflowTaskFixtures: taskEntry ? [task] : [],
@@ -318,6 +320,28 @@ export function createOutsourcingSourceFactScenarios(deps) {
         })
       },
       verify: async (page) => {
+        if (taskPost) {
+          if (viewport.width <= 600) {
+            await page.getByTestId('mobile-role-nav-tasks').click()
+            const card = page.locator(`[data-mobile-task-id="${task.id}"]`)
+            await clickTaskCardContent(card, card.getByText(task.task_name, { exact: true }))
+          } else {
+            await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
+          }
+          await page.getByRole('button', { name: '任务办理', exact: true }).filter({ visible: true }).click()
+          const confirm = page.getByRole('button', { name: '确认回货入库', exact: true }).filter({ visible: true })
+          await expect(confirm).toBeEnabled()
+          await assertNoHorizontalOverflow(page, name)
+          await page.screenshot({ path: path.resolve(outputDir, `${name}-before-confirm.png`) })
+          await confirm.click()
+          await expectText(page, '本次委外回货已入库')
+          assert.equal(operationalFactMethods.filter((method) => method === 'post_outsourcing_fact').length, 1)
+          assert.equal(createParams.length, 0, '入库确认不重新生成回货草稿')
+          await page.getByRole('tablist', { name: '任务处理步骤', exact: true }).getByRole('tab').nth(2).click()
+          await expectText(page.getByTestId('workflow-task-action-receipt'), '本次委外回货已入库')
+          await page.screenshot({ path: path.resolve(outputDir, `${name}-receipt.png`) })
+          return
+        }
         if (taskEntry) {
           await page.getByTestId('mobile-role-nav-tasks').click()
           const card = page.locator(`[data-mobile-task-id="${task.id}"]`)
@@ -672,10 +696,14 @@ export function createOutsourcingSourceFactScenarios(deps) {
             const body = await response.json()
             return body.result?.data?.outsourcing_facts?.some((row) => row.fact_no === params.fact_no)
           }) : null
-          const recordsEntry = page.getByRole('button', {
-            name: '委外记录',
+          let recordsEntry = page.getByRole('button', {
+            name: '加工收发记录',
             exact: true,
           })
+          if (await recordsEntry.count() === 0) {
+            await page.getByRole('button', { name: /^更多操作/u }).filter({ visible: true }).click()
+            recordsEntry = page.getByText('加工收发记录', { exact: true }).filter({ visible: true })
+          }
           if (await recordsEntry.isDisabled()) {
             await page
               .getByText('OUT-SOURCE-L1', { exact: true })
@@ -750,9 +778,9 @@ export function createOutsourcingSourceFactScenarios(deps) {
             assert.equal(operationalFactMethods.includes('post_outsourcing_fact'), false)
           }
 
-          if (['post', 'post-and-void'].includes(recordAction)) {
+          if (['post', 'post-and-void', 'post-and-reverse'].includes(recordAction)) {
             const postButton = recordsModal.getByRole('button', {
-              name: /过\s*账/u,
+              name: materialIssue ? '确认委外发料' : '确认回货入库', exact: true,
             })
             if ((await postButton.count()) === 0) {
               throw new Error(
@@ -760,7 +788,7 @@ export function createOutsourcingSourceFactScenarios(deps) {
               )
             }
             await postButton.click()
-            await expectText(page, '委外记录已过账')
+            await expectText(page, materialIssue ? '委外发料已出库' : '本次委外回货已入库')
             await expectText(factRow, '已过账')
             assert.equal(
               operationalFactMethods.includes('post_outsourcing_fact'),
@@ -769,7 +797,19 @@ export function createOutsourcingSourceFactScenarios(deps) {
             )
           }
 
+          if (recordAction === 'post-and-reverse') {
+            await recordsModal.getByRole('button', { name: '撤销回货入库', exact: true }).click()
+            const reversal = page.getByRole('dialog').filter({ hasText: '撤销回货入库？' }).last()
+            await expectText(reversal, '撤销本次委外回货入库的库存影响')
+            await reversal.getByLabel('业务原因', { exact: true }).fill('模拟更正本次回货')
+            await page.screenshot({ path: path.resolve(outputDir, `${name}-reversal.png`) })
+            await reversal.getByRole('button', { name: '撤销回货入库', exact: true }).click()
+            await expectText(page, '回货入库已撤销，本次库存影响已恢复')
+            await expectText(factRow, '已取消')
+            assert.equal(operationalFactMethods.filter((method) => method === 'cancel_outsourcing_fact').length, 1)
+          }
           if (['void', 'post-and-void'].includes(recordAction)) {
+            const voidName = recordAction === 'post-and-void' || !materialIssue ? '委外回货' : '委外发料'
             const voidRow =
               recordAction === 'post-and-void'
                 ? recordsModal
@@ -781,20 +821,20 @@ export function createOutsourcingSourceFactScenarios(deps) {
             await voidRow.click()
             await recordsModal
               .getByRole('button', {
-                name: '作废草稿（库存零变动）',
+                name: `作废${voidName}草稿`,
                 exact: true,
               })
               .click()
             const confirm = page.locator('.ant-modal-confirm:visible').last()
             await confirm.waitFor({ state: 'visible', timeout: 10_000 })
-            await expectText(confirm, '本次作废不会产生任何库存变动')
+            await expectText(confirm, '作废不会改变库存')
             await confirm
               .locator('textarea:visible')
               .fill('STYLE-L1：委外草稿录入有误')
             await confirm
-              .getByRole('button', { name: '确认作废', exact: true })
+              .getByRole('button', { name: `作废${voidName}草稿`, exact: true })
               .click()
-            await expectText(page, '委外草稿已作废，库存未发生变动')
+            await expectText(page, `${voidName}草稿已作废，库存未发生变动`)
             await expectText(voidRow, '已取消')
             assert.equal(
               operationalFactMethods.includes('cancel_outsourcing_fact'),
@@ -810,6 +850,13 @@ export function createOutsourcingSourceFactScenarios(deps) {
   }
 
   return [
+    ...[false, true].map((mobile) => createScenario({
+      name: `outsourcing-inbound-task-copy-${mobile ? 'mobile' : 'desktop'}`,
+      actionType: 'RETURN_RECEIPT',
+      taskEntry: true,
+      taskPost: true,
+      viewport: mobile ? { width: 390, height: 844 } : { width: 1920, height: 1080 },
+    })),
     createScenario({
       name: 'outsourcing-material-draft-form-page',
       actionType: 'MATERIAL_ISSUE',
@@ -856,11 +903,13 @@ export function createOutsourcingSourceFactScenarios(deps) {
     createScenario({
       name: 'outsourcing-source-return-receipt-wide-desktop',
       actionType: 'RETURN_RECEIPT',
+      recordAction: 'post-and-reverse',
       viewport: { width: 3840, height: 2160 },
     }),
     createScenario({
       name: 'outsourcing-source-return-receipt-mobile',
       actionType: 'RETURN_RECEIPT',
+      recordAction: 'post',
       viewport: { width: 390, height: 844 },
     }),
     createScenario({

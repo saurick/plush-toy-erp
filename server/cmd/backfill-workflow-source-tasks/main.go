@@ -65,7 +65,7 @@ func main() {
 		"mode":     map[bool]string{true: "apply", false: "dry-run"}[*apply],
 		"result":   result,
 		"notes": []string{
-			"reconciles RELEASED production orders, POSTED REWORK bundles and DRAFT shipment preparation tasks",
+			"reconciles RELEASED production orders, POSTED REWORK bundles and DRAFT shipment preparation tasks including outstanding pre-shipment quality inspections",
 			"normalizes proven timezone-only source intent differences and preserves original workflow events",
 			"fulfillment handoffs follow source facts; no approval, stock movement or shipment fact is fabricated",
 			"DRAFT shipments still require an explicit submit action from the shipment page",

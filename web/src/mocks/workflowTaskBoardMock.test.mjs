@@ -8,6 +8,21 @@ import {
 
 const snapshotAt = 1_750_000_000
 
+test('单据模块模拟查询先过滤再分页，单据类型候选保持完整', () => {
+  const tasks = [
+    task(1, 'ready', { source_type: 'production_fact' }),
+    task(2, 'done', { source_type: 'production-progress' }),
+    task(3, 'ready', { source_type: 'production_order' }),
+    task(4, 'ready', { source_type: 'purchase_receipt' }),
+  ]
+  const board = buildWorkflowTaskBoardMock({ tasks, params: { source_section: 'production', lane_key: 'all', limit: 1, offset: 1 }, snapshotAt })
+  assert.equal(board.total, 3)
+  assert.deepEqual(board.counts, { actionable: 2, exception: 0, due: 0, finished: 1 })
+  assert.equal(board.lanes[0].tasks.length, 1)
+  assert.equal(board.lanes[0].tasks[0].id, 2)
+  assert.deepEqual(board.source_types, ['production_fact', 'production_order', 'purchase_receipt'])
+})
+
 function task(id, status, overrides = {}) {
   return {
     id,
@@ -79,7 +94,7 @@ test('workflowTaskBoardMock: 服务端筛选、source options 与聚焦分页口
   })
 
   assert.equal(board.total, 23)
-  assert.deepEqual(board.source_types, ['inbound', 'project-orders'])
+  assert.deepEqual(board.source_types, ['purchase_receipt', 'sales_order'])
   assert.deepEqual(board.owner_role_keys, ['engineering'])
   assert.equal(board.lanes.length, 1)
   assert.equal(board.lanes[0].total, 23)

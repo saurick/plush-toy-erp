@@ -14,6 +14,12 @@ const (
 	Label = "sales_order"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldCreateIdempotencyKey holds the string denoting the create_idempotency_key field in the database.
+	FieldCreateIdempotencyKey = "create_idempotency_key"
+	// FieldCreateIntentHash holds the string denoting the create_intent_hash field in the database.
+	FieldCreateIntentHash = "create_intent_hash"
+	// FieldCreateActorID holds the string denoting the create_actor_id field in the database.
+	FieldCreateActorID = "create_actor_id"
 	// FieldOrderNo holds the string denoting the order_no field in the database.
 	FieldOrderNo = "order_no"
 	// FieldCustomerID holds the string denoting the customer_id field in the database.
@@ -117,6 +123,9 @@ const (
 // Columns holds all SQL columns for salesorder fields.
 var Columns = []string{
 	FieldID,
+	FieldCreateIdempotencyKey,
+	FieldCreateIntentHash,
+	FieldCreateActorID,
 	FieldOrderNo,
 	FieldCustomerID,
 	FieldCurrency,
@@ -160,6 +169,12 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// CreateIdempotencyKeyValidator is a validator for the "create_idempotency_key" field. It is called by the builders before save.
+	CreateIdempotencyKeyValidator func(string) error
+	// CreateIntentHashValidator is a validator for the "create_intent_hash" field. It is called by the builders before save.
+	CreateIntentHashValidator func(string) error
+	// CreateActorIDValidator is a validator for the "create_actor_id" field. It is called by the builders before save.
+	CreateActorIDValidator func(int) error
 	// OrderNoValidator is a validator for the "order_no" field. It is called by the builders before save.
 	OrderNoValidator func(string) error
 	// CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
@@ -214,6 +229,21 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByCreateIdempotencyKey orders the results by the create_idempotency_key field.
+func ByCreateIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCreateIdempotencyKey, opts...).ToFunc()
+}
+
+// ByCreateIntentHash orders the results by the create_intent_hash field.
+func ByCreateIntentHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCreateIntentHash, opts...).ToFunc()
+}
+
+// ByCreateActorID orders the results by the create_actor_id field.
+func ByCreateActorID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCreateActorID, opts...).ToFunc()
 }
 
 // ByOrderNo orders the results by the order_no field.

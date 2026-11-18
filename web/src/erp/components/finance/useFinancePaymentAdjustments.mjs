@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Form } from 'antd'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
+import { financePaymentActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 
 import {
   FinancePaymentStatus,
@@ -92,7 +93,7 @@ export default function useFinancePaymentAdjustments({
           payment.status === FinancePaymentStatus.DRAFT
             ? '该收付款已进入审批，请先在任务中心驳回或阻塞流程'
             : payment.status === FinancePaymentStatus.APPROVED
-              ? '只有流程受阻且尚未过账的收付款可以取消'
+              ? '只有流程受阻且尚未入账的收付款可以取消'
               : '当前状态不能取消收付款'
         )
         return
@@ -107,6 +108,7 @@ export default function useFinancePaymentAdjustments({
   }
 
   const cancelPayment = async () => {
+    const presentation = financePaymentActionPresentation(currentPayment, 'cancel')
     let values
     try {
       values = await cancelForm.validateFields(['reason'])
@@ -123,28 +125,29 @@ export default function useFinancePaymentAdjustments({
       })
       rememberPayment(payment)
       setCancelOpen(false)
-      reportBusinessResult('收付款已取消', payment)
+      reportBusinessResult(presentation.success, payment)
       await loadReferences()
       message.success(
-        '收付款已取消；如流程已有审批效果，系统会保留恢复记录，供管理员继续核对处理'
+        `${presentation.success}；如流程已有审批效果，系统会保留恢复记录，供管理员继续核对处理`
       )
     } catch (error) {
       if (isSourceBusinessActionResultUnknown(error)) {
         const recovered = await recoverPayment(currentPayment.id, true)
         if (recovered?.status === FinancePaymentStatus.CANCELLED) {
           setCancelOpen(false)
-          reportBusinessResult('已重新读取收付款取消结果', recovered)
-          message.success('已重新读取收付款取消结果')
+          reportBusinessResult(`已重新读取并确认：${presentation.success}`, recovered)
+          message.success(`已重新读取并确认：${presentation.success}`)
           return
         }
       }
-      message.error(getActionErrorMessage(error, '取消收付款'))
+      message.error(getActionErrorMessage(error, presentation.label))
     } finally {
       setLoading(false)
     }
   }
 
   const reversePayment = async () => {
+    const presentation = financePaymentActionPresentation(currentPayment, 'reverse')
     let values
     try {
       values = await reverseForm.validateFields(['reason'])
@@ -161,20 +164,20 @@ export default function useFinancePaymentAdjustments({
       })
       rememberPayment(payment)
       setReverseOpen(false)
-      reportBusinessResult('收付款已冲销，原核销金额已恢复', payment)
+      reportBusinessResult(presentation.success, payment)
       await loadReferences()
-      message.success('收付款已冲销，原核销金额已恢复')
+      message.success(presentation.success)
     } catch (error) {
       if (isSourceBusinessActionResultUnknown(error)) {
         const recovered = await recoverPayment(currentPayment.id, true)
         if (recovered?.status === FinancePaymentStatus.REVERSED) {
           setReverseOpen(false)
-          reportBusinessResult('已重新读取收付款冲销结果', recovered)
-          message.success('已重新读取收付款冲销结果')
+          reportBusinessResult(`已重新读取并确认：${presentation.success}`, recovered)
+          message.success(`已重新读取并确认：${presentation.success}`)
           return
         }
       }
-      message.error(getActionErrorMessage(error, '冲销收付款'))
+      message.error(getActionErrorMessage(error, presentation.label))
     } finally {
       setLoading(false)
     }

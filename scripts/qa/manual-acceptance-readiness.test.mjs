@@ -1484,7 +1484,7 @@ test("all 50 formal targets are owned by shared generator stages", () => {
   assert.deepEqual(
     plan.targets.find((target) => target.id === "desktopPages:global-dashboard")
       .generatorStageKeys,
-    ["task"],
+    ["source"],
   );
   assert.deepEqual(
     plan.targets.find(
@@ -2448,7 +2448,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:global-dashboard")
       .actual,
-    75,
+    report.targets.find((item) => item.id === "desktopPages:sales-orders").actual,
   );
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:inventory")

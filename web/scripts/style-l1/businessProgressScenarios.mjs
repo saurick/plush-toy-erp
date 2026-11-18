@@ -41,6 +41,9 @@ export function createBusinessProgressScenarios({
           'erp.business_dashboard.read',
           'sales_order.read',
           'sales_order_item.read',
+          'purchase.order.read',
+          'purchase.receipt.read',
+          'field.procurement_commercial.read',
           'pmc.plan.read',
           'production.wip.read',
           'workflow.task.read',
@@ -73,11 +76,69 @@ export function createBusinessProgressScenarios({
           }
           return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: '', data } } })
         })
+        const relatedTasks = () => {
+          const sample = progressFixtureData({ id: 1, view: 'orders' }, { detail: true }).sections.tasks[0]
+          return Array.from({ length: 22 }, (_, i) => ({
+            ...sample,
+            id: 100 + i,
+            number: `TASK-${String(100 + i).padStart(4, '0')}`,
+            label: i === 0 ? 'order_approval' : i === 1 ? '办理出货前检验' : `复核第 ${i} 批来料检验`,
+            role: i ? 'quality' : 'purchase',
+            status: i === 0 ? 'blocked' : i === 1 ? 'ready' : 'done',
+            note: i === 0 ? sample.note : '',
+          }))
+        }
+        await page.route('**/rpc/workflow', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'get_task' || ![102, 121].includes(params.task_id)) return route.fallback()
+          calls.push({ method, params })
+          const task = {
+            id: params.task_id,
+            version: 1,
+            task_name: `核对指定任务 ${params.task_id}`,
+            task_status_key: 'done',
+            task_group: 'business_followup',
+            task_no: `RW20261118-0${params.task_id}`,
+            owner_role_key: 'purchase',
+            source_type: 'sales_order',
+            source_id: 1,
+            source_no: 'SO-0001',
+          }
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { task } } } })
+        })
+        await page.route('**/rpc/purchase_order', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'list_purchase_followups') return route.fallback()
+          calls.push({ method, params })
+          return route.fulfill({
+            json: {
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 0,
+                data: {
+                  rows: [],
+                  total: 0,
+                  counts: {},
+                  days: {},
+                  as_of_date: '2026-11-18',
+                  access: { quality: false, commercial: true, finance: false },
+                },
+              },
+            },
+          })
+        })
         await page.route('**/rpc/business', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           if (method === 'list_progress_owner_options') {
             const names = restricted ? ['模拟业务员'] : ['模拟业务员', '已结束订单的业务员']
             return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { names } } } })
+          }
+          if (method === 'list_progress_tasks') {
+            calls.push({ method, params })
+            const rows = relatedTasks().filter((row) => (!params.owner_role_key || row.role === params.owner_role_key) &&
+              (params.task_status === 'all' || (params.task_status === 'ended') === (row.status === 'done')))
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: '', data: { rows: rows.slice(params.offset, params.offset + params.limit), total: rows.length } } } })
           }
           if (!['list_progress', 'get_progress'].includes(method)) {
             return route.fallback()
@@ -118,6 +179,12 @@ export function createBusinessProgressScenarios({
             }
             if (data.sections?.tasks) {
               data.sections.tasks[0].label = 'order_approval'
+              if (name === 'erp-business-dashboard-desktop' && data.row.id === 1) {
+                const records = relatedTasks()
+                data.sections.tasks = records.slice(0, 20)
+                data.has_more.tasks = true
+                data.task_total = records.length
+              }
             }
           }
           return route.fulfill({
@@ -286,7 +353,7 @@ export function createBusinessProgressScenarios({
         if (name === 'erp-business-dashboard-desktop') {
           const detailReads = calls.filter((call) => call.method === 'get_progress').length
           await board.getByRole('button', { name: '查看 SO-0002 的关联任务', exact: true }).click()
-          await page.waitForURL((url) => url.pathname === '/erp/task-board' && url.searchParams.get('link_task') === '102')
+          await page.waitForURL((url) => url.pathname === '/erp/task-board' && url.searchParams.get('task_id') === '102')
           assert.equal(calls.filter((call) => call.method === 'get_progress').length, detailReads, '直达任务不同时打开进度')
           await page.goBack()
           await progressCard('SO-0002').waitFor()
@@ -333,8 +400,28 @@ export function createBusinessProgressScenarios({
         await drawer.getByRole('tab', { name: '领料', exact: true }).focus()
         await page.keyboard.press('ArrowRight')
         await drawer.getByRole('tab', { name: '关联任务', exact: true, selected: true }).waitFor()
-        await drawer.getByRole('button', { name: '查看 TASK-0100', exact: true }).waitFor()
+        await drawer.getByRole('button', { name: '查看任务 TASK-0100', exact: true }).waitFor()
         assert.equal(await drawer.getByText('order_approval', { exact: true }).count(), 0)
+        if (name === 'erp-business-dashboard-desktop') {
+          await drawer.getByRole('navigation', { name: '本单任务分页' }).getByRole('button', { name: '下一页' }).click()
+          const picked = drawer.getByRole('button', { name: '查看任务 TASK-0121', exact: true })
+          await picked.click()
+          await page.getByRole('heading', { name: '核对指定任务 121', exact: true }).waitFor()
+          assert(calls.some((call) => call.method === 'get_task' && call.params.task_id === 121))
+          await page.getByRole('button', { name: '返回进度看板', exact: true }).click()
+          await picked.waitFor()
+          assert.equal(new URL(page.url()).searchParams.get('blocked_only'), 'true')
+          await drawer.getByRole('button', { name: '已结束', exact: true }).click()
+          await drawer.getByRole('button', { name: '查看任务 TASK-0102', exact: true }).waitFor()
+          assert(calls.some((call) => call.method === 'list_progress_tasks' && call.params.task_status === 'ended' && call.params.id === 1))
+          const followupRead = page.waitForRequest((request) => request.url().endsWith('/rpc/purchase_order') && request.postDataJSON()?.method === 'list_purchase_followups')
+          await drawer.getByRole('button', { name: '本单采购跟进', exact: true }).click()
+          assert.equal((await followupRead).postDataJSON().params.sales_order_id, 1)
+          await page.getByRole('tab', { name: '采购跟进', selected: true }).waitFor()
+          await page.getByRole('button', { name: '返回进度看板', exact: true }).click()
+          await drawer.getByRole('tab', { name: '关联任务', selected: true }).waitFor()
+          await drawer.getByRole('button', { name: '已结束', pressed: true }).waitFor()
+        }
         await assertBusinessModalViewport(page, drawer, { label: name })
         await page.screenshot({ path: path.join(outputDir, `${name}-complete-progress.png`) })
         await page.keyboard.press('Escape')

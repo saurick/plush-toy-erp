@@ -1673,13 +1673,13 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('SUBMITTED', 'REJECTED', {
-        guard: '判定结果由正式质检 usecase 写入。',
+        guard: '通过正式质检操作记录判定结果。',
         action: 'reject_quality_inspection',
         permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'fact_ledger',
       }),
       transition('SUBMITTED', 'CANCELLED', {
-        guard: '已提交质检取消条件由领域 usecase 校验。',
+        guard: '取消已提交检验前，须通过质检业务规则校验。',
         action: 'cancel_quality_inspection',
         permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'fact_ledger',

@@ -19,8 +19,8 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开任务管理',
       },
       {
-        title: '查看今日重点',
-        description: '查看待处理、阻塞和即将到期的事项。',
+        title: '查看业务汇总',
+        description: '核对销售订单明细与已提交的工程用料。',
         path: '/erp/dashboard',
         actionLabel: '打开工作台',
       },
@@ -523,7 +523,7 @@ export const GENERIC_HELP_GUIDE = Object.freeze({
   headline: '从当前可见页面开始，按来源和状态完成手头工作。',
   priorities: [],
   workflow: [
-    '先从工作台或当前可见页面查看待处理事项。',
+    '先从任务管理查看待处理事项。',
     '打开来源记录，核对状态、数量、负责人和下一步提示。',
     '只办理当前页面明确提供的操作。',
     '完成后回到来源业务页面确认记录状态。',

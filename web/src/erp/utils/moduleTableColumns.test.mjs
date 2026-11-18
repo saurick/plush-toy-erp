@@ -103,7 +103,6 @@ test('moduleTableColumns: 会生成稳定列顺序 key', () => {
 test('moduleTableColumns: 业务字段显式保留正文语义对齐', () => {
   const contracts = [
     ['components/workflow/WorkflowDashboardViews.jsx', '任务时间', 'left'],
-    ['pages/DashboardPage.jsx', '任务时间', 'left'],
     ['components/workbench/SalesOrderSummaryPanel.jsx', '客户', 'left'],
     ['components/workbench/SalesOrderSummaryPanel.jsx', '产品名称', 'left'],
     ['components/workbench/SalesOrderSummaryPanel.jsx', '备注', 'left'],

@@ -20,6 +20,12 @@ type SalesOrder struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// CreateIdempotencyKey holds the value of the "create_idempotency_key" field.
+	CreateIdempotencyKey *string `json:"create_idempotency_key,omitempty"`
+	// CreateIntentHash holds the value of the "create_intent_hash" field.
+	CreateIntentHash *string `json:"create_intent_hash,omitempty"`
+	// CreateActorID holds the value of the "create_actor_id" field.
+	CreateActorID *int `json:"create_actor_id,omitempty"`
 	// OrderNo holds the value of the "order_no" field.
 	OrderNo string `json:"order_no,omitempty"`
 	// CustomerID holds the value of the "customer_id" field.
@@ -148,9 +154,9 @@ func (*SalesOrder) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case salesorder.FieldCustomerSnapshot, salesorder.FieldContactSnapshot, salesorder.FieldDeliverySnapshot:
 			values[i] = new([]byte)
-		case salesorder.FieldID, salesorder.FieldCustomerID, salesorder.FieldPaymentTermDays, salesorder.FieldVersion, salesorder.FieldSettledBy:
+		case salesorder.FieldID, salesorder.FieldCreateActorID, salesorder.FieldCustomerID, salesorder.FieldPaymentTermDays, salesorder.FieldVersion, salesorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case salesorder.FieldOrderNo, salesorder.FieldCurrency, salesorder.FieldCustomerOrderNo, salesorder.FieldSalesOwner, salesorder.FieldPaymentMethod, salesorder.FieldPriceConditionNote, salesorder.FieldTaxMode, salesorder.FieldFreightTerms, salesorder.FieldLifecycleStatus, salesorder.FieldSettlementAction, salesorder.FieldSettlementMode, salesorder.FieldSettlementReason, salesorder.FieldNote:
+		case salesorder.FieldCreateIdempotencyKey, salesorder.FieldCreateIntentHash, salesorder.FieldOrderNo, salesorder.FieldCurrency, salesorder.FieldCustomerOrderNo, salesorder.FieldSalesOwner, salesorder.FieldPaymentMethod, salesorder.FieldPriceConditionNote, salesorder.FieldTaxMode, salesorder.FieldFreightTerms, salesorder.FieldLifecycleStatus, salesorder.FieldSettlementAction, salesorder.FieldSettlementMode, salesorder.FieldSettlementReason, salesorder.FieldNote:
 			values[i] = new(sql.NullString)
 		case salesorder.FieldOrderDate, salesorder.FieldPlannedDeliveryDate, salesorder.FieldSettledAt, salesorder.FieldCreatedAt, salesorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -175,6 +181,27 @@ func (_m *SalesOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case salesorder.FieldCreateIdempotencyKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field create_idempotency_key", values[i])
+			} else if value.Valid {
+				_m.CreateIdempotencyKey = new(string)
+				*_m.CreateIdempotencyKey = value.String
+			}
+		case salesorder.FieldCreateIntentHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field create_intent_hash", values[i])
+			} else if value.Valid {
+				_m.CreateIntentHash = new(string)
+				*_m.CreateIntentHash = value.String
+			}
+		case salesorder.FieldCreateActorID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field create_actor_id", values[i])
+			} else if value.Valid {
+				_m.CreateActorID = new(int)
+				*_m.CreateActorID = int(value.Int64)
+			}
 		case salesorder.FieldOrderNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field order_no", values[i])
@@ -436,6 +463,21 @@ func (_m *SalesOrder) String() string {
 	var builder strings.Builder
 	builder.WriteString("SalesOrder(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	if v := _m.CreateIdempotencyKey; v != nil {
+		builder.WriteString("create_idempotency_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CreateIntentHash; v != nil {
+		builder.WriteString("create_intent_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CreateActorID; v != nil {
+		builder.WriteString("create_actor_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("order_no=")
 	builder.WriteString(_m.OrderNo)
 	builder.WriteString(", ")

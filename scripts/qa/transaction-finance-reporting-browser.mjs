@@ -26,7 +26,15 @@ export async function financeReportingEvidenceFlow(browser, options, client, fix
     assert.ok(listed.payments.every(row => row.currency === 'CNY' && row.kind === 'ADVANCE'));
     assert.equal(listed.totals.reduce((sum, row) => sum + row.count, 0), listed.total);
     await filterPanel.getByRole('button', { name: '收起', exact: true }).click();
-    await expect(page.getByLabel('收付款筛选汇总')).toContainText('含全部分页');
+    const tools = page.getByRole('button', { name: '表格工具', exact: true });
+    await tools.click();
+    await page.getByRole('menuitem', { name: /查看金额汇总/u }).click();
+    const totals = await modal(page, '金额汇总');
+    await expect(totals).toContainText(`全部页 · 共 ${listed.total} 笔`);
+    await expect(totals.locator('tbody tr[data-row-key]')).toHaveCount(listed.totals.length);
+    await totals.press('Escape');
+    await expect(totals).toBeHidden();
+    await expect(tools).toBeFocused();
 
     const paymentID = report.flows.find(row => row.key === 'desktop_purchase_advance').paymentID;
     await selectRow(page, paymentID);

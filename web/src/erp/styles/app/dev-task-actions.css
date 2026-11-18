@@ -75,14 +75,10 @@
   .erp-command-center-hero,
   .erp-business-board-lower-grid,
   .erp-business-board-workspace,
-  .erp-product-core-dashboard__grid,
-  .erp-workbench-main-grid {
+  .erp-product-core-dashboard__grid {
     grid-template-columns: 1fr;
   }
 
-  .erp-workbench-queue-filter {
-    flex: 1 1 160px;
-  }
 }
 
 @media (max-width: 960px) {
@@ -104,24 +100,12 @@
 }
 
 @media (max-width: 720px) {
-  .erp-workbench-command {
-    padding: 10px;
-  }
-
-  .erp-product-core-dashboard__hero,
-  .erp-workbench-panel-head {
+  .erp-product-core-dashboard__hero {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .erp-workbench-queue-filter-strip {
-    align-items: stretch;
-  }
 
-  .erp-workbench-queue-filter {
-    flex-basis: 100%;
-    justify-content: space-between;
-  }
 
   .erp-workbench-role-row {
     grid-template-columns: 1fr;

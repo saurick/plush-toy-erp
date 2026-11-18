@@ -58,6 +58,9 @@ func (r *businessProgressRepo) readProgress(ctx context.Context, q biz.BusinessP
 func (r *businessProgressRepo) ListBusinessProgress(ctx context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressBoard, error) {
 	result := &biz.BusinessProgressBoard{Rows: []*biz.BusinessProgressRow{}, SnapshotAt: q.SnapshotAt, Access: q.Access}
 	err := r.readProgress(ctx, q, func(tx *stdsql.Tx) error {
+		if q.Display == "lines" {
+			return loadBusinessProgressDelivery(ctx, tx, q, r.data.sqlDialect, result)
+		}
 		cte, args := progressQuery(q, r.data.sqlDialect)
 		err := tx.QueryRowContext(ctx, cte+progressCountsSQL(q), args...).
 			Scan(&result.Counts.Total, &result.Counts.Overdue, &result.Counts.DueSoon, &result.Counts.Undated, &result.Counts.Blocked, &result.Counts.Unlinked, &result.Total)
@@ -95,6 +98,31 @@ func (r *businessProgressRepo) ListBusinessProgressOwners(ctx context.Context, q
 	return result, err
 }
 
+func progressListOrder(q biz.BusinessProgressQuery) string {
+	field := map[string]string{
+		biz.BusinessProgressSortOrderNo: "order_no",
+		biz.BusinessProgressSortDueDate: "due_date",
+		biz.BusinessProgressSortProduct: "product_label",
+	}[q.SortBy]
+	if field != "" {
+		direction := " ASC"
+		if q.SortDirection == "desc" {
+			direction = " DESC"
+		}
+		if q.Display == "lines" {
+			return field + direction + " NULLS LAST,order_no,line_no,id"
+		}
+		return field + direction + " NULLS LAST,id DESC"
+	}
+	if q.Display == "lines" {
+		return `CASE delivery_status
+ WHEN 'overdue' THEN 0 WHEN 'closed' THEN 1 WHEN 'due_soon' THEN 2
+ WHEN 'undated' THEN 3 WHEN 'unknown' THEN 4 WHEN 'open' THEN 5 WHEN 'delivered' THEN 6 ELSE 7 END,
+ due_at,order_no,line_no,id`
+	}
+	return "active DESC,blocked DESC,overdue DESC,CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,due_at,id DESC"
+}
+
 func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.BusinessProgressQuery, cte string, args []any) (out []*biz.BusinessProgressRow, err error) {
 	args = append(append([]any{}, args...), q.Limit, q.Offset)
 	query := cte + ` SELECT id,order_no,status,customer,product,product_count,product_id,sales_owner,CAST(due_date AS TEXT),CAST(updated_at AS TEXT),
@@ -102,7 +130,7 @@ func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.Business
  overdue,due_soon,blocked,production_orders,production_closed,material_total,material_pending,in_progress_batches,outsourced_batches,
  waiting_batches,rejected_batches,planned_batches,open_tasks,blocked_tasks,unassigned_tasks,attention_task_id,attention_task,
  attention_reason,attention_owner,attention_role,CAST(completed_quantity AS TEXT),current_operation,operation_count FROM filtered` + (" WHERE " + progressFilterCondition(q)) +
-		fmt.Sprintf(" ORDER BY active DESC,blocked DESC,overdue DESC,CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,due_at,id DESC LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+		fmt.Sprintf(" ORDER BY %s LIMIT $%d OFFSET $%d", progressListOrder(q), len(args)-1, len(args))
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -186,7 +214,7 @@ func (r *businessProgressRepo) GetBusinessProgress(ctx context.Context, q biz.Bu
 		sectionArgs := append(append([]any{}, args...), q.ID)
 		id := fmt.Sprintf("$%d", len(sectionArgs))
 		queries := progressDetailQueries(q, id, r.data.sqlDialect)
-		for _, key := range []string{"lines", "production", "batches", "materials", "tasks"} {
+		for _, key := range []string{"lines", "production", "batches", "materials"} {
 			query, ok := queries[key]
 			if !ok {
 				continue
@@ -218,6 +246,15 @@ func (r *businessProgressRepo) GetBusinessProgress(ctx context.Context, q biz.Bu
 			}
 			result.Sections[key] = list
 		}
+		if q.Access.Tasks {
+			q.Limit, q.Offset = biz.WorkCenterDefaultLimit, 0
+			page, err := loadProgressTaskPage(ctx, tx, q, r.data.sqlDialect)
+			if err != nil {
+				return err
+			}
+			result.Sections["tasks"], result.TaskTotal = page.Rows, page.Total
+			result.HasMore["tasks"] = page.Total > len(page.Rows)
+		}
 		return nil
 	})
 	return result, err
@@ -226,10 +263,10 @@ func (r *businessProgressRepo) GetBusinessProgress(ctx context.Context, q biz.Bu
 func progressDetailQueries(q biz.BusinessProgressQuery, id, sqlDialect string) map[string]string {
 	queries := map[string]string{}
 	if q.View == "orders" {
-		queries["lines"] = `SELECT l.id,'sales_line',CAST(l.line_no AS TEXT),l.product_label,CASE WHEN l.bom_id IS NOT NULL AND l.bom_fingerprint IS NOT NULL THEN '工程资料已完成' ELSE '待完善工程资料' END,
+		queries["lines"] = `SELECT l.id,'sales_line',CAST(l.line_no AS TEXT),l.product_label,CASE WHEN l.line_status='canceled' THEN '已取消' WHEN l.bom_id IS NOT NULL AND l.bom_fingerprint IS NOT NULL THEN '工程资料已完成' ELSE '待完善工程资料' END,
  CAST(l.ordered_quantity AS TEXT),l.unit_name,` + progressDateSQL("l.due_at", sqlDialect) + `,'','',
  CASE WHEN EXISTS(SELECT 1 FROM shipment_mismatch m WHERE m.order_id=l.sales_order_id) THEN '出货关联待核对'
- ELSE '已出货 ' || CAST(l.shipped_quantity AS TEXT) END,COALESCE(l.product_id,0),l.sales_order_id FROM sales_lines l
+ ELSE '已出货 ' || CAST(l.shipped_quantity AS TEXT) END,COALESCE(l.product_id,0),l.sales_order_id FROM sales_delivery_lines l
  WHERE l.sales_order_id=` + id + " ORDER BY l.line_no,l.id"
 	} else {
 		linkedNote := "'已关联销售明细'"
@@ -264,9 +301,58 @@ func progressDetailQueries(q biz.BusinessProgressQuery, id, sqlDialect string) m
 	if !q.Access.WIP {
 		delete(queries, "batches")
 	}
-	if q.Access.Tasks {
-		queries["tasks"] = `SELECT id,'task',task_code,task_name,task_status_key,'','',` + progressDateSQL("due_at", sqlDialect) + `,
- assignee_name,owner_role_key,COALESCE(blocked_reason,''),0,source_id FROM task_rows WHERE view_key='` + q.View + "' AND board_id=" + id + " ORDER BY attention_rank"
-	}
 	return queries
+}
+
+func (r *businessProgressRepo) ListBusinessProgressTasks(ctx context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressTaskPage, error) {
+	var page *biz.BusinessProgressTaskPage
+	err := r.readProgress(ctx, q, func(tx *stdsql.Tx) error {
+		var err error
+		page, err = loadProgressTaskPage(ctx, tx, q, r.data.sqlDialect)
+		return err
+	})
+	return page, err
+}
+
+func loadProgressTaskPage(ctx context.Context, tx *stdsql.Tx, q biz.BusinessProgressQuery, sqlDialect string) (*biz.BusinessProgressTaskPage, error) {
+	cte, args := progressCTE(q)
+	// task_rows is already restricted to this view, document and reader.
+	scope := " FROM task_rows WHERE TRUE"
+	switch q.TaskStatus {
+	case "open":
+		scope += " AND task_status_key IN ('ready','blocked')"
+	case "ended":
+		scope += " AND task_status_key IN ('done','rejected','withdrawn')"
+	}
+	if q.TaskRole != "" {
+		args = append(args, q.TaskRole)
+		scope += fmt.Sprintf(" AND owner_role_key=$%d", len(args))
+	}
+	query := cte + ` SELECT id,task_no,task_name,task_status_key,` + progressDateSQL("due_at", sqlDialect) +
+		`,assignee_name,owner_role_key,COALESCE(blocked_reason,''),source_id,COUNT(*) OVER()` + scope +
+		fmt.Sprintf(" ORDER BY attention_rank LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
+	rows, err := tx.QueryContext(ctx, query, append(append([]any{}, args...), q.Limit, q.Offset)...)
+	if err != nil {
+		return nil, err
+	}
+	page := &biz.BusinessProgressTaskPage{Rows: []biz.BusinessProgressRecord{}}
+	for rows.Next() {
+		record := biz.BusinessProgressRecord{Kind: "task"}
+		var date stdsql.NullString
+		if err := rows.Scan(&record.ID, &record.Number, &record.Label, &record.Status, &date, &record.Owner, &record.Role, &record.Note, &record.ParentID, &page.Total); err != nil {
+			return nil, errors.Join(err, rows.Close())
+		}
+		record.Date = progressDate(date.String)
+		page.Rows = append(page.Rows, record)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return nil, err
+	}
+	// After tasks leave a filtered page the client needs the new last page.
+	if len(page.Rows) == 0 && q.Offset > 0 {
+		if err := tx.QueryRowContext(ctx, cte+" SELECT COUNT(*)"+scope, args...).Scan(&page.Total); err != nil {
+			return nil, err
+		}
+	}
+	return page, nil
 }

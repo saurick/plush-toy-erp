@@ -870,7 +870,21 @@
       "purpose": "保存客户订单承诺、交付计划、付款方式和销售责任信息。",
       "boundary": "销售订单生效不等于已预留、已生产、已出货或已产生应收。",
       "lifecycle": "draft 转 submitted、active，再 closed；允许按状态 canceled；不物理删除。",
-      "writeBoundary": "SalesOrderUsecase 创建、草稿聚合保存、提交、生效、关闭和取消。"
+      "writeBoundary": "SalesOrderUsecase 创建、草稿聚合保存、提交、生效、关闭和取消。",
+      "fieldNotes": [
+        {
+          "name": "create_idempotency_key",
+          "note": "自动编号创建的稳定请求键，全表唯一，与订单及明细同事务写入且不可变；历史订单和未携带键的显式编号创建保留空值。"
+        },
+        {
+          "name": "create_intent_hash",
+          "note": "规范化创建单头和明细的 SHA256 摘要；同键内容变化返回冲突，后续编辑不改写创建意图。"
+        },
+        {
+          "name": "create_actor_id",
+          "note": "创建键绑定的登录经办人，由服务端取得，不接受调用方指定；与创建键、内容摘要成组存在。"
+        }
+      ]
     },
     {
       "name": "shipment_items",

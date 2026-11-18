@@ -1328,6 +1328,7 @@ export function createBusinessListAssertions({ outputDir }) {
       await trigger.click()
       await dialog.waitFor()
     }
+    await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
     await waitForFiniteAnimations(page)
     assert.equal(await dialog.getByRole('button', { name: '搜索', exact: true }).count(), 0, '筛选面板无需单独提交搜索')
     const metrics = await page.evaluate(() => {
@@ -1336,6 +1337,8 @@ export function createBusinessListAssertions({ outputDir }) {
         const box = node.getBoundingClientRect()
         const style = getComputedStyle(node)
         return {
+          top: box.top,
+          bottom: box.bottom,
           width: box.width,
           height: box.height,
           radius: style.borderRadius,
@@ -1362,9 +1365,7 @@ export function createBusinessListAssertions({ outputDir }) {
       const inputs = [
         ...(date?.querySelectorAll('.erp-business-date-input') || []),
       ]
-      const dateType = date?.querySelector(
-        '.erp-business-date-range-filter__type-label, .erp-business-date-range-filter__type.ant-select .ant-select-selector'
-      )
+      const periods = date?.querySelector('[role="group"][aria-label="时间范围"]')
       const dateRange = date?.querySelector(
         '.erp-business-date-range-filter__range'
       )
@@ -1384,7 +1385,8 @@ export function createBusinessListAssertions({ outputDir }) {
           )
         ),
         date: read(date),
-        dateType: read(dateType),
+        periods: read(periods),
+        dateRange: read(dateRange),
         dateRangeGap: dateRange
           ? Number.parseFloat(getComputedStyle(dateRange).gap || '0')
           : 0,
@@ -1422,14 +1424,9 @@ export function createBusinessListAssertions({ outputDir }) {
       `日期范围保留起止输入 ${evidence}`
     )
     assert(
-      isNominalControlHeight(metrics.date.height),
-      `日期筛选遵循 34px 高保真控件 ${evidence}`
-    )
-    assert(
-      metrics.dateType &&
-        isNominalControlHeight(metrics.dateType.height) &&
-        metrics.dateType.radius === '8px',
-      `日期类型应保持独立清晰的控件边界 ${evidence}`
+      metrics.periods && metrics.periods.scrollWidth <= metrics.periods.clientWidth + 1 &&
+        metrics.dateRange.top >= metrics.periods.bottom,
+      `时间范围按钮完整显示，自定义起止日期另起一行 ${evidence}`
     )
     assert(
       metrics.controls.every(

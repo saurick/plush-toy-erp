@@ -48,10 +48,10 @@ export function createDensityCompletionScenarios(scenarios, deps) {
       await panel.waitFor()
       await capture(page, `filters-${width}`, panel)
       if (!baseline) {
-        const source = panel.getByRole('combobox', { name: '来源单据', exact: true })
+        const source = panel.getByRole('group', { name: '单据类型', exact: true })
         await chooseMobileFilterOption(source, '采购订单')
         await panel.getByRole('group', { name: '任务状态筛选', exact: true }).getByRole('button', { name: /^阻塞/u }).click()
-        const sort = panel.getByRole('combobox', { name: '任务排序', exact: true })
+        const sort = panel.getByRole('group', { name: '任务排序', exact: true })
         await chooseMobileFilterOption(sort, '截止最早')
         await capture(page, `filters-selected-${width}`, panel)
         await panel.getByRole('button', { name: '关闭筛选', exact: true }).click()

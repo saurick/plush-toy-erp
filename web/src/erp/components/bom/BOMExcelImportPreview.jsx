@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useState } from 'react'
 import { Alert, Button, Radio, Space, Typography } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
 import BusinessModal from '../business-list/BusinessModal.jsx'
@@ -142,9 +142,9 @@ export default function BOMExcelImportPreview({
         {quantityNotice ? <Typography.Text>{quantityNotice}</Typography.Text> : null}
         <div className="erp-source-import-picker__toolbar" role="group" aria-label="导入筛选与搜索">
           <div className="erp-source-import-picker__filters">
-            <FilterSelect
+            <FilterChipGroup
+              allowClear
               label="待处理项"
-              placeholder="筛选待处理项"
               aria-label="BOM 待处理筛选"
               value={reviewFilter}
               onChange={(value) => { setReviewFilter(value || ''); setPage(1) }}

@@ -48,12 +48,12 @@ function actionCopy(actionType) {
   return actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
     ? {
         title: '委外发料',
-        alert: '发料记录创建为草稿，确认过账后才会更新库存出库记录。',
+        alert: '发料记录创建为草稿，使用“确认委外发料”后才会更新库存出库记录。',
       }
     : {
         title: '登记回货',
         alert:
-          '选择已有产品批次或填写本次回货的新批次号；记录创建为草稿，确认过账后才会更新库存入库记录。',
+          '选择已有产品批次或填写本次回货的新批次号；记录创建为草稿，使用“确认回货入库”后才会更新库存入库记录。',
       }
 }
 

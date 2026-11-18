@@ -143,23 +143,20 @@ test('revoking read access cancels an in-flight page and rejects its late respon
   assert.equal(view.calls.length, 1)
 })
 
-test('clearing a candidate filter restores the prompt and removes the query condition', async (t) => {
+test('direct candidate filters preserve the selected state and clearing removes the query condition', async (t) => {
   const view = await harness(t, (params) => materialPage(params))
   await view.renderPicker({ filters: [{ key: 'stock_category', label: '库存分类', options: [{ value: 'MAIN', label: '主料' }] }] })
-  const input = document.querySelector('input[aria-label="库存分类"]')
-  const control = input.closest('.ant-select')
-  assert.equal(control.querySelector('.ant-select-selection-placeholder').textContent, '按库存分类筛选')
-  await view.act(async () => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
-  await view.flush()
-  await view.act(async () => document.querySelector('.ant-select-item-option').click())
+  const group = document.querySelector('[role="group"][aria-label="库存分类"]')
+  assert.equal(group.querySelector('[aria-pressed="true"]').textContent, '不限')
+  await view.act(async () => view.button('主料').click())
   await view.flush()
   assert.equal(view.calls.at(-1).params.stock_category, 'MAIN')
   assert.equal(view.button('清空筛选').disabled, false)
-  await view.act(async () => control.querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+  await view.act(async () => view.button('不限').click())
   await view.flush()
   assert.equal(Object.hasOwn(view.calls.at(-1).params, 'stock_category'), false)
   assert.equal(view.button('清空筛选').disabled, true)
-  assert.equal(control.querySelector('.ant-select-selection-placeholder').textContent, '按库存分类筛选')
+  assert.equal(group.querySelector('[aria-pressed="true"]').textContent, '不限')
 })
 
 test('an empty failed material page exposes failure rather than claiming that no material exists', async (t) => {
@@ -272,9 +269,7 @@ test('changing category during filtered selection aborts the old query while ret
   await view.renderPicker({ filters: [{ key: 'stock_category', label: '库存分类', options: [{ value: 'MAIN', label: '主料' }] }] })
   await view.select(1)
   await view.act(async () => allFilteredButton().click())
-  const input = document.querySelector('input[aria-label="库存分类"]')
-  await view.act(async () => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
-  await view.act(async () => document.querySelector('.ant-select-item-option').click())
+  await view.act(async () => view.button('主料').click())
   assert.equal(signal.aborted, true)
   assert.equal(view.calls.at(-1).params.stock_category, 'MAIN')
   await view.act(async () => finish())
@@ -307,9 +302,7 @@ test('material updates refresh an open picker without losing its page, filters o
   const props = { params: { purchase_supplier_id: 9 }, filters: [{ key: 'stock_category', label: '库存分类', options: [{ value: 'MAIN', label: '主料' }] }] }
   await view.renderPicker(props)
   await view.select(1)
-  const filter = document.querySelector('input[aria-label="库存分类"]')
-  await view.act(async () => filter.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
-  await view.act(async () => document.querySelector('.ant-select-item-option').click())
+  await view.act(async () => view.button('主料').click())
   await view.nextPage()
   const before = view.calls.length
   prefix = '更新后材料'

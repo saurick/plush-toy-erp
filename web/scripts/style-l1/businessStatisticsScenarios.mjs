@@ -3,18 +3,13 @@ import { chooseSelectOption } from './selectControlActions.mjs'
 import { statisticsFixtureData } from './businessStatisticsFixtures.mjs'
 
 async function select(page, name, label) {
-  const input = page.getByRole('combobox', { name, exact: true })
-  await input.focus()
-  await input.press('ArrowDown')
-  await page
-    .locator('.ant-select-dropdown:visible .ant-select-item-option')
-    .getByText(label, { exact: true })
-    .click()
-  await input
-    .locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
-    .locator('.ant-select-selection-item')
-    .filter({ hasText: label })
-    .waitFor()
+  if (['每页来源订单数', '每页统计汇总数'].includes(name)) {
+    await chooseSelectOption(page.getByRole('combobox', { name, exact: true }), { label })
+  } else {
+    const choices = page.getByRole('group', { name, exact: true })
+    await choices.getByRole('button', { name: label, exact: true }).click()
+    await choices.getByRole('button', { name: label, exact: true, pressed: true }).waitFor()
+  }
   await page.waitForFunction(() => {
     const body = document.querySelector('.erp-statistics-body')
     return (
@@ -63,9 +58,8 @@ async function verifyToolbarRows(scope, assert, { wrapped = false } = {}) {
       views: box('.erp-business-visual-switch, .statistics-display-tabs'),
       metrics: box('.erp-statistics-metrics'),
       snapshot: box('.erp-statistics-meta'),
-      controlHeights: Array.from(filters.children, (node) =>
-        bounds(node.querySelector('.ant-select-selector') || node).height
-      ),
+      controlHeights: Array.from(filters.querySelectorAll('.erp-search-input'), (node) => bounds(node).height),
+      choiceHeights: Array.from(filters.querySelectorAll('.erp-filter-chip'), (node) => bounds(node).height),
       searchSubmitHeight: filters.querySelector('.erp-search-submit')?.getBoundingClientRect().height,
     }
   })
@@ -255,7 +249,8 @@ export function createBusinessStatisticsScenarios({
         }
         const defaultToolbar = await verifyToolbarRows(stats, assert, { wrapped: narrow })
         if (!narrow && !dark && !restricted) {
-          assert(defaultToolbar.controlHeights.every((height) => height === 34), '桌面筛选控件应保持 34px')
+          assert.deepEqual(defaultToolbar.controlHeights, [34], '桌面搜索输入保持 34px')
+          assert(defaultToolbar.choiceHeights.length > 0 && defaultToolbar.choiceHeights.every((height) => height >= 32), '直接点选沿用共享按钮触区，不把分组标题计入控件高度')
           await page.screenshot({ path: `${outputDir}/statistics-table-desktop.png` })
           const desktopViewport = page.viewportSize()
           await page.setViewportSize({ ...desktopViewport, width: 1440 })
@@ -266,20 +261,18 @@ export function createBusinessStatisticsScenarios({
           const end = toolbar.getByRole('textbox', { name: '结束日期', exact: true })
           assert.equal(await start.count(), 0, '预设交期只显示一个控件')
           const controlPosition = (field) => field.evaluate((input) => {
-            const { x, y, height } = input.closest('.ant-picker, .ant-select, .ant-input-affix-wrapper').getBoundingClientRect()
-            return { x, center: y + height / 2 }
+            const { x, y, right, bottom, height } = input.closest('.erp-filter-field, .ant-picker, .ant-select, .ant-input-affix-wrapper').getBoundingClientRect()
+            return { x, y, right, bottom, center: y + height / 2 }
           })
           const filterBoxes = await Promise.all([
-            toolbar.getByRole('combobox', { name: '汇总维度', exact: true }),
-            toolbar.getByRole('combobox', { name: '交期范围', exact: true }),
-            toolbar.getByRole('combobox', { name: '统计币种', exact: true }),
+            toolbar.getByRole('group', { name: '汇总维度', exact: true }),
+            toolbar.getByRole('group', { name: '交期范围', exact: true }),
+            toolbar.getByRole('group', { name: '统计币种', exact: true }),
             toolbar.getByRole('textbox', { name: '搜索客户', exact: true }),
-            toolbar.getByRole('combobox', { name: '统计排序', exact: true }),
+            toolbar.getByRole('group', { name: '统计排序', exact: true }),
           ].map(controlPosition))
-          assert(filterBoxes.every((box, index) =>
-            Math.abs(box.center - filterBoxes[0].center) <= 2 &&
-            (index === 0 || box.x > filterBoxes[index - 1].x)
-          ), '1280px 下常用筛选、搜索和排序应按操作顺序同排对齐')
+          assert(filterBoxes.every((box, index) => index === 0 || (Math.abs(box.bottom - filterBoxes[index - 1].bottom) <= 2 ? box.x >= filterBoxes[index - 1].right - 1 : box.y >= filterBoxes[index - 1].bottom - 1)), '筛选和排序按阅读顺序自然换行，不相互覆盖')
+          assert.equal(await toolbar.getByRole('combobox').count(), 0, '固定统计条件直接点选')
           await verifyToolbarRows(stats, assert, { wrapped: true })
           await page.setViewportSize(desktopViewport)
           await select(page, '交期范围', '自定义')
@@ -311,9 +304,7 @@ export function createBusinessStatisticsScenarios({
             assert.equal(dates.period, 'custom')
             assert.equal(dates[otherField], otherDate)
           }
-          const period = toolbar.locator('.erp-statistics-delivery-period .ant-select')
-          await period.hover()
-          await period.locator('.ant-select-clear').click()
+          await toolbar.getByRole('group', { name: '交期范围', exact: true }).getByRole('button', { name: '不限', exact: true }).click()
           await page.waitForURL((url) => url.searchParams.get('period') === 'all')
           await start.waitFor({ state: 'detached' })
           const clearedQuery = new URL(page.url()).searchParams
@@ -399,10 +390,7 @@ export function createBusinessStatisticsScenarios({
           assert.equal(await stats.getByText(/订单金额 ·/).count(), 0)
           assert.equal(await stats.getByRole('tablist', { name: '统计内容', exact: true }).count(), 0)
           await stats.getByText('交付汇总', { exact: true }).waitFor()
-          await stats.getByRole('combobox', { name: '统计排序' }).press('ArrowDown')
-          await page.locator('.ant-select-dropdown:visible').waitFor()
-          assert.equal(await page.getByRole('option', { name: '金额降序', exact: true }).count(), 0)
-          await page.keyboard.press('Escape')
+          assert.equal(await stats.getByRole('group', { name: '统计排序' }).getByRole('button', { name: '金额降序', exact: true }).count(), 0)
           return
         }
         if (narrow || dark) {
@@ -501,6 +489,18 @@ export function createBusinessStatisticsScenarios({
         assert.equal(calls.at(-1).params.sort, 'name')
         assert.equal(calls.at(-1).params.direction, 'asc')
         assert.equal(calls.at(-1).params.offset, 0)
+        const nameHeader = stats.locator('th.ant-table-column-has-sorters:visible').filter({ hasText: '客户' }).first()
+        await nameHeader.press('Enter')
+        await stats.locator('th[aria-sort="descending"]:visible').filter({ hasText: '客户' }).first().waitFor()
+        assert.equal(calls.at(-1).params.sort, 'name')
+        assert.equal(calls.at(-1).params.direction, 'desc')
+        const resetRead = page.waitForResponse((response) => response.url().endsWith('/rpc/business') && response.request().postDataJSON()?.params?.sort === 'count')
+        await page.waitForFunction(() => document.activeElement?.matches('.erp-statistics-table th[aria-sort="descending"]'))
+        await page.keyboard.press('Enter')
+        await resetRead
+        await stats.locator('tbody tr.ant-table-row').first().waitFor()
+        assert.equal(calls.at(-1).params.sort, 'count')
+        assert.equal(calls.at(-1).params.direction, 'desc')
         await select(page, '统计排序', '订单数降序')
         await page.screenshot({
           path: `${outputDir}/statistics-delivery-desktop.png`,
@@ -598,17 +598,18 @@ export function createBusinessStatisticsScenarios({
             ?.textContent.includes('358,100.00')
         )
         assert.equal(
-          await stats.getByRole('combobox', { name: '交期范围' }).count(),
+          await stats.getByRole('group', { name: '交期范围' }).count(),
           0
         )
         assert.equal(await reports.getByRole('tab', { name: '应收账龄', selected: true }).count(), 1)
-        assert.equal(await stats.getByRole('combobox', { name: '汇总维度' }).count(), 0)
+        assert.equal(await stats.getByRole('group', { name: '汇总维度' }).count(), 0)
         assert.equal(calls.at(-1).params.group_by, 'customer')
         assert.equal(calls.at(-1).params.keyword, '')
         for (const [width, controlHeight, wrapped = false] of [[1280, 34], [760, 46, true], [1920, 34]]) {
           await page.setViewportSize({ ...page.viewportSize(), width })
           const toolbar = await verifyToolbarRows(stats, assert, { wrapped })
-          assert.deepEqual(toolbar.controlHeights, Array(3).fill(controlHeight), `${width}px 下币种、搜索和排序应立即同高`)
+          assert.deepEqual(toolbar.controlHeights, [controlHeight], `${width}px 下搜索输入保持响应尺寸`)
+          assert(toolbar.choiceHeights.length > 0 && toolbar.choiceHeights.every((height) => height >= (width <= 767 ? 44 : 32)), `${width}px 下币种和排序保留直接点选触区`)
           assert.equal(toolbar.searchSubmitHeight, controlHeight - 4, `${width}px 下搜索按钮应同步调整高度`)
           if (wrapped) await assertNoHorizontalOverflow(page)
         }
@@ -720,9 +721,9 @@ export function createBusinessStatisticsScenarios({
           /订单总数\s*48/
         )
         await verifyToolbarRows(frame, assert)
-        await chooseSelectOption(frame.locator('#statistics-period'), 'custom')
+        await frame.getByRole('group', { name: '交期范围', exact: true }).getByRole('button', { name: '自定义', exact: true }).click()
         await verifyToolbarRows(frame, assert, { wrapped: true })
-        await chooseSelectOption(frame.locator('#statistics-period'), 'month')
+        await frame.getByRole('group', { name: '交期范围', exact: true }).getByRole('button', { name: '本月', exact: true }).click()
         const displayModes = frame.getByRole('group', { name: '统计展示方式', exact: true })
         await displayModes.getByRole('button', { name: '图表', exact: true }).click()
         const designSegment = frame.locator('[data-statistics-tooltip]').first()

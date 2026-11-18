@@ -1,7 +1,6 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createSessionRecoveryScenarios } from './sessionRecoveryScenarios.mjs'
 import { createSidebarNavigationScenarios } from './sidebarNavigationScenarios.mjs'
-import { assertTaskTitleFocusInteractions } from './taskTitleFocusAssertions.mjs'
 
 export function createCustomerSessionScenarios({
   expectHeading,
@@ -22,8 +21,6 @@ export function createCustomerSessionScenarios({
   clickERPThemeOption,
   assertERPThemeMode,
   assertDarkThemeContrast,
-  assertDashboardWorkbenchEntryNavigation,
-  assertDashboardWorkbenchLayout,
   customerRuntimeEffectiveSession,
   assertThemeReadable,
   expectNoButton,
@@ -453,8 +450,36 @@ export function createCustomerSessionScenarios({
       },
     },
     {
+      name: 'erp-task-only-home',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false, roles: [{ role_key: 'warehouse' }],
+        permissions: ['workflow.task.read'],
+        menus: [{ key: 'task-board', path: '/erp/task-board', required_any: ['workflow.task.read'] }],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession, pages: ['task-board'], actions: ['workflow.task.read'],
+      },
+      viewport: { width: 1280, height: 720 },
+      verify: async (page) => {
+        await page.getByRole('tab', { name: '待我处理', selected: true }).waitFor()
+        assert.equal(new URL(page.url()).pathname, '/erp/task-board')
+        assert.equal(await page.getByRole('menuitem', { name: '工作台', exact: true }).count(), 0)
+        const riskRequests = []
+        page.on('request', (request) => {
+          if (request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'get_workbench') riskRequests.push(request)
+        })
+        await page.goto(new URL('/erp/task-board?view=risk', page.url()).href)
+        await page.getByRole('tab', { name: '全部任务', selected: true }).waitFor()
+        await page.waitForURL((url) => !url.searchParams.has('view'))
+        assert.equal(await page.getByRole('tab', { name: '风险任务', exact: true }).count(), 0)
+        assert.equal(riskRequests.length, 0)
+      },
+    },
+    {
       name: 'erp-yoyo-global-dashboard-desktop',
-      path: '/erp/dashboard?__style_l1_workbench_delay=2000',
+      path: '/erp/dashboard',
       auth: 'admin',
       effectiveSession: {
         configRevision: 'style-l1-yoyo-global-dashboard',
@@ -518,633 +543,36 @@ export function createCustomerSessionScenarios({
         ],
       },
       viewport: { width: 1440, height: 600 },
+      workflowTaskFixtures: [
+        { id: 94001, task_name: '待核对包装', urge_count: 1 },
+        { id: 94002, task_name: '已升级的交接', escalated_at: 1700000000 },
+        { id: 94003, task_name: '常规交接' },
+        { id: 94004, task_name: '已办结的催办', task_status_key: 'done', urge_count: 1 },
+      ].map((task) => ({
+        version: 1, owner_role_key: 'boss', task_status_key: 'ready',
+        task_code: `STYLE-RISK-${task.id}`, task_group: 'trial_warehouse_work', ...task,
+      })),
       verify: async (page) => {
-        await page
-          .getByRole('region', { name: '工作台', exact: true })
-          .waitFor({ state: 'visible' })
-        await expectText(page, '待我处理')
-        await expectText(page, '待我审批')
-        await expectText(page, '阻塞/逾期')
-        await expectText(page, '待我处理')
-        await page
-          .locator(
-            '.erp-workbench-queue-panel[aria-busy="true"] .ant-spin-spinning'
-          )
-          .waitFor({ state: 'visible', timeout: 5_000 })
-        const loadingShell = await page.evaluate(() => {
-          const card = document.querySelector('.erp-workbench-command-card')
-          const queue = document.querySelector('.erp-workbench-queue-panel')
-          const detail = document.querySelector('.erp-workbench-task-detail')
-          const cardRect = card?.getBoundingClientRect()
-          return {
-            cardWidth: cardRect?.width || 0,
-            cardHeight: cardRect?.height || 0,
-            queueVisible: Boolean(queue?.getBoundingClientRect().height),
-            detailVisible: Boolean(detail?.getBoundingClientRect().height),
-            queueBusy: queue?.getAttribute('aria-busy'),
-            spinnerVisible: Boolean(queue?.querySelector('.ant-spin-spinning')),
-            cardSkeletonCount:
-              card?.querySelectorAll('.ant-skeleton').length || 0,
-            filterLabels: [
-              ...(card?.querySelectorAll('.erp-workbench-queue-filter') || []),
-            ].map((item) => item.getAttribute('aria-label') || ''),
-          }
-        })
-        assert(
-          loadingShell.cardWidth > 0 &&
-            loadingShell.cardHeight > 0 &&
-            loadingShell.queueVisible &&
-            !loadingShell.detailVisible &&
-            loadingShell.queueBusy === 'true' &&
-            loadingShell.spinnerVisible &&
-            loadingShell.cardSkeletonCount === 0 &&
-            loadingShell.filterLabels.every((label) =>
-              label.includes('数量读取中')
-            ),
-          `工作台慢响应时应先显示完整页面外壳，只让任务表局部加载: ${JSON.stringify(
-            loadingShell
-          )}`
-        )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-loading-shell.png'
-          ),
-        })
-        await page
-          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page.evaluate(() => {
-          const url = new URL(window.location.href)
-          url.searchParams.delete('__style_l1_workbench_delay')
-          window.history.replaceState({}, '', url)
-        })
-        await assertTextAbsent(page, '当前可见任务概览')
-        await assertTextAbsent(page, '等待交接')
-        for (const engineeringText of [
-          'Product Core',
-          'customer key',
-          'Workflow',
-          'RBAC',
-          'source document',
-          '内部来源',
-        ]) {
-          await assertTextAbsent(page, engineeringText)
-        }
-
-        const seededTaskCount = await page.evaluate(async () => {
-          const now = Math.floor(Date.now() / 1000)
-          const createTask = async ({
-            index,
-            overdue = false,
-            blocked = false,
-          }) => {
-            const suffix = String(index).padStart(2, '0')
-            const kind = blocked
-              ? 'blocked-overdue'
-              : overdue
-                ? 'risk'
-                : 'actionable'
-            const sourceKind = blocked ? 'B' : overdue ? 'R' : 'A'
-            const response = await fetch('/rpc/workflow', {
-              method: 'POST',
-              headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: `workbench-long-queue-${kind}-${suffix}`,
-                method: 'create_task',
-                params: {
-                  idempotency_key: crypto.randomUUID(),
-                  task_code: `style-l1-workbench-${kind}-${suffix}`,
-                  task_group: 'sales-orders',
-                  task_name: `${
-                    blocked
-                      ? '长队列阻塞逾期'
-                      : overdue
-                        ? '长队列逾期'
-                        : '长队列待办'
-                  } ${suffix}`,
-                  source_type: 'sales-orders',
-                  source_id: 10_000 + index + (overdue ? 1_000 : 0),
-                  source_no: `SO-LONG-${sourceKind}-${suffix}`,
-                  business_status_key: 'project_pending',
-                  task_status_key: 'ready',
-                  owner_role_key: 'boss',
-                  ...(index === 1 && !overdue
-                    ? { required_capability_key: 'workflow.task.approve' }
-                    : {}),
-                  priority: overdue ? 90 : 1,
-                  due_at: overdue
-                    ? now - (10 - index) * 60
-                    : now + 86_400 + index * 60,
-                  payload: { notification_type: 'task_created' },
-                },
-              }),
-            })
-            const body = await response.json()
-            if (!response.ok || body?.result?.code !== 0) {
-              throw new Error(
-                `create long workbench task failed: ${JSON.stringify(body)}`
-              )
-            }
-            const task = body.result.data?.task || null
-            if (!blocked || !task) return task
-
-            const mutationResponse = await fetch('/rpc/workflow', {
-              method: 'POST',
-              headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: `workbench-long-queue-block-${suffix}`,
-                method: 'block_task_action',
-                params: {
-                  task_id: task.id,
-                  expected_version: task.version,
-                  idempotency_key: `style-l1-workbench-block-${task.id}`,
-                  action_key: 'block',
-                  reason: '等待资料补齐',
-                },
-              }),
-            })
-            const mutationBody = await mutationResponse.json()
-            if (!mutationResponse.ok || mutationBody?.result?.code !== 0) {
-              throw new Error(
-                `block long workbench task failed: ${JSON.stringify(
-                  mutationBody
-                )}`
-              )
-            }
-            return mutationBody.result.data?.task || null
-          }
-
-          for (let index = 1; index <= 18; index += 1) {
-            await createTask({ index })
-          }
-          for (let index = 1; index <= 9; index += 1) {
-            await createTask({
-              index,
-              overdue: true,
-              blocked: index === 1,
-            })
-          }
-          return 27
-        })
-        assert.equal(seededTaskCount, 27, '工作台长队列样本应完整创建')
-        const workbenchReadMethods = []
-        const recordWorkbenchRead = (request) => {
-          if (!request.url().includes('/rpc/workflow')) return
-          try {
-            const method = request.postDataJSON()?.method
-            if (
-              ['get_workbench', 'list_workbench_role_tasks'].includes(method)
-            ) {
-              workbenchReadMethods.push(method)
-            }
-          } catch {
-            // Non-JSON requests are outside this RPC assertion.
-          }
-        }
-        page.on('request', recordWorkbenchRead)
-        await page.getByRole('button', { name: '刷新当前页' }).click()
-        await page
-          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        page.off('request', recordWorkbenchRead)
-        assert.deepEqual(
-          workbenchReadMethods,
-          ['get_workbench'],
-          `刷新工作台应只有一条有界读取，不再按岗位和视图扇出: ${JSON.stringify(
-            workbenchReadMethods
-          )}`
-        )
-
-        const queuePanel = page.locator('.erp-workbench-queue-panel')
-        const waitForWorkbenchRead = (queueKey, offset = 0) =>
-          page.waitForResponse((response) => {
-            if (!response.url().includes('/rpc/workflow')) return false
-            try {
-              const body = response.request().postDataJSON()
-              return (
-                body?.method === 'get_workbench' &&
-                body?.params?.queue_key === queueKey &&
-                body?.params?.offset === offset
-              )
-            } catch {
-              return false
-            }
-          })
-        const actionableFilter = page.getByRole('button', {
-          name: /待我处理，\d+ 项/,
-        })
-        const approvalFilter = page.getByRole('button', {
-          name: /待我审批，\d+ 项/,
-        })
-        const riskFilter = page.getByRole('button', {
-          name: /阻塞\/逾期，\d+ 项/,
-        })
-        const actionableLabel =
-          await actionableFilter.getAttribute('aria-label')
-        const actionableTotal = Number(
-          String(actionableLabel || '').match(/待我处理，(\d+) 项/u)?.[1] || 0
-        )
-        assert(
-          actionableTotal >= 18,
-          `工作台待处理队列应包含新建的 18 条样本: ${actionableLabel}`
-        )
-        const approvalLabel = await approvalFilter.getAttribute('aria-label')
-        const approvalTotal = Number(
-          String(approvalLabel || '').match(/待我审批，(\d+) 项/u)?.[1] || 0
-        )
-        assert(
-          approvalTotal >= 1,
-          `工作台审批队列应包含显式审批任务: ${approvalLabel}`
-        )
-        const approvalRead = waitForWorkbenchRead('approval')
-        await approvalFilter.click()
-        await approvalRead
-        await queuePanel
-          .getByText('长队列待办 01', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-approval-inbox.png'
-          ),
-        })
-        const actionableRead = waitForWorkbenchRead('actionable')
-        await actionableFilter.click()
-        await actionableRead
-        await page
-          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await queuePanel
-          .locator('.ant-table-tbody .ant-table-row')
-          .first()
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await queuePanel.locator('.ant-table-tbody .ant-table-row').count(),
-          8,
-          '工作台长队列首屏应只展示 8 项'
-        )
-        const readWorkbenchPaginationLayout = () =>
-          page.evaluate(() => {
-            const readRect = (selector) => {
-              const element = document.querySelector(selector)
-              if (!(element instanceof HTMLElement)) return null
-              const rect = element.getBoundingClientRect()
-              return {
-                top: Number(rect.top.toFixed(2)),
-                left: Number(rect.left.toFixed(2)),
-                width: Number(rect.width.toFixed(2)),
-                height: Number(rect.height.toFixed(2)),
-              }
-            }
-            const content = document.querySelector('.erp-admin-content')
-            const firstRow = document.querySelector(
-              '.erp-workbench-queue-panel .ant-table-tbody .ant-table-row'
-            )
-            const detailTitle = document.querySelector(
-              '.erp-workbench-task-detail .erp-workbench-detail-title'
-            )
-            return {
-              commandCard: readRect('.erp-workbench-command-card'),
-              mainGrid: readRect('.erp-workbench-main-grid'),
-              queuePanel: readRect('.erp-workbench-queue-panel'),
-              table: readRect('.erp-workbench-queue-panel .ant-table-wrapper'),
-              pagination: readRect('.erp-task-pagination .ant-pagination'),
-              detailPanel: readRect('.erp-workbench-task-detail'),
-              content: {
-                rect: readRect('.erp-admin-content'),
-                clientHeight: content?.clientHeight || 0,
-                scrollHeight: content?.scrollHeight || 0,
-                scrollTop: content?.scrollTop || 0,
-              },
-              rowCount: document.querySelectorAll(
-                '.erp-workbench-queue-panel .ant-table-tbody .ant-table-row'
-              ).length,
-              firstRowText: String(firstRow?.textContent || '')
-                .replace(/\s+/gu, ' ')
-                .trim(),
-              detailTitle: String(detailTitle?.textContent || '').trim(),
-            }
-          })
-        const assertWorkbenchPaginationGeometryStable = (
-          before,
-          after,
-          label
-        ) => {
-          const tolerance = 2
-          for (const key of [
-            'commandCard',
-            'mainGrid',
-            'queuePanel',
-            'table',
-            'pagination',
-          ]) {
-            assert(before[key], `${label}: 缺少翻页前 ${key} 几何信息`)
-            assert(after[key], `${label}: 缺少翻页后 ${key} 几何信息`)
-            for (const metric of label === '工作台翻页完成后'
-              ? ['left', 'width', 'height']
-              : ['top', 'left', 'width', 'height']) {
-              const delta = Math.abs(before[key][metric] - after[key][metric])
-              assert(
-                delta <= tolerance,
-                `${label}: ${key}.${metric} 位移 ${delta}px 超过 ${tolerance}px；before=${JSON.stringify(
-                  before[key]
-                )} after=${JSON.stringify(after[key])}`
-              )
-            }
-          }
-          for (const metric of label === '工作台翻页完成后'
-            ? ['clientHeight', 'scrollHeight']
-            : ['clientHeight', 'scrollHeight', 'scrollTop']) {
-            const delta = Math.abs(
-              before.content[metric] - after.content[metric]
-            )
-            assert(
-              delta <= tolerance,
-              `${label}: content.${metric} 变化 ${delta}px 超过 ${tolerance}px；before=${JSON.stringify(
-                before.content
-              )} after=${JSON.stringify(after.content)}`
-            )
-          }
-        }
-        const actionableSecondPageButton = page.locator(
-          '.ant-pagination-item-2'
-        )
-        await actionableSecondPageButton.scrollIntoViewIfNeeded()
-        await page.evaluate(
-          () =>
-            new Promise((resolve) => {
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => resolve())
-              })
-            })
-        )
-        const firstPageLayout = await readWorkbenchPaginationLayout()
-        await page.evaluate(() => {
-          const url = new URL(window.location.href)
-          url.searchParams.set('__style_l1_workbench_delay', '1200')
-          window.history.replaceState({}, '', url)
-        })
-        const actionableSecondPageRead = waitForWorkbenchRead(
-          'actionable',
-          8
-        ).then(
-          () => null,
-          (error) => error
-        )
-        await actionableSecondPageButton.click()
-        await queuePanel
-          .locator('.ant-spin-spinning')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        const loadingSecondPageLayout = await readWorkbenchPaginationLayout()
-        assert.equal(
-          loadingSecondPageLayout.rowCount,
-          firstPageLayout.rowCount,
-          '工作台翻页加载中应保留当前 8 行，而不是先清空表格'
-        )
-        assert.equal(
-          loadingSecondPageLayout.firstRowText,
-          firstPageLayout.firstRowText,
-          '工作台翻页加载中应保留当前页首行'
-        )
-        assertWorkbenchPaginationGeometryStable(
-          firstPageLayout,
-          loadingSecondPageLayout,
-          '工作台翻页加载中'
-        )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-pagination-loading-stable.png'
-          ),
-        })
-        const actionableSecondPageReadError = await actionableSecondPageRead
-        if (actionableSecondPageReadError) {
-          throw actionableSecondPageReadError
-        }
-        await page
-          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page
-          .locator('.ant-pagination-item-2.ant-pagination-item-active')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        const settledSecondPageLayout = await readWorkbenchPaginationLayout()
-        assert.equal(
-          settledSecondPageLayout.rowCount,
-          8,
-          '工作台第二页完成后仍应展示 8 行'
-        )
-        assert.notEqual(
-          settledSecondPageLayout.firstRowText,
-          firstPageLayout.firstRowText,
-          '工作台第二页完成后应原子替换为新页数据'
-        )
-        assertWorkbenchPaginationGeometryStable(
-          firstPageLayout,
-          settledSecondPageLayout,
-          '工作台翻页完成后'
-        )
-        const queueStart = await page.evaluate(() => {
-          const content = document.querySelector('.erp-admin-content')
-          const panel = document.querySelector('.erp-workbench-queue-panel')
-          return Math.abs(
-            panel.getBoundingClientRect().top -
-              content.getBoundingClientRect().top -
-              parseFloat(getComputedStyle(content).paddingTop) -
-              12
-          )
-        })
-        assert(queueStart <= 2, '工作台翻页后定位列表起点')
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-pagination-settled.png'
-          ),
-        })
-        await page.evaluate(() => {
-          const url = new URL(window.location.href)
-          url.searchParams.delete('__style_l1_workbench_delay')
-          window.history.replaceState({}, '', url)
-        })
-
-        const riskLabel = await riskFilter.getAttribute('aria-label')
-        const riskTotal = Number(
-          String(riskLabel || '').match(/阻塞\/逾期，(\d+) 项/u)?.[1] || 0
-        )
-        assert(
-          riskTotal >= 9,
-          `工作台风险队列应包含新建的 9 条样本: ${riskLabel}`
-        )
-        const riskRead = waitForWorkbenchRead('risk')
-        await riskFilter.click()
-        await riskRead
-        await queuePanel
-          .locator('.ant-table-tbody .ant-table-row')
-          .first()
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        const firstRiskRow = queuePanel
-          .locator('.ant-table-tbody .ant-table-row')
-          .first()
-        await firstRiskRow
-          .getByText('长队列阻塞逾期 01', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        const statusRiskMetrics = await firstRiskRow
-          .locator('.erp-workbench-task-status-risk')
-          .evaluate((element) => {
-            const containerRect = element.getBoundingClientRect()
-            const tags = [...element.querySelectorAll('.ant-tag')]
-            return {
-              labels: tags.map((tag) => String(tag.textContent || '').trim()),
-              tagCount: tags.length,
-              clientWidth: element.clientWidth,
-              scrollWidth: element.scrollWidth,
-              tagsInside: tags.every((tag) => {
-                const rect = tag.getBoundingClientRect()
-                return (
-                  rect.left >= containerRect.left - 1 &&
-                  rect.right <= containerRect.right + 1
-                )
-              }),
-            }
-          })
-        assert.deepEqual(
-          statusRiskMetrics.labels,
-          ['阻塞', '逾期'],
-          `阻塞且逾期的工作台任务应同时展示主状态与时间风险: ${JSON.stringify(
-            statusRiskMetrics
-          )}`
-        )
-        assert(
-          statusRiskMetrics.tagCount === 2 &&
-            statusRiskMetrics.clientWidth > 0 &&
-            statusRiskMetrics.scrollWidth <=
-              statusRiskMetrics.clientWidth + 1 &&
-            statusRiskMetrics.tagsInside,
-          `工作台状态与风险标签不得溢出单元格: ${JSON.stringify(
-            statusRiskMetrics
-          )}`
-        )
-        await queuePanel.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-status-risk-desktop.png'
-          ),
-        })
-        const actionableLayoutRead = waitForWorkbenchRead('actionable')
-        await actionableFilter.click()
-        await actionableLayoutRead
-        await page
-          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-
-        const queueRows = queuePanel.locator('.ant-table-tbody .ant-table-row')
-        assert.equal(
-          await queuePanel
-            .getByRole('columnheader', { name: '操作', exact: true })
-            .count(),
-          0
-        )
-        const queueRowCount = await queueRows.count()
-        assert.equal(queueRowCount, 8, '工作台待处理队列首屏应保持 8 条')
-        await queueRows
-          .first()
-          .getByRole('button', { name: '查看长队列待办 01详情', exact: true })
-          .focus()
-        await page.keyboard.press('Enter')
-        const workbenchTaskDrawer = page.locator('.erp-task-action-drawer')
-        await workbenchTaskDrawer.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
-        await workbenchTaskDrawer
-          .getByRole('heading', { name: '长队列待办 01', exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-task-open.png'
-          ),
-        })
-        await workbenchTaskDrawer.locator('.ant-drawer-close').click()
-        await workbenchTaskDrawer.waitFor({
-          state: 'hidden',
-          timeout: 10_000,
-        })
-
-        await queueRows.first().locator('td').first().click()
-        await workbenchTaskDrawer.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.getByRole('tab', { name: '待我处理', selected: true }).waitFor()
+        assert.equal(new URL(page.url()).pathname, '/erp/task-board')
+        const risk = page.getByRole('tab', { name: '风险任务', exact: true })
+        await risk.click()
+        const list = page.getByRole('region', { name: '风险任务', exact: true })
+        const task = list.getByRole('button', { name: '查看待核对包装详情' })
+        await task.waitFor()
+        await list.getByRole('button', { name: '查看已升级的交接详情' }).waitFor()
+        assert.equal(await list.getByText('常规交接', { exact: true }).count(), 0)
+        assert.equal(await list.getByText('已办结的催办', { exact: true }).count(), 0)
+        await task.click()
+        const drawer = page.getByRole('dialog')
+        await drawer.waitFor()
         await page.keyboard.press('Escape')
-        await workbenchTaskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
-        await queueRows
-          .first()
-          .getByRole('button', { name: '查看长队列待办 01详情', exact: true })
-          .evaluate((button) => {
-            if (document.activeElement !== button) {
-              throw new Error('整行打开后关闭详情应回到该任务标题')
-            }
-          })
-
-        await assertDashboardWorkbenchLayout(page, {
-          scenarioName: '全宽工作台',
-        })
-        await assertTaskTitleFocusInteractions(page, queueRows.first())
-        const mobileRiskRead = waitForWorkbenchRead('risk')
-        await riskFilter.click()
-        await mobileRiskRead
-        await queuePanel
-          .getByText('长队列阻塞逾期 01', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page.setViewportSize({ width: 390, height: 844 })
-        await page.waitForFunction(
-          () => {
-            const grid = document.querySelector('.erp-workbench-main-grid')
-            return (
-              grid &&
-              getComputedStyle(grid).gridTemplateColumns.split(' ').length === 1
-            )
-          },
-          null,
-          { timeout: 10_000 }
-        )
-        await assertDashboardWorkbenchLayout(page, {
-          scenarioName: '窄屏工作台',
-        })
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-mobile-long-queue-top.png'
-          ),
-        })
-        await page.setViewportSize({ width: 1440, height: 900 })
-        await clickERPThemeOption(page, '暗色')
-        await assertERPThemeMode(page, {
-          scenarioName: 'erp-yoyo-global-dashboard-dark-long-queue',
-          expectedMode: 'dark',
-          expectedEffectiveTheme: 'dark',
-        })
-        await assertDarkThemeContrast(page, {
-          scenarioName: 'erp-yoyo-global-dashboard-dark-long-queue',
-          selector: '.erp-workbench-queue-panel',
-        })
-        await assertTaskTitleFocusInteractions(page, queueRows.first())
-        await page.locator('.erp-workbench-command-card').screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-yoyo-global-dashboard-dark-long-queue.png'
-          ),
-        })
-        await clickERPThemeOption(page, '浅色')
-        await assertDashboardWorkbenchEntryNavigation(page, {
-          scenarioName: 'erp-yoyo-global-dashboard-source-access',
-        })
+        await drawer.waitFor({ state: 'hidden' })
+        await page.reload()
+        await task.waitFor()
+        await page.getByRole('tab', { name: '待我处理', exact: true }).click()
+        await page.getByRole('tab', { name: '日历', exact: true }).click()
+        await page.getByRole('region', { name: '待办日历', exact: true }).waitFor()
       },
     },
     {
@@ -1373,7 +801,8 @@ export function createCustomerSessionScenarios({
           state: 'visible',
           timeout: 10_000,
         })
-        await expectText(page, '工作台 功能预览')
+        await expectHeading(page, '工作台')
+        await expectText(page, '功能预览：尚未连接客户环境，不显示客户业务数据。')
         await expectText(page, '本地功能预览')
         await expectText(page, '当前尚未启用客户业务设置')
         await expectText(page, '工作台、任务管理和业务数据暂时不能使用')

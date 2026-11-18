@@ -1,7 +1,7 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { RpcErrorCode } from '@/common/consts/errorCodes.js'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import SourceImportPickerModal from './business-list/SourceImportPickerModal.jsx'
 import { ReferenceRecordsContext } from './RemoteReferenceSelect.jsx'
 import {
@@ -120,11 +120,10 @@ function RemoteReferencePickerContent({
     <SourceImportPickerModal
       {...props}
       renderFilters={filters.length ? () => filters.map((filter) => (
-        <FilterSelect
+        <FilterChipGroup
           key={filter.key}
           label={filter.label}
           aria-label={filter.label}
-          placeholder={`按${filter.label}筛选`}
           allowClear
           options={filter.options}
           value={query.filters[filter.key]}

@@ -176,7 +176,7 @@ test('quality page preserves the source receipt numeric(20,6) quantity string', 
 })
 
 test('quality page names and filters the shared read model by business inspection type', () => {
-  assert.match(source, /title="质量检验"/u)
+  assert.match(source, /title=\{getBusinessDocumentTitle\('quality_inspection'\)\}/u)
   assert.match(source, /QUALITY_INSPECTION_TYPE_FILTER_OPTIONS/u)
   assert.match(source, /queryQualityInspections\(\{ \.\.\.qualityQuery, \.\.\.options \}\)/u)
   assert.match(querySource, /inspection_type: inspectionTypeFilter/u)

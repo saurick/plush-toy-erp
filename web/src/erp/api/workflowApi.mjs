@@ -1,7 +1,7 @@
 import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generated.mjs'
 import { resolveBusinessStatusCounts, businessStatusCount } from '../utils/businessStatusCounts.mjs'
 import { DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from '../utils/workflowTaskDiscovery.mjs'
-import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+import { WorkflowTaskBoardSort, WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
@@ -91,7 +91,7 @@ const WORKFLOW_WORKBENCH_QUEUE_KEYS = new Set([
   'risk',
   'approval',
 ])
-const WORKFLOW_WORKBENCH_QUERY_KEYS = new Set(['queue_key', 'limit', 'offset'])
+const WORKFLOW_WORKBENCH_QUERY_KEYS = new Set(['queue_key', 'sort', 'limit', 'offset'])
 const WORKFLOW_WORKBENCH_RESPONSE_KEYS = Object.freeze(
   [
     'counts',
@@ -292,6 +292,7 @@ function requireWorkflowWorkbenchQuery(params = {}) {
       (key) => !WORKFLOW_WORKBENCH_QUERY_KEYS.has(key)
     ) ||
     !WORKFLOW_WORKBENCH_QUEUE_KEYS.has(params.queue_key) ||
+    (params.sort !== undefined && ![WorkflowTaskBoardSort.TIME_ASC, WorkflowTaskBoardSort.TIME_DESC].includes(params.sort)) ||
     !Number.isSafeInteger(params.limit) ||
     params.limit < 1 ||
     params.limit > WorkCenterPaginationPolicy.maxPageSize ||
@@ -302,6 +303,7 @@ function requireWorkflowWorkbenchQuery(params = {}) {
   }
   return {
     queue_key: params.queue_key,
+    ...(params.sort ? { sort: params.sort } : {}),
     limit: params.limit,
     offset: params.offset,
   }

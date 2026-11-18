@@ -23,7 +23,7 @@ import {
   workflowMockCanViewTask,
   workflowMockPermissionAllowed,
 } from './workflowTaskMockAuthorization.mjs'
-import { buildWorkflowTaskBoardMock } from './workflowTaskBoardMock.mjs'
+import { sortWorkbenchMockTasks, buildWorkflowTaskBoardMock } from './workflowTaskBoardMock.mjs'
 import { buildWorkflowRoleTaskPageMock } from './workflowRoleTaskMock.mjs'
 
 function mockAdminAccessToken() {
@@ -1608,18 +1608,7 @@ export function setupJsonRpcMockServer() {
                   )
               ),
             }
-            Object.values(queues).forEach((items) =>
-              items.sort((left, right) => {
-                const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
-                const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
-                if (leftDue !== rightDue) return leftDue - rightDue
-                const nameOrder = String(left.task_name || '').localeCompare(
-                  String(right.task_name || '')
-                )
-                if (nameOrder !== 0) return nameOrder
-                return Number(right.id || 0) - Number(left.id || 0)
-              })
-            )
+            sortWorkbenchMockTasks(queues[queueKey], params.sort)
             responseBody = {
               jsonrpc: '2.0',
               id,

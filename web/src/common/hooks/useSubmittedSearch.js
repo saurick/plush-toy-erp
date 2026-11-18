@@ -3,18 +3,21 @@ import { useEffect, useRef, useState } from 'react'
 const normalize = (value) => String(value ?? '').trim()
 
 // Acknowledging a submitted query must not overwrite newer, unsubmitted typing.
-export default function useSubmittedSearch({ value = '', onSearch, resetKey }) {
-  const [draft, setDraft] = useState(() => String(value ?? ''))
+export default function useSubmittedSearch({ value = '', initialDraft, onSearch, resetKey }) {
+  const [draft, setDraft] = useState(() => String(initialDraft ?? value ?? ''))
   const composing = useRef(false)
   const submitted = useRef(normalize(value))
   const pending = useRef()
   const previousResetKey = useRef(resetKey)
+  const previousValue = useRef(value)
 
   useEffect(() => {
     const next = String(value ?? '')
     const normalized = normalize(next)
     const reset = previousResetKey.current !== resetKey
     previousResetKey.current = resetKey
+    if (!reset && previousValue.current === value) return
+    previousValue.current = value
     if (
       !reset &&
       pending.current !== undefined &&

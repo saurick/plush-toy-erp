@@ -131,25 +131,25 @@ function BusinessChainSelector({ catalog, value, onChange }) {
     [catalog.businessChainOverview, chainOptionFilter]
   )
   return (
-    <div className="erp-dev-flow-chain-selector">
-      <label htmlFor="dev-flow-chain-select">切换业务流程</label>
-      <Select
-        emptyValue={ALL_BUSINESS_CHAINS_KEY}
-        placeholder="切换业务流程"
-        id="dev-flow-chain-select"
-        aria-label="切换业务流程"
-        showSearch
-        virtual={false}
-        {...searchProps}
-        classNames={DEFINITION_SELECT_CLASS_NAMES}
-        filterOption={optionFilter}
-        notFoundContent="没有匹配的业务链"
-        value={value}
-        options={options}
-        optionRender={renderDefinitionSelectOption}
-        onChange={onChange}
-      />
-    </div>
+    <Select
+      className="erp-dev-flow-chain-selector"
+      label="切换业务流程"
+      labelPlacement="stacked"
+      emptyValue={ALL_BUSINESS_CHAINS_KEY}
+      placeholder="切换业务流程"
+      id="dev-flow-chain-select"
+      aria-label="切换业务流程"
+      showSearch
+      virtual={false}
+      {...searchProps}
+      classNames={DEFINITION_SELECT_CLASS_NAMES}
+      filterOption={optionFilter}
+      notFoundContent="没有匹配的业务链"
+      value={value}
+      options={options}
+      optionRender={renderDefinitionSelectOption}
+      onChange={onChange}
+    />
   )
 }
 

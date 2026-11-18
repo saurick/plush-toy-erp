@@ -245,6 +245,7 @@ export default function WorkflowExceptionPanel({
   )
   const filterControls = (
     <WorkflowTaskDiscoveryFilters
+      labelPlacement={toolbarContainer ? 'inline' : 'stacked'}
       profile={profile}
       roleKey={roleKey}
       value={filters}

@@ -15,7 +15,7 @@ func progressTaskSQL(q biz.BusinessProgressQuery) (string, []any) {
 	if q.Access.Tasks {
 		scope = q.TaskVisibility
 	}
-	return workflowTaskVisibilitySQL(scope, workflowtask.FieldID, workflowtask.FieldTaskCode, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceID, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldAssigneeID, workflowtask.FieldDueAt, workflowtask.FieldBlockedReason)
+	return workflowTaskVisibilitySQL(scope, workflowtask.FieldID, workflowtask.FieldTaskNo, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceID, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldAssigneeID, workflowtask.FieldDueAt, workflowtask.FieldBlockedReason)
 }
 
 // Production lines, rather than order headers, are the join key. One production
@@ -110,13 +110,16 @@ shipment_mismatch AS (
  JOIN sales_order_items l ON l.id=i.sales_order_item_id
  WHERE s.status='SHIPPED' AND (s.sales_order_id IS NULL OR l.sales_order_id<>s.sales_order_id)
 ),
-sales_lines AS (
+sales_delivery_lines AS (
  SELECT l.*, COALESCE(l.planned_delivery_date,s.planned_delivery_date) AS due_at,
  COALESCE(d.quantity,0) AS shipped_quantity,
  COALESCE(NULLIF(l.product_name_snapshot,''),NULLIF(l.requested_product_name,''),p.name,'未填写产品') AS product_label,
  u.name AS unit_name FROM sales_order_items l JOIN sales_orders s ON s.id=l.sales_order_id
  LEFT JOIN products p ON p.id=l.product_id JOIN units u ON u.id=l.unit_id
- LEFT JOIN shipped d ON d.sales_order_item_id=l.id WHERE l.line_status<>'canceled'
+ LEFT JOIN shipped d ON d.sales_order_item_id=l.id
+),
+sales_lines AS (
+ SELECT * FROM sales_delivery_lines WHERE line_status<>'canceled'
 ),
 ranked_sales_lines AS (
  SELECT *,ROW_NUMBER() OVER (PARTITION BY sales_order_id ORDER BY product_label,id) AS product_rank
@@ -180,7 +183,7 @@ func progressBaseScopeSQL(q biz.BusinessProgressQuery) string {
 
 func progressBase(q biz.BusinessProgressQuery) string {
 	if q.View == "orders" {
-		return `SELECT s.id,s.order_no,s.lifecycle_status AS status,
+		return `SELECT s.id,s.order_no,s.lifecycle_status AS status,s.customer_id,
  COALESCE(NULLIF(s.customer_snapshot->>'name',''),c.name,'') AS customer,
  COALESCE(a.product,'未填写产品') AS product,COALESCE(a.product_count,0) AS product_count,
  COALESCE(a.product_id,0) AS product_id,
@@ -225,8 +228,6 @@ func progressBase(q biz.BusinessProgressQuery) string {
 func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []any) {
 	cte, args := progressCTE(q)
 	bind := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
-	local := q.SnapshotAt.In(time.FixedZone("Asia/Shanghai", 8*3600))
-	dayArg, soonArg := bind(local.Format("2006-01-02")), bind(local.AddDate(0, 0, 6).Format("2006-01-02"))
 	dueDate := progressDateSQL("b.due_at", sqlDialect)
 	dateConditions := []string{"1=1"}
 	if q.DateFrom != "" {
@@ -235,6 +236,8 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 	if q.DateTo != "" {
 		dateConditions = append(dateConditions, dueDate+"<="+bind(q.DateTo))
 	}
+	day, soon := progressDateWindow(q.SnapshotAt)
+	dayArg, soonArg := bind(day), bind(soon)
 	cte += ", base AS (" + progressBase(q) + `), joined AS (
  SELECT b.*,` + dueDate + ` AS due_date,
  CASE WHEN ` + strings.Join(dateConditions, " AND ") + ` THEN 1 ELSE 0 END AS in_date_range,
@@ -254,19 +257,12 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
  COALESCE(t.attention_role,'') AS attention_role
  FROM base b LEFT JOIN production p ON p.board_id=b.id LEFT JOIN materials m ON m.board_id=b.id
  LEFT JOIN batches w ON w.board_id=b.id LEFT JOIN task_summary t ON t.board_id=b.id AND t.view_key='` + q.View + `'
-), filtered AS (SELECT * FROM joined j WHERE 1=1`
-	if q.ID > 0 {
-		cte += " AND j.id=" + bind(q.ID)
-	}
+), filtered AS (SELECT * FROM joined j WHERE ` + progressScopeSQL(q, bind)
 	like := func(value string) string {
-		return bind("%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(strings.ToLower(value)) + "%")
+		return bind(progressLikePattern(value))
 	}
 	ownerSearch := func(key string) string {
-		linkedOwnerSearch := ""
-		if q.View == "production" && q.Access.Sales {
-			linkedOwnerSearch = " OR EXISTS(SELECT 1 FROM production_order_items i JOIN sales_order_items l ON l.id=i.sales_order_item_id JOIN sales_orders s ON s.id=l.sales_order_id WHERE i.production_order_id=j.id AND lower(s.sales_owner) LIKE " + key + " ESCAPE '\\')"
-		}
-		return "(lower(j.sales_owner) LIKE " + key + " ESCAPE '\\'" + linkedOwnerSearch + " OR j.id IN (SELECT tr.board_id FROM task_rows tr WHERE tr.view_key='" + q.View + "' AND tr.task_status_key IN ('ready','blocked') AND (lower(tr.assignee_name) LIKE " + key + " ESCAPE '\\' OR lower(tr.owner_role_key) LIKE " + key + " ESCAPE '\\')))"
+		return progressOwnerMatch(q, key)
 	}
 	if q.Keyword != "" {
 		key := like(q.Keyword)
@@ -282,17 +278,35 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 		}
 		cte += " AND (lower(j.order_no) LIKE " + key + " ESCAPE '\\' OR lower(j.customer) LIKE " + key + " ESCAPE '\\' OR lower(j.product) LIKE " + key + " ESCAPE '\\' OR EXISTS(" + sourceSearch + ")" + linkedSalesSearch + " OR " + ownerSearch(key) + ")"
 	}
-	if q.OwnerName != "" {
-		cte += " AND j.id IN (SELECT owners.board_id FROM (" + progressOwnerRowsSQL(q) + ") owners WHERE owners.name=" + bind(q.OwnerName) + ")"
-	}
 	if q.Owner != "" {
 		cte += " AND " + ownerSearch(like(q.Owner))
 	}
 	return cte + ")", args
 }
 
-// Each facet count is the result of selecting that option while retaining the
-// other dimensions. Undated selection clears the date range in both clients.
+func progressDateWindow(t time.Time) (string, string) {
+	local := t.In(time.FixedZone("Asia/Shanghai", 8*3600))
+	return local.Format("2006-01-02"), local.AddDate(0, 0, 6).Format("2006-01-02")
+}
+
+func progressScopeSQL(q biz.BusinessProgressQuery, bind func(any) string) string {
+	conditions := []string{"1=1"}
+	if q.ID > 0 {
+		conditions = append(conditions, "j.id="+bind(q.ID))
+	}
+	if q.OwnerName != "" {
+		conditions = append(conditions, "j.id IN (SELECT owners.board_id FROM ("+progressOwnerRowsSQL(q)+") owners WHERE owners.name="+bind(q.OwnerName)+")")
+	}
+	if q.CustomerID > 0 {
+		conditions = append(conditions, "j.customer_id="+bind(q.CustomerID))
+	}
+	return strings.Join(conditions, " AND ")
+}
+
+func progressLikePattern(value string) string {
+	return "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(strings.ToLower(value)) + "%"
+}
+
 // Both the picker and exact filtering use accountable people on readable sources.
 func progressOwnerRowsSQL(q biz.BusinessProgressQuery) string {
 	boardTable := "sales_orders"
@@ -311,6 +325,16 @@ func progressOwnerRowsSQL(q biz.BusinessProgressQuery) string {
 		JOIN sales_order_items l ON l.id=i.sales_order_item_id JOIN sales_orders s ON s.id=l.sales_order_id WHERE s.sales_owner<>''`
 }
 
+func progressOwnerMatch(q biz.BusinessProgressQuery, key string) string {
+	linkedOwnerSearch := ""
+	if q.View == "production" && q.Access.Sales {
+		linkedOwnerSearch = " OR EXISTS(SELECT 1 FROM production_order_items i JOIN sales_order_items l ON l.id=i.sales_order_item_id JOIN sales_orders s ON s.id=l.sales_order_id WHERE i.production_order_id=j.id AND lower(s.sales_owner) LIKE " + key + " ESCAPE '\\')"
+	}
+	return "(lower(j.sales_owner) LIKE " + key + " ESCAPE '\\'" + linkedOwnerSearch + " OR j.id IN (SELECT tr.board_id FROM task_rows tr WHERE tr.view_key='" + q.View + "' AND tr.task_status_key IN ('ready','blocked') AND (lower(tr.assignee_name) LIKE " + key + " ESCAPE '\\' OR lower(tr.owner_role_key) LIKE " + key + " ESCAPE '\\')))"
+}
+
+// Each facet count is the result of selecting that option while retaining the
+// other dimensions. Undated selection clears the date range in both clients.
 func progressFilterCondition(q biz.BusinessProgressQuery) string {
 	conditions := []string{"1=1"}
 	if q.DueStatus != "undated" {

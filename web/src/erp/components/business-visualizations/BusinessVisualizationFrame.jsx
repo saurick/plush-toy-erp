@@ -117,6 +117,7 @@ export function BusinessViewSurface({
   children,
   className = '',
   activeView,
+  label,
   loading = false,
   preserveViews,
 }) {
@@ -160,6 +161,8 @@ export function BusinessViewSurface({
   return (
     <div
       ref={rootRef}
+      role={label ? 'region' : undefined}
+      aria-label={label}
       className={`erp-business-view-surface ${className}`.trim()}
     >
       {switcher ? (

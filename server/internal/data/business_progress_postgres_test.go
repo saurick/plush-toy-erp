@@ -49,6 +49,16 @@ func TestBusinessDocumentSearchPostgresProgress(t *testing.T) {
 	if err != nil || len(detail.Sections["production"]) != 1 || len(detail.Sections["tasks"]) != 1 || detail.Sections["lines"][0].Date != "2026-09-24" || detail.Sections["lines"][0].ProductID != product.ID {
 		t.Fatalf("detail=%+v err=%v", detail, err)
 	}
+	byRole := biz.BusinessProgressQuery{View: "orders", ID: so.ID, Access: q.Access, TaskVisibility: q.TaskVisibility, TaskRole: "pmc", TaskStatus: "open"}
+	page, err := uc.Tasks(ctx, byRole)
+	if err != nil || page.Total != 1 || len(page.Rows) != 1 || page.Rows[0].Number != detail.Sections["tasks"][0].Number {
+		t.Fatalf("order task page=%+v err=%v", page, err)
+	}
+	byRole.Offset = 100
+	page, err = uc.Tasks(ctx, byRole)
+	if err != nil || page.Total != 1 || len(page.Rows) != 0 {
+		t.Fatalf("page past last task=%+v err=%v", page, err)
+	}
 	q.ID = 0
 	q.View = "production"
 	q.Owner = "进度负责人"

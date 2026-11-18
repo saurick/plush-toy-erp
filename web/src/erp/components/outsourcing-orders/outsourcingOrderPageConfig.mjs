@@ -28,7 +28,7 @@ export const OUTSOURCING_ORDER_SORT_OPTIONS = [
 
 export const OUTSOURCING_ORDER_DATE_FILTER_OPTIONS = [
   { label: '下单日期', value: 'order_date' },
-  { label: '预计回货日期', value: 'expected_return_date' },
+  { label: '预计回货日期', value: 'expected_return_date', upcoming: true },
 ]
 
 export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [

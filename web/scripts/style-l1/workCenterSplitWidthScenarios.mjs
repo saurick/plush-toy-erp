@@ -4,7 +4,7 @@ import { createTaskItemSemanticsScenarios } from './taskItemSemanticsScenarios.m
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createWorkCenterSplitWidthScenarios({ assert, outputDir }) {
-  const base = createTaskItemSemanticsScenarios({ assert }).find((scene) => scene.name === 'task-item-layout-workbench-1056-light')
+  const base = createTaskItemSemanticsScenarios({ assert }).find((scene) => scene.name === 'task-item-layout-risk-1056-light')
   const tasks = Array.from({ length: 12 }, (_, index) => ({
     ...base.workflowTaskFixtures[0],
     id: 97500 + index,
@@ -18,10 +18,10 @@ export function createWorkCenterSplitWidthScenarios({ assert, outputDir }) {
       items: Array.from({ length: index % 3 + 1 }, (_, item) => ({ kind: 'product', name: index === 5 ? '窄栏验证长名称产品和包装配件套装' : `窄栏验证产品 ${index + 1}`, code: `WIDTH-PRODUCT-${index + 1}-${item + 1}` })),
     },
   }))
-  return ['workbench', 'tasks'].flatMap((kind) => ['light', 'dark'].map((themeMode) => ({
+  return ['risk', 'tasks'].flatMap((kind) => ['light', 'dark'].map((themeMode) => ({
     ...base,
     name: `work-center-split-width-${kind}-${themeMode}`,
-    path: kind === 'workbench' ? '/erp/dashboard' : '/erp/task-board?mode=todo&lane=actionable',
+    path: kind === 'risk' ? '/erp/task-board?view=risk' : '/erp/task-board?mode=todo&lane=actionable',
     themeMode,
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,

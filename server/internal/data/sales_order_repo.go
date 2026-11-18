@@ -1178,6 +1178,9 @@ func (r *salesOrderRepo) ListSalesOrderItems(ctx context.Context, filter biz.Sal
 }
 
 func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in *biz.SalesOrderMutation, items []*biz.SalesOrderItemSaveMutation) (*biz.SalesOrderWithItems, error) {
+	if id == 0 && !validSalesOrderCreateIdentity(in) {
+		return nil, biz.ErrBadParam
+	}
 	tx, err := beginSalesOrderDraftTx(ctx, r.data)
 	if err != nil {
 		return nil, err
@@ -1187,6 +1190,11 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			tx.rollback(ctx, r.log)
 		}
 	}()
+	if id == 0 && in.IdempotencyKey != "" {
+		if replay, found, err := r.salesOrderCreateReplayInTx(ctx, tx.Client, in); err != nil || found {
+			return replay, err
+		}
+	}
 	var previousMethod *string
 	if id > 0 {
 		previous, err := tx.SalesOrder.Get(ctx, id)
@@ -1286,7 +1294,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 				return nil, err
 			}
 		}
-		orderRow, err = tx.SalesOrder.Create().
+		create := tx.SalesOrder.Create().
 			SetOrderNo(orderNo).
 			SetCustomerID(in.CustomerID).
 			SetCurrency(in.Currency).
@@ -1308,8 +1316,12 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetOrderDate(in.OrderDate).
 			SetNillablePlannedDeliveryDate(in.PlannedDeliveryDate).
 			SetLifecycleStatus(biz.SalesOrderStatusDraft).
-			SetNillableNote(in.Note).
-			Save(ctx)
+			SetNillableNote(in.Note)
+		if in.IdempotencyKey != "" {
+			create.SetCreateIdempotencyKey(in.IdempotencyKey).
+				SetCreateIntentHash(in.CreateIntentHash).SetCreateActorID(in.ActorID)
+		}
+		orderRow, err = create.Save(ctx)
 		if err != nil {
 			return nil, err
 		}

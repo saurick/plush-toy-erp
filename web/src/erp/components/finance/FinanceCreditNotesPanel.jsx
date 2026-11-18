@@ -169,7 +169,6 @@ export default function FinanceCreditNotesPanel({ attemptsRef }) {
               aria-label="账款调整状态"
               counts={creditStatusCounts}
               loading={tableLoading.credits}
-              className="erp-business-filter-control--status"
               value={creditStatusFilter}
               options={CREDIT_STATUS_OPTIONS}
               onChange={(value) => {

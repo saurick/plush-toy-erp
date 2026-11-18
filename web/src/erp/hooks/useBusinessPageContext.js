@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 
 export const BusinessPageContext = createContext(null)
 export const TaskBusinessWorkspaceContext = createContext(null)
+export const TaskBusinessStepVisibleContext = createContext(true)
 export const TaskBusinessInformationContext = createContext(null)
 
 // A task hosts the existing business page without changing the surrounding route.

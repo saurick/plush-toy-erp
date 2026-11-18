@@ -1,19 +1,12 @@
 import React from 'react'
-import FilterChip from '@/common/components/navigation/FilterChip'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
+import FilterField from '@/common/components/navigation/FilterField.jsx'
+import './mobileFilterPopover.css'
 
-export default function MobileFilterChoices({ label, value, options, onChange, disabled = false }) {
+export default function MobileFilterChoices({ label, 'aria-label': ariaLabel = label, value, options, onChange, disabled = false }) {
   return (
-    <div className="mobile-filter-options" role="group" aria-label={label}>
-      {options.map((option) => (
-        <FilterChip
-          key={option.value}
-          selected={value === option.value}
-          disabled={disabled || option.disabled}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </FilterChip>
-      ))}
-    </div>
+    <FilterField label={label} className="mobile-filter-field erp-mobile-controls" disabled={disabled}>
+      <FilterChipGroup className="mobile-filter-options" aria-label={ariaLabel} value={value} options={options} onChange={onChange} disabled={disabled} />
+    </FilterField>
   )
 }

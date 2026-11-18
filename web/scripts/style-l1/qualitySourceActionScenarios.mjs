@@ -352,7 +352,7 @@ viewport: { width: viewport.width, height: viewport.height },
         await selectRow(page, 'QI-REGULAR-OPEN')
         const cancel = await findSelectionActionButton(page, '取消质检')
         assert(await cancel.isVisible(), 'ordinary submitted inspections retain cancellation')
-        await page.getByRole('heading', { name: '质量检验', exact: true }).click()
+        await page.getByRole('heading', { name: '质量检验记录', exact: true }).click()
         await selectRow(page, 'QI-CORRECTION-OPEN')
         await page.locator('[data-business-action-key="cancel"]').waitFor({ state: 'hidden' })
         const more = page.getByRole('button', { name: /更多操作/u }).first()

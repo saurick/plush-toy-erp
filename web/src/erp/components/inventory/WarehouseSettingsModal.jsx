@@ -214,7 +214,7 @@ export default function WarehouseSettingsModal({ open, onCancel, onSaved }) {
         scroll={{ x: 560 }}
         rowSelection={{ type: 'radio', columnTitle: null, selectedRowKeys: selected ? [selected.id] : [], getCheckboxProps: (row) => ({ disabled: selectionLocked, 'aria-label': `选择仓库 ${row.code} · ${row.name}` }), onChange: (_keys, selectedRows) => { if (!selectionLocked) setSelectedID(selectedRows[0]?.id || 0) } }}
         rowClassName={(row) => row.id === selectedID ? 'ant-table-row-selected' : ''}
-        onRow={(row) => ({ onClick: () => { if (!selectionLocked) setSelectedID(row.id) } })}
+        onRow={selectionLocked ? undefined : (row) => ({ onClick: () => setSelectedID(row.id) })}
         columns={[
           { title: '编号', dataIndex: 'code', width: 140 },
           { align: 'left', title: '仓库名称', dataIndex: 'name' },

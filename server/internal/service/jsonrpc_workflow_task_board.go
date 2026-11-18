@@ -40,6 +40,10 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 	if res != nil {
 		return biz.WorkflowTaskBoardQuery{}, res
 	}
+	sourceSection, res := getOptionalWorkflowTaskBoardString(pm, "source_section", 32)
+	if res != nil {
+		return biz.WorkflowTaskBoardQuery{}, res
+	}
 	laneKey, res := getOptionalWorkflowTaskBoardString(pm, "lane_key", 32)
 	if res != nil {
 		return biz.WorkflowTaskBoardQuery{}, res
@@ -92,6 +96,7 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 		OwnerRoleKey:                ownerRoleKey,
 		Due:                         due,
 		SourceType:                  sourceType,
+		SourceSection:               sourceSection,
 		LaneKey:                     laneKey,
 		Sort:                        sortKey,
 		ApprovalOnly:                approvalOnly,
@@ -150,6 +155,10 @@ func getWorkflowWorkbenchQuery(pm map[string]any) (biz.WorkflowWorkbenchQuery, *
 	if _, ok := (biz.WorkflowWorkbenchCounts{}).QueueTotal(queueKey); !ok {
 		return biz.WorkflowWorkbenchQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "queue_key 不是有效的工作台队列"}
 	}
+	sortKey, res := getOptionalWorkflowTaskBoardString(pm, "sort", 32)
+	if res != nil {
+		return biz.WorkflowWorkbenchQuery{}, res
+	}
 	limit, ok := getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)
 	if !ok {
 		return biz.WorkflowWorkbenchQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "limit 必须是正整数"}
@@ -163,6 +172,7 @@ func getWorkflowWorkbenchQuery(pm map[string]any) (biz.WorkflowWorkbenchQuery, *
 	}
 	return biz.WorkflowWorkbenchQuery{
 		QueueKey: queueKey,
+		Sort:     sortKey,
 		Limit:    limit,
 		Offset:   offset,
 	}, nil

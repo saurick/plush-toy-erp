@@ -259,12 +259,14 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addBackend(PermissionProcessRuntimeRecover, permissionMethods("customer_config", "recover_compensated_process_domain_command", "resume_blocked_process_node"), []string{"允许恢复已补偿异常命令，或在排除阻塞后恢复非领域命令节点；领域命令不得直接重放"})
 
 	// Shared ERP entries.
+	riskTasks := menuPermissionSurface("task-board", "task-actions", "协同任务", "risk-tasks", "风险任务", permissionControlSection, "允许查看岗位和监督范围内的风险任务", permissionMethods("workflow", "get_workbench"), workflowUsageConditions)
 	add(PermissionERPWorkbenchRead,
-		menuPermissionSurface("global-dashboard", "role-workbench", "岗位工作台", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_workbench", "list_workbench_role_tasks"), workflowUsageConditions),
+		riskTasks,
+		menuPermissionSurface("global-dashboard", "role-workbench", "岗位工作台", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", nil, businessUsageConditions),
 		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "workbench-summary-list", "按来源权限查看汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_sales_order_summary_filter_options", "list_engineering_material_requests"), businessUsageConditions),
 	)
 	add(PermissionERPBusinessDashboardRead,
-		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "进度看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress", "get_delivery_statistics", "list_delivery_statistics_sources", "get_receivable_statistics", "list_receivable_statistics_sources"), businessUsageConditions),
+		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "进度看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress", "list_progress_tasks", "get_delivery_statistics", "list_delivery_statistics_sources", "get_receivable_statistics", "list_receivable_statistics_sources"), businessUsageConditions),
 	)
 	addMenu(PermissionERPPrintTemplateRead, "print-center", "print-templates", "打印模板", "print-template-list", "模板打印中心", permissionControlPage, "允许进入并查看", nil, businessUsageConditions)
 	addBackend(PermissionERPBusinessChainDebugRead, permissionMethods("debug", "capabilities", "config"), debugUsageConditions)
@@ -298,7 +300,13 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionMaterialDisable, "materials", "materials", "材料档案", "materials-status", "启用或停用材料", permissionControlSwitch, "显示并允许切换状态", permissionMethods("masterdata", "set_material_active"), businessUsageConditions)
 	addCRUD(PermissionProcessRead, PermissionProcessCreate, PermissionProcessUpdate, PermissionProcessDisable, "processes", "processes", "工序档案", "工序", "masterdata", []string{"get_process", "list_processes"}, []string{"create_process"}, []string{"update_process"}, []string{"set_process_active"})
 	addCRUD(PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, "products", "products", "产品档案", "产品", "masterdata", []string{"get_product", "list_products"}, []string{"create_product"}, []string{"update_product"}, []string{"set_product_active"})
-	addCRUD(PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, "products", "product-skus", "产品规格", "产品规格", "masterdata", []string{"get_product_sku", "list_product_skus"}, []string{"create_product_sku"}, []string{"update_product_sku"}, []string{"set_product_sku_active"})
+	add(PermissionProductSKURead,
+		menuPermissionSurface("products", "product-skus", "产品规格", "product-skus-content", "产品规格页面和内容", permissionControlPage, "允许进入并查看", permissionMethods("masterdata", "get_product_sku", "list_product_skus"), businessUsageConditions),
+		menuPermissionSurface("inventory", "inventory-ledger", "库存台账", "inventory-sort-product-sku", "按产品规格排序", permissionControlSection, "允许按规格编号排列库存余额", permissionMethods("inventory", "list_inventory_balances"), []string{"同时需要库存查询权限；仅在按产品规格排序时校验"}),
+	)
+	addMenu(PermissionProductSKUCreate, "products", "product-skus", "产品规格", "product-skus-create", "新建产品规格", permissionControlButton, "显示并允许创建", permissionMethods("masterdata", "create_product_sku"), businessUsageConditions)
+	addMenu(PermissionProductSKUUpdate, "products", "product-skus", "产品规格", "product-skus-update", "编辑产品规格及表单", permissionControlForm, "显示并允许编辑", permissionMethods("masterdata", "update_product_sku"), businessUsageConditions)
+	addMenu(PermissionProductSKUDisable, "products", "product-skus", "产品规格", "product-skus-status", "启用或停用产品规格", permissionControlSwitch, "显示并允许切换状态", permissionMethods("masterdata", "set_product_sku_active"), businessUsageConditions)
 
 	addMenu(PermissionBOMRead, "material-bom", "bom-versions", "BOM 版本", "bom-version-list", "BOM 版本和明细", permissionControlPage, "允许进入并查看", permissionMethods("bom", "list_bom_versions", "get_bom_version"), businessUsageConditions)
 	addMenu(PermissionBOMCreate, "material-bom", "bom-versions", "BOM 版本", "create-bom", "新建或复制 BOM 版本", permissionControlButton, "显示并允许创建", permissionMethods("bom", "save_bom_with_items", "copy_bom_version"), businessUsageConditions)
@@ -358,21 +366,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 
 	// Workflow tasks.
-	workflowSurfaces := func(controlKey string, controlLabel string, controlType string, effect string, methods []PermissionBackendMethod) []PermissionUsageSurface {
-		return []PermissionUsageSurface{
-			menuPermissionSurface("global-dashboard", "task-actions", "工作台任务", "workbench-"+controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
-			menuPermissionSurface("task-board", "task-actions", "协同任务", controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
-		}
+	taskSurface := func(controlKey string, controlLabel string, controlType string, effect string, methods []PermissionBackendMethod) PermissionUsageSurface {
+		return menuPermissionSurface("task-board", "task-actions", "协同任务", controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions)
 	}
-	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_task", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment", "get_task_process_context", "get_task_handling_chain", "get_task_link", "list_exceptions", "list_task_events"))
-	for index := range workflowTaskReadSurfaces {
-		if workflowTaskReadSurfaces[index].PageKey == "global-dashboard" {
-			workflowTaskReadSurfaces[index].BackendMethods = append(
-				workflowTaskReadSurfaces[index].BackendMethods,
-				permissionMethods("workflow", "get_workbench", "list_workbench_role_tasks")...,
-			)
-		}
-	}
+	workflowTaskReadSurfaces := []PermissionUsageSurface{riskTasks, taskSurface("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_task", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment", "get_task_process_context", "get_task_handling_chain", "get_task_link", "list_exceptions", "list_task_events"))}
 	workflowTaskReadSurfaces = append(
 		workflowTaskReadSurfaces,
 		menuPermissionSurface("shipments", "shipment-approval", "财务审批", "shipment-approval", "查看审批", permissionControlButton, "允许查看当前出货单的审批流程", permissionMethods("workflow", "list_tracking", "get_tracking"), workflowUsageConditions),
@@ -392,11 +389,11 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("production-exceptions", "task-supervision", "异常处理", "cross-role-exception-list", "跨岗位异常处理任务监督", permissionControlSection, "允许只读查看其他责任岗位异常任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 	)
 
-	add(PermissionWorkflowTaskUpdate, workflowSurfaces("update-task", "更新、阻塞和恢复任务", permissionControlForm, "显示并允许更新", permissionMethods("workflow", "block_task_action", "resume_task_action", "urge_task"))...)
-	add(PermissionWorkflowTaskAssign, workflowSurfaces("assign-task", "转交协同任务", permissionControlButton, "显示并允许转交", permissionMethods("workflow", "get_task_assignment_options", "reassign_task"))...)
-	add(PermissionWorkflowTaskApprove, workflowSurfaces("approve-task", "审批协同任务", permissionControlButton, "显示并允许审批", permissionMethods("workflow", "complete_task_action"))...)
-	add(PermissionWorkflowTaskReject, workflowSurfaces("reject-task", "驳回协同任务", permissionControlButton, "显示并允许驳回", permissionMethods("workflow", "reject_task_action"))...)
-	add(PermissionWorkflowTaskComplete, workflowSurfaces("complete-task", "完成协同任务", permissionControlButton, "显示并允许完成", permissionMethods("workflow", "complete_task_action"))...)
+	add(PermissionWorkflowTaskUpdate, taskSurface("update-task", "更新、阻塞和恢复任务", permissionControlForm, "显示并允许更新", permissionMethods("workflow", "block_task_action", "resume_task_action", "urge_task")))
+	add(PermissionWorkflowTaskAssign, taskSurface("assign-task", "转交协同任务", permissionControlButton, "显示并允许转交", permissionMethods("workflow", "get_task_assignment_options", "reassign_task")))
+	add(PermissionWorkflowTaskApprove, taskSurface("approve-task", "审批协同任务", permissionControlButton, "显示并允许审批", permissionMethods("workflow", "complete_task_action")))
+	add(PermissionWorkflowTaskReject, taskSurface("reject-task", "驳回协同任务", permissionControlButton, "显示并允许驳回", permissionMethods("workflow", "reject_task_action")))
+	add(PermissionWorkflowTaskComplete, taskSurface("complete-task", "完成协同任务", permissionControlButton, "显示并允许完成", permissionMethods("workflow", "complete_task_action")))
 
 	// Purchase, outsourcing and inbound.
 	purchaseOrderReceiptProgressMethods := permissionMethods("purchase_order", "get_purchase_order_receipt_progress")
@@ -600,7 +597,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	for _, permission := range []string{PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionPMCPlanRead, PermissionProductionWIPRead, PermissionWorkflowTaskRead} {
 		usage := out[permission]
-		usage.Surfaces = append(usage.Surfaces, menuPermissionSurface("business-dashboard", "progress-sources", "来源进度", "progress-source-read", "按来源权限查看进度", permissionControlSection, "允许查看对应来源环节", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress"), []string{"页面入口仍需进度看板权限；订单同时要求销售单与明细读取，工序及质检另需生产读取；任务沿用 revision 与责任可见范围"}))
+		usage.Surfaces = append(usage.Surfaces, menuPermissionSurface("business-dashboard", "progress-sources", "来源进度", "progress-source-read", "按来源权限查看进度", permissionControlSection, "允许查看对应来源环节", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress", "list_progress_tasks"), []string{"页面入口仍需进度看板权限；订单同时要求销售单与明细读取，工序及质检另需生产读取；任务沿用 revision 与责任可见范围"}))
 		out[permission] = usage
 	}
 	applySourceActionReadPermissionUsages(out)

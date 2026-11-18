@@ -1,5 +1,6 @@
 import React from 'react'
 import FilterChip from '@/common/components/navigation/FilterChip'
+import FilterField from '@/common/components/navigation/FilterField.jsx'
 import { businessStatusCount } from '../../utils/businessStatusCounts.mjs'
 import './business-status-filter.css'
 
@@ -14,17 +15,18 @@ export default function BusinessStatusFilter({
   exact = false,
   removable = true,
   allLabel = '不限状态',
+  label,
   onChange,
-  'aria-label': label = '业务状态',
+  'aria-label': ariaLabel = label || '业务状态',
 }) {
   const statusOptions = options.some((option) => option.value === '')
     ? options
     : [{ value: '', label: allLabel }, ...options]
-  return (
+  const choices = (
     <div
       className="erp-business-status-filters"
       role="group"
-      aria-label={label}
+      aria-label={ariaLabel}
       aria-busy={loading}
     >
       {statusOptions.map((option) => {
@@ -65,4 +67,5 @@ export default function BusinessStatusFilter({
       })}
     </div>
   )
+  return label ? <FilterField label={label} disabled={disabled || loading || exact}>{choices}</FilterField> : choices
 }

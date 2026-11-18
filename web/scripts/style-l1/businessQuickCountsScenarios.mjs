@@ -144,6 +144,7 @@ export function createBusinessQuickCountsScenarios({ assert, customerRuntimeEffe
         const trigger = operation.getByRole('button', { name: /^筛选(?:，已应用 \d+ 项)?$/u })
         await trigger.click()
         const dialog = page.getByRole('dialog', { name: '筛选条件', exact: true })
+        await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
         await dialog.getByRole('textbox', { name: '开始日期', exact: true }).click()
         const picker = page.locator('.ant-picker-dropdown:visible')
         await picker.locator('td.ant-picker-cell-in-view:not(.ant-picker-cell-disabled) .ant-picker-cell-inner').nth(10).click()

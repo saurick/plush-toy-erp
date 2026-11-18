@@ -146,56 +146,6 @@
   color: var(--erp-visual-danger-text, #b4232c);
 }
 
-.erp-sales-delivery-order {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.erp-sales-delivery-order > span,
-.erp-sales-delivery-progress small {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-}
-
-.erp-sales-delivery-progress {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  width: 100%;
-  max-width: 220px;
-  font-variant-numeric: tabular-nums;
-}
-
-.erp-business-visual-identity {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.erp-business-visual-identity strong,
-.erp-business-visual-identity span,
-.erp-business-visual-identity small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.erp-business-visual-identity strong {
-  color: var(--erp-text, #17251d);
-}
-
-.erp-business-visual-identity span,
-.erp-business-visual-identity small {
-  color: var(--erp-text-muted, #52627a);
-  font-size: var(--erp-font-caption);
-}
-
 .erp-business-visual-status {
   --visual-status-color: var(--erp-text-muted);
   gap: 5px;
@@ -420,43 +370,6 @@
 .erp-arrival-calendar__note {
   margin: 0;
   padding: 0 var(--erp-panel-padding-inline, 12px) 12px;
-}
-
-.erp-finance-due-list {
-  border-top: 1px solid var(--erp-border, #e5ece7);
-}
-
-.erp-finance-due-list__row {
-  display: grid;
-  width: 100%;
-  grid-template-columns:
-    minmax(220px, 1.2fr) repeat(3, minmax(120px, 0.65fr))
-    minmax(110px, 0.5fr);
-  align-items: center;
-  gap: 14px;
-  padding: 11px 18px;
-  border: 0;
-  border-bottom: 1px solid var(--erp-border, #edf1ee);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.erp-finance-due-list__amount {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  overflow-wrap: anywhere;
-}
-
-.erp-finance-due-list__amount small {
-  color: var(--erp-text-muted, #52627a);
-  font-size: var(--erp-font-micro);
-}
-
-.erp-finance-due-list__amount strong {
-  font-variant-numeric: tabular-nums;
 }
 
 .erp-inventory-distribution-grid {
@@ -1040,9 +953,11 @@
 }
 
 .erp-task-progress-rail__value {
+  min-inline-size: 3ch;
   font-size: var(--erp-font-emphasis);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  text-align: center;
 }
 
 .erp-task-progress-rail__item[data-lane='exception']
@@ -1059,7 +974,6 @@
   color: var(--erp-visual-success-text);
 }
 
-.erp-finance-due-list__row,
 .erp-inventory-distribution-grid__card,
 button.erp-production-process__step {
   transition:
@@ -1068,10 +982,7 @@ button.erp-production-process__step {
 }
 
 @media (hover: hover) {
-  :is(
-    .erp-finance-due-list__row,
-    .erp-inventory-distribution-grid__card
-  ):not(:disabled, [aria-disabled='true']):hover {
+  .erp-inventory-distribution-grid__card:not(:disabled, [aria-disabled='true']):hover {
     border-color: var(--erp-interactive-border-hover);
     background: var(--erp-interactive-bg-hover);
   }
@@ -1081,14 +992,12 @@ button.erp-production-process__step {
   }
 }
 
-.erp-finance-due-list__row:focus-visible,
 .erp-inventory-distribution-grid__card:focus-visible {
   outline: 2px solid var(--erp-interactive-border-focus);
   outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .erp-finance-due-list__row,
   .erp-inventory-distribution-grid__card,
   button.erp-production-process__step {
     transition: none;
@@ -1112,14 +1021,6 @@ button.erp-production-process__step {
   .erp-business-visual-metrics {
     width: 100%;
     justify-content: flex-start;
-  }
-
-  .erp-finance-due-list__row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .erp-finance-due-list__row > :first-child {
-    grid-column: 1 / -1;
   }
 }
 

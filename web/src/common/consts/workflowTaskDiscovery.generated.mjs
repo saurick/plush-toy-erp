@@ -14,6 +14,97 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     key: 'collaboration',
     label: '协同跟进',
   })]),
+  documents: Object.freeze([Object.freeze({
+    key: 'sales_order',
+    label: '销售订单',
+    section_key: 'sales',
+    sources: Object.freeze(['sales_order', 'sales-orders', 'project-orders']),
+  }), Object.freeze({
+    key: 'purchase_order',
+    label: '采购订单',
+    section_key: 'purchase',
+    sources: Object.freeze(['purchase_order', 'purchase-order', 'accessories-purchase']),
+  }), Object.freeze({
+    key: 'outsourcing_order',
+    label: '委外订单',
+    section_key: 'outsourcing',
+    sources: Object.freeze(['outsourcing_order', 'outsourcing-order', 'processing-contracts']),
+  }), Object.freeze({
+    key: 'production_order',
+    label: '生产订单',
+    section_key: 'production',
+    sources: Object.freeze(['production_order', 'production-order', 'production-orders']),
+  }), Object.freeze({
+    key: 'purchase_receipt',
+    label: '采购收货单',
+    section_key: 'purchase',
+    sources: Object.freeze(['purchase_receipt', 'purchase-receipt', 'inbound']),
+  }), Object.freeze({
+    key: 'shipment',
+    label: '出货单',
+    section_key: 'shipment',
+    sources: Object.freeze(['shipment', 'shipments']),
+  }), Object.freeze({
+    key: 'production_fact',
+    label: '生产记录',
+    section_key: 'production',
+    sources: Object.freeze(['production_fact', 'production-fact', 'production-progress']),
+  }), Object.freeze({
+    key: 'quality_inspection',
+    label: '质量检验记录',
+    section_key: 'quality',
+    sources: Object.freeze(['quality_inspection', 'quality-inspection', 'quality-inspections']),
+  }), Object.freeze({
+    key: 'bom_header',
+    label: '物料清单（BOM）',
+    section_key: 'engineering',
+    sources: Object.freeze(['bom_header', 'material-bom']),
+  }), Object.freeze({
+    key: 'engineering_material_request',
+    label: '工程用料申请',
+    section_key: 'engineering',
+    sources: Object.freeze(['engineering_material_request']),
+  }), Object.freeze({
+    key: 'production_exception_decision',
+    label: '生产异常处置单',
+    section_key: 'production',
+    sources: Object.freeze(['production_exception_decision']),
+  }), Object.freeze({
+    key: 'production_wip_batch',
+    label: '生产工序批次',
+    section_key: 'production',
+    sources: Object.freeze(['production_wip_batch']),
+  }), Object.freeze({
+    key: 'production_packaging_confirmation',
+    label: '包装确认记录',
+    section_key: 'production',
+    sources: Object.freeze(['production_packaging_confirmation']),
+  }), Object.freeze({
+    key: 'outsourcing_fact',
+    label: '加工收发记录',
+    section_key: 'outsourcing',
+    sources: Object.freeze(['outsourcing_fact']),
+  }), Object.freeze({
+    key: 'finance_payment',
+    label: '收付款单',
+    section_key: 'finance',
+    sources: Object.freeze(['finance_payment']),
+  }), Object.freeze({
+    key: 'inventory_operation',
+    label: '库存作业单',
+    section_key: 'warehouse',
+    sources: Object.freeze(['inventory_operation']),
+  }), Object.freeze({
+    key: 'purchase_rejection_disposition',
+    label: '采购拒收处置单',
+    section_key: 'purchase',
+    sources: Object.freeze(['purchase_rejection_disposition']),
+  }), Object.freeze({
+    key: 'outsourcing_return_disposition',
+    label: '委外回货处置单',
+    section_key: 'outsourcing',
+    sources: Object.freeze(['outsourcing_return_disposition']),
+  })]),
   exception_guides: Object.freeze([Object.freeze({
     business_chain: 'purchase_quality_disposition',
     diagram: Object.freeze({
@@ -1455,19 +1546,32 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       guides: Object.freeze([]),
       issues: '财务未放行，库存、质量或包装条件不足，或出货登记需要纠错。',
       resume: '取得有效放行且可发货数量、质量和包装均符合条件，再显式确认实际发货；放行或任务完成不代表已发货。',
-      task_stages: Object.freeze([]),
+      task_stages: Object.freeze(['shipment_quality']),
     }),
-    handoffs: Object.freeze(['业务核对订单、可发货数量和客户要求，准备出货单。', '财务审批放行后，业务显式确认实际发货。', '实际发货后减少库存，形成应收、对账等后续业务来源。']),
+    handoffs: Object.freeze(['业务核对订单、可发货数量和客户要求，准备出货单。', '财务审批放行后，业务显式确认实际发货。', '实际发货后减少库存，形成应收、对账等后续业务来源。', '按需发起出货前检验，品质从待办打开本次检验单。未判定或不合格时出货受阻，录入合格或让步接收后再核对财务放行。']),
     label: '放行与实际发货',
     result: '业务准备、财务放行、业务实际发货完成后，才表示真实发货。',
-    role: '业务 / 财务',
-    role_keys: Object.freeze(['sales', 'finance']),
+    role: '业务 / 品质 / 财务',
+    role_keys: Object.freeze(['sales', 'quality', 'finance']),
     stage: 'shipment',
-    stages: Object.freeze(['shipment']),
+    stages: Object.freeze(['shipment_quality', 'shipment']),
     subflow: Object.freeze({
       edges: Object.freeze([Object.freeze({
         from: 'prepare',
+        label: '未发起检验',
         to: 'approval',
+      }), Object.freeze({
+        from: 'prepare',
+        label: '已发起检验',
+        to: 'quality',
+      }), Object.freeze({
+        from: 'quality',
+        label: '合格或让步接收',
+        to: 'approval',
+      }), Object.freeze({
+        from: 'quality',
+        label: '不合格',
+        to: 'blocked',
       }), Object.freeze({
         from: 'approval',
         label: '通过且发货条件满足',
@@ -1486,6 +1590,11 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         key: 'prepare',
         label: '业务准备出货单',
         role_keys: Object.freeze(['sales']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:3']),
+        key: 'quality',
+        label: '品质办理出货前检验',
+        role_keys: Object.freeze(['quality']),
       }), Object.freeze({
         detail_refs: Object.freeze(['approval:0']),
         key: 'approval',
@@ -1955,6 +2064,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     label: '加工收发',
     module: 'outsourcing',
     sources: Object.freeze(['outsourcing_fact']),
+  }), Object.freeze({
+    chain: 'fulfillment',
+    group: '发货',
+    groups: Object.freeze(['handoff_shipment_quality']),
+    key: 'shipment_quality',
+    label: '出货前检验',
+    module: 'quality',
   }), Object.freeze({
     chain: 'fulfillment',
     group: '质检',

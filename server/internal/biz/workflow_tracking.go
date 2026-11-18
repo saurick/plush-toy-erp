@@ -16,6 +16,7 @@ type WorkflowTrackingQuery struct {
 	OwnerRoleKey    string
 	Attention       string
 	SourceType      string
+	SortDirection   string
 	SourceID        int
 	DateFrom        *time.Time
 	DateTo          *time.Time
@@ -74,6 +75,7 @@ func normalizeWorkflowTrackingQuery(q WorkflowTrackingQuery) (WorkflowTrackingQu
 		(q.Status != "" && q.Status != "active" && q.Status != "completed") ||
 		(q.OwnerRoleKey != "" && !isWorkflowTaskBoardOwnerRoleKey(q.OwnerRoleKey)) ||
 		(q.Attention != "" && q.Attention != "overdue" && q.Attention != "blocked") ||
+		(q.SortDirection != "" && q.SortDirection != "asc" && q.SortDirection != "desc") ||
 		q.Limit < 1 || q.Limit > WorkCenterMaxLimit || q.Offset < 0 {
 		return q, ErrBadParam
 	}

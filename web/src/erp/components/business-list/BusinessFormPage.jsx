@@ -11,7 +11,7 @@ import { FullscreenExitOutlined, FullscreenOutlined } from '@ant-design/icons'
 import { createPortal } from 'react-dom'
 import { useBlocker, useLocation, } from 'react-router-dom'
 import { revealBusinessLineItemErrors } from './businessLineItemDisclosure.mjs'
-import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import useBusinessPageContext, { TaskBusinessStepVisibleContext } from '../../hooks/useBusinessPageContext.js'
 import { message, useModal } from '@/common/utils/antdApp'
 import { hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
@@ -123,7 +123,10 @@ export default function BusinessFormPage({
   const { appearance } = useERPTheme()
   const formBodyRef = useRef(null)
   const pane = React.useContext(BusinessEditorPaneContext)
-  const visible = open && pane?.active !== false && split?.visible !== false
+  const stepVisible = React.useContext(TaskBusinessStepVisibleContext)
+  const stepVisibleRef = useRef(stepVisible)
+  stepVisibleRef.current = stepVisible
+  const visible = open && stepVisible && pane?.active !== false && split?.visible !== false
   const editorGroup = useBusinessEditorGroup()
   const editorOwner = useRef(Symbol('business-editor')).current
   const onTaskFormEditingChange = outletContext?.taskBusiness?.onFormEditingChange
@@ -189,12 +192,10 @@ export default function BusinessFormPage({
   const dirty = Boolean(
     open &&
     editableSeen.current &&
-    initializedRef.current &&
-    baseline !== null &&
-    (initialDirty ||
-      hasChanges ||
-      pendingAttachments > 0 ||
-      businessFormSnapshot(form?.getFieldsValue(true)) !== baseline)
+    (hasChanges || pendingAttachments > 0 || (
+      initializedRef.current && baseline !== null &&
+      (initialDirty || businessFormSnapshot(form?.getFieldsValue(true)) !== baseline)
+    ))
   )
   currentRef.current = { dirty, saving: busy, attachmentBusy, onCancel, title }
   useEffect(() => {
@@ -320,7 +321,7 @@ export default function BusinessFormPage({
     layout?.setAttribute('data-business-form-editing', 'true')
     toolbarWorkspace?.setAttribute('data-business-form-editing', 'true')
     taskLayout?.setAttribute('data-business-form-editing', 'true')
-    if (scroller) scroller.scrollTop = 0
+    if (scroller && !taskFocused) scroller.scrollTop = 0
     return () => {
       scroller?.removeAttribute('data-business-form-editing')
       layout?.removeAttribute('data-business-form-editing')
@@ -331,12 +332,12 @@ export default function BusinessFormPage({
       const trigger = triggerRef.current
       window.requestAnimationFrame(() => {
         // Do not let a pending close restore steal focus from a rapid reopen.
-        if (openRef.current) return
+        if (openRef.current || !stepVisibleRef.current) return
         if (position?.node.isConnected) position.node.scrollTop = position.top
         if (trigger?.isConnected) trigger.focus?.({ preventScroll: true })
       })
     }
-  }, [visible, split?.open])
+  }, [visible, taskFocused, split?.open])
 
   useEffect(() => {
     if (!open) {
@@ -561,7 +562,7 @@ export default function BusinessFormPage({
           ) : null}
         </header>
       )}
-      <BusinessFormBody ref={formBodyRef} open={open} active={pane?.active !== false} loading={loading} busy={busy || initializing} formDisplay={appearance.formDisplay}>
+      <BusinessFormBody ref={formBodyRef} open={open} active={visible} loading={loading} busy={busy || initializing} formDisplay={appearance.formDisplay}>
         <Spin spinning={loading}>
           <BusinessFormPendingAttachmentsContext.Provider
             value={reportPendingAttachments}

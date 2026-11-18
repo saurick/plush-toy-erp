@@ -11,6 +11,20 @@ const workflowTaskSourceLinksCTE = `finance_task_sources AS (
  JOIN finance_payments p ON lower(t.source_type)='finance_payment' AND t.source_id=p.id
  JOIN finance_allocations a ON a.payment_id=COALESCE(p.refund_of_payment_id,p.id)
  JOIN finance_facts f ON f.id=a.finance_fact_id
+), outsourcing_task_contracts AS (
+ SELECT t.id AS task_id,t.source_id AS order_id,0 AS line_id,TRUE AS whole_contract
+ FROM visible_tasks t WHERE lower(t.source_type)='outsourcing_order'
+ UNION ALL
+ SELECT x.task_id,x.source_id,0,TRUE FROM finance_task_sources x WHERE x.source_type='outsourcing_order'
+ UNION ALL
+ SELECT x.task_id,f.source_id,f.source_line_id,FALSE FROM (
+  SELECT t.id AS task_id,t.source_id AS fact_id FROM visible_tasks t WHERE lower(t.source_type)='outsourcing_fact'
+  UNION ALL
+  SELECT t.id,q.source_id FROM visible_tasks t JOIN quality_inspections q ON t.source_id=q.id
+  WHERE lower(t.source_type)='quality_inspection' AND q.source_type='OUTSOURCING_FACT'
+  UNION ALL
+  SELECT x.task_id,x.source_id FROM finance_task_sources x WHERE x.source_type='outsourcing_fact'
+ ) x JOIN outsourcing_facts f ON f.id=x.fact_id AND f.source_type='OUTSOURCING_ORDER'
 ), production_task_lines AS (
  SELECT t.id AS task_id,pi.id AS item_id FROM visible_tasks t
  JOIN production_order_items pi ON lower(t.source_type) IN ('production_order','production-orders') AND t.source_id=pi.production_order_id
@@ -38,28 +52,13 @@ const workflowTaskSourceLinksCTE = `finance_task_sources AS (
  SELECT t.id,b.production_order_item_id FROM visible_tasks t JOIN quality_inspections q
  ON lower(t.source_type)='quality_inspection' AND t.source_id=q.id JOIN production_wip_batches b ON b.id=q.production_wip_batch_id
  UNION
- SELECT t.id,b.production_order_item_id FROM visible_tasks t JOIN outsourcing_orders o
- ON lower(t.source_type)='outsourcing_order' AND t.source_id=o.id JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
+ SELECT x.task_id,b.production_order_item_id FROM outsourcing_task_contracts x
+ JOIN outsourcing_orders o ON o.id=x.order_id JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
  UNION
- SELECT t.id,b.production_order_item_id FROM visible_tasks t JOIN outsourcing_facts f
- ON lower(t.source_type)='outsourcing_fact' AND t.source_id=f.id
- JOIN outsourcing_orders o ON f.source_type='OUTSOURCING_ORDER' AND o.id=f.source_id
- JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
- UNION
- SELECT x.task_id,b.production_order_item_id FROM finance_task_sources x
- JOIN outsourcing_orders o ON x.source_type='outsourcing_order' AND o.id=x.source_id
- JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
- UNION
- SELECT x.task_id,b.production_order_item_id FROM finance_task_sources x
- JOIN outsourcing_facts f ON x.source_type='outsourcing_fact' AND f.id=x.source_id
- JOIN outsourcing_orders o ON f.source_type='OUTSOURCING_ORDER' AND o.id=f.source_id
- JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
- UNION
- SELECT t.id,b.production_order_item_id FROM visible_tasks t JOIN quality_inspections q
- ON lower(t.source_type)='quality_inspection' AND t.source_id=q.id
- JOIN outsourcing_facts f ON q.source_type='OUTSOURCING_FACT' AND q.source_id=f.id
- JOIN outsourcing_orders o ON f.source_type='OUTSOURCING_ORDER' AND o.id=f.source_id
- JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
+ SELECT x.task_id,b.production_order_item_id FROM outsourcing_task_contracts x
+ JOIN outsourcing_order_items i ON i.outsourcing_order_id=x.order_id AND (x.whole_contract OR i.id=x.line_id)
+ JOIN production_wip_outsourcing_allocations a ON a.outsourcing_order_item_id=i.id
+ JOIN production_wip_batches b ON b.id=a.production_wip_batch_id
 ),
 purchase_task_orders AS (
  SELECT t.id AS task_id,p.id AS purchase_order_id FROM visible_tasks t JOIN purchase_orders p
@@ -102,6 +101,11 @@ task_sources AS (
  UNION
  SELECT t.id, 'orders', s.sales_order_id FROM visible_tasks t
  JOIN shipments s ON lower(t.source_type) IN ('shipment','shipments') AND t.source_id=s.id WHERE s.sales_order_id IS NOT NULL
+ UNION
+ SELECT t.id,'orders',s.sales_order_id FROM visible_tasks t
+ JOIN quality_inspections q ON lower(t.source_type)='quality_inspection' AND t.source_id=q.id
+ JOIN shipments s ON q.source_type='SHIPMENT' AND q.inspection_type='FINISHED_GOODS' AND s.id=q.source_id
+ WHERE s.sales_order_id IS NOT NULL
  UNION
  SELECT t.id, 'orders', r.sales_order_id FROM visible_tasks t
  JOIN engineering_material_requests r ON lower(t.source_type)='engineering_material_request' AND t.source_id=r.id

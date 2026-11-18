@@ -117,11 +117,16 @@ export function productionFactCancelPermissions(record) {
     : [PermissionCode.PRODUCTION_FACT_CANCEL]
 }
 
+export function operationalFactStatusText(status) {
+  const key = String(status || '').trim()
+  return STATUS_LABELS[key] || (key ? '业务状态' : '-')
+}
+
 export function statusTag(status) {
   const key = String(status || '').trim()
   return (
     <Tag color={STATUS_COLORS[key] || 'default'}>
-      {STATUS_LABELS[key] || (key ? '业务状态' : '-')}
+      {operationalFactStatusText(key)}
     </Tag>
   )
 }
@@ -192,6 +197,7 @@ export function selectedLabelForKey(key, record) {
     }`
   }
   if (key === 'finance') {
+    if (record.counterpartyDisplayName) return `${recordNoForKey(key, record)} / ${record.counterpartyDisplayName}`
     return `${recordNoForKey(key, record)} / ${counterpartyTypeText(
       record.counterparty_type
     )} ${record.counterparty_id ? '已关联' : '-'}`

@@ -19,6 +19,14 @@ func TestEngineeringMaterialListKeepsExactSnapshotsAndPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := submitMaterialRequestFixture(t, ctx, f)
+	// Model a rejected submission for a different style with the same display name.
+	oldProduct := createSalesOrderTestProduct(t, ctx, client, f.line.UnitID, "REQUEST-LIST-OLD", true)
+	frozen := client.EngineeringMaterialRequest.GetX(ctx, first.ID).SourceSnapshot
+	for _, part := range frozen {
+		part["product_id"] = oldProduct.ID
+		part["product_code"] = oldProduct.Code
+	}
+	client.EngineeringMaterialRequest.UpdateOneID(first.ID).SetSourceSnapshot(frozen).SaveX(ctx)
 	filter := biz.EngineeringMaterialListFilter{Keyword: "  request-list  ", Page: 1, Limit: 1}
 	list, err := f.uc.ListEngineeringMaterialRequests(ctx, filter)
 	if err != nil || list.Total != 2 || len(list.Items) != 1 || list.Items[0].ID != second.ID {
@@ -26,6 +34,15 @@ func TestEngineeringMaterialListKeepsExactSnapshotsAndPagination(t *testing.T) {
 	}
 	if list.Items[0].OrderStatus != biz.SalesOrderStatusActive {
 		t.Fatalf("order state: %+v", list.Items[0])
+	}
+	sorted := filter
+	sorted.SortBy, sorted.SortDirection = biz.WorkbenchSummarySortSubmittedAt, "asc"
+	for offset, want := range []int{first.ID, second.ID} {
+		sorted.Page = offset + 1
+		page, err := f.uc.ListEngineeringMaterialRequests(ctx, sorted)
+		if err != nil || page.Total != 2 || len(page.Items) != 1 || page.Items[0].ID != want {
+			t.Fatalf("submission order page=%d want=%d list=%+v err=%v", sorted.Page, want, page, err)
+		}
 	}
 	filter.Page = 2
 	list, err = f.uc.ListEngineeringMaterialRequests(ctx, filter)
@@ -36,6 +53,19 @@ func TestEngineeringMaterialListKeepsExactSnapshotsAndPagination(t *testing.T) {
 	list, err = f.uc.ListEngineeringMaterialRequests(ctx, filter)
 	if err != nil || list.Total != 1 || list.Items[0].ID != first.ID {
 		t.Fatalf("status filter: %+v %v", list, err)
+	}
+	if len(list.Items[0].ProductRefs) != 0 {
+		t.Fatal("product references returned without product access")
+	}
+	withRefs, err := f.uc.ListEngineeringMaterialRequests(ctx, biz.EngineeringMaterialListFilter{Page: 1, Limit: 20, IncludeProductRefs: true})
+	if err != nil || len(withRefs.Items) != 2 {
+		t.Fatalf("snapshot rows: %+v %v", withRefs, err)
+	}
+	for index, expectedID := range []int{f.bom.ProductID, oldProduct.ID} {
+		refs := withRefs.Items[index].ProductRefs
+		if len(refs) != 1 || refs[0].ProductID != expectedID || refs[0].ProductName != "原提交产品" || (index == 1 && refs[0].ProductCode != oldProduct.Code) {
+			t.Fatalf("submission %d: got %+v, want one reference to product %d", withRefs.Items[index].ID, refs, expectedID)
+		}
 	}
 	filter.Keyword = "does-not-exist"
 	list, err = f.uc.ListEngineeringMaterialRequests(ctx, filter)

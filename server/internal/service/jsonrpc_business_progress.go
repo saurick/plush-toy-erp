@@ -19,25 +19,45 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 	if params != nil {
 		pm = params.AsMap()
 	}
-	allowed := []string{"view", "keyword", "scope", "due_status", "blocked_only", "unlinked_only", "owner", "date_from", "date_to", "limit", "offset", "id"}
+	allowed := []string{"view", "keyword", "scope", "due_status", "blocked_only", "unlinked_only", "owner", "date_from", "date_to", "limit", "offset", "id", "customer_id", "display", "delivery_status"}
 	if method == "list_progress" {
-		allowed = append(allowed, "owner_name")
+		allowed = append(allowed, "sort_by", "sort_direction", "owner_name")
 	}
 	if method == "list_progress_owner_options" {
 		allowed = []string{"view"}
+	}
+	if method == "list_progress_tasks" {
+		allowed = []string{"view", "id", "limit", "offset", "task_status", "owner_role_key"}
 	}
 	if res := rejectUnknownWorkflowTaskParams(pm, method, allowed...); res != nil {
 		return id, res, nil
 	}
 	q := biz.BusinessProgressQuery{}
+	if method == "list_progress_tasks" {
+		var res *v1.JsonrpcResult
+		if q.TaskStatus, res = getOptionalWorkflowTaskBoardString(pm, "task_status", 20); res != nil {
+			return id, res, nil
+		}
+		if q.TaskRole, res = getOptionalWorkflowTaskBoardString(pm, "owner_role_key", 64); res != nil {
+			return id, res, nil
+		}
+	}
 	if method == "list_progress" {
 		var res *v1.JsonrpcResult
 		q.OwnerName, res = getOptionalWorkflowTaskBoardString(pm, "owner_name", 128)
 		if res != nil {
 			return id, res, nil
 		}
+		q.SortBy, res = getOptionalWorkflowTaskBoardString(pm, "sort_by", 32)
+		if res != nil {
+			return id, res, nil
+		}
+		q.SortDirection, res = getOptionalWorkflowTaskBoardString(pm, "sort_direction", 4)
+		if res != nil {
+			return id, res, nil
+		}
 	}
-	for key, dest := range map[string]*string{"view": &q.View, "keyword": &q.Keyword, "scope": &q.Scope, "due_status": &q.DueStatus, "owner": &q.Owner, "date_from": &q.DateFrom, "date_to": &q.DateTo} {
+	for key, dest := range map[string]*string{"view": &q.View, "keyword": &q.Keyword, "scope": &q.Scope, "due_status": &q.DueStatus, "owner": &q.Owner, "date_from": &q.DateFrom, "date_to": &q.DateTo, "display": &q.Display, "delivery_status": &q.DeliveryStatus} {
 		value, res := getOptionalWorkflowTaskBoardString(pm, key, 100)
 		if res != nil {
 			return id, res, nil
@@ -58,7 +78,15 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 	if q.Offset, ok = getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0); !ok {
 		return id, invalidParamResult(), nil
 	}
-	if q.ID, ok = getOptionalWorkflowTaskBoardInteger(pm, "id", 0, 0); !ok {
+	if method == "list_progress" {
+		q.ID, ok = getOptionalWorkflowTaskBoardInteger(pm, "id", 0, 0)
+	} else if method != "list_progress_owner_options" {
+		q.ID, ok = getRequiredJSONRPCPositiveInt(pm, "id")
+	}
+	if !ok {
+		return id, invalidParamResult(), nil
+	}
+	if q.CustomerID, ok = getOptionalWorkflowTaskBoardInteger(pm, "customer_id", 0, 0); !ok {
 		return id, invalidParamResult(), nil
 	}
 	permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
@@ -87,7 +115,7 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 			return id, res, nil
 		}
 	}
-	if q.View == "" && !q.Access.Sales && q.Access.Production {
+	if q.View == "" && q.Display == "" && q.CustomerID == 0 && !q.Access.Sales && q.Access.Production {
 		q.View = "production"
 	}
 	var result any
@@ -97,6 +125,8 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 		result, err = d.businessProgressUC.Owners(ctx, q)
 	case "get_progress":
 		result, err = d.businessProgressUC.Detail(ctx, q)
+	case "list_progress_tasks":
+		result, err = d.businessProgressUC.Tasks(ctx, q)
 	default:
 		result, err = d.businessProgressUC.List(ctx, q)
 	}

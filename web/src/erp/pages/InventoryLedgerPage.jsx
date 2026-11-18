@@ -21,6 +21,7 @@ import {
   Space,
   Tag,
 } from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
@@ -36,6 +37,7 @@ import { useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
+import { inventoryOperationActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import {
   createInventoryLedgerColumns,
   VIEW_BALANCES,
@@ -165,15 +167,26 @@ import { BusinessViewPanels } from '../components/business-visualizations/Busine
 const EMPTY_INVENTORY_ROWS = Object.freeze([])
 const INVENTORY_SORT_FIELDS = {
   [VIEW_BALANCES]: {
+    id: 'registration_order',
+    subject_type: 'stock_kind',
     subject_id: 'subject_code',
+    unit_id: 'unit_name',
     warehouse_id: 'warehouse_name',
     lot_id: 'lot_no',
     quantity: 'quantity',
+    active_reserved_quantity: 'active_reserved_quantity',
+    available_quantity: 'available_quantity',
+    pending_inspection_quantity: 'pending_inspection_quantity',
+    pending_packaging_quantity: 'pending_packaging_quantity',
     issuable_quantity: 'issuable_quantity',
     restricted_quantity: 'restricted_quantity',
     ready_to_ship_quantity: 'ready_to_ship_quantity',
   },
   [VIEW_LOTS]: { lot_no: 'lot_no', received_at: 'received_at' },
+}
+const INVENTORY_BALANCE_SORT_WITH_SKU = {
+  ...INVENTORY_SORT_FIELDS[VIEW_BALANCES],
+  product_sku_id: 'sku_code',
 }
 
 const INVENTORY_OPERATION_SESSION_PREFIX =
@@ -181,7 +194,7 @@ const INVENTORY_OPERATION_SESSION_PREFIX =
 const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
   [InventoryOperationStatus.DRAFT]: '草稿',
   [InventoryOperationStatus.SUBMITTED]: '待审批',
-  [InventoryOperationStatus.APPROVED]: '已批准待过账',
+  [InventoryOperationStatus.APPROVED]: '已批准待执行',
   [InventoryOperationStatus.REJECTED]: '已驳回',
   [InventoryOperationStatus.POSTED]: '已过账',
   [InventoryOperationStatus.CANCELLED]: '已取消',
@@ -265,8 +278,6 @@ export default function InventoryLedgerPage() {
   const listResult = listResults[activeView]
   const rows = listResult?.rows || EMPTY_INVENTORY_ROWS
   const total = listResult?.total || 0
-  const sortFields = !outletContext?.taskBusiness ? INVENTORY_SORT_FIELDS[activeView] : undefined
-  const sort = sortFields ? sortByView[activeView] : null
   const previousView = useRef(activeView)
   const routeLotID = taskStock?.lot_id || searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
@@ -321,6 +332,15 @@ export default function InventoryLedgerPage() {
     adminProfile,
     PermissionCode.PRODUCT_SKU_READ
   )
+  const sortFields = outletContext?.taskBusiness
+    ? undefined
+    : activeView === VIEW_BALANCES && canReadProductSKUs
+      ? INVENTORY_BALANCE_SORT_WITH_SKU
+      : INVENTORY_SORT_FIELDS[activeView]
+  const requestedSort = sortByView[activeView]
+  const sort = sortFields && requestedSort && Object.values(sortFields).includes(requestedSort.sort_by)
+    ? requestedSort
+    : null
   const canOpenRelatedPath = useCallback(
     (path) =>
       canOpenRelatedDocumentPath({
@@ -853,7 +873,7 @@ export default function InventoryLedgerPage() {
             title: operationType === 'CYCLE_COUNT' ? '库存盘点已提交复核' : '人工库存调整已提交审批',
           })
         } else {
-          message.success('库存作业草稿已生成，请核对后过账')
+          message.success('库存作业草稿已生成，请核对后按对应动作办理')
         }
       } catch (error) {
         const retained =
@@ -969,7 +989,7 @@ export default function InventoryLedgerPage() {
         }
         rememberInventoryOperation(saved)
         setEditingOperation(null)
-        reportBusinessResult('库存作业草稿已保存，尚未过账', saved)
+        reportBusinessResult('库存作业草稿已保存，尚未更新库存', saved)
         message.success('库存作业草稿已保存')
       } catch (error) {
         message.error(getActionErrorMessage(error, '保存库存作业草稿'))
@@ -983,6 +1003,7 @@ export default function InventoryLedgerPage() {
   const transitionInventoryOperation = useCallback(
     async (action, reason = '', operation = currentOperation) => {
       if (!operation?.id || !operation?.version) return
+      const presentation = inventoryOperationActionPresentation(operation, action)
       setOperationLoading(true)
       try {
         const result = await executeInventoryOperationTransition({
@@ -1001,7 +1022,7 @@ export default function InventoryLedgerPage() {
         }
         setOperationCancelOpen(false)
         setOperationCancelReason('')
-        reportBusinessResult({ submit: '库存盘点与调整已提交复核，尚未过账', post: '库存作业已过账', cancel: '库存作业已取消' }[action], result.operation)
+        reportBusinessResult(presentation.success, result.operation)
         await loadRows()
         if (action === 'submit') {
           showProcessSubmissionReceipt({
@@ -1016,11 +1037,11 @@ export default function InventoryLedgerPage() {
           message.success(
             result.recovered
               ? '已重新读取库存作业结果'
-              : { post: '库存作业已过账', cancel: '库存作业已取消' }[action]
+              : presentation.success
           )
         }
       } catch (error) {
-        message.error(getActionErrorMessage(error, '处理库存作业'))
+        message.error(getActionErrorMessage(error, presentation.label))
       } finally {
         setOperationLoading(false)
       }
@@ -1232,6 +1253,8 @@ export default function InventoryLedgerPage() {
       setOperationLoading(false)
     }
   }
+  const inventoryPostPresentation = inventoryOperationActionPresentation(currentOperation)
+  const inventoryCancelPresentation = inventoryOperationActionPresentation(currentOperation, 'cancel')
   const currentOperationCanCancel =
     canCreateInventoryOperation &&
     currentOperation?.id &&
@@ -1263,7 +1286,7 @@ export default function InventoryLedgerPage() {
       <PageHeaderCard
         compact
         helpKey="inventory"
-        title={operationsOnly ? '库存作业' : '库存查询'}
+        title={operationsOnly ? '库存作业' : getBusinessDocumentTitle('inventory')}
       />
 
       {currentOperation || operationRecoveryError ? (
@@ -1283,12 +1306,12 @@ export default function InventoryLedgerPage() {
             operationRecoveryError || (outletContext?.taskBusiness ? '' :
             (currentOperation?.status === InventoryOperationStatus.DRAFT
               ? inventoryOperationRequiresApproval(currentOperation.operation_type)
-                ? '请核对后提交审批；创建人不能审批，批准后仍须由仓库过账。'
-                : '请核对作业内容后过账；过账前库存不会变化。'
+                ? '请核对后提交审批；创建人不能审批，批准后仍须由仓库确认执行。'
+                : `请核对后${inventoryPostPresentation.label}；确认前库存不会变化。`
               : currentOperation?.status === InventoryOperationStatus.SUBMITTED
                 ? '等待另一位有权人员批准或驳回；审批本身不会改变库存。'
                 : currentOperation?.status === InventoryOperationStatus.APPROVED
-                  ? '审批已通过，仓库过账后才会形成库存变动。'
+                  ? `审批已通过，请由仓库${inventoryPostPresentation.label}，之后才会形成库存结果。`
                   : currentOperation?.reject_reason ||
                     currentOperation?.cancel_reason ||
                     currentOperation?.reason ||
@@ -1333,8 +1356,9 @@ export default function InventoryLedgerPage() {
                     </Popconfirm>
                   ) : (
                     <Popconfirm
-                      title="确认过账这张库存作业？"
-                      okText="确认过账"
+                      title={inventoryPostPresentation.title}
+                      description={inventoryPostPresentation.description}
+                      okText={inventoryPostPresentation.label}
                       cancelText="返回"
                       onConfirm={() => transitionInventoryOperation('post')}
                     >
@@ -1343,7 +1367,7 @@ export default function InventoryLedgerPage() {
                         size="small"
                         loading={operationLoading}
                       >
-                        过账
+                        {inventoryPostPresentation.label}
                       </Button>
                     </Popconfirm>
                   )
@@ -1351,8 +1375,9 @@ export default function InventoryLedgerPage() {
                 {currentOperation.status === InventoryOperationStatus.APPROVED &&
                 canCreateInventoryOperation ? (
                   <Popconfirm
-                    title="确认过账这张库存作业？"
-                    okText="确认过账"
+                    title={inventoryPostPresentation.title}
+                    description={inventoryPostPresentation.description}
+                    okText={inventoryPostPresentation.label}
                     cancelText="返回"
                     onConfirm={() => transitionInventoryOperation('post')}
                   >
@@ -1361,7 +1386,7 @@ export default function InventoryLedgerPage() {
                       size="small"
                       loading={operationLoading}
                     >
-                      过账
+                      {inventoryPostPresentation.label}
                     </Button>
                   </Popconfirm>
                 ) : null}
@@ -1383,7 +1408,7 @@ export default function InventoryLedgerPage() {
                     disabled={operationLoading}
                     onClick={openOperationCancellation}
                   >
-                    核对并取消
+                    {inventoryCancelPresentation.label}
                   </Button>
                 ) : null}
                 {inventoryOperationRequiresApproval(currentOperation.operation_type) && !outletContext?.taskBusiness ? (
@@ -1566,7 +1591,6 @@ export default function InventoryLedgerPage() {
                     counts={statusCounts}
                     loading={loading}
                     aria-label="批次状态"
-                    className="erp-business-filter-control--status"
                     value={lotStatus}
                     options={LOT_STATUS_OPTIONS}
                     onChange={(nextStatus) => {
@@ -1604,23 +1628,15 @@ export default function InventoryLedgerPage() {
             ) : null}
                 {activeView !== VIEW_BALANCES ? (
                   <DateRangeFilter
-                    options={
-                  activeView === VIEW_LOTS
-                    ? LOT_DATE_FILTER_OPTIONS
-                    : TXN_DATE_FILTER_OPTIONS
-                }
+                    options={activeView === VIEW_LOTS ? LOT_DATE_FILTER_OPTIONS : TXN_DATE_FILTER_OPTIONS}
                     value={activeView === VIEW_LOTS ? 'received_at' : 'occurred_at'}
-                    onTypeChange={() => {}}
                     startValue={dateFilterStart}
                     endValue={dateFilterEnd}
-                    onStartChange={(nextStart) => {
-                  setDateFilterStart(nextStart)
-                  resetCurrentPage()
-                }}
-                    onEndChange={(nextEnd) => {
-                  setDateFilterEnd(nextEnd)
-                  resetCurrentPage()
-                }}
+                    onRangeChange={(from, to) => {
+                      setDateFilterStart(from)
+                      setDateFilterEnd(to)
+                      resetCurrentPage()
+                    }}
                   />
             ) : null}
                 {routeSourceType && routeSourceID ? (
@@ -1854,9 +1870,9 @@ export default function InventoryLedgerPage() {
       />
       <BusinessModal
         size="confirm"
-        title="取消库存作业"
+        title={inventoryCancelPresentation.label}
         open={operationCancelOpen}
-        okText="确认取消"
+        okText={inventoryCancelPresentation.label}
         cancelText="返回"
         okButtonProps={{ danger: true }}
         confirmLoading={operationLoading}
@@ -1865,18 +1881,19 @@ export default function InventoryLedgerPage() {
         onCancel={() => !operationLoading && setOperationCancelOpen(false)}
         onOk={() => {
           if (!operationCancelReason.trim()) {
-            message.warning('请填写取消原因')
+            message.warning('请填写业务原因')
             return
           }
           transitionInventoryOperation('cancel', operationCancelReason)
         }}
       >
+        <p>{inventoryCancelPresentation.description}</p>
         <Input.TextArea
           value={operationCancelReason}
           rows={3}
           maxLength={255}
           showCount
-          placeholder="请填写取消原因"
+          placeholder="请填写业务原因"
           onChange={(event) => setOperationCancelReason(event.target.value)}
         />
       </BusinessModal>

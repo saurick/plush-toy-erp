@@ -3,6 +3,7 @@ import { Space, Tag, Typography } from 'antd'
 import { QualityInspectionStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { QUALITY_RESULT_OPTIONS } from './qualityInspectionResultOptions.mjs'
+import { QUALITY_STATUS_LABELS, QUALITY_RESULT_LABELS } from '../../utils/qualityInspectionLabels.mjs'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -12,15 +13,6 @@ import { businessSubjectLabel, referenceLabel, inventoryLotStatusLabel } from '.
 const { Text } = Typography
 
 export const QUALITY_INSPECTIONS_MODULE_KEY = 'quality-inspections'
-
-export const QUALITY_STATUS_OPTIONS = [
-  { label: '全部状态', value: '' },
-  { label: '草稿', value: QualityInspectionStatus.DRAFT },
-  { label: '已提交', value: QualityInspectionStatus.SUBMITTED },
-  { label: '合格', value: QualityInspectionStatus.PASSED },
-  { label: '不合格', value: QualityInspectionStatus.REJECTED },
-  { label: '已取消', value: QualityInspectionStatus.CANCELLED },
-]
 
 export const QUALITY_RESULT_FILTER_OPTIONS = [
   { label: '全部结果', value: '' },
@@ -54,26 +46,12 @@ export const QUALITY_DATE_FILTER_OPTIONS = [
   { label: '质检日期', value: 'inspected_at' },
 ]
 
-export const QUALITY_STATUS_LABELS = Object.freeze({
-  [QualityInspectionStatus.DRAFT]: '草稿',
-  [QualityInspectionStatus.SUBMITTED]: '已提交',
-  [QualityInspectionStatus.PASSED]: '合格',
-  [QualityInspectionStatus.REJECTED]: '不合格',
-  [QualityInspectionStatus.CANCELLED]: '已取消',
-})
-
 const QUALITY_STATUS_COLORS = Object.freeze({
   [QualityInspectionStatus.DRAFT]: 'default',
   [QualityInspectionStatus.SUBMITTED]: 'gold',
   [QualityInspectionStatus.PASSED]: 'green',
   [QualityInspectionStatus.REJECTED]: 'red',
   [QualityInspectionStatus.CANCELLED]: 'default',
-})
-
-const QUALITY_RESULT_LABELS = Object.freeze({
-  PASS: '合格',
-  CONCESSION: '让步接收',
-  REJECT: '不合格',
 })
 
 const QUALITY_RESULT_COLORS = Object.freeze({
