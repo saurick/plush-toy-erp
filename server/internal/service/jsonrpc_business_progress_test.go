@@ -19,6 +19,38 @@ func (r *progressAPIRepo) ListBusinessProgress(_ context.Context, q biz.Business
 	r.query, r.calls = q, r.calls+1
 	return &biz.BusinessProgressBoard{Rows: []*biz.BusinessProgressRow{}, SnapshotAt: q.SnapshotAt, Access: q.Access}, r.err
 }
+func (r *progressAPIRepo) ListBusinessProgressOwners(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressOwnerOptions, error) {
+	r.query, r.calls = q, r.calls+1
+	return &biz.BusinessProgressOwnerOptions{Names: []string{"模拟业务员"}}, r.err
+}
+
+func TestBusinessProgressOwnerOptionsRPC(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		view string
+		keys []string
+		want int32
+	}{
+		{"order reader", "orders", []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}, errcode.OK.Code},
+		{"production reader", "production", []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionPMCPlanRead}, errcode.OK.Code},
+		{"unreadable source", "orders", []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionPMCPlanRead}, errcode.PermissionDenied.Code},
+		{"missing dashboard", "orders", []string{biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}, errcode.PermissionDenied.Code},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, tc.keys...)
+			r := &progressAPIRepo{}
+			d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
+			_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress_owner_options", "owners", newDataStruct(map[string]any{"view": tc.view}))
+			if err != nil || res.Code != tc.want || (r.calls == 1) != (tc.want == errcode.OK.Code) {
+				t.Fatalf("view=%s: %v %v", tc.view, res, err)
+			}
+			if r.calls == 1 && (r.query.View != tc.view || res.Data.AsMap()["names"].([]any)[0] != "模拟业务员") {
+				t.Fatal(res, r.query)
+			}
+		})
+	}
+}
+
 func (r *progressAPIRepo) GetBusinessProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressDetail, error) {
 	r.query, r.calls = q, r.calls+1
 	return nil, biz.ErrSalesOrderNotFound
@@ -30,8 +62,8 @@ func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 	r := &progressAPIRepo{}
 	d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
 	ctx := workflowJSONRPCAdminContext()
-	_, res, err := d.handleBusiness(ctx, "list_progress", "1", nil)
-	if err != nil || res.Code != errcode.OK.Code || r.calls != 1 || r.query.View != "production" || !r.query.Access.Production || r.query.Access.Sales || r.query.Access.WIP || r.query.Access.Tasks {
+	_, res, err := d.handleBusiness(ctx, "list_progress", "1", newDataStruct(map[string]any{"owner_name": "模拟业务员"}))
+	if err != nil || res.Code != errcode.OK.Code || r.calls != 1 || r.query.View != "production" || r.query.OwnerName != "模拟业务员" || !r.query.Access.Production || r.query.Access.Sales || r.query.Access.WIP || r.query.Access.Tasks {
 		t.Fatalf("default production result=%+v query=%+v err=%v", res, r.query, err)
 	}
 	for _, input := range []struct {

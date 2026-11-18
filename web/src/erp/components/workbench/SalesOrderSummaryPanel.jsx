@@ -19,6 +19,7 @@ import {
   SelectFilter,
 } from '../business-list/BusinessListLayout.jsx'
 import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
+import SalesOrderSummaryPartyFilters from './SalesOrderSummaryPartyFilters.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
 import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'
@@ -44,20 +45,6 @@ const statusLabel = (row) => {
       ?.label || '状态待确认'
   const line = { closed: '明细已关闭', canceled: '明细已取消' }[row.line_status]
   return line ? `${order} · ${line}` : order
-}
-
-function SearchFilter({ label, placeholder = label, value, onSearch }) {
-  const search = { value, onSearch }
-  return (
-    <SearchInput
-      type="search"
-      aria-label={label}
-      placeholder={placeholder}
-      allowClear
-      maxLength={100}
-      {...search}
-    />
-  )
 }
 
 export default function SalesOrderSummaryPanel({
@@ -275,31 +262,24 @@ export default function SalesOrderSummaryPanel({
       <BusinessOperationPanel
         compact
         activeFilterCount={[
-          filters.customer,
-          filters.sales_owner,
+          filters.customer_id || filters.customer,
+          filters.sales_owner_name || filters.sales_owner,
           filters.lifecycle_status,
           filters.date_from || filters.date_to,
         ].filter(Boolean).length}
         filters={
           <>
             {summaryTypeControl}
-            <SearchFilter
-              primarySearch
-              label="搜索订单号、产品名称或款号"
+            <SearchInput
+              type="search"
+              aria-label="搜索订单号、产品名称或款号"
               placeholder="订单号、产品或款号"
+              allowClear
+              maxLength={100}
               value={filters.keyword}
               onSearch={(q) => update({ q })}
             />
-            <SearchFilter
-              label="搜索客户"
-              value={filters.customer}
-              onSearch={(customer) => update({ customer })}
-            />
-            <SearchFilter
-              label="搜索跟单业务人员"
-              value={filters.sales_owner}
-              onSearch={(owner) => update({ owner })}
-            />
+            <SalesOrderSummaryPartyFilters filters={filters} update={update} refreshRevision={refreshRevision} />
             <SelectFilter
               aria-label="订单状态"
               value={filters.lifecycle_status}
@@ -322,7 +302,9 @@ export default function SalesOrderSummaryPanel({
         }
         onClearFilters={() =>
           update({
+            customer_id: '',
             customer: '',
+            owner_name: '',
             owner: '',
             status: '',
             date: '',

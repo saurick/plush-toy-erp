@@ -236,7 +236,7 @@ export function createOutsourcingSummaryScenarios({
         await toolbar.getByRole('button', { name: '筛选', exact: true }).click()
         const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         await filters.getByRole('group', { name: '明细合同状态', exact: true }).getByRole('button', { name: '已取消', exact: true }).click()
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         assert.equal(await toolbar.getByRole('button', { name: '筛选，已应用 1 项', exact: true }).count(), 1)
         await directClear.click()
         await region.getByText('模拟筛选布料', { exact: true }).waitFor()

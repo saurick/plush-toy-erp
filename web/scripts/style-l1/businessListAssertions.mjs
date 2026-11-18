@@ -1329,6 +1329,7 @@ export function createBusinessListAssertions({ outputDir }) {
       await dialog.waitFor()
     }
     await waitForFiniteAnimations(page)
+    assert.equal(await dialog.getByRole('button', { name: '搜索', exact: true }).count(), 0, '筛选面板无需单独提交搜索')
     const metrics = await page.evaluate(() => {
       const read = (node) => {
         if (!node) return null
@@ -1466,7 +1467,7 @@ export function createBusinessListAssertions({ outputDir }) {
     )
     await assertBusinessDateRangePickerOrderGuard(page, { scenarioName })
     if (opened) {
-      await dialog.getByRole('button', { name: '完成', exact: true }).click()
+      await dialog.getByRole('button', { name: '收起', exact: true }).click()
       await dialog.waitFor({ state: 'hidden' })
     }
   }

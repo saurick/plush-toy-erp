@@ -110,3 +110,18 @@ test('URL paging and filters reject malformed values without inventing dates', (
   assert.equal(result.date_from, undefined)
   assert.equal(result.date_to, undefined)
 })
+
+test('summary selections use customer identity and full owner names, with visible text filters on earlier links', () => {
+  const old = new URLSearchParams({ 'sales.customer': '客户', 'sales.owner': '跟单' })
+  const selected = updateSummarySearch(old, 'sales', { customer_id: 42, owner_name: '跟'.repeat(128) })
+  const filters = readSalesSummaryFilters(selected)
+  assert.equal(filters.customer_id, 42)
+  assert.equal(filters.sales_owner_name.length, 128)
+  assert.equal(filters.customer, '')
+  assert.equal(filters.sales_owner, '')
+  assert.equal(readSalesSummaryFilters(old).customer, '客户')
+  assert.equal(readSalesSummaryFilters(old).sales_owner, '跟单')
+  for (const id of ['0', '-1', '1.5', '1e2', '9007199254740993']) {
+    assert.equal(readSalesSummaryFilters(new URLSearchParams({ 'sales.customer_id': id })).customer_id, undefined)
+  }
+})

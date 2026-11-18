@@ -1227,7 +1227,7 @@ export function BusinessOperationPanel({
                 </div>
                 <footer>
                   <Button type="primary" onClick={closeFilters}>
-                    完成
+                    收起
                   </Button>
                 </footer>
               </section>

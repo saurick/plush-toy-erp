@@ -70,6 +70,31 @@ func (r *businessProgressRepo) ListBusinessProgress(ctx context.Context, q biz.B
 	return result, err
 }
 
+func (r *businessProgressRepo) ListBusinessProgressOwners(ctx context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressOwnerOptions, error) {
+	result := &biz.BusinessProgressOwnerOptions{Names: []string{}}
+	err := r.readProgress(ctx, q, func(tx *stdsql.Tx) (err error) {
+		cte, args := progressCTE(q)
+		rows, err := tx.QueryContext(ctx, cte+" SELECT DISTINCT owners.name FROM ("+progressOwnerRowsSQL(q)+") owners ORDER BY owners.name", args...)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if closeErr := rows.Close(); err == nil {
+				err = closeErr
+			}
+		}()
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				return err
+			}
+			result.Names = append(result.Names, name)
+		}
+		return rows.Err()
+	})
+	return result, err
+}
+
 func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.BusinessProgressQuery, cte string, args []any) (out []*biz.BusinessProgressRow, err error) {
 	args = append(append([]any{}, args...), q.Limit, q.Offset)
 	query := cte + ` SELECT id,order_no,status,customer,product,product_count,product_id,sales_owner,CAST(due_date AS TEXT),CAST(updated_at AS TEXT),

@@ -19,10 +19,24 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "view", "keyword", "scope", "due_status", "blocked_only", "unlinked_only", "owner", "date_from", "date_to", "limit", "offset", "id"); res != nil {
+	allowed := []string{"view", "keyword", "scope", "due_status", "blocked_only", "unlinked_only", "owner", "date_from", "date_to", "limit", "offset", "id"}
+	if method == "list_progress" {
+		allowed = append(allowed, "owner_name")
+	}
+	if method == "list_progress_owner_options" {
+		allowed = []string{"view"}
+	}
+	if res := rejectUnknownWorkflowTaskParams(pm, method, allowed...); res != nil {
 		return id, res, nil
 	}
 	q := biz.BusinessProgressQuery{}
+	if method == "list_progress" {
+		var res *v1.JsonrpcResult
+		q.OwnerName, res = getOptionalWorkflowTaskBoardString(pm, "owner_name", 128)
+		if res != nil {
+			return id, res, nil
+		}
+	}
 	for key, dest := range map[string]*string{"view": &q.View, "keyword": &q.Keyword, "scope": &q.Scope, "due_status": &q.DueStatus, "owner": &q.Owner, "date_from": &q.DateFrom, "date_to": &q.DateTo} {
 		value, res := getOptionalWorkflowTaskBoardString(pm, key, 100)
 		if res != nil {
@@ -78,9 +92,12 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 	}
 	var result any
 	var err error
-	if method == "get_progress" {
+	switch method {
+	case "list_progress_owner_options":
+		result, err = d.businessProgressUC.Owners(ctx, q)
+	case "get_progress":
 		result, err = d.businessProgressUC.Detail(ctx, q)
-	} else {
+	default:
 		result, err = d.businessProgressUC.List(ctx, q)
 	}
 	if err != nil {

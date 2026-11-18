@@ -23,7 +23,7 @@ func (d *jsonrpcDispatcher) handleBusiness(
 	}
 
 	switch method {
-	case "list_progress", "get_progress":
+	case "list_progress", "list_progress_owner_options", "get_progress":
 		return d.handleBusinessProgress(ctx, method, id, params)
 
 	case "get_delivery_statistics", "list_delivery_statistics_sources", "get_receivable_statistics", "list_receivable_statistics_sources":

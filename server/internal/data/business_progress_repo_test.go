@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2/log"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -382,5 +383,47 @@ func TestBusinessProgressCombinedFiltersAndFacetCounts(t *testing.T) {
 				t.Fatalf("pagination=%+v err=%v", page, err)
 			}
 		})
+	}
+}
+
+func TestBusinessProgressOwnerChoicesRespectSourceAndTaskVisibility(t *testing.T) {
+	ctx := t.Context()
+	f := openProductionOrderRepoTest(t, "progress_owner_choices")
+	first := f.client.SalesOrder.Query().OnlyX(ctx)
+	f.client.SalesOrder.UpdateOneID(first.ID).SetSalesOwner("李华").SaveX(ctx)
+	other := f.client.SalesOrder.Create().SetOrderNo("SO-OWNER-2").SetCustomerID(first.CustomerID).SetOrderDate(time.Now()).SetSalesOwner("李华明").SaveX(ctx)
+	f.client.SalesOrderItem.Create().SetSalesOrderID(other.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetOrderedQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+	for _, tr := range []struct{ user, role, status string }{{"可见处理人", "pmc", "ready"}, {"隐藏处理人", "finance", "blocked"}, {"已办处理人", "pmc", "done"}} {
+		user := f.client.AdminUser.Create().SetUsername(tr.user).SetPasswordHash("fixture").SaveX(ctx)
+		f.client.WorkflowTask.Create().SetTaskCode("owner-" + tr.role + tr.status).SetTaskName("核对").SetTaskGroup("test").SetSourceType("sales_order").SetSourceID(first.ID).SetTaskStatusKey(tr.status).SetOwnerRoleKey(tr.role).SetAssigneeID(user.ID).SaveX(ctx)
+	}
+	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
+	q := biz.BusinessProgressQuery{View: "orders", Scope: "all", Limit: 1, Access: biz.BusinessProgressAccess{Sales: true, Tasks: true}, TaskVisibility: &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{"pmc"}}}
+	names, err := uc.Owners(ctx, q)
+	if err != nil || !slices.Equal(names.Names, []string{"可见处理人", "李华", "李华明"}) {
+		t.Fatalf("choices=%+v err=%v", names, err)
+	}
+	for _, name := range names.Names {
+		q.OwnerName = name
+		board, err := uc.List(ctx, q)
+		want := first.ID
+		if name == "李华明" {
+			want = other.ID
+		}
+		if err != nil || board.Total != 1 || len(board.Rows) != 1 || board.Rows[0].ID != want {
+			t.Fatalf("owner=%s board=%+v err=%v", name, board, err)
+		}
+	}
+	q.Access.Tasks = false
+	q.TaskVisibility = nil
+	names, err = uc.Owners(ctx, q)
+	if err != nil || !slices.Equal(names.Names, []string{"李华", "李华明"}) {
+		t.Fatal(names, err)
+	}
+	q.View, q.OwnerName = "production", ""
+	q.Access = biz.BusinessProgressAccess{Production: true}
+	names, err = uc.Owners(ctx, q)
+	if err != nil || len(names.Names) != 0 {
+		t.Fatalf("production-only names=%+v err=%v", names, err)
 	}
 }

@@ -262,7 +262,7 @@ async function filterAndRestore(page, options, client, report, config) {
     databaseIDs,
     [...ids].sort((a, b) => a - b),
   );
-  await dialog.getByRole("button", { name: "完成", exact: true }).click();
+  await dialog.getByRole("button", { name: "收起", exact: true }).click();
   await expect
     .poll(async () =>
       page
@@ -294,7 +294,7 @@ async function filterAndRestore(page, options, client, report, config) {
   const restoredIDs = restoredRows.map(({ id }) => id);
   assert.ok(restoredIDs.length > 0 && restoredIDs.every(Number.isSafeInteger));
   assert.deepEqual(client.query(`SELECT json_agg(id ORDER BY id) FROM ${config.table} WHERE id IN (${restoredIDs.join(',')})${restoredValue ? ` AND ${config.field}='${restoredValue}'` : ''}`), [...restoredIDs].sort((a, b) => a - b));
-  await dialog.getByRole("button", { name: "完成", exact: true }).click();
+  await dialog.getByRole("button", { name: "收起", exact: true }).click();
   await expect
     .poll(async () =>
       page

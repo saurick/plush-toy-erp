@@ -57,7 +57,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       }
       const closeFilters = async () => {
         if (await filterDialog.isVisible()) {
-          await filterDialog.getByRole('button', { name: '完成', exact: true }).click()
+          await filterDialog.getByRole('button', { name: '收起', exact: true }).click()
           await filterDialog.waitFor({ state: 'hidden' })
         }
       }

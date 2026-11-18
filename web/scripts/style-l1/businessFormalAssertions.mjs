@@ -447,7 +447,7 @@ export function createBusinessFormalAssertions(deps) {
       )
     }
     if (opened) {
-      await dialog.getByRole('button', { name: '完成', exact: true }).click()
+      await dialog.getByRole('button', { name: '收起', exact: true }).click()
     }
   }
 

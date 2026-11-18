@@ -46,13 +46,19 @@ function summaryDate(value) {
 
 export function readSalesSummaryFilters(params) {
   const text = (key) => (params.get(`sales.${key}`) || '').trim().slice(0, 100)
+  const customerParam = params.get('sales.customer_id') || ''
+  const customerID = /^[1-9]\d*$/u.test(customerParam) ? Number(customerParam) : 0
+  const hasCustomerID = customerID > 0 && Number.isSafeInteger(customerID)
+  const ownerName = (params.get('sales.owner_name') || '').trim()
   const status = text('status')
   const dateFrom = summaryDate(text('from'))
   const dateTo = summaryDate(text('to'))
   return {
     keyword: text('q'),
-    customer: text('customer'),
-    sales_owner: text('owner'),
+    ...(hasCustomerID ? { customer_id: customerID } : {}),
+    customer: hasCustomerID ? '' : text('customer'),
+    ...(ownerName ? { sales_owner_name: ownerName } : {}),
+    sales_owner: ownerName ? '' : text('owner'),
     lifecycle_status: SALES_SUMMARY_STATUSES.some(
       ({ value }) => value === status
     )

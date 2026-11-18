@@ -86,7 +86,7 @@ export function createDashboardTaskScenarios({
             await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
             const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
             await filters.getByRole('group', { name: '任务状态', exact: true }).getByRole('button', { name: label, exact: true }).click()
-            await filters.getByRole('button', { name: '完成', exact: true }).click()
+            await filters.getByRole('button', { name: '收起', exact: true }).click()
           }
           await page.getByRole('button', { name: /已结束/, pressed: true }).waitFor()
           const rows = page.locator('.erp-task-table-row')
@@ -337,7 +337,7 @@ export function createDashboardTaskScenarios({
         await expectText(page, '当前分类暂无匹配任务')
         await moreFilters.click()
         assert.equal(await extraFilters.getByRole('button', { name: /清空筛选/ }).isDisabled(), true, '只有搜索词时没有可清空的筛选条件')
-        await extraFilters.getByRole('button', { name: '完成', exact: true }).click()
+        await extraFilters.getByRole('button', { name: '收起', exact: true }).click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(location.search)
           return params.get('lane') === 'exception' && params.get('q') === '布局验证无匹配任务'
@@ -1949,7 +1949,7 @@ export function createDashboardTaskScenarios({
           false,
           '任务管理回到默认筛选后清空按钮不可用'
         )
-        await page.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '收起', exact: true }).click()
         await taskBoardSearch.fill('')
         await taskBoardSearch.press('Enter')
         await page.waitForFunction(() => !new URLSearchParams(location.search).has('q'))
@@ -2270,7 +2270,7 @@ export function createDashboardTaskScenarios({
         assert.equal(await extraFilters.getByRole('combobox', { name: '办理事项', exact: true }).count(), 0)
         assert.equal(new URL(page.url()).searchParams.has('task_group'), false)
         await page.getByText('第 1-20 条 / 共 43 条', { exact: true }).waitFor()
-        await extraFilters.getByRole('button', { name: '完成', exact: true }).click()
+        await extraFilters.getByRole('button', { name: '收起', exact: true }).click()
         const search = page.getByRole('textbox', { name: /可搜索/ })
         await search.fill('材料入库')
         await search.press('Enter')
@@ -2285,7 +2285,7 @@ export function createDashboardTaskScenarios({
         await extraFilters.waitFor()
         await waitForFiniteAnimations(page)
         await page.screenshot({ path: path.resolve(outputDir, 'erp-task-board-title-search.png') })
-        await extraFilters.getByRole('button', { name: '完成', exact: true }).click()
+        await extraFilters.getByRole('button', { name: '收起', exact: true }).click()
         await page.getByRole('button', { name: '清除搜索', exact: true }).click()
         await page.getByText('第 1-20 条 / 共 43 条', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.has('q'), false)
@@ -2475,7 +2475,7 @@ export function createDashboardTaskScenarios({
           page,
           'erp-task-board-mobile-filters-open'
         )
-        await extraFilters.getByRole('button', { name: '完成', exact: true }).click()
+        await extraFilters.getByRole('button', { name: '收起', exact: true }).click()
         await extraFilters.waitFor({ state: 'hidden' })
         await page.locator('.erp-task-board-filters').screenshot({
           path: path.resolve(outputDir, 'erp-task-board-mobile-filters.png'),

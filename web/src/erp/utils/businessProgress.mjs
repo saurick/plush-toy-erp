@@ -189,8 +189,8 @@ export function progressExtraFilters(query) {
     query.unlinked_only && {
       key: 'unlinked_only', label: '仅看未关联销售', clear: { unlinked_only: false },
     },
-    query.owner && {
-      key: 'owner', label: `负责人：${query.owner}`, clear: { owner: '' },
+    (query.owner_name || query.owner) && {
+      key: 'owner', label: `负责人：${query.owner_name || query.owner}`, clear: { owner: '', owner_name: '' },
     },
     (query.date_from || query.date_to) && {
       key: 'date',
@@ -210,6 +210,7 @@ export function progressFilterReset(query) {
     due_status: query.due_status === 'undated' ? 'all' : query.due_status,
     unlinked_only: false,
     owner: '',
+    owner_name: '',
     from: '',
     to: '',
   }
@@ -250,7 +251,8 @@ export function progressQueryFromURL(params) {
     due_status: dueStatus,
     blocked_only: scope !== 'ended' && params.get('blocked_only') === 'true',
     unlinked_only: view === 'production' && params.get('unlinked_only') === 'true',
-    owner: (params.get('owner') || '').slice(0, 100),
+    owner: params.get('owner_name') ? '' : (params.get('owner') || '').slice(0, 100),
+    ...(params.get('owner_name') ? { owner_name: params.get('owner_name') } : {}),
     date_from: dueStatus === 'undated' || reversed ? '' : date('from'),
     date_to: dueStatus === 'undated' || reversed ? '' : date('to'),
     limit,

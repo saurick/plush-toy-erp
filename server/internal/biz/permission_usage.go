@@ -261,10 +261,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	// Shared ERP entries.
 	add(PermissionERPWorkbenchRead,
 		menuPermissionSurface("global-dashboard", "role-workbench", "岗位工作台", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_workbench", "list_workbench_role_tasks"), workflowUsageConditions),
-		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "workbench-summary-list", "按来源权限查看汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_engineering_material_requests"), businessUsageConditions),
+		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "workbench-summary-list", "按来源权限查看汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_sales_order_summary_filter_options", "list_engineering_material_requests"), businessUsageConditions),
 	)
 	add(PermissionERPBusinessDashboardRead,
-		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "进度看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "list_progress", "get_progress", "get_delivery_statistics", "list_delivery_statistics_sources", "get_receivable_statistics", "list_receivable_statistics_sources"), businessUsageConditions),
+		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "进度看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress", "get_delivery_statistics", "list_delivery_statistics_sources", "get_receivable_statistics", "list_receivable_statistics_sources"), businessUsageConditions),
 	)
 	addMenu(PermissionERPPrintTemplateRead, "print-center", "print-templates", "打印模板", "print-template-list", "模板打印中心", permissionControlPage, "允许进入并查看", nil, businessUsageConditions)
 	addBackend(PermissionERPBusinessChainDebugRead, permissionMethods("debug", "capabilities", "config"), debugUsageConditions)
@@ -332,7 +332,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	// Sales orders.
 	salesOrderReadMethods := append(permissionMethods("sales_order", "get_sales_order", "list_sales_orders", "export_sales_orders"), permissionMethods("customer_config", "get_sales_order_acceptance_process", "start_sales_order_acceptance_process")...)
 	add(PermissionSalesOrderRead,
-		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary"), businessUsageConditions),
+		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_sales_order_summary_filter_options"), businessUsageConditions),
 		menuPermissionSurface("sales-orders", "sales-orders", "销售订单", "sales-order-list", "销售订单列表和详情", permissionControlPage, "允许进入并查看", salesOrderReadMethods, businessUsageConditions),
 		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-order-reference", "出货单可导入的销售订单", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
 	)
@@ -352,7 +352,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionSalesOrderClose, "sales-orders", "sales-order-actions", "订单动作", "close-sales-order", "关闭销售订单", permissionControlButton, "显示并允许关闭", permissionMethods("sales_order", "close_sales_order"), businessUsageConditions)
 	addMenu(PermissionSalesOrderCancel, "sales-orders", "sales-order-actions", "订单动作", "cancel-sales-order", "取消销售订单", permissionControlButton, "显示并允许取消", permissionMethods("sales_order", "cancel_sales_order"), businessUsageConditions)
 	add(PermissionSalesOrderItemRead,
-		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary-items", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary"), businessUsageConditions),
+		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary-items", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_sales_order_summary_filter_options"), businessUsageConditions),
 		menuPermissionSurface("sales-orders", "sales-order-items", "订单明细", "sales-order-item-list", "销售订单明细", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_items"), businessUsageConditions),
 		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-item-reference", "出货单可导入的销售订单行", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
 	)
@@ -600,7 +600,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	for _, permission := range []string{PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionPMCPlanRead, PermissionProductionWIPRead, PermissionWorkflowTaskRead} {
 		usage := out[permission]
-		usage.Surfaces = append(usage.Surfaces, menuPermissionSurface("business-dashboard", "progress-sources", "来源进度", "progress-source-read", "按来源权限查看进度", permissionControlSection, "允许查看对应来源环节", permissionMethods("business", "list_progress", "get_progress"), []string{"页面入口仍需进度看板权限；订单同时要求销售单与明细读取，工序及质检另需生产读取；任务沿用 revision 与责任可见范围"}))
+		usage.Surfaces = append(usage.Surfaces, menuPermissionSurface("business-dashboard", "progress-sources", "来源进度", "progress-source-read", "按来源权限查看进度", permissionControlSection, "允许查看对应来源环节", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress"), []string{"页面入口仍需进度看板权限；订单同时要求销售单与明细读取，工序及质检另需生产读取；任务沿用 revision 与责任可见范围"}))
 		out[permission] = usage
 	}
 	applySourceActionReadPermissionUsages(out)

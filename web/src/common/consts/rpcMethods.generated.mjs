@@ -95,6 +95,7 @@ export const RpcMethod = Object.freeze({
     GET_RECEIVABLE_STATISTICS: 'get_receivable_statistics',
     LIST_DELIVERY_STATISTICS_SOURCES: 'list_delivery_statistics_sources',
     LIST_PROGRESS: 'list_progress',
+    LIST_PROGRESS_OWNER_OPTIONS: 'list_progress_owner_options',
     LIST_RECEIVABLE_STATISTICS_SOURCES: 'list_receivable_statistics_sources',
   }),
   customer_config: Object.freeze({
@@ -362,6 +363,7 @@ export const RpcMethod = Object.freeze({
     LIST_ENGINEERING_MATERIAL_REQUESTS: 'list_engineering_material_requests',
     LIST_SALES_ORDER_ITEMS: 'list_sales_order_items',
     LIST_SALES_ORDER_SUMMARY: 'list_sales_order_summary',
+    LIST_SALES_ORDER_SUMMARY_FILTER_OPTIONS: 'list_sales_order_summary_filter_options',
     LIST_SALES_ORDERS: 'list_sales_orders',
     SAVE_SALES_ORDER_ENGINEERING: 'save_sales_order_engineering',
     SAVE_SALES_ORDER_WITH_ITEMS: 'save_sales_order_with_items',

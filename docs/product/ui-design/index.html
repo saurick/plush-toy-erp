@@ -5130,7 +5130,7 @@
         { id:'ATT-DOC-1', name:'客户确认资料.pdf', kind:'file', size:'684 KB', status:'done', progress:100, uploader:'何敏', time:'昨天 15:26' },
         { id:'ATT-DOC-2', name:'2026圣诞限定海外客户多语言包装唛头条码洗水唛及分批交付最终确认资料-BOM-V3.xlsx', kind:'file', size:'96 KB', status:'failed', progress:62, uploader:'当前账号', time:'刚刚', error:'网络中断，已保留所选文件，可原位重试' }
       ],
-      dashboardPeriod: 'today', dashboardView: 'tasks', dashboardQueue: 'todo', dashboardSummaryType: 'materials', dashboardSummarySearch: '', dashboardSelectedDate: '09/25', dashboardSelectedStage: '生产',
+      dashboardPeriod: 'today', dashboardView: 'tasks', dashboardQueue: 'todo', dashboardSummaryType: 'materials', dashboardSummarySearch: '', summaryCustomer: '', summaryOwner: '', dashboardSelectedDate: '09/25', dashboardSelectedStage: '生产',
       auditCategory: 'all', auditResult: 'all', auditSearch: '', auditDate: 'today',
       progressView: 'orders', progressScope: 'active', progressDue: 'all', progressBlockedOnly: false, progressSearch: '', progressSelected: 'MP01',
       mobilePreviewState: 'data', mobileMain: 'tasks', mobileTab: 'todo', mobileQuick: 'all', mobileSearch: '', mobileSort: 'newest', mobileStatus: '',
@@ -7404,7 +7404,12 @@ active = new Set()
 
     function filteredDashboardSummaryRows(summary) {
       const query = state.dashboardSummarySearch.trim().toLowerCase();
-      return summary.rows.map((values,index)=>({values,sourceId:summary.sourceIds[index]})).filter(row=>!query||row.values.join(' ').toLowerCase().includes(query));
+      return summary.rows.map((values,index)=>({values,sourceId:summary.sourceIds[index]})).filter(({values})=>{
+        if (state.dashboardSummaryType !== 'sales') return !query || values.join(' ').toLowerCase().includes(query);
+        return (!state.summaryCustomer || state.summaryCustomer === values[2]) &&
+          (!state.summaryOwner || state.summaryOwner === values[10]) &&
+          (!query || [values[0],values[3]].join(' ').toLowerCase().includes(query));
+      });
     }
 
     function renderDashboardSummary() {
@@ -7517,7 +7522,7 @@ active = new Set()
     function renderDashboard() {
       const config = { title: '工作台' };
       const isSummary = state.dashboardView === 'summary';
-      const operation = `<section class="page-navigation"><div class="navigation-row"><h1>工作台</h1><div class="segment" aria-label="工作台内容">${[['tasks','待办'],['summary','业务汇总']].map(([key,label])=>`<button class="${state.dashboardView===key?'active':''}" data-action="dashboard-view" data-value="${key}">${label}</button>`).join('')}</div>${renderPageActions()}</div>${isSummary?`<div class="navigation-row"><div class="segment" aria-label="汇总类型">${[['materials','工程用料'],['sales','销售订单'],['outsourcing','委外合同明细']].map(([key,label])=>`<button class="${state.dashboardSummaryType===key?'active':''}" data-action="dashboard-summary-type" data-value="${key}">${label}</button>`).join('')}</div><label class="search">${icon('search')}<input id="dashboard-summary-search" value="${escapeHTML(state.dashboardSummarySearch)}" placeholder="搜订单或材料" data-search-hint="可搜索：订单、产品、材料、供应商" /></label><button class="btn" data-action="nav" data-page="progress">进度看板</button></div>`:''}</section>`;
+      const operation = `<section class="page-navigation"><div class="navigation-row"><h1>工作台</h1><div class="segment" aria-label="工作台内容">${[['tasks','待办'],['summary','业务汇总']].map(([key,label])=>`<button class="${state.dashboardView===key?'active':''}" data-action="dashboard-view" data-value="${key}">${label}</button>`).join('')}</div>${renderPageActions()}</div>${isSummary?`<div class="navigation-row"><div class="segment" aria-label="汇总类型">${[['materials','工程用料'],['sales','销售订单'],['outsourcing','委外合同明细']].map(([key,label])=>`<button class="${state.dashboardSummaryType===key?'active':''}" data-action="dashboard-summary-type" data-value="${key}">${label}</button>`).join('')}</div><label class="search">${icon('search')}<input id="dashboard-summary-search" value="${escapeHTML(state.dashboardSummarySearch)}" placeholder="${state.dashboardSummaryType==='sales'?'订单号、产品或款号':'搜订单或材料'}" /></label>${state.dashboardSummaryType==='sales'?renderFilterTrigger([state.summaryCustomer,state.summaryOwner].filter(Boolean).length,'open-filter','clear-summary-filters'):''}<button class="btn" data-action="nav" data-page="progress">进度看板</button></div>`:''}</section>`;
       if (state.previewState !== 'data') return `${operation}${renderDataState(config)}`;
       if (isSummary) return `${operation}${renderDashboardSummary()}`;
       const activeTasks = tasks.filter(task=>task.lane!=='done');
@@ -12473,7 +12478,7 @@ return {orders,financeCustomers};})();
         "title": "工作台中的业务汇总",
         "paragraphs": [
           "账号已开放汇总查看能力时，工作台显示“待办 / 业务汇总”。进入业务汇总后，可在已开放的销售订单汇总与材料汇总之间切换；没有对应权限时不显示该视图。",
-          "销售订单汇总按每张订单的产品明细展示，可按关键词、日期和订单状态筛选，再选择“导出当前筛选”下载 CSV，或打开原销售订单核对。生产数量包含订单数量与船头版数量，未出货数根据实际出货记录计算，计划交付日期优先采用明细交期。单价等商业资料仍按账号权限显示。",
+          "销售订单汇总按每张订单的产品明细展示，可在主搜索查单号、产品或款号，在筛选中选择客户、跟单业务人员、订单状态和日期。选中或清空立即更新，「收起」关闭筛选面板。选择“导出当前筛选”下载 CSV，或打开原销售订单核对。生产数量包含订单数量与船头版数量，未出货数根据实际出货记录计算，计划交付日期优先采用明细交期。单价等商业资料仍按账号权限显示。",
           "材料汇总按已提交的用料审批记录查找，筛选订单或审批状态后打开本次提交详情，核对冻结材料、数量和审批进度；未提交的编制草稿不会出现在该清单。汇总查询不生成采购、库存或财务记录。"
         ]
       },
@@ -12481,7 +12486,7 @@ return {orders,financeCustomers};})();
         "key": "tracking",
         "title": "跟踪进度与异常",
         "paragraphs": [
-          "进度看板用于查询订单及生产交付进度。结合筛选范围、当前阶段、阻塞原因和办理人阅读，不能把没有关联的任务当作同一条前后依赖。",
+          "进度看板用于查询订单及生产交付进度。结合筛选范围、当前阶段、阻塞原因和办理人阅读，不能把没有关联的任务当作同一条前后依赖。电脑端在「订单交付」和「生产执行」的筛选中都可按姓名查找处理人或业务负责人。选中后立即更新，点「收起」返回看板。",
           "进度看板的「经营统计」可按权限查看「交付汇总」和「应收账龄」。先选主题，再在同一栏设定条件；交期选择「自定义」可录入具体日期。默认看表格和表尾合计，切换到「图表」可比较当前页的分布。点名称、状态数字或图表分段核对来源，返回后继续查看原结果。",
           "查看任务或业务记录中的流程、异常与历史记录，核对同一来源和本次对象。有差异时保留来源单号，交对应责任岗位处理。"
         ]
@@ -16858,7 +16863,7 @@ return {orders,financeCustomers};})();
       const top = Math.min((trigger?.bottom || 130) + 8, Math.max(12, innerHeight - 360));
       const right = Math.max(12, innerWidth - (trigger?.right || innerWidth - 12));
       const active = tracking ? [f.role,f.source,f.attention,f.from||f.to].some(Boolean) : Boolean(state.boardRole !== 'all' || Object.values(taskDiscoveryDemo).some(Boolean));
-      return `<section class="popover" id="task-filter-popover" role="dialog" aria-label="筛选条件" style="top:${top}px;right:${right}px;width:min(560px,calc(100vw - 24px))"><div class="popover-head"><strong>筛选条件</strong><button class="btn" data-action="task-filter-clear" ${active?'':'disabled'}>清空筛选</button></div>${tracking?'':renderTaskDiscoveryControls()}<div class="filter-grid">${fields}</div><div class="popover-foot"><button class="btn primary" data-action="close-overlay">完成</button></div></section>`;
+      return `<section class="popover" id="task-filter-popover" role="dialog" aria-label="筛选条件" style="top:${top}px;right:${right}px;width:min(560px,calc(100vw - 24px))"><div class="popover-head"><strong>筛选条件</strong><button class="btn" data-action="task-filter-clear" ${active?'':'disabled'}>清空筛选</button></div>${tracking?'':renderTaskDiscoveryControls()}<div class="filter-grid">${fields}</div><div class="popover-foot"><button class="btn primary" data-action="close-overlay">收起</button></div></section>`;
     }
 
     function handlingTask() {
@@ -19174,6 +19179,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         state.trackingFilters[state.boardMode]=normalizeTrackingDemoFilters({...state.trackingFilters[state.boardMode],[key]:event.target.value});
         renderView();renderFloating();document.querySelector(`#task-filter-popover [data-tracking-filter="${key}"]`)?.focus();
       }));
+      document.querySelectorAll('[data-summary-party]').forEach(input=>input.addEventListener('change',()=>{ state[input.dataset.summaryParty]=input.value; renderView(); renderFloating(); }));
       document.querySelectorAll('#filter-popover input, #filter-popover ui-select').forEach(input=>input.addEventListener(input.id==='filter-party'?'input':'change',()=>{
         state.filterParty=(document.querySelector('#filter-party')?.value||'').trim();state.filterOwner=document.querySelector('#filter-owner')?.value||'all';state.filterDateFrom=document.querySelector('#filter-date-from')?.value||'';state.filterDateTo=document.querySelector('#filter-date-to')?.value||'';state.pageNo=1;state.selected.clear();
         document.querySelector('#filter-date-from').max=state.filterDateTo;document.querySelector('#filter-date-to').min=state.filterDateFrom;renderView();
@@ -19274,8 +19280,15 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function renderFilterPopover() {
+      if (state.page === 'dashboard' && state.dashboardView === 'summary' && state.dashboardSummaryType === 'sales') {
+        const field = (key, label, column) => {
+          const names = [...new Set(workbenchSummaries.sales.rows.map(row=>row[column]))];
+          return `<div class="field"><label>${label}<ui-select data-summary-party="${key}" aria-label="${label}" placeholder="请选择${label}"><option value=""></option>${names.map(name=>`<option value="${escapeHTML(name)}" ${state[key]===name?'selected':''}>${escapeHTML(name)}</option>`).join('')}</ui-select></label></div>`;
+        };
+        return `<div class="popover" role="dialog" aria-label="筛选条件" style="top:58px;right:146px"><div class="popover-head"><strong>筛选条件</strong><button class="btn ghost" data-action="reset-summary-filters" ${state.summaryCustomer||state.summaryOwner?'':'disabled'}>清空筛选</button></div><div class="filter-grid">${field('summaryCustomer','客户',2)}${field('summaryOwner','跟单业务人员',10)}</div><div class="popover-actions"><button class="btn primary" data-action="close-overlay">收起</button></div></div>`;
+      }
       const config = currentPageConfig();
-      if(config?.key==='exceptions')return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>筛选条件</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${renderDirectFilterChoices('异常类型',state.exceptionType,[['all','全部异常类型'],...config.sampleParties.map(type=>[type,type])],'demo-filter-choice','exceptionType')}${renderDirectFilterChoices('业务状态',state.exceptionExecution,[['all','全部业务状态'],['pending','待办理 / 额度生效'],['applied','业务已执行'],['reversed','业务已冲正']],'demo-filter-choice','exceptionExecution')}</div><div class="popover-foot"><button class="btn" data-action="clear-filter">清空筛选</button><button class="btn" data-action="close-overlay">完成</button></div></div>`;
+      if(config?.key==='exceptions')return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>筛选条件</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${renderDirectFilterChoices('异常类型',state.exceptionType,[['all','全部异常类型'],...config.sampleParties.map(type=>[type,type])],'demo-filter-choice','exceptionType')}${renderDirectFilterChoices('业务状态',state.exceptionExecution,[['all','全部业务状态'],['pending','待办理 / 额度生效'],['applied','业务已执行'],['reversed','业务已冲正']],'demo-filter-choice','exceptionExecution')}</div><div class="popover-foot"><button class="btn" data-action="clear-filter">清空筛选</button><button class="btn" data-action="close-overlay">收起</button></div></div>`;
       const orderStatus = config?.key==='sales'&&state.salesView==='delivery' ? renderDirectFilterChoices('订单状态',state.status,config.statuses.map(([value,label])=>[value,value==='all'?'不限':label]),'demo-filter-choice','status') : '';
       const qualityResults = config?.key==='quality' ? renderDirectFilterChoices('检验结果',state.qualityResult||'',[['','不限'],['PASS','合格'],['CONCESSION','让步接收','quality-concession'],['REJECT','不合格']],'demo-filter-choice','qualityResult') : '';
       const party = config?.party || '业务对象';
@@ -20281,6 +20294,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         state.selected.clear();state.infoModal={title:`${title}回执`,html:`<section class="task-receipt"><div class="task-receipt-row"><strong>处理范围</strong><span>${selectedRows.length} 条 · ${list}</span></div><div class="task-receipt-row"><strong>处理结果</strong><span>${result}</span></div><div class="task-receipt-row"><strong>边界</strong><span>${state.batchAction==='primary'?'每条记录仍按自身状态、权限和依赖条件独立提交；失败项不会被静默跳过。':'批量操作不会扩大数据授权或合并业务事实。'}</span></div></section>`};state.overlay='info';renderView();renderFloating();
       }
       else if (action === 'sort') { const key = target.dataset.key; if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc'; else { state.sortKey = key; state.sortDir = 'asc'; } state.pageNo = 1; renderView(); }
+      else if (action === 'clear-summary-filters' || action === 'reset-summary-filters') { state.summaryCustomer=''; state.summaryOwner=''; if(action==='clear-summary-filters')state.overlay=''; renderView(); renderFloating(); }
       else if (action === 'open-filter') { state.overlay = 'filter'; renderFloating(); }
       else if (action === 'toggle-summary') { state.summaryOpen = !state.summaryOpen; renderView(); }
       else if (action === 'clear-filter') { resetListFilters(); state.overlay=null; state.selected.clear(); renderAll(); document.querySelector('[data-action="open-filter"]')?.focus(); toast('附加筛选已重置'); }

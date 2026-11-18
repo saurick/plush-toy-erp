@@ -39,6 +39,9 @@ func (r *salesOrderRepo) ListSalesOrderSummary(ctx context.Context, filter biz.S
 	if filter.SalesOwner != "" {
 		orderPredicates = append(orderPredicates, salesorder.SalesOwnerContainsFold(filter.SalesOwner))
 	}
+	if filter.SalesOwnerName != "" {
+		orderPredicates = append(orderPredicates, salesorder.SalesOwnerEQ(filter.SalesOwnerName))
+	}
 	if filter.LifecycleStatus != "" {
 		orderPredicates = append(orderPredicates, salesorder.LifecycleStatus(filter.LifecycleStatus))
 	}
@@ -94,4 +97,46 @@ func (r *salesOrderRepo) ListSalesOrderSummary(ctx context.Context, filter biz.S
 		result = append(result, &biz.SalesOrderSummaryRow{Order: entSalesOrderToBiz(order), Item: items[i], UnitName: unit.Name})
 	}
 	return result, total, nil
+}
+
+func (r *salesOrderRepo) ListSalesOrderSummaryFilterOptions(ctx context.Context) (result *biz.SalesOrderSummaryOptions, err error) {
+	// Keep historical names searchable while selecting one stable customer identity.
+	rows, err := r.data.postgres.QueryContext(ctx, `SELECT DISTINCT c.id, c.name, c.code, COALESCE(o.customer_snapshot->>'name', '') AS snapshot_name
+		FROM sales_orders o JOIN customers c ON c.id = o.customer_id
+		WHERE EXISTS (SELECT 1 FROM sales_order_items i WHERE i.sales_order_id = o.id)
+		ORDER BY c.name, c.id, snapshot_name`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			result, err = nil, closeErr
+		}
+	}()
+	var options biz.SalesOrderSummaryOptions
+	for rows.Next() {
+		var customer biz.SalesSummaryCustomerOption
+		var historicalName string
+		if err := rows.Scan(&customer.ID, &customer.Name, &customer.Code, &historicalName); err != nil {
+			return nil, err
+		}
+		n := len(options.Customers)
+		if n == 0 || options.Customers[n-1].ID != customer.ID {
+			options.Customers = append(options.Customers, customer)
+		}
+		if historicalName != "" && historicalName != customer.Name {
+			last := &options.Customers[len(options.Customers)-1]
+			last.PreviousNames = append(last.PreviousNames, historicalName)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	options.SalesOwners, err = r.data.postgres.SalesOrder.Query().
+		Where(salesorder.HasItems(), salesorder.SalesOwnerNEQ("")).
+		Unique(true).Order(salesorder.BySalesOwner()).Select(salesorder.FieldSalesOwner).Strings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &options, nil
 }

@@ -81,19 +81,18 @@ export function createFilterConflictScenarios(deps) {
     if (phone) await assertMobileFilterDensity({ assert, dialog: filters })
     if (phone) assert.equal(await filters.getByRole('textbox').count(), 0, '手机进度不要求输入姓名')
     else {
-      const owner = filters.getByRole('textbox', { name: '处理人或业务负责人', exact: true })
-      assert.equal(await filters.getByRole('button', { name: '应用', exact: true }).count(), 0)
+      const owner = filters.getByRole('combobox', { name: '处理人或业务负责人', exact: true })
+      assert.equal(await filters.getByRole('button', { name: '搜索', exact: true }).count(), 0)
+      await owner.press('ArrowDown')
       await owner.fill('业务')
-      await owner.press('Enter')
-      await waitQuery({ owner: '业务' })
-      await owner.fill('')
-      await owner.press('Enter')
-      await waitQuery({ owner: '' })
-      await owner.fill('待重置姓名')
+      assert.equal(new URL(page.url()).searchParams.has('owner_name'), false)
+      await page.locator('.ant-select-dropdown:visible .ant-select-item-option').getByText('模拟业务员', { exact: true }).click()
+      await waitQuery({ owner_name: '模拟业务员' })
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
+      await trigger.click()
+      await waitForFilters(page, filters)
       await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
-      await page.waitForTimeout(400)
-      await waitQuery({ owner: '' })
-      assert.equal(await owner.inputValue(), '', 'reset cancels pending owner search')
+      await waitQuery({ owner_name: '' })
     }
     await due(filters, '已逾期').click()
     await filters.getByRole('button', { name: /^仅看任务受阻/ }).click()
@@ -244,7 +243,7 @@ export function createFilterConflictScenarios(deps) {
             await panel.getByRole('button', { name: /筛选流程/ }).click()
           } else {
             await choose(page, filters, '关注事项', '只看逾期')
-            await filters.getByRole('button', { name: '完成', exact: true }).click()
+            await filters.getByRole('button', { name: '收起', exact: true }).click()
             await toolbar.getByRole('button', { name: /^已结束，/ }).click()
             await toolbar.getByRole('button', { name: /^筛选/ }).click()
           }
@@ -259,7 +258,7 @@ export function createFilterConflictScenarios(deps) {
         await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
       } else {
         assert.equal(await filters.getByRole('group', { name: '关注事项', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.length > 0 && buttons.every((button) => button.disabled)), true)
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
       }
       assert(requests.some((query) => query.status === 'completed' && !query.attention && !query.owner_role_key))
       await page.reload()
@@ -302,8 +301,16 @@ export function createFilterConflictScenarios(deps) {
     },
     beforeNavigate: async (page) => {
       await desktop.beforeNavigate(page)
+      let failOwnerLookup = true
       await page.route('**/rpc/business', async (route) => {
         const { id, method, params = {} } = route.request().postDataJSON()
+        if (method === 'list_progress_owner_options') {
+          const result = failOwnerLookup
+            ? { code: 50000, message: '暂时无法读取名单' }
+            : { code: 0, message: 'OK', data: { names: ['模拟生产处理人'] } }
+          failOwnerLookup = false
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result } })
+        }
         if (!['list_progress', 'get_progress'].includes(method)) return route.fallback()
         const data = progressFixtureData({ ...params, view: params.view || 'production' }, { detail: method === 'get_progress' })
         data.access.sales = false
@@ -315,6 +322,14 @@ export function createFilterConflictScenarios(deps) {
       await panel.getByRole('button', { name: '查看 MO-0001 完整进度', exact: true }).waitFor()
       assert.equal(new URL(page.url()).searchParams.has('view'), false)
       await panel.getByRole('button', { name: /^筛选进度/ }).click()
+      const filters = page.getByRole('dialog', { name: '筛选进度' })
+      await filters.getByRole('button', { name: '重试', exact: true }).click()
+      const owners = filters.getByRole('combobox', { name: '处理人或业务负责人' })
+      await owners.press('ArrowDown')
+      const choices = page.locator('.ant-select-dropdown:visible .ant-select-item-option')
+      await choices.getByText('模拟生产处理人', { exact: true }).waitFor()
+      assert.equal(await choices.getByText('模拟业务员', { exact: true }).count(), 0)
+      await owners.press('Escape')
       await page.getByRole('button', { name: /^仅看未关联销售/ }).click()
       await page.waitForURL((url) => url.searchParams.get('view') === 'production' && url.searchParams.get('unlinked_only') === 'true')
       await panel.getByRole('button', { name: '查看 MO-0003 完整进度', exact: true }).waitFor()
@@ -367,7 +382,7 @@ export function createFilterConflictScenarios(deps) {
       assert.equal(await typeGroup.evaluate((node) => node.isConnected), true)
       const nextBounds = await types.boundingBox()
       assert(Object.keys(bounds).every((key) => Math.abs(bounds[key] - nextBounds[key]) <= 1), '切换时日期选项保持原位')
-      await filters.getByRole('button', { name: '完成', exact: true }).click()
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
       await filters.waitFor({ state: 'hidden' })
 
       await page.setViewportSize({ width: 390, height: 844 })
@@ -434,7 +449,7 @@ export function createFilterConflictScenarios(deps) {
       if (config.group) {
         await openFilters()
         await choose(page, filters, '记录范围', '不限')
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         const group = page.getByRole('group', { name: config.group, exact: true })
         const selectedStatus = group.getByRole('button', { pressed: true })
         const selectStatus = async (label) => {
@@ -454,7 +469,7 @@ export function createFilterConflictScenarios(deps) {
         assert.equal(await operation.getByRole('button', { name: '清空筛选', exact: true }).count(), 0, '仅快捷状态不显示额外条件清空入口')
         await openFilters()
         await Promise.all([response(), choose(page, filters, '记录范围', '不限')])
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
       } else {
         await openFilters()
         assert(page.filterQueries.length > 0)
@@ -464,7 +479,7 @@ export function createFilterConflictScenarios(deps) {
         await page.reload()
         await openFilters()
         assert.equal(page.filterQueries.at(-1)[config.field] || '', '', '切换范围并刷新不能恢复已清理状态')
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
       }
       await waitForFiniteAnimations(page)
       const directClear = operation.getByRole('button', { name: '清空筛选', exact: true })
@@ -511,7 +526,7 @@ export function createFilterConflictScenarios(deps) {
       await dates.getByRole('group', { name: '选择日期范围' }).getByRole('button').nth(18).click()
       await dates.getByRole('button', { name: '取消', exact: true }).click()
       assert.equal(new URL(page.url()).searchParams.get('date_from'), selectedDate, '取消草稿保留已应用日期')
-      await filters.getByRole('button', { name: '完成', exact: true }).click()
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
       const search = panel.getByPlaceholder('搜单号、产品、物料')
       await search.fill('保留搜索条件')
       await search.press('Enter')
@@ -520,7 +535,7 @@ export function createFilterConflictScenarios(deps) {
       await waitForFilters(page, filters)
       await filters.getByRole('button', { name: /清空筛选/ }).click()
       await page.waitForURL((url) => !url.searchParams.has('period') && !url.searchParams.has('date_from') && url.searchParams.get('q') === '保留搜索条件')
-      await filters.getByRole('button', { name: '完成', exact: true }).click()
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
       const finished = panel.getByRole('button', { name: /已结束/, pressed: true })
       assert.equal(await finished.locator('.erp-filter-chip__clear').count(), 1)
       await finished.click()

@@ -18,6 +18,15 @@ export async function listBusinessProgress(params = {}, options = {}) {
   return requireProgressBoard(result?.data)
 }
 
+export async function listBusinessProgressOwners(view, options = {}) {
+  const result = await rpc.call(RpcMethod.business.LIST_PROGRESS_OWNER_OPTIONS, { view }, options)
+  const names = result?.data?.names
+  if (!Array.isArray(names) || !names.every((name) => typeof name === 'string' && name.trim())) {
+    throw new Error('负责人名单格式有误')
+  }
+  return names
+}
+
 export async function getBusinessProgress(params, options = {}) {
   const result = await rpc.call(RpcMethod.business.GET_PROGRESS, params, options)
   return requireProgressDetail(result?.data)

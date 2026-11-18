@@ -445,6 +445,11 @@ export async function listSalesOrderSummary(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listSalesOrderSummaryFilterOptions(options = {}) {
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.LIST_SALES_ORDER_SUMMARY_FILTER_OPTIONS, {}, options)
+  return dataOf(result)
+}
+
 export async function listAllSalesOrderSummary(params = {}, options = {}) {
   return listAllPaginatedRecords(listSalesOrderSummary, params, 'items', options, {
     invalidResponseMessage: '服务器返回的销售汇总不完整，请刷新后重试',

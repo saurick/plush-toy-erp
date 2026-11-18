@@ -135,7 +135,7 @@ export function createAuditLogScenarios({
         const choices = await filters.locator('.erp-business-filter-field--choices').boundingBox()
         assert(choices.width > bounds.width + 200, '整行筛选选项保留可用空间')
         await assertNoHorizontalOverflow(page, `操作记录筛选 ${width}px`)
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         await filters.waitFor({ state: 'hidden' })
       }
       await page.setViewportSize(originalViewport)
@@ -153,7 +153,7 @@ export function createAuditLogScenarios({
       assert(page.auditRequests.some((params) => params.event_key), '选择操作类型应提交筛选条件')
       await operation.locator('.ant-select-clear').click()
       await page.waitForFunction(() => document.querySelector('.ant-pagination-total-text')?.textContent?.includes('201'))
-      await filters.getByRole('button', { name: '完成', exact: true }).click()
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
       const pager = page.locator('.ant-pagination')
       const readAuditPage = (limit, offset) => page.waitForResponse((response) => {
         if (!response.url().endsWith('/rpc/admin')) return false
@@ -286,7 +286,7 @@ export function createAuditLogScenarios({
           const panelBounds = await filters.boundingBox()
           const fieldBounds = await operation.boundingBox()
           assert(Math.abs(panelBounds.width - fieldBounds.width) <= 1, '窄屏筛选保留整行可用宽度')
-          await filters.getByRole('button', { name: '完成', exact: true }).click()
+          await filters.getByRole('button', { name: '收起', exact: true }).click()
         }
         await assertNoHorizontalOverflow(page, `audit-${name}`)
       },

@@ -1359,7 +1359,9 @@ export function setupJsonRpcMockServer() {
         `unknown jsonrpc url=${domain}`
       )
     } else if (domain === 'business') {
-      if (method === 'list_progress') {
+      if (method === 'list_progress_owner_options') {
+        responseBody = { jsonrpc: '2.0', id, result: makeBizResult({ names: [] }), error: '' }
+      } else if (method === 'list_progress') {
         responseBody = {
           jsonrpc: '2.0',
           id,

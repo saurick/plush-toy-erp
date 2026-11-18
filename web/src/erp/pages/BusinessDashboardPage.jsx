@@ -72,7 +72,6 @@ export default function BusinessDashboardPage() {
       : 'orders')
   const access = data?.access
   const [moreOpen, setMoreOpen] = useState(false)
-  const [filterResetKey, setFilterResetKey] = useState(0)
   const filterTriggerRef = useRef(null)
   useEffect(() => {
     if (!moreOpen) return undefined
@@ -105,7 +104,7 @@ export default function BusinessDashboardPage() {
   )
   const changeView = (nextView) => {
     const previous = new URLSearchParams(window.location.search)
-    const keys = ['q', 'scope', 'due_status', 'blocked_only', 'unlinked_only', 'owner', 'from', 'to', 'page', 'page_size', 'selected', 'display']
+    const keys = ['q', 'scope', 'due_status', 'blocked_only', 'unlinked_only', 'owner', 'owner_name', 'from', 'to', 'page', 'page_size', 'selected', 'display']
     if (view === 'orders' || view === 'production') {
       viewQueries.current[view] = Object.fromEntries(keys.filter((key) => previous.has(key)).map((key) => [key, previous.get(key)]))
     } else if (view === 'statistics') {
@@ -329,10 +328,11 @@ export default function BusinessDashboardPage() {
                   aria-label="筛选进度"
                 >
                   <BusinessProgressFilterFields
+                    adminProfile={adminProfile}
                     query={filterQuery}
                     counts={filterCounts}
                     taskAccess={access?.tasks}
-                    resetKey={filterResetKey}
+                    open={moreOpen}
                     onChange={update}
                     onDateRange={() => {
                       setMoreOpen(false)
@@ -341,10 +341,7 @@ export default function BusinessDashboardPage() {
                   />
                   <div className="erp-progress-filter-actions">
                     <Button
-                      onClick={() => {
-                        setFilterResetKey((value) => value + 1)
-                        update(progressFilterReset(query))
-                      }}
+                      onClick={() => update(progressFilterReset(query))}
                     >
                       重置筛选
                     </Button>
@@ -355,7 +352,7 @@ export default function BusinessDashboardPage() {
                         filterTriggerRef.current?.focus()
                       }}
                     >
-                      完成
+                      收起
                     </Button>
                   </div>
                 </section>

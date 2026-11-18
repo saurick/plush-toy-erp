@@ -21,6 +21,7 @@ export function createWorkbenchSummaryScenarios({
     id: index + 1,
     sales_order_id: 100 + index,
     order_no: `SO-SUM-${index + 1}`,
+    customer_id: index === 20 ? 42 : 7,
     customer_name: index === 20 ? '模拟筛选客户' : '模拟普通客户',
     order_date: 1788883200,
     planned_delivery_date: 1789747200,
@@ -34,7 +35,7 @@ export function createWorkbenchSummaryScenarios({
     production_quantity: '102',
     unshipped_quantity: '60',
     unit_name: '只',
-    sales_owner: '模拟业务员',
+    sales_owner: index === 20 ? '历史跟单' : '历史跟单甲',
     lifecycle_status: 'active',
     line_status: 'open',
     designer: null,
@@ -46,6 +47,7 @@ export function createWorkbenchSummaryScenarios({
   function makeScenario(name, actions, mode, dark = false) {
     let calls = []
     let failNext = false
+    let failOptionRead = false
     const allowed = [...new Set([...baseActions, ...actions])]
     const result = {
       name,
@@ -69,11 +71,13 @@ export function createWorkbenchSummaryScenarios({
       beforeNavigate: async (page) => {
         calls = []
         failNext = false
+        failOptionRead = mode === 'sales'
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
           if (
             ![
               'list_sales_order_summary',
+              'list_sales_order_summary_filter_options',
               'list_engineering_material_requests',
               'get_engineering_material_request',
             ].includes(method)
@@ -82,7 +86,21 @@ export function createWorkbenchSummaryScenarios({
           }
           calls.push({ method, params })
           let data
-          if (method === 'list_sales_order_summary') {
+          if (method === 'list_sales_order_summary_filter_options') {
+            if (failOptionRead) {
+              failOptionRead = false
+              return route.fulfill({
+                json: { jsonrpc: '2.0', id, result: { code: 50000, message: '暂时无法读取名单' } },
+              })
+            }
+            data = {
+              customers: [
+                { id: 42, name: '模拟筛选客户', code: 'C-42', previous_names: ['客户旧名'] },
+                { id: 7, name: '模拟普通客户', code: 'C-7', previous_names: [] },
+              ],
+              sales_owners: ['历史跟单', '历史跟单甲'],
+            }
+          } else if (method === 'list_sales_order_summary') {
             if (failNext) {
               failNext = false
               return route.fulfill({
@@ -98,6 +116,9 @@ export function createWorkbenchSummaryScenarios({
             const rows = fixtureRows
               .filter(
                 (row) =>
+                  (!params.customer_id || row.customer_id === params.customer_id) &&
+                  (!params.sales_owner_name || row.sales_owner === params.sales_owner_name) &&
+                  (!params.lifecycle_status || row.lifecycle_status === params.lifecycle_status) &&
                   (!params.customer ||
                     row.customer_name.includes(params.customer)) &&
                   (!params.keyword ||
@@ -253,7 +274,7 @@ export function createWorkbenchSummaryScenarios({
           const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
           await filters.getByRole('group', { name: '审批状态', exact: true }).getByRole('button').nth(1).click()
           await region.getByRole('button', { name: '筛选，已应用 1 项', exact: true }).waitFor()
-          await filters.getByRole('button', { name: '完成', exact: true }).click()
+          await filters.getByRole('button', { name: '收起', exact: true }).click()
           await region.getByRole('button', { name: '清空筛选', exact: true }).click()
           await region.getByRole('button', { name: '清空筛选', exact: true }).waitFor({ state: 'hidden' })
           assert.equal(await search.inputValue(), 'SO-MATERIAL-SUM')
@@ -381,11 +402,21 @@ export function createWorkbenchSummaryScenarios({
         await filterTrigger.click()
         const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
         await filterDialog.waitFor()
-        assert.equal(
-          await filterDialog.getByRole('searchbox').count(),
-          2,
-          '客户与业务人员筛选在同一浮层'
-        )
+        assert.equal(await filterDialog.getByRole('button', { name: '搜索', exact: true }).count(), 0)
+        const customer = filterDialog.getByRole('combobox', { name: '客户', exact: true })
+        const owner = filterDialog.getByRole('combobox', { name: '跟单业务人员', exact: true })
+        const selectControl = (input) => input.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]')
+        const pick = async (input, keyword, label) => {
+          await selectControl(input).locator('.ant-select-selector').click()
+          await input.fill(keyword)
+          await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: label }).click()
+        }
+        if (mode === 'sales') {
+          await filterDialog.getByRole('button', { name: '重试', exact: true }).click()
+          await filterDialog.getByRole('alert').waitFor({ state: 'hidden' })
+        }
+        await customer.waitFor()
+        await owner.waitFor()
         const dateRange = filterDialog.locator(
           '.erp-business-date-range-filter'
         )
@@ -399,7 +430,7 @@ export function createWorkbenchSummaryScenarios({
           '起止日期各自保留清晰边框'
         )
         await filterDialog
-          .getByRole('button', { name: '完成', exact: true })
+          .getByRole('button', { name: '收起', exact: true })
           .click()
         await region.locator('.ant-pagination-item-2').scrollIntoViewIfNeeded()
         await exerciseTableScrollPagination(page, {
@@ -413,14 +444,20 @@ export function createWorkbenchSummaryScenarios({
         })
         assert.equal(calls.at(-1).params.offset, 20)
         await filterTrigger.click()
-        const customer = filterDialog.getByRole('searchbox', {
-          name: '搜索客户',
-          exact: true,
-        })
-        await customer.fill('模拟筛选客户')
-        await customer.press('Enter')
+        await pick(customer, '客户旧名', '模拟筛选客户')
+        await region.getByText('模拟产品 1', { exact: true }).waitFor({ state: 'hidden' })
+        await pick(owner, '历史', /^历史跟单$/u)
+        await region.getByRole('button', { name: '筛选，已应用 2 项' }).waitFor()
+        assert.equal(calls.at(-1).params.customer_id, 42)
+        assert.equal(calls.at(-1).params.sales_owner_name, '历史跟单')
+        const ownerSelect = selectControl(owner)
+        await ownerSelect.hover()
+        await ownerSelect.locator('.ant-select-clear').click()
+        await region.getByRole('button', { name: '筛选，已应用 1 项' }).waitFor()
+        assert.equal(calls.at(-1).params.customer_id, 42)
+        assert.equal(calls.at(-1).params.sales_owner_name, undefined)
         await filterDialog
-          .getByRole('button', { name: '完成', exact: true })
+          .getByRole('button', { name: '收起', exact: true })
           .click()
         await page.waitForFunction(() =>
           document
@@ -448,9 +485,8 @@ export function createWorkbenchSummaryScenarios({
         await filterDialog.waitFor({ state: 'visible' })
         await waitForFiniteAnimations(page)
         assert.equal(await customer.inputValue(), '', '重开面板不能恢复已清空的客户条件')
-        await customer.fill('模拟筛选客户')
-        await customer.press('Enter')
-        await filterDialog.getByRole('button', { name: '完成', exact: true }).click()
+        await pick(customer, '筛选', '模拟筛选客户')
+        await filterDialog.getByRole('button', { name: '收起', exact: true }).click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         await page
           .getByLabel('工作台视图')
@@ -463,9 +499,9 @@ export function createWorkbenchSummaryScenarios({
           .click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         await filterTrigger.click()
-        assert.equal(await customer.inputValue(), '模拟筛选客户')
+        await filterDialog.locator('.ant-select-selection-item').getByText('模拟筛选客户', { exact: true }).waitFor()
         await filterDialog
-          .getByRole('button', { name: '完成', exact: true })
+          .getByRole('button', { name: '收起', exact: true })
           .click()
         failNext = true
         await page.getByRole('button', { name: '刷新当前页' }).click()
@@ -481,19 +517,23 @@ export function createWorkbenchSummaryScenarios({
           .click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         await filterTrigger.click()
+        await selectControl(customer).locator('.ant-select-selector').click()
+        const beforeTyping = calls.length
         await customer.fill('没有这家客户')
-        await customer.press('Enter')
+        await page.locator('.ant-select-dropdown:visible').getByText('没有匹配的选项').waitFor()
+        assert.equal(calls.length, beforeTyping, '查找候选不提交汇总查询')
+        await customer.press('Escape')
+        await filterDialog.getByRole('button', { name: '已取消', exact: true }).click()
         await filterDialog
-          .getByRole('button', { name: '完成', exact: true })
+          .getByRole('button', { name: '收起', exact: true })
           .click()
         await region
           .getByText('暂无符合条件的销售订单明细', { exact: true })
           .waitFor()
         await filterTrigger.click()
-        await customer.fill('模拟筛选客户')
-        await customer.press('Enter')
+        await filterDialog.getByRole('group', { name: '订单状态' }).getByRole('button', { name: '不限', exact: true }).click()
         await filterDialog
-          .getByRole('button', { name: '完成', exact: true })
+          .getByRole('button', { name: '收起', exact: true })
           .click()
         await region.getByText('模拟产品 21', { exact: true }).waitFor()
         await page.waitForFunction(() =>

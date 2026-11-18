@@ -13,7 +13,8 @@ import (
 
 type salesOrderSummaryJSONRPCRepo struct {
 	*stubSalesOrderJSONRPCRepo
-	filter *biz.SalesOrderSummaryFilter
+	filter      *biz.SalesOrderSummaryFilter
+	optionsRead bool
 }
 
 func (r *salesOrderSummaryJSONRPCRepo) ListSalesOrderSummary(_ context.Context, f biz.SalesOrderSummaryFilter) ([]*biz.SalesOrderSummaryRow, int, error) {
@@ -21,6 +22,52 @@ func (r *salesOrderSummaryJSONRPCRepo) ListSalesOrderSummary(_ context.Context, 
 	price := decimal.NewFromInt(3)
 	return []*biz.SalesOrderSummaryRow{{Order: &biz.SalesOrder{ID: 1, OrderNo: "SO-SUM", OrderDate: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), CustomerSnapshot: map[string]any{"name": "模拟客户"}, Currency: "USD"},
 		Item: &biz.SalesOrderItem{ID: 2, SalesOrderID: 1, OrderedQuantity: decimal.NewFromInt(10), PreShipmentSampleQuantity: decimal.NewFromInt(2), UnitPrice: &price, ImportSource: map[string]any{"private": "source evidence"}}, UnitName: "只"}}, 1, nil
+}
+
+func (r *salesOrderSummaryJSONRPCRepo) ListSalesOrderSummaryFilterOptions(context.Context) (*biz.SalesOrderSummaryOptions, error) {
+	r.optionsRead = true
+	return &biz.SalesOrderSummaryOptions{
+		Customers:   []biz.SalesSummaryCustomerOption{{ID: 42, Code: "C-42", Name: "模拟客户", PreviousNames: []string{"模拟旧名"}}},
+		SalesOwners: []string{"模拟跟单员"},
+	}, nil
+}
+
+func TestSalesOrderSummaryFilterOptionsJSONRPC(t *testing.T) {
+	reads := []string{biz.PermissionERPWorkbenchRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}
+	for _, tc := range []struct {
+		name                    string
+		permissions             []string
+		params                  map[string]any
+		moduleDisabled, allowed bool
+	}{
+		{"summary reader", reads, nil, false, true},
+		{"missing workbench", reads[1:], nil, false, false},
+		{"missing order", []string{reads[0], reads[2]}, nil, false, false},
+		{"missing item", reads[:2], nil, false, false},
+		{"unknown field", reads, map[string]any{"actor_id": 1}, false, false},
+		{"disabled module", reads, nil, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := &stubSalesOrderJSONRPCRepo{}
+			d := newSalesOrderJSONRPCTestData(t, base, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, tc.permissions...))
+			repo := &salesOrderSummaryJSONRPCRepo{stubSalesOrderJSONRPCRepo: base}
+			d.salesOrderUC = biz.NewSalesOrderUsecase(repo)
+			if tc.moduleDisabled {
+				d.customerConfigUC = sourceModuleGateCustomerConfig(map[string]string{"sales_orders": "disabled"})
+			}
+			_, result, err := d.handleSalesOrder(workflowJSONRPCAdminContext(), "list_sales_order_summary_filter_options", "options", mustJSONRPCStruct(t, tc.params))
+			if err != nil || (result.Code == errcode.OK.Code) != tc.allowed || repo.optionsRead != tc.allowed {
+				t.Fatalf("result=%v err=%v read=%v", result, err, repo.optionsRead)
+			}
+			if tc.allowed {
+				data := result.Data.AsMap()
+				c := data["customers"].([]any)[0].(map[string]any)
+				if len(c) != 4 || c["id"] != float64(42) || c["code"] != "C-42" || c["name"] != "模拟客户" || c["previous_names"].([]any)[0] != "模拟旧名" || data["sales_owners"].([]any)[0] != "模拟跟单员" {
+					t.Fatal(data)
+				}
+			}
+		})
+	}
 }
 
 func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
@@ -32,7 +79,7 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 		allowed, disabled, anonymous, super bool
 	}{
 		{name: "source reader", permissions: reads, allowed: true, params: map[string]any{"customer": " 模拟客户 ", "offset": 20, "limit": 20}},
-		{name: "exact customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 42}},
+		{name: "exact customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 42, "sales_owner_name": "模拟跟单员"}},
 		{name: "cleared customer", permissions: reads, allowed: true, params: map[string]any{"customer_id": 0}},
 		{name: "negative customer", permissions: reads, params: map[string]any{"customer_id": -1}},
 		{name: "fractional customer", permissions: reads, params: map[string]any{"customer_id": 1.5}},
@@ -73,7 +120,7 @@ func TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing.T) {
 			if !tc.allowed {
 				return
 			}
-			if tc.name == "exact customer" && repo.filter.CustomerID != 42 {
+			if tc.name == "exact customer" && (repo.filter.CustomerID != 42 || repo.filter.SalesOwnerName != "模拟跟单员") {
 				t.Fatalf("exact customer filter was lost: %+v", repo.filter)
 			}
 			d.applySensitiveFieldReadPolicy(ctx, "sales_order", "list_sales_order_summary", result)

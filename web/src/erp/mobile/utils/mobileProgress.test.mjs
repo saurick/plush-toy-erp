@@ -29,7 +29,7 @@ test('手机进度更新和恢复只保留常用条件，姓名与精确日期�
   let query = normalizeMobileProgressQuery({}, 'production')
   for (const changes of [
     { q: '模拟客户' },
-    { from: '2026-10-16', to: '2026-10-18', owner: '负责人' },
+    { from: '2026-10-16', to: '2026-10-18', owner: '负责人', owner_name: '精确姓名' },
     { from: '', to: '' },
     { from: '2026-10-16', to: '2026-10-18' },
     { due_status: 'undated' },
@@ -38,6 +38,7 @@ test('手机进度更新和恢复只保留常用条件，姓名与精确日期�
     query = normalizeMobileProgressQuery(withProgressFilters(query, changes), 'production')
     const restored = readMobileProgressState({ mobileProgress: { scope: 'test', query } }, 'test', 'production')
     assert.deepEqual(restored.query, query)
+    assert.equal(query.owner_name, undefined)
     assert.equal(query.from, undefined)
     assert.equal(query.to, undefined)
   }

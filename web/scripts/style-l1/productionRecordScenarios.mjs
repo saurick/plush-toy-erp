@@ -257,7 +257,7 @@ export function createProductionRecordScenarios(deps) {
           }
           if (expectedTab === '异常处理') {
             await filterDialog
-              .getByRole('button', { name: '完成', exact: true })
+              .getByRole('button', { name: '收起', exact: true })
               .click()
           }
           await assertNoHorizontalOverflow(page, scenarioName)
@@ -275,7 +275,7 @@ export function createProductionRecordScenarios(deps) {
         await expectText(page, '全部业务状态')
         await page
           .getByRole('dialog', { name: '筛选条件' })
-          .getByRole('button', { name: '完成', exact: true })
+          .getByRole('button', { name: '收起', exact: true })
           .click()
         await expectText(page, '当前操作')
         await expectText(page, '请选择一条记录')

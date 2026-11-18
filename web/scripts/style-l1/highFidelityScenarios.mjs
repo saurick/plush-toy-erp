@@ -105,7 +105,7 @@ export function createHighFidelityScenarios({
         const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
         await filterDialog.waitFor()
         await filterDialog
-          .getByRole('button', { name: '完成', exact: true })
+          .getByRole('button', { name: '收起', exact: true })
           .focus()
         await page.keyboard.press('Tab')
         assert.ok(

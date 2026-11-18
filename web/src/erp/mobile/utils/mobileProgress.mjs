@@ -25,7 +25,7 @@ export function mobileProgressDefaultView(role, access) {
 
 export function normalizeMobileProgressQuery(values, defaultView) {
   const params = new URLSearchParams(values || {})
-  for (const key of ['owner', 'from', 'to', 'date_from', 'date_to']) params.delete(key)
+  for (const key of ['owner', 'owner_name', 'from', 'to', 'date_from', 'date_to']) params.delete(key)
   if (!params.get('view')) params.set('view', defaultView)
   const query = progressQueryFromURL(params)
   return {

@@ -17,6 +17,7 @@ type BusinessProgressAccess struct {
 
 type BusinessProgressQuery struct {
 	View, Keyword, Scope, DueStatus, Owner, DateFrom, DateTo string
+	OwnerName                                                string
 	BlockedOnly, UnlinkedOnly                                bool
 	Limit, Offset, ID                                        int
 	SnapshotAt                                               time.Time
@@ -114,7 +115,12 @@ type BusinessProgressDetail struct {
 	Access     BusinessProgressAccess              `json:"access"`
 }
 
+type BusinessProgressOwnerOptions struct {
+	Names []string `json:"names"`
+}
+
 type BusinessProgressRepo interface {
+	ListBusinessProgressOwners(context.Context, BusinessProgressQuery) (*BusinessProgressOwnerOptions, error)
 	ListBusinessProgress(context.Context, BusinessProgressQuery) (*BusinessProgressBoard, error)
 	GetBusinessProgress(context.Context, BusinessProgressQuery) (*BusinessProgressDetail, error)
 }
@@ -146,7 +152,7 @@ func normalizeBusinessProgressQuery(q BusinessProgressQuery) (BusinessProgressQu
 		q.View != "production" && q.UnlinkedOnly ||
 		q.DueStatus == "undated" && (q.DateFrom != "" || q.DateTo != "") ||
 		q.Limit < 1 || q.Limit > WorkCenterMaxLimit || q.Offset < 0 || q.Offset > 1000000 || q.ID < 0 ||
-		len([]rune(q.Keyword)) > 100 || len([]rune(q.Owner)) > 100 {
+		len([]rune(q.Keyword)) > 100 || len([]rune(q.Owner)) > 100 || len([]rune(q.OwnerName)) > 128 {
 		return q, ErrBadParam
 	}
 	if q.View == "orders" && !q.Access.Sales || q.View == "production" && !q.Access.Production {
@@ -169,6 +175,17 @@ func normalizeBusinessProgressQuery(q BusinessProgressQuery) (BusinessProgressQu
 		q.SnapshotAt = time.Now().UTC()
 	}
 	return q, nil
+}
+
+func (uc *BusinessProgressUsecase) Owners(ctx context.Context, q BusinessProgressQuery) (*BusinessProgressOwnerOptions, error) {
+	q, err := normalizeBusinessProgressQuery(q)
+	if err != nil {
+		return nil, err
+	}
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	return uc.repo.ListBusinessProgressOwners(ctx, q)
 }
 
 func (uc *BusinessProgressUsecase) List(ctx context.Context, q BusinessProgressQuery) (*BusinessProgressBoard, error) {

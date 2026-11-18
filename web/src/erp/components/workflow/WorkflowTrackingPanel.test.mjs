@@ -178,7 +178,7 @@ test('tracking scopes keep their names and clearing a source reloads the current
   assert.equal(calls.at(-1).params.scope, 'visible')
   assert.equal(calls.at(-1).params.source_id, 12)
   assert.equal(calls.at(-1).params.offset, 20)
-  await harness.click(harness.button('完成'))
+  await harness.click(harness.button('收起'))
   const scopedRequest = calls.at(-1)
   await harness.click(harness.button('清除单据范围'))
   assert.equal(scopedRequest.signal.aborted, true)

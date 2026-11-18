@@ -1,6 +1,10 @@
-import React from 'react'
-import { Button } from 'antd'
-import SearchInput from '@/common/components/SearchInput'
+import React, { useEffect, useState } from 'react'
+import { Alert, Button } from 'antd'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import FilterSelect from '@/common/components/select/FilterSelect.jsx'
+import { listBusinessProgressOwners } from '../../api/businessProgressApi.mjs'
+import { savedTextFilterValue, withSavedTextFilter } from '../../utils/businessFilterPresentation.mjs'
+import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import MobileFilterChoices from '../../mobile/components/MobileFilterChoices.jsx'
@@ -60,6 +64,45 @@ export function ProgressBlockedFilter({ query, counts, taskAccess, onChange, com
   )
 }
 
+function ProgressOwnerFilter({ query, onChange }) {
+  const [state, setState] = useState({ loading: true, options: [], error: '' })
+  const [retry, setRetry] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    setState({ loading: true, options: [], error: '' })
+    listBusinessProgressOwners(query.view, { signal: controller.signal })
+      .then((names) => {
+        if (!controller.signal.aborted) {
+          setState({ loading: false, options: names.map((name) => ({ label: name, value: name })), error: '' })
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setState({ loading: false, options: [], error: getActionErrorMessage(error, '读取负责人名单') })
+        }
+      })
+    return () => controller.abort()
+  }, [query.view, retry])
+
+  const label = '处理人或业务负责人'
+  return (
+    <>
+      <FilterSelect
+        label={label}
+        aria-label={label}
+        placeholder="请选择人员"
+        showSearch
+        optionFilterProp="label"
+        loading={state.loading}
+        value={query.owner_name || (query.owner ? savedTextFilterValue : '')}
+        options={withSavedTextFilter(state.options, query.owner)}
+        onChange={(name) => onChange({ owner_name: name, owner: '' })}
+      />
+      {state.error && <Alert type="error" showIcon message={state.error} action={<Button onClick={() => setRetry((value) => value + 1)}>重试</Button>} />}
+    </>
+  )
+}
+
 export default function BusinessProgressFilterFields({
   query,
   counts,
@@ -67,9 +110,9 @@ export default function BusinessProgressFilterFields({
   onChange,
   onDateRange,
   compact = false,
-  resetKey,
+  open,
+  adminProfile,
 }) {
-  const owner = { value: query.owner, resetKey, onSearch: (value) => onChange({ owner: value }) }
   return (
     <div className={`erp-progress-filter-fields${compact ? ' erp-progress-filter-fields--compact' : ''}`}>
       <fieldset role={compact ? 'presentation' : undefined}>
@@ -109,17 +152,12 @@ export default function BusinessProgressFilterFields({
           </FilterChip>
         </fieldset>
       )}
-      {!compact && (
-        <fieldset>
-          <legend>处理人或业务负责人</legend>
-          <SearchInput
-            aria-label="处理人或业务负责人"
-            placeholder="输入姓名"
-            maxLength={100}
-            allowClear
-            {...owner}
-          />
-        </fieldset>
+      {!compact && open && (
+        <ProgressOwnerFilter
+          key={`${query.view}:${workflowTaskAdminAccessRequestIdentity(adminProfile)}`}
+          query={query}
+          onChange={onChange}
+        />
       )}
       {!compact && (
         <fieldset>

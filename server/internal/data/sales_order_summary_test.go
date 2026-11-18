@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"testing"
 	"time"
 
@@ -130,7 +131,7 @@ func TestSalesOrderSummaryFiltersCustomerIdentityAcrossNamesAndSnapshots(t *test
 	defer mustCloseEntClient(t, client)
 	selected := createSalesOrderTestCustomer(t, ctx, client, "C-SELECTED", true)
 	other := createSalesOrderTestCustomer(t, ctx, client, "C-OTHER", true)
-	client.Customer.UpdateOneID(selected.ID).SetName("模拟更名客户").SaveX(ctx)
+	client.Customer.UpdateOneID(selected.ID).SetName("模拟更名客户").SetIsActive(false).SaveX(ctx)
 	client.Customer.UpdateOneID(other.ID).SetName("模拟更名客户").SaveX(ctx)
 	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-IDENTITY", true)
 	for index, seed := range []struct {
@@ -142,10 +143,19 @@ func TestSalesOrderSummaryFiltersCustomerIdentityAcrossNamesAndSnapshots(t *test
 		{other.ID, map[string]any{"name": "模拟更名客户"}},
 		{other.ID, map[string]any{"name": "模拟更名客户分公司"}},
 	} {
-		order := client.SalesOrder.Create().SetOrderNo(fmt.Sprintf("SO-IDENTITY-%d", index)).
+		order := client.SalesOrder.Create().SetSalesOwner([]string{"手填跟单", "手填跟单甲", "手填跟单", ""}[index]).SetOrderNo(fmt.Sprintf("SO-IDENTITY-%d", index)).
 			SetCustomerID(seed.customerID).SetCustomerSnapshot(seed.snapshot).SetOrderDate(time.Now().UTC()).SaveX(ctx)
 		client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetUnitID(unit.ID).SetOrderedQuantity(decimal.NewFromInt(1)).SaveX(ctx)
 	}
+	client.SalesOrder.Create().SetOrderNo("SO-WITHOUT-LINES").SetCustomerID(selected.ID).SetSalesOwner("无明细跟单").SetOrderDate(time.Now().UTC()).SaveX(ctx)
+	options, err := uc.ListSalesOrderSummaryFilterOptions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(options.Customers) != 2 || options.Customers[0].ID != selected.ID || options.Customers[0].Name != "模拟更名客户" || !slices.Equal(options.Customers[0].PreviousNames, []string{"模拟旧名称"}) || !slices.Equal(options.SalesOwners, []string{"手填跟单", "手填跟单甲"}) {
+		t.Fatalf("options=%+v", options)
+	}
+
 	filter := biz.SalesOrderSummaryFilter{SalesOrderFilter: biz.SalesOrderFilter{CustomerID: selected.ID, Limit: 20, LifecycleScope: "all"}}
 	rows, total, err := uc.ListSalesOrderSummary(ctx, filter)
 	if err != nil || total != 2 || len(rows) != 2 {
@@ -156,6 +166,13 @@ func TestSalesOrderSummaryFiltersCustomerIdentityAcrossNamesAndSnapshots(t *test
 			t.Fatalf("same or partial name selected another customer: %+v", row.Order)
 		}
 	}
+	filter.SalesOwnerName = "手填跟单"
+	rows, total, err = uc.ListSalesOrderSummary(ctx, filter)
+	if err != nil || total != 1 || len(rows) != 1 || *rows[0].Order.SalesOwner != filter.SalesOwnerName {
+		t.Fatalf("combined exact filters: %v %d %v", rows, total, err)
+	}
+	filter.SalesOwnerName = ""
+
 	filter.CustomerID = 0
 	rows, total, err = uc.ListSalesOrderSummary(ctx, filter)
 	if err != nil || total != 4 || len(rows) != 4 {

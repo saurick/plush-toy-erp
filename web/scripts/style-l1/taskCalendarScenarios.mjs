@@ -215,7 +215,7 @@ revision,
           await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
           const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
           assert.equal(await filters.getByText('截止时间', { exact: true }).count(), 0, 'desktop calendar has one date condition')
-          await filters.getByRole('button', { name: '完成', exact: true }).click()
+          await filters.getByRole('button', { name: '收起', exact: true }).click()
         }
         assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30)
         const monthBefore = await calendar.locator('.workflow-task-calendar__month').boundingBox()

@@ -375,7 +375,7 @@ export function createInventoryPresentationScenarios(deps) {
         await filters.getByText('选择产品', { exact: true }).waitFor()
         await types.getByRole('button', { name: '不限', exact: true }).click()
         assert.equal(await objectFilter('存货').isDisabled(), true)
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         assert.equal(await search.inputValue(), 'SKU', '打开和关闭筛选应保留搜索词')
         await search.fill('')
         await search.press('Enter')

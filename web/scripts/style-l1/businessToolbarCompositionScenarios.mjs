@@ -237,7 +237,7 @@ effectiveSession: session,
         await page.locator('.ant-select').filter({ has: picker }).locator('.ant-select-selector').click()
         await picker.fill('仓库 30')
         await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '布局核对仓库 30 · 长名称材料与成品存放区' }).click()
-        await page.getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByRole('button', { name: '收起', exact: true }).click()
         assert.equal(await categories.getByRole('tab').count(), 3, '动态仓库名单增长不增加库存内容分类')
         const evidence = await inspect(page, 'inventory-30-warehouses', 1366)
         await page.screenshot({ path: path.join(outputDir, 'toolbar-dynamic-options-growth.png') })

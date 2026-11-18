@@ -572,7 +572,7 @@ export function createSalesOrderDemandEntryScenarios(deps) {
             .filter({ hasText: 'CUS-STYLE-L1' })
             .click(),
         ])
-        await page.getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByRole('button', { name: '收起', exact: true }).click()
         await page.getByText('交付进度', { exact: true }).click()
         await page
           .getByRole('region', { name: '销售交付进度' })
@@ -601,7 +601,7 @@ export function createSalesOrderDemandEntryScenarios(deps) {
           Object.hasOwn(regressionState.summaries.at(-1), 'customer_id'),
           false
         )
-        await page.getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByRole('button', { name: '收起', exact: true }).click()
         await page.getByText('订单列表', { exact: true }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         const openDraft = async () => {

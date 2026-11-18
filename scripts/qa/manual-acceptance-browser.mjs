@@ -1761,7 +1761,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
       .getByLabel("记录范围", { exact: true })
       .getByText("全部记录", { exact: true })
       .click();
-    await filters.getByRole("button", { name: "完成", exact: true }).click();
+    await filters.getByRole("button", { name: "收起", exact: true }).click();
     const search = page.getByRole("textbox", {
       name: "搜索订单、客户或产品",
       exact: true,
@@ -2725,7 +2725,7 @@ async function prepareListQuantityScope(page, target) {
         null,
         { timeout: PAGE_TIMEOUT_MS },
       );
-    await panel.getByRole("button", { name: "完成", exact: true }).click();
+    await panel.getByRole("button", { name: "收起", exact: true }).click();
     if (hasLifecycle)
       await page.waitForURL((url) => url.searchParams.get("scope") === "all", {
         timeout: PAGE_TIMEOUT_MS,

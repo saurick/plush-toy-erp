@@ -57,7 +57,7 @@ onChange: setStatus,
   assert.equal(document.activeElement, trigger())
   await harness.click(trigger())
   await harness.click(harness.button('待处理'))
-  await harness.click(harness.button('完成'))
+  await harness.click(harness.button('收起'))
   assert.ok(document.querySelector('button[aria-label="清空筛选"]'))
   assert.equal(document.querySelector('output').textContent, '共 1 条')
   assert.equal(trigger().textContent.trim(), '筛选 · 1')

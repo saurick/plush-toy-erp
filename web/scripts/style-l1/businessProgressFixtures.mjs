@@ -162,7 +162,8 @@ export function progressFixtureData(
           row.attention_owner,
           row.attention_role,
         ].some((s) => s.includes(params.keyword))) &&
-      (!params.owner || row.sales_owner.includes(params.owner))
+      (!params.owner || row.sales_owner.includes(params.owner)) &&
+      (!params.owner_name || [row.sales_owner, row.attention_owner].includes(params.owner_name))
   )
   const matching = (candidate) => base.filter((row) =>
     (!candidate.blocked_only || (!restricted && row.blocked)) &&

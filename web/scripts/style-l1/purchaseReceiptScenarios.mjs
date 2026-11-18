@@ -194,7 +194,7 @@ export function createPurchaseReceiptScenarios(deps) {
       )}`
     )
     await filterDialog
-      .getByRole('button', { name: '完成', exact: true })
+      .getByRole('button', { name: '收起', exact: true })
       .click()
   }
 

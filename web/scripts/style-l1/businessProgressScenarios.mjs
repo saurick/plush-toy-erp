@@ -75,6 +75,10 @@ export function createBusinessProgressScenarios({
         })
         await page.route('**/rpc/business', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
+          if (method === 'list_progress_owner_options') {
+            const names = restricted ? ['模拟业务员'] : ['模拟业务员', '已结束订单的业务员']
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { names } } } })
+          }
           if (!['list_progress', 'get_progress'].includes(method)) {
             return route.fallback()
           }
@@ -300,10 +304,12 @@ export function createBusinessProgressScenarios({
           await board.locator('.ant-pagination-prev button').click()
           await progressCard('SO-0001').waitFor()
           await board.getByRole('button', { name: /^筛选进度/ }).click()
-          await page.getByPlaceholder('输入姓名').fill('查无负责人')
-          await page.getByPlaceholder('输入姓名').press('Enter')
+          const owner = page.getByRole('combobox', { name: '处理人或业务负责人' })
+          await owner.press('ArrowDown')
+          await owner.fill('已结束订单')
+          await page.locator('.ant-select-dropdown:visible .ant-select-item-option').getByText('已结束订单的业务员', { exact: true }).click()
           await board.getByText('没有符合条件的记录').waitFor()
-          assert.equal(new URL(page.url()).searchParams.get('owner'), '查无负责人')
+          assert.equal(new URL(page.url()).searchParams.get('owner_name'), '已结束订单的业务员')
           await page.getByRole('button', { name: '重置筛选', exact: true }).click()
           await page.keyboard.press('Escape')
           await progressCard('SO-0001').waitFor()
@@ -365,7 +371,7 @@ export function createBusinessProgressScenarios({
         await page.getByRole('dialog').waitFor({ state: 'hidden' })
         await verifyProgressMotion(page, assert, true)
         await board.getByRole('button', { name: /^筛选进度/ }).click()
-        await page.getByPlaceholder('输入姓名').waitFor()
+        await page.getByRole('combobox', { name: '处理人或业务负责人', exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, `${name}-filters-open`)
         if (narrow) {
           await page.getByRole('button', { name: '自定义交期日期', exact: true }).click()
@@ -375,7 +381,7 @@ export function createBusinessProgressScenarios({
           await dates.getByRole('button', { name: '取消', exact: true }).click()
         }
         await page.getByRole('button', { name: /^仅看未关联销售/ }).click()
-        await page.getByRole('dialog', { name: '筛选进度', exact: true }).getByRole('button', { name: '完成', exact: true }).click()
+        await page.getByRole('dialog', { name: '筛选进度', exact: true }).getByRole('button', { name: '收起', exact: true }).click()
         assert.equal(await board.getByRole('button', { name: /^筛选进度/ }).evaluate((node) => node === document.activeElement), true)
         await progressCard('MO-0003').waitFor()
         await page.waitForFunction(() => document.querySelectorAll('.erp-progress-row').length === 1)

@@ -210,7 +210,7 @@ export function createProductionCompactPagesScenarios({
           .getByRole('group', { name: '业务状态', exact: true })
           .getByRole('button', { name: '待办理 / 额度生效', exact: true })
           .click()
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         await page.getByRole('tab', { name: '生产订单', exact: true }).click()
         await page.waitForURL('**/erp/production/orders')
         await page.locator('.ant-table-tbody tr[data-row-key="71"]').waitFor()
@@ -231,7 +231,7 @@ export function createProductionCompactPagesScenarios({
             .getAttribute('aria-pressed'),
           'true'
         )
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         await filters.waitFor({ state: 'hidden' })
         await page.screenshot({ path: path.join(outputDir, 'production-exception-query-4k.png'), scale: 'device' })
         for (const width of [1440, 1024, 768]) {
@@ -319,7 +319,7 @@ export function createProductionCompactPagesScenarios({
         await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
         assert.equal(await query.inputValue(), 'PE-COMPACT')
         assert.equal(await statuses.getByRole('button', { name: /^已批准/u }).getAttribute('aria-pressed'), 'true')
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         await filters.waitFor({ state: 'hidden' })
         await query.fill('不存在的异常')
         await query.press('Enter')

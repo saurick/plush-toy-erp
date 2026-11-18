@@ -282,6 +282,9 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 		}
 		cte += " AND (lower(j.order_no) LIKE " + key + " ESCAPE '\\' OR lower(j.customer) LIKE " + key + " ESCAPE '\\' OR lower(j.product) LIKE " + key + " ESCAPE '\\' OR EXISTS(" + sourceSearch + ")" + linkedSalesSearch + " OR " + ownerSearch(key) + ")"
 	}
+	if q.OwnerName != "" {
+		cte += " AND j.id IN (SELECT owners.board_id FROM (" + progressOwnerRowsSQL(q) + ") owners WHERE owners.name=" + bind(q.OwnerName) + ")"
+	}
 	if q.Owner != "" {
 		cte += " AND " + ownerSearch(like(q.Owner))
 	}
@@ -290,6 +293,24 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 
 // Each facet count is the result of selecting that option while retaining the
 // other dimensions. Undated selection clears the date range in both clients.
+// Both the picker and exact filtering use accountable people on readable sources.
+func progressOwnerRowsSQL(q biz.BusinessProgressQuery) string {
+	boardTable := "sales_orders"
+	if q.View == "production" {
+		boardTable = "production_orders"
+	}
+	names := "SELECT tr.board_id, tr.assignee_name AS name FROM task_rows tr JOIN " + boardTable +
+		" board ON board.id=tr.board_id WHERE tr.task_status_key IN ('ready','blocked') AND tr.assignee_name<>''"
+	if !q.Access.Sales {
+		return names
+	}
+	if q.View == "orders" {
+		return names + " UNION ALL SELECT id, sales_owner FROM sales_orders WHERE sales_owner<>''"
+	}
+	return names + ` UNION ALL SELECT i.production_order_id, s.sales_owner FROM production_order_items i
+		JOIN sales_order_items l ON l.id=i.sales_order_item_id JOIN sales_orders s ON s.id=l.sales_order_id WHERE s.sales_owner<>''`
+}
+
 func progressFilterCondition(q biz.BusinessProgressQuery) string {
 	conditions := []string{"1=1"}
 	if q.DueStatus != "undated" {

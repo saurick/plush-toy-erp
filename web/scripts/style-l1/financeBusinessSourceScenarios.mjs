@@ -54,7 +54,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
       .click()
     const filters = page.getByRole('dialog', { name: '筛选条件' })
     await filters.getByRole('button', { name: '清空筛选' }).click()
-    await filters.getByRole('button', { name: '完成', exact: true }).click()
+    await filters.getByRole('button', { name: '收起', exact: true }).click()
   }
 
   const assertFinanceSourceModal = async (

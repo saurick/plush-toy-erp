@@ -3076,8 +3076,17 @@
       "total": 0
     },
     "message": "OK",
-    "params": {},
+    "params": {
+      "owner_name": "模拟业务员"
+    },
     "test": "TestBusinessProgressJSONRPCPermissionsAndValidation"
+  },
+  "business.list_progress_owner_options": {
+    "basis": "handler-fixture",
+    "data": { "names": ["模拟业务员"] },
+    "message": "OK",
+    "params": { "view": "orders" },
+    "test": "TestBusinessProgressOwnerOptionsRPC"
   },
   "business.list_receivable_statistics_sources": {
     "basis": "backend-wire-shape",
@@ -21751,9 +21760,27 @@
     },
     "message": "OK",
     "params": {
+      "sales_owner_name": "模拟跟单员",
       "customer_id": 42
     },
     "test": "TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction"
+  },
+  "sales_order.list_sales_order_summary_filter_options": {
+    "basis": "handler-fixture",
+    "data": {
+      "customers": [
+        {
+          "code": "C-42",
+          "id": 42,
+          "name": "模拟客户",
+          "previous_names": ["模拟旧名"]
+        }
+      ],
+      "sales_owners": ["模拟跟单员"]
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestSalesOrderSummaryFilterOptionsJSONRPC"
   },
   "sales_order.list_sales_orders": {
     "basis": "handler-fixture",

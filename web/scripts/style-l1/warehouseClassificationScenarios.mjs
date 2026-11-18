@@ -283,7 +283,7 @@ materials
         await expect(onlyUnclassified).toBeDisabled()
         await expect(onlyUnclassified).not.toBeChecked()
         await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
 
         await page.setViewportSize({ width: 390, height: 844 })
         await filterTrigger.click()
@@ -296,7 +296,7 @@ materials
         deps.assert(geometry.left >= -1 && geometry.right <= geometry.width + 1 && geometry.overflow <= 1,
           `窄窗口的库存筛选应完整显示：${JSON.stringify(geometry)}`)
         await filters.screenshot({ path: `${deps.outputDir}/inventory-unclassified-filter-narrow.png` })
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
         await expect(filterTrigger).toBeFocused()
       },
     },

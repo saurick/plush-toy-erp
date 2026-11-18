@@ -143,7 +143,7 @@ effectiveSession: customerRuntimeEffectiveSession,
           assert.equal(reads.at(-1).result, 'REJECT')
           await results.getByRole('button', { name: '不限', exact: true }).click()
           await page.getByText('QI-RESULT-PASS', { exact: true }).waitFor()
-          await filter.getByRole('button', { name: '完成', exact: true }).click()
+          await filter.getByRole('button', { name: '收起', exact: true }).click()
           await assertNoHorizontalOverflow(page, appearance.name)
           await selectRow(page, 'QI-RESULT-PENDING')
           await clickSelectionAction(page, '判定合格')
@@ -227,7 +227,7 @@ unit_precision: 0,
         await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
         const filters = page.getByRole('dialog', { name: '筛选条件' })
         await filters.getByRole('group', { name: group, exact: true }).getByRole('button', { name: value, exact: true }).click()
-        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
       }
       return {
         name: viewport.name,
@@ -313,7 +313,7 @@ viewport: { width: viewport.width, height: viewport.height },
             const filters = page.getByRole('dialog', { name: '筛选条件' })
             const selectedType = filters.getByRole('group', { name: '检验类型', exact: true }).getByRole('button', { name: types[index][1], exact: true })
             assert.equal(await selectedType.getAttribute('aria-pressed'), 'true')
-            await filters.getByRole('button', { name: '完成', exact: true }).click()
+            await filters.getByRole('button', { name: '收起', exact: true }).click()
           }
         },
       }
@@ -711,7 +711,7 @@ viewport: { width: viewport.width, height: viewport.height },
             .getByRole('group', { name: '检验类型', exact: true })
             .getByRole('button', { name: '生产分段质检', exact: true })
             .click()
-          await filters.getByRole('button', { name: '完成', exact: true }).click()
+          await filters.getByRole('button', { name: '收起', exact: true }).click()
 
           const row = page
             .getByRole('row')
@@ -765,7 +765,7 @@ viewport: { width: viewport.width, height: viewport.height },
             await filter.waitFor({ state: 'visible', timeout: 10_000 })
             assert.equal(await filter.isDisabled(), true, `生产分段质检下 ${filterLabel} 应禁用`)
           }
-          await filters.getByRole('button', { name: '完成', exact: true }).click()
+          await filters.getByRole('button', { name: '收起', exact: true }).click()
 
           await row.click()
           for (const technicalCopy of [

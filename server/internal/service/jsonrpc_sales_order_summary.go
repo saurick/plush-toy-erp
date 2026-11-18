@@ -8,7 +8,7 @@ import (
 	"server/internal/errcode"
 )
 
-func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, id string, pm map[string]any) (string, *v1.JsonrpcResult, error) {
+func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, method, id string, pm map[string]any) (string, *v1.JsonrpcResult, error) {
 	for _, permission := range []string{biz.PermissionERPWorkbenchRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead} {
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
@@ -17,11 +17,27 @@ func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, id stri
 	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
 		return id, res, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "customer_id", "customer", "sales_owner", "lifecycle_status", "date_field", "date_from", "date_to", "limit", "offset") {
+	if method == "list_sales_order_summary_filter_options" {
+		if !sourceOrderAllowsOnly(pm, "customer_key") {
+			return id, invalidParamResult(), nil
+		}
+		options, err := d.salesOrderUC.ListSalesOrderSummaryFilterOptions(ctx)
+		if err != nil {
+			return id, d.mapSalesOrderError(ctx, err), nil
+		}
+		customers := make([]any, 0, len(options.Customers))
+		for _, customer := range options.Customers {
+			customers = append(customers, map[string]any{"id": customer.ID, "code": customer.Code, "name": customer.Name, "previous_names": toAnySliceString(customer.PreviousNames)})
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"customers": customers, "sales_owners": toAnySliceString(options.SalesOwners),
+		})}, nil
+	}
+	if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "customer_id", "customer", "sales_owner", "sales_owner_name", "lifecycle_status", "date_field", "date_from", "date_to", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	filter := biz.SalesOrderSummaryFilter{SalesOrderFilter: biz.SalesOrderFilter{Limit: 20, LifecycleScope: "all"}}
-	for key, target := range map[string]*string{"keyword": &filter.Keyword, "customer": &filter.Customer, "sales_owner": &filter.SalesOwner, "lifecycle_status": &filter.LifecycleStatus, "date_field": &filter.DateField} {
+	for key, target := range map[string]*string{"keyword": &filter.Keyword, "customer": &filter.Customer, "sales_owner": &filter.SalesOwner, "sales_owner_name": &filter.SalesOwnerName, "lifecycle_status": &filter.LifecycleStatus, "date_field": &filter.DateField} {
 		if raw, exists := pm[key]; exists {
 			value, ok := raw.(string)
 			if !ok {

@@ -25,7 +25,7 @@ export async function financeReportingEvidenceFlow(browser, options, client, fix
     assert.ok(listed.payments.length >= 2);
     assert.ok(listed.payments.every(row => row.currency === 'CNY' && row.kind === 'ADVANCE'));
     assert.equal(listed.totals.reduce((sum, row) => sum + row.count, 0), listed.total);
-    await filterPanel.getByRole('button', { name: '完成', exact: true }).click();
+    await filterPanel.getByRole('button', { name: '收起', exact: true }).click();
     await expect(page.getByLabel('收付款筛选汇总')).toContainText('含全部分页');
 
     const paymentID = report.flows.find(row => row.key === 'desktop_purchase_advance').paymentID;
@@ -55,7 +55,7 @@ export async function financeReportingEvidenceFlow(browser, options, client, fix
     const statementFilters = await filters(page);
     await statementFilters.getByRole('group', { name: '对账往来类型', exact: true }).getByRole('button', { name: '供应商', exact: true }).click();
     await selectOption(page, statementFilters.getByRole('combobox', { name: '对账往来方', exact: true }), new RegExp(fixture.supplier.name, 'u'));
-    await statementFilters.getByRole('button', { name: '完成', exact: true }).click();
+    await statementFilters.getByRole('button', { name: '收起', exact: true }).click();
     const { statement } = await clickRPC(page, 'get_finance_statement', () => page.getByRole('button', { name: '查询对账', exact: true }).click());
     assert.equal(statement.counterparty_id, fixture.supplier.id);
     assert.equal(statement.currency, 'CNY');
