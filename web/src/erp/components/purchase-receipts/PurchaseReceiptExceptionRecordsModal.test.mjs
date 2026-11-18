@@ -40,10 +40,9 @@ test('purchase exception records modal loads complete paginated records and comp
     /Number\(nextRecord\?\.id \|\| 0\) !== Number\(record\.id\)/u
   )
   assert.match(source, /草稿可直接作废且不更新库存/u)
-  assert.match(source, /record\?\.status === 'DRAFT'/u)
-  assert.match(source, /采购退货草稿已作废，未更新库存/u)
-  assert.match(source, /入库调整草稿已作废，未更新库存/u)
-  assert.match(source, /取消已确认记录时会保留原记录，并将库存恢复到操作前/u)
+  assert.match(source, /撤销已确认记录只撤销该笔记录对库存的影响，原记录仍保留/u)
+  assert.match(source, /const presentation = purchaseFactActionPresentation\(kind, record, action\)/u)
+  assert.match(source, /message\.success\(presentation\.success\)/u)
 })
 
 test('purchase exception records modal guards stale reads and reconciles unknown writes', () => {
@@ -73,11 +72,13 @@ test('purchase exception records modal presents business labels without technica
     '退货单号',
     '调整单号',
     '调整原因',
-    '作废草稿',
-    '取消并恢复库存',
   ]) {
     assert.match(source, new RegExp(label, 'u'))
   }
+  assert.match(source, /const cancelPresentation = purchaseFactActionPresentation\(kind, record, 'cancel'\)/u)
+  assert.match(source, /okText=\{cancelPresentation\.label\}/u)
+  assert.match(source, /description=\{cancelPresentation\.description\}/u)
+  assert.match(source, />\s*\{cancelPresentation\.label\}\s*<\/Button>/u)
   for (const forbiddenLabel of [
     'idempotency_key',
     'correction_group',

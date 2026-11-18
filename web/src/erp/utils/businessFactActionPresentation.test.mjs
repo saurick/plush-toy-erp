@@ -18,7 +18,7 @@ test('outsourcing issue and return describe opposite inventory effects', () => {
 })
 
 test('voiding drafts and reversing confirmed stock retain different consequences', () => {
-  for (const [scope, fact_type] of [['production', 'MATERIAL_ISSUE'], ['production', 'FINISHED_GOODS_RECEIPT'], ['outsourcing', 'RETURN_RECEIPT']]) {
+  for (const [scope, fact_type] of [['production', 'MATERIAL_ISSUE'], ['production', 'FINISHED_GOODS_RECEIPT'], ['outsourcing', 'MATERIAL_ISSUE'], ['outsourcing', 'RETURN_RECEIPT']]) {
     const draft = operationalFactActionPresentation(scope, { fact_type, status: 'DRAFT' }, 'cancel')
     const posted = operationalFactActionPresentation(scope, { fact_type, status: 'POSTED' }, 'cancel')
     assert.match(draft.label, /^作废/u)
@@ -27,6 +27,19 @@ test('voiding drafts and reversing confirmed stock retain different consequences
     assert.match(posted.label, /^撤销/u)
     assert.match(posted.description, /本次.*库存影响/u)
     assert.doesNotMatch(posted.description, /恢复至.*前库存/u)
+  }
+})
+
+test('purchase return and adjustment distinguish draft void from confirmed reversal', () => {
+  for (const [kind, name] of [['return', '采购退货'], ['adjustment', '入库调整']]) {
+    const draft = purchaseFactActionPresentation(kind, { status: 'DRAFT' }, 'cancel')
+    const posted = purchaseFactActionPresentation(kind, { status: 'POSTED' }, 'cancel')
+    assert.equal(draft.label, `作废${name}草稿`)
+    assert.match(draft.description, /不会改变库存；原记录继续保留/u)
+    assert.equal(draft.success, `${name}草稿已作废，库存未发生变动`)
+    assert.equal(posted.label, `撤销${name}`)
+    assert.match(posted.description, /本次.*库存影响，保留.*反向记录/u)
+    assert.equal(posted.success, `${name}已撤销，本次库存影响已恢复`)
   }
 })
 

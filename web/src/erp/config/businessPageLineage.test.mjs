@@ -68,6 +68,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'get_finance_fact',
   'get_finance_payment',
   'get_finance_credit_note',
+  'get_inventory_distribution',
   'get_inventory_operation',
   'get_outsourcing_return_disposition',
   'get_production_exception',

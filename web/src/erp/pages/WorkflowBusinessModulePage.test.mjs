@@ -116,11 +116,7 @@ test('workflow business page resets page filters and recovers an emptied tail pa
   )
   assert.match(
     source,
-    /setDueFrom\(value\)[\s\S]{0,120}resetBusinessPaginationCurrent\(setPagination\)/u
-  )
-  assert.match(
-    source,
-    /setDueTo\(value\)[\s\S]{0,120}resetBusinessPaginationCurrent\(setPagination\)/u
+    /onRangeChange=\{\(from, to\) => \{\s*setDueFrom\(from\)\s*setDueTo\(to\)\s*resetBusinessPaginationCurrent\(setPagination\)/u
   )
 })
 

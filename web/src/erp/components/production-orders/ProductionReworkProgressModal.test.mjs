@@ -25,12 +25,13 @@ test('rework progress distinguishes cancellation, work, packaging and completion
     '待安排',
     '待品质检验',
     '手工完成，待成品入库',
-    '成品入库草稿待过账',
+    '成品入库待确认',
     '已入库，待查货包装',
     '返工成品已可发货',
   ]) {
     assert.match(source, new RegExp(copy, 'u'))
   }
+  assert.match(source, /成品入库草稿已生成，待仓库核对数量与库位后确认成品入库/u)
   assert.match(source, /继续办理返工工序/u)
   assert.match(source, /当前生产订单暂无成品返工进度/u)
 })

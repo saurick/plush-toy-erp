@@ -642,9 +642,7 @@ export function createPurchaseReceiptScenarios(deps) {
         })
         await page.setViewportSize({ width: 1440, height: 900 })
 
-        const returnPostButton = modal.getByRole('button', {
-          name: /确\s*认/u,
-        })
+        const returnPostButton = modal.getByRole('button', { name: '确认采购退货', exact: true })
         assert.equal(
           await returnPostButton.count(),
           1,
@@ -653,18 +651,19 @@ export function createPurchaseReceiptScenarios(deps) {
         await returnPostButton.click()
         await page
           .locator('.ant-popover:visible')
-          .getByRole('button', { name: /确\s*认/u })
+          .getByRole('button', { name: '确认采购退货', exact: true })
           .click()
         await expectText(page, '采购退货已确认')
         await modal.getByRole('tab', { name: /入库调整/u }).click()
         await expectText(page, 'PRA-STYLE-L1')
-        await modal.getByRole('button', { name: '取消并恢复库存' }).click()
+        await modal.getByText('草稿可直接作废且不更新库存；确认草稿后库存会同步更新；撤销已确认记录只撤销该笔记录对库存的影响，原记录仍保留。').waitFor()
+        await modal.getByRole('button', { name: '撤销入库调整', exact: true }).click()
         await page
           .locator('.ant-popover:visible')
           .last()
-          .getByRole('button', { name: '确认取消', exact: true })
+          .getByRole('button', { name: '撤销入库调整', exact: true })
           .click()
-        await expectText(page, '入库调整已取消，库存已恢复到调整前')
+        await expectText(page, '入库调整已撤销，本次库存影响已恢复')
 
         const metrics = await modal.evaluate((node) => {
           const box = node.getBoundingClientRect()
@@ -732,7 +731,7 @@ export function createPurchaseReceiptScenarios(deps) {
           await modal.waitFor({ state: 'visible' })
           assert.equal(await modal.getByRole('tab').count(), 1, '只展示授权的记录类别')
           assert.equal(await modal.getByRole('tab', { name: tab }).count(), 1)
-          assert.equal(await modal.getByRole('button', { name: /^(确认|取消并恢复库存|作废草稿)$/u }).count(), 0, '记录读取权限不开放办理动作')
+          assert.equal(await modal.getByRole('button', { name: /^(?:确认|撤销)(?:采购退货|入库调整)$|^作废(?:采购退货|入库调整)草稿$/u }).count(), 0, '记录读取权限不开放办理动作')
           await modal.getByRole('button', { name: '关闭', exact: true }).click()
           await modal.waitFor({ state: 'hidden' })
           await clickSelectionAction(page, /相关单据/u)

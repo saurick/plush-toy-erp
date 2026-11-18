@@ -221,7 +221,10 @@ test('masterDataOrderApi: sales orders expose aggregate save and lifecycle actio
 })
 
 test('SalesOrdersPage: order form save uses single transaction API', () => {
-  assert.match(salesOrderPageSource, /saveSalesOrderWithItems\(\{/)
+  assert.match(
+    salesOrderPageSource,
+    /save:\s*async\s*\(\)\s*=>\s*\{\s*const result = await saveSalesOrderWithItems\(params\)\s*return result\.sales_order/u
+  )
   assert.match(
     salesOrderPageSource,
     /expected_version:\s*editingOrder\.version/

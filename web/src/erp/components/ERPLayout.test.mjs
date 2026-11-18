@@ -4,7 +4,7 @@ import test, { after } from 'node:test'
 
 import { act, createElement, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import {
   registerJSXTestLoader,
   installTestDOM,
@@ -21,8 +21,16 @@ let layoutRuntimePromise
 let businessProbeRPC
 let businessPageMounts = 0
 let businessPageRPCAttempts = 0
+const requestDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'Request')
 const sharedDOM = installTestDOM()
+// Data-router navigation constructs a Request with the test DOM's AbortSignal.
+Object.defineProperty(globalThis, 'Request', {
+  configurable: true,
+  writable: true,
+  value: sharedDOM.runtimeWindow.Request,
+})
 after(() => {
+  Object.defineProperty(globalThis, 'Request', requestDescriptor)
   sharedDOM.restore()
 })
 
@@ -40,6 +48,13 @@ function loadERPLayoutRuntime() {
     }))
   }
   return layoutRuntimePromise
+}
+
+function createLayoutRouter(initialPath, element, children) {
+  return createMemoryRouter([{ path: '/erp', element, children }], {
+    initialEntries: [initialPath],
+    future: { v7_relativeSplatPath: true },
+  })
 }
 
 function encodeTokenPart(value) {
@@ -139,26 +154,16 @@ test('ERPLayout: effective session 失败时不挂载业务子页或启动业务
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
+  const router = createLayoutRouter(
+    '/erp/business-dashboard',
+    createElement(ERPLayout),
+    [{ path: 'business-dashboard', element: createElement(BusinessPageProbe) }]
+  )
 
   try {
     await act(async () => {
       root.render(
-        createElement(
-          MemoryRouter,
-          { initialEntries: ['/erp/business-dashboard'] },
-          createElement(
-            Routes,
-            null,
-            createElement(
-              Route,
-              { path: '/erp', element: createElement(ERPLayout) },
-              createElement(Route, {
-                path: 'business-dashboard',
-                element: createElement(BusinessPageProbe),
-              })
-            )
-          )
-        )
+        createElement(RouterProvider, { router, future: { v7_startTransition: true } })
       )
     })
     await act(async () => {
@@ -191,6 +196,7 @@ test('ERPLayout: effective session 失败时不挂载业务子页或启动业务
     )
   } finally {
     await act(async () => root.unmount())
+    router.dispose()
     container.remove()
     console.warn = originalWarn
     JsonRpc.prototype.call = originalRPCCall
@@ -292,46 +298,43 @@ async function mountRecoveryHarness(initialPath = '/erp/business-dashboard') {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
+  const router = createLayoutRouter(
+    initialPath,
+    createElement(ERPThemeProvider, null, createElement(ERPLayout)),
+    [
+      { path: 'business-dashboard', element: createElement(DraftPage) },
+      { path: 'help-center', element: createElement('div', null, '帮助') },
+      { path: 'system/permissions', element: createElement(DraftPage) },
+    ]
+  )
   const settle = () =>
     act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
-  await act(async () =>
-    root.render(
-      createElement(
-        MemoryRouter,
-        { initialEntries: [initialPath] },
-        createElement(
-          Routes,
-          null,
-          createElement(
-            Route,
-            {
-              path: '/erp',
-              element: createElement(
-                ERPThemeProvider,
-                null,
-                createElement(ERPLayout)
-              ),
-            },
-            createElement(Route, {
-              path: 'business-dashboard',
-              element: createElement(DraftPage),
-            }),
-            createElement(Route, {
-              path: 'help-center',
-              element: createElement('div', null, '帮助'),
-            }),
-            createElement(Route, {
-              path: 'system/permissions',
-              element: createElement(DraftPage),
-            })
-          )
-        )
+  const cleanup = async () => {
+    try {
+      await act(async () => root.unmount())
+    } finally {
+      router.dispose()
+      unsubscribe()
+      container.remove()
+      globalThis.fetch = originalFetch
+      console.warn = originalWarn
+      dialogPrototype.showModal = originalShowModal
+      dialogPrototype.close = originalClose
+    }
+  }
+  try {
+    await act(async () =>
+      root.render(
+        createElement(RouterProvider, { router, future: { v7_startTransition: true } })
       )
     )
-  )
-  await settle()
+    await settle()
+  } catch (error) {
+    await cleanup()
+    throw error
+  }
   const button = (text) =>
     [...container.querySelectorAll('button')].find(
       (node) => node.textContent.replace(/\s/gu, '') === text
@@ -357,15 +360,7 @@ async function mountRecoveryHarness(initialPath = '/erp/business-dashboard') {
       )
       await settle()
     },
-    cleanup: async () => {
-      await act(async () => root.unmount())
-      unsubscribe()
-      container.remove()
-      globalThis.fetch = originalFetch
-      console.warn = originalWarn
-      dialogPrototype.showModal = originalShowModal
-      dialogPrototype.close = originalClose
-    },
+    cleanup,
   }
 }
 
