@@ -46,7 +46,11 @@ func (r *workflowRepo) readWorkflowSnapshot(ctx context.Context, keyword string,
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
 	if d == dialect.Postgres && keyword != "" {
 		if _, err := tx.ExecContext(ctx, "SET LOCAL jit = off"); err != nil {
 			return err
@@ -56,7 +60,11 @@ func (r *workflowRepo) readWorkflowSnapshot(ctx context.Context, keyword string,
 	if err := read(client); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
+	return nil
 }
 
 // Consumers choose their projection; responsibility filtering has one owner.
