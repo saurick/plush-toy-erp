@@ -363,6 +363,9 @@ const allowedERPImportsByFile = new Map([
     "components/business-list/BusinessLineItemsFooter.jsx",
     "components/business-list/BusinessTextArea.jsx",
   ])],
+  ["web/src/dev-workbench/components/flow-state/BusinessChainDesignCanvas.jsx", new Set([
+    "components/business-list/BusinessTextArea.jsx",
+  ])],
   ["web/src/dev-workbench/components/flow-state/FinanceRelationshipsView.jsx", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/components/flow-state/FinanceTraceView.jsx", new Set(["api/operationalFactApi.mjs", "components/finance/financePaymentPresentation.jsx"])],
   ["web/src/dev-workbench/config/devFulfillmentRelations.mjs", new Set(["utils/roleKeys.mjs"])],
@@ -668,18 +671,29 @@ test("select value samples use only pure option builders, line renderers and ima
   ]) assert.equal(isAllowedERPImport(sample, `@/erp/${module}`), false);
 });
 
+function listERPImports(source) {
+  return [...source.matchAll(
+    /(?:from\s+|import\s*(?:\(\s*)?)['"]([^'"]*erp\/[^'"]+)['"]/gu,
+  )].map((match) => match[1]);
+}
+
+test("flow explorer draft notes only consume the shared ERP presentation control", () => {
+  const canvas = "web/src/dev-workbench/components/flow-state/BusinessChainDesignCanvas.jsx";
+  const control = "@/erp/components/business-list/BusinessTextArea.jsx";
+  assert.deepEqual(listERPImports(read(canvas)), [control]);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", control), false);
+});
+
 test("dev workbench boundary: ERP imports stay on explicit adapters and presentation samples", () => {
   const workbenchSources = listFiles("web/src/dev-workbench")
     .filter((file) => /\.(?:js|jsx|mjs)$/u.test(file))
     .map((file) => ({ file, source: read(file) }));
 
   for (const { file, source } of workbenchSources) {
-    for (const match of source.matchAll(
-      /(?:from\s+|import\s*(?:\(\s*)?)['"]([^'"]*erp\/[^'"]+)['"]/gu,
-    )) {
+    for (const specifier of listERPImports(source)) {
       assert(
-        isAllowedERPImport(file, match[1]),
-        `${file} imports non-approved ERP internals: ${match[1]}`,
+        isAllowedERPImport(file, specifier),
+        `${file} imports non-approved ERP internals: ${specifier}`,
       );
     }
   }
