@@ -5,6 +5,7 @@ const escape = (text) => String(text).replaceAll('&', '&amp;').replaceAll('<', '
 // DOM tests use stable SVG hooks; browser QA covers real Mermaid parsing and layout.
 export default {
   initialize() {},
+  registerIconPacks() {},
   async render(id, chart) {
     const nodes = [...chart.matchAll(/^\s*(N\d+)(?:\[|\(\[)"([^"\n]*)"/gm)]
     const edges = [...chart.matchAll(/^\s*(N\d+) (E\d+)@(?:-->|-\.->)(?:\|"([^"\n]*)"\|)? (N\d+)/gm)]

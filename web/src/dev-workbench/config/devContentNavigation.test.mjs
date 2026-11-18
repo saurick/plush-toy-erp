@@ -56,7 +56,14 @@ function staticTarget(attribute) {
   return ''
 }
 
-test('工作台内容区只保留受控对象关联和岗位配置，不重复提供通用跨页入口', () => {
+function docsLinkProperties(expression) {
+  return expression?.type === 'CallExpression' && expression.callee.name === 'buildDevDocsLocation' &&
+    expression.arguments.length === 1 && expression.arguments[0].type === 'ObjectExpression'
+    ? expression.arguments[0].properties
+    : []
+}
+
+test('工作台内容区只保留受控对象关联、岗位配置和规则出处，不重复提供通用跨页入口', () => {
   const violations = []
   for (const file of sourceFiles(root)) {
     const relative = path.relative(root, file)
@@ -97,23 +104,26 @@ test('工作台内容区只保留受控对象关联和岗位配置，不重复�
         target === '/erp/system/permissions?tab=' && approvalTab?.type === 'MemberExpression' &&
         expression.quasis[1].value.cooked === '' && !approvalTab.computed &&
         approvalTab.object.name === 'PERMISSION_CENTER_TAB_KEYS' && approvalTab.property.name === 'APPROVALS'
+      const docProperties = docsLinkProperties(expression)
       const skillSourceLink = relative === 'components/DevProjectSkillsExecutionGuide.jsx' &&
-        expression?.type === 'CallExpression' && expression.callee.name === 'buildDevDocsLocation' &&
-        expression.arguments.length === 1 && expression.arguments[0].type === 'ObjectExpression' &&
-        expression.arguments[0].properties.length === 2 &&
-        expression.arguments[0].properties.some(({ key, value }) => key?.name === 'path' && value?.name === 'sourcePath') &&
-        expression.arguments[0].properties.some(({ key, value }) => key?.name === 'headingId' &&
+        docProperties.length === 2 &&
+        docProperties.some(({ key, value }) => key?.name === 'path' && value?.name === 'sourcePath') &&
+        docProperties.some(({ key, value }) => key?.name === 'headingId' &&
           value?.type === 'MemberExpression' && value.object.name === 'note' && value.property.name === 'headingId')
       const skillSourceRecovery = relative === 'pages/DevProjectSkillsPage.jsx' &&
-        expression?.type === 'CallExpression' && expression.callee.name === 'buildDevDocsLocation' &&
-        expression.arguments.length === 1 && expression.arguments[0].type === 'ObjectExpression' &&
-        expression.arguments[0].properties.length === 1 &&
-        expression.arguments[0].properties.some(({ key, value }) => key?.name === 'path' &&
+        docProperties.length === 1 &&
+        docProperties.some(({ key, value }) => key?.name === 'path' &&
           value?.type === 'MemberExpression' && value.object.name === 'selected' && value.property.name === 'sourcePath')
+      const headerTools = node.parent.parent?.type === 'JSXExpressionContainer' ? node.parent.parent.parent : null
+      const visualizationSourceLink = relative === 'pages/DevVisualizationPage.jsx' &&
+        headerTools?.type === 'JSXAttribute' && headerTools.name.name === 'tools' && headerTools.parent.name.name === 'DevPageHeader' &&
+        docProperties.length === 2 && [['path', 'docs/engineering/可视化表达规范.md'], ['headingId', 'visualization-choices']].every(
+          ([name, text]) => docProperties.some(({ key, value, computed }) => !computed && key?.name === name && value?.value === text)
+        )
       const controlledReadingLink = relative === 'components/DevReadingNavigation.jsx' &&
         expression?.type === 'Identifier' && expression.name === 'to' &&
         source.includes('if (!isProductCoreReadingDestination(to)) return')
-      const contextualLink = samePageExample || permissionLink || customerApprovalLink || skillSourceLink || skillSourceRecovery || controlledReadingLink
+      const contextualLink = samePageExample || permissionLink || customerApprovalLink || skillSourceLink || skillSourceRecovery || visualizationSourceLink || controlledReadingLink
       if (routerLinks.has(node.name.name) && !contextualLink) violations.push(`${relative}:${node.loc.start.line} 内容区路由链接`)
       if ((['Button', 'a'].includes(node.name.name) || routerLinks.has(node.name.name)) && destination && !attributes.some((item) => item.name.name === 'download') && /^\/(?:__dev|erp)(?:\/|\?|$)/u.test(target) && !contextualLink) violations.push(`${relative}:${node.loc.start.line} 内容区跨页地址`)
       const click = attributes.find((item) => item.name.name === 'onClick')

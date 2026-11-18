@@ -40,7 +40,7 @@ test('任务标题固定表达办理事项，五类常规关联各有明确计�
   assert.equal(task.productName, '')
   assert.equal(task.reference, '')
   assert.equal(task.hasProduct, false)
-  assert.equal(task.source, '收付款与核销 · DEMO-SK-002')
+  assert.equal(task.source, '收付款单 · DEMO-SK-002')
   const missing = designTaskPresentation(taskByID('blocked'))
   assert.equal(missing.title, '确认颜色')
   assert.equal(missing.reference, '产品编号未填写')

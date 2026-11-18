@@ -7,7 +7,8 @@ import DevPageNav from '../components/DevPageNav.jsx'
 import { WorkbenchNotice, WorkbenchReading, WorkbenchSection } from '../components/WorkbenchPattern.jsx'
 import { VisualizationExamples, VISUALIZATION_EXAMPLES } from '../components/DevVisualizationExamples.jsx'
 import { readVisualizationChoices, resolveVisualizationChoice } from '../config/devVisualization.mjs'
-import { DEV_DOCS_ROUTE, DEV_PAGE_TITLE_BY_ROUTE, DEV_VISUALIZATION_ROUTE } from '../config/devRoutes.mjs'
+import { DEV_PAGE_TITLE_BY_ROUTE, DEV_VISUALIZATION_ROUTE } from '../config/devRoutes.mjs'
+import { buildDevDocsLocation } from './devDocsNavigation.mjs'
 import '../styles/dev-visualization.css'
 
 const { Title, Text } = Typography
@@ -15,7 +16,6 @@ const choices = readVisualizationChoices(source)
 const catalogReady = choices.length === Object.keys(VISUALIZATION_EXAMPLES).length &&
   choices.every((choice) => Object.hasOwn(VISUALIZATION_EXAMPLES, choice.value))
 const exampleCount = Object.values(VISUALIZATION_EXAMPLES).reduce((count, examples) => count + examples.length, 0)
-const sourceRoute = `${DEV_DOCS_ROUTE}?${new URLSearchParams({ path: 'docs/engineering/可视化表达规范.md' })}#visualization-choices`
 
 export default function DevVisualizationPage() {
   const [params, setParams] = useSearchParams()
@@ -42,7 +42,7 @@ export default function DevVisualizationPage() {
       <DevPageNav />
       <DevPageHeader
         title={<Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_VISUALIZATION_ROUTE]}</Title>}
-        tools={<Link to={sourceRoute}>规则源文档</Link>}
+        tools={<Link to={buildDevDocsLocation({ path: 'docs/engineering/可视化表达规范.md', headingId: 'visualization-choices' })}>规则源文档</Link>}
       />
       <main>
         {catalogReady ? (
