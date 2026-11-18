@@ -1,6 +1,7 @@
 import React, { useId, useRef, useState } from 'react'
-import { Button, Checkbox, Input, Popover, Tag } from 'antd'
+import { Button, Checkbox, Popover, Tag } from 'antd'
 import { FilterOutlined } from '@ant-design/icons'
+import SearchInput from '@/common/components/SearchInput.jsx'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect.jsx'
 import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
@@ -36,6 +37,7 @@ export default function BusinessChainNodeLibrary({
   setNodeScope,
   listRef,
 }) {
+  const [searchReset, setSearchReset] = useState(0)
   const [nextOnly, setNextOnly] = useState(true)
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(null)
@@ -141,11 +143,12 @@ export default function BusinessChainNodeLibrary({
         <Button type="text" aria-label="收起节点库面板" onClick={onToggle}><strong>节点库</strong></Button>
         <span>{library.chains.length} 条链路</span>
       </div>
-      <Input
+      <SearchInput
         aria-label="搜索业务节点"
         placeholder="搜索步骤、单据或岗位"
+        resetKey={`${chainKey}:${searchReset}`}
         value={filters.search}
-        onChange={(event) => change({ search: event.target.value })}
+        onSearch={(search) => change({ search })}
         allowClear
       />
       <FilterChipGroup
@@ -314,9 +317,11 @@ export default function BusinessChainNodeLibrary({
           <div className="erp-chain-design__empty-results">
             <p>没有匹配节点。</p>
             <Button
-              onClick={() =>
-                { setNodeScope('all'); setFilters({ view: 'all', search: '', ...emptyFacets }) }
-              }
+              onClick={() => {
+                setNodeScope('all')
+                setSearchReset((previous) => previous + 1)
+                setFilters({ view: 'all', search: '', ...emptyFacets })
+              }}
             >
               查看全部节点
             </Button>

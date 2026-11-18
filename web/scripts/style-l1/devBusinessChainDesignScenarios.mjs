@@ -206,12 +206,14 @@ export function createDevBusinessChainDesignScenarios({
           exact: true,
         })
         await search.fill('BOM')
+        await search.press('Enter')
         await expect(
           editor
             .locator('.erp-chain-design__library-item')
             .filter({ hasText: '有效 BOM' })
         ).toContainText('工程')
         await search.fill('采购审批任务')
+        await search.press('Enter')
         await add('采购订单审批')
         await editor
           .getByRole('button', { name: '查看节点：采购订单审批', exact: true })
@@ -295,6 +297,7 @@ export function createDevBusinessChainDesignScenarios({
           .click()
         await page.setViewportSize({ width: 1920, height: 1080 })
         await search.fill('')
+        await search.press('Enter')
         await from.click()
         await to.click()
         await expect(

@@ -41,6 +41,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
               ).draft
           )
         await search.fill('IQC 确认')
+        await search.press('Enter')
         await editor
           .getByRole('button', {
             name: '加入：IQC 确认本行检验通过',
@@ -132,6 +133,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
         await editor.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '选择流程范围', exact: true }) }).locator('.ant-select-selector').click()
         await page.locator('.ant-select-dropdown:visible').getByText('销售受理到生产准备', { exact: true }).click()
         await search.fill('')
+        await search.press('Enter')
         await expect(canvas).toHaveAttribute('data-view-mode', 'mainline')
         for (const label of ['老板批准用料', '财务批准采购']) {
           await expect(

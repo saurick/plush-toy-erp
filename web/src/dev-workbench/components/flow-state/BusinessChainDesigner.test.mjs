@@ -168,7 +168,7 @@ test('损坏视图保留现场并显示错误，编辑画布不覆盖原存储',
   )
 })
 
-test('节点库搜索与分组筛选即时生效，重置保留阅读视角和搜索，画布不受影响', async (t) => {
+test('节点库提交搜索后更新列表，分组筛选即时生效，重置筛选保留关键词和阅读视角', async (t) => {
   const harness = await createReactTestHarness(t)
   const { default: Designer } = await import('./BusinessChainDesigner.jsx')
   await harness.render(h(Designer, { catalog }))
@@ -224,6 +224,7 @@ test('节点库搜索与分组筛选即时生效，重置保留阅读视角和�
     Simulate.change(search)
   })
   await harness.flush()
+  await click(root.querySelector('[aria-label="业务节点库"]'), '搜索')
   await click(root, '筛选业务节点')
   await click(dialog, '重置筛选')
   assert.equal(search.value, '工程')
@@ -243,4 +244,27 @@ test('节点库搜索与分组筛选即时生效，重置保留阅读视角和�
     'false'
   )
   assert.equal(window.sessionStorage.getItem(workingKey), before)
+})
+
+test('没有匹配节点时查看全部会清掉尚未提交的搜索草稿', async (t) => {
+  const harness = await createReactTestHarness(t)
+  const { default: NodeLibrary } = await import('./BusinessChainNodeLibrary.jsx')
+  await harness.render(h(NodeLibrary, {
+    library: { entries: [], nodes: [], chains: [], roles: [] },
+    filters: { view: 'steps', search: '', domain: '', type: '', role: '', chain: '' },
+    chainKey: 'all',
+    nodeScope: 'all',
+    setNodeScope() {},
+    setFilters() {},
+  }))
+  const root = harness.container
+  const search = root.querySelector('input[aria-label="搜索业务节点"]')
+  await harness.act(() => {
+    search.value = '尚未提交'
+    Simulate.change(search)
+  })
+  assert.equal(search.value, '尚未提交')
+  const reset = [...root.querySelectorAll('button')].find((button) => button.textContent === '查看全部节点')
+  await harness.act(() => reset.click())
+  assert.equal(search.value, '')
 })

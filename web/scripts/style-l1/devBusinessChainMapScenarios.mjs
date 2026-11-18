@@ -62,9 +62,9 @@ export function createDevBusinessChainMapScenarios({
             )
           }
         }
-        await editor
-          .getByRole('textbox', { name: '搜索业务节点' })
-          .fill('提交委外订单')
+        const search = editor.getByRole('textbox', { name: '搜索业务节点' })
+        await search.fill('提交委外订单')
+        await search.press('Enter')
         await action('加入：提交委外订单').click()
         await action('关闭画布说明').click()
         const node = action('查看节点：提交委外订单')
