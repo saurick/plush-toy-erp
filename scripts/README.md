@@ -97,7 +97,7 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 `index.codex-commit-once.lock` 是持久的 OS 锁载体，文件存在不表示被占用，不删除它。该入口协调遵守约定的提交进程，不能阻止编辑器同时改同一文件或绕过 hooks 的外部 Git 命令；出现这类漂移须核对现场，不强行合并或反复重试。
 
-遇到可协调的冲突时，入口在 stderr 输出一行 `[commit-scope:coordination]` JSON，包含 `reason`、精确 `paths` 和项目 Skill 路径。当前 Codex 会话在进程退出后读取 [按需 Git 冲突协调](../.agents/skills/plush-git-conflict-coordination/SKILL.md)，自动联系实际相关会话核清，再验证和串行提交；这条诊断本身不发送消息、不自动重试、不改变授权。提交前发现混合 hunk 或跨会话依赖时直接进入同一流程，不必故意触发一次失败。
+遇到冲突时，入口在 stderr 输出一行 `[commit-scope:coordination]` JSON，包含 `reason`、精确 `paths` 和项目 Skill 路径。进程退出后，由当前提交会话按 [Git 冲突处理流程](../.agents/skills/plush-git-conflict-coordination/SKILL.md) 核对差异和已有交接。提交前已发现混合 hunk 或跨会话依赖时，也按同一流程处理。诊断和后续处理均不触发跨会话消息。
 
 | `reason` | 核对对象 |
 | --- | --- |
@@ -105,11 +105,11 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 | `worktree_changed` | 范围内文件仍有活动写入；定向核对对应片段 |
 | `foreign_staging` / `index_changed` | 本组与实际暂存的相关文件；保留他人暂存，核清后再处理 |
 | `commit_busy` | 本轮等待结束仍有提交占用；核对当前操作者，不循环重试 |
-| `native_index_lock` | 先按 Git 锁恢复门禁核验，再决定是否联系实际操作者 |
+| `native_index_lock` | 按 Git 锁恢复门禁核验，锁仍被占用或归属不明时保留现场 |
 | `head_changed` / `branch_changed` | hooks 期间仓库身份变化；重读现场，不能直接换基线重试 |
 | `merge_changed` / `git_operation_active` | 合并父提交变化或已有 Git 操作现场；保留现场，核清原操作者，不覆盖或自动继续 |
 
-按需协调只覆盖当前已授权目标及必要依赖，明确暂缓的批次继续保留，不推送。相关会话通过现有聊天工具交接，进展通过有界事件等待取得；无后台队列、广播、定时扫描或常驻进程。
+处理范围限当前已授权目标及必要依赖。能独立验证的部分继续提交，明确暂缓或无法分开的片段保留，在当前会话说明具体原因。推送另行授权。
 
 ## Hook 对应关系
 

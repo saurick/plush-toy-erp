@@ -27,7 +27,7 @@
 - 存在待提交或需交接改动时，在最终回复保留一份被动 `Git handoff record`：精确文件 / hunk、提交分组及中文意图、验证与盲区、外部脏文件、commit / push 授权。简单改动可融入交付摘要；该记录不产生授权或跨会话调度状态。
 - Local 首次写入前和收口时，按全局只读 Git 规则核对实时 HEAD、index、`index.lock`、status 和 scoped diff，保留其他任务改动；共享 Local 不运行普通 `git status`。真实并发、混合 hunk 或索引冲突只阻断相关路径/动作，锁恢复遵循全局规则；不建立常驻调度、租约、registry、daemon、后台轮询、定时唤醒或广播。
 - 已授权的本地提交统一通过 `python3 scripts/git-hooks/commit-scope.py`，用已审查的 `--base` 与精确文件或 `--patch` 保护核对、暂存、hooks 和提交。该入口允许一次最长 60 秒的操作系统互斥等待（默认 45 秒，不轮询），获得锁后重新核对；不在外部先操作共享 index，不用全局整文件脚本或裸 `git commit` 绕过项目入口。原有暂存仅在完整内容等于已审查候选时复用，其他内容保留；参数与恢复见 [提交入口](scripts/README.md#git-commit-entry)。这不授予提交、推送或同文件并行写入权限。
-- 项目负责人已授权按需协调：已授权提交遇到同文件、混合改动、跨会话依赖或入口冲突诊断时，当前会话先按 [Git 冲突协调 Skill](.agents/skills/plush-git-conflict-coordination/SKILL.md#host-capabilities) 核对宿主工具，再自动联系对应会话核清，验证后由单一操作者串行提交，不把常规协调交还用户。范围限当前目标的必要依赖；“先别提交”等明确暂缓批次继续保留，不能用依赖关系或 ready 回执解除。此协调不推送；缺少工具仅阻断依赖协调的部分，没有实际冲突不联系或扫描其他会话。
+- 已授权本地提交遇到冲突或必要依赖，由正在提交的会话按 [Git 冲突处理流程](.agents/skills/plush-git-conflict-coordination/SKILL.md) 核对当前差异和已有交接，自行拆分、验证并串行提交。无论其他会话是否在运行，提交过程都不向其发消息、派活、追问或回传结果。仍在写入、归属不清、明确暂缓或依赖不可分的片段保留原状，继续处理可独立提交的部分，结果只记在当前会话。
 - 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
 ## 过程记录
@@ -41,7 +41,7 @@
 - 项目 skills 位于 `.agents/skills/` 并随仓库管理；只承载 plush 专项 SOP。
 - `.agents/skills/README.md` 管项目路由；按全局规则选择当前目标需要的分支和验证，切换 skill 后继续已授权工作。
 - 运行诊断、可观测/错误、安全隐私、发布和回滚统一使用 `$plush-operations-governance`。
-- Git 精确收口与原生锁核验使用全局 `$git-closeout-coordination`；本项目已授权提交的跨会话冲突另用 `$plush-git-conflict-coordination`，只补按需联系与依赖核清，不复制 Git 门禁。
+- Git 精确收口与原生锁核验使用全局 `$git-closeout-coordination`。本项目已授权提交遇到混合改动或跨会话依赖时，使用 `$plush-git-conflict-coordination` 在当前会话核清归属与依赖。
 - 修改项目 Skill 后运行唯一项目 validator `node scripts/qa/skill-health.mjs` 与 scoped `git diff --check`，覆盖与额外检查见 [维护与验证](.agents/skills/README.md#skill-validation)；仅在适用范围、入口或元数据变化时同步 README / metadata / 引用。
 
 ## Product Core 与客户差异
