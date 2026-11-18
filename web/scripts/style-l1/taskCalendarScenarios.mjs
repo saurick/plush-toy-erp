@@ -253,15 +253,10 @@ revision,
         }
         assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30)
         await verifyCalendarScroll(calendar, assert, { monthSticks: !mobile, headingSticks: !mobile })
-        if (!mobile && themeMode === 'light') {
-          await page.setViewportSize({ width: 1280, height: 700 })
-          await verifyCalendarScroll(calendar, assert, { monthSticks: false, headingSticks: true })
-          await page.setViewportSize({ width: 760, height: 900 })
-          await verifyCalendarScroll(calendar, assert, { monthSticks: false, headingSticks: false })
-          await page.setViewportSize(viewport)
-        }
-        const monthBefore = await calendar.locator('.workflow-task-calendar__month').boundingBox()
+        const monthPanel = calendar.locator('.workflow-task-calendar__month')
         const emptyDay = calendar.locator('button[data-date][aria-label$="，0 项待办"]').first()
+        await emptyDay.scrollIntoViewIfNeeded()
+        const monthBefore = await monthPanel.boundingBox()
         const emptySelection = await emptyDay.getAttribute('data-date')
         const held = { expectedSelection: emptySelection, started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = held
@@ -274,8 +269,13 @@ revision,
           assert(!pendingCounts.some((value) => value.trim() === '—'), `switching dates must not replace the month with placeholders: ${JSON.stringify(pendingCounts)}`)
           assert.equal(await calendar.locator(`button[data-date="${today}"] .workflow-task-calendar__count`).textContent(), '65 项', 'same-month totals remain visible while another date loads')
           assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 0, 'another date never displays the previous date tasks')
-          const monthPending = await calendar.locator('.workflow-task-calendar__month').boundingBox()
-          for (const dimension of ['x', 'y', 'width', 'height']) assert(Math.abs(monthBefore[dimension] - monthPending[dimension]) <= 1, `month ${dimension} stays stable during selection`)
+          const monthPending = await monthPanel.boundingBox()
+          for (const dimension of ['x', 'y', 'width', 'height']) {
+            assert(
+              Math.abs(monthBefore[dimension] - monthPending[dimension]) <= 1,
+              `month ${dimension} stays stable during selection: ${monthBefore[dimension]} -> ${monthPending[dimension]}`,
+            )
+          }
         } finally {
           held.release.resolve()
         }
@@ -521,6 +521,17 @@ revision,
         await crowdedDay.getByText('65 项', { exact: true }).waitFor()
         await page.mouse.move(0, 0)
         await page.screenshot({ path: path.join(outputDir, `${name}-preview.png`), fullPage: false })
+        // 窗口尺寸会触发控件过渡，滚动断点单独核对，不与切换日期的位置变化混测。
+        if (!mobile && themeMode === 'light') {
+          try {
+            await page.setViewportSize({ width: 1280, height: 700 })
+            await verifyCalendarScroll(calendar, assert, { monthSticks: false, headingSticks: true })
+            await page.setViewportSize({ width: 760, height: 900 })
+            await verifyCalendarScroll(calendar, assert, { monthSticks: false, headingSticks: false })
+          } finally {
+            await page.setViewportSize(viewport)
+          }
+        }
       },
     }
   }).concat(taskCalendarDesignScenario(deps))
