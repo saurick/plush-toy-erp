@@ -470,7 +470,7 @@ test('mobileRoleTaskModel: 详情关联来源不把非订单任务误写成订�
 
   assert.equal(
     resolveTaskRelatedSourceLabel(inboundTask),
-    '来源：入库任务 · IN-001'
+    '来源：采购收货单 · IN-001'
   )
   assert.equal(
     resolveTaskRelatedSourceLabel(unknownSourceTask),

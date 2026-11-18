@@ -128,15 +128,15 @@ export function createDevWorkbenchDesktopScenarios({
         assert.match(await approvalRow.innerText(), /审批通过 \/ 审批退回/u)
         const header = page.locator('.erp-dev-task-handling__header')
         const before = await header.boundingBox()
-        const filterControl = (name) => page.locator('.erp-dev-task-matrix .ant-select')
-          .filter({ has: page.getByRole('combobox', { name, exact: true }) })
-          .locator('.ant-select-selector')
+        const chooseFilter = (group, option) => page
+          .getByRole('group', { name: group, exact: true })
+          .getByRole('button', { name: option, exact: true })
+          .click()
         assert.equal(await page.getByRole('tab').count(), 0)
         assert.deepEqual(await page.locator('.erp-dev-task-catalog').getByRole('columnheader').allTextContents(),
           ['办理事项', '办理岗位', '办理类型', '本次办理', '审批与交接', '电脑', '手机'])
         for (const [key, label] of Object.entries(ROLE_DISPLAY_NAMES)) {
-          await filterControl('办理岗位').click()
-          await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: new RegExp(`^${label}$`, 'u') }).click()
+          await chooseFilter('办理岗位', label)
           await page.waitForFunction(({ roleKey, roleLabel }) => {
             const rows = [...document.querySelectorAll('.erp-dev-task-catalog .ant-table-row')]
             return new URL(window.location.href).searchParams.get('role') === roleKey &&
@@ -153,20 +153,17 @@ export function createDevWorkbenchDesktopScenarios({
             assert.doesNotMatch(text, /销售订单编制与提交|订单审批/u)
           }
         }
-        await filterControl('办理岗位').click()
-        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^业务$/u }).click()
+        await chooseFilter('办理岗位', '业务')
         await page.reload()
         await expectHeading(page, '任务办理')
         assert.equal(new URL(page.url()).searchParams.get('role'), 'sales')
         assert.equal(await page.getByRole('alert').count(), 0)
         await page.getByRole('button', { name: '重置', exact: true }).click()
         assert.equal(new URL(page.url()).searchParams.has('role'), false)
-        await filterControl('办理类型').click()
-        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^审核决策$/u }).click()
+        await chooseFilter('办理类型', '审核决策')
         const rows = page.locator('.erp-dev-task-catalog .ant-table-row')
         for (const role of ['老板', 'PMC', '财务']) assert((await rows.allTextContents()).some((text) => text.includes(role)), `审核清单缺少 ${role}`)
-        await filterControl('办理岗位').click()
-        await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option').filter({ hasText: /^PMC$/u }).click()
+        await chooseFilter('办理岗位', 'PMC')
         await page.reload()
         await page.getByRole('button', { name: '订单评审', exact: true }).waitFor()
         assert.equal(await rows.count(), 1)

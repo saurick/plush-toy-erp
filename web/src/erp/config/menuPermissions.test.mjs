@@ -85,7 +85,7 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
     [
       ['/erp/finance/receivables', '应收管理'],
       ['/erp/finance/payables', '应付管理'],
-      ['/erp/finance/payments', '收付款核销'],
+      ['/erp/finance/payments', '收付款单'],
       ['/erp/finance/reconciliation', '对账管理'],
       ['/erp/finance/invoices', '发票管理'],
     ]

@@ -35,7 +35,7 @@ test('合并环节为每一种任务提供有效查询入口，避免只查到�
   assert.match(first.approvals[1].condition, /自动送审.*老板.*另一位财务/u)
   assert.match(catalog.fulfillment_flow.find((step) => step.stage === 'purchasing').approvals[0].condition, /不重复审批/u)
   const shipment = catalog.fulfillment_flow.find((step) => step.stage === 'shipment')
-  assert.deepEqual(shipment.role_keys, ['sales', 'finance'])
+  assert.deepEqual(shipment.role_keys, ['sales', 'quality', 'finance'])
   assert.match(shipment.approvals[0].passed, /不算已经发货/u)
 })
 

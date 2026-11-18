@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 
 import test from 'node:test'
+import { financePaymentActionPresentation } from '../utils/businessFactActionPresentation.mjs'
 import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 function read(relativePath) {
@@ -100,7 +101,14 @@ test('finance payments: lists real payments, allocates multiple facts and preser
   assert.match(financeAdjustments, /reverseFinancePayment/u)
   assert.match(financeCreditSubmission, /createFinanceCreditNote/u)
   assert.match(financeCreditSubmission, /reverseFinanceCreditNote/u)
-  assert.match(read('../components/finance/FinancePaymentAdjustmentModals.jsx'), /保留原收付款及核销记录/u)
+  assert.match(
+    read('../components/finance/FinancePaymentAdjustmentModals.jsx'),
+    /description=\{financePaymentActionPresentation\(currentPayment, 'reverse'\)\.description\}/u
+  )
+  assert.match(
+    financePaymentActionPresentation({ direction: 'RECEIPT' }, 'reverse').description,
+    /保留原款项与反向记录；实际退款另行登记并审批/u
+  )
   assert.match(financePaymentsPage, /getFinancePaymentApprovalProcess/u)
   assert.match(financeCreation, /startFinancePaymentApprovalProcess/u)
   assert.match(financePaymentsPage, />\s*核对审批流\s*</u)

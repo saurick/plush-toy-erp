@@ -804,7 +804,11 @@ test('SalesOrdersPage: sales order submit action enters acceptance workflow', ()
 test('SalesOrdersPage: process submit payload does not replace selected sales order', () => {
   assert.match(
     salesOrderPageSource,
-    /action\.returnsRecord === false \? order : updated \|\| order/
+    /action\.returnsRecord === false \? order : updated/
+  )
+  assert.match(
+    salesOrderPageSource,
+    /if \(action\.returnsRecord !== false\) requireSourceActionRecord\(updated, order\.id\)/
   )
   assert.match(salesOrderPageSource, /setSelectedOrder\(nextSelectedOrder\)/)
 })

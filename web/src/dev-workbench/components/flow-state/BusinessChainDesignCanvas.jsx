@@ -6,10 +6,11 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Button, Dropdown, Input, Space, Splitter } from 'antd'
+import { Button, Dropdown, Space, Splitter } from 'antd'
 import { UndoOutlined, RedoOutlined } from '@ant-design/icons'
 import DiagramViewControls from '@/common/components/diagram/DiagramViewControls.jsx'
 import SupplementalHelp from '@/common/components/help/SupplementalHelp.jsx'
+import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
 import { diagramDomainStyle } from '@/common/components/diagram/diagramSemantics.mjs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
@@ -68,12 +69,12 @@ function DraftNotes({ draft, change }) {
   return (
     <>
       <p>记录待讨论的顺序、接入条件或状态规则。</p>
-      <Input.TextArea
+      <BusinessTextArea
         aria-label="视图备注内容"
         value={text}
         onChange={(event) => setText(event.target.value)}
         maxLength={2000}
-        autoSize={{ minRows: 3, maxRows: 6 }}
+        minRows={3}
         placeholder="例如：这个接点还需要核对哪项前置条件？"
       />
       <div className="erp-chain-design__actions">

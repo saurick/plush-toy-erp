@@ -133,8 +133,12 @@ test('busy-aware modals protect backdrop dismissal directly or through the share
     const sourcePath = relative(SOURCE_ROOT, absolutePath)
     const source = readFileSync(absolutePath, 'utf8')
     for (const element of listModalOpeningElements(source)) {
+      const closeButtonLabelOnly =
+        /^<BusinessModal\b/u.test(element.source) &&
+        /\bclosable\s*=\s*\{\{\s*['"]aria-label['"]\s*:\s*(['"])[^'"\n]*\1\s*\}\}/u.test(element.source)
       const hasBusyCloseContract =
-        /\b(?:confirmLoading|closable|keyboard)\s*=/u.test(element.source)
+        /\b(?:confirmLoading|keyboard)\s*=/u.test(element.source) ||
+        (/\bclosable\s*=/u.test(element.source) && !closeButtonLabelOnly)
       const usesSharedSubmissionGuard =
         /^<(?:BusinessFormModal|BusinessModal)\b/u.test(element.source) &&
         /\bconfirmLoading\s*=/u.test(element.source)

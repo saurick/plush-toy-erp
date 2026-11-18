@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, } from 'react-router-dom'
 import { Button } from 'antd'
-import { CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, MinusCircleOutlined, QuestionCircleOutlined, SyncOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, MinusCircleOutlined, SyncOutlined } from '@ant-design/icons'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Pagination from '@/common/components/pagination/AppPagination'
@@ -19,7 +19,7 @@ const statusIcons = {
   draft: ClockCircleOutlined,
   closed: ExclamationCircleOutlined,
   cancelled: MinusCircleOutlined,
-  unknown: QuestionCircleOutlined,
+  unknown: ExclamationCircleOutlined,
   inProgress: SyncOutlined,
   open: ClockCircleOutlined,
 }

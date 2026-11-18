@@ -36,7 +36,7 @@
 .erp-chain-design__role-filter { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .erp-chain-design__role-filter > label { white-space: nowrap; }
 .erp-chain-design-draft-dialog p { margin-block: 12px 0; }
-.erp-chain-design-draft-dialog [role="alert"] { color: var(--erp-danger); }
+.erp-chain-design-draft-dialog [role="alert"] { color: var(--erp-visual-danger-text); }
 
 .erp-chain-design__workspace { display: grid; grid-template-columns: 18.5rem minmax(0, 1fr); flex: 1 0 520px; min-width: 0; border: 1px solid var(--erp-border); border-radius: 8px; overflow: hidden; }
 .erp-chain-design__workspace[data-library-visible="false"] { grid-template-columns: minmax(0, 1fr); }

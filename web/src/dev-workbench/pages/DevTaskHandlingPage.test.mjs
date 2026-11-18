@@ -43,29 +43,16 @@ async function mount(t, url = '/__dev/task-handling') {
     await ui.flush()
   }
   const choose = async (label, option) => {
-    const selector = ui.container
-      .querySelector(`[aria-label="${label}"][role="combobox"]`)
-      .closest('.ant-select')
-    await ui.act(() =>
-      selector
-        .querySelector('.ant-select-selector')
-        .dispatchEvent(
-          new ui.runtimeWindow.MouseEvent('mousedown', { bubbles: true })
-        )
+    const group = ui.container.querySelector(`[role="group"][aria-label="${label}"]`)
+    assert.ok(group, `缺少筛选组：${label}`)
+    const button = [...group.querySelectorAll('button')].find(
+      (el) => el.textContent.trim() === option
     )
-    await ui.flush()
-    const options = [
-      ...document.querySelectorAll(
-        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
-      ),
-    ]
-    assert(
-      !options.some((el) => /^(全部|不限)/u.test(el.textContent)),
-      '不应提供伪筛选选项'
-    )
-    await click(options.find((el) => el.textContent === option))
+    assert.ok(button, `缺少筛选项：${label} / ${option}`)
+    await click(button)
+    assert.equal(button.getAttribute('aria-pressed'), 'true')
   }
-  const clear = async (label) => {
+  const clearSelect = async (label) => {
     const control = ui.container
       .querySelector(`[aria-label="${label}"][role="combobox"]`)
       .closest('.ant-select')
@@ -87,7 +74,7 @@ async function mount(t, url = '/__dev/task-handling') {
     ...ui,
     click,
     choose,
-    clear,
+    clearSelect,
     button,
     go,
     params: () => new URLSearchParams(location.search),
@@ -105,7 +92,7 @@ test('任务办理直接显示清单，筛选清空和历史导航恢复时保�
   await v.choose('办理类型', '单据与明细编辑')
   await v.choose('手机支持', '仅查看')
   assert.equal(v.container.querySelector('[role="alert"]'), null)
-  await v.clear('手机支持')
+  await v.choose('手机支持', '不限')
   assert.equal(v.params().has('mobile'), false)
   await v.go(-1)
   await v.flush()
@@ -134,7 +121,7 @@ test('有筛选的独立深链直接打开，动作清空不回选且保留环�
   assert.equal(v.container.querySelector('[role="alert"]'), null)
   await v.click(v.container.querySelector('[data-row-key="sewing_execute"] button'))
   assert.equal(v.params().get('stage'), 'sewing_execute')
-  await v.clear('关联动作')
+  await v.clearSelect('关联动作')
   assert.equal(v.params().get('action'), '')
   assert.equal(v.container.querySelector('[data-relation-action]'), null)
   assert(v.container.querySelector('[aria-label="关联动作"]'))
@@ -208,7 +195,7 @@ test('审核清单展示具体事项及办理岗位，岗位和类型组合筛�
     assert.equal(v.container.querySelector('[role="alert"]'), null)
     assert(v.button(label))
   }
-  await v.clear('办理岗位')
+  await v.choose('办理岗位', '不限')
   assert.equal(v.params().has('role'), false)
   assert.equal(v.params().get('kind'), 'decision')
   assert(v.button('订单评审'))
