@@ -45,17 +45,8 @@
 }
 
 .erp-dev-integration__filter {
-  display: flex;
   flex: 0 1 240px;
-  align-items: center;
   min-width: 0;
-  gap: 8px;
-}
-
-.erp-dev-integration__filter > label {
-  flex: 0 0 auto;
-  color: var(--erp-text-muted);
-  white-space: nowrap;
 }
 
 .erp-dev-integration__filter--search {

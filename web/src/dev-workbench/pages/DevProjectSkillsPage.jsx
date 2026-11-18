@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Spin, Tag, Typography } from 'antd'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { DEV_PAGE_TITLE_BY_ROUTE, DEV_PROJECT_SKILLS_ROUTE } from '../config/devRoutes.mjs'
 import SearchInput from '@/common/components/SearchInput'
@@ -9,20 +9,22 @@ import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
-import DevProjectSkillsDecisionGuide from '../components/DevProjectSkillsDecisionGuide.jsx'
+import Select from '@/common/components/select/AppSelect'
+import DevProjectSkillsExecutionGuide from '../components/DevProjectSkillsExecutionGuide.jsx'
+import { buildDevDocsLocation } from './devDocsNavigation.mjs'
 import { WorkbenchNotice, WorkbenchSection } from '../components/WorkbenchPattern.jsx'
 import { requestWorkbenchJson } from '../config/devWorkbenchRequest.mjs'
 
 import {
   DEV_PROJECT_SKILLS_API,
   filterProjectSkills,
-  readProjectSkillDecisionGuide,
+  readProjectSkillExecutionGuides,
 } from '../config/devProjectSkills.mjs'
 import '../styles/dev-project-skills.css'
 
 const { Title, Text } = Typography
-const decisionSources = import.meta.glob(
-  '../../../../.agents/skills/plush-operations-governance/SKILL.md',
+const executionSources = import.meta.glob(
+  '../../../../.agents/skills/*/SKILL.md',
   { eager: true, import: 'default', query: '?raw' }
 )
 
@@ -72,14 +74,26 @@ export default function DevProjectSkillsPage() {
   const selected = selectedName
     ? filtered.find((skill) => skill.name === selectedName)
     : filtered[0]
-  const decisionSource = selected && decisionSources[`../../../../${selected.sourcePath}`]
-  const decisionGuide = useMemo(() => readProjectSkillDecisionGuide(decisionSource), [decisionSource])
+  const executionSource = selected && executionSources[`../../../../${selected.sourcePath}`]
+  const execution = useMemo(() => {
+    try {
+      const topics = readProjectSkillExecutionGuides(executionSource)
+      return { topics, error: topics.length === 0 }
+    } catch {
+      return { topics: [], error: true }
+    }
+  }, [executionSource])
+  const topic = execution.topics.find((item) => item.id === params.get('topic')) || execution.topics[0]
 
   const updateQuery = (values) => {
     setParams(
       (current) => {
         const next = new URLSearchParams(current)
-        if ('q' in values || 'skill' in values) next.delete('decision')
+        if ('q' in values || 'skill' in values) {
+          next.delete('topic')
+          next.delete('step')
+        }
+        if ('topic' in values) next.delete('step')
         Object.entries(values).forEach(([key, value]) => {
           if (value) next.set(key, value)
           else next.delete(key)
@@ -247,26 +261,39 @@ export default function DevProjectSkillsPage() {
                     </div>
                     <p>{selected.scope || '适用范围尚未登记，请查看原文。'}</p>
                     <code className="erp-dev-skills__name">${selected.name}</code>
-                    {decisionGuide ? (
-                      <DevProjectSkillsDecisionGuide
-                        key={selected.name}
-                        guide={decisionGuide}
-                        sourcePath={selected.sourcePath}
-                        value={params.get('decision')}
-                        onChange={(decision) => updateQuery({ skill: selected.name, decision })}
+                    {execution.error ? (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message="执行流程暂时无法显示"
+                        description="请核对正文中的专题与步骤说明，修正后刷新。"
+                        action={<Link to={buildDevDocsLocation({ path: selected.sourcePath })}>查看 Skill 正文</Link>}
                       />
                     ) : null}
-                    {selected.relatedSkills.length ? (
-                      <section>
-                        <Title level={3}>相关 Skill</Title>
-                        <div className="erp-dev-skills__related">
-                          {selected.relatedSkills.map((name) => (
-                            <Button key={name} size="small" onClick={() => updateQuery({ skill: name, q: '' })}>
-                              {skills.find((skill) => skill.name === name)?.title || name}
-                            </Button>
-                          ))}
+                    {topic ? (
+                      <>
+                        <div className="erp-dev-skills__topic-tools">
+                          <label htmlFor="skill-execution-topic">执行专题</label>
+                          <Select
+                            id="skill-execution-topic"
+                            aria-label="执行专题"
+                            allowClear={false} // 不可清空：执行专题必须保留一个当前流程。
+                            showSearch={false}
+                            value={topic.id}
+                            options={execution.topics.map((item) => ({ value: item.id, label: item.title }))}
+                            onChange={(nextTopic) => updateQuery({ skill: selected.name, topic: nextTopic })}
+                          />
+                          <Text type="secondary">{execution.topics.length} 个专题</Text>
                         </div>
-                      </section>
+                        <p>{topic.summary}</p>
+                        <DevProjectSkillsExecutionGuide
+                          key={`${selected.name}:${topic.id}`}
+                          topic={topic}
+                          sourcePath={selected.sourcePath}
+                          value={params.get('step')}
+                          onChange={(step) => updateQuery({ skill: selected.name, topic: topic.id, step })}
+                        />
+                      </>
                     ) : null}
                   </>
                 ) : (

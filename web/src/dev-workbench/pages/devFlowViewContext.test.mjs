@@ -66,18 +66,17 @@ test('main-tab restoration shares current stage and facets but keeps the instanc
   assert.equal(restored.has('flow'), false)
 })
 
-const resolve = (query, task, taskScoped = false, topics = false) =>
+const resolve = (query, task, taskScoped = false) =>
   resolveDevFlowViewContext({
     catalog,
     searchParams: new URLSearchParams(query),
     task,
     taskScoped,
-    topics,
   })
 test('reading context follows the selected topic, stage, or exception instead of old global selections', () => {
   assert.equal(
     resolve(
-      'chain=all&flow_topic=delivery_to_settlement&flow_stage=shell_quality', null, false, true
+      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_stage=shell_quality'
     ).chainKey,
     'delivery_to_settlement'
   )
@@ -91,7 +90,7 @@ test('reading context follows the selected topic, stage, or exception instead of
     ).chainKey,
     'production_exception'
   )
-  assert.equal(resolve('chain=all&flow_topic=', null, false, true), null)
+  assert.equal(resolve('chain=all&flow_tab=topics&flow_topic='), null)
 })
 test('task tools reject stale task records and use only registered unambiguous discovery', () => {
   const task = { id: 23, discovery: { stage_key: 'shipping' } }
@@ -130,30 +129,30 @@ test('task tools reject stale task records and use only registered unambiguous d
 
 test('default topic, map focus and selected neighbor use the same visible business definition', () => {
   assert.equal(
-    resolve('chain=all', null, false, true).chainKey,
+    resolve('chain=all&flow_tab=topics').chainKey,
     'sales_to_production'
   )
   assert.equal(
     resolve(
-      'chain=all&flow_topic=delivery_to_settlement&flow_map=purchase_to_inventory', null, false, true
+      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_map=purchase_to_inventory'
     ).chainKey,
     'purchase_to_inventory'
   )
   assert.equal(
     resolve(
-      'chain=all&flow_topic=delivery_to_settlement&flow_map=purchase_to_inventory&flow_map_node=finance_payment_and_reversal', null, false, true
+      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_map=purchase_to_inventory&flow_map_node=finance_payment_and_reversal'
     ).chainKey,
     'finance_payment_and_reversal'
   )
   assert.equal(
     resolve(
-      'chain=all&flow_topic=delivery_to_settlement&flow_topic_node=shipped', null, false, true
+      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_topic_node=shipped'
     ).nodeKey,
     'shipped'
   )
   assert.equal(
     resolve(
-      'chain=all&flow_topic=delivery_to_settlement&flow_topic_node=missing', null, false, true
+      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_topic_node=missing'
     ),
     null
   )

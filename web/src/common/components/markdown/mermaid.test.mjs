@@ -14,6 +14,7 @@ const componentSource = readFileSync(
   'utf8'
 )
 const css = readFileSync(new URL('./mermaid.css', import.meta.url), 'utf8')
+const controlsCss = readFileSync(new URL('../diagram/diagramViewControls.css', import.meta.url), 'utf8')
 
 test('initial fit-width stays distinct from full fit and manual zoom', () => {
   assert.equal(getInitialMermaidZoomMode('fit'), 'fit-all')
@@ -22,13 +23,13 @@ test('initial fit-width stays distinct from full fit and manual zoom', () => {
   assert.equal(getInitialMermaidZoomMode(0.8), 'manual')
 })
 
-test('Mermaid viewer owns its shared interaction styles', () => {
+test('Mermaid viewer reuses shared controls and owns its viewport styles', () => {
   assert.match(componentSource, /import '\.\/mermaid\.css'/u)
   assert.match(css, /^\.erp-markdown-mermaid\s*\{/mu)
   assert.match(css, /\.erp-markdown-mermaid__toolbar[\s\S]*?flex-wrap:\s*wrap/u)
   assert.match(
-    css,
-    /\.erp-markdown-mermaid__tool[\s\S]*?width:\s*32px[\s\S]*?height:\s*32px/u
+    controlsCss,
+    /\.erp-diagram-view-controls__button[\s\S]*?width:\s*32px[\s\S]*?height:\s*32px/u
   )
   assert.match(css, /\.erp-markdown-mermaid__viewport[\s\S]*?overflow:\s*auto/u)
 })
@@ -51,7 +52,7 @@ test('Mermaid viewer applies zoom and fullscreen geometry without a page wrapper
 })
 
 test('Mermaid viewer preserves keyboard focus affordances and theme tokens', () => {
-  assert.match(css, /\.erp-markdown-mermaid__tool:focus-visible/u)
+  assert.match(controlsCss, /\.erp-diagram-view-controls__button:focus-visible/u)
   assert.match(css, /--erp-border/u)
   assert.match(css, /--erp-surface-bg/u)
   assert.match(css, /--erp-text/u)

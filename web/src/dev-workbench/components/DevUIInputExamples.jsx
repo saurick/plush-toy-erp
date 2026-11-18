@@ -235,20 +235,17 @@ export function DateInputExample() {
         </div>
       </div>
       <section className="erp-control-input-field" aria-label="日期范围示例">
-        <h3>日期范围</h3>
         <DateRangeFilter
           key={`range-${resetKey}`}
-          typePresentation="inline"
           options={[
             { value: 'order', label: '下单日期' },
-            { value: 'delivery', label: '交货日期' },
+            { value: 'delivery', label: '交货日期', upcoming: true },
           ]}
           value={values.type}
           onTypeChange={(value) => update('type', value)}
           startValue={values.start}
           endValue={values.end}
-          onStartChange={(value) => update('start', value)}
-          onEndChange={(value) => update('end', value)}
+          onRangeChange={(start, end) => setValues((current) => ({ ...current, start, end }))}
         />
         <output aria-label="日期范围当前值">
           {values.start || '未设置'} 至 {values.end || '未设置'}

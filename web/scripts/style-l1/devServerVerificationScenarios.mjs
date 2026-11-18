@@ -164,6 +164,7 @@ export function createDevServerVerificationScenarios({
           assert.equal(await region.locator('.ant-tag-success').count(), 0)
           ci = await openCI()
           await ci.getByText('上次读取记录，仅供追溯；本次状态尚未确认。', { exact: true }).waitFor()
+          await ci.getByText('上次结果：完整 CI 通过', { exact: true }).waitFor()
           await ci.getByRole('link', { name: '查看 GitLab 测试报告', exact: true }).waitFor()
           await closeTestingDetails(page)
           state.failQuality = true

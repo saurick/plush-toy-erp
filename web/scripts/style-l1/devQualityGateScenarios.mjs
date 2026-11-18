@@ -910,7 +910,12 @@ export function createDevQualityGateScenarios({
           const section = CI_WORKFLOW_SECTIONS.find((item) => item.key === key)
           const header = workflowGuide.getByRole('button', { name: `collapsed ${section.label}`, exact: true })
           await header.click()
-          if (section.chart) await workflowGuide.locator(`[data-section="${key}"] [data-mermaid-status="rendered"]`).waitFor()
+          if (section.chart) {
+            const diagrams = workflowGuide.locator(`[data-section="${key}"] [data-mermaid-status="rendered"]`)
+            const expected = section.charts?.length || 1
+            await diagrams.nth(expected - 1).waitFor()
+            assert.equal(await diagrams.count(), expected)
+          }
           if (section.table) {
             const table = workflowGuide.getByRole('region', { name: `${section.label}明细表` })
             await table.waitFor()

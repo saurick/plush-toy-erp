@@ -1,4 +1,5 @@
 import { expect } from 'playwright/test'
+import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 
 const contentWithoutCamera = (raw) => {
   const value = JSON.parse(raw)
@@ -37,10 +38,7 @@ export function createDevBusinessChainDesignViewportScenarios({
         await editor.getByRole('button', { name: '全库', exact: true }).click()
         await editor.getByRole('button', { name: '调整布局', exact: true }).click()
         // Object-level gestures remain available through the complete node library.
-        await editor
-          .getByRole('group', { name: '常用视角', exact: true })
-          .getByRole('button', { name: '全部', exact: true })
-          .click()
+        await chooseChainNodeView(page, editor, '全部')
         await editor
           .locator('.erp-chain-design__canvas-bar')
           .getByText('全部已载入节点', { exact: true })
@@ -123,8 +121,7 @@ async function assertExpandedChainFitWidth(page, assert) {
   await assertReadable(purchaseIds, '采购链路')
   await assertNodeAndEdgeVisualSemantics(editor, assert)
   await fitAll.click()
-  await action('查看节点：采购下单到入库应付').click()
-  await action('收起这条链路').click()
+  await action('收起链路').click()
   await fitWidth.click()
   await action('查看节点：采购下单到入库应付').click()
   await action('展开这条链路的步骤').click()
@@ -261,7 +258,7 @@ async function assertConnectionToolbarGeometry(page, editor, assert) {
 
 async function assertChainDesignPageHeight(page, editor, assert) {
   const readDrafts = () => page.evaluate(() => ({
-    saved: localStorage.getItem('plush-workbench:business-chain-design'),
+    saved: localStorage.getItem('plush-workbench:business-chain-design:working'),
     working: sessionStorage.getItem('plush-workbench:business-chain-design:working'),
   }))
   const before = await readDrafts()
@@ -309,7 +306,7 @@ async function assertChainDesignPageHeight(page, editor, assert) {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '短窗口换行后仍无横向溢出')
   await page.setViewportSize({ width: 1920, height: 1080 })
   await page.evaluate(() => window.scrollTo(0, 0))
-  assert.deepEqual(await readDrafts(), before, '调整窗口尺寸不改写已保存视图和当前草稿')
+  assert.deepEqual(await readDrafts(), before, '调整窗口尺寸不改写本地和标签页的探索记录')
 }
 
 async function assertChainDesignNavigation(page, editor, assert) {

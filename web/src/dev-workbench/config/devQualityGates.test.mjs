@@ -262,6 +262,7 @@ test('quality gates config: route, four views and per-view query contracts stay 
   )
   assert.deepEqual(QUERY_KEYS, {
     view: 'view',
+    guide: 'guide',
     profile: 'profile',
     operation: 'operation',
     q: 'q',
@@ -272,7 +273,7 @@ test('quality gates config: route, four views and per-view query contracts stay 
   assert.deepEqual(VIEW_QUERY_KEYS, {
     server: ['view'],
     run: ['view', 'profile', 'operation'],
-    governance: ['view', 'q', 'filter'],
+    governance: ['view', 'q', 'filter', 'guide'],
     gaps: ['view', 'range', 'risk'],
   })
 })
@@ -955,4 +956,18 @@ fetchImpl: (url, options) => {
   }
   assert.equal(calls.length, 4)
   assert(calls.every(({ method }) => method === 'GET'))
+})
+
+test('quality rules subviews are URL-backed and reject unrelated or duplicate parameters', () => {
+  for (const guide of ['catalog', 'hooks', 'flows', 'tests']) {
+    const search = buildQualityGateViewSearch('governance', { guide, filter: 'all', q: '权限' })
+    const parsed = parseQualityGateSearch(search)
+    assert.equal(parsed.valid, true)
+    assert.equal(parsed.values.guide, guide)
+    assert.equal(parsed.values.q, '权限')
+  }
+  assert.equal(parseQualityGateSearch('?view=governance').values.guide, 'catalog')
+  assert.equal(parseQualityGateSearch('?view=governance&guide=unknown').valid, false)
+  assert.equal(parseQualityGateSearch('?view=governance&guide=hooks&guide=flows').valid, false)
+  assert.equal(parseQualityGateSearch('?view=run&guide=hooks').valid, false)
 })

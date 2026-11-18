@@ -1,10 +1,10 @@
-import { DEV_BUSINESS_RULES_ROUTE, DEV_BUSINESS_TOPICS_ROUTE, DEV_STATUS_FLOWS_ROUTE } from '../config/devRoutes.mjs'
+import { DEV_BUSINESS_RULES_ROUTE, DEV_STATUS_FLOWS_ROUTE } from '../config/devRoutes.mjs'
 
 export const DEV_BUSINESS_RULE_VIEWS = Object.freeze(['states', 'processes', 'facts', 'finance_rules'])
 
-export function resolveDevFlowViewRoute(view, { topics = false } = {}) {
+export function resolveDevFlowViewRoute(view) {
   if (DEV_BUSINESS_RULE_VIEWS.includes(view)) return DEV_BUSINESS_RULES_ROUTE
-  return topics && view === 'chain' ? DEV_BUSINESS_TOPICS_ROUTE : DEV_STATUS_FLOWS_ROUTE
+  return DEV_STATUS_FLOWS_ROUTE
 }
 
 export const DEV_FLOW_STATE_QUERY_KEYS = Object.freeze({
@@ -67,17 +67,19 @@ export function patchDevFlowRelationFilters(searchParams, patch) {
 
 export const DEV_FLOW_STATE_DEFAULT_VIEW = 'chain'
 export const DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY = 'all'
+export const DEV_FLOW_SPECIALIZED_CHAIN_TAB = 'topics'
 
-export function buildDevFlowSurfaceLocation(searchParams, { topics = false, topicKey } = {}) {
-  const next = new URLSearchParams()
+export function buildDevSpecializedChainLocation(chainKey, searchParams = new URLSearchParams()) {
+  const next = new URLSearchParams({
+    [DEV_FLOW_STATE_QUERY_KEYS.view]: DEV_FLOW_STATE_DEFAULT_VIEW,
+    [DEV_FLOW_STATE_QUERY_KEYS.chain]: DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY,
+    [DEV_FLOW_STATE_QUERY_KEYS.roleTab]: DEV_FLOW_SPECIALIZED_CHAIN_TAB,
+    [DEV_FLOW_STATE_QUERY_KEYS.roleTopic]: chainKey,
+  })
   for (const key of Object.values(DEV_FLOW_RELATION_FILTER_KEYS)) {
     if (searchParams.has(key)) next.set(key, searchParams.get(key))
   }
-  if (topics && topicKey !== undefined) next.set(DEV_FLOW_STATE_QUERY_KEYS.roleTopic, topicKey)
-  return {
-    pathname: topics ? DEV_BUSINESS_TOPICS_ROUTE : DEV_STATUS_FLOWS_ROUTE,
-    search: next.toString() ? `?${next}` : '',
-  }
+  return { pathname: DEV_STATUS_FLOWS_ROUTE, search: `?${next}` }
 }
 
 export const DEV_FLOW_STATE_VIEW_SELECTION_QUERY_KEYS = Object.freeze({

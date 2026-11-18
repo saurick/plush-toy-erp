@@ -88,12 +88,14 @@ import { createDevBusinessChainPrintScenarios } from './devBusinessChainPrintSce
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevQualityGateLayoutScenarios } from './devQualityGateLayoutScenarios.mjs'
+import { createDevQualityGateRulesScenarios } from './devQualityGateRulesScenarios.mjs'
 import { createDevWorkbenchPatternScenarios } from './devWorkbenchPatternScenarios.mjs'
 import { createDevServerVerificationScenarios } from './devServerVerificationScenarios.mjs'
 import { createDevTestingGuideScenarios } from './devTestingGuideScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
 import { createDevWorkbenchDensityScenarios } from './devWorkbenchDensityScenarios.mjs'
 import { createDevProjectSkillsScenarios } from './devProjectSkillsScenarios.mjs'
+import { createDevVisualizationScenarios } from './devVisualizationScenarios.mjs'
 import { createDevPressureScenarios } from './devPressureScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
 import { createDevVersionCenterPlanLifecycleScenarios } from './devVersionCenterPlanLifecycleScenarios.mjs'
@@ -522,6 +524,7 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createDevWorkbenchDensityScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevProjectSkillsScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
+    ...createDevVisualizationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevPressureScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevUIDesignDetailScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDevUIFeedbackScenarios(deps),
@@ -535,6 +538,7 @@ export function createStyleL1Scenarios(deps) {
       path,
     }),
     ...createDevQualityGateLayoutScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
+    ...createDevQualityGateRulesScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevServerVerificationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevTestingGuideScenarios({ assert, assertNoHorizontalOverflow }),

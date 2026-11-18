@@ -10,6 +10,7 @@ export function DrillDrawer({
   refreshing,
   selectedDrillKey,
   setSelectedDrillKey,
+  stale,
 }) {
   return (
     <Drawer
@@ -34,6 +35,7 @@ export function DrillDrawer({
             refreshing={loading || refreshing}
             disabled={!customerReady}
             onRefresh={refresh}
+            stale={stale}
           />
         ))}
     </Drawer>

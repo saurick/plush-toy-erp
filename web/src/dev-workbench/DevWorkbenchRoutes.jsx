@@ -4,7 +4,6 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import {
   DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
-  DEV_BUSINESS_TOPICS_ROUTE,
   DEV_BUSINESS_RULES_ROUTE,
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
@@ -14,6 +13,7 @@ import {
   DEV_DEVELOPMENT_RESOURCES_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_PROJECT_SKILLS_ROUTE,
+  DEV_VISUALIZATION_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
   DEV_HUB_ROUTE,
   DEV_INTEGRATION_ROUTE,
@@ -95,17 +95,13 @@ const DevFlowStateObservatoryPage = createDevLazyRoute(
   DEV_STATUS_FLOWS_ROUTE,
   () => import('./pages/DevFlowStateObservatoryPage.jsx')
 )
+const DevTaskHandlingPage = createDevLazyRoute(DEV_TASK_HANDLING_ROUTE, () => import('./pages/DevTaskHandlingPage.jsx'))
 const DevFlowExplorerPage = createDevLazyRoute(
   DEV_FLOW_EXPLORER_ROUTE,
   () => import('./pages/DevFlowExplorerPage.jsx')
 )
-const DevTaskHandlingPage = createDevLazyRoute(DEV_TASK_HANDLING_ROUTE, () => import('./pages/DevTaskHandlingPage.jsx'))
 const DevBusinessRulesPage = createDevLazyRoute(
   DEV_BUSINESS_RULES_ROUTE,
-  () => import('./pages/DevFlowStateObservatoryPage.jsx')
-)
-const DevBusinessTopicsPage = createDevLazyRoute(
-  DEV_BUSINESS_TOPICS_ROUTE,
   () => import('./pages/DevFlowStateObservatoryPage.jsx')
 )
 const DevBusinessUsabilityPage = createDevLazyRoute(
@@ -115,6 +111,10 @@ const DevBusinessUsabilityPage = createDevLazyRoute(
 const DevUIDesignPage = createDevLazyRoute(
   DEV_UI_DESIGN_ROUTE,
   () => import('./pages/DevUIDesignPage.jsx')
+)
+const DevVisualizationPage = createDevLazyRoute(
+  DEV_VISUALIZATION_ROUTE,
+  () => import('./pages/DevVisualizationPage.jsx')
 )
 const DevCustomerConfigPage = createDevLazyRoute(
   DEV_CUSTOMER_CONFIG_ROUTE,
@@ -225,7 +225,6 @@ export default function DevWorkbenchRoutes() {
           />
           <Route path="flow-explorer" element={<DevFlowExplorerPage />} />
           <Route path="task-handling" element={<DevTaskHandlingPage />} />
-          <Route path="business-topics" element={<DevBusinessTopicsPage />} />
           <Route path="business-rules" element={<DevBusinessRulesPage />} />
           <Route path="integration" element={<DevIntegrationPage />} />
           <Route
@@ -234,6 +233,7 @@ export default function DevWorkbenchRoutes() {
           />
           <Route path="docs" element={<DevDocsPage />} />
           <Route path="project-skills" element={<DevProjectSkillsPage />} />
+          <Route path="visualization" element={<DevVisualizationPage />} />
           <Route element={<DevTestingPage />}>
             <Route path="testing" />
             <Route path="business-chain-audit" element={<DevBusinessChainAuditPage />} />

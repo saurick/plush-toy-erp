@@ -100,6 +100,7 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-flow-state-observatory-desktop-light",
   "dev-flow-explorer-navigation-desktop",
   "dev-flow-explorer-reading-desktop",
+  "dev-flow-explorer-overview-lanes-desktop",
   "dev-flow-explorer-export-desktop",
   "dev-business-topics-navigation-desktop",
   "dev-page-task-handling-desktop-light",
@@ -687,6 +688,7 @@ function isPhaseLabelGovernedPath(file) {
 
 function isDevPageGovernancePath(file) {
   return (
+    /^web\/src\/dev-workbench\/config\/devBusinessChain(?:Design|Exploration|Granularity|NodeCatalog|Map)[^/]*\.mjs$/u.test(file) ||
     (file.startsWith("web/") && GROWTH_VALIDATION_EVIDENCE_SOURCES.has(file)) ||
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
@@ -726,7 +728,8 @@ function devBrowserScenarioNames(file) {
     ? ["dev-business-rules-navigation-desktop", "dev-business-rules-context-return-desktop", "dev-business-rules-selection-recovery-desktop"]
     : [];
   const mappings = [
-    /^web\/src\/dev-workbench\/config\/devBusinessChain(?:Design|Exploration|Granularity|NodeCatalog|Map)[^/]*\.mjs$/u.test(file) ||
+    [/BusinessTopicsView|BusinessChainTopics|BusinessTopicDetails/u, ["dev-flow-explorer-navigation-desktop"]],
+    [/BusinessChain(?:Design|Exploration|Granularity|NodeCatalog|NodeLibrary|NodeFilter|Map|Reading|Employee|Export)|businessChain(?:Design|Export)|useBusinessChainDraft|DevFlowExplorer|devFlowExplorer/u, ["dev-flow-explorer-export-desktop", "dev-flow-explorer-overview-lanes-desktop", "dev-flow-explorer-reading-desktop", "dev-flow-explorer-navigation-desktop", "dev-business-chain-design-desktop", "dev-business-chain-design-fullscreen-desktop", "dev-business-chain-design-viewport-desktop", "dev-business-chain-design-mainline-desktop", "dev-business-chain-map-desktop", "dev-business-chain-map-fit-width-desktop"]],
     [/ProductCoreRelations|ReadingNavigation|dev-reading-navigation/u, ["dev-page-product-core-desktop-light", "dev-business-topics-navigation-desktop", "dev-page-business-chain-audit-desktop-light", "dev-version-center-tabs-pagination-desktop"]],
     [/DevPageHeader|styles\/dev-workbench-(?:density|layout)\.css/u, ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-workbench-patterns-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]],
     [/DevSourceReferences|dev-source-references/u, ["dev-workbench-content-desktop-light", "dev-workbench-patterns-desktop-light", "dev-flow-rules-complete", "dev-page-integration-desktop-light", "dev-project-skills-guidance-desktop-light"]],
@@ -752,8 +755,10 @@ function devBrowserScenarioNames(file) {
     ],
     [/DevVerificationEvidence|devVerificationEvidence|dev-verification-evidence/u, ["dev-server-verification-layout-desktop-light"]],
     [/QualityGateContextStrip|QualityGateExecutionFlow|dev-quality-gates\.css/u, ["dev-quality-gates-local-diagnostics-desktop-light", "dev-quality-gates-desktop-light"]],
-    [/QualityGateGovernanceViews|QualityGateEvidenceCharts|QualityGateRunView|DevQualityGatesPage/u, ["dev-quality-gates-layout-desktop-light", "dev-quality-gates-desktop-light", "dev-quality-gates-local-diagnostics-desktop-light"]],
+    [/QualityGateRules|devQualityGateGuide|devQualityGateDirectory|devQualityGateTestDirectory|dev-quality-guide|DevCiWorkflowGuide|devCiWorkflow/u, ["dev-quality-gates-rules-desktop-light"]],
+    [/QualityGateGovernanceViews|QualityGateEvidenceCharts|QualityGateRunView|DevQualityGatesPage/u, ["dev-quality-gates-layout-desktop-light", "dev-quality-gates-desktop-light", "dev-quality-gates-local-diagnostics-desktop-light", "dev-quality-gates-rules-desktop-light"]],
     [/DevProjectSkills|devProjectSkills|dev-project-skills/u, ["dev-project-skills-guidance-desktop-light"]],
+    [/DevVisualization|devVisualization|dev-visualization/u, ["dev-visualization-standards-desktop"]],
     [/DevDataPreparationPage|devDataPreparation|useDataPreparation/u, ["dev-data-preparation-workflow-desktop", "dev-data-preparation-4k"]],
     [/flow-state\/(?:FactsView|RuntimeView|WorkflowView|StateRulesView)/u, ["dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete"]],
     [/devFlowActionRules|flow-state\/FlowRuleTables/u, ["dev-flow-rules-complete", "dev-flow-action-rules-desktop-light", "dev-material-lifecycle-bom-references-desktop", "dev-business-rules-selection-recovery-desktop"]],
@@ -893,7 +898,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     if (/^web\/src\/common\/(?:components\/(?:diagram\/(?:diagramSemantics|DiagramNodeIcon|DiagramTypeLegend)|markdown\/(?:index\.jsx|mermaid))|theme\/erpThemePalette)/u.test(file)) {
       addNodeTests(state, ["web/src/common/components/markdown/mermaidSemantics.test.mjs", "web/src/common/components/markdown/mermaidTheme.test.mjs", "web/src/common/components/markdown/mermaidNodeActions.test.mjs", "web/src/common/theme/erpThemePalette.test.mjs", "web/src/dev-workbench/config/devBusinessFlowGraph.test.mjs", "web/src/erp/config/helpScenarioPresentation.test.mjs"], file, "T5");
       addFollowUp(state, "shared-visual-semantics-browser", "T5",
-        "运行 STYLE_L1_SCENARIOS=dev-workbench-mermaid-accent,help-center-all-scenes-desktop-dark,help-center-mermaid-mobile,dev-business-chain-customer-review-print,unified-sales-interactions,finance-visual-status-semantics pnpm --dir web style:l1；核对对象图标尺寸、语义色、选中保留分支边框、明暗主题、手机操作和固定浅色打印。", file);
+        "运行 STYLE_L1_SCENARIOS=dev-visualization-standards-desktop,dev-workbench-mermaid-accent,help-center-all-scenes-desktop-dark,help-center-mermaid-mobile,dev-business-chain-customer-review-print,unified-sales-interactions,finance-visual-status-semantics pnpm --dir web style:l1；核对对象图标尺寸、语义色、选中保留分支边框、明暗主题、手机操作和固定浅色打印。", file);
     }
     if (/components\/(?:purchase-receipts\/PurchaseReceiptExceptionModal|inventory\/InventoryOperationModal|outsourcing-orders\/OutsourcingOrderSourceFactModal)\.jsx|warehouseDraftPageScenarios\.mjs/u.test(file)) {
       addNodeTests(state, ["web/src/erp/components/inventory/InventoryOperationModal.behavior.test.mjs", "web/src/erp/components/inventory/InventoryOperationRecordsModal.test.mjs", "web/src/erp/components/purchase-receipts/PurchaseReceiptExceptionModal.test.mjs", "web/src/erp/components/outsourcing-orders/OutsourcingOrderSourceFactModal.test.mjs"], file, "T5");
@@ -959,12 +964,21 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "web/src/dev-workbench/config/devTestingOperation.test.mjs",
       ], file, "T3");
     }
+    if (/(?:AuditLogsPage|auditActionFilters|auditLogParams|auditLogScenarios)/u.test(file)) {
+      addFollowUp(
+        state,
+        "browser-regression",
+        "T5",
+        "运行 STYLE_L1_SCENARIOS=system-audit-logs-desktop,system-audit-logs-phone-390,system-audit-logs-tablet-820,system-audit-logs-desktop-dark pnpm --dir web style:l1，核对来源与操作类型按钮、分页和筛选恢复。",
+        file,
+      );
+    }
     if (/(?:DevControlStandards|DevUIInputExamples|common\/components\/select\/AppSelect|control-foundation\.css|groupedSelect(?:Assertions|Scenarios))/u.test(file)) {
       addFollowUp(
         state,
         "browser-regression",
         "T5",
-        "运行 STYLE_L1_SCENARIOS=shared-grouped-select-light-desktop,shared-grouped-select-dark-desktop,shared-grouped-select-light-mobile,shared-grouped-select-dark-mobile,grouped-select-business-rules,grouped-select-design-html,history-records-source-switch,system-audit-logs-desktop pnpm --dir web style:l1，核对分类标题、组内缩进、选中勾选、搜索清空、禁用与键盘、浅深主题、独立 HTML 及普通选项隔离。",
+        "运行 STYLE_L1_SCENARIOS=shared-grouped-select-light-desktop,shared-grouped-select-dark-desktop,shared-grouped-select-light-mobile,shared-grouped-select-dark-mobile,grouped-select-business-rules,grouped-select-design-html,history-records-source-switch pnpm --dir web style:l1，核对分类标题、组内缩进、选中勾选、搜索清空、禁用与键盘、浅深主题、独立 HTML 及普通选项隔离。",
         file,
       );
     }
@@ -1040,6 +1054,14 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       addFollowUp(state, "browser-regression", "T5",
         "运行 STYLE_L1_SCENARIOS=dev-workbench-action-placement-desktop-light,dev-workbench-patterns-desktop-light,dev-page-product-core-desktop-light,dev-page-integration-desktop-light,dev-page-testing-desktop-light,dev-testing-report-layout-desktop-light,dev-quality-gates-layout-desktop-light,dev-server-verification-layout-desktop-light,dev-data-preparation-workflow-desktop,dev-data-preparation-4k,dev-flow-state-details-desktop-light,dev-flow-state-observatory-instance,dev-flow-rules-complete,dev-project-skills-guidance-desktop-light pnpm --dir web style:l1，完成统一样板与真实消费者的搜索恢复、失败重试、证据时效及桌面布局验收；设计样板不得调用写接口。",
         file);
+    }
+    if (/QualityGateRules|devQualityGateGuide|devQualityGateDirectory|devQualityGateTestDirectory|devCiWorkflow/u.test(file)) {
+      addNodeTests(state, [
+        "web/src/dev-workbench/config/devQualityGateGuide.test.mjs",
+        "web/src/dev-workbench/config/devQualityGateDirectory.test.mjs",
+        "web/src/dev-workbench/config/devCiWorkflow.test.mjs",
+        "web/dev-server/devQualityGateTestDirectory.test.mjs",
+      ], file, "T5");
     }
     if (/devWorkbenchRequest|devQualityGates|DevQualityGatesPage|DevVerificationEvidence|devVerificationEvidence/u.test(file)) {
       addNodeTests(state, [

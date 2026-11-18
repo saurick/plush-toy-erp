@@ -43,6 +43,13 @@ import {
 } from "./lib/repository-identity.mjs";
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
 import { normalizeManualAcceptanceSourceScaleProfile } from "./manual-acceptance-source-data.mjs";
+import { assertScenarioGenerationId } from "../../config/scenario-generation.mjs";
+import {
+  assertScenarioServerCompatibility,
+  captureScenarioGeneration,
+  finishScenarioGeneration,
+  readScenarioGenerationSource,
+} from "./scenario-generation-snapshot.mjs";
 
 export const SCENARIO_DEMO_SCHEMA_VERSION = "plush.scenario-demo-plan/v2";
 export const SCENARIO_DEMO_READBACK_SCHEMA_VERSION =
@@ -278,6 +285,7 @@ function targetEnvironment(targetAlias) {
 
 export function buildScenarioDemoPlan({
   repository,
+  sourceFingerprint,
   targetAlias = PERSISTENT_SCENARIO_DATASET_TARGET,
   databaseTarget,
   migrationFingerprint,
@@ -314,6 +322,7 @@ export function buildScenarioDemoPlan({
   });
   if (
     !repository ||
+    !/^[0-9a-f]{64}$/u.test(String(sourceFingerprint || "")) ||
     !/^[0-9a-f]{40}$/u.test(String(repository.commit || "")) ||
     typeof repository.dirty !== "boolean" ||
     !/^[0-9a-f]{64}$/u.test(String(repository.fingerprint || "")) ||
@@ -349,6 +358,7 @@ export function buildScenarioDemoPlan({
     backendURL,
     databaseName,
     repository,
+    sourceFingerprint,
     target: {
       safeTarget: local
         ? databaseTarget.safeTarget
@@ -396,8 +406,11 @@ async function resolveScenarioDemoPlan({
   commandRunner,
   fetchImpl,
   readRepository,
+  readSource,
+  checkServerCompatibility,
 }) {
   const repository = await readRepository(projectRoot);
+  const sourceFingerprint = readSource(projectRoot).fingerprint;
   if (targetAlias === CUSTOMER_TRIAL_133_TARGET) {
     const attestation =
       targetAttestation ||
@@ -405,9 +418,11 @@ async function resolveScenarioDemoPlan({
     const parsed =
       typeof attestation === "string" ? JSON.parse(attestation) : attestation;
     const migrationVersion = String(parsed?.migration || "");
+    await checkServerCompatibility(projectRoot, parsed?.release);
     return {
       plan: buildScenarioDemoPlan({
         repository,
+        sourceFingerprint,
         targetAlias,
         sourceScaleProfile,
         targetAttestation: parsed,
@@ -453,6 +468,7 @@ async function resolveScenarioDemoPlan({
   return {
     plan: buildScenarioDemoPlan({
       repository,
+      sourceFingerprint,
       targetAlias,
       sourceScaleProfile,
       databaseTarget,
@@ -617,6 +633,10 @@ async function applyScenarioDemo({
   outputRoot,
   environment,
   commandRunner,
+  executionId,
+  captureGeneration,
+  finishGeneration,
+  applyDataset,
 }) {
   const { plan } = resolved;
   const credentials =
@@ -649,43 +669,56 @@ async function applyScenarioDemo({
       await readRepository(projectRoot),
     );
   await checkRepository();
-  if (plan.targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET) {
-    await applyLocalCustomerConfig({ plan, credentials, fetchImpl });
+  const generation = captureGeneration({ projectRoot, plan, executionId });
+  try {
     await checkRepository();
-    await ensureLocalScenarioReferences({ projectRoot, plan, environment, commandRunner });
-    await checkRepository();
-  }
-  const canonicalOutputRoot =
-    outputRoot || path.join(projectRoot, MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT);
-  const applyReportPath = manualAcceptanceDatasetApplyReportPath({
-    outputRoot: canonicalOutputRoot,
-    dataVersion: plan.dataVersion,
-    targetAlias: plan.targetAlias,
-  });
-  const report = await applyManualAcceptanceDataset(
-    plan.canonicalPlan,
-    {
-      confirmation: plan.canonicalPlan.target.expectedConfirmation,
-      targetAttestation:
-        plan.canonicalPlan.target.targetAttestation || undefined,
-      resumeReportPath: (await fileExists(applyReportPath))
-        ? applyReportPath
-        : undefined,
-    },
-    {
+    if (plan.targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET) {
+      await applyLocalCustomerConfig({ plan, credentials, fetchImpl });
+      await checkRepository();
+      await ensureLocalScenarioReferences({ projectRoot, plan, environment, commandRunner });
+      await checkRepository();
+    }
+    const canonicalOutputRoot =
+      outputRoot || path.join(projectRoot, MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT);
+    const applyReportPath = manualAcceptanceDatasetApplyReportPath({
       outputRoot: canonicalOutputRoot,
-      credentials,
-      fetchImpl,
-    },
-  );
-  if (!report.ok) {
-    const failure = report.stages?.find((stage) => stage.key === report.failedStage)?.error || "no stage diagnostic";
-    throw new ScenarioDemoError(
-      `scenario-demo canonical stage failed: ${report.failedStage || "unknown"}; ${safeErrorMessage(failure)}`,
+      dataVersion: plan.dataVersion,
+      targetAlias: plan.targetAlias,
+    });
+    const report = await applyDataset(
+      plan.canonicalPlan,
+      {
+        confirmation: plan.canonicalPlan.target.expectedConfirmation,
+        targetAttestation:
+          plan.canonicalPlan.target.targetAttestation || undefined,
+        resumeReportPath: (await fileExists(applyReportPath))
+          ? applyReportPath
+          : undefined,
+      },
+      {
+        outputRoot: canonicalOutputRoot,
+        credentials,
+        fetchImpl,
+      },
     );
+    if (!report.ok) {
+      const failure = report.stages?.find((stage) => stage.key === report.failedStage)?.error || "no stage diagnostic";
+      throw new ScenarioDemoError(
+        `scenario-demo canonical stage failed: ${report.failedStage || "unknown"}; ${safeErrorMessage(failure)}`,
+      );
+    }
+    await checkRepository();
+    const readback = buildScenarioDemoReadback({ plan, datasetReport: report });
+    finishGeneration(projectRoot, generation.id, "passed", new Date(), {
+      readback,
+      taskSchedule: report.taskSchedule || null,
+      resume: report.resume || null,
+    });
+    return readback;
+  } catch (error) {
+    finishGeneration(projectRoot, generation.id, "not_proven");
+    throw error;
   }
-  await checkRepository();
-  return buildScenarioDemoReadback({ plan, datasetReport: report });
 }
 
 export function parseScenarioDemoArgs(argv = []) {
@@ -694,6 +727,7 @@ export function parseScenarioDemoArgs(argv = []) {
     expectedPlanDigest: "",
     target: PERSISTENT_SCENARIO_DATASET_TARGET,
     targetAttestation: "",
+    executionId: undefined,
     sourceScaleProfile: "volume",
     help: false,
   };
@@ -709,6 +743,8 @@ export function parseScenarioDemoArgs(argv = []) {
       options.target = String(argv[++index] || "").trim();
     } else if (token === "--target-attestation-json") {
       options.targetAttestation = String(argv[++index] || "").trim();
+    } else if (token === "--execution-id") {
+      options.executionId = assertScenarioGenerationId(argv[++index]);
     } else if (token === "--source-scale-profile") {
       options.sourceScaleProfile = normalizeManualAcceptanceSourceScaleProfile(
         String(argv[++index] || ""),
@@ -741,6 +777,8 @@ function usage() {
 
 默认使用 volume 来源资料档；--source-scale-profile acceptance 可显式选择轻量档。
 规模纳入计划与语义摘要；已有同批报告不匹配时停止，不能隐式覆盖。
+执行前自动保存当前源码（含未提交修改）与参数，回执位于 output/qa/scenario-generations/。
+代码按内容指纹去重；--execution-id <UUID> 可绑定现有工作台操作，不代替业务批次。
 
 执行当前登记的长期批次：
   SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:scenario-demo:<database>:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}:<plan-digest>' \\
@@ -761,6 +799,11 @@ export async function runScenarioDemoCli(
     readRepository = readRepositoryIdentity,
     outputRoot,
     targetAttestation,
+    readSource = readScenarioGenerationSource,
+    checkServerCompatibility = assertScenarioServerCompatibility,
+    captureGeneration = captureScenarioGeneration,
+    finishGeneration = finishScenarioGeneration,
+    applyDataset = applyManualAcceptanceDataset,
   } = {},
 ) {
   const options = parseScenarioDemoArgs(argv);
@@ -778,6 +821,8 @@ export async function runScenarioDemoCli(
       commandRunner,
       fetchImpl,
       readRepository,
+      readSource,
+      checkServerCompatibility,
     });
   } catch (error) {
     throw new ScenarioDemoError(safeErrorMessage(error), error?.exitCode || 1);
@@ -801,6 +846,10 @@ export async function runScenarioDemoCli(
       outputRoot,
       environment,
       commandRunner,
+      executionId: options.executionId,
+      captureGeneration,
+      finishGeneration,
+      applyDataset,
     });
     return {
       exitCode: 0,

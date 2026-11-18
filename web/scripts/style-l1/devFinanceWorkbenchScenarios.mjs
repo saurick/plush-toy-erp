@@ -12,7 +12,7 @@ export function createDevFinanceWorkbenchScenarios({
   return [
     {
       name: 'dev-finance-prototype-alignment',
-      path: '/__dev/business-topics?flow_topic=finance_relations',
+      path: '/__dev/status-flows?flow_tab=topics&flow_topic=finance_relations',
       viewport: { width: 1920, height: 1080 },
       beforeNavigate: (page) => startNoWriteAudit(page, writes),
       verify: async (page) => {

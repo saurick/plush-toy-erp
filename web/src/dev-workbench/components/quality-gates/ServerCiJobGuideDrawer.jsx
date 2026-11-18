@@ -26,6 +26,7 @@ const { Paragraph, Text } = Typography
 export function ServerJobGuideDrawer({
   repository,
   evidence,
+  stale,
   open,
   selectedJobName,
   onSelect,
@@ -45,6 +46,7 @@ export function ServerJobGuideDrawer({
   const selectedRole = selectedJob
     ? SERVER_JOB_ROLE[selectedJob.role] || SERVER_JOB_ROLE.execution
     : null
+  const diagnosticText = buildCiDiagnosticText({ repository, evidence, job: selectedJob, stale })
 
   return (
     <Drawer
@@ -56,6 +58,7 @@ export function ServerJobGuideDrawer({
       afterOpenChange={onAfterOpenChange}
       destroyOnHidden
     >
+      {stale ? <Paragraph type="secondary">以下运行结果来自上次读取，本次状态尚未核实。</Paragraph> : null}
       {selectedJob && selectedGuide ? (
         <div className="erp-dev-quality-job-guide-drawer__detail">
           <Space size={6} wrap>
@@ -104,13 +107,8 @@ export function ServerJobGuideDrawer({
               },
               {
                 key: 'current',
-                label: '本次结果',
-                children: (
-                  <Space size={[8, 4]} wrap>
-                    <Tag>{SERVER_PIPELINE_JOB_STATUS[selectedJob.status]}</Tag>
-
-                  </Space>
-                ),
+                label: stale ? '上次读取' : '本次结果',
+                children: <Tag>{SERVER_PIPELINE_JOB_STATUS[selectedJob.status]}</Tag>,
               },
               {
                 key: 'checks',
@@ -210,7 +208,7 @@ export function ServerJobGuideDrawer({
         <div className="erp-dev-quality-job-guide-drawer__catalog">
           <DevCiWorkflowGuide />
           <Text type="secondary">
-            先看阶段，再按需查看单个 Job；依赖、状态与耗时仍以当前 GitLab
+            先看阶段，再按需查看单个 Job；依赖、状态与耗时仍以对应 GitLab
             流水线为准。
           </Text>
           {timing.flowGroups.map((group) => (
@@ -263,19 +261,13 @@ export function ServerJobGuideDrawer({
       )}
       <details className="erp-dev-disclosure erp-dev-ci-diagnostic">
         <summary>
-          查看与复制{selectedJob ? '本 Job' : '本次流水线'}排查信息
+          查看与复制{selectedJob ? '本 Job' : '流水线'}排查信息
         </summary>
         <Paragraph
           className="erp-dev-ci-diagnostic__text"
-          copyable={{
-            text: buildCiDiagnosticText({
-              repository,
-              evidence,
-              job: selectedJob,
-            }),
-          }}
+          copyable={{ text: diagnosticText }}
         >
-          {buildCiDiagnosticText({ repository, evidence, job: selectedJob })}
+          {diagnosticText}
         </Paragraph>
       </details>
     </Drawer>

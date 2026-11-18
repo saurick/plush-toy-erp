@@ -12,11 +12,11 @@ export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 
 export const DEV_DOCS_ROUTE = '/__dev/docs'
 export const DEV_PROJECT_SKILLS_ROUTE = '/__dev/project-skills'
+export const DEV_VISUALIZATION_ROUTE = '/__dev/visualization'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
 export const DEV_FLOW_EXPLORER_ROUTE = '/__dev/flow-explorer'
 export const DEV_BUSINESS_RULES_ROUTE = '/__dev/business-rules'
 export const DEV_TASK_HANDLING_ROUTE = '/__dev/task-handling'
-export const DEV_BUSINESS_TOPICS_ROUTE = '/__dev/business-topics'
 export const DEV_BUSINESS_USABILITY_ROUTE = '/__dev/business-usability'
 export const DEV_UI_DESIGN_ROUTE = '/__dev/ui-design'
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
@@ -50,13 +50,13 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
     key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_ENGINEERING_ROUTE,
     label: '产品与业务',
-    description: '产品能力、业务链路、流程探索、规则、专题、权限与交互设计',
+    description: '产品能力、业务链路、流程探索、规则、权限与交互设计',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.developmentResources,
     route: DEV_DEVELOPMENT_RESOURCES_ROUTE,
     label: '开发资源',
-    description: '接口、项目文档、Skill 与项目关系图',
+    description: '接口、文档、Skill、图例与项目关系图',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.quality,
@@ -96,12 +96,6 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_BUSINESS_RULES_ROUTE,
     label: '业务规则',
-  }),
-  Object.freeze({
-    key: 'business-topics',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    route: DEV_BUSINESS_TOPICS_ROUTE,
-    label: '业务专题',
   }),
   Object.freeze({
     key: 'task-handling',
@@ -145,6 +139,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
     route: DEV_PROJECT_SKILLS_ROUTE,
     label: '项目 Skill',
+  }),
+  Object.freeze({
+    key: 'visualization',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
+    route: DEV_VISUALIZATION_ROUTE,
+    label: '可视化规范',
   }),
   Object.freeze({
     key: 'testing',

@@ -618,8 +618,7 @@ async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOv
         const history = page.locator('.erp-dev-version-tab--history')
         await history.getByText('共 3 条记录', { exact: true }).waitFor()
         const chooseScope = async (label) => {
-          await history.getByRole('combobox', { name: '记录归属', exact: true }).press('ArrowDown')
-          await page.locator('.ant-select-dropdown').filter({ visible: true }).getByText(label, { exact: true }).click()
+          await history.getByRole('group', { name: '记录归属', exact: true }).getByRole('button', { name: label, exact: true }).click()
         }
         // Detail reads remain usable when every remote summary read fails.
         const detailRead = page.waitForResponse((response) => response.url().includes('/__dev/api/delivery/operations/') && response.url().includes('target=demo-133') && response.status() === 200)
@@ -951,14 +950,14 @@ export function createDevVersionCenterScenarios({
             }
             if (viewport.width === 1920) {
               const layoutDiagram = ciGuide.locator('[data-section="ci-entry"] .erp-markdown-mermaid')
-              await layoutDiagram.locator('[data-mermaid-zoom-action="fit"]').click()
+              await layoutDiagram.locator('[data-diagram-zoom-action="fit"]').click()
               await guidePage.mouse.move(0, 0)
               await assertMermaidZoomMode(layoutDiagram, assert, 'fit')
               await layoutDiagram.scrollIntoViewIfNeeded()
-              await layoutDiagram.locator('[data-mermaid-zoom-action="reset"]').click()
+              await layoutDiagram.locator('[data-diagram-zoom-action="reset"]').click()
               await guidePage.mouse.move(0, 0)
               await assertMermaidZoomMode(layoutDiagram, assert, 'reset')
-              await layoutDiagram.locator('[data-mermaid-zoom-action="fit-all"]').click()
+              await layoutDiagram.locator('[data-diagram-zoom-action="fit-all"]').click()
               await assertMermaidZoomMode(layoutDiagram, assert, 'fit-all')
               await switchMermaidLayout(guidePage, layoutDiagram, assert)
               await layoutDiagram.scrollIntoViewIfNeeded()

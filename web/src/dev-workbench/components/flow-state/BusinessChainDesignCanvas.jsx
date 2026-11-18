@@ -145,6 +145,7 @@ export default function BusinessChainDesignCanvas({
   onCameraCommit,
 }) {
   const viewport = useRef(null)
+  const scopePurpose = useRef(null)
   const panTarget = useRef(null)
   const surface = useRef(null)
   const gesture = useRef(null)
@@ -161,8 +162,10 @@ export default function BusinessChainDesignCanvas({
   useEffect(() => { setCameraDirty(false) }, [viewRequest.revision])
   useEffect(() => {
     if (!cameraDirty) return undefined
-    const timer = window.setTimeout(() => { onCameraCommit(view); setCameraDirty(false) }, 200)
-    return () => window.clearTimeout(timer)
+    const commit = () => { onCameraCommit(view); setCameraDirty(false) }
+    const timer = window.setTimeout(commit, 200)
+    window.addEventListener('pagehide', commit)
+    return () => { window.clearTimeout(timer); window.removeEventListener('pagehide', commit) }
   }, [cameraDirty, onCameraCommit, view])
   useEffect(() => { setHighlightPath(null) }, [selection?.nodeId])
   const map = businessChainMapState(draft, library)
@@ -260,6 +263,8 @@ export default function BusinessChainDesignCanvas({
     library,
     effectiveMode
   )
+  const { scopeSummary } = projected
+  const expandedInScope = Boolean(scopeSummary && map.expandedChains.includes(scopeSummary.chainKey))
   const reading = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode, expandedNodes: map.expandedNodes, showBranches: draft.presentation?.showBranches, selection, pathIds: highlightPath || [] })
   const hasBranches = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode }).nodes.length < projected.nodes.length
   const graph = {
@@ -273,7 +278,7 @@ export default function BusinessChainDesignCanvas({
     graph.nodes.find((node) => node.id === id && node.summary) ||
     library.byId.get(id)
   const { nodes } = graph
-  const bands = layout === 'lanes' && effectiveMode !== 'overview' ? businessChainLaneBands(graph, library) : []
+  const bands = layout === 'lanes' ? businessChainLaneBands(graph, library) : []
   const routes = routeBusinessChainEdges(graph)
   const positions = new Map(
     [...fullNodes, ...graph.nodes].map((node) => [node.id, node])
@@ -298,6 +303,10 @@ export default function BusinessChainDesignCanvas({
   const close = () => {
     const id = selection?.anchorId || selection?.nodeId || selection?.to
     setSelection(null)
+    if (selection?.chainKey === map.chainKey && scopePurpose.current) {
+      scopePurpose.current.focus({ preventScroll: true })
+      return
+    }
     const item = [
       ...(surface.current?.querySelectorAll('[data-design-node]') || []),
     ].find((el) => el.dataset.designNode === id)
@@ -349,7 +358,10 @@ export default function BusinessChainDesignCanvas({
         )
       : nodes
     const ids = new Set(fittedNodes.map((node) => node.id))
-    const bounds = [...fittedNodes.map((node) => ({ ...node, ...size })), ...bands]
+    const fittedBands = chainKey && layout === 'lanes'
+      ? businessChainLaneBands({ ...graph, nodes: fittedNodes }, library)
+      : bands
+    const bounds = [...fittedNodes.map((node) => ({ ...node, ...size })), ...fittedBands]
     for (const edge of surface.current.querySelectorAll('[data-design-edge]')) {
       if (ids.has(edge.dataset.edgeFrom) && ids.has(edge.dataset.edgeTo)) {
         bounds.push(edge.getBBox())
@@ -371,7 +383,7 @@ export default function BusinessChainDesignCanvas({
       chainKey,
       x: (area.clientWidth - (right + left) * scale) / 2,
       y:
-        mode === 'fit-width'
+        mode === 'fit-width' || expandedInScope
           ? -top * scale
           : (area.clientHeight - (bottom + top) * scale) / 2,
     })
@@ -413,7 +425,9 @@ export default function BusinessChainDesignCanvas({
       revision: frameRequest.revision,
       restoreRevision: viewRequest.revision,
     }
-    if (previous?.restoreRevision !== viewRequest.revision && viewRequest.view) {
+    // A saved automatic camera may have included a distant overview card.
+    const refitScope = expandedInScope && viewRequest.view?.mode !== 'manual'
+    if (previous?.restoreRevision !== viewRequest.revision && viewRequest.view && !refitScope) {
       pendingFit.current = false
       return
     }
@@ -443,6 +457,7 @@ export default function BusinessChainDesignCanvas({
     view.chainKey,
     selection,
     viewRequest,
+    expandedInScope,
     setView,
   ])
   const pan = (event) => {
@@ -894,15 +909,25 @@ export default function BusinessChainDesignCanvas({
       <div className="erp-chain-design__scope-bar" aria-label="当前探索范围">
         <span className="erp-chain-design__scope-label">
           {!draft.nodes.length ? '空白画布 · 尚未加载链路' : `${map.scope === 'whole' ? '整体' : '局部'} · `}
+          {map.focusId && scopeSummary ? `${scopeSummary.label} · ` : null}
           {!draft.nodes.length ? null : map.focusId
             ? library.byId.get(map.focusId).label
             : map.chainKey === 'all'
               ? '业务全流程地图'
               : library.chains.find(({ value }) => value === map.chainKey)
                   ?.label}
+          {scopeSummary ? ` · ${scopeSummary.count} 步` : null}
+          {map.visibleIds.length > 0 && !canGrowUpstream && !canGrowDownstream
+            ? ' · 已登记的上下游均已载入'
+            : null}
         </span>
-        {map.chainKey !== 'all' ? <Button onClick={() => setSelection({ chainKey: map.chainKey })}>用途与交接</Button> : null}
-        {draft.nodes.length > 0 && (map.scope !== 'whole' || canGrowUpstream || canGrowDownstream) ? (
+        {map.chainKey !== 'all' ? <Button ref={scopePurpose} onClick={() => setSelection({ chainKey: map.chainKey })}>用途与交接</Button> : null}
+        {scopeSummary ? (
+          <Button aria-expanded={expandedInScope} onClick={() => toggleChain(scopeSummary.chainKey)}>
+            {expandedInScope ? '收起链路' : '展开链路'}
+          </Button>
+        ) : null}
+        {draft.nodes.length > 0 ? (
           <Space wrap>
             <Button
               disabled={!canGrowUpstream}

@@ -63,7 +63,7 @@
 
 “组件选用”（`/__dev/ui-design?page=controls&control=components`）直接读取[正式组件入口](../../engineering/前端实现与交互约定.md#组件复用与使用入口--shared-component-entrypoints)，覆盖通用、业务组合和打印专用组件；打印组件的复用边界随表展示，完整打印专题由文档目录查阅。
 
-“业务工具栏组合”（`/__dev/ui-design?page=controls&control=business-toolbar`）按需加载库存查询、采购订单、工作台待办和历史记录，复用真实工具栏、表格、查询、筛选、详情与列设置。已访问业务保持挂载，往返保留本地搜索草稿、筛选、分页和选择；“恢复示例”回到初始状态。职责标注可关闭，分类增长与 30 项数据名单分开演示；假设分类不进入产品导航。查询、列设置与导出仅处理本地虚构数据，不读取业务记录、不保存账号偏好。
+“业务工具栏组合”（`/__dev/ui-design?page=controls&control=business-toolbar`）按需加载库存查询、采购订单、任务管理待办和历史记录，复用真实工具栏、表格、查询、筛选、详情与列设置。已访问业务保持挂载，往返保留本地搜索草稿、筛选、分页和选择；“恢复示例”回到初始状态。职责标注可关闭，分类增长与 30 项数据名单分开演示；假设分类不进入产品导航。查询、列设置与导出仅处理本地虚构数据，不读取业务记录、不保存账号偏好。
 
 [长值与多列](/__dev/ui-design?page=controls&control=select-overflow)直接使用 `AppSelect` 和 `BusinessLineItemsTable`，可切换长短名称、420px 窄区域和十列明细，默认核对两行名称和独立编码，再操作锁定值阅读、仓库搜索与清空；行为规则见[完整值读取](交互设计说明.md#select-overflow)。
 

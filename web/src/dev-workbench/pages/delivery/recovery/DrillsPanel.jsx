@@ -6,6 +6,7 @@ export function DrillsPanel({
   drillTriggerRef,
   overview,
   setSelectedDrillKey,
+  stale,
 }) {
   return (
     <section
@@ -41,7 +42,8 @@ export function DrillsPanel({
                 <DrillRow
                   key={drill.key}
                   drill={drill}
-                  recommended={drill.key === overview.next?.key}
+                  recommended={!stale && drill.key === overview.next?.key}
+                  stale={stale}
                   onOpen={(key, trigger) => {
                     drillTriggerRef.current = trigger
                     setSelectedDrillKey(key)

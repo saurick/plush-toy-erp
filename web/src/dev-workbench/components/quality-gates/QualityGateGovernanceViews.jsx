@@ -215,13 +215,13 @@ export function GapsView({ data, loading, error, values, onRange, onRisk, onRetr
     <WorkbenchSection flat className="erp-dev-quality-gaps-view" aria-label="改动缺口结果">
       <WorkbenchToolbar className="erp-dev-quality-view-tools">
         <FilterChipGroup
-          aria-label="改动范围"
+          label="改动范围"
           options={GAP_RANGE_OPTIONS}
           value={values.range}
           onChange={onRange}
         />
         <FilterChipGroup
-          aria-label="风险范围"
+          label="风险范围"
           options={GAP_RISK_OPTIONS}
           value={values.risk}
           onChange={onRisk}

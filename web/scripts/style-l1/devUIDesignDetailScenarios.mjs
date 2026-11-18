@@ -331,7 +331,7 @@ export function createDevUIDesignDetailScenarios({
         await frame.getByRole('button', { name: '演示账号与验证码' }).click()
         await frame.getByRole('button', { name: '填入演示信息' }).click()
         await frame.getByRole('button', { name: '登录', exact: true }).click()
-        await frame.locator('.workbench-queue-tabs button').first().waitFor()
+        await frame.locator('#dashboard-summary-search').waitFor()
         await frame.locator('.preview-account-trigger').click()
         await frame
           .getByRole('button', { name: '退出登录', exact: true })
@@ -344,7 +344,7 @@ export function createDevUIDesignDetailScenarios({
           ''
         )
         await chooseUIDesignMode(page, '桌面 ERP')
-        await frame.locator('.workbench-queue-tabs button').first().waitFor()
+        await frame.locator('#dashboard-summary-search').waitFor()
         await assertNoHorizontalOverflow(page)
       },
     },
@@ -898,27 +898,10 @@ export function createDevUIDesignDetailScenarios({
           'erp-ui-interaction-design.html'
         )
         await page.getByRole('button', { name: /重置演示/ }).click()
-        const queueHeading = frame.locator('.workbench-queue-head')
-        await queueHeading.waitFor()
-        const queueLayout = await queueHeading.evaluate((header) => {
-          const firstButton = header.querySelector(
-            '.workbench-queue-tabs button'
-          )
-          return {
-            copyPresent:
-              header.textContent.includes('先处理需要我判断或推进的事项'),
-            firstButtonOffset: firstButton
-              ? firstButton.getBoundingClientRect().left -
-                header.getBoundingClientRect().left
-              : null,
-          }
-        })
-        assert.equal(queueLayout.copyPresent, false)
-        assert.ok(
-          queueLayout.firstButtonOffset >= 0 &&
-            queueLayout.firstButtonOffset <= 16,
-          `工作台任务筛选应靠左显示: ${JSON.stringify(queueLayout)}`
-        )
+        await frame.locator('#dashboard-summary-search').waitFor()
+        await frame.locator('.nav-item[data-page="tasks"]').click()
+        await frame.getByRole('button', { name: '风险任务', exact: true }).click()
+        await frame.locator('.task-board-table tbody tr[data-action="open-task"]').first().waitFor()
         for (const colorScheme of ['light', 'dark']) {
           await page.emulateMedia({ colorScheme })
           await frame.locator(`body[data-mode="${colorScheme}"]`).waitFor()

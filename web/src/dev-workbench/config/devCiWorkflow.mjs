@@ -1,3 +1,5 @@
+import { QUALITY_GATE_FLOWS } from './devQualityGateGuide.mjs'
+
 export const CI_WORKFLOW_SECTIONS = Object.freeze([
   {
     key: 'overview',
@@ -25,22 +27,14 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     label: '提交前：快照与检查',
     description:
       '提交检查读取暂存快照；开发期 affected 读取所选改动范围。下表描述当前脚本职责，未读取本机 hooks 配置或执行回执，不能据此判定已启用、已执行或通过。',
-    chart: `flowchart TD
-      A["核对 HEAD、index 与改动范围"] --> B["核对 hooks 配置"]
-      B --> C["选择验证并完成精确暂存"]
-      C --> D["提交触发 pre-commit"]
-      D --> E["导出同一份 index 快照"]
-      E --> F["基础合同与敏感信息检查"]
-      F --> G["按暂存路径检查 Shell、Go、YAML 等"]
-      G --> H{"检查通过？"}
-      H -->|"否"| I["修复后重新暂存和验证"]
-      H -->|"是"| J["commit-msg 校验后形成提交"]`,
+    chart: QUALITY_GATE_FLOWS.commit.chart,
+    nodes: QUALITY_GATE_FLOWS.commit.nodes,
     points: [
       '先读取 HEAD、index、index.lock 与 scoped diff，区分本轮改动、其他改动和未跟踪文件。活动或归属不明的锁保留现场。',
       'core.hooksPath 应指向 .githooks，文件还必须存在且可执行。仓库有 hook 文件不等于当前 checkout 已启用；缺失时按 scripts/setup-git-hooks.sh 修复配置并重新核对。',
       '开发阶段按 affected 计划完成同名测试及 required follow-ups。计划只表示要检查什么，生成计划不代表已执行；full 推荐也不能用短检查绿色代替。',
       'pre-commit 在一次性 index 快照中检查，未暂存的修复不属于提交。失败后核对暂存内容，避免工作区通过而实际提交仍旧。',
-      '当前提交 hook 没有 Web ESLint / Stylelint。修改前端时应在开发验证中补齐相关 lint；这个缺口不会因流程图存在而消失。',
+      '提交 hook 对暂存 web/src JavaScript 与测试执行零 warning ESLint；Stylelint 仍由开发验证和完整门禁覆盖。',
     ],
     table: {
       headers: ['顺序 / 输入', '实际检查与成功信号', '失败时先查'],
@@ -49,7 +43,7 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
         ['index 快照', 'checkout-index 后执行 gate-profiles 的 index-transition 校验', '必需文件是否遗漏、删除或丢失可执行位'],
         ['数据库与公共错误码', 'db-guard、error-code-sync、暂存错误码检查', 'schema / migration / atlas.sum / 生成码是否同步；静态 guard 不证明存量升级'],
         ['敏感信息', '严格扫描暂存内容；工具缺失也阻断', '脱敏定位后修正源文件；不得用关闭扫描通过'],
-        ['按路径选中', 'DEV 页面合同、shfmt、ShellCheck、go vet、golangci-lint、YAML lint', '是否命中触发路径、工具版本和实际检查范围'],
+        ['按路径选中', 'Web ESLint、DEV 页面合同、shfmt、ShellCheck、go vet、golangci-lint、YAML lint', '是否命中触发路径、工具版本和实际检查范围'],
         ['提交消息', 'commit-msg 校验项目提交格式', 'type(scope): 中文摘要；提交授权与推送授权分别核对'],
       ],
     },
@@ -77,7 +71,7 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
         ['范围 / 源码完整性', '暂存 diff、index 快照与 required 文件', 'clean HEAD/tree、remote/ref/range、gate 指纹', '可信 diff、source archive、同 SHA / plan 身份'],
         ['敏感信息', '严格扫描暂存内容', '严格扫描真实推送历史；hook 再读回', 'plan 可信基线扫描 + Node 领域收口'],
         ['Shell / YAML / Go 静态', '按暂存路径选择相关检查', '短 Node 检查不等价于这些 lint', 'static、shared 与 Server 正式检查'],
-        ['Web ESLint / Stylelint', '当前未包含', '当前未包含', 'quality_web_checks 执行'],
+        ['Web ESLint / Stylelint', 'ESLint 按路径；不含 Stylelint', '当前未包含', 'quality_web_checks 执行'],
         ['Node / Web 单元与合同', '仅命中时执行 DEV 页面治理', '受影响 fast、改动 / 同名 Web 测试和固定边界合同', 'Node 各分组与 Web 全部登记测试'],
         ['权限 / 跨层消费者', '错误码同步等局部合同', '取决于 affected 选测映射；需核对具体清单', 'shared / Node / Web 按正式分组检查'],
         ['schema / migration', 'db-guard 静态预检', '范围与数据库 guard；不执行真实升级', 'make data 零漂移、合成存量升级与关键 PostgreSQL'],
@@ -92,16 +86,9 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     key: 'push',
     label: '推送前：短期回执与放行',
     description: 'prepare-push 在连接建立前做准备；pre-push 在 Git 建立连接后按真实 stdin 复核。准备回执只允许推送，不授予 CI 通过或发布资格。',
-    chart: `flowchart TD
-      A["已授权推送与 clean HEAD"] --> B["fetch 并核对远端 main"]
-      B --> C["prepare-push 计算实际范围"]
-      C --> D["源码、数据库 guard、历史与 secrets"]
-      D --> E["执行选中的短 Node 检查"]
-      E --> F["读回身份并签发短期回执"]
-      F --> G["普通 push 触发 pre-push"]
-      G --> H["真实 stdin、签名、TTL 与指纹复核"]
-      H --> I["实时历史与 secrets 检查"]
-      I --> J["推送成功后查同 SHA 的 CI"]`,
+    chart: QUALITY_GATE_FLOWS.push.chart,
+    charts: QUALITY_GATE_FLOWS.push.charts,
+    nodes: QUALITY_GATE_FLOWS.push.nodes,
     points: [
       '远端新增提交必须先处理，不能强推覆盖。脏工作区、混合来源或共享 writer 未结束时，先解决受影响范围，不能用旧候选直接推送。',
       '只有默认 origin/main 的实际目标确认为项目 GitLab 时才使用 server-ci 短门禁。短 Node 检查最多 4 路，整批 120 至 300 秒；完整验证由 GitLab 执行。',
@@ -117,17 +104,8 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     key: 'ci-entry',
     label: '进入 CI：触发、准备与执行',
     description: 'protected main 按实际路径选择：普通 Markdown 只运行 3 个 Job；混合、代码、配置和数据库生成文档运行完整 CI。MR 使用 affected/full，release 与定时打印监测另走各自入口。',
-    chart: `flowchart TD
-      A["GitLab 收到提交"] --> B["workflow 与 Job rules"]
-      B --> C["Runner 领取并检出源码"]
-      C --> E["plan：范围、信任与计划"]
-      E --> S{"验证范围"}
-      S -->|"docs"| K["quality_docs：文档检查"]
-      K --> L["CI Gate：仅文档通过"]
-      S -->|"full"| F["prepare：工具条件、依赖与缓存"]
-      F --> G["按真实 needs 运行各领域"]
-      G --> I["quality_aggregate：回执与清理核验"]
-      I --> J["CI Gate 固化证据包"]`,
+    chart: QUALITY_GATE_FLOWS.ci.chart,
+    nodes: QUALITY_GATE_FLOWS.ci.nodes,
     points: [
       '找不到流水线时先核对 remote、ref、SHA 和 pipeline source，再看 workflow.rules；有流水线但没有某 Job 时看该 Job rules。不要直接按测试失败处理。',
       'pending 先看 Runner online、plush / isolated / amd64 标签、protected 资格、空槽与 resource_group。排队时长和执行时长分开判断。',
@@ -283,7 +261,7 @@ export function formatCiWorkflowSection(section) {
 }
 
 // Only copy the normalized public projection; raw logs and credential-bearing data stay outside it.
-export function buildCiDiagnosticText({ repository, evidence, job } = {}) {
+export function buildCiDiagnosticText({ repository, evidence, job, stale = false } = {}) {
   const pipeline = evidence?.pipeline
   const selectedJobs = job ? [job] : evidence?.jobs || []
   const guides = new Map(
@@ -291,6 +269,7 @@ export function buildCiDiagnosticText({ repository, evidence, job } = {}) {
   )
   const lines = [
     'CI 排查信息（页面已读取证据，非完整日志）',
+    ...(stale ? ['证据时效：上次读取；本次状态与覆盖范围尚未核实。'] : []),
     `本机 HEAD：${repository?.commit || '未读取'}`,
     `本机工作区：${typeof repository?.dirty === 'boolean' ? (repository.dirty ? '存在未提交改动' : '干净') : '未读取'}`,
     `CI SHA：${evidence?.gitSha || '未读取'}`,

@@ -154,6 +154,30 @@ function scenarioOperationFixture(overrides = {}) {
   })
 }
 
+test('generation details bind to the exact operation while historical records remain honest about missing snapshots', () => {
+  const operation = scenarioOperationFixture()
+  const generation = {
+    schemaVersion: 'plush.scenario-generation/v1',
+    id: operation.id,
+    batchId: `20261114T020000000Z_${'6'.repeat(12)}`,
+    startedAt: '2026-11-14T02:00:00.000Z',
+    completedAt: '2026-11-14T02:01:00.000Z',
+    status: 'passed',
+    targetKey: operation.targetSummary.targetKey,
+    sourceFingerprint: '6'.repeat(64),
+    parametersFingerprint: '7'.repeat(64),
+    archiveSha256: '8'.repeat(64),
+    fileCount: 10,
+    repositoryFingerprint: operation.repository.fingerprint,
+    planDigest: operation.targetSummary.preflightFingerprint,
+  }
+  assert.equal(validateDevDataPreparationOperation({ ...operation, generation }).generation.id, operation.id)
+  assert.equal(validateDevDataPreparationOperation({ ...operation, generation: null }).generation, null)
+  for (const patch of [{ id: '99999999-9999-4999-8999-999999999999' }, { targetKey: 'customer-trial-133' }, { planDigest: '0'.repeat(64) }, { repositoryFingerprint: '0'.repeat(64) }, { token: 'must-not-accept' }]) {
+    assert.throws(() => validateDevDataPreparationOperation({ ...operation, generation: { ...generation, ...patch } }))
+  }
+})
+
 function fullOperationFixture(overrides = {}) {
   const stageTimings = ACCEPTANCE_PLAN.dataStages.map(({ key }, index) => ({
     key,

@@ -10,7 +10,7 @@ export function createDevPurchaseChainVerificationScenarios({
   return [
     {
       name: 'dev-purchase-chain-verification',
-      path: '/__dev/business-topics?flow_topic=purchase_to_inventory',
+      path: '/__dev/status-flows?flow_tab=topics&flow_topic=purchase_to_inventory',
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       beforeNavigate: async (page) => {
@@ -47,6 +47,12 @@ export function createDevPurchaseChainVerificationScenarios({
         await detail.getByRole('tab', { name: '办理规则', exact: true }).click()
         await expect(detail).toContainText('品质')
         await expect(detail).toContainText('检验')
+        const workbenchViews = page.getByRole('tablist', { name: '业务链路方式', exact: true })
+        await workbenchViews.getByRole('tab', { name: '实例跟踪', exact: true }).click()
+        await expect(detail).toHaveCount(0)
+        await workbenchViews.getByRole('tab', { name: '业务结构', exact: true }).click()
+        await expect(detail.getByRole('tab', { name: '办理规则', exact: true, selected: true })).toBeVisible()
+        assert.equal(new URL(page.url()).searchParams.get('flow_topic_step'), 'purchase_quality:posts_fact:purchase_accepted')
         await detail.getByRole('tab', { name: '验证证据', exact: true }).click()
         await detail.getByText('具名检查项与执行结果', { exact: true }).click()
         await expect(detail.locator('[data-step-rule="purchase-quality-handoff"]')).toBeVisible()

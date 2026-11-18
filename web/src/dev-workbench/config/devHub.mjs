@@ -1,6 +1,5 @@
 import {
   DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
-  DEV_BUSINESS_TOPICS_ROUTE,
   DEV_BUSINESS_RULES_ROUTE,
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
@@ -8,6 +7,7 @@ import {
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_PROJECT_SKILLS_ROUTE,
+  DEV_VISUALIZATION_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
   DEV_HUB_ROUTE,
   DEV_INTEGRATION_ROUTE,
@@ -64,7 +64,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'status-flows',
-    searchKeywords: Object.freeze(['业务链观察']),
+    searchKeywords: Object.freeze(['业务链观察', '专项链路', '财务关联', '系统衔接']),
     englishTitle: 'Business Chain Observatory',
     group: '业务链治理 / Business Chain Governance',
     route: DEV_STATUS_FLOWS_ROUTE,
@@ -77,7 +77,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '禁止通用改状态 / No generic status write',
       '不进生产构建 / No prod build',
     ]),
-    description: '沿订单全流程核对岗位交接、异常处理与实例进度。',
+    description: '查看订单全流程、专项链路与逐步验证，跟踪具体业务实例。',
   }),
   Object.freeze({
     key: 'flow-explorer',
@@ -109,22 +109,6 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description: '查看状态流转、流程定义、事实规则与财务口径。',
-  }),
-  Object.freeze({
-    key: 'business-topics',
-    searchKeywords: Object.freeze(['财务关联', '采购', '委外', '系统衔接']),
-    englishTitle: 'Business Topics',
-    group: '业务链治理 / Business Chain Governance',
-    route: DEV_BUSINESS_TOPICS_ROUTE,
-    source: 'docs/architecture/业务链与运行轨迹边界.md',
-    truthSource: '与业务链路共用正式链路、岗位、状态与事实目录',
-    status: '只读关系投影 / Read-only relationships',
-    guardrails: Object.freeze([
-      '专题与总链同源 / Shared chain definitions',
-      '流程示意不代表实例进度 / Design is not runtime evidence',
-      '不进生产构建 / No prod build',
-    ]),
-    description: '按专题查看跨模块关系、形成条件、责任岗位和纠错路径。',
   }),
   Object.freeze({
     key: 'task-handling',
@@ -202,6 +186,21 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description: '按任务选 Skill，核对适用范围与调用方式',
+  }),
+  Object.freeze({
+    key: 'visualization',
+    searchKeywords: Object.freeze(['图例', '图解', '可视化表达']),
+    englishTitle: 'Visualization Guide',
+    group: '文档治理 / Docs',
+    route: DEV_VISUALIZATION_ROUTE,
+    source: 'docs/engineering/可视化表达规范.md',
+    truthSource: '可视化表达规范与隔离图例',
+    status: '只读选用 / Read-only guidance',
+    guardrails: Object.freeze([
+      '图例不代表运行或验收 / Examples are not runtime evidence',
+      '不进生产构建 / No prod build',
+    ]),
+    description: '按读者任务选择表达，查看可点图例',
   }),
   Object.freeze({
     key: 'testing',

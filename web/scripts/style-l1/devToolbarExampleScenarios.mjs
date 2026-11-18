@@ -4,7 +4,7 @@ import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 export function createDevToolbarExampleScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
   const requests = new WeakMap()
   const path = '/__dev/ui-design?page=controls&control=business-toolbar'
-  const examples = [['inventory', '库存查询', '仓库'], ['purchase', '采购订单', '供应商'], ['tasks', '工作台待办', '办理人'], ['history', '历史记录', '操作人']]
+  const examples = [['inventory', '库存查询', '仓库'], ['purchase', '采购订单', '供应商'], ['tasks', '任务管理待办', '办理人'], ['history', '历史记录', '操作人']]
   const current = (page) => page.locator('.erp-dev-toolbar-example__page:not([hidden])')
   const switchBusiness = async (page, label) => {
     await page.getByLabel('组合示例业务', { exact: true }).getByRole('radio', { name: label, exact: true }).locator('..').click()
@@ -193,7 +193,7 @@ name: 'dev-ui-toolbar-composition',
         await current(page).getByRole('tab', { name: '采购跟进', exact: true }).click()
         assert.equal(await current(page).getByRole('button', { name: '新建采购订单', exact: true }).count(), 0)
         assert.equal(await current(page).getByRole('group', { name: '采购订单快捷条件', exact: true }).count(), 0)
-        await switchBusiness(page, '工作台待办')
+        await switchBusiness(page, '任务管理待办')
         await current(page).getByRole('button', { name: /常规待办，共 4 条/u }).click()
         await current(page).getByRole('tab', { name: '日历', exact: true }).click()
         await current(page).getByLabel('本地待办日历', { exact: true }).waitFor()
@@ -270,9 +270,9 @@ name: 'dev-ui-toolbar-category-growth',
         for (const [_key, label] of examples) {
           await switchBusiness(page, label)
           await choose(page, '组合示例增长场景', '假设：功能分类增多')
-          if (label === '工作台待办') {
+          if (label === '任务管理待办') {
             assert.equal(await current(page).getByRole('tab', { name: '列表', exact: true }).getAttribute('aria-selected'), 'true')
-            assert.equal(await current(page).getByRole('group', { name: '工作台待办快捷条件', exact: true }).getByRole('button').count(), 4)
+            assert.equal(await current(page).getByRole('group', { name: '任务管理待办快捷条件', exact: true }).getByRole('button').count(), 4)
             await current(page).getByRole('button', { name: /^筛选(?:，|$)/u }).click()
             await choose(page, '扩展待办分类', '扩展分类 F', 'F')
             await page.keyboard.press('Escape')

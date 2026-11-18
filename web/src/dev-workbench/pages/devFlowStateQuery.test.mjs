@@ -2,18 +2,16 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  buildDevFlowSurfaceLocation,
+  buildDevSpecializedChainLocation,
   canonicalizeDevFlowStateSearchParams,
   DEV_BUSINESS_RULE_VIEWS,
   resolveDevFlowViewRoute,
 } from './devFlowStateQuery.mjs'
 
-test('规则定义统一在独立菜单查看，专题和实例仍回各自入口', () => {
+test('规则定义继续使用独立菜单，业务结构与实例共用业务链路入口', () => {
   for (const view of DEV_BUSINESS_RULE_VIEWS) {
     assert.equal(resolveDevFlowViewRoute(view), '/__dev/business-rules')
-    assert.equal(resolveDevFlowViewRoute(view, { topics: true }), '/__dev/business-rules')
   }
-  assert.equal(resolveDevFlowViewRoute('chain', { topics: true }), '/__dev/business-topics')
   for (const view of ['chain', 'tracking', 'workflow', 'runtime', 'finance_records']) {
     assert.equal(resolveDevFlowViewRoute(view), '/__dev/status-flows')
   }
@@ -175,16 +173,19 @@ test('reading and instance filters survive specialist views without stale object
   assert.deepEqual(canonicalize(query), { changed: false, query })
 })
 
-test('independent topic navigation carries relation filters without stale reading or instance selections', () => {
+test('专项链路链接保留关联筛选，清除旧环节、实例与核验选择', () => {
   const from = new URLSearchParams('view=tracking&chain=purchase_to_inventory&node=receipt&flow_stage=incoming_quality&flow_role=warehouse&flow_object=fact.purchase_receipt&flow_permission=warehouse.inbound.confirm&task_id=42&flow_topic=finance_relations&finance_topic=adjustments')
-  const target = buildDevFlowSurfaceLocation(from, { topics: true, topicKey: 'purchase_to_inventory' })
-  assert.equal(target.pathname, '/__dev/business-topics')
+  from.set('flow_topic_step', 'old-action')
+  from.set('flow_topic_batch', 'old-report')
+  const target = buildDevSpecializedChainLocation('purchase_to_inventory', from)
+  assert.equal(target.pathname, '/__dev/status-flows')
   assert.deepEqual(Object.fromEntries(new URLSearchParams(target.search)), {
-    flow_role: 'warehouse', flow_object: 'fact.purchase_receipt', flow_permission: 'warehouse.inbound.confirm', flow_topic: 'purchase_to_inventory',
+    view: 'chain',
+    chain: 'all',
+    flow_tab: 'topics',
+    flow_role: 'warehouse',
+    flow_object: 'fact.purchase_receipt',
+    flow_permission: 'warehouse.inbound.confirm',
+    flow_topic: 'purchase_to_inventory',
   })
-  const main = buildDevFlowSurfaceLocation(new URLSearchParams(target.search))
-  assert.equal(main.pathname, '/__dev/status-flows')
-  assert.equal(new URLSearchParams(main.search).has('flow_topic'), false)
-  assert.equal(new URLSearchParams(main.search).get('flow_role'), 'warehouse')
-  assert.equal(buildDevFlowSurfaceLocation(new URLSearchParams(), { topics: true }).search, '')
 })

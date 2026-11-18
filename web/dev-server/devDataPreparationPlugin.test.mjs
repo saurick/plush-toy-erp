@@ -1,4 +1,3 @@
-import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from "../../scripts/qa/manual-acceptance-target-policy.mjs";
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
@@ -13,6 +12,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import test from 'node:test'
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from '../../scripts/qa/manual-acceptance-target-policy.mjs'
 
 import {
   acquireDataPreparationExecutionLock,
@@ -86,6 +86,28 @@ function createFixture(t) {
   }
 }
 
+function generationReader(store) {
+  return (_root, id) => {
+    const operation = readDataPreparationOperation(store, id)
+    if (!['running', 'passed', 'not_proven'].includes(operation.status)) return null
+    return {
+      schemaVersion: 'plush.scenario-generation/v1',
+      id,
+      batchId: `20260729T020304000Z_${'6'.repeat(12)}`,
+      startedAt: '2026-07-29T02:03:04.000Z',
+      completedAt: '2026-07-29T02:04:04.000Z',
+      status: 'passed',
+      targetKey: operation.targetSummary.targetKey,
+      sourceFingerprint: '6'.repeat(64),
+      parametersFingerprint: '7'.repeat(64),
+      archiveSha256: '8'.repeat(64),
+      fileCount: 10,
+      repositoryFingerprint: operation.repository.fingerprint,
+      planDigest: operation.targetSummary.preflightFingerprint,
+    }
+  }
+}
+
 function fixedRandom() {
   return Buffer.from('01020304', 'hex')
 }
@@ -138,6 +160,7 @@ function successfulRunner(calls) {
     }
     if (args[0]?.endsWith('scenario-demo-data.mjs') && !args.includes('--apply')) {
       return { stdout: JSON.stringify(buildScenarioDemoPlan({
+        sourceFingerprint: '6'.repeat(64),
         repository: REPOSITORY,
         databaseTarget: {
           databaseName: 'plush_erp',
@@ -240,6 +263,7 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
   })
   assert.deepEqual(
     scenarioDemoExecutionCommand(root, {
+      id: '11111111-1111-4111-8111-111111111111',
       targetSummary: {
         targetKey: 'local-development',
         preflightFingerprint: 'c'.repeat(64),
@@ -254,6 +278,8 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
         '--apply',
         '--expected-plan-digest',
         'c'.repeat(64),
+        '--execution-id',
+        '11111111-1111-4111-8111-111111111111',
       ],
       options: { cwd: '/repo' },
     }
@@ -293,9 +319,10 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
   )
 })
 
-test('scenario demo binds the current dataset plan, needs no browser credential input, and stores exact readback', async (t) => {
+async function scenarioDemoWithSnapshotFailure(t, snapshotFailure) {
   const fixture = createFixture(t)
   const calls = []
+  let generationAvailable = true
   const planDigest = 'd'.repeat(64)
   const commandRunner = async (command, args, options) => {
     calls.push({ command, args: [...args], options })
@@ -310,6 +337,7 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
       return {
         stdout: JSON.stringify({
           schemaVersion: 'plush.scenario-demo-plan/v2',
+          sourceFingerprint: '6'.repeat(64),
           profileKey: 'scenario-demo',
           targetAlias: 'scenario-demo',
           datasetKey: 'yoyoosun-manual-acceptance',
@@ -361,6 +389,8 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
         '--apply',
         '--expected-plan-digest',
         planDigest,
+        '--execution-id',
+        args[args.indexOf('--execution-id') + 1],
       ])
       assert.equal(
         args.some((value) =>
@@ -409,6 +439,11 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
     operationStore: fixture.store,
+    readGeneration: (root, id) => {
+      if (generationAvailable) return generationReader(fixture.store)(root, id)
+      if (snapshotFailure === 'corrupt') throw new Error('snapshot archive is corrupt')
+      return null
+    },
     commandRunner,
     readRepositoryState: async () => REPOSITORY,
     environment: {},
@@ -452,11 +487,37 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
     ).length,
     1
   )
-})
+  generationAvailable = false
+  const invalidSnapshot = await service.act({
+    action: 'prepare',
+    payload: {
+      profileKey: 'scenario-demo',
+      targetKey: 'local-development',
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY.replace('223e4567', '923e4567'),
+    },
+  })
+  await service.act({
+    action: 'execute',
+    payload: {
+      operationId: invalidSnapshot.operation.id,
+      confirmation: invalidSnapshot.operation.confirmationRequired,
+    },
+  })
+  const unproven = await waitForOperation(service, invalidSnapshot.operation.id, 'not_proven')
+  assert.equal(unproven.generation, null)
+  assert.equal(unproven.issues[0].code, 'profile_execution_outcome_not_proven')
+  assert.equal(unproven.issues.some(({ code }) => code === 'generation_snapshot_unverified'), snapshotFailure === 'corrupt')
+}
+
+for (const snapshotFailure of ['missing', 'corrupt']) {
+  test(`scenario demo stores exact readback and leaves ${snapshotFailure} snapshots unproven`,
+    (t) => scenarioDemoWithSnapshotFailure(t, snapshotFailure))
+}
 
 test('real volume plans and readbacks pass the workbench while full acceptance retains its own identity', async (t) => {
   const fixture = createFixture(t)
   const planOptions = {
+    sourceFingerprint: '6'.repeat(64),
     repository: REPOSITORY,
     databaseTarget: {
       databaseName: 'plush_erp',
@@ -494,6 +555,7 @@ test('real volume plans and readbacks pass the workbench while full acceptance r
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
     operationStore: fixture.store,
+    readGeneration: generationReader(fixture.store),
     commandRunner: async (command, args, options) => {
       if (!args[0]?.endsWith('scenario-demo-data.mjs')) return fallback(command, args, options)
       assert.equal(args[args.indexOf('--source-scale-profile') + 1], 'volume')
@@ -543,6 +605,8 @@ test('real volume plans and readbacks pass the workbench while full acceptance r
 
 test('133 scenario creates and verifies a fresh target-bound backup before canonical apply', async (t) => {
   const fixture = createFixture(t)
+  const repository = { ...REPOSITORY, dirty: true }
+  const serverRelease = 'c'.repeat(40)
   const order = []
   const planDigest = '8'.repeat(64)
   const migrationVersion =
@@ -553,7 +617,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
   const targetFingerprint = hashDataPreparationPlan({
     targetAlias: 'customer-trial-133',
     databaseName,
-    release: REPOSITORY.commit,
+    release: serverRelease,
     migration: migrationVersion,
   })
   const preflight = {
@@ -564,8 +628,8 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
     remote: {
       runtime: {
         resourceIdentity: 'passed',
-        serverSha: REPOSITORY.commit,
-        webSha: REPOSITORY.commit,
+        serverSha: serverRelease,
+        webSha: serverRelease,
         databaseName,
         migrationVersion,
         activeCustomerConfig: {
@@ -586,7 +650,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
         serverReady: 'passed',
         webHealth: 'passed',
       },
-      publicEntry: { status: 'passed', gitSha: REPOSITORY.commit },
+      publicEntry: { status: 'passed', gitSha: serverRelease },
       backup: { tooling: 'passed' },
     },
   }
@@ -605,6 +669,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
       return {
         stdout: JSON.stringify({
           schemaVersion: 'plush.scenario-demo-plan/v2',
+          sourceFingerprint: '6'.repeat(64),
           profileKey: 'scenario-demo',
           targetAlias: 'customer-trial-133',
           datasetKey: 'yoyoosun-manual-acceptance',
@@ -614,7 +679,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
           backendURL: 'https://demo.yoyoosun.net',
           databaseName,
           migrationVersion,
-          repository: REPOSITORY,
+          repository,
           target: {
             targetFingerprint,
             disposable: false,
@@ -653,7 +718,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
         targetEnvironment: 'customer-trial-133',
         targetFingerprint,
         databaseName,
-        release: REPOSITORY.commit,
+        release: serverRelease,
         migrationVersion,
         customerConfigRevision: configRevision,
         datasetKey: 'yoyoosun-manual-acceptance',
@@ -677,8 +742,9 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
   const service = createDevDataPreparationService({
     projectRoot: fixture.root,
     operationStore: fixture.store,
+    readGeneration: generationReader(fixture.store),
     commandRunner,
-    readRepositoryState: async () => REPOSITORY,
+    readRepositoryState: async () => repository,
     readCustomerTrialPreflight: async () => preflight,
     createCustomerTrialBackup: async (identity) => {
       order.push('backup')
@@ -712,7 +778,7 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
       idempotencyKey: SCENARIO_REMOTE_IDEMPOTENCY_KEY,
     },
   })
-  assert.equal(prepared.operation.targetSummary.releaseSha, REPOSITORY.commit)
+  assert.equal(prepared.operation.targetSummary.releaseSha, serverRelease)
   assert.equal(prepared.operation.targetSummary.databaseName, databaseName)
   assert.match(prepared.operation.targetSummary.rollbackPoint, /^pre-data-/u)
 
@@ -734,6 +800,10 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
     prepared.operation.targetSummary.rollbackPoint
   )
   assert.equal(passed.readback.backupReceipt.sizeBytes, 4096)
+  assert.equal(passed.repository.dirty, true)
+  assert.equal(passed.readback.release, serverRelease)
+  assert.equal(passed.generation.id, passed.id)
+  assert.notEqual(passed.targetSummary.releaseSha, passed.repository.commit)
 })
 
 test('concurrent services atomically claim one idempotency key and return one operation', async (t) => {
@@ -1587,16 +1657,21 @@ test('only a provably different legacy database stops blocking current local pre
     targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
   }
   const operation = {
-    id: 'new-plan', profileKey: 'scenario-demo', targetSummary: activeTarget,
+    id: 'new-plan',
+    profileKey: 'scenario-demo',
+    targetSummary: activeTarget,
     createdAt: '2026-07-30T00:00:00.000Z',
   }
   const legacy = {
-    id: 'old-record', profileKey: 'scenario-demo', status: 'not_proven',
+    id: 'old-record',
+    profileKey: 'scenario-demo',
+    status: 'not_proven',
     updatedAt: '2026-07-29T00:00:00.000Z',
     targetSummary: {
       safeTarget: 'host=192.168.0.200 port=5432 database=plush_erp',
       targetFingerprint: createHash('sha256').update('postgres://192.168.0.200:5432/plush_erp').digest('hex'),
-      disposable: false, automaticCleanup: false,
+      disposable: false,
+      automaticCleanup: false,
     },
   }
   assert.equal(unresolvedDataPreparationOutcomeBlocksExecution(operation, [legacy]), false)
@@ -1615,25 +1690,36 @@ test('ready-plan projection uses the execution guard and never rewrites unresolv
   for (const targetKey of ['local-development', null]) {
     const fixture = createFixture(t)
     const targetSummary = {
-      safeTarget: 'local-development:plush_erp', targetFingerprint: 'c'.repeat(64),
-      preflightFingerprint: 'd'.repeat(64), disposable: false, automaticCleanup: false,
+      safeTarget: 'local-development:plush_erp',
+      targetFingerprint: 'c'.repeat(64),
+      preflightFingerprint: 'd'.repeat(64),
+      disposable: false,
+      automaticCleanup: false,
       ...(targetKey ? { targetKey } : {}),
     }
     const input = { profileKey: 'core-demo', repository: REPOSITORY, runId: 'unregistered', targetSummary }
     const { operation } = createOrReuseDataPreparationOperation(fixture.store, {
-      ...input, planHash: hashDataPreparationPlan(input), idempotencyKey: IDEMPOTENCY_KEY,
-      operationId: '623e4567-e89b-42d3-a456-426614174000', now: '2026-07-29T02:00:00.000Z',
+      ...input,
+      planHash: hashDataPreparationPlan(input),
+      idempotencyKey: IDEMPOTENCY_KEY,
+      operationId: '623e4567-e89b-42d3-a456-426614174000',
+      now: '2026-07-29T02:00:00.000Z',
     })
     transitionDataPreparationOperation(fixture.store, operation.id, { status: 'launching', message: 'started', now: '2026-07-29T02:01:00.000Z' })
     transitionDataPreparationOperation(fixture.store, operation.id, { status: 'not_proven', message: 'outcome unknown', now: '2026-07-29T02:02:00.000Z' })
     const recordPath = path.join(fixture.store, 'operations', `${operation.id}.json`)
     const original = readFileSync(recordPath)
     const service = createDevDataPreparationService({
-      projectRoot: fixture.root, operationStore: fixture.store, commandRunner: successfulRunner([]),
-      readRepositoryState: async () => REPOSITORY, environment: {},
-      now: () => new Date('2026-07-29T02:07:04.000Z'), random: fixedRandom,
+      projectRoot: fixture.root,
+      operationStore: fixture.store,
+      commandRunner: successfulRunner([]),
+      readRepositoryState: async () => REPOSITORY,
+      environment: {},
+      now: () => new Date('2026-07-29T02:07:04.000Z'),
+      random: fixedRandom,
     })
-    const prepared = await service.act({ action: 'prepare', payload: {
+    const prepared = await service.act({ action: 'prepare',
+      payload: {
       profileKey: 'scenario-demo', targetKey: 'local-development', idempotencyKey: SCENARIO_IDEMPOTENCY_KEY,
     } })
     assert.equal(prepared.operation.status, 'ready')
@@ -1644,7 +1730,8 @@ test('ready-plan projection uses the execution guard and never rewrites unresolv
     const summary = await service.summary({ force: true })
     validateDevDataPreparationSummary(summary)
     assert.equal(summary.unresolvedOperations.find(({ id }) => id === operation.id).targetKey, targetKey)
-    await assert.rejects(service.act({ action: 'execute', payload: {
+    await assert.rejects(service.act({ action: 'execute',
+      payload: {
       operationId: prepared.operation.id, confirmation: prepared.operation.confirmationRequired,
     } }), /unresolved|not proven/iu)
     assert.deepEqual(readFileSync(recordPath), original, 'reads and rejected execution preserve the original receipt byte for byte')

@@ -46,6 +46,7 @@ const devPageSources = [
   'DevQualityGatesPage.jsx',
   'DevDataPreparationPage.jsx',
   'DevUIDesignPage.jsx',
+  'DevVisualizationPage.jsx',
   'DevCustomerConfigPage.jsx',
   'DevDatabaseMigrationPage.jsx',
   'DevVersionCenterPage.jsx',
@@ -161,7 +162,6 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
       ['product-engineering', '业务链路'],
       ['product-engineering', '流程探索'],
       ['product-engineering', '业务规则'],
-      ['product-engineering', '业务专题'],
       ['product-engineering', '任务办理'],
       ['product-engineering', '权限关系'],
       ['product-engineering', '交互设计'],
@@ -169,6 +169,7 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
       ['quality', '页面说明检查'],
       ['development-resources', '项目文档'],
       ['development-resources', '项目 Skill'],
+      ['development-resources', '可视化规范'],
       ['quality', '测试执行'],
       ['quality', '链路实测报告'],
       ['quality', '质量门禁'],
@@ -222,7 +223,7 @@ test('devHub: shared workspace navigation exposes overview and four responsibili
     false,
     '页面说明检查保留登记和深链，通过测试执行按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 8)
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 7)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'development-resources')
   assert.deepEqual(
     getDevSecondaryNavItems('quality').map((item) => item.key),
@@ -353,7 +354,7 @@ test('devHub: tools share one area registry without duplicate overview stage inv
 })
 
 test('devHub: dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 17)
+  assert.equal(devPageSources.length, 18)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -421,7 +422,6 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/status-flows',
       '/__dev/flow-explorer',
       '/__dev/business-rules',
-      '/__dev/business-topics',
       '/__dev/task-handling',
       '/__dev/permission-relationships',
       '/__dev/ui-design',
@@ -429,6 +429,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/business-usability',
       '/__dev/docs',
       '/__dev/project-skills',
+      '/__dev/visualization',
       '/__dev/testing',
       '/__dev/business-chain-audit',
       '/__dev/quality-gates',
@@ -584,7 +585,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 20)
+  assert.equal(summary.entryCount, DEV_SECONDARY_NAV_ITEMS.length)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)
@@ -712,6 +713,6 @@ test('devHub: every tool has a unique owner and old name searches retain their d
     }
   }
   assert.deepEqual(getDevSecondaryNavItems('development-resources').map((item) => item.route), [
-    '/__dev/integration', '/__dev/docs', '/__dev/project-skills',
+    '/__dev/integration', '/__dev/docs', '/__dev/project-skills', '/__dev/visualization',
   ])
 })

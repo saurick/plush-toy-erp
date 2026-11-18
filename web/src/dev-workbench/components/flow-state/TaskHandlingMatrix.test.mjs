@@ -38,20 +38,9 @@ async function mount(t) {
       (el) => el.textContent.replace(/\s/gu, '') === label.replace(/\s/gu, '')
     )
   const choose = async (label, text) => {
-    const control = root
-      .querySelector(`[aria-label="${label}"][role="combobox"]`)
-      .closest('.ant-select')
-    await ui.act(() =>
-      control
-        .querySelector('.ant-select-selector')
-        .dispatchEvent(
-          new ui.runtimeWindow.MouseEvent('mousedown', { bubbles: true })
-        )
-    )
-    await ui.flush()
-    const option = [
-      ...document.querySelectorAll('.ant-select-item-option'),
-    ].find((el) => el.textContent === text)
+    const group = root.querySelector(`[aria-label="${label}"][role="group"]`)
+    assert(group, label)
+    const option = [...group.querySelectorAll('button')].find((el) => el.textContent === text)
     assert(option, text)
     await click(option)
   }

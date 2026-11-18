@@ -223,7 +223,7 @@ export default function DevVerificationEvidence({ compact = false }) {
               <td>
                 <DevTestingDetails id="server-ci" label="查看 CI" title="GitLab CI 证据">
                   {stale ? <p role="status">上次读取记录，仅供追溯；本次状态尚未确认。</p> : !state?.ci.passed ? <p>本条是对应提交的 CI 记录，未证明当前工作区通过。</p> : null}
-                  {state?.ci.evidence ? <ServerCiEvidencePanel summary={{ repository: state.ciRepository || state.repository, serverEvidence: state.ci.evidence }} /> : <p>尚未取得 GitLab CI 证据。</p>}
+                  {state?.ci.evidence ? <ServerCiEvidencePanel stale={stale} summary={{ repository: state.ciRepository || state.repository, serverEvidence: state.ci.evidence }} /> : <p>尚未取得 GitLab CI 证据。</p>}
                 </DevTestingDetails>
               </td>
             </tr>

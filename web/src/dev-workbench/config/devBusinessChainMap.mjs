@@ -405,11 +405,9 @@ function projectVisibleBusinessChainMap(draft, library, map, mode) {
   if (mode !== 'overview') return graph
   const chains = visibleChains(map, library)
   const expanded = new Set(map.expandedChains)
-  const shown = new Set(
-    graph.nodes
-      .filter(({ id }) => expanded.has(library.byId.get(id).chainKey))
-      .map(({ id }) => id)
-  )
+  const steps = graph.nodes.filter(({ id }) => expanded.has(library.byId.get(id).chainKey))
+  const shown = new Set(steps.map(({ id }) => id))
+  const stepEdges = graph.edges.filter(({ from, to }) => shown.has(from) && shown.has(to))
   const summaries = chains.map((key, index) => ({
     ...(map.summaries.find((node) => node.id === key) || {
       x: 32 + (index % 3) * 300,
@@ -426,10 +424,14 @@ function projectVisibleBusinessChainMap(draft, library, map, mode) {
         isBusinessChainStep(library.byId.get(id))
     ).length,
   }))
+  if (summaries.length === 1 && summaries[0].chainKey === map.chainKey) {
+    // In a single chain the scope bar carries the expanded summary; map coordinates stay cached.
+    return { scopeSummary: summaries[0], nodes: steps.length ? steps : summaries, edges: stepEdges }
+  }
   return {
-    nodes: [...summaries, ...graph.nodes.filter(({ id }) => shown.has(id))],
+    nodes: [...summaries, ...steps],
     edges: [
-      ...graph.edges.filter(({ from, to }) => shown.has(from) && shown.has(to)),
+      ...stepEdges,
       ...(library.overview?.relations || [])
         .filter(
           (edge) =>
@@ -581,10 +583,9 @@ export function toggleBusinessChainMapRegion(draft, library, key) {
   if (collapsing || map.focusPositions) return next
   const before = projectBusinessChainMap(draft, library, 'overview').nodes
   const visible = new Set(before.map(({ id }) => id))
-  const added = projectBusinessChainMap(next, library, 'overview').nodes.filter(
-    ({ id }) => !visible.has(id)
-  )
-  const occupied = [...before, ...added.filter((node) => node.manual)]
+  const after = projectBusinessChainMap(next, library, 'overview').nodes
+  const added = after.filter(({ id }) => !visible.has(id))
+  const occupied = after.filter((node) => visible.has(node.id) || node.manual)
   const placements = new Map()
   for (const node of added.filter((node) => !node.manual)) {
     const placement = { ...node, ...freePosition(occupied, node) }

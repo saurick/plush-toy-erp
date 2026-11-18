@@ -3,7 +3,7 @@ import DevTimestamp from '../../../components/DevTimestamp.jsx'
 
 const { Paragraph } = Typography
 
-export function SecurityPanel({ activeView, overview }) {
+export function SecurityPanel({ activeView, overview, stale }) {
   return (
     <section
       hidden={activeView !== 'security'}
@@ -37,9 +37,9 @@ export function SecurityPanel({ activeView, overview }) {
                   <th scope="row">{check.title}</th>
                   <td>
                     <Tag
-                      color={check.status === 'partial' ? 'blue' : undefined}
+                      color={!stale && check.status === 'partial' ? 'blue' : undefined}
                     >
-                      {check.statusLabel}
+                      {stale && check.status === 'partial' ? `上次：${check.statusLabel}` : check.statusLabel}
                     </Tag>
                   </td>
                   <td>

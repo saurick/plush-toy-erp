@@ -1,4 +1,5 @@
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
+import { validateScenarioGeneration } from '../../../../config/scenario-generation.mjs'
 import { DEV_DATA_PREPARATION_ROUTE } from './devRoutes.mjs'
 import manualAcceptanceContract from '../../../../server/internal/manualacceptance/contract.json' with { type: 'json' }
 
@@ -916,6 +917,7 @@ export function validateDevDataPreparationOperation(operation) {
   assertExactKeys(
     operation,
     [
+      ...(Object.hasOwn(operation || {}, 'generation') ? ['generation'] : []),
       'confirmationRequired',
       'contract',
       'createdAt',
@@ -936,6 +938,16 @@ export function validateDevDataPreparationOperation(operation) {
     'data preparation operation'
   )
   validateOperationContract(operation.contract, 'current')
+  if (operation.generation != null) {
+    validateScenarioGeneration(operation.generation)
+    if (operation.profileKey !== DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo ||
+      operation.generation.id !== operation.id ||
+      operation.generation.repositoryFingerprint !== operation.repository?.fingerprint ||
+      operation.generation.planDigest !== operation.targetSummary?.preflightFingerprint ||
+      operation.generation.targetKey !== operation.targetSummary?.targetKey) {
+      throw new Error('造数快照与执行记录不匹配')
+    }
+  }
   const targetSummaryKeys = [
     'automaticCleanup',
     'disposable',

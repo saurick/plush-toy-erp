@@ -50,10 +50,11 @@ export function createDevQualityGateLayoutScenarios({
               ? 'gaps'
               : 'summary'
           if (view === 'governance') await state.governanceWait
+          if (view === 'summary') await state.summaryWait
           if (state.error === view) {
             return route.fulfill({ status: 503, body: '{}' })
           }
-          const summary = createQualityGateStyleSummary(state.mode)
+          const summary = createQualityGateStyleSummary(state.mode, { serverStatus: state.serverStatus })
           if (state.historyCount) {
             summary.operations = Array.from({ length: state.historyCount }, (_, index) => ({
               ...summary.operations[index % summary.operations.length],
@@ -393,6 +394,39 @@ export function createDevQualityGateLayoutScenarios({
         await page.getByRole('tab', { name: '服务器 CI', exact: true }).click()
         await page.getByText('服务器 · GitLab Runner', { exact: true }).waitFor()
         assert.equal(await page.getByRole('tab', { name: '改动缺口', exact: true }).isVisible(), false)
+        const currentCi = page.getByRole('region', { name: '当前提交的 CI 结果', exact: true })
+        const previousCi = page.getByRole('region', { name: '上次读取的 CI 结果', exact: true })
+        const originalPipeline = currentCi.getByRole('link', { name: /查看 GitLab 流水线/u })
+        const pipelineHref = await originalPipeline.getAttribute('href')
+        let releaseSummary
+        state.summaryWait = new Promise((resolve) => { releaseSummary = resolve })
+        state.error = 'summary'
+        try {
+          await page.getByRole('button', { name: /刷新状态/u }).click()
+          await page.getByText('GitLab CI 正在读取服务器证据', { exact: true }).waitFor()
+          await previousCi.getByText('上次结果：完整 CI 通过', { exact: true }).waitFor()
+          assert.equal(await currentCi.count(), 0)
+          assert.equal(await previousCi.locator('.ant-tag-success').count(), 0)
+          await assertNoHorizontalOverflow(page, '服务器 CI 刷新中')
+        } finally {
+          state.summaryWait = undefined
+          releaseSummary()
+        }
+        await page.getByText('质量门禁状态读取失败', { exact: true }).waitFor()
+        assert.equal(await currentCi.count(), 0, '读取失败不能恢复旧的当前 CI 标题')
+        assert.equal(await previousCi.getByRole('link', { name: /查看 GitLab 流水线/u }).getAttribute('href'), pipelineHref)
+        await page.getByRole('button', { name: '流程与原理', exact: true }).click()
+        const jobGuide = page.getByRole('dialog', { name: 'Job 说明', exact: true })
+        await jobGuide.getByText('以下运行结果来自上次读取，本次状态尚未核实。', { exact: true }).waitFor()
+        await jobGuide.locator('.ant-drawer-close').click()
+        await jobGuide.waitFor({ state: 'hidden' })
+        await assertNoHorizontalOverflow(page, '服务器 CI 读取失败')
+        state.error = ''
+        state.serverStatus = 'docs_passed'
+        await refresh()
+        await currentCi.getByText('文档检查通过', { exact: true }).waitFor()
+        assert.equal(await previousCi.count(), 0, '成功重读后只保留新结论')
+        state.serverStatus = undefined
         await page.getByRole('tab', { name: '本地检查', exact: true }).click()
         await page.getByText('当前没有已暂存改动', { exact: true }).waitFor()
         assert.equal(new URL(page.url()).searchParams.get('range'), 'staged')

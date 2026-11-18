@@ -62,6 +62,10 @@ export function createDevBusinessChainMapScenarios({
             )
           }
         }
+        const upstream = action('上游再一层')
+        const downstream = action('下游再一层')
+        await expect(upstream).toHaveCount(0)
+        await expect(downstream).toHaveCount(0)
         const search = editor.getByRole('textbox', { name: '搜索业务节点' })
         await search.fill('提交委外订单')
         await search.press('Enter')
@@ -168,15 +172,6 @@ export function createDevBusinessChainMapScenarios({
           .getByRole('button', { name: '聚焦此处', exact: true })
           .click()
         await detail('链路概览').click()
-        await action('保存当前').click()
-        const naming = page.getByRole('dialog', {
-          name: '保存本地视图',
-          exact: true,
-        })
-        await naming
-          .getByRole('textbox', { name: '视图名称', exact: true })
-          .fill('地图式阅读验证')
-        await naming.getByRole('button', { name: '保存', exact: true }).click()
         const saved = await working()
         await page.reload()
         await expect(canvas).toHaveAttribute('data-view-mode', 'overview')
@@ -231,6 +226,22 @@ export function createDevBusinessChainMapScenarios({
         await chooseScope('业务全流程地图')
         await expect(canvas).toHaveAttribute('data-view-mode', 'overview')
         await action('适应画布全图').click()
+        await chooseScope('采购下单到入库应付')
+        await detail('链路概览').click()
+        const scope = editor.getByLabel('当前探索范围', { exact: true })
+        const boundaryText = '已登记的上下游均已载入'
+        await expect(upstream).toBeEnabled()
+        await downstream.click()
+        await downstream.click()
+        await expect(upstream).toBeVisible()
+        await expect(upstream).toBeDisabled()
+        await expect(downstream).toBeVisible()
+        await expect(downstream).toBeDisabled()
+        await expect(scope).toContainText(boundaryText)
+        await action('撤销').click()
+        await expect(downstream).toBeEnabled()
+        await expect(scope).not.toContainText(boundaryText)
+        await action('返回来处').click()
         await action('查看节点：采购入库的退货、调整与冲正').click()
         await action('只看这条链路').click()
         await detail('全部已载入节点').click()
@@ -291,6 +302,10 @@ export function createDevBusinessChainMapScenarios({
           overviewLayout,
           '返回时恢复整图每个节点的位置'
         )
+        await chooseScope('生产异常决策与执行')
+        await expect(upstream).toBeEnabled()
+        await expect(downstream).toBeDisabled()
+        await expect(scope).not.toContainText(boundaryText)
         assert.deepEqual(
           writes.get(page),
           [],

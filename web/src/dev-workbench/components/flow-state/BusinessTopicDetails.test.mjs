@@ -102,7 +102,7 @@ test('图中与相邻详情选取对象共用 URL，当前专题和对象不会�
     })
   }
   await harness.render(h(MemoryRouter, {
-    initialEntries: ['/__dev/business-topics'],
+    initialEntries: ['/__dev/status-flows?flow_tab=topics'],
     future: { v7_startTransition: true, v7_relativeSplatPath: true },
   }, h(Page)))
   const root = harness.container
@@ -115,8 +115,8 @@ test('图中与相邻详情选取对象共用 URL，当前专题和对象不会�
   await harness.act(() => material.click())
   await harness.flush()
   const params = new URLSearchParams(location.search)
-  assert.equal(location.pathname, '/__dev/business-topics')
-  assert.equal(params.has('flow_tab'), false)
+  assert.equal(location.pathname, '/__dev/status-flows')
+  assert.equal(params.get('flow_tab'), 'topics')
   assert.equal(params.get('flow_topic'), 'sales_to_production')
   assert.equal(params.get('flow_topic_node'), 'material_request')
   assert(root.querySelector('[data-graph-node="material_request"][aria-pressed="true"]'))
@@ -127,10 +127,10 @@ test('图中与相邻详情选取对象共用 URL，当前专题和对象不会�
   await harness.act(() => map.click())
   await harness.flush()
   assert(root.querySelector('[data-business-chain-system]'))
-  assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此专题').length, 0)
+  assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此链路').length, 0)
   await harness.act(() => root.querySelector('[data-business-chain-system] [data-graph-node][aria-pressed="false"]').dispatchEvent(new harness.runtimeWindow.MouseEvent('click', { bubbles: true })))
   await harness.flush()
-  assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此专题').length, 1)
+  assert.equal([...root.querySelectorAll('button')].filter((button) => button.textContent === '查看此链路').length, 1)
   const back = [...root.querySelectorAll('button')]
     .find((button) => button.textContent.startsWith('返回'))
   await harness.act(() => back.click())

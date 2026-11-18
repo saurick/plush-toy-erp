@@ -27,7 +27,7 @@ import {
   parseDevBusinessUsabilitySearch,
 } from '../config/devBusinessUsability.mjs'
 import '../styles/dev-business-usability.css'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -177,21 +177,19 @@ export default function DevBusinessUsabilityPage() {
             aria-label="搜索页面说明"
             onSearch={(value) => updateQuery({ keyword: value })}
           />
-          <FilterSelect
+          <FilterChipGroup
+            allowClear
             emptyValue="all"
             label="说明覆盖状态"
-            placeholder="说明覆盖状态"
             value={status}
             options={DEV_BUSINESS_USABILITY_STATUS_OPTIONS}
             aria-label="按说明覆盖状态筛选"
             onChange={(value) => updateQuery({ status: value })}
           />
-          <FilterSelect
+          <FilterChipGroup
+            allowClear
             emptyValue="all"
             label="岗位帮助"
-            placeholder="岗位帮助"
-            showSearch
-            optionFilterProp="label"
             value={role}
             options={DEV_BUSINESS_USABILITY_ROLE_OPTIONS}
             aria-label="按岗位帮助推荐筛选"

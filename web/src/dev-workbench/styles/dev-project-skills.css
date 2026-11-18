@@ -4,8 +4,7 @@
 
 .erp-dev-skills__header,
 .erp-dev-skills__health,
-.erp-dev-skills__detail-head,
-.erp-dev-skills__related {
+.erp-dev-skills__detail-head {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -18,18 +17,12 @@
 }
 
 .erp-dev-skills h1.ant-typography,
-.erp-dev-skills h2.ant-typography,
-.erp-dev-skills h3.ant-typography {
+.erp-dev-skills h2.ant-typography {
   margin: 0;
 }
 
 .erp-dev-skills h2.ant-typography {
   font-size: 18px;
-}
-
-.erp-dev-skills h3.ant-typography {
-  margin-bottom: 8px;
-  font-size: 14px;
 }
 
 .erp-dev-skills__health {
@@ -87,20 +80,33 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-skills__decision-content {
+.erp-dev-skills__topic-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-dev-skills__topic-tools .ant-select {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 360px;
+}
+
+.erp-dev-skills__flow-content {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
 }
 
-.erp-dev-skills__decision-chart {
-  flex: 3 1 560px;
+.erp-dev-skills__flow-chart {
+  flex: 3 1 520px;
   min-width: 0;
 }
 
-.erp-dev-skills__decision-note {
-  flex: 1 1 220px;
+.erp-dev-skills__step {
+  flex: 2 1 320px;
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -109,15 +115,28 @@
   background: var(--erp-surface-bg-soft);
 }
 
-.erp-dev-skills__decision-note a {
+.erp-dev-skills__step dl {
+  display: grid;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.erp-dev-skills__step dt {
+  margin-block-end: 4px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-dev-skills__step dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-skills__step a {
   justify-self: start;
   color: var(--erp-primary);
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.erp-dev-skills__related {
-  margin-block-start: 8px;
 }
 
 .erp-dev-skills__state {

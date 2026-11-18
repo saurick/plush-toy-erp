@@ -157,11 +157,42 @@ export function createDevDrillRecoveryScenarios({
         await page.setViewportSize({ width: 1100, height: 900 })
         await assertNoHorizontalOverflow(page, 'dev-recovery-narrow-desktop')
         await page.setViewportSize({ width: 1440, height: 900 })
-        await page.route('**/__dev/api/delivery/summary', (route) => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ status: 'failed', message: '操作未完成；请刷新版本中心查看已记录状态' }) }))
-        await page.getByRole('button', { name: '核验目标', exact: true }).click()
+        const currentReadiness = page.getByRole('region', { name: '当前恢复准备度', exact: true })
+        const previousReadiness = page.getByRole('region', { name: '上次读取的恢复准备度', exact: true })
+        const target = await currentReadiness.locator('code').allTextContents()
+        await currentReadiness.getByText('验证通过', { exact: true }).waitFor()
+        let releaseRead
+        const delayedFailure = new Promise((resolve) => { releaseRead = resolve })
+        const summaryEndpoint = '**/__dev/api/delivery/summary'
+        const failRead = async (route) => {
+          await delayedFailure
+          await route.fulfill({ status: 409, json: { status: 'failed', message: '操作未完成；请刷新版本中心查看已记录状态' } })
+        }
+        await page.route(summaryEndpoint, failRead)
+        const refresh = page.getByRole('button', { name: /核验目标/u })
+        try {
+          await refresh.click()
+          await previousReadiness.getByText('当前状态待核对', { exact: true }).waitFor()
+          assert.equal(await previousReadiness.locator('.ant-tag-success').count(), 0)
+        } finally {
+          releaseRead()
+        }
         await page.getByText('最新状态核对失败', { exact: true }).waitFor()
         await page.getByText(/读取恢复证据失败/u).waitFor()
+        assert.deepEqual(await previousReadiness.locator('code').allTextContents(), target, '保留上次目标和运行版本')
+        await page.getByRole('tab', { name: '恢复演练', exact: true }).click()
+        const drills = page.getByRole('table', { name: '演练清单' })
+        await drills.getByText('上次：最近证据可用', { exact: true }).waitFor()
+        assert.equal(await drills.getByText('当前建议', { exact: true }).count(), 0)
+        await page.getByRole('tab', { name: '备份记录', exact: true }).click()
+        await backups.getByRole('columnheader', { name: '上次记录的保留状态' }).waitFor()
+        await backups.getByText('最新轮换状态暂未确认，以下为已有记录', { exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, 'dev-recovery-read-failure')
+        await page.unroute(summaryEndpoint, failRead)
+        await refresh.click()
+        await currentReadiness.getByText('验证通过', { exact: true }).waitFor()
+        assert.equal(await previousReadiness.count(), 0, '成功重读后恢复当前判定')
+        await backups.getByRole('columnheader', { name: '保留状态', exact: true }).waitFor()
       },
     },
   ]

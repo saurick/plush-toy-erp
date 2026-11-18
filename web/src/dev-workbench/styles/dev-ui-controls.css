@@ -363,34 +363,6 @@
   padding-inline: 12px;
 }
 
-.erp-control-example-options {
-  display: grid;
-  width: min(360px, calc(100vw - 24px));
-  gap: 10px;
-  padding: 10px;
-}
-
-.erp-control-example-popover .ant-popover-inner {
-  padding: 0;
-}
-
-.erp-control-example-options fieldset {
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  margin: 0;
-}
-
-.erp-control-example-options legend {
-  width: 100%;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.erp-control-example-options .ant-btn {
-  min-height: 44px;
-}
-
 .erp-control-example-result {
   padding: 16px;
   border: 1px solid var(--erp-border);

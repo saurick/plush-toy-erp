@@ -20,40 +20,11 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
       ).draft
       return { nodes, edges, ideas }
     })
-  const saved = () =>
-    page.evaluate(() =>
-      localStorage.getItem('plush-workbench:business-chain-design')
-    )
-  const copyDraft = async () => {
-    await editor.getByRole('button', { name: '更多视图操作', exact: true }).click()
-    await page.getByRole('menuitem', { name: '另存一份', exact: true }).click()
-  }
-  const nameDraft = async (action, title, name) => {
-    if (action === '另存一份') await copyDraft()
-    else await editor.getByRole('button', { name: action, exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: title, exact: true })
-    await dialog
-      .getByRole('textbox', { name: '视图名称', exact: true })
-      .fill(name)
-    await dialog.getByRole('button', { name: '保存', exact: true }).click()
-    await expect(dialog).not.toBeVisible()
-  }
-  await nameDraft('保存视图', '保存本地视图', '快捷键原稿')
-  await nameDraft('另存一份', '另存一份本地视图', '快捷键副本')
-  // Enter the saved draft through the switcher so its undo history starts here.
-  for (const name of ['快捷键原稿', '快捷键副本']) {
-    await editor
-      .locator('.erp-chain-design__draft-select .ant-select-selector')
-      .click()
-    await page
-      .locator('.ant-select-dropdown:visible .ant-select-item-option')
-      .getByText(name, { exact: true })
-      .click()
-  }
+  // Reload starts a fresh history for the same automatically recorded canvas.
+  await page.reload()
+  await expect(canvas).toBeVisible()
   await editor.getByRole('button', { name: '调整布局', exact: true }).click()
   const baseline = await working()
-  const savedBefore = await saved()
-  assert.equal(JSON.parse(savedBefore).length, 2)
   await expect(redo).toBeDisabled()
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
@@ -240,15 +211,6 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   })
   await checkTextEditing(search)
   await search.fill('')
-  await copyDraft()
-  const naming = page.getByRole('dialog', {
-    name: '另存一份本地视图',
-    exact: true,
-  })
-  await checkTextEditing(
-    naming.getByRole('textbox', { name: '视图名称', exact: true })
-  )
-  await naming.getByRole('button', { name: '取消', exact: true }).click()
   await editor
     .getByRole('button', { name: '更多视图操作', exact: true })
     .click()
@@ -262,7 +224,6 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   await pan.focus()
   await page.keyboard.press('Control+z')
   assert.deepEqual(await working(), baseline, '输入后仍能在画布撤销之前的移动')
-  assert.equal(await saved(), savedBefore, '快捷键不覆盖任何已保存视图')
   await expect(
     editor.getByRole('button', { name: '撤销', exact: true })
   ).toBeDisabled()
@@ -282,25 +243,11 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   await page.keyboard.press('Control+z')
   await page.keyboard.press('Control+z')
   assert.deepEqual(await working(), baseline)
-  await editor
-    .locator('.erp-chain-design__draft-select .ant-select-selector')
-    .click()
-  await page
-    .locator('.ant-select-dropdown:visible .ant-select-item-option')
-    .getByText('快捷键原稿', { exact: true })
-    .click()
-  const switchDialog = page.getByRole('dialog', { name: '当前视图有未保存修改', exact: true })
-  await expect(switchDialog).toBeVisible()
-  await switchDialog.getByRole('button', { name: '放弃修改并切换', exact: true }).click()
+  await page.reload()
   await expect(redo).toBeDisabled()
   await pan.focus()
   await page.keyboard.press('Meta+Shift+z')
-  assert.deepEqual(
-    await working(),
-    baseline,
-    '切换视图后不能重做上一个视图的修改'
-  )
-  assert.equal(await saved(), savedBefore, '重做不覆盖任何已保存视图')
+  assert.deepEqual(await working(), baseline, '重新打开自动记录后不沿用上次的重做历史')
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()

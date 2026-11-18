@@ -123,7 +123,7 @@ test("grouped select changes retain hierarchy and actual consumer browser checks
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const text = plan.followUps.find((item) => item.id === "browser-regression")?.text || "";
-    for (const scenario of ["shared-grouped-select-light-desktop", "shared-grouped-select-dark-desktop", "shared-grouped-select-light-mobile", "shared-grouped-select-dark-mobile", "grouped-select-business-rules", "grouped-select-design-html", "history-records-source-switch", "system-audit-logs-desktop"]) assert(text.includes(scenario), `${file}: ${scenario}`);
+    for (const scenario of ["shared-grouped-select-light-desktop", "shared-grouped-select-dark-desktop", "shared-grouped-select-light-mobile", "shared-grouped-select-dark-mobile", "grouped-select-business-rules", "grouped-select-design-html", "history-records-source-switch"]) assert(text.includes(scenario), `${file}: ${scenario}`);
     assert(!ids(plan).includes("full"), file);
   }
 });

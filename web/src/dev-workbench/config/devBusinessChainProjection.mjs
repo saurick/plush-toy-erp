@@ -257,15 +257,19 @@ export function buildDevBusinessChainRoleGuide(catalog, chainKey) {
   ])
 }
 
-export function buildDevBusinessChainTopics(catalog, role = 'all') {
-  const topics = new Map(catalog.businessChains.map((chain) => {
-    const steps = buildDevBusinessChainRoleGuide(catalog, chain.key)
-    const matchingSteps = steps.filter((step) => fulfillmentStepMatchesRole(step, role))
-    return [chain.key, { chain, steps, matchingSteps }]
-  }))
+const chainsReachedFromExceptions = new Set(taskCatalog.exception_guides.map((guide) => guide.business_chain))
+
+export function buildDevBusinessChainTopics(catalog, { role = 'all', selectedChainKey } = {}) {
+  const topics = new Map(catalog.businessChains
+    .filter((chain) => chain.key === selectedChainKey || chain.kind !== 'exception' || !chainsReachedFromExceptions.has(chain.key))
+    .map((chain) => {
+      const steps = buildDevBusinessChainRoleGuide(catalog, chain.key)
+      const matchingSteps = steps.filter((step) => fulfillmentStepMatchesRole(step, role))
+      return [chain.key, { chain, steps, matchingSteps }]
+    }))
   return catalog.businessChainOverview.lanes.map((lane) => ({
     ...lane,
     topics: lane.chainKeys.map((key) => topics.get(key))
-      .filter((topic) => role === 'all' || topic.matchingSteps.length > 0),
+      .filter((topic) => topic && (role === 'all' || topic.matchingSteps.length > 0)),
   })).filter((lane) => lane.topics.length > 0)
 }

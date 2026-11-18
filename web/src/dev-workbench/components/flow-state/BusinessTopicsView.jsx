@@ -1,15 +1,10 @@
 import React from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { buildDevFlowExplorerLocation } from '../../pages/devFlowExplorerNavigation.mjs'
 import BusinessChainTopics from './BusinessChainTopics.jsx'
-import BusinessRelationFilters from './BusinessRelationFilters.jsx'
-import {
-  DEV_FLOW_STATE_QUERY_KEYS as keys,
-  readDevFlowRelationFilters,
-  patchDevFlowRelationFilters,
-} from '../../pages/devFlowStateQuery.mjs'
+import { buildDevFlowExplorerLocation } from '../../pages/devFlowExplorerNavigation.mjs'
+import { DEV_FLOW_STATE_QUERY_KEYS as keys } from '../../pages/devFlowStateQuery.mjs'
 
-export default function BusinessTopicsView({ catalog, actions, currentChainKey, onOpenView }) {
+export default function BusinessTopicsView({ catalog, currentChainKey, onOpenView }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -26,18 +21,12 @@ export default function BusinessTopicsView({ catalog, actions, currentChainKey, 
   }, { state: location.state })
 
   return (
-    <section className="erp-dev-fulfillment-guide" aria-label="业务专题阅读">
+    <section aria-label="专项链路阅读">
       <BusinessChainTopics
         catalog={catalog}
         currentChainKey={currentChainKey}
         selectedTopicKey={searchParams.get(keys.roleTopic)}
         onSelectChain={selectTopic}
-        filterControls={<BusinessRelationFilters
-          catalog={catalog}
-          actions={actions}
-          filters={readDevFlowRelationFilters(searchParams)}
-          onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
-        />}
         onOpenView={onOpenView}
         onOpenExplorer={(chainKey, nodeKey, opener) => {
           const { pathname, search, hash, state } = location
@@ -61,9 +50,6 @@ export default function BusinessTopicsView({ catalog, actions, currentChainKey, 
           [keys.node]: nodeKey || null,
         })}
       />
-      <p className="erp-dev-fulfillment-guide__boundary">
-        流程示意，非实际进度；任务完成不代替正式业务结果。
-      </p>
     </section>
   )
 }

@@ -16,7 +16,7 @@ import {
 } from '../config/devHub.mjs'
 import { DEV_WORKSPACE_NAV_ITEMS } from '../config/devRoutes.mjs'
 import { DEV_WORKBENCH_GUIDE } from '../config/devWorkbenchFlow.mjs'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 
 const { Text, Title } = Typography
 const VIEW_ITEMS = [
@@ -128,10 +128,10 @@ export default function DevHubPage() {
             value={keyword}
             onSearch={(value) => selectParam('q', value, true)}
           />
-          <FilterSelect
+          <FilterChipGroup
+            allowClear
             emptyValue="all"
             label="工具分组"
-            placeholder="工具分组"
             aria-label="全部开发工具分组"
             value={group}
             options={GROUP_OPTIONS}

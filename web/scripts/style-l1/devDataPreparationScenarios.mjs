@@ -56,6 +56,21 @@ safeTarget: `登记目标：${targetKey}`,
     },
     createdAt: CREATED_AT,
     updatedAt: UPDATED_AT,
+    generation: terminal && profileKey === 'scenario-demo' ? {
+      schemaVersion: 'plush.scenario-generation/v1',
+      id,
+      batchId: `20260729T020000000Z_${'6'.repeat(12)}`,
+      startedAt: CREATED_AT,
+      completedAt: UPDATED_AT,
+      status: 'passed',
+      targetKey,
+      sourceFingerprint: '6'.repeat(64),
+      parametersFingerprint: '7'.repeat(64),
+      archiveSha256: '8'.repeat(64),
+      fileCount: 100,
+      repositoryFingerprint: repository.fingerprint,
+      planDigest: 'f'.repeat(64),
+    } : null,
     timing: {
       startedAt: status === 'ready' ? null : CREATED_AT,
       completedAt: terminal ? UPDATED_AT : null,
@@ -335,6 +350,19 @@ export function createDevDataPreparationScenarios({ assert, assertNoHorizontalOv
         const reads = workflow.reads.length
         await page.getByRole('tab', { name: '执行记录', exact: true }).click()
         const records = page.getByRole('tabpanel', { name: '执行记录', exact: true })
+        const completed = records.locator('.ant-collapse-item').filter({ hasText: '已完成' })
+        await completed.locator('.ant-collapse-header').click()
+        assert.equal(await completed.getByText('内容指纹', { exact: true }).isVisible(), false, '列表和默认详情不铺开技术字段')
+        await completed.getByText('排查信息', { exact: true }).click()
+        await completed.getByText('本地工作区，包含未提交修改', { exact: true }).waitFor()
+        await completed.getByText('已保存', { exact: true }).waitFor()
+        await completed.getByText('6'.repeat(64), { exact: true }).waitFor()
+        for (const width of [1920, 1280, 1024]) {
+          await page.setViewportSize({ width, height: 900 })
+          await assertNoHorizontalOverflow(page, `snapshot details ${width}px`)
+        }
+        await completed.getByText('排查信息', { exact: true }).click()
+        await completed.locator('.ant-collapse-header').click()
         await records.getByText('服务器 Demo', { exact: true }).waitFor()
         await coverage.waitFor({ state: 'hidden' })
         await page.getByRole('tab', { name: '准备数据', exact: true }).click()
@@ -474,6 +502,15 @@ export function createDevDataPreparationScenarios({ assert, assertNoHorizontalOv
       deviceScaleFactor: 2,
       beforeNavigate: async (page) => {
         history = createDataPreparationBrowserFixture()
+        history.summary.currentOperations = [{
+          ...operationFixture({ profileKey: 'scenario-demo', targetKey: 'local-development', repository: REPOSITORY }, 'passed'),
+          generation: null,
+          issues: [{
+            code: 'generation_snapshot_unverified',
+            severity: 'blocked',
+            message: '代码与参数快照未能核验，请检查原始存档；该快照不能作为复现依据。',
+          }],
+        }]
         const { contract } = operationFixture({ profileKey: 'scenario-demo', targetKey: 'local-development', repository: REPOSITORY })
         history.summary.unresolvedOperations = [{
           id: '44444444-4444-4444-8444-444444444444',
@@ -494,6 +531,13 @@ export function createDevDataPreparationScenarios({ assert, assertNoHorizontalOv
         assert.equal(await page.getByText('历史记录', { exact: true }).count(), 0)
         const records = JSON.stringify(history.summary.unresolvedOperations)
         await page.getByRole('tab', { name: '执行记录', exact: true }).click()
+        const current = page.getByRole('tabpanel', { name: '执行记录', exact: true }).locator('.ant-collapse-item').filter({ hasText: '已完成' })
+        await current.locator('.ant-collapse-header').click()
+        await current.getByText('代码与参数快照未能核验，请检查原始存档；该快照不能作为复现依据。', { exact: true }).waitFor()
+        await current.getByText('排查信息', { exact: true }).click()
+        await current.getByText('校验未通过', { exact: true }).waitFor()
+        assert.equal(await current.getByText('已保存', { exact: true }).count(), 0)
+        await current.locator('.ant-collapse-header').click()
         const older = page.getByRole('region', { name: '历史记录' })
         await older.getByText('本地长期基础数据', { exact: true }).waitFor()
         await older.getByText('目标未确认', { exact: true }).waitFor()

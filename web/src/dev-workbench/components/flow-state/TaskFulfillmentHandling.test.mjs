@@ -35,13 +35,13 @@ test('所有环节保留办理规则和受阻处理，关联岗位路径只读�
   }
 })
 
-test('业务专题选定后直接呈现同源交互图，没有文字节点中转页', async (t) => {
+test('专项链路选定后直接呈现同源交互图，没有文字节点中转页', async (t) => {
   const harness = await createReactTestHarness(t)
   const { default: Topics } = await import('./BusinessChainTopics.jsx')
   const chain = businessCatalog.businessChains.find((item) => item.key === 'delivery_to_settlement')
   await harness.render(h(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Topics, { catalog: businessCatalog, selectedTopicKey: chain.key, onSelectChain: () => {} })))
   const root = harness.container
   assert(root.querySelector('[data-topic-diagram="delivery_to_settlement"] [data-business-flow]'))
-  assert(root.querySelector('[aria-label="选择业务专题"]'))
+  assert(root.querySelector('[aria-label="选择专项链路"]'))
   assert(!root.querySelector('.erp-dev-fulfillment-guide__topic-nodes'))
 })

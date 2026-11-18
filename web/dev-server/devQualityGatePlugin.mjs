@@ -41,6 +41,8 @@ import {
   isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 import { resolveProjectNodeRuntime } from './devQaCoveragePlugin.mjs'
+import { readQualityGateTestDirectory } from './devQualityGateTestDirectory.mjs'
+import { QUALITY_GATE_TEST_DIRECTORY_API } from '../src/dev-workbench/config/devQualityGateDirectory.mjs'
 
 export const DEV_QUALITY_GATE_API_PATH = '/__dev/api/qa/quality-gates'
 export const DEV_QUALITY_GATE_SESSION_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/session`
@@ -1850,6 +1852,7 @@ export function createDevQualityGateMiddleware({
   projectRoot,
   service,
   readRPCReview = readDevRPCContractReview,
+  readTestDirectory = readQualityGateTestDirectory,
   csrfToken = randomBytes(32).toString('base64url'),
 } = {}) {
   const qualityService = service || createDevQualityGateService({ projectRoot })
@@ -1877,6 +1880,17 @@ export function createDevQualityGateMiddleware({
       return
     }
     try {
+      if (request.method === 'GET' && requestPath === QUALITY_GATE_TEST_DIRECTORY_API) {
+        if (requestUrl.search) throw new Error('测试目录不接受查询参数')
+        let directory
+        try {
+          directory = await readTestDirectory(path.resolve(projectRoot || process.cwd()))
+        } catch (error) {
+          throw new Error('测试目录读取失败，请核对执行端源码是否完整且可读', { cause: error })
+        }
+        if (!response.destroyed) sendJson(response, 200, directory)
+        return
+      }
       if (request.method === 'GET' && requestPath === RPC_CONTRACT_REVIEW_API) {
         const range = requestUrl.searchParams.get('range') || 'worktree'
         if ([...requestUrl.searchParams.keys()].some((key) => key !== 'range') || requestUrl.searchParams.getAll('range').length > 1 || !['worktree', 'staged'].includes(range)) throw new Error('unsupported RPC contract review query')

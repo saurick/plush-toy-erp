@@ -122,7 +122,6 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
   assert.match(page, /<BusinessTopicsView/u);
   assert.match(read("web/src/dev-workbench/components/flow-state/BusinessTopicsView.jsx"), /<BusinessChainTopics/u);
-  assert.doesNotMatch(guide, /renderTopics|value: 'topics'/u);
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /aria-label="流程视图"/u);
   assert.match(guide, /relatedChainKnown = businessCatalog\.businessChains\.some\(\(chain\) => chain\.key === relatedChainKey\)/u);
@@ -355,7 +354,7 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
   assert.match(page, /data-business-chain-overview/u);
   assert.match(page, /data-topic-diagram/u);
   assert.match(page, /data-business-chain-system/u);
-  assert.match(page, /buildDevBusinessChainTopics\(catalog\)/u);
+  assert.match(page, /buildDevBusinessChainTopics\(catalog,\s*\{/u);
   assert.match(page, /系统衔接图/u);
 });
 
@@ -522,14 +521,16 @@ test("dev flow state observatory: state rules explain exceptional paths without 
   assert.match(page, /data-exceptional=/u);
   assert.match(page, /data-path-group=/u);
   assert.match(page, /<BusinessFlowDiagram/u);
-  assert.match(page, /getDevFlowStateTransitionDiagramLabel/u);
+  assert.match(page, /buildDevFlowStateRuleGraph\(flow\)/u);
+  assert.match(page, /<BusinessFlowDiagram[^>]*\bflow=\{graph\}/u);
+  assert.match(presentation, /label: getDevFlowStateTransitionDiagramLabel\(transition\)/u);
   assert.match(page, /--erp-dev-state-path-color/u);
   assert.match(presentation, /buildDevFlowStateRelatedViews/u);
   const focusedRules = read("web/src/dev-workbench/components/flow-state/FlowRuleTables.jsx");
   for (const label of ["办理规则", "办理条件", "受阻时", "结果与纠正", "纠正与恢复"]) assert(focusedRules.includes(label));
   assert.doesNotMatch(page, /data-all-transitions/u);
-  assert.match(page, /nodes: flow\.states\.map/u);
-  assert.match(page, /edges: flow\.transitions\.map/u);
+  assert.match(presentation, /nodes: flow\.states\.map/u);
+  assert.match(presentation, /edges: flow\.transitions\.map/u);
   assert.doesNotMatch(page, /状态转换筛选|聚焦状态|定位状态|transitionFilter/u);
   assert.doesNotMatch(page, /生命周期转换/u);
 
@@ -544,14 +545,13 @@ test("dev flow state observatory: state rules explain exceptional paths without 
   }
   assert.doesNotMatch(presentation, /DEV_FLOW_STATE_TRANSITION_FILTERS|filterDevFlowStateTransitions/u);
   assert.match(presentation, /按登记规则转换/u);
-  assert.match(presentation, /flowchart LR/u);
-  assert.match(presentation, /linkStyle/u);
-  for (const color of ["#2b8a3e", "#d46b08", "#cf1322", "#1677ff", "#722ed1"]) {
-    assert(
-      presentation.includes(color),
-      `missing diagram path color: ${color}`,
-    );
-  }
+  assert.match(presentation, /direction: flow\.transitions\.length > 0 \? 'LR' : 'TB'/u);
+  assert.match(presentation, /branch: getDevFlowStateTransitionPresentation\(flow, transition\)\.isExceptional/u);
+  const diagram = read("web/src/dev-workbench/components/flow-state/BusinessFlowDiagram.jsx");
+  assert.match(diagram, /buildBusinessFlowMermaid\(/u);
+  const renderer = read("web/src/common/components/markdown/mermaidGraph.mjs");
+  assert.match(renderer, /edge\.branch/u);
+  assert.match(renderer, /branch \? '-\.->' : '-->'/u);
 });
 
 test("dev flow state observatory: evidence is collapsed and no risky business write is imported", () => {

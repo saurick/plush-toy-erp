@@ -197,7 +197,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
             .getByRole('button', { name: '适应画布全图', exact: true })
             .click()
           await expect(
-            editor.getByRole('button', { name: '保存视图', exact: true })
+            editor.getByRole('button', { name: '更多视图操作', exact: true })
           ).toBeInViewport()
           const bounds = await canvas.boundingBox()
           assert(

@@ -44,7 +44,8 @@ test('订单到结清、质量返工的能力均能定位到所属链路与单�
     const row = relations.get(capability).find((item) => item.key === key)
     assert(row, `${capability} 应有 ${key} 关联`)
     const definition = new URL(row.definitionURL, 'http://localhost')
-    assert.equal(definition.pathname, '/__dev/business-topics')
+    assert.equal(definition.pathname, '/__dev/status-flows')
+    assert.equal(definition.searchParams.get('flow_tab'), 'topics')
     assert.equal(definition.searchParams.get('flow_topic'), key)
     const evidence = new URL(row.evidenceURL, 'http://localhost')
     assert.equal(evidence.pathname, '/__dev/business-chain-audit')
@@ -71,7 +72,7 @@ test('引用改名、遗漏与重复失败关闭，不把状态或相似名称�
   assert.deepEqual(buildProductCoreChainRelations(changed, catalog), buildProductCoreChainRelations(capabilities, catalog), '关联不提升产品、发布或验收状态')
 })
 
-test('能力名称通过 URL 编码，业务专题保持唯一当前入口', () => {
+test('能力名称通过 URL 编码，专项链路在业务结构打开', () => {
   const name = '应收、应付、发票、收付款、核销与账款调整'
   assert.equal(new URL(productCoreCapabilityURL(name), 'http://localhost').searchParams.get('capability'), name)
   const topic = new URL(productCoreChainURL('production_exception'), 'http://localhost')
@@ -90,7 +91,8 @@ test('关联导航只开放已登记对象和发布记录，不生成通用跨�
     }
   }
   for (const url of [
-    '', '/__dev/product-core', '/__dev/business-topics', '/__dev/business-chain-audit',
+    '', '/__dev/product-core', '/__dev/status-flows', '/__dev/business-chain-audit',
+    '/__dev/status-flows?view=chain&chain=all&flow_topic=production_exception',
     '/__dev/business-chain-audit?chain=all', '/__dev/business-chain-audit?chain=unknown',
     '/__dev/version-center?view=versions', '/__dev/version-center?view=history&action=release',
     '/__dev/version-center?view=history&view=versions', '/__dev/testing',

@@ -1,9 +1,10 @@
 import {
   DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
-  DEV_BUSINESS_TOPICS_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
+  DEV_STATUS_FLOWS_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
 } from './devRoutes.mjs'
+import { buildDevSpecializedChainLocation, DEV_FLOW_SPECIALIZED_CHAIN_TAB } from '../pages/devFlowStateQuery.mjs'
 import { chainStepAuditURL } from './devBusinessChainVerification.mjs'
 import { CHAIN_AUDIT_BATCH_PATTERN } from './devBusinessChainAudit.mjs'
 import { DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS } from './devBusinessChainStepContracts.mjs'
@@ -25,7 +26,8 @@ export function productCoreCapabilityURL(capability) {
 }
 
 export function productCoreChainURL(chainKey) {
-  return `${DEV_BUSINESS_TOPICS_ROUTE}?${new URLSearchParams({ view: 'chain', chain: 'all', flow_topic: chainKey })}`
+  const { pathname, search } = buildDevSpecializedChainLocation(chainKey)
+  return pathname + search
 }
 
 export const PRODUCT_CORE_RELEASE_EVIDENCE_URL = `${DEV_VERSION_CENTER_ROUTE}?view=history`
@@ -41,8 +43,10 @@ export function isProductCoreReadingDestination(value) {
   if (url.pathname === DEV_PRODUCT_CORE_ROUTE) {
     return onlyKeys(['capability']) && PRODUCT_CORE_CHAIN_REFERENCES.some((entry) => entry.capability === query.get('capability'))
   }
-  if (url.pathname === DEV_BUSINESS_TOPICS_ROUTE) {
-    return onlyKeys(['view', 'chain', 'flow_topic']) && query.get('view') === 'chain' && query.get('chain') === 'all' && knownChain(query.get('flow_topic'))
+  if (url.pathname === DEV_STATUS_FLOWS_ROUTE) {
+    return onlyKeys(['view', 'chain', 'flow_tab', 'flow_topic']) &&
+      query.get('view') === 'chain' && query.get('chain') === 'all' &&
+      query.get('flow_tab') === DEV_FLOW_SPECIALIZED_CHAIN_TAB && knownChain(query.get('flow_topic'))
   }
   if (url.pathname === DEV_BUSINESS_CHAIN_AUDIT_ROUTE) {
     return onlyKeys(['chain', 'step', 'batch']) && knownChain(query.get('chain')) &&

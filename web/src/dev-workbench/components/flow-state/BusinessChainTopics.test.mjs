@@ -14,14 +14,14 @@ test('专题默认选择、主动清空和刷新恢复使用同一 URL 真源', 
   let location
   function Page() {
     location = useLocation()
-    return h(Topics, { catalog, actions: [] })
+    return h(Topics, { catalog })
   }
   const render = (entry, key) => harness.render(h(MemoryRouter, {
     key,
     initialEntries: [entry],
     future: { v7_startTransition: true, v7_relativeSplatPath: true },
   }, h(Page)))
-  await render('/__dev/business-topics', 'initial')
+  await render('/__dev/status-flows?flow_tab=topics', 'initial')
   const root = harness.container
   assert(root.querySelector('[data-topic-diagram]'))
   assert.equal(new URLSearchParams(location.search).has('flow_topic'), false)
@@ -31,11 +31,11 @@ test('专题默认选择、主动清空和刷新恢复使用同一 URL 真源', 
   await harness.flush()
   assert.equal(new URLSearchParams(location.search).get('flow_topic'), '')
   assert.equal(root.querySelector('[data-topic-diagram]'), null)
-  assert(root.textContent.includes('请选择业务专题'))
+  assert(root.textContent.includes('请选择专项链路'))
   await render(location.pathname + location.search, 'reload')
   assert.equal(root.querySelector('[data-topic-diagram]'), null)
-  assert(root.textContent.includes('请选择业务专题'))
-  const input = root.querySelector('input[aria-label="选择业务专题"]')
+  assert(root.textContent.includes('请选择专项链路'))
+  const input = root.querySelector('input[aria-label="选择专项链路"]')
   await harness.act(() => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
   await harness.flush()
   const option = [...document.querySelectorAll('.ant-select-item-option')]
@@ -56,10 +56,10 @@ test('没有可用专题与主动清空分别显示空态', async (t) => {
     key, future: { v7_startTransition: true, v7_relativeSplatPath: true },
   }, h(Topics, { catalog: currentCatalog, selectedTopicKey: '', onSelectChain: () => {} })))
   await render(catalog, 'cleared')
-  assert(harness.container.textContent.includes('请选择业务专题'))
-  assert(!harness.container.textContent.includes('该岗位暂无关联专题'))
+  assert(harness.container.textContent.includes('请选择专项链路'))
+  assert(!harness.container.textContent.includes('该岗位暂无关联链路'))
   await render(emptyCatalog, 'unavailable')
-  assert(harness.container.textContent.includes('该岗位暂无关联专题'))
-  assert(!harness.container.textContent.includes('请选择业务专题'))
+  assert(harness.container.textContent.includes('该岗位暂无关联链路'))
+  assert(!harness.container.textContent.includes('请选择专项链路'))
   assert.equal(harness.container.querySelector('[data-topic-diagram]'), null)
 })

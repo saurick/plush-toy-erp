@@ -65,6 +65,7 @@ function trialAttestation() {
 
 function localPlan() {
   return buildScenarioDemoPlan({
+    sourceFingerprint: "6".repeat(64),
     repository: REPOSITORY,
     databaseTarget: LOCAL_DATABASE,
     migrationFingerprint: "e".repeat(64),
@@ -75,6 +76,7 @@ function localPlan() {
 test("persistent scenario plans default to volume while explicit acceptance keeps a distinct digest", () => {
   const volume = localPlan();
   const acceptance = buildScenarioDemoPlan({
+    sourceFingerprint: "6".repeat(64),
     repository: REPOSITORY,
     databaseTarget: LOCAL_DATABASE,
     migrationFingerprint: "e".repeat(64),
@@ -94,6 +96,7 @@ test("persistent scenario plans default to volume while explicit acceptance keep
 
 function remotePlan() {
   return buildScenarioDemoPlan({
+    sourceFingerprint: "6".repeat(64),
     repository: REPOSITORY,
     targetAlias: CUSTOMER_TRIAL_133_TARGET,
     targetAttestation: trialAttestation(),
@@ -291,6 +294,7 @@ test("plan validation fails closed for arbitrary target, database, migration, or
   assert.throws(
     () =>
       buildScenarioDemoPlan({
+        sourceFingerprint: "6".repeat(64),
         repository: REPOSITORY,
         targetAlias: "production",
         databaseTarget: LOCAL_DATABASE,
@@ -302,6 +306,7 @@ test("plan validation fails closed for arbitrary target, database, migration, or
   assert.throws(
     () =>
       buildScenarioDemoPlan({
+        sourceFingerprint: "6".repeat(64),
         repository: REPOSITORY,
         databaseTarget: { ...LOCAL_DATABASE, host: "127.0.0.1" },
         migrationFingerprint: "e".repeat(64),
@@ -312,6 +317,7 @@ test("plan validation fails closed for arbitrary target, database, migration, or
   assert.throws(
     () =>
       buildScenarioDemoPlan({
+        sourceFingerprint: "6".repeat(64),
         repository: REPOSITORY,
         databaseTarget: LOCAL_DATABASE,
         migrationFingerprint: "bad",
@@ -322,6 +328,7 @@ test("plan validation fails closed for arbitrary target, database, migration, or
   assert.throws(
     () =>
       buildScenarioDemoPlan({
+        sourceFingerprint: "6".repeat(64),
         repository: REPOSITORY,
         targetAlias: CUSTOMER_TRIAL_133_TARGET,
         targetAttestation: {
@@ -341,6 +348,7 @@ test("CLI accepts only registered persistent targets and binds apply to plan dig
     expectedPlanDigest: "",
     target: PERSISTENT_SCENARIO_DATASET_TARGET,
     targetAttestation: "",
+    executionId: undefined,
     sourceScaleProfile: "volume",
     help: false,
   });
@@ -406,6 +414,8 @@ test("local CLI plan proves database, migration, runtime, and repository", async
     commandRunner,
     fetchImpl,
     readRepository: async () => REPOSITORY,
+    readSource: () => ({ fingerprint: "6".repeat(64) }),
+    checkServerCompatibility: async () => {},
   });
 
   assert.equal(result.exitCode, 0);
@@ -454,4 +464,53 @@ test("credential lookup is runtime-only and digesting is order-stable", () => {
     scenarioDemoDigest({ a: 1, b: 2 }),
   );
   assert.ok(new ScenarioDemoError("blocked", 2) instanceof Error);
+});
+
+test("remote apply with dirty local code snapshots before writing and records both success and unknown outcomes", async () => {
+  const repository = { ...REPOSITORY, dirty: true };
+  const id = "11111111-1111-4111-8111-111111111111";
+  const events = [];
+  let fail = false;
+  const deps = {
+    projectRoot: "/workspace",
+    environment: {},
+    readRepository: async () => repository,
+    readSource: () => ({ fingerprint: "6".repeat(64) }),
+    checkServerCompatibility: async (_root, release) => {
+      assert.equal(release, trialAttestation().release);
+      events.push("compatibility");
+    },
+    targetAttestation: trialAttestation(),
+    captureGeneration: ({ plan, executionId }) => {
+      assert.equal(plan.repository.dirty, true);
+      assert.notEqual(plan.release, plan.repository.commit);
+      assert.equal(executionId, id);
+      events.push("snapshot");
+      return { id };
+    },
+    finishGeneration: (_root, executionId, status) => {
+      assert.equal(executionId, id);
+      events.push(status);
+    },
+    applyDataset: async () => {
+      events.push("write");
+      if (fail) throw new Error("injected write failure");
+      return completedDatasetReport(plan);
+    },
+  };
+  const args = ["--target", CUSTOMER_TRIAL_133_TARGET, "--execution-id", id];
+  const { plan } = await runScenarioDemoCli(args, deps);
+  deps.environment.SCENARIO_DEMO_CONFIRM = `APPLY_SCENARIO_DEMO:${plan.targetAlias}:${plan.databaseName}:${plan.dataVersion}:${plan.runId}:${plan.planDigest}`;
+  events.length = 0;
+  const applyArgs = [...args, "--apply", "--expected-plan-digest", plan.planDigest];
+  const result = await runScenarioDemoCli(applyArgs, deps);
+  assert.equal(result.readback.release, trialAttestation().release);
+  assert.deepEqual(events, ["compatibility", "snapshot", "write", "passed"]);
+  fail = true;
+  events.length = 0;
+  await assert.rejects(runScenarioDemoCli(applyArgs, deps), /injected write failure/u);
+  assert.deepEqual(events, ["compatibility", "snapshot", "write", "not_proven"]);
+  events.length = 0;
+  await assert.rejects(runScenarioDemoCli([...args, "--apply", "--expected-plan-digest", "0".repeat(64)], deps), /does not match/u);
+  assert.deepEqual(events, ["compatibility"]);
 });

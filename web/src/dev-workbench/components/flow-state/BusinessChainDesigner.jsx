@@ -56,6 +56,7 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
   const [filters, setFilters] = useState({ view: 'steps', search: '', domain: '', type: '', role: '', chain: '' })
   const [nodeScope, setNodeScope] = useState('current')
   const libraryList = useRef(null)
+  const libraryToggle = useRef(null)
   const [history, setHistory] = useState([])
   const initialCamera = draft.presentation?.viewport || { x: 0, y: 0, scale: 1, mode: 'manual' }
   const [camera, setCamera] = useState(initialCamera)
@@ -71,13 +72,13 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
       } else {
         appliedEntry.current = 'blank'
         // Keep the entry until this tab has persisted its blank state, even if opener storage was copied.
-        draftModel.open(null)
+        draftModel.startNew()
       }
       return
     }
     if (!entry || issue || appliedEntry.current === entry) return
     appliedEntry.current = entry
-    // Opening a source changes only reading scope; cached layouts and saved views remain intact.
+    // Opening a source changes only reading scope; existing coordinates and notes are preserved.
     change((previous) => {
       const next = applyDevFlowExplorerEntry(previous, library, entry)
       const { viewport: _viewport, ...presentation } = next.presentation || {}
@@ -154,12 +155,6 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
       if (libraryList.current) libraryList.current.scrollTop = previous.scrollTop
     })
   }
-  const viewModel = {
-    ...draftModel,
-    dirty: draftModel.dirty || Boolean(draft.presentation?.viewport &&
-      ['x', 'y', 'scale', 'mode', 'chainKey'].some((key) => (draft.presentation.viewport[key] ?? null) !== (camera[key] ?? null))),
-    save: (name, copy) => draftModel.save(name, copy, { viewport: camera }),
-  }
   const addNode = (id, position) => {
     if (!present.has(id)) {
       change((previous) =>
@@ -195,13 +190,21 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
         tools={
           <div className="erp-chain-design__file-actions" hidden={workspace !== 'explore'}>
             <BusinessChainDesignDrafts
-              model={viewModel}
-              onOpen={(opened) => { resetInteraction(); setHistory([]); restoreCamera(opened?.presentation?.viewport) }}
-              onNotice={setNotice}
+              confirmNew={draftModel.needsNewConfirmation}
+              onNew={() => {
+                const error = draftModel.startNew()
+                if (!error) {
+                  resetInteraction()
+                  setHistory([])
+                  restoreCamera(null)
+                }
+                return error
+              }}
+              notesCount={draft.ideas.length}
               onNotes={() => {
-              setConnecting(null)
-              setSelection({ ideas: true })
-            }}
+                setConnecting(null)
+                setSelection({ ideas: true })
+              }}
             />
             <BusinessChainDesignExport
               disabled={!scope.nodes.length || workspace !== 'explore'}
@@ -212,7 +215,7 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
                 return {
                   surface: workspaceRef.current.querySelector('.erp-chain-design__surface'),
                   scale: camera.scale,
-                  title: draftModel.saved?.name || chain,
+                  title: chain,
                   context: [
                     `${map.scope === 'whole' ? '整体' : '局部'} · ${chain}`,
                     map.focusId ? library.byId.get(map.focusId)?.label : '',
@@ -229,6 +232,7 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
         context={
           <WorkbenchToolbar className="erp-chain-design__toolbar" hidden={workspace !== 'explore'}>
             <Button
+              ref={libraryToggle}
               icon={libraryVisible ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
               aria-label={libraryVisible ? '收起节点库' : '展开节点库'}
               aria-expanded={libraryVisible}
@@ -298,17 +302,21 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
           </WorkbenchToolbar>
         }
       />
-      {issue ? <WorkbenchNotice tone="error" title={issue} /> : null}
+      {issue ? <WorkbenchNotice tone="error" title={issue} action={!draftModel.restoreFailed ? <Button onClick={draftModel.retryPersistence}>重试自动保留</Button> : null} /> : null}
       <div className="erp-chain-design__workspace" data-library-visible={libraryVisible} hidden={workspace !== 'explore'}>
         <BusinessChainNodeLibrary
           id={`${legendId}-library`}
           hidden={!libraryVisible}
           library={library}
           present={present}
+          selectedNodeId={selection?.nodeId}
           connecting={connecting}
           onAdd={addNode}
           onInspect={(nodeId) => { setConnecting(null); setSelection({ nodeId, detailsOnly: true }) }}
-          onToggle={() => setLibraryVisible(false)}
+          onToggle={() => {
+            setLibraryVisible(false)
+            libraryToggle.current?.focus({ preventScroll: true })
+          }}
           filters={filters}
           setFilters={setFilters}
           chainKey={map.chainKey}

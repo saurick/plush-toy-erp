@@ -12,6 +12,7 @@ import { chromium } from 'playwright'
 import { createStandaloneWorkbenchServer } from '../dev-server/standaloneWorkbench.mjs'
 import { hashWorkbenchPassword } from '../dev-server/workbenchSession.mjs'
 import { createQualityGateStyleSummary } from './style-l1/devQualityGateScenarios.mjs'
+import { readQualityGateTestDirectory } from '../dev-server/devQualityGateTestDirectory.mjs'
 import { assertButtonSpacing } from './style-l1/buttonSpacingAssertions.mjs'
 import { assertControlPreviewThemeIsolation } from './style-l1/controlThemeAssertions.mjs'
 import { openERPAppearance } from './style-l1/themeAssertions.mjs'
@@ -47,6 +48,7 @@ let writes = 0
 const requests = []
 const checks = []
 const errors = []
+const testDirectory = await readQualityGateTestDirectory(root)
 const certificateRoot = await mkdtemp(
   path.join(os.tmpdir(), 'workbench-browser-tls-')
 )
@@ -156,14 +158,15 @@ try {
               return
             }
             const quality = pathname === '/__dev/api/qa/quality-gates'
-            response.writeHead(quality ? 200 : 503, {
+            const directory = pathname === '/__dev/api/qa/quality-gates/test-directory'
+            response.writeHead(quality || directory ? 200 : 503, {
               'content-type': 'application/json',
             })
             response.end(
               JSON.stringify(
                 quality
                   ? createQualityGateStyleSummary('passed')
-                  : { message: '隔离验收中未提供该数据' }
+                  : directory ? testDirectory : { message: '隔离验收中未提供该数据' }
               )
             )
           }),
@@ -216,6 +219,21 @@ try {
     'login restores deep link and the built standalone diagnostic branch'
   )
 
+  await page.goto(`${origin}/__dev/quality-gates?view=governance&guide=hooks`)
+  await page.getByRole('heading', { name: 'Hook 入口与调用关系', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'scripts/git-hooks/commit-msg.sh', exact: true }).click()
+  await page.screenshot({ path: path.join(output, 'quality-gate-hooks.png') })
+  await page.getByRole('button', { name: '进入对应流程', exact: true }).click()
+  await page.locator('[data-mermaid-node-id="MSG"]').first().waitFor()
+  await page.getByRole('region', { name: '门禁节点说明', exact: true }).getByText('提交标题检查', { exact: true }).waitFor()
+  await page.getByRole('button', { name: '返回 Hook 入口', exact: true }).click()
+  await page.getByRole('button', { name: 'scripts/git-hooks/commit-msg.test.mjs · 定位', exact: true }).click()
+  await page.getByRole('button', { name: 'scripts/git-hooks/commit-msg.test.mjs', exact: true }).waitFor()
+  await assertNoHorizontalOverflow(page, 'built quality gate rules')
+  checks.push('built quality rules preserve Hook-to-node-to-test navigation and reuse the formal test directory without writes')
+  await page.goto(`${origin}/__dev/quality-gates?view=run`)
+  await page.getByRole('tab', { name: '诊断历史', exact: true }).waitFor()
+
   await openERPAppearance(page)
   const appearance = page.getByRole('dialog', { name: '外观与密度' })
   for (const [label, mode] of [['暗色', 'dark'], ['浅色', 'light']]) {
@@ -252,7 +270,7 @@ try {
   checks.push('built component catalog retains local sample links, consumer guidance and document return state without business shortcuts')
 
   await page.goto(
-    `${origin}/__dev/business-topics?flow_topic=purchase_to_inventory&flow_topic_node=purchase_quality&flow_topic_step=purchase_quality%3Aposts_fact%3Apurchase_accepted`
+    `${origin}/__dev/status-flows?flow_tab=topics&flow_topic=purchase_to_inventory&flow_topic_node=purchase_quality&flow_topic_step=purchase_quality%3Aposts_fact%3Apurchase_accepted`
   )
   const purchaseStep = page.getByRole('region', {
     name: '交接规则与验证',

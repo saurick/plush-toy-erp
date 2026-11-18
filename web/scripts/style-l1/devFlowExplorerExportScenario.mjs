@@ -23,7 +23,7 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
     beforeNavigate: async (page) => {
       startNoWriteAudit(page, writes)
       await page.addInitScript(({ workingKey, draft }) => {
-        if (!sessionStorage.getItem(workingKey)) sessionStorage.setItem(workingKey, JSON.stringify({ currentId: null, draft }))
+        if (!sessionStorage.getItem(workingKey)) sessionStorage.setItem(workingKey, JSON.stringify({ draft }))
       }, { workingKey, draft })
     },
     verify: async (page) => {
@@ -46,6 +46,7 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
       const svg = (await exportFile('SVG')).toString()
       assert(svg.includes('操作说明（在流程探索页面使用）'))
       assert(svg.includes('图例'))
+      assert(svg.includes('业务全流程地图'))
       assert.equal((svg.match(/data-export-node=/gu) || []).length, 3)
       const laneStyles = await page.locator('.erp-chain-design__lane').evaluateAll((lanes) => lanes.map((lane) => ({ domain: lane.dataset.domain, fill: getComputedStyle(lane).backgroundColor, border: getComputedStyle(lane).borderTopColor })))
       assert.equal((svg.match(/data-export-lane=/gu) || []).length, laneStyles.length)

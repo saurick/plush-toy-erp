@@ -59,7 +59,8 @@ test('CI pipeline details preserve report failures, results and links through ru
   await ui.show()
   assert.match(ui.container.textContent, /CI 运行中/u)
   assert.match(ui.container.textContent, /测试报告暂时读取失败/u)
-  assert.doesNotMatch(ui.container.textContent, /结束时间|尚未完成/u)
+  assert.match(ui.container.textContent, /覆盖率读取失败，暂不能判断是否有报告/u)
+  assert.doesNotMatch(ui.container.textContent, /结束时间|尚未完成|尚无覆盖率报告/u)
 
   ui.evidence.status = 'failed'
   ui.evidence.pipeline.status = 'completed'

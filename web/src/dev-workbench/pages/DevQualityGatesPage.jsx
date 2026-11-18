@@ -43,6 +43,8 @@ import {
   GapsView,
 } from '../components/quality-gates/QualityGateGovernanceViews.jsx'
 
+import QualityGateRulesView from '../components/quality-gates/QualityGateRulesView.jsx'
+
 const { Title } = Typography
 
 const POLL_INTERVAL_MS = 1500
@@ -50,7 +52,7 @@ const POLL_INTERVAL_MS = 1500
 const EMPTY_VIEW_STATE = Object.freeze({
   server: Object.freeze({}),
   run: Object.freeze({ profile: '', operation: '' }),
-  governance: Object.freeze({ q: '', filter: 'relevant' }),
+  governance: Object.freeze({ q: '', filter: 'relevant', guide: 'catalog' }),
   gaps: Object.freeze({ range: 'current', risk: 'all' }),
 })
 
@@ -376,17 +378,19 @@ export default function DevQualityGatesPage() {
     !busy &&
     !initialLoading
   )
+  const serverRefreshing = activeView === 'server' && refreshing
+  const contextError = serverRefreshing ? '' : summaryError
   const displayedStatus = qualityGateViewStatus(
-    summary,
+    serverRefreshing ? null : summary,
     activeView,
-    summaryError
+    contextError
   )
   const contextStrip = (
     <ContextStrip
       summary={summary}
       status={displayedStatus}
       view={activeView}
-      summaryError={summaryError}
+      summaryError={contextError}
       onReturnLocal={() => selectView('run')}
       standalone={standalone}
       flat={activeView === 'run' && !standalone}
@@ -488,6 +492,7 @@ export default function DevQualityGatesPage() {
                 <ServerCiEvidencePanel
                   inlineHistory
                   showEmptyState={false}
+                  stale={serverRefreshing || Boolean(summaryError)}
                   summary={summary}
                 />
               ) : null}
@@ -514,7 +519,7 @@ export default function DevQualityGatesPage() {
                   />
                 </>
               ) : null}
-              {parsed.valid && activeView === 'governance' ? (
+              <QualityGateRulesView active={parsed.valid && activeView === 'governance'} guide={parsed.values.guide || viewValuesRef.current.governance.guide} onGuide={(guide) => updateViewValues({ guide })}>
                 <GovernanceView
                   data={activeViewState.data}
                   loading={activeViewState.loading}
@@ -527,7 +532,7 @@ export default function DevQualityGatesPage() {
                     updateViewValues({ filter })
                   }
                 />
-              ) : null}
+              </QualityGateRulesView>
               {parsed.valid && activeView === 'gaps' ? (
                 <GapsView
                   data={activeViewState.data}

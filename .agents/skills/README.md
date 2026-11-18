@@ -46,6 +46,8 @@
 
 ## 维护与验证 / Skill Validation
 
+项目 Skill 的详细执行指引由工作台直接读取各 `SKILL.md`，专题与四项步骤说明的格式、同源和浏览器合同见[执行指引来源与维护](../../docs/engineering/研发效能工作台与CI-CD设计.md#skill-execution-guides)。修改流程时同步图和对应节点的前置条件、具体操作、完成标准与失败处理；图不产生额外授权或运行证据。
+
 仓库根目录运行 `node scripts/qa/skill-health.mjs`。这是项目 validator，仅使用现有 Node 与仓库代码，不依赖 Python、PyYAML、客户私有仓库或运行服务。`affected` 对 Markdown 与项目 Skill 变更选择同一入口，也核对被引用文档的章节变化。
 
 检查当前项目支持的平面字符串 YAML：frontmatter 的 `name / description` 与 `openai.yaml` 的 `interface` 字段；同时核对目录名、metadata、README 索引、Skill 指令与 references 的本地文件/章节链接、项目 Skill 名称引用及未完成 TODO 占位。代码块中的示例不作为指令占位；`assets` 中的输出模板不扫描正文，指令指向模板的链接仍须有效。此检查不验证宿主工具或全局 Skill 是否可执行。

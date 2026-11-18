@@ -259,7 +259,7 @@ async function inspectFilters(page, evidence, seen) {
       (await select.getAttribute('aria-label')) ||
       ''
     if (
-      !/筛选|分组|范围|推荐|职责|业务域|功能模块|岗位|员工|关键规则专项|记录归属|业务专题|关系图目录方式/u.test(
+      !/筛选|分组|范围|推荐|职责|业务域|功能模块|岗位|员工|关键规则专项|记录归属|专项链路|关系图目录方式/u.test(
         label
       ) ||
       seen.has(`select:${label}`) ||

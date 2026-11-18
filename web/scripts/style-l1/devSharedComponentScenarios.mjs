@@ -441,15 +441,10 @@ export function createDevSharedComponentScenarios({
           exact: true,
         })
         await waitForFiniteAnimations(page)
-        await range
-          .locator('.erp-business-date-range-filter__type .ant-select-selector')
-          .click()
-        await waitForFiniteAnimations(page)
-        assert.equal(await range.getByRole('combobox', { name: '日期类型', exact: true }).getAttribute('aria-expanded'), 'true', '带标签的日期类型在点击后保持选项展开')
-        await page
-          .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-          .getByText('交货日期', { exact: true })
-          .click()
+        const dateTypes = range.getByRole('group', { name: '日期类型', exact: true })
+        assert.equal(await range.getByRole('combobox', { name: '日期类型', exact: true }).count(), 0)
+        await dateTypes.getByRole('button', { name: '交货日期', exact: true }).click()
+        assert.equal(await dateTypes.getByRole('button', { name: '交货日期', exact: true }).getAttribute('aria-pressed'), 'true')
         assert.equal(
           await range
             .getByRole('group', { name: '交货日期', exact: true })

@@ -2,7 +2,7 @@ import { WorkflowTaskDiscoveryCatalog as tasks } from '../../common/consts/workf
 import { isWorkflowBusinessChainException } from '../../erp/utils/workflowBusinessChain.mjs'
 import { buildDevBusinessChainTopics } from '../config/devBusinessChainProjection.mjs'
 import { normalizeFulfillmentRole } from '../../erp/utils/workflowFulfillment.mjs'
-import { DEV_FLOW_STATE_QUERY_KEYS as keys } from './devFlowStateQuery.mjs'
+import { DEV_FLOW_SPECIALIZED_CHAIN_TAB, DEV_FLOW_STATE_QUERY_KEYS as keys } from './devFlowStateQuery.mjs'
 
 export const FLOW_READING_CONTEXT_KEYS = [
   keys.financeFact,
@@ -52,7 +52,6 @@ export function resolveDevFlowViewContext({
   searchParams,
   task,
   taskScoped = false,
-  topics = false,
 }) {
   let chainKey = null
   let nodeKey = null
@@ -75,13 +74,12 @@ export function resolveDevFlowViewContext({
     chainKey = tasks.exception_guides.find(
       (item) => item.key === searchParams.get(keys.exception)
     )?.business_chain
-  } else if (topics) {
+  } else if (searchParams.get(keys.roleTab) === DEV_FLOW_SPECIALIZED_CHAIN_TAB) {
     const topicKey = searchParams.has(keys.roleTopic)
       ? searchParams.get(keys.roleTopic)
-      : buildDevBusinessChainTopics(
-          catalog,
-          normalizeFulfillmentRole(searchParams.get(keys.role))
-        ).flatMap((lane) => lane.topics)[0]?.chain.key
+      : buildDevBusinessChainTopics(catalog, {
+          role: normalizeFulfillmentRole(searchParams.get(keys.role)),
+        }).flatMap((lane) => lane.topics)[0]?.chain.key
     chainKey =
       searchParams.get(keys.roleMapNode) ||
       searchParams.get(keys.roleMap) ||

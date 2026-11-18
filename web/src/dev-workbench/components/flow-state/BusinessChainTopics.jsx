@@ -5,11 +5,12 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { normalizeFulfillmentRole } from '@/erp/utils/workflowFulfillment.mjs'
 import { buildDevBusinessChainTopics } from '../../config/devBusinessChainProjection.mjs'
-import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
+import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, patchDevFlowRelationFilters, readDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
 import { buildChainActionRelations, relationMatches, relationFiltersActive } from '../../config/devFulfillmentRelations.mjs'
 import AppSelect from '@/common/components/select/AppSelect'
 
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
+import BusinessRelationFilters from './BusinessRelationFilters.jsx'
 import BusinessTopicDetails, { BusinessTopicVerification } from './BusinessTopicDetails.jsx'
 import BusinessChainStepVerification from './BusinessChainStepVerification.jsx'
 import { WorkbenchReading } from '../WorkbenchPattern.jsx'
@@ -23,7 +24,6 @@ export default function BusinessChainTopics({
   currentChainKey,
   onSelectChain,
   selectedTopicKey,
-  filterControls,
   onExploreChain,
   onOpenExplorer,
   onOpenView,
@@ -56,8 +56,15 @@ export default function BusinessChainTopics({
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
   const filters = readDevFlowRelationFilters(searchParams)
   const filtered = relationFiltersActive(filters)
-  const lanes = buildDevBusinessChainTopics(catalog).map((lane) => ({ ...lane,
-    topics: lane.topics.filter(({ chain }) => !filtered || buildChainActionRelations(catalog, chain).some((action) => relationMatches(action, filters))),
+  const { directory, actionsByChain, directoryActions } = useMemo(() => {
+    const directory = buildDevBusinessChainTopics(catalog, { selectedChainKey: selectedTopicKey })
+    const actionsByChain = new Map(directory.flatMap((lane) => lane.topics.map(({ chain }) => [
+      chain.key, buildChainActionRelations(catalog, chain),
+    ])))
+    return { directory, actionsByChain, directoryActions: [...actionsByChain.values()].flat() }
+  }, [catalog, selectedTopicKey])
+  const lanes = directory.map((lane) => ({ ...lane,
+    topics: lane.topics.filter(({ chain }) => !filtered || actionsByChain.get(chain.key).some((action) => relationMatches(action, filters))),
   })).filter((lane) => lane.topics.length)
   const chainByKey = useMemo(
     () => new Map(catalog.businessChains.map((chain) => [chain.key, chain])),
@@ -123,7 +130,7 @@ export default function BusinessChainTopics({
     })),
   }), [topic])
   const graph = mapOpen ? map : topicDiagram
-  const matchingActions = topic ? buildChainActionRelations(catalog, topic).filter((action) => relationMatches(action, filters)) : []
+  const matchingActions = topic ? actionsByChain.get(topic.key).filter((action) => relationMatches(action, filters)) : []
   const matchingNodes = filtered && !mapOpen ? new Set(matchingActions.flatMap((action) => action.nodeKeys)) : null
   const node =
     graph?.nodes.find((item) => item.key === picked && (!matchingNodes || matchingNodes.has(item.key))) ||
@@ -157,15 +164,15 @@ export default function BusinessChainTopics({
       {mapOpen ? (
         <div className="erp-dev-fulfillment-guide__detail-title">
           <Button icon={<LeftOutlined aria-hidden />} onClick={closeMap}>
-            返回{topic ? ` ${topic.label}` : '业务专题'}
+            返回{topic ? ` ${topic.label}` : '专项链路'}
           </Button>
           <h3>系统衔接图</h3>
         </div>
       ) : null}
       <div className="erp-dev-chain-topics__toolbar">
         <AppSelect
-          aria-label={mapOpen ? '关注专题' : '选择业务专题'}
-          label={mapOpen ? '关注专题' : '业务专题'}
+          aria-label={mapOpen ? '关注链路' : '选择专项链路'}
+          label={mapOpen ? '关注链路' : '专项链路'}
           showSearch
           optionFilterProp="label"
           virtual={false}
@@ -194,7 +201,12 @@ export default function BusinessChainTopics({
                 }))]
           }
         />
-        {filterControls}
+        <BusinessRelationFilters
+          catalog={catalog}
+          actions={directoryActions}
+          filters={filters}
+          onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
+        />
         {!mapOpen && !financeSelected && topic && onOpenExplorer ? (
           <Button onClick={(event) => onOpenExplorer(topic.key, null, event.currentTarget)}>在流程探索中打开</Button>
         ) : null}
@@ -222,7 +234,7 @@ export default function BusinessChainTopics({
         >
           {mapOpen ? (
             <p className="erp-dev-fulfillment-guide__hint">
-              当前专题与直接上下游。
+              当前链路与直接上下游。
             </p>
           ) : (
             <p className="erp-dev-chain-topics__summary">{topic.summary}</p>
@@ -291,7 +303,7 @@ export default function BusinessChainTopics({
                       onSelectChain(node.key)
                     }}
                     >
-                      查看此专题
+                      查看此链路
                     </Button>
                 ) : null}
                 </div>
@@ -319,7 +331,7 @@ export default function BusinessChainTopics({
       ) : (
         <Empty
           description={
-            available.length ? '请选择业务专题' : filtered ? '没有同时满足条件的专题，移除筛选可恢复查看' : '该岗位暂无关联专题'
+            available.length ? '请选择专项链路' : filtered ? '没有同时满足条件的链路，移除筛选可恢复查看' : '该岗位暂无关联链路'
           }
         />
       )}

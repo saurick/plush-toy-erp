@@ -1,3 +1,4 @@
+import { QUALITY_GATE_RULE_VIEWS } from './devQualityGateGuide.mjs'
 import { requestWorkbenchJson } from './devWorkbenchRequest.mjs'
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { DEV_QUALITY_GATES_ROUTE } from './devRoutes.mjs'
@@ -17,6 +18,7 @@ export const DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND =
 
 export const QUERY_KEYS = Object.freeze({
   view: 'view',
+  guide: 'guide',
   profile: 'profile',
   operation: 'operation',
   q: 'q',
@@ -94,7 +96,7 @@ export function getQualityGateEnvironment(view, standalone = false) {
 export const VIEW_QUERY_KEYS = Object.freeze({
   server: Object.freeze(['view']),
   run: Object.freeze(['view', 'profile', 'operation']),
-  governance: Object.freeze(['view', 'q', 'filter']),
+  governance: Object.freeze(['view', 'q', 'filter', 'guide']),
   gaps: Object.freeze(['view', 'range', 'risk']),
 })
 export const DEFAULT_VIEW = 'server'
@@ -1077,6 +1079,9 @@ export function parseQualityGateSearch(search, { operationIds = null } = {}) {
     values.profile = profile
     values.operation = operation
   } else if (view === 'governance') {
+    const guide = params.get(QUERY_KEYS.guide) || 'catalog'
+    if (!QUALITY_GATE_RULE_VIEWS.some((item) => item.value === guide)) issues.push('门禁规则内容不存在或已经过期')
+    values.guide = guide
     const q = params.get(QUERY_KEYS.q) || ''
     const filter = params.get(QUERY_KEYS.filter) || 'relevant'
     if (q.length > 80 || hasControlCharacter(q)) {

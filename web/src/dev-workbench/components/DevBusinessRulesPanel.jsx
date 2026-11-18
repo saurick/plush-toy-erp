@@ -19,7 +19,7 @@ import {
 } from '../config/devBusinessRules.mjs'
 import DevTimestamp from './DevTimestamp.jsx'
 import '../styles/dev-business-rules.css'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 
 const gateLabel = (key) =>
   ({ server: '后端单元与合同', web: '前端数据与打印', postgres: '关键 PostgreSQL' })[key]
@@ -147,9 +147,9 @@ export default function DevBusinessRulesPanel({ report, reportCurrent, onRunCons
       </p>
       <div className="erp-dev-business-rules__toolbar">
         <Button disabled={consistencyBusy || !onRunConsistency} onClick={onRunConsistency}>运行业务数据一致性专项</Button>
-        <FilterSelect
+        <FilterChipGroup
+          allowClear
           label="关键规则专项"
-          placeholder="关键规则专项"
           aria-label="关键规则专项"
           value={filters.category}
           onChange={(value) => update('ruleCategory', value)}

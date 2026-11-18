@@ -38,7 +38,7 @@ const AREA_PRESENTATION = {
   },
   [DEV_WORKBENCH_AREA_KEYS.developmentResources]: {
     title: DEV_PAGE_TITLE_BY_ROUTE[DEV_DEVELOPMENT_RESOURCES_ROUTE],
-    description: '查接口、项目文档、Skill 与项目关系。',
+    description: '查接口、文档、Skill、图例与项目关系。',
     icon: <CodeOutlined />,
   },
   [DEV_WORKBENCH_AREA_KEYS.quality]: {

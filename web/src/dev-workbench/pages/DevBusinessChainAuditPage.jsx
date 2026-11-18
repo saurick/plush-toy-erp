@@ -35,7 +35,7 @@ import {
   filterChainAuditSteps,
 } from '../config/devBusinessChainAudit.mjs'
 import '../styles/dev-business-chain-audit.css'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 
 const { Title, Text } = Typography
 const formatTime = (value) =>
@@ -325,13 +325,12 @@ function ChainSteps({ data, chain, status, keyword, stepKey, updateQuery }) {
     <section className="erp-dev-chain-audit__stack" aria-label="步骤明细">
       <div className="erp-dev-chain-audit__toolbar">
         <SearchInput ref={searchRef} allowClear placeholder="搜环节或岗位" searchHint="可搜索：环节、岗位、实际读回" aria-label="搜索环节、岗位或实际读回" value={keyword} onSearch={(value) => updateQuery({ q: value || null })} />
-        <FilterSelect
+        <FilterChipGroup
+          allowClear
           emptyValue="all"
           label="步骤结果"
-          placeholder="步骤结果"
           aria-label="筛选步骤结果"
           value={status}
-          className="erp-dev-chain-audit__status-select"
           options={[{ value: 'all', label: '全部结果' }, ...Object.entries(CHAIN_AUDIT_STATES).map(([value, item]) => ({ value, label: item.label }))]}
           onChange={(value) => updateQuery({ status: value === 'all' ? null : value })}
         />

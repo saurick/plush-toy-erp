@@ -175,8 +175,6 @@ function BusinessChainOverviewView({
   selectedTask,
   onOpenView,
   onOpenTopics,
-  topics = false,
-  actions,
 }) {
   const { runtime, matchingChain } = useBusinessChainRuntime(
     catalog,
@@ -185,16 +183,18 @@ function BusinessChainOverviewView({
   )
   return (
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
-      {topics ? <BusinessTopicsView
-        catalog={catalog}
-        actions={actions}
-        currentChainKey={matchingChain?.key}
-        onOpenView={onOpenView}
-      /> : <TaskFulfillmentGuide
+      <TaskFulfillmentGuide
         businessCatalog={catalog}
         onOpenView={onOpenView}
         onOpenTopics={onOpenTopics}
-      />}
+        specializedChains={
+          <BusinessTopicsView
+            catalog={catalog}
+            currentChainKey={matchingChain?.key}
+            onOpenView={onOpenView}
+          />
+        }
+      />
       {taskId ? (
         <section
           className="erp-dev-flow-chain-runtime"

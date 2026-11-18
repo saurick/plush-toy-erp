@@ -34,7 +34,7 @@ function fixture(t) {
   return { root, write }
 }
 
-test('projects source metadata, task index and real references without treating code samples as routing', (t) => {
+test('projects source metadata and task index while leaving reference checks to the validator', (t) => {
   const { root } = fixture(t)
   fs.appendFileSync(
     path.join(root, '.agents/skills/plush-one/SKILL.md'),
@@ -46,12 +46,14 @@ test('projects source metadata, task index and real references without treating 
   assert(!Number.isNaN(Date.parse(data.checkedAt)))
   assert.equal(data.source, '.agents/skills')
   const skill = data.skills[0]
-  assert.equal(skill.title, '页面治理')
-  assert.equal(skill.scope, '页面与布局')
-  assert.deepEqual(skill.relatedSkills, ['plush-two'])
-  assert.deepEqual(skill.references, [
-    { path: 'docs/guide.md', headingId: 'evidence' },
-  ])
+  assert.deepEqual(skill, {
+    name: 'plush-one',
+    title: '页面治理',
+    scope: '页面与布局',
+    summary: 'Inspect project task boundaries and evidence',
+    sourcePath: '.agents/skills/plush-one/SKILL.md',
+    issues: [],
+  })
   assert(!JSON.stringify(data).includes(root))
 })
 

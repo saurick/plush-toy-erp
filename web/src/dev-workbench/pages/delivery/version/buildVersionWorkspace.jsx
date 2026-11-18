@@ -9,7 +9,6 @@ import {
 } from './shared.jsx'
 import Table from '@/common/components/table/AppTable'
 import { DEV_PAGINATION } from '../../../config/devPagination.mjs'
-import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { DeliveryTaskPath } from '../DeliveryTaskPath.jsx'
 import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
 import DevPipelineTimingPanel, {
@@ -26,8 +25,7 @@ import {
   deliveryReadOnlyReleasePresentation,
   formatDeliveryDuration,
 } from '../../../config/devDelivery.mjs'
-import FilterSelect from '@/common/components/select/FilterSelect'
-import AppSelect from '@/common/components/select/AppSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { versionRetention } from '../../../config/devRetention.mjs'
 
 const { Text, Link } = Typography
@@ -225,11 +223,10 @@ export function buildVersionWorkspace({
                   />
                 </div>
                 <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--action">
-                  <Text type="secondary">动作</Text>
-                  <FilterSelect
+                  <FilterChipGroup
+                    allowClear
                     emptyValue="all"
                     label="动作"
-                    placeholder="动作"
                     aria-label="筛选动作"
                     value={operationHistoryFilters.action}
                     options={OPERATION_HISTORY_ACTION_OPTIONS.filter(
@@ -248,8 +245,8 @@ export function buildVersionWorkspace({
                   />
                 </div>
                 <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
-                  <Text type="secondary">记录归属</Text>
-                  <AppSelect
+                  <FilterChipGroup
+                    label="记录归属"
                     allowClear={
                       false /* 不可清空：记录归属绑定具体环境的读取入口，未选择时不能查询跨目标记录。 */
                     }

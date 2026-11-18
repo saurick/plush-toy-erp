@@ -9,7 +9,7 @@ import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCata
 registerMermaidTestRenderer()
 
 const initialURL =
-  '/__dev/business-topics?flow_topic=finance_relations'
+  '/__dev/status-flows?flow_tab=topics&flow_topic=finance_relations'
 const button = (root, label) =>
   [...root.querySelectorAll('button')].find(
     (item) => item.textContent === label
@@ -118,7 +118,7 @@ test('专题与规则在同一侧栏查看，情景选择只替换 URL 状态且
   assert.equal(drawer.querySelector('[role="tablist"]'), tabs)
   assert(drawer.querySelector('[data-finance-rules]'))
   assert.equal(drawer.querySelectorAll('a[href]').length, 0)
-  assert.equal(state.location.pathname, '/__dev/business-topics')
+  assert.equal(state.location.pathname, '/__dev/status-flows')
   assert.equal(new URLSearchParams(state.location.search).has('view'), false)
   await harness.act(() => button(drawer, '关闭').click())
   assert.equal(
@@ -161,7 +161,7 @@ test('深链接打开侧栏，当前步骤与月结示例均可在保留总览�
       .textContent.includes('2026-11-30')
   )
   assert(harness.container.querySelector('[data-finance-overview]'))
-  assert.equal(state.location.pathname, '/__dev/business-topics')
+  assert.equal(state.location.pathname, '/__dev/status-flows')
   assert.equal(new URLSearchParams(state.location.search).has('view'), false)
 })
 
@@ -219,7 +219,7 @@ test('真实账款在所选行下展开，关闭侧栏取消未完成的只读�
   )
   assert.equal(document.activeElement, rowButton)
   assert.deepEqual(requests, ['list_finance_facts', 'get_finance_fact'])
-  assert.equal(state.location.pathname, '/__dev/business-topics')
+  assert.equal(state.location.pathname, '/__dev/status-flows')
   assert.equal(new URLSearchParams(state.location.search).has('view'), false)
   await harness.act(() => button(drawer, '关闭').click())
   await harness.flush()

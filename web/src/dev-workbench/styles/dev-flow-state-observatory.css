@@ -553,11 +553,6 @@
 }
 
 .erp-dev-flow-chain-heading__actions,
-.erp-dev-flow-chain-selector {
-  display: grid;
-  gap: 6px;
-}
-
 .erp-dev-flow-chain-heading__actions > .ant-btn {
   min-height: 42px;
 }

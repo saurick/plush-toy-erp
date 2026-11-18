@@ -14,16 +14,18 @@ function CiWorkflowSectionContent({ section }) {
       <Typography.Paragraph type="secondary">
         {section.description}
       </Typography.Paragraph>
-      {section.chart ? (
-        <div className="erp-dev-ci-guide__diagram" data-section={section.key}>
+      {(section.charts || (section.chart ? [{ label: section.label, chart: section.chart }] : [])).map(({ label, chart }) => (
+        <div className="erp-dev-ci-guide__diagram" data-section={section.key} key={label}>
+          {section.charts ? <Typography.Text type="secondary">{label}</Typography.Text> : null}
           <MermaidDiagram
-            chart={section.chart}
-            label={`${section.label}原理图`}
+            chart={chart}
+            label={`${label}原理图`}
             showSourceOnError={false}
             flowchartHtmlLabels={false}
+            interactiveNodes={section.nodes ? Object.entries(section.nodes).map(([id, node]) => ({ id, label: node.label, description: `${node.trigger} ${node.result} ${node.failure}` })) : undefined}
           />
         </div>
-      ) : null}
+      ))}
       <ol>
         {section.points.map((point) => (
           <li key={point}>{point}</li>

@@ -12,7 +12,7 @@ import { DevReadingLink } from './DevReadingNavigation.jsx'
 
 const { Title } = Typography
 
-export function ChainCapabilityLinks({ chainKey, fromLabel = '业务专题', report = false }) {
+export function ChainCapabilityLinks({ chainKey, fromLabel = '专项链路', report = false }) {
   const names = productCapabilitiesForChain(chainKey)
   if (!names.length) return null
   return (
@@ -23,12 +23,12 @@ export function ChainCapabilityLinks({ chainKey, fromLabel = '业务专题', rep
           <DevReadingLink key={name} to={productCoreCapabilityURL(name)} fromLabel={fromLabel}>{name}</DevReadingLink>
         ))}
       </Space>
-      {report ? <p><DevReadingLink to={productCoreChainURL(chainKey)} fromLabel={fromLabel}>查看当前业务专题</DevReadingLink>；本批次是否覆盖该链路，以报告记录为准。</p> : null}
+      {report ? <p><DevReadingLink to={productCoreChainURL(chainKey)} fromLabel={fromLabel}>查看当前专项链路</DevReadingLink>；本批次是否覆盖该链路，以报告记录为准。</p> : null}
     </section>
   )
 }
 
-export function ChainEvidenceLinks({ chainKey, fromLabel = '业务专题' }) {
+export function ChainEvidenceLinks({ chainKey, fromLabel = '专项链路' }) {
   return (
     <>
       <Space wrap>

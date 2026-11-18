@@ -339,6 +339,10 @@ const commonSamplePresentationDependencies = [
   "server/internal/unitpolicy/units.json",
 ];
 const allowedERPImportsByFile = new Map([
+  ["web/src/dev-workbench/components/DevVisualizationDocumentExample.jsx", new Set([
+    "components/DocumentGuide.jsx",
+    "components/documentGuideGeometry.mjs",
+  ])],
   ["web/src/dev-workbench/components/DevSupplementalHelpExample.jsx", new Set([
     "components/help/BusinessContextHelp",
     "components/business-list/BusinessTextArea.jsx",
@@ -678,6 +682,18 @@ test("dev workbench boundary: ERP imports stay on explicit adapters and presenta
         `${file} imports non-approved ERP internals: ${match[1]}`,
       );
     }
+  }
+});
+
+test("visualization examples only use isolated fixtures and presentation components", () => {
+  const adapter = "web/src/dev-workbench/components/DevVisualizationDocumentExample.jsx";
+  for (const module of ["components/DocumentGuide.jsx", "components/documentGuideGeometry.mjs"]) {
+    assert.equal(isAllowedERPImport(adapter, "@/erp/" + module), true);
+    assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevVisualizationPage.jsx", "@/erp/" + module), false);
+    assert.doesNotMatch(read("web/src/erp/" + module), /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+  }
+  for (const file of [adapter, "web/src/dev-workbench/components/DevVisualizationExamples.jsx", "web/src/dev-workbench/pages/DevVisualizationPage.jsx"]) {
+    assert.doesNotMatch(read(file), /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
   }
 });
 

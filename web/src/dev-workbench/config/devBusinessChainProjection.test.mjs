@@ -28,18 +28,30 @@ test('compact topic diagrams keep all paths, branch conditions and fact-posting 
 })
 
 test('business topics follow registered role duties and preserve complete handoffs', () => {
-  const all = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG).flatMap((lane) => lane.topics)
-  assert.deepEqual(new Set(all.map((topic) => topic.chain.key)), new Set(DEV_FLOW_STATE_CATALOG.businessChains.map((chain) => chain.key)))
-  assert.equal(all.length, DEV_FLOW_STATE_CATALOG.businessChains.length)
-  const engineering = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, 'engineering').flatMap((lane) => lane.topics)
+  const engineering = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, { role: 'engineering' }).flatMap((lane) => lane.topics)
   assert.deepEqual(engineering.map((topic) => topic.chain.key), ['sales_to_production'])
-  const warehouse = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, 'warehouse').flatMap((lane) => lane.topics)
+  const warehouse = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, { role: 'warehouse' }).flatMap((lane) => lane.topics)
   assert(warehouse.some((topic) => topic.chain.key === 'purchase_posting_corrections'))
   const purchase = warehouse.find((topic) => topic.chain.key === 'purchase_to_inventory')
   assert(purchase.matchingSteps.every((step) => step.role_keys.includes('warehouse')))
   assert(purchase.steps.some((step) => step.role_keys.includes('finance')), 'a role entry must retain downstream financial handoffs')
   assert(purchase.steps.some((step) => step.role_keys.includes('quality')), 'a role entry must retain quality handoffs')
-  assert.deepEqual(buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, 'unregistered-role'), [], 'unknown roles must not acquire duties from a permission or label guess')
+  assert.deepEqual(buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, { role: 'unregistered-role' }), [], 'unknown roles must not acquire duties from a permission or label guess')
+})
+
+test('已有异常处理入口的链路不重复列出，直达时仍可查看完整动作', () => {
+  const catalog = DEV_FLOW_STATE_CATALOG
+  const directory = (options) => buildDevBusinessChainTopics(catalog, options).flatMap((lane) => lane.topics)
+  const defaultKeys = new Set(directory().map(({ chain }) => chain.key))
+  const routedExceptions = ['production_exception', 'purchase_quality_disposition', 'outsourcing_quality_disposition']
+  assert.deepEqual(catalog.businessChains.filter(({ key }) => !defaultKeys.has(key)).map(({ key }) => key), routedExceptions)
+  assert(defaultKeys.has('purchase_posting_corrections'))
+  assert(defaultKeys.has('finance_payment_and_reversal'))
+  for (const key of routedExceptions) {
+    const direct = directory({ selectedChainKey: key }).filter(({ chain }) => !defaultKeys.has(chain.key))
+    assert.deepEqual(direct.map(({ chain }) => chain.key), [key])
+    assert.equal(direct[0].steps.length, catalog.businessChains.find((chain) => chain.key === key).steps.length)
+  }
 })
 
 test('responsibility labels preserve formal roles and explain unresolved pools without a generic role name', () => {

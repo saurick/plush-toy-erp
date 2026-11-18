@@ -10,10 +10,12 @@ import {
 } from '../../../config/devRetention.mjs'
 
 const { Text } = Typography
-export default function BackupRetentionPanel({ retention }) {
+export default function BackupRetentionPanel({ retention, stale }) {
   const [environment, setEnvironment] = useState('demo')
   const [page, setPage] = useState(1)
   const rows = retainedBackupRows(retention, environment)
+  const retentionUnverified = stale || retention?.status !== 'passed' ||
+    Date.now() - Date.parse(retention.generatedAt) > 3 * 3600_000
   return (
     <Card
       title="备份保留记录"
@@ -34,9 +36,7 @@ export default function BackupRetentionPanel({ retention }) {
             setPage(1)
           }}
         />
-        {!retention ||
-        retention.status !== 'passed' ||
-        Date.now() - Date.parse(retention.generatedAt) > 3 * 3600_000 ? (
+        {retentionUnverified ? (
           <Alert
             type="warning"
             showIcon
@@ -80,11 +80,11 @@ export default function BackupRetentionPanel({ retention }) {
               render: (value) => <DevTimestamp value={value} action="生成于" />,
             },
             {
-              title: '保留状态',
+              title: retentionUnverified && rows.length ? '上次记录的保留状态' : '保留状态',
               dataIndex: 'state',
               render: (value, row) => (
                 <Space direction="vertical" size={0}>
-                  <Tag color={RETENTION_STATES[value]?.color}>
+                  <Tag color={retentionUnverified ? 'default' : RETENTION_STATES[value]?.color}>
                     {RETENTION_STATES[value]?.label ?? '待核对'}
                   </Tag>
                   {row.state === 'protected' ? (

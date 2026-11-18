@@ -9,6 +9,8 @@ description: 项目代码审查治理（plush-toy-erp）。Use when reviewing pl
 
 用这个 skill 审查 `plush-toy-erp` 的代码和正式文档改动。默认只审查，不改代码。
 
+<a id="review-scope"></a>
+
 ## 范围解析 Scope
 
 1. 用户指定 commit、branch、文件、目录或 PR 时，只审指定范围。
@@ -33,6 +35,8 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 - 服务端、schema、事实层任务读相关 `biz / data / service / schema / migration` 和测试，职责或运行入口不清时才读 `server/README.md`。
 - 文档或页面设计相关改动需要同时按项目 docs/page governance skill 的规则审查，但本 skill 不要求它们必须一起触发。
 
+<a id="review-risks"></a>
+
 ## 高风险检查 Risk Checklist
 
 重点审这些问题：
@@ -49,6 +53,8 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 - 部署与 migration：schema 变更必须走 Ent + Atlas；发布不能假设低配服务器可构建。
 - 错误码：新增/修改错误码必须保持服务端真源、前端生成码表、消费层和测试同步。
 - 文档漂移：代码能力层级、菜单、API、部署、产品状态、真源变了，要检查相关 README、当前真源、产品/架构文档和 `progress.md`。
+
+<a id="review-gates"></a>
 
 ## 项目审查门禁 Project Review Gates
 
@@ -71,6 +77,8 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 - 文档/Skill-only 改动检查 scoped diff 格式与相关引用；触达项目 Skills 时按[维护与验证](../README.md#skill-validation)运行项目 validator。
 - 不要为 docs-only 或 skill-only 改动机械运行迁移、全量 UI 回归或重型服务端测试，除非 touched path 需要。
 
+<a id="review-output"></a>
+
 ## 输出要求 Output
 
 按 code review 姿态输出：
@@ -80,3 +88,81 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 3. 写清审查范围、已读真源、已跑或未跑的验证。
 4. 只列与本次改动相关的剩余盲区，不机械枚举未触达的测试或环境。
 5. 默认不附长篇改动总结，除非用户要求。
+
+## 执行流程 / Execution Guide
+
+### 范围与风险检查 / inspect
+
+默认只审查当前指定改动；按触达面检查真实消费者、领域边界和必要文档。
+
+```mermaid
+flowchart LR
+  scope["确定候选"]
+  truth["查明真源"]
+  risk["检查边界"]
+  consumer["核对<br/>消费者"]
+
+  scope --> truth
+  truth --> risk
+  risk --> consumer
+  consumer -->|发现合同冲突| truth
+```
+
+- `scope` [确定候选](#review-scope)
+  - 前置条件：用户已指定审查对象，或本会话实现范围可核对。
+  - 具体操作：读取指定提交、文件或精确 diff；独立审查先只读盘点，按当前请求与交接划定候选。
+  - 完成标准：候选基线、路径和其他改动分开，审查不产生修改或提交授权。
+  - 失败处理：归属不清时缩小到可证实范围；不把全部脏文件当成同一任务。
+- `truth` [查明真源](#review-scope)
+  - 前置条件：候选范围和基线明确。
+  - 具体操作：沿调用方、数据来源、正式合同和测试确认行为；服务端看 biz/data/service，页面看实际组件与消费者。
+  - 完成标准：每个重要行为能指向责任模块和真实调用入口。
+  - 失败处理：发现仅被测试引用的字段或抽象时继续查动态调用与公开合同，证实失效后提出清理建议。
+- `risk` [检查边界](#review-risks)
+  - 前置条件：已掌握受影响主路径。
+  - 具体操作：检查权限、状态、事务、幂等、字段清空与回补、Workflow/Fact、删除语义、客户差异和错误码；只展开实际触达项。
+  - 完成标准：正常与失败路径的风险、影响对象及触发条件清楚。
+  - 失败处理：不靠新增 fallback、放宽条件或页面补事实掩盖缺陷；证据不够时记录待核验而非断言漏洞。
+- `consumer` [核对消费者](#review-gates)
+  - 前置条件：改动影响页面、文档、生成物或交付合同。
+  - 具体操作：核对真实页面与共享样板、接口生成物、README 和正式设计是否同步；视觉问题结合浏览器和盒模型判断。
+  - 完成标准：没有遗漏必需消费者，也没有把渲染噪点当产品缺陷。
+  - 失败处理：缺少运行或纸面证据时明确盲区，转入“验证与结论”选择必要检查。
+
+### 验证与结论 / verify
+
+用最小充分验证支撑审查结论；修复只在同时获得实施授权时执行。
+
+```mermaid
+flowchart LR
+  plan["选择验证"]
+  run["读取结果"]
+  findings["核实问题"]
+  report["提交审查<br/>结论"]
+
+  plan --> run
+  run --> findings
+  findings --> report
+  findings -->|证据不足| plan
+```
+
+- `plan` [选择验证](#review-gates)
+  - 前置条件：已识别改动与高风险路径。
+  - 具体操作：检查已有同名测试和浏览器证据，按影响选择静态、领域、接口、页面、迁移或恢复检查。
+  - 完成标准：验证能覆盖具体风险，范围与资源预算相称。
+  - 失败处理：目标环境不可用时保留未验证；不机械升级到全量 QA。
+- `run` [读取结果](#review-gates)
+  - 前置条件：检查可执行且在已有授权内。
+  - 具体操作：运行选定检查并读取完整摘要，核对执行数、失败、跳过、版本和环境；复现时使用受控数据。
+  - 完成标准：证据可绑定候选，缺失和失败没有被写成通过。
+  - 失败处理：测试异常先定位环境或断言问题，不放宽测试；必要修复未授权时仅给明确建议。
+- `findings` [核实问题](#review-output)
+  - 前置条件：代码路径与验证结果已收集。
+  - 具体操作：对每个候选问题核对可达触发、实际影响、位置与修复建议，按风险排序并删除无证据猜测。
+  - 完成标准：每条发现可复查，严重度与实际影响相符。
+  - 失败处理：存在反证时修正或撤回发现，不能因为测试红色直接认定本轮代码有错。
+- `report` [提交审查结论](#review-output)
+  - 前置条件：问题与盲区已核实。
+  - 具体操作：先列发现；无阻塞时明确说明，并给审查范围、实际验证和相关未覆盖项。
+  - 完成标准：结论清楚，既不替代发布验收，也不暗示已经修复。
+  - 失败处理：发现新差异或版本漂移时只复查相关路径，更新结论后再交付。

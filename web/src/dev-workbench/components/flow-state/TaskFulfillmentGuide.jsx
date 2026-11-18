@@ -5,7 +5,8 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
-import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
+import { DEV_FLOW_SPECIALIZED_CHAIN_TAB, DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
+import { FLOW_READING_CONTEXT_KEYS } from '../../pages/devFlowViewContext.mjs'
 import { buildFulfillmentRelations, buildChainActionRelations, relationMatches, relationFiltersActive } from '../../config/devFulfillmentRelations.mjs'
 import BusinessRelationFilters from './BusinessRelationFilters.jsx'
 import BusinessActionRelations from './BusinessActionRelations.jsx'
@@ -38,6 +39,11 @@ const detailKeys = [
   queryKeys.roleSubstep,
   queryKeys.relationAction,
 ]
+const structureTabs = [
+  { value: 'main', label: '订单全流程' },
+  { value: DEV_FLOW_SPECIALIZED_CHAIN_TAB, label: '专项链路' },
+  { value: 'exceptions', label: '异常处理' },
+]
 
 export default function TaskFulfillmentGuide({
   businessCatalog,
@@ -45,6 +51,7 @@ export default function TaskFulfillmentGuide({
   scoped = false,
   onOpenView,
   onOpenTopics,
+  specializedChains,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
@@ -63,9 +70,8 @@ export default function TaskFulfillmentGuide({
   const detailRef = React.useRef(null)
   const openerRef = React.useRef(null)
   const revealRef = React.useRef(false)
-  const view = !scoped && searchParams.get(queryKeys.roleTab) === 'exceptions'
-    ? searchParams.get(queryKeys.roleTab)
-    : 'main'
+  const view = scoped ? 'main' : searchParams.get(queryKeys.roleTab) || 'main'
+  const showSpecializedChains = view === DEV_FLOW_SPECIALIZED_CHAIN_TAB
   const guideKey = searchParams.get(queryKeys.exception)
   const selection = guideKey
     ? selectFulfillmentException({
@@ -142,11 +148,12 @@ export default function TaskFulfillmentGuide({
       }
     }, true)
   const setView = (value) =>
-    update((next) => {
-      detailKeys.forEach((key) => next.delete(key))
-      if (value === 'main') next.delete(queryKeys.roleTab)
-      else next.set(queryKeys.roleTab, value)
-    })
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous)
+      FLOW_READING_CONTEXT_KEYS.forEach((key) => next.delete(key))
+      if (value !== 'main') next.set(queryKeys.roleTab, value)
+      return next
+    }, { state: { ...location.state, flowReturnFrames: [], flowRestoreFrame: null } })
   const closeDetail = () => {
     update((next) =>
       (canReturn ? exceptionKeys : detailKeys).forEach((key) =>
@@ -168,21 +175,18 @@ export default function TaskFulfillmentGuide({
           <SlidingTabList
             aria-label="流程视图"
             value={view}
-            options={[
-              { value: 'main', label: '订单全流程' },
-              { value: 'exceptions', label: '异常处理' },
-            ]}
+            options={structureTabs}
             onChange={setView}
           />
         )}
-        <BusinessRelationFilters
+        {!showSpecializedChains ? <BusinessRelationFilters
           catalog={businessCatalog}
           actions={filterActions}
           filters={filters}
           onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
-        />
+        /> : null}
       </div>
-      {view === 'main' ? (
+      {showSpecializedChains ? specializedChains : view === 'main' ? (
         <>
           <p className="erp-dev-fulfillment-guide__scope-bar" role="status">
             {filtered
@@ -250,7 +254,7 @@ export default function TaskFulfillmentGuide({
           ) : null}
         </section>
       )}
-      {showDetail ? (
+      {!showSpecializedChains && showDetail ? (
         <section
           className="erp-dev-fulfillment-guide__panel"
           aria-label="流程详情"
@@ -410,7 +414,7 @@ export default function TaskFulfillmentGuide({
           /> : null}
           {!scoped && !selection?.invalid && relatedChainKnown ? (
             <>
-              {onOpenTopics ? <Button onClick={() => onOpenTopics(relatedChainKey)}>查看相关专题</Button> : null}
+              {onOpenTopics ? <Button onClick={() => onOpenTopics(relatedChainKey)}>查看相关专项链路</Button> : null}
               <ChainCapabilityLinks chainKey={relatedChainKey} fromLabel="业务链路" />
               <details className="erp-dev-disclosure">
                 <summary>数据与验证</summary>

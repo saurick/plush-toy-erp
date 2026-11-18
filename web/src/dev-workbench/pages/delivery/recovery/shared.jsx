@@ -32,7 +32,13 @@ export function DrillAction({
   return <Text type="secondary">{action.label}</Text>
 }
 
-export function DrillRow({ drill, recommended, onOpen }) {
+function DrillStatusTag({ drill, stale }) {
+  const { label, color } = drill.statusPresentation
+  const historical = stale && ['current', 'available', 'guarded', 'blocked'].includes(drill.status)
+  return <Tag color={historical ? 'default' : color}>{historical ? `上次：${label}` : label}</Tag>
+}
+
+export function DrillRow({ drill, recommended, onOpen, stale }) {
   return (
     <tr className="erp-dev-recovery-row" data-priority={drill.priority}>
       <td>
@@ -50,9 +56,7 @@ export function DrillRow({ drill, recommended, onOpen }) {
         {recommended ? <Tag className="erp-dev-accent-tag">当前建议</Tag> : null}
       </th>
       <td>
-        <Tag color={drill.statusPresentation.color}>
-          {drill.statusPresentation.label}
-        </Tag>
+        <DrillStatusTag drill={drill} stale={stale} />
         <Tag color={drill.riskPresentation.color}>
           {drill.riskPresentation.label}
         </Tag>
@@ -66,14 +70,13 @@ export function DrillDetail({
   refreshing,
   disabled,
   onRefresh,
+  stale,
 }) {
   return (
     <div className="erp-dev-recovery-row__detail">
       <Space wrap>
         <Tag>{drill.priority}</Tag>
-        <Tag color={drill.statusPresentation.color}>
-          {drill.statusPresentation.label}
-        </Tag>
+        <DrillStatusTag drill={drill} stale={stale} />
         <Tag color={drill.riskPresentation.color}>
           {drill.riskPresentation.label}
         </Tag>
@@ -93,7 +96,7 @@ export function DrillDetail({
         ))}
       </ol>
       <Paragraph type="secondary">{drill.boundary}</Paragraph>
-      <Text strong>最近证据</Text>
+      <Text strong>{stale ? '上次读取的证据' : '最近证据'}</Text>
       <Paragraph>{drill.evidenceState.note}</Paragraph>
       {drill.evidenceState.operationId ? (
         <Paragraph type="secondary">

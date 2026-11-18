@@ -1,4 +1,5 @@
 import { expect } from 'playwright/test'
+import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 
 export function createDevBusinessChainDesignFullscreenScenarios({
   assert,
@@ -20,10 +21,7 @@ export function createDevBusinessChainDesignFullscreenScenarios({
         await editor.getByRole('button', { name: '全库', exact: true }).click()
         await editor.getByRole('button', { name: '调整布局', exact: true }).click()
         // Object-level gestures remain available through the complete node library.
-        await editor
-          .getByRole('group', { name: '常用视角', exact: true })
-          .getByRole('button', { name: '全部', exact: true })
-          .click()
+        await chooseChainNodeView(page, editor, '全部')
         await editor
           .locator('.erp-chain-design__canvas-bar')
           .getByText('全部已载入节点', { exact: true })
@@ -151,16 +149,11 @@ async function assertChainDesignFullscreen(page, editor, assert) {
     .press('Escape')
   await expect(editor.locator('.erp-chain-design__card')).toHaveCount(0)
   await expect(fullscreen).toBeVisible()
-  await editor.getByRole('button', { name: '保存视图', exact: true }).click()
-  const naming = page.getByRole('dialog', { name: '保存本地视图', exact: true })
-  await expect(naming).toBeVisible()
-  await naming
-    .getByRole('textbox', { name: '视图名称', exact: true })
-    .fill('全屏探索验证')
-  await naming
-    .getByRole('button', { name: '取消', exact: true })
-    .press('Escape')
-  await expect(naming).toHaveCount(0)
+  await editor.getByRole('button', { name: '新建空白视图', exact: true }).click()
+  const confirm = page.getByRole('dialog', { name: '替换当前探索？', exact: true })
+  await expect(confirm).toBeVisible()
+  await confirm.getByRole('button', { name: '取消', exact: true }).press('Escape')
+  await expect(confirm).toHaveCount(0)
   await expect(fullscreen).toBeVisible()
   await exit.click()
   await expect(fullscreen).toHaveCount(0)
@@ -196,7 +189,7 @@ async function assertChainDesignFullscreen(page, editor, assert) {
       '全屏铺满浏览器内容区'
     )
     await expect(
-      editor.getByRole('button', { name: '保存视图', exact: true })
+      editor.getByRole('button', { name: '更多视图操作', exact: true })
     ).toBeInViewport()
     await editor.getByRole('button', { name: '图例与操作说明', exact: true }).click()
     const legendPanel = editor.getByRole('dialog', { name: '画布图例', exact: true })
@@ -206,10 +199,7 @@ async function assertChainDesignFullscreen(page, editor, assert) {
     await legendPanel.press('Escape')
     await expect(legendPanel).toBeHidden()
     await expect(fullscreen).toBeVisible()
-    const filterTrigger = editor.getByRole('button', {
-      name: '筛选业务节点',
-      exact: true,
-    })
+    const filterTrigger = editor.getByRole('button', { name: /^筛选业务节点 · /u })
     await filterTrigger.click()
     const filterPanel = page.getByRole('dialog', {
       name: '筛选业务节点',

@@ -36,6 +36,7 @@ export default function DevDrillRecoveryPage() {
     selectView,
     selectedDrillKey,
     setSelectedDrillKey,
+    stale,
     statusText,
     summary,
   } = useDrillRecovery()
@@ -133,7 +134,7 @@ export default function DevDrillRecoveryPage() {
         {summary ? (
           <section
             className="erp-dev-recovery-status"
-            aria-label="当前恢复准备度"
+            aria-label={stale ? '上次读取的恢复准备度' : '当前恢复准备度'}
           >
             <dl className="erp-dev-delivery-facts">
               <div>
@@ -147,32 +148,35 @@ export default function DevDrillRecoveryPage() {
                 <dt>运行版本</dt>
                 <dd>
                   <Text code>{shortGitSha(overview.currentSha)}</Text>
-                  <Tag color={runtimeProven ? 'success' : 'warning'}>
-                    {runtimeProven ? '前后端一致' : '身份未证明'}
+                  <Tag color={stale ? 'default' : runtimeProven ? 'success' : 'warning'}>
+                    {stale ? '上次读取，待核对' : runtimeProven ? '前后端一致' : '身份未证明'}
                   </Tag>
                 </dd>
               </div>
               <div>
                 <dt>公网入口</dt>
                 <dd>
-                  <Tag color={publicHealthy ? 'success' : 'warning'}>
-                    {publicHealthy ? '验证通过' : '证据未完成'}
+                  <Tag color={stale ? 'default' : publicHealthy ? 'success' : 'warning'}>
+                    {stale ? '当前状态待核对' : publicHealthy ? '验证通过' : '证据未完成'}
                   </Tag>
                 </dd>
               </div>
             </dl>
-            {!recoveryReady ? (
+            {stale ? (
+              <Text type="secondary">以上目标和版本来自上次读取，当前状态尚未核实。</Text>
+            ) : !recoveryReady ? (
               <Text type="secondary">先补齐目标、版本或公网入口证据</Text>
             ) : null}
           </section>
         ) : null}
 
-        <SecurityPanel activeView={activeView} overview={overview} />
+        <SecurityPanel activeView={activeView} overview={overview} stale={stale} />
         <DrillsPanel
           activeView={activeView}
           drillTriggerRef={drillTriggerRef}
           overview={overview}
           setSelectedDrillKey={setSelectedDrillKey}
+          stale={stale}
         />
         <section
           hidden={activeView !== 'backups'}
@@ -180,7 +184,7 @@ export default function DevDrillRecoveryPage() {
           role="tabpanel"
           aria-labelledby="dev-recovery-tab-backups"
         >
-          <BackupRetentionPanel retention={summary?.retention} />
+          <BackupRetentionPanel retention={summary?.retention} stale={stale} />
         </section>
         <EmergencyPanel
           activeView={activeView}
@@ -195,6 +199,7 @@ export default function DevDrillRecoveryPage() {
         refreshing={refreshing}
         selectedDrillKey={selectedDrillKey}
         setSelectedDrillKey={setSelectedDrillKey}
+        stale={stale}
       />
     </div>
   )

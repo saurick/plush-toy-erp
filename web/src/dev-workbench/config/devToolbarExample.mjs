@@ -13,7 +13,7 @@ export const TOOLBAR_EXAMPLES = [
   },
   {
     key: 'tasks',
-    label: '工作台待办',
+    label: '任务管理待办',
     scope: '办理人',
     placeholder: '搜任务、单号、产品',
   },

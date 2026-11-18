@@ -389,6 +389,11 @@ function OperationReadback({ operation, acceptancePlan }) {
 function OperationDetail({ operation, acceptancePlan }) {
   const profileCopy = DEV_DATA_PREPARATION_PROFILE_COPY[operation.profileKey]
   const fullAcceptance = operation.profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+  const snapshotStatus = operation.generation
+    ? '已保存'
+    : operation.issues.some(({ code }) => code === 'generation_snapshot_unverified')
+      ? '校验未通过'
+      : '本记录未保存快照'
   return (
     <div className="erp-dev-data-operation-detail">
       <div className="erp-dev-data-operation-overview">
@@ -422,6 +427,33 @@ function OperationDetail({ operation, acceptancePlan }) {
           size="small"
           column={fullAcceptance ? 1 : { xs: 1, md: 2 }}
           items={[
+            ...(!fullAcceptance ? [{
+              key: 'sourceState',
+              label: '造数代码',
+              children: operation.repository.dirty ? '本地工作区，包含未提交修改' : '本地工作区，已提交',
+            }, {
+              key: 'snapshot',
+              label: '代码与参数快照',
+              children: snapshotStatus,
+            }] : []),
+            ...(operation.generation ? [{
+              key: 'batch',
+              label: '造数批次',
+              children: <Text code copyable>{operation.generation.batchId}</Text>,
+            }, {
+              key: 'sourceFingerprint',
+              label: '内容指纹',
+              children: <Text code copyable>{operation.generation.sourceFingerprint}</Text>,
+            }, {
+              key: 'snapshotId',
+              label: '快照编号',
+              children: <Text code copyable>{operation.generation.id}</Text>,
+            }] : []),
+            ...(operation.targetSummary.targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133 ? [{
+              key: 'serverRelease',
+              label: '服务器版本',
+              children: <Text code copyable>{operation.targetSummary.releaseSha}</Text>,
+            }] : []),
             {
               key: 'planHash',
               label: '不可变计划',

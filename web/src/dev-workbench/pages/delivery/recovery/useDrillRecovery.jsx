@@ -194,6 +194,7 @@ export function useDrillRecovery() {
     selectView,
     selectedDrillKey,
     setSelectedDrillKey,
+    stale: Boolean(summary && !fresh),
     statusText,
     summary,
   }

@@ -29,6 +29,7 @@ import {
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
 import { projectDataPreparationAcceptancePlan, supportsDataPreparationTarget } from '../src/dev-workbench/config/devDataPreparation.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
+import { readScenarioGeneration } from '../../scripts/qa/scenario-generation-snapshot.mjs'
 import { createCustomerTrial133DataBackup } from '../../scripts/qa/customer-trial-133-data.mjs'
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../scripts/qa/manual-acceptance-core-contract.mjs'
@@ -273,7 +274,7 @@ function operationTargetSummary(target, { profileKey, repository, runId }) {
     target.migrationVersion || 'verified-during-lifecycle'
   const rollbackPoint =
     target.targetKey === CUSTOMER_TRIAL_133_TARGET
-      ? customerTrialBackupAlias(repository, runId)
+      ? customerTrialBackupAlias({ commit: target.releaseSha }, runId)
       : profileKey === 'full-acceptance'
         ? `automatic-cleanup:${runId}`
         : `forward-only:${target.databaseName}:${SCENARIO_DEMO_RUN_ID}`
@@ -284,7 +285,7 @@ function operationTargetSummary(target, { profileKey, repository, runId }) {
     preflightFingerprint: target.preflightFingerprint,
     disposable: target.disposable,
     automaticCleanup: target.automaticCleanup,
-    releaseSha: repository.commit,
+    releaseSha: target.releaseSha || repository.commit,
     databaseName: target.databaseName,
     migrationVersion,
     customerConfigRevision,
@@ -374,6 +375,8 @@ export function scenarioDemoExecutionCommand(
       '--apply',
       '--expected-plan-digest',
       operation.targetSummary.preflightFingerprint,
+      '--execution-id',
+      operation.id,
       ...scenarioTargetArgs(operation.targetSummary.targetKey, attestation),
     ]),
     options: Object.freeze({ cwd: root }),
@@ -540,6 +543,7 @@ function scenarioDemoPlanFingerprint(stdout, repository, target) {
     plan.repository?.commit !== repository.commit ||
     plan.repository?.dirty !== repository.dirty ||
     plan.repository?.fingerprint !== repository.fingerprint ||
+    !/^[0-9a-f]{64}$/u.test(String(plan.sourceFingerprint || '')) ||
     plan.target?.targetFingerprint !== target.targetFingerprint ||
     plan.target?.disposable !== false ||
     plan.target?.registeredTargetOnly !== true ||
@@ -581,7 +585,7 @@ function parseScenarioDemoReadback(stdout, operation) {
     readback?.targetFingerprint !== operation.targetSummary.targetFingerprint ||
     readback?.databaseName !==
       operation.targetSummary.safeTarget.split(':').slice(1).join(':') ||
-    readback?.release !== operation.repository.commit ||
+    readback?.release !== operation.targetSummary.releaseSha ||
     !/^20[0-9]{12}$/u.test(String(readback?.migrationVersion || '')) ||
     typeof readback?.customerConfigRevision !== 'string' ||
     readback.customerConfigRevision.length < 1 ||
@@ -1065,6 +1069,7 @@ export function createDevDataPreparationService({
   operationStore,
   commandRunner = defaultCommandRunner,
   readRepositoryState = readRepositoryIdentity,
+  readGeneration = readScenarioGeneration,
   environment = process.env,
   now = () => new Date(),
   random = randomBytes,
@@ -1166,7 +1171,7 @@ export function createDevDataPreparationService({
     })
   }
 
-  function assertCustomerTrialPreflight(report, repository) {
+  function assertCustomerTrialPreflight(report) {
     const runtime = report?.remote?.runtime
     const config = runtime?.activeCustomerConfig
     const debug = runtime?.debug
@@ -1185,9 +1190,9 @@ export function createDevDataPreparationService({
       report?.target !== CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET ||
       report?.trialTarget !== CUSTOMER_TRIAL_133_TARGET ||
       report?.customer !== 'yoyoosun' ||
-      runtime?.serverSha !== repository.commit ||
-      runtime?.webSha !== repository.commit ||
-      report?.remote?.publicEntry?.gitSha !== repository.commit ||
+      !/^[0-9a-f]{40}$/u.test(String(runtime?.serverSha || '')) ||
+      runtime?.webSha !== runtime.serverSha ||
+      report?.remote?.publicEntry?.gitSha !== runtime.serverSha ||
       runtime?.databaseName !== CUSTOMER_TRIAL_133_DATABASE ||
       runtime?.resourceIdentity !== 'passed' ||
       !/^20[0-9]{12}$/u.test(String(runtime?.migrationVersion || '')) ||
@@ -1230,10 +1235,9 @@ export function createDevDataPreparationService({
     })
   }
 
-  async function readCustomerTrialTargetIdentity(repository) {
+  async function readCustomerTrialTargetIdentity() {
     const report = assertCustomerTrialPreflight(
-      await readCustomerTrialPreflight(),
-      repository
+      await readCustomerTrialPreflight()
     )
     const attestation = customerTrialAttestation(report)
     const { runtime } = report.remote
@@ -1249,6 +1253,7 @@ export function createDevDataPreparationService({
       preflight: report,
       summary: Object.freeze({
         targetKey: CUSTOMER_TRIAL_133_TARGET,
+        releaseSha: runtime.serverSha,
         safeTarget: `${CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET}:${runtime.databaseName}`,
         targetFingerprint: fingerprint,
         preflightFingerprint: '0'.repeat(64),
@@ -1297,7 +1302,7 @@ export function createDevDataPreparationService({
       })
     }
     if (profileKey === 'scenario-demo') {
-      const target = await readCustomerTrialTargetIdentity(repository)
+      const target = await readCustomerTrialTargetIdentity()
       const command = scenarioDemoPlanCommand(
         root,
         CUSTOMER_TRIAL_133_TARGET,
@@ -1533,8 +1538,28 @@ export function createDevDataPreparationService({
     return pending
   }
 
+  function readOperationGeneration(operation) {
+    const generation = operation.profileKey === 'scenario-demo' ? readGeneration(root, operation.id) : null
+    if (generation && (
+      generation.id !== operation.id ||
+      generation.repositoryFingerprint !== operation.repository.fingerprint ||
+      generation.planDigest !== operation.targetSummary.preflightFingerprint ||
+      generation.targetKey !== operation.targetSummary.targetKey
+    )) throw new Error('generation snapshot does not belong to this operation')
+    return generation
+  }
+
   function operationForPage(operation, executionHistory) {
-    const projection = publicOperation(operation)
+    const projection = { ...publicOperation(operation), generation: null }
+    try {
+      projection.generation = readOperationGeneration(operation)
+    } catch {
+      projection.issues = [...projection.issues, {
+        code: 'generation_snapshot_unverified',
+        severity: 'blocked',
+        message: '代码与参数快照未能核验，请检查原始存档；该快照不能作为复现依据。',
+      }]
+    }
     if (operation.status !== 'ready') return projection
     const blockers = blockingDataPreparationOperations(operation, executionHistory || listDataPreparationOperations(store, { limit: 200 }))
     if (!blockers.length) return projection
@@ -1801,9 +1826,8 @@ severity: 'blocked',
       SCENARIO_DEMO_RUN_ID,
       operation.targetSummary.preflightFingerprint,
     ].join(':')
-    let result
     try {
-      result = await commandRunner(command.command, command.args, {
+      const result = await commandRunner(command.command, command.args, {
         ...command.options,
         env: {
           ...environment,
@@ -1822,6 +1846,15 @@ severity: 'blocked',
         },
         maxBuffer: 4 * 1024 * 1024,
       })
+      const readback = parseScenarioDemoReadback(result.stdout, operation)
+      const generation = readOperationGeneration(operation)
+      if (!generation || generation.status !== 'passed') {
+        throw new Error('造数快照与本次执行未能核对，结果需要重新确认')
+      }
+      const completedReadback = backupReceipt
+        ? Object.freeze({ ...readback, backupReceipt })
+        : readback
+      return validateScenarioDemoPublicReadback(completedReadback, operation)
     } catch {
       const unknownOutcome = new Error(
         'scenario demo write outcome is not proven; authoritative readback is required'
@@ -1829,11 +1862,6 @@ severity: 'blocked',
       unknownOutcome.outcomeUnknown = true
       throw unknownOutcome
     }
-    const readback = parseScenarioDemoReadback(result.stdout, operation)
-    const completedReadback = backupReceipt
-      ? Object.freeze({ ...readback, backupReceipt })
-      : readback
-    return validateScenarioDemoPublicReadback(completedReadback, operation)
   }
 
   function execute(payload) {

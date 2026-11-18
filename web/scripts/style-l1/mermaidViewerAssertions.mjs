@@ -57,8 +57,8 @@ export async function assertMermaidDefaultView(page, diagram, assert) {
     .locator('.erp-markdown-mermaid__toolbar button')
     .evaluateAll((buttons) => buttons.map((button) =>
       button.dataset.mermaidLayoutAction ||
-      button.dataset.mermaidZoomAction ||
-      button.dataset.mermaidFullscreenAction
+      button.dataset.diagramZoomAction ||
+      button.dataset.diagramFullscreenAction
     ))
   const hasLayout = Boolean(await diagram.getAttribute('data-mermaid-direction'))
   assert.deepEqual(controls, [
@@ -188,7 +188,7 @@ export async function switchMermaidLayout(
   if (advanceFocus) {
     assert(
       await diagram
-        .locator('[data-mermaid-zoom-action="fit-all"]')
+        .locator('[data-diagram-zoom-action="fit-all"]')
         .evaluate((node) => node === document.activeElement),
       '渲染完成后不得抢回用户已移走的焦点'
     )
@@ -264,7 +264,7 @@ export async function waitForMermaidFit(page, diagram) {
 }
 
 export async function fitMermaidDiagram(diagram, assert) {
-  await diagram.locator('[data-mermaid-zoom-action="fit-all"]').click()
+  await diagram.locator('[data-diagram-zoom-action="fit-all"]').click()
   await assertMermaidFits(diagram, assert)
   await assertMermaidCentered(diagram, assert)
   await assertMermaidZoomMode(diagram, assert, 'fit-all')
@@ -274,7 +274,7 @@ export async function assertMermaidZoomMode(diagram, assert, selectedAction) {
   const controls = await diagram.evaluate((root) =>
     ['fit-all', 'fit', 'reset'].map((action) => {
       const button = root.querySelector(
-        `[data-mermaid-zoom-action="${action}"]`
+        `[data-diagram-zoom-action="${action}"]`
       )
       const style = getComputedStyle(button)
       return {
@@ -307,7 +307,7 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   const initialViewport = page.viewportSize()
   const canvas = diagram.locator('.erp-markdown-mermaid__canvas')
   const button = (action) =>
-    diagram.locator(`[data-mermaid-zoom-action="${action}"]`)
+    diagram.locator(`[data-diagram-zoom-action="${action}"]`)
   const assertWidth = async () => {
     const geometry = await diagram.evaluate((root) => {
       const viewport = root.querySelector('.erp-markdown-mermaid__viewport')
@@ -351,7 +351,7 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   const appearance = () =>
     diagram.evaluate((root) => {
       const tool = getComputedStyle(
-        root.querySelector('[data-mermaid-zoom-action="zoom-out"]')
+        root.querySelector('[data-diagram-zoom-action="zoom-out"]')
       )
       return {
         theme: root.dataset.mermaidTheme,
@@ -360,7 +360,7 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
         toolColor: tool.color,
         toolBorder: tool.borderColor,
         labelColor: getComputedStyle(
-          root.querySelector('[data-mermaid-zoom-label]')
+          root.querySelector('[data-diagram-zoom-label]')
         ).color,
       }
     })
@@ -372,7 +372,7 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
     ) >= 3,
     '图表控件的图标与背景须有足够对比度'
   )
-  await diagram.locator('[data-mermaid-fullscreen-action="open"]').click()
+  await diagram.locator('[data-diagram-fullscreen-action="open"]').click()
   assert.deepEqual(
     await appearance(),
     inlineAppearance,
@@ -388,7 +388,7 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   await assertMermaidZoomMode(diagram, assert, 'fit-all')
   await page.setViewportSize({ width: 900, height: 500 })
   await waitForFiniteAnimations(page)
-  const close = diagram.locator('[data-mermaid-fullscreen-action="close"]')
+  const close = diagram.locator('[data-diagram-fullscreen-action="close"]')
   assert(
     await close.evaluate((node) => {
       const rect = node.getBoundingClientRect()
@@ -406,7 +406,7 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   await page.setViewportSize(initialViewport)
   await waitForFiniteAnimations(page)
   await diagram
-    .locator('[data-mermaid-fullscreen-action="close"]')
+    .locator('[data-diagram-fullscreen-action="close"]')
     .press('Escape')
   await assertMermaidZoomMode(diagram, assert, 'fit')
   assert.deepEqual(
@@ -439,7 +439,7 @@ export async function verifyMermaidDarkTheme(page, diagram, assert) {
     await waitForMermaidFit(page, diagram)
     await verifyMermaidZoomModes(page, diagram, assert)
   } finally {
-    const close = diagram.locator('[data-mermaid-fullscreen-action="close"]')
+    const close = diagram.locator('[data-diagram-fullscreen-action="close"]')
     if (await close.count()) await close.press('Escape')
     await openERPAppearance(page)
     await dialog.getByText(previousMode, { exact: true }).click()
@@ -481,9 +481,9 @@ export async function verifyMermaidViewer(page, diagram, assert) {
   )
   assert((await viewport.boundingBox()).height <= 520)
 
-  await diagram.locator('[data-mermaid-zoom-action="zoom-in"]').click()
+  await diagram.locator('[data-diagram-zoom-action="zoom-in"]').click()
   assert((await svg.boundingBox()).width > original.width * 1.1)
-  await diagram.locator('[data-mermaid-zoom-action="reset"]').click()
+  await diagram.locator('[data-diagram-zoom-action="reset"]').click()
   assert.equal(await canvas.getAttribute('data-mermaid-zoom'), '100')
   await page.setViewportSize({
     width: Math.min(initialViewport.width, 1100),
@@ -535,32 +535,32 @@ export async function verifyMermaidViewer(page, diagram, assert) {
 
   const inlineZoom = await canvas.getAttribute('data-mermaid-zoom')
   await diagram
-    .locator('[data-mermaid-fullscreen-action="open"]')
+    .locator('[data-diagram-fullscreen-action="open"]')
     .scrollIntoViewIfNeeded()
   await verifyStableMermaidScroll(page, diagram, assert, async () => {
-    await diagram.locator('[data-mermaid-fullscreen-action="open"]').click()
-    await diagram.locator('[data-mermaid-fullscreen-action="close"]').waitFor()
+    await diagram.locator('[data-diagram-fullscreen-action="open"]').click()
+    await diagram.locator('[data-diagram-fullscreen-action="close"]').waitFor()
     await fit()
     if (direction) {
       await switchMermaidLayout(page, diagram, assert)
       await switchMermaidLayout(page, diagram, assert)
     }
     await diagram
-      .locator('[data-mermaid-fullscreen-action="close"]')
+      .locator('[data-diagram-fullscreen-action="close"]')
       .press('Escape')
-    await diagram.locator('[data-mermaid-fullscreen-action="open"]').waitFor()
+    await diagram.locator('[data-diagram-fullscreen-action="open"]').waitFor()
   })
   assert.equal(await canvas.getAttribute('data-mermaid-zoom'), inlineZoom)
   await page.waitForFunction(
     (root) =>
-      root.querySelector('[data-mermaid-fullscreen-action="open"]') ===
+      root.querySelector('[data-diagram-fullscreen-action="open"]') ===
       document.activeElement,
     await diagram.elementHandle()
   )
 
   // Deliberately overflow the canvas to prove dragging changes the actual scroll position.
   for (let i = 0; i < 12; i += 1) {
-    const button = diagram.locator('[data-mermaid-zoom-action="zoom-in"]')
+    const button = diagram.locator('[data-diagram-zoom-action="zoom-in"]')
     if (await button.isEnabled()) await button.click()
   }
   await viewport.scrollIntoViewIfNeeded()

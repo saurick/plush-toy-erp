@@ -90,7 +90,7 @@ export function BusinessTopicVerification({ topic }) {
   return (
     <details className="erp-dev-disclosure erp-dev-chain-topics__verification">
       <summary>数据与验证（{topic.acceptanceScenarios.length} 类场景）</summary>
-      <p>本专题的登记范围；实际执行结果见链路实测报告。</p>
+      <p>本链路的登记范围；实际执行结果见链路实测报告。</p>
       <ChainEvidenceLinks chainKey={topic.key} />
       <table data-table-lines="appearance">
         <thead>

@@ -152,6 +152,26 @@ DOM 断言只输出有界值：存在性用 `Boolean(container.querySelector(...
 
 **边界**：按对应语言 / 配置类型补充检查，不替代业务回归
 
+<a id="quality-gate-guide-sync"></a>
+
+## 门禁图文同步 / Quality Gate Guide Sync
+
+质量门禁的“门禁规则”保留原门禁目录，另提供 Hook 入口、执行流程与测试结构；`?view=governance&guide=hooks|flows|tests|catalog` 定位对应内容。图解释执行代码，不代表 Hook 已启用、计划已执行或检查通过。
+
+| 真源 / 改动 | 同轮同步与验证 |
+| --- | --- |
+| `.githooks/*`、`scripts/git-hooks/*`、推送准备和回执逻辑 | 核对 `devQualityGateGuide.mjs` 的入口、调用、条件、阻断与恢复说明，以及索引到流程节点和同名测试的关联 |
+| affected、full / strict、隔离环境与资源清理 | 修改对应关键 Mermaid 与节点说明；并行、条件、清理结果不能由图补造 |
+| CI 编排与覆盖合同 | 核对 `devCiWorkflow.mjs` 及其共用流程来源；保留 GitLab 原生运行结果和 DAG 入口 |
+| 测试新增、删除、改名和分组 | 维护 `node-test-groups.mjs` 与正式发现器；工作台只读复用，不手抄文件清单、数量或另造测试执行器 |
+| 断言或测试数据调整，但执行流程未变 | 核对说明是否受影响；不机械重画或要求全量门禁 |
+
+1. 先对照当前脚本与同名行为测试，识别本次改变的调用、条件和结果。
+2. 在同一轮修改对应图、节点说明、索引与引用；提交、推送、CI 三类证据不合并。中文含义由修改者核对，不自动推导全部代码。
+3. 运行相关行为测试与图文合同检查；页面路径变化验证选中节点、返回、搜索分页及失败恢复。图文检查只证明解析、节点和引用一致，不能代替执行测试。
+
+测试结构在打开或刷新时读取当前执行端的正式 Node / Web 测试发现结果与 Go 测试文件路径。未登记、重复登记、已登记但文件缺失分别显示；缺源码目录或读取失败不伪装成零测试通过。文件计数不等于用例数、业务覆盖或已执行数。接口不执行测试、不读源码内容、不接受任意路径或命令，且不建立常驻监听或全量代码解析服务。
+
 ## 门禁完整性与 CI 边界
 
 `/__dev/quality-gates` 通过 development-only Bridge 异步调用固定的 full / strict 正式 runner。
@@ -880,6 +900,25 @@ MANUAL_ACCEPTANCE_UAT_PASSWORD='<different-demo-password>' \
 ```
 
 长期库优先通过 `node scripts/qa/scenario-demo-data.mjs --target customer-trial-133 --source-scale-profile volume` 取得只读计划。将计划字段代入 `SCENARIO_DEMO_CONFIRM=APPLY_SCENARIO_DEMO:customer-trial-133:<databaseName>:<dataVersion>:<runId>:<planDigest>`，随后向同一命令追加 `--apply --expected-plan-digest <planDigest>`；远端 attestation 与独立账号仍须符合该入口合同，不传数据库重建回执。
+
+<a id="scenario-generation-snapshot"></a>
+
+#### 造数执行快照
+
+本地开发与 Demo 共用 `scenario-demo-data.mjs` 和九阶段 runner。每次 apply 在任何业务写入前保存代码与参数，失败也保留执行回执；不要求工作区干净，不自动 commit、push、部署或迁移。服务器实际 SHA 与本地 Git 基准 SHA 分别记录，服务器 SHA 必须在本地 Git 对象库中可核对，且当前后端 / 数据库源码与该提交一致。未提交的造数脚本与前端修改可使用；未部署的后端修改须先发布后再造数。
+
+| 记录 | 保存方式 |
+| --- | --- |
+| 执行时间与批次 | `receipt.json` 保存 UTC 毫秒时间、状态及“时间戳 + 短内容指纹”；页面按用户时区展示。业务基线 `dataVersion` / `runId` 保持原幂等含义 |
+| 代码 | `output/qa/scenario-generations/code/<完整指纹>/source.tar.gz` 与 `manifest.json`；读取 Git 登记和未忽略的新源码的当前字节，包含未提交修改和删除结果，按路径、内容和执行权限计算 SHA-256；相同内容仅存一份 |
+| 参数 | `output/qa/scenario-generations/runs/<执行 UUID>/parameters.json`；冻结规模档、完整业务计划、目标、迁移、配置身份、本地基准提交 / dirty / 工作区指纹和 Node 版本 |
+| 结果 | 同目录 `receipt.json`；成功后另存 `result.json`，包含业务读回、实际任务时间安排和阶段复用信息。业务调用失败或执行期间源码改变记为 `not_proven`，不能自动重试 |
+
+源码快照仅包含 `scripts / server / config / web / deployments` 中的公开源码及根依赖清单；排除测试、文档、构建输出、依赖目录、`.env*`、`*.local.*`、凭据 / 密钥文件与符号链接。代码范围比阶段逻辑指纹更广，用于追溯整次执行；页面或非造数代码修改可能改变快照指纹，但仍由原阶段逻辑指纹决定是否局部刷新，不据此全量重造。目录仅当前用户可访问，文件仅当前用户可读写；参数采用固定字段，不保存进程环境、密码、token、DSN 或原始命令。
+
+工作台自动用 operation UUID 关联快照；CLI 也自动生成 UUID，可用 `--execution-id <UUID>` 显式关联。快照编号可在“排查信息”复制。重复使用同一 UUID 不覆盖历史。只读计划不落快照；开始、失败或未知结果不表示成功造数。执行前后核对源码与计划，读取回执及复用存档时验证参数、清单和压缩包指纹，损坏时拒绝继续。业务调用返回后若结果或快照无法核验，操作记为 `not_proven`；损坏的快照在记录页明确提示“校验未通过”，不妨碍查看其他记录。
+
+需要查阅原代码时，在仓库根目录将对应存档解压到一次性独立目录；不要覆盖工作区。存档不包含运行凭据、依赖安装目录或数据库备份，`result.json` 的复用记录也不等于原数据库状态。重新执行仍需恢复适当工具链、取得当前凭据，核对目标版本 / 迁移 / 既有数据并重新生成计划和确认；不能直接重放旧确认串。
 
 下面是另行授权的 fresh 验收示例；它要求对应重建回执，不用于长期库常规补数：
 

@@ -3,7 +3,7 @@ import { Button, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import AppSelect from '@/common/components/select/AppSelect'
-import FilterSelect from '@/common/components/select/FilterSelect'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import {
   WorkbenchFacts,
   WorkbenchSection,
@@ -164,11 +164,10 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
   return (
     <section className="erp-dev-task-matrix" aria-label="任务清单">
       <WorkbenchToolbar>
-        <FilterSelect
+        <FilterChipGroup
+          allowClear
           label="办理岗位"
           aria-label="办理岗位"
-          placeholder="选择办理岗位"
-          virtual={false}
           value={role}
           onChange={(value) => patch('role', value)}
           options={TASK_HANDLING_ROLE_KEYS.map((key) => ({
@@ -176,20 +175,20 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
             label: getRoleDisplayName(key),
           }))}
         />
-        <FilterSelect
+        <FilterChipGroup
+          allowClear
           label="办理类型"
           aria-label="办理类型"
-          placeholder="选择办理类型"
           value={kind}
           onChange={(value) => patch('kind', value)}
           options={Object.entries(TASK_HANDLING_KINDS)
             .filter(([key]) => key !== 'automatic')
             .map(([value, item]) => ({ value, label: item.label }))}
         />
-        <FilterSelect
+        <FilterChipGroup
+          allowClear
           label="手机支持"
           aria-label="手机支持"
-          placeholder="选择手机支持范围"
           value={mobile}
           onChange={(value) => patch('mobile', value)}
           options={Object.entries(MOBILE_HANDLING_LABELS)

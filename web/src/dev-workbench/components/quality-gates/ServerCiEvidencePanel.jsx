@@ -9,6 +9,7 @@ import { ServerJobGuideDrawer } from './ServerCiJobGuideDrawer.jsx'
 
 const { Link, Text } = Typography
 export const SERVER_CI_STATUS = { passed: '完整 CI 通过', docs_passed: '文档检查通过', running: 'CI 运行中', failed: 'CI 未通过', missing: '当前提交尚无 CI', unavailable: 'CI 读取失败' }
+const SERVER_CI_STATUS_COLORS = { passed: 'success', failed: 'error' }
 
 const HISTORY_TITLE = '历史流水线记录（GitLab）'
 const HISTORY_BOUNDARY = '历史状态来自 GitLab；历史成功不能证明当前提交通过。'
@@ -36,7 +37,7 @@ const HISTORY_COLUMNS = [
   },
 ]
 
-export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHistory = false }) {
+export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHistory = false, stale = false }) {
   const evidence = summary?.serverEvidence
   const [jobGuideOpen, setJobGuideOpen] = useState(false)
   const [selectedJobName, setSelectedJobName] = useState('')
@@ -46,6 +47,10 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHi
   }, [])
   if (!evidence) return null
   const { reports } = evidence
+  const statusLabel = SERVER_CI_STATUS[evidence.status] || 'CI 尚未证明'
+  const statusColor = stale ? 'default' : SERVER_CI_STATUS_COLORS[evidence.status] || 'default'
+  const resultTitle = stale ? '上次读取的 CI 结果' : '当前提交的 CI 结果'
+  const historyBoundary = stale ? '历史状态为上次读取的 GitLab 记录；历史成功不能证明当前提交通过。' : HISTORY_BOUNDARY
   const firstFailure = evidence.jobs?.find((job) => job.conclusion === 'failure')
   const guideButton = (
     <Button size="small" aria-label="流程与原理" onClick={(event) => { guideTrigger.current = event.currentTarget; setSelectedJobName(''); setJobGuideOpen(true) }}>流程与原理</Button>
@@ -55,10 +60,10 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHi
   return (
     <section className="erp-dev-quality-server-evidence" aria-label="GitLab CI 质量证据">
       {evidence.pipeline ? (
-        <WorkbenchSection flat title={inlineHistory ? '当前提交的 CI 结果' : undefined}>
+        <WorkbenchSection flat title={inlineHistory ? resultTitle : undefined}>
           <Space wrap>
             <Text>CI 对应版本 <Text code>{shortCommit(evidence.gitSha)}</Text></Text>
-            <Tag color={evidence.status === 'passed' ? 'success' : evidence.status === 'failed' ? 'error' : 'default'}>{SERVER_CI_STATUS[evidence.status] || 'CI 尚未证明'}</Tag>
+            <Tag color={statusColor}>{stale ? `上次结果：${statusLabel}` : statusLabel}</Tag>
             <Text>耗时 {formatQualityGateDuration(evidence.pipeline.durationMs)}</Text>
             {evidence.pipeline.finishedAt || evidence.pipeline.status === 'completed' ? (
               <DevTimestamp value={evidence.pipeline.finishedAt} missing="结束时间未记录" />
@@ -83,18 +88,20 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHi
                 <Link href={item.url} target="_blank" rel="noopener noreferrer">查看覆盖率 Job</Link>
                 {item.artifactUrl ? <Link href={item.artifactUrl} target="_blank" rel="noopener noreferrer">查看覆盖率制品</Link> : <Text type="secondary">覆盖率制品已过期或尚未上传</Text>}
               </Space>
-            )) : <Text type="secondary">本次流水线尚无覆盖率报告</Text>}
+            )) : (
+              <Text type="secondary">{reports?.status === 'unavailable' ? '覆盖率读取失败，暂不能判断是否有报告' : '本次流水线尚无覆盖率报告'}</Text>
+            )}
           </Space>
           <Text type="secondary">{inlineHistory ? '' : 'CI 不覆盖未提交改动；'}覆盖率仅代表本次执行范围，部署与客户验收分别核对。</Text>
         </WorkbenchSection>
       ) : showEmptyState ? (
         <div role="status">
-          <Text strong>{SERVER_CI_STATUS[evidence.status] || 'CI 尚未证明'}</Text>
-          <div><Text type="secondary">{evidence.status === 'missing' ? '当前提交尚未产生执行结果，可查看历史流水线。' : '请刷新后重新核对；读取失败不代表没有流水线。'}</Text></div>
+          <Text strong>{stale ? '上次读取未取得流水线' : statusLabel}</Text>
+          <div><Text type="secondary">{stale ? '本次状态尚未核实，可查看历史流水线。' : evidence.status === 'missing' ? '当前提交尚未产生执行结果，可查看历史流水线。' : '请刷新后重新核对；读取失败不代表没有流水线。'}</Text></div>
         </div>
       ) : null}
       {inlineHistory ? (
-        <WorkbenchSection flat title={HISTORY_TITLE} description={HISTORY_BOUNDARY} tools={<>{allHistoryLink}{guideButton}</>}>
+        <WorkbenchSection flat title={HISTORY_TITLE} description={historyBoundary} tools={<>{allHistoryLink}{guideButton}</>}>
           {historyUnavailable ? (
             <WorkbenchNotice tone="warning" title="历史列表暂时读取失败" description="可在 GitLab 查看全部流水线。" />
           ) : evidence.history.length ? (
@@ -113,7 +120,7 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHi
           <details className="erp-dev-disclosure">
             <summary>{HISTORY_TITLE}</summary>
             <Space direction="vertical">
-              <Text type="secondary">{HISTORY_BOUNDARY}</Text>
+              <Text type="secondary">{historyBoundary}</Text>
               {historyUnavailable ? <Text type="warning">历史列表暂时读取失败，仍可进入 GitLab 查看。</Text> : null}
               {evidence.history.map((run) => <Link key={run.id} href={run.url} target="_blank" rel="noopener noreferrer">#{run.id} · {shortCommit(run.gitSha)} · {PIPELINE_RESULTS[run.result].label}</Link>)}
               {allHistoryLink}
@@ -121,7 +128,7 @@ export function ServerCiEvidencePanel({ summary, showEmptyState = true, inlineHi
           </details>
         </>
       )}
-      <ServerJobGuideDrawer repository={summary.repository} evidence={evidence} open={jobGuideOpen} selectedJobName={selectedJobName} onSelect={setSelectedJobName} onShowAll={() => setSelectedJobName('')} onClose={() => setJobGuideOpen(false)} onAfterOpenChange={restoreGuideFocus} />
+      <ServerJobGuideDrawer repository={summary.repository} evidence={evidence} stale={stale} open={jobGuideOpen} selectedJobName={selectedJobName} onSelect={setSelectedJobName} onShowAll={() => setSelectedJobName('')} onClose={() => setJobGuideOpen(false)} onAfterOpenChange={restoreGuideFocus} />
     </section>
   )
 }

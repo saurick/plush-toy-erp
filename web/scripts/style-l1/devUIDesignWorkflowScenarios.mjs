@@ -30,7 +30,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
     await page.locator('.erp-dev-ui-design-header').getByRole('tab', { name: '可交互设计', exact: true }).waitFor()
     await page.getByRole('button', { name: /全屏预览/ }).click()
     const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-    await frame.getByRole('button', { name: '业务汇总', exact: true }).waitFor()
+    await frame.locator('#dashboard-summary-search').waitFor()
     assert.equal(
       await frame.locator('.page-navigation').evaluate((node) => getComputedStyle(node).backgroundColor),
       'rgb(255, 255, 255)',
@@ -58,6 +58,7 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
     const closeTask = () => frame.locator('.drawer [data-action="close-drawer"]').first().click()
     const visibleActions = () => frame.locator('.drawer [data-action="task-choice"] strong').allTextContents()
 
+    await frame.locator('.nav-item[data-page="tasks"]').click()
     await openTask('T06')
     assert.equal(await frame.locator('.task-steps button').count(), 3)
     assert.equal(await frame.locator('.task-steps').isVisible(), true)
@@ -126,7 +127,6 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
     await frame.locator('.business-detail-modal [data-action="close-drawer"]').last().click()
     await closeTask()
 
-    return { frame, materialSummary }
   }
   return [
     ...createDevTaskGovernanceScenarios({ assert, outputDir, path }),
@@ -1127,9 +1127,9 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
       path: '/__dev/ui-design',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        const { frame, materialSummary } = await verifyTaskDetailFlow(page)
-
-        await frame.getByRole('button', { name: '业务汇总', exact: true }).click()
+        const frame = await open(page)
+        const materialSummary = frame.getByRole('dialog', { name: '材料汇总', exact: true })
+        await frame.locator('#dashboard-summary-search').waitFor()
         assert.deepEqual(await frame.locator('.summary-table th').allTextContents(), ['订单号', '产品', '审批状态', '提交时间', '查看'])
         await frame.locator('#dashboard-summary-search').fill('IP 联名')
         await frame.locator('#dashboard-summary-search').press('Enter')

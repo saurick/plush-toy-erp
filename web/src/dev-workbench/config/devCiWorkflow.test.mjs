@@ -22,7 +22,16 @@ test('diagnostic copy keeps failure identity and native Job links without invent
 test('copyable instructions include complete table rows, commands and source references', () => {
   const section = CI_WORKFLOW_SECTIONS.find(({ key }) => key === 'coverage')
   const text = formatCiWorkflowSection(section)
-  assert.match(text, /Web ESLint \/ Stylelint \| 当前未包含 \| 当前未包含/u)
+  assert.match(text, /Web ESLint \/ Stylelint \| ESLint 按路径；不含 Stylelint \| 当前未包含/u)
   assert.match(text, /scripts\/qa\/affected.mjs/u)
   assert(CI_WORKFLOW_SECTIONS.every(({ table }) => !table || table.rows.every((row) => row.length === table.headers.length)))
+})
+
+test('diagnostic copy keeps the pipeline identity when only the last read is available', () => {
+  const text = buildCiDiagnosticText({
+    evidence: { gitSha: 'b'.repeat(40), status: 'passed', coversWorkingTree: true, pipeline: { id: 10, status: 'completed', conclusion: 'success' } },
+    stale: true,
+  })
+  assert.match(text, /上次读取；本次状态与覆盖范围尚未核实/u)
+  assert.match(text, /Pipeline：10 \/ completed \/ success/u)
 })

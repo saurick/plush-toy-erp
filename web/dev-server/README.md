@@ -23,6 +23,7 @@
 | `devBusinessChainAuditPlugin.mjs` | 只读列举本地链路实跑批次、读取结构化报告、按证据清单校验摘要并下载文件；不执行业务写入或复跑 |
 | `devPermissionRelationshipsPlugin.mjs` | 在独立工作台访问边界内，只读查询登记开发库的账号、岗位、权限和审批关系；复用正式 Go repository、权限解释与 DTO，不使用 ERP 登录身份 |
 | `devQualityGatePlugin.mjs` | 复用正式 full / strict runner 与回执，自动选择显式 loopback base 或本机托管 PostgreSQL，提供异步运行、取消、超时、清理读回和只读治理 |
+| `devQualityGateTestDirectory.mjs` | 复用正式 Node / Web 发现器，只读投影测试文件与分组；不执行测试，缺源码和失效登记分别保留 |
 | `devDataPreparationPlugin.mjs` | 提供单一数据准备 operation 真源；同一 Scenario profile 显式绑定本地或 133，冻结当前数据合同、release、数据库、migration、客户配置与回滚点，长期数据与隔离验收不互相替代 |
 
 ### 迁移、发布与访问控制
@@ -94,7 +95,7 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 
 项目 Skill 使用固定 `GET /__dev/api/project-skills`，只读取当前仓库 `.agents/skills/`，不接受查询参数、请求体或写方法。
 
-`devProjectSkillsPlugin.mjs` 复用 `skill-health.mjs` 的 validator 和 metadata parser，返回适用范围、入口 Markdown 引用、正文提及的项目 Skill 以及带时间的结构诊断；只在打开页面或显式刷新时检查。它不执行 Skill、命令或业务写入，也不采集会话、调用次数或全局 Skill。
+`devProjectSkillsPlugin.mjs` 复用 `skill-health.mjs` 的 validator 和 metadata parser，返回名称、适用范围、摘要、正文路径以及带时间的结构诊断；引用有效性仍由同一 validator 检查，不另行提取引用清单或把正文提及的 Skill 生成导航。只在打开页面或显式刷新时检查，不执行 Skill、命令或业务写入，也不采集会话、调用次数或全局 Skill。
 
 源文件继续在仓库维护，正文阅读复用项目文档查看器。
 
