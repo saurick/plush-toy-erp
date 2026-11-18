@@ -122,13 +122,22 @@ export function createSearchSubmissionScenarios(deps) {
               customer_snapshot: { id: 1, code: 'SEARCH-C', name: '搜索验证客户' },
               customer_order_no: index === 0 || index === DEFAULT_BUSINESS_PAGE_SIZE + 2 ? '指定' : '',
               lifecycle_status: index === DEFAULT_BUSINESS_PAGE_SIZE + 2 ? 'submitted' : 'draft',
-              version: 1, item_count: 0, order_date: 1790430000,
+              version: 1,
+              item_count: 0,
+              order_date: 1790430000,
             })).filter((order) => !params.keyword || JSON.stringify(order).includes(params.keyword))
-            if (params.keyword === '另一客户') orders.push({
-              id: 10000, order_no: 'SO-SEARCH-OTHER-CUSTOMER', customer_id: 2,
-              customer_snapshot: { id: 2, code: 'SEARCH-C2', name: '搜索验证客户2' },
-              lifecycle_status: 'draft', version: 1, item_count: 0, order_date: 1790430000,
-            })
+            if (params.keyword === '另一客户') {
+              orders.push({
+                id: 10000,
+                order_no: 'SO-SEARCH-OTHER-CUSTOMER',
+                customer_id: 2,
+                customer_snapshot: { id: 2, code: 'SEARCH-C2', name: '搜索验证客户2' },
+                lifecycle_status: 'draft',
+                version: 1,
+                item_count: 0,
+                order_date: 1790430000,
+              })
+            }
             const status_counts = {}
             for (const order of orders) status_counts[order.lifecycle_status] = (status_counts[order.lifecycle_status] || 0) + 1
             const filtered = orders.filter((order) => !params.lifecycle_status || order.lifecycle_status === params.lifecycle_status)
@@ -161,12 +170,12 @@ export function createSearchSubmissionScenarios(deps) {
         await delay(450)
         assert.equal(page.statusCountRequests.length, before, 'typing must not request the order list')
         await page.locator('.erp-business-operation-panel__search').getByRole('button', { name: '搜索', exact: true }).click()
-        await page.getByRole('button', { name: '不限状态，共 2 条', exact: true }).waitFor()
+        await page.getByRole('button', { name: '不限状态，共 2 张', exact: true }).waitFor()
         assert.equal(page.statusCountRequests.length, before + 1, 'button submits once')
         await search.press('Enter')
         await delay(80)
         assert.equal(page.statusCountRequests.length, before + 1, 'same query must not be duplicated')
-        await page.getByRole('button', { name: '草稿，共 1 条', exact: true }).click()
+        await page.getByRole('button', { name: '草稿，共 1 张', exact: true }).click()
         await page.getByRole('button', { name: '清除搜索', exact: true }).click()
         await page.locator('.ant-table-tbody').getByText('SO-COUNT-001', { exact: true }).waitFor()
         await page.locator('.ant-pagination-item-2').click()
@@ -191,7 +200,7 @@ export function createSearchSubmissionScenarios(deps) {
         assert.deepEqual(references(), [...baseline, 'list_customers', 'list_customers'], 'returning to a known customer reuses the page reference records')
         await search.fill('不存在的搜索结果')
         await search.press('Enter')
-        await page.getByRole('button', { name: '不限状态，共 0 条', exact: true }).waitFor()
+        await page.getByRole('button', { name: '不限状态，共 0 张', exact: true }).waitFor()
         assert.equal(await search.inputValue(), '不存在的搜索结果')
         await assertNoHorizontalOverflow(page, 'search-submit-desktop')
         await page.screenshot({ path: path.join(outputDir, 'search-submit-desktop.png') })
