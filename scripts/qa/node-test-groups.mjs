@@ -293,6 +293,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/pressure-isolated-lifecycle.test.mjs",
     "scripts/qa/pressure-runtime.test.mjs",
     "scripts/qa/scenario-demo-data.test.mjs",
+    "scripts/qa/scenario-generation-snapshot.test.mjs",
     "scripts/qa/test-coverage-report.test.mjs",
     "scripts/qa/yoyoosun-customer-closure.test.mjs",
     "scripts/qa/yoyoosun-release-readiness.test.mjs",

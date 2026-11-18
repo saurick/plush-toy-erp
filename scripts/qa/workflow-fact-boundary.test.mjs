@@ -53,7 +53,7 @@ const factReadProjections = new Map([
   ["server/internal/data/workflow_handling_chain.go", ["production_facts", "outsourcing_facts"]],
   ["server/internal/data/workflow_exceptions.go", ["outsourcing_facts", "inventory_txns"]],
 ]);
-const backfillLock = '"LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"';
+const backfillLock = '"LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, quality_inspections, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"';
 
 test("workflow fact boundary: workflow runtime does not post domain facts", () => {
   assert(workflowSourceFiles.length > 0, "expected workflow runtime files");

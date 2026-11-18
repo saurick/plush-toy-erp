@@ -164,12 +164,21 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(seedDataSource.includes("title: '功能预览'"));
   assert(seedDataSource.includes("title: '系统设置'"));
 
-  const dashboardSource = readRelative("web/src/erp/pages/DashboardPage.jsx");
-  const dashboardViewsSource = readRelative("web/src/erp/components/workflow/WorkflowDashboardViews.jsx");
-  assert(dashboardSource.includes("ProductCoreDashboard"));
+  const workbenchSource = readRelative("web/src/erp/pages/WorkbenchPage.jsx");
+  const dashboardViewsSource = readRelative(
+    "web/src/erp/components/workflow/WorkflowDashboardViews.jsx",
+  );
+  assert.match(
+    workbenchSource,
+    /const preview\s*=\s*adminProfile\?\.is_super_admin\s*===\s*true\s*&&\s*!adminProfile\.effective_session\?\.customer\?\.key/u,
+    "preview must use the session's customer binding and super-admin access",
+  );
+  assert.match(
+    workbenchSource,
+    /\{preview\s*\?\s*<ProductCoreDashboard\b[^>]*\/>\s*:\s*hasSummaries\s*\?\s*\(\s*<WorkbenchSummaries\b/u,
+    "preview must render instead of mounting customer summary queries",
+  );
   assert(dashboardViewsSource.includes('data-product-core-dashboard="true"'));
-  assert(dashboardSource.includes("shouldShowProductCoreDashboard"));
-  assert.match(dashboardSource, /\{shouldShowProductCoreDashboard\s*\?/u);
   assert(dashboardViewsSource.includes("不显示客户业务数据"));
 
   const syncSource = readRelative("web/src/erp/utils/adminProfileSync.mjs");
