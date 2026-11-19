@@ -294,7 +294,8 @@ function flattenCatalogTargets(catalog) {
 
 function accountForTarget(target, formalAccounts) {
   if (target.key === "admin-login") return null;
-  const roleKey = new Set(["global-dashboard", "task-board"]).has(target.key)
+  // The progress evidence reads the organization-wide order total.
+  const roleKey = new Set(["global-dashboard", "business-dashboard", "task-board"]).has(target.key)
     ? "boss"
     : target.roleKeys[0];
   const account = formalAccounts.find((item) => item.roleKey === roleKey);
