@@ -1,5 +1,5 @@
-import { chooseDisplay, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
+import { viewTrigger, chooseChainScope, chooseViewOption, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { assertChainNodeFilters } from './devBusinessChainNodeFilterAssertions.mjs'
 import { assertChainDesignKeyboard } from './devBusinessChainDesignKeyboardAssertions.mjs'
 
@@ -89,47 +89,27 @@ export function createDevBusinessChainDesignMainlineScenarios({
           .getByRole('button', { name: '关闭画布说明', exact: true })
           .click()
         const beforeGranularity = await working()
-        const display = editor.getByRole('combobox', { name: '流程颗粒度' })
-        const displayHelp = editor.getByRole('button', {
-          name: '查看全部已载入节点说明',
-          exact: true,
-        })
-        const displayExplanation = page.getByText(
-          '不会新增节点，也不会自动载入整条流程。',
-          { exact: true }
-        )
-        await displayHelp.hover()
-        await expect(displayExplanation).toBeVisible()
-        await expect(page.getByText(
-          '需要整条流程时，在上方“流程范围”选择链路；已聚焦局部时，点击“回到整体”。',
-          { exact: true }
-        )).toBeVisible()
-        await search.hover()
-        await expect(displayExplanation).toBeHidden()
-        await display.focus()
-        await page.keyboard.press('Tab')
-        await expect(displayHelp).toBeFocused()
-        await expect(displayExplanation).toBeVisible()
+        const view = viewTrigger(editor)
+        await view.focus()
+        await view.press('Enter')
+        const panel = page.getByRole('dialog', { name: '画布视图', exact: true })
+        const allLoaded = panel.getByRole('radio', { name: '全部已载入节点', exact: true })
+        await expect(allLoaded).toHaveAccessibleDescription('同时查看当前范围已载入的单据、记录和任务')
+        await expect(panel.getByRole('radio', { checked: true }).first()).toBeFocused()
         await page.keyboard.press('Escape')
-        await expect(displayExplanation).toBeHidden()
-        await expect(displayHelp).toBeFocused()
-        await displayHelp.click()
-        await search.hover()
-        await expect(displayExplanation).toBeVisible()
-        await displayHelp.click()
-        await expect(displayExplanation).toBeHidden()
+        await expect(panel).toBeHidden()
+        await expect(view).toBeFocused()
         assert.deepEqual(await working(), beforeGranularity, '查看显示说明不改变画布或保存内容')
-        await chooseDisplay(editor, '全部已载入节点')
-        await expect(editor.locator('.erp-chain-design__mode')).toContainText('全部已载入节点')
+        await chooseViewOption(editor, '全部已载入节点')
+        await expect(viewTrigger(editor)).toContainText('全部已载入节点')
         await expect(canvas).toHaveAttribute('data-view-mode', 'all')
         const detailed = await working()
         assert.deepEqual(detailed.map, beforeGranularity.map, '颗粒度不扩大范围或改变展开状态')
         assert.deepEqual(detailed.nodes, beforeGranularity.nodes, '颗粒度不新增节点并保留位置')
         assert.deepEqual(detailed.edges, beforeGranularity.edges, '颗粒度切换保留已载入关系')
-        await chooseDisplay(editor, '业务步骤')
+        await chooseViewOption(editor, '业务步骤')
         assert.deepEqual((await working()).nodes, beforeGranularity.nodes, '返回业务步骤保留手动位置')
-        await editor.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '选择流程范围', exact: true }) }).locator('.ant-select-selector').click()
-        await page.locator('.ant-select-dropdown:visible').getByText('销售受理到生产准备', { exact: true }).click()
+        await chooseChainScope(page, '销售受理到生产准备')
         await search.fill('')
         await search.press('Enter')
         await expect(canvas).toHaveAttribute('data-view-mode', 'mainline')
@@ -173,12 +153,12 @@ export function createDevBusinessChainDesignMainlineScenarios({
           .click()
         assert.deepEqual(await working(), content, '查看关联任务不改变视图')
         const count = await nodes.count()
-        await chooseDisplay(editor, '全部已载入节点')
+        await chooseViewOption(editor, '全部已载入节点')
         assert(
           (await nodes.count()) > count,
           '全部已载入节点显示办理步骤间已载入的单据和业务记录'
         )
-        await chooseDisplay(editor, '业务步骤')
+        await chooseViewOption(editor, '业务步骤')
         assert.deepEqual(
           (await working()).nodes,
           content.nodes,

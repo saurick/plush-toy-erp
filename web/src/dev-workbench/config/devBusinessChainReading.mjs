@@ -3,19 +3,24 @@ import {
   businessChainNodeContext,
   CHAIN_DESIGN_NODE_SIZE,
   isBusinessChainStep,
+  orientBusinessChainPoint,
 } from './devBusinessChainDesignView.mjs'
 
 export const CHAIN_READING_LAYERS = Object.freeze([
-  { value: 'normal', label: '主线与供给', kinds: ['continues', 'supplies'] },
-  { value: 'exception', label: '异常与回接', kinds: ['branches_to', 'returns_to', 'reworks'] },
-  { value: 'correction', label: '过账后纠正', kinds: ['corrects'] },
-  { value: 'impact', label: '横切影响', kinds: ['cross_cuts'] },
+  { value: 'normal', label: '主线与供给', shortLabel: '主线', kinds: ['continues', 'supplies'] },
+  { value: 'exception', label: '异常与回接', shortLabel: '异常', kinds: ['branches_to', 'returns_to', 'reworks'] },
+  { value: 'correction', label: '过账后纠正', shortLabel: '纠正', kinds: ['corrects'] },
+  { value: 'impact', label: '横切影响', shortLabel: '横切', kinds: ['cross_cuts'] },
 ])
 
 export function businessChainRelationLayer(relation) {
   const layer = CHAIN_READING_LAYERS.find((item) => item.kinds.includes(relation.kind))
   if (!layer) throw new Error(`Unknown chain relationship: ${relation.kind}`)
   return layer.value
+}
+
+export function businessChainHandoffs(catalog, chainKey) {
+  return catalog.businessChainOverview.relations.filter((edge) => edge.fromChainKey === chainKey || edge.toChainKey === chainKey)
 }
 
 export function describeBusinessChainReading(catalog, chainKey) {
@@ -26,7 +31,7 @@ export function describeBusinessChainReading(catalog, chainKey) {
     chain,
     inputs: chain.nodes.filter((node) => chain.entryNodeKeys.includes(node.key)),
     outputs: chain.nodes.filter((node) => node.terminal || !outgoing.has(node.key)),
-    handoffs: catalog.businessChainOverview.relations.filter((edge) => edge.fromChainKey === chainKey),
+    handoffs: businessChainHandoffs(catalog, chainKey),
   }
 }
 
@@ -231,18 +236,22 @@ export function arrangeBusinessChainReading(graph, library, layout = 'flow') {
   return positions
 }
 
-export function businessChainLaneBands(graph, library) {
+export function businessChainLaneBands(graph, library, direction = 'LR') {
   const domains = [...new Set(graph.nodes.filter((node) => !node.summary).map((node) => library.byId.get(node.id).domain))]
   return domains.map((domain) => {
     const nodes = graph.nodes.filter((node) => !node.summary && library.byId.get(node.id).domain === domain)
-    const left = Math.min(...nodes.map((node) => node.x)) - 16
+    const left = Math.min(...nodes.map((node) => node.x)) - (direction === 'TB' ? 60 : 16)
     const top = Math.min(...nodes.map((node) => node.y)) - 30
+    const origin = orientBusinessChainPoint({ x: left, y: top }, direction)
+    const end = orientBusinessChainPoint({
+      x: Math.max(...graph.nodes.map((node) => node.x + CHAIN_DESIGN_NODE_SIZE.width)) + 16,
+      y: Math.max(...nodes.map((node) => node.y + CHAIN_DESIGN_NODE_SIZE.height)) + 14,
+    }, direction)
     return {
       domain,
-      x: left,
-      y: top,
-      width: Math.max(...graph.nodes.map((node) => node.x + CHAIN_DESIGN_NODE_SIZE.width)) - left + 16,
-      height: Math.max(...nodes.map((node) => node.y + CHAIN_DESIGN_NODE_SIZE.height)) - top + 14,
+      ...origin,
+      width: end.x - origin.x,
+      height: end.y - origin.y,
     }
   })
 }

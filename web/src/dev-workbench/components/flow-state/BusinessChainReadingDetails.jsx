@@ -11,30 +11,31 @@ import {
   CHAIN_READING_LAYERS,
 } from '../../config/devBusinessChainReading.mjs'
 
-export function ChainPurposeDetails({ catalog, chainKey, onRelation }) {
+export function ChainPurposeDetails({ catalog, chainKey, onRelation, onShowHandoffs }) {
   const { chain, inputs, outputs, handoffs } = describeBusinessChainReading(catalog, chainKey)
   return (
     <div className="erp-chain-reading-details">
       <strong>用途与交接</strong>
       <p>{chain.summary}</p>
+      {onShowHandoffs && handoffs.length > 0 && <Button type="primary" onClick={onShowHandoffs}>在图上看交接</Button>}
       <WorkbenchFacts items={[
         { label: '从什么开始', value: inputs.map((node) => node.label).join('、') },
         { label: '交出什么结果', value: outputs.map((node) => node.label).join('、') },
       ]}
       />
       {handoffs.length ? (
-        <section aria-label="交给哪些链路">
-          <strong>交给哪些链路</strong>
+        <section aria-label="直接交接">
+          <strong>直接交接 · {handoffs.length} 条</strong>
           {handoffs.map((relation) => (
             <div className="erp-chain-design__state-transition" key={relation.key}>
               <Button onClick={() => onRelation(relation)}>
-                {catalog.businessChains.find((item) => item.key === relation.toChainKey).label}
+                {relation.fromChainKey === chainKey ? '交接至' : '来自'} {catalog.businessChains.find((item) => item.key === (relation.fromChainKey === chainKey ? relation.toChainKey : relation.fromChainKey)).label}
               </Button>
               <p>{relation.label}</p>
             </div>
           ))}
         </section>
-      ) : <p>当前目录未登记后续跨链接点；不表示可以任意连接。</p>}
+      ) : <p>当前目录尚未登记这条链路的对外交接。</p>}
       <details>
         <summary>流程地图与实际进度有什么区别？</summary>
         <p>地图说明规则、分支与交接；某笔业务可能按行、按批并行推进，实际经过以任务、单据和事实记录为准。</p>

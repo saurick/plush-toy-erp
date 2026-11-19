@@ -11,11 +11,11 @@ import {
   arrangeBusinessChainMap,
   businessChainMapCanCollapseGrowth,
   businessChainMapCanGrow,
+  businessChainMapState,
   collapseBusinessChainMapGrowth,
   expandBusinessChainMap,
   focusBusinessChainMap,
   growBusinessChainMap,
-  moveBusinessChainMapNode,
   projectBusinessChainMap,
   showBusinessChainWhole,
   toggleBusinessChainMapRegion,
@@ -31,6 +31,8 @@ const stable = (before, after) => {
   const next = positions(after)
   for (const node of before.nodes) assert.deepEqual(next.get(node.id), node)
 }
+const storedPosition = (nodes, id, position) =>
+  nodes.map((node) => node.id === id ? { ...node, ...position } : node)
 
 test('范围与颗粒度独立：概览、步骤、全部已载入节点投影不改变局部范围或坐标', () => {
   const draft = expandBusinessChainMap(
@@ -67,11 +69,11 @@ test('部分载入的保存视图只展示已载入内容，不补出关联节�
     assert.deepEqual(graph.edges, [])
   }
   assert.deepEqual(draft, before)
-  const summaryId = projectBusinessChainMap(draft, library, 'overview').nodes[0].id
-  const moved = moveBusinessChainMapNode(draft, library, summaryId, { x: 320, y: -90 })
-  assert.deepEqual(moved.nodes, draft.nodes, '手动摆放概览不载入业务节点')
-  assert.deepEqual(moved.edges, draft.edges)
-  const restored = parseBusinessChainDraft(JSON.stringify(moved), library)
+  const map = businessChainMapState(draft, library)
+  const saved = { ...draft, map: { ...map, summaries: [{ id: map.chainKey, x: 320, y: -90, manual: true }] } }
+  const restored = parseBusinessChainDraft(JSON.stringify(saved), library)
+  assert.deepEqual(restored.nodes, draft.nodes, '恢复保存的概览坐标不载入业务节点')
+  assert.deepEqual(restored.edges, draft.edges)
   const summary = projectBusinessChainMap(restored, library, 'overview').nodes[0]
   assert.equal(summary.x, 320)
   assert.equal(summary.y, -90)
@@ -175,7 +177,7 @@ test('聚焦、回到整体及不同链路往返保留已缓存和手动调整�
     library,
     'outsourcing_to_inventory'
   )
-  draft = moveBusinessChainMapNode(draft, library, start, { x: -300, y: 42 })
+  draft.nodes = storedPosition(draft.nodes, start, { x: -300, y: 42, manual: true })
   draft.presentation = { mode: 'all', role: 'quality' }
   const whole = structuredClone(draft)
   draft = focusBusinessChainMap(draft, library, start)
@@ -195,15 +197,11 @@ test('聚焦、回到整体及不同链路往返保留已缓存和手动调整�
   assert.equal(draft.nodes.find(({ id }) => id === start).manual, true)
 })
 
-test('采购入库调整聚焦时收紧同一组节点，展开和局部调整都保留原图布局', () => {
+test('采购入库调整聚焦时收紧同一组节点，展开和恢复局部坐标均保留原图布局', () => {
   const { id } = library.nodes.find(({ label }) => label === '采购入库调整')
   const mode = 'all'
-  const whole = moveBusinessChainMapNode(
-    showBusinessChainWhole(emptyBusinessChainDraft(), library),
-    library,
-    id,
-    { x: 728, y: 5100 }
-  )
+  const whole = showBusinessChainWhole(emptyBusinessChainDraft(), library)
+  whole.nodes = storedPosition(whole.nodes, id, { x: 728, y: 5100, manual: true })
   const focused = focusBusinessChainMap(whole, library, id, mode)
   const compact = projectBusinessChainMap(focused, library, mode)
   const wholePositions = positions(whole)
@@ -225,11 +223,9 @@ test('采购入库调整聚焦时收紧同一组节点，展开和局部调整�
   stable(compact, expanded)
 
   const original = positions(compact).get(id)
-  const moved = moveBusinessChainMapNode(focused, library, id, {
-    x: original.x,
-    y: original.y - 48,
-  })
-  const restored = parseBusinessChainDraft(JSON.stringify(moved), library)
+  const savedPositions = storedPosition(focused.map.focusPositions, id, { y: original.y - 48 })
+  const saved = { ...focused, map: { ...focused.map, focusPositions: savedPositions } }
+  const restored = parseBusinessChainDraft(JSON.stringify(saved), library)
   const restoredGraph = projectBusinessChainMap(restored, library, mode)
   assert.equal(positions(restoredGraph).get(id).y, original.y - 48)
   const arranged = arrangeBusinessChainMap(restored, library, mode)
@@ -286,14 +282,9 @@ test('整体概览覆盖登记的 11 条链路，跨链连线只来自正式概�
 test('保存往返完整保留局部范围、颗粒度、分区展开、局部细节与手动位置；不保存规则副本', () => {
   let draft = showBusinessChainWhole(emptyBusinessChainDraft(), library, 'all')
   draft = focusBusinessChainMap(draft, library, start)
-  draft = moveBusinessChainMapNode(draft, library, start, { x: -800, y: -60 })
-  draft = moveBusinessChainMapNode(
-    draft,
-    library,
-    'map:outsourcing_to_inventory',
-    { x: 33, y: 55 }
-  )
-  draft.presentation = { mode: 'overview', role: '' }
+  draft.map.focusPositions = storedPosition(draft.map.focusPositions, start, { x: -800, y: -60 })
+  draft.map.focusPositions = storedPosition(draft.map.focusPositions, 'map:outsourcing_to_inventory', { x: 33, y: 55 })
+  draft.presentation = { mode: 'overview', role: '', direction: 'TB' }
   draft.map.expandedChains = ['outsourcing_to_inventory']
   draft.map.expandedNodes = [start]
   const parsed = parseBusinessChainDraft(
@@ -381,10 +372,7 @@ test('概览重排后再展开避让现有概览节点，已显示区域及手�
       false
     )
   }
-  const manual = moveBusinessChainMapNode(expanded, library, start, {
-    x: -123,
-    y: -456,
-  })
+  const manual = { ...expanded, nodes: storedPosition(expanded.nodes, start, { x: -123, y: -456, manual: true }) }
   const collapsed = toggleBusinessChainMapRegion(
     manual,
     library,
@@ -446,4 +434,15 @@ test('隐藏视图关系或中间单据不会被自动细节重新补回；保�
       (edge) => edge.from === condensed.from && edge.to === condensed.to
     )
   )
+})
+
+test('单链交接图随当前探索恢复，切换链路或重新聚焦须从用途与交接开启', () => {
+  const purchase = showBusinessChainWhole(emptyBusinessChainDraft(), library, 'purchase_to_inventory')
+  const saved = (draft) => parseBusinessChainDraft(JSON.stringify(draft), library)
+  assert.equal(saved(purchase).map.showHandoffs, undefined)
+  const open = saved({ ...purchase, map: { ...purchase.map, showHandoffs: true } })
+  assert.equal(open.map.showHandoffs, true)
+  assert.deepEqual(open.map.visibleIds, purchase.map.visibleIds)
+  assert.equal(showBusinessChainWhole(open, library, 'purchase_quality_disposition').map.showHandoffs, undefined)
+  assert.equal(focusBusinessChainMap(open, library, purchase.map.visibleIds[0]).map.showHandoffs, undefined)
 })

@@ -109,6 +109,7 @@ export function showBusinessChainWhole(
     library
   )
   const map = { ...businessChainMapState(draft, library) }
+  delete map.showHandoffs
   delete map.focusPositions
   return ensureBusinessChainMapLayout(
     mergeRegion(draft, region, {
@@ -158,6 +159,7 @@ export function addBusinessChainMapNode(draft, library, id, position) {
     },
     {
       ...map,
+      showHandoffs: map.showHandoffs && map.chainKey === library.byId.get(id).chainKey,
       scope: 'local',
       chainKey: map.visibleIds.length
         ? map.chainKey === library.byId.get(id).chainKey
@@ -175,7 +177,7 @@ export function addBusinessChainMapNode(draft, library, id, position) {
   )
   return ensureBusinessChainMapLayout(
     map.focusPositions && position
-      ? moveBusinessChainMapNode(next, library, id, position)
+      ? withFocusPositions(next, focusPositionsById(next.map).set(id, position))
       : next,
     library
   )
@@ -188,6 +190,7 @@ export function focusBusinessChainMap(
   mode = draft.presentation?.mode ?? 'mainline'
 ) {
   const map = { ...businessChainMapState(draft, library) }
+  delete map.showHandoffs
   delete map.focusPositions
   const root = draft.nodes.find((node) => node.id === id) || {
     id,
@@ -521,35 +524,6 @@ function extendFocusPositions(draft, library) {
   return withFocusPositions(draft, positions)
 }
 
-export function moveBusinessChainMapNode(draft, library, id, position) {
-  const map = businessChainMapState(draft, library)
-  if (map.focusPositions) {
-    const positions = focusPositionsById(map)
-    positions.set(id, position)
-    return withFocusPositions(draft, positions)
-  }
-  if (id.startsWith('map:')) {
-    const key = id.slice(4)
-    const existing = map.summaries.some((node) => node.id === key)
-    const positionNode = { id: key, ...position, manual: true }
-    return {
-      ...draft,
-      map: {
-        ...map,
-        summaries: existing
-          ? map.summaries.map((node) => node.id === key ? positionNode : node)
-          : [...map.summaries, positionNode],
-      },
-    }
-  }
-  return {
-    ...draft,
-    nodes: draft.nodes.map((node) =>
-      node.id === id ? { ...node, ...position, manual: true } : node
-    ),
-  }
-}
-
 export function hideBusinessChainMapEdges(draft, library, pairs) {
   const map = businessChainMapState(draft, library)
   const hidden = new Set([...(map.hiddenEdges || []), ...pairs])
@@ -652,6 +626,7 @@ export function parseBusinessChainMap(map, library, ids) {
     !['all', ...library.chains.map(({ value }) => value)].includes(
       map.chainKey
     ) ||
+    (map.showHandoffs !== undefined && typeof map.showHandoffs !== 'boolean') ||
     !(map.focusId === null || ids.has(map.focusId))
   ) {
     throw new Error('Invalid map scope')
@@ -709,6 +684,7 @@ export function parseBusinessChainMap(map, library, ids) {
   return {
     scope: map.scope,
     chainKey: map.chainKey,
+    ...(map.showHandoffs && map.chainKey !== 'all' ? { showHandoffs: true } : {}),
     focusId: map.focusId,
     visibleIds: strings(map.visibleIds, ids),
     expandedChains: strings(map.expandedChains, chainKeys),

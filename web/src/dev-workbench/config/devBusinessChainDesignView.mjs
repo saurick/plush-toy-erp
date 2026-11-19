@@ -1,4 +1,14 @@
 // Presentation only: every condensed path retains its original draft edges.
+export const CHAIN_DISPLAY_OPTIONS = {
+  overview: { label: '链路概览', description: '从链路卡片查看用途和交接' },
+  mainline: { label: '业务步骤', description: '沿办理步骤和岗位任务阅读' },
+  all: { label: '全部已载入节点', description: '同时查看当前范围已载入的单据、记录和任务' },
+}
+export const CHAIN_LAYOUT_OPTIONS = {
+  lanes: { label: '业务泳道', description: '按业务领域分行' },
+  flow: { label: '阶段排布', description: '按办理顺序排列' },
+}
+
 export const CHAIN_DESIGN_NODE_SIZE = Object.freeze({ width: 176, height: 88 })
 
 // The same mapping converts a vertical drop position back to the saved coordinates.

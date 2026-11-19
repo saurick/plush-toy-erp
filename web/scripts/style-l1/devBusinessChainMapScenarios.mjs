@@ -1,5 +1,5 @@
-import { chooseDisplay, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
+import { chooseChainScope, chooseViewOption, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 
 export function createDevBusinessChainMapScenarios({
   assert,
@@ -25,7 +25,7 @@ export function createDevBusinessChainMapScenarios({
         const card = editor.locator('.erp-chain-design__card')
         const action = (name) =>
           editor.getByRole('button', { name, exact: true })
-        const detail = (name) => chooseDisplay(editor, name)
+        const detail = (name) => chooseViewOption(editor, name)
         const working = () =>
           page.evaluate(
             () =>
@@ -35,22 +35,6 @@ export function createDevBusinessChainMapScenarios({
                 )
               ).draft
           )
-        const chooseScope = async (name) => {
-          await editor
-            .locator('.ant-select')
-            .filter({
-              has: page.getByRole('combobox', {
-                name: '选择流程范围',
-                exact: true,
-              }),
-            })
-            .locator('.ant-select-selector')
-            .click()
-          await page
-            .locator('.ant-select-dropdown:visible')
-            .getByText(name, { exact: true })
-            .click()
-        }
         const stable = (before, after) => {
           for (const node of before.nodes) {
             assert.deepEqual(
@@ -67,11 +51,12 @@ export function createDevBusinessChainMapScenarios({
         const search = editor.getByRole('textbox', { name: '搜索业务节点' })
         await search.fill('提交委外订单')
         await search.press('Enter')
-        await action('加入：提交委外订单').click()
+        const source = editor.locator('.erp-chain-design__library-item').filter({ has: page.getByRole('button', { name: '加入：提交委外订单', exact: true }) })
+        await source.dragTo(canvas, { targetPosition: { x: 180, y: 160 } })
         await action('关闭画布说明').click()
         const node = action('查看节点：提交委外订单')
-        await expect(canvas).not.toHaveAttribute('data-adjusting', 'true')
         const initial = await working()
+        assert.equal(initial.nodes.find(({ id }) => id === initial.map.focusId).manual, true)
         const drag = async () => {
           const box = await node.boundingBox()
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -87,28 +72,19 @@ export function createDevBusinessChainMapScenarios({
         assert.deepEqual(
           await working(),
           initial,
-          '默认阅读时拖动节点不会改变布局'
+          '拖动画布上的节点不改变布局'
         )
         if (await card.isVisible()) await action('关闭画布说明').click()
-        await chooseExplorerAction(editor, '调整布局')
-        await drag()
-        const manual = await working()
-        assert.equal(
-          manual.nodes.find(({ id }) => id === initial.map.focusId).manual,
-          true
-        )
-        assert.notDeepEqual(manual.nodes, initial.nodes)
-        await action('结束调整').click()
         await action('往后展开一步').click()
         const first = await working()
         assert.equal(first.map.visibleIds.length, 2)
-        stable(manual, first)
+        stable(initial, first)
         await action('往后展开一步').click()
         const second = await working()
         assert(second.map.visibleIds.length > first.map.visibleIds.length)
         stable(first, second)
         await detail('全部已载入节点')
-        assert.deepEqual((await working()).nodes, second.nodes, '显示全部已载入节点不新增内容或改变手动位置')
+        assert.deepEqual((await working()).nodes, second.nodes, '显示全部已载入节点不新增内容或改变位置')
         assert.deepEqual((await working()).edges, second.edges, '显示切换保留已载入关系')
         assert.deepEqual(
           (await working()).map.visibleIds,
@@ -121,7 +97,7 @@ export function createDevBusinessChainMapScenarios({
         await expect(canvas).toHaveAttribute('data-view-mode', 'all')
         const whole = await working()
         assert(whole.map.visibleIds.length > second.map.visibleIds.length)
-        stable(manual, whole)
+        stable(initial, whole)
         await node.click()
         await card
           .getByRole('button', { name: '聚焦此处', exact: true })
@@ -138,7 +114,7 @@ export function createDevBusinessChainMapScenarios({
           .getByRole('button', { name: '展开这条链路的步骤', exact: true })
           .click()
         assert((await editor.locator('[data-design-node]').count()) > 1)
-        await chooseScope('业务全流程地图')
+        await chooseChainScope(page, '业务全流程地图')
         await expect(canvas).toHaveAttribute('data-view-mode', 'overview')
         await expect(editor.locator('[data-design-node^="map:"]')).toHaveCount(
           11
@@ -160,7 +136,7 @@ export function createDevBusinessChainMapScenarios({
         await card
           .getByRole('button', { name: '展开这条链路的步骤', exact: true })
           .click()
-        await chooseScope('委外发料到回货应付')
+        await chooseChainScope(page, '委外发料到回货应付')
         await detail('业务步骤')
         await node.click()
         await card
@@ -173,11 +149,10 @@ export function createDevBusinessChainMapScenarios({
         assert.deepEqual(
           await working(),
           saved,
-          '刷新恢复范围、颗粒度、展开状态和手动位置'
+          '刷新恢复范围、颗粒度、展开状态和保存的坐标'
         )
-        await expect(canvas).not.toHaveAttribute('data-adjusting', 'true')
         await action('回到整体').click()
-        stable(manual, await working())
+        stable(initial, await working())
         for (const viewport of [
           { width: 1024, height: 768 },
           { width: 1920, height: 1080 },
@@ -215,10 +190,10 @@ export function createDevBusinessChainMapScenarios({
           const ys = nodes.map(({ y }) => y)
           return Math.max(...ys) - Math.min(...ys)
         }
-        await chooseScope('业务全流程地图')
+        await chooseChainScope(page, '业务全流程地图')
         await expect(canvas).toHaveAttribute('data-view-mode', 'overview')
         await action('适应画布全图').click()
-        await chooseScope('采购下单到入库应付')
+        await chooseChainScope(page, '采购下单到入库应付')
         await detail('链路概览')
         const scope = editor.getByRole('group', { name: '画布操作', exact: true })
         const boundaryText = '已没有更多前后内容可展开'
@@ -240,18 +215,17 @@ export function createDevBusinessChainMapScenarios({
         assert.deepEqual(collapsed.edges, fullyExpanded.edges, '收起扩展保留缓存关系')
         await expect(collapseGrowth).toHaveCount(0)
         await expect(scope).not.toContainText(boundaryText)
-        await chooseExplorerAction(editor, '调整布局')
-        await action('撤销').click()
+        await chooseExplorerAction(editor, '撤销')
         assert.deepEqual((await working()).map.visibleIds, fullyExpanded.map.visibleIds)
         await expect(collapseGrowth).toBeVisible()
-        await action('重做').click()
+        await chooseExplorerAction(editor, '重做')
         assert.deepEqual((await working()).map.visibleIds, collapsed.map.visibleIds)
         await downstream.click()
         await downstream.click()
         const reopened = await working()
         assert.deepEqual(reopened.map.visibleIds, fullyExpanded.map.visibleIds)
         stable(fullyExpanded, reopened)
-        await action('撤销').click()
+        await chooseExplorerAction(editor, '撤销')
         await expect(downstream).toBeEnabled()
         await expect(scope).not.toContainText(boundaryText)
         await action('返回来处').click()
@@ -293,14 +267,6 @@ export function createDevBusinessChainMapScenarios({
           }),
           '聚焦后适应全图能看到所有局部节点和连线'
         )
-        await purchaseAdjustment.press('ArrowDown')
-        const moved = await drawn()
-        assert.notDeepEqual(moved, compact, '局部图仍可手动调整')
-        await action('重新排布').click()
-        assert.deepEqual(await drawn(), compact, '重新排布仍能整理局部布局')
-        await action('撤销').click()
-        assert.deepEqual(await drawn(), moved, '局部主动重排可撤销')
-        await action('重做').click()
         await fitAll.click()
         await action('往后展开一步').click()
         const extended = await drawn()
@@ -313,7 +279,7 @@ export function createDevBusinessChainMapScenarios({
           overviewLayout,
           '返回时恢复整图每个节点的位置'
         )
-        await chooseScope('生产异常决策与执行')
+        await chooseChainScope(page, '生产异常决策与执行')
         await expect(upstream).toBeEnabled()
         await expect(downstream).toBeDisabled()
         await expect(scope).not.toContainText(boundaryText)

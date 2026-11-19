@@ -512,6 +512,7 @@ export function parseBusinessChainDraft(raw, library) {
     (!['overview', 'mainline', 'all'].includes(draft.presentation.mode) ||
       typeof draft.presentation.role !== 'string' ||
       (draft.presentation.layout !== undefined && !['flow', 'lanes'].includes(draft.presentation.layout)) ||
+      (draft.presentation.direction !== undefined && !['LR', 'TB'].includes(draft.presentation.direction)) ||
       (draft.presentation.showBranches !== undefined && typeof draft.presentation.showBranches !== 'boolean') ||
       (draft.presentation.layers !== undefined && (!Array.isArray(draft.presentation.layers) ||
         new Set(draft.presentation.layers).size !== draft.presentation.layers.length ||
@@ -545,6 +546,7 @@ export function parseBusinessChainDraft(raw, library) {
             mode: draft.presentation.mode,
             role: draft.presentation.role,
             ...(draft.presentation.layout ? { layout: draft.presentation.layout } : {}),
+            ...(draft.presentation.direction ? { direction: draft.presentation.direction } : {}),
             ...(draft.presentation.showBranches !== undefined ? { showBranches: draft.presentation.showBranches } : {}),
             ...(draft.presentation.layers ? { layers: [...new Set(draft.presentation.layers)] } : {}),
             ...(draft.presentation.viewport ? { viewport: {

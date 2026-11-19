@@ -1,5 +1,5 @@
-import { chooseDisplay, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
+import { chooseViewOption, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 
 export function createDevBusinessChainDesignFullscreenScenarios({
@@ -20,10 +20,9 @@ export function createDevBusinessChainDesignFullscreenScenarios({
           exact: true,
         })
         await searchWholeLibrary(editor)
-        await chooseExplorerAction(editor, '调整布局')
         // Object-level gestures remain available through the complete node library.
         await chooseChainNodeView(page, editor, '全部')
-        await chooseDisplay(editor, '全部已载入节点')
+        await chooseViewOption(editor, '全部已载入节点')
         await expect(
           editor.getByRole('button', { name: '适应画布全图', exact: true })
         ).toBeDisabled()
@@ -112,19 +111,7 @@ async function assertChainDesignFullscreen(page, editor, assert) {
     (await canvas.boundingBox()).height > normalHeight,
     '全屏扩大画布编辑区域'
   )
-  const body = node.locator('.erp-chain-design__node-body')
   const before = await node.getAttribute('style')
-  const box = await body.boundingBox()
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(
-    box.x + box.width / 2 + 24,
-    box.y + box.height / 2 + 100,
-    { steps: 6 }
-  )
-  await page.mouse.up()
-  const after = await node.getAttribute('style')
-  assert.notEqual(after, before, '全屏内可拖动节点')
   const from = editor.getByRole('button', {
     name: '从销售订单拖出连线',
     exact: true,
@@ -165,8 +152,8 @@ async function assertChainDesignFullscreen(page, editor, assert) {
   ).toHaveCount(1)
   assert.equal(
     await node.getAttribute('style'),
-    after,
-    '退出保留拖动后的节点位置'
+    before,
+    '退出全屏保留原节点位置'
   )
   await expect
     .poll(() => canvas.evaluate((element) => element.scrollLeft))
@@ -215,28 +202,20 @@ async function assertChainDesignFullscreen(page, editor, assert) {
     await expect(filterPanel).toBeHidden()
     await expect(filterTrigger).toBeFocused()
     await expect(fullscreen).toBeVisible()
-    const template = page.getByRole('combobox', {
-      name: '选择流程范围',
-      exact: true,
-    })
-    await editor
-      .locator('.ant-select')
-      .filter({ has: template })
-      .locator('.ant-select-selector')
-      .click()
-    await expect(
-      page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    ).toBeVisible()
-    await template.press('Escape')
+    const scopeTrigger = editor.getByRole('button', { name: /^流程范围：/u })
+    await scopeTrigger.click()
+    const scopePanel = fullscreen.getByRole('dialog', { name: '选择流程范围', exact: true })
+    await expect(scopePanel).toBeVisible()
+    await scopePanel.getByRole('button', { pressed: true }).press('Escape')
+    await expect(scopePanel).toBeHidden()
+    await expect(scopeTrigger).toBeFocused()
     await expect(fullscreen).toBeVisible()
     await exit.press('Escape')
     await expect(fullscreen).toHaveCount(0)
   }
   await page.setViewportSize(initialViewport)
-  await editor.getByRole('button', { name: '撤销', exact: true }).click()
-  assert.equal(
-    await node.getAttribute('style'),
-    before,
-    '退出全屏后仍可撤销布局修改'
-  )
+  await chooseExplorerAction(editor, '撤销')
+  await expect(canvas.locator('[data-design-node]')).toHaveCount(2)
+  await chooseExplorerAction(editor, '重做')
+  await expect(canvas.locator('[data-design-node]')).toHaveCount(3)
 }

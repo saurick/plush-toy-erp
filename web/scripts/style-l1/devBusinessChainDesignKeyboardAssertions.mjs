@@ -1,5 +1,5 @@
-import { chooseDisplay, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
+import { chooseViewOption, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 
 export async function assertChainDesignKeyboard(page, editor, assert) {
   const canvas = editor.getByRole('region', {
@@ -11,7 +11,6 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     name: '平移画布，使用方向键移动视图',
     exact: true,
   })
-  const redo = editor.getByRole('button', { name: '重做', exact: true })
   const node = (name) =>
     editor.getByRole('button', { name: `查看节点：${name}`, exact: true })
   const working = () =>
@@ -25,9 +24,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   await page.reload()
   await expect(canvas).toBeVisible()
   await editor.getByRole('button', { name: '展开节点库', exact: true }).click()
-  await chooseExplorerAction(editor, '调整布局')
   const baseline = await working()
-  await expect(redo).toBeDisabled()
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()
@@ -57,14 +54,12 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   await page.keyboard.press('Meta+z')
   await expect(node('完成订单工程资料')).toHaveCount(1)
   assert.deepEqual(await working(), baseline, '⌘Z 一步恢复节点、连线和位置')
-  await expect(redo).toBeEnabled()
   await page.keyboard.press('Meta+Shift+z')
   assert.deepEqual(await working(), removed, '⌘Shift+Z 重做节点及相邻线的移除')
-  await expect(redo).toBeDisabled()
-  await editor.getByRole('button', { name: '撤销', exact: true }).click()
-  await redo.click()
-  assert.deepEqual(await working(), removed, '重做按钮复用同一份历史')
-  await expect(pan).toBeFocused()
+  await chooseExplorerAction(editor, '撤销')
+  await chooseExplorerAction(editor, '重做')
+  assert.deepEqual(await working(), removed, '菜单里的重做复用同一份历史')
+  await pan.focus()
   await page.keyboard.press('Control+z')
   assert.deepEqual(await working(), baseline)
 
@@ -104,7 +99,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   )
   await page.keyboard.press('Control+z')
 
-  await chooseDisplay(editor, '全部已载入节点')
+  await chooseViewOption(editor, '全部已载入节点')
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()
@@ -145,20 +140,22 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     '尚未加入视图的候选接点不删除其他关系'
   )
   await editor.getByRole('button', { name: '取消连线', exact: true }).click()
-  await chooseDisplay(editor, '业务步骤')
+  await chooseViewOption(editor, '业务步骤')
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()
 
   // Keep both histories and a selected node while checking editing and composition guards.
-  await node('完成订单工程资料').press('ArrowDown')
-  const moved = await working()
-  assert.notDeepEqual(moved, baseline)
-  await node('完成订单工程资料').press('ArrowDown')
-  const movedAgain = await working()
+  await summary.press('Enter')
+  await page.keyboard.press('Backspace')
+  const firstEdit = await working()
+  assert.notDeepEqual(firstEdit, baseline)
+  await node('完成订单工程资料').press('Enter')
+  await page.keyboard.press('Delete')
+  const secondEdit = await working()
+  assert.notDeepEqual(secondEdit, firstEdit)
   await page.keyboard.press('Control+z')
-  assert.deepEqual(await working(), moved)
-  await expect(redo).toBeEnabled()
+  assert.deepEqual(await working(), firstEdit)
   await node('完成订单工程资料').press('Enter')
   await card.dispatchEvent('keydown', { key: 'Delete', isComposing: true })
   await card.dispatchEvent('keydown', {
@@ -174,7 +171,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   })
   assert.deepEqual(
     await working(),
-    moved,
+    firstEdit,
     '输入法组合输入不触发移除、撤销或重做'
   )
   const checkTextEditing = async (input) => {
@@ -197,7 +194,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     await input.press('Control+Shift+z')
     assert.deepEqual(
       await working(),
-      moved,
+      firstEdit,
       '输入框中的删除、撤销和重做保留视图'
     )
   }
@@ -219,29 +216,24 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     .click()
   await pan.focus()
   await page.keyboard.press('Control+z')
-  assert.deepEqual(await working(), baseline, '输入后仍能在画布撤销之前的移动')
-  await expect(
-    editor.getByRole('button', { name: '撤销', exact: true })
-  ).toBeDisabled()
+  assert.deepEqual(await working(), baseline, '输入后仍能在画布撤销之前的连线编辑')
   await page.keyboard.press('Control+z')
   assert.deepEqual(await working(), baseline, '撤销到头不会进入其他视图')
   await page.keyboard.press('Control+Shift+z')
-  assert.deepEqual(await working(), moved, '输入结束后重做历史仍保留')
+  assert.deepEqual(await working(), firstEdit, '输入结束后重做历史仍保留')
   await page.keyboard.press('Meta+Shift+z')
-  assert.deepEqual(await working(), movedAgain, '连续重做保持编辑顺序')
-  await expect(redo).toBeDisabled()
+  assert.deepEqual(await working(), secondEdit, '连续重做保持编辑顺序')
   await page.keyboard.press('Control+z')
-  await node('完成订单工程资料').press('ArrowRight')
+  await node('汇总用料并自动送审').press('Enter')
+  await page.keyboard.press('Delete')
   const revised = await working()
-  await expect(redo).toBeDisabled()
+  assert.notDeepEqual(revised, firstEdit)
   await page.keyboard.press('Control+Shift+z')
   assert.deepEqual(await working(), revised, '新编辑使旧的重做分支失效')
   await page.keyboard.press('Control+z')
   await page.keyboard.press('Control+z')
   assert.deepEqual(await working(), baseline)
   await page.reload()
-  await chooseExplorerAction(editor, '调整布局')
-  await expect(redo).toBeDisabled()
   await pan.focus()
   await page.keyboard.press('Meta+Shift+z')
   assert.deepEqual(await working(), baseline, '重新打开自动记录后不沿用上次的重做历史')

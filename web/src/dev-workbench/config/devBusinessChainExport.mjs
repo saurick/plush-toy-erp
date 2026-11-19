@@ -1,6 +1,6 @@
 import { DIAGRAM_DOMAINS, DIAGRAM_NODE_TYPES } from '../../common/components/diagram/diagramSemantics.mjs'
 
-export const CHAIN_CANVAS_OPERATIONS = '拖空白平移 · Ctrl / ⌘ + 滚轮缩放；开启“调整布局”后可拖动节点。'
+export const CHAIN_CANVAS_OPERATIONS = '拖空白平移 · Ctrl / ⌘ + 滚轮缩放。全流程地图和阶段排布可切换横竖方向。'
 export const CHAIN_CANVAS_RELATIONS = Object.freeze({
   known: '办理 / 推进',
   exception: '异常分支',
@@ -54,8 +54,8 @@ export function captureBusinessChainExport(surface, scale) {
     bounds.push(...result)
     return result
   }
-  const nodes = [...surface.querySelectorAll('[data-design-node]')].map((element) => {
-    const body = element.querySelector('.erp-chain-design__node-body')
+  const nodes = [...surface.querySelectorAll('[data-design-node], [data-handoff-chain]')].map((element) => {
+    const body = element.querySelector('.erp-chain-design__node-body') || element
     const rect = box(body.getBoundingClientRect())
     bounds.push(rect)
     const texts = [...body.children].filter((child) => ['SMALL', 'STRONG'].includes(child.tagName)).flatMap((child) => textRuns(child, child.tagName === 'SMALL' ? muted : ink))
@@ -64,7 +64,7 @@ export function captureBusinessChainExport(surface, scale) {
       viewBox: icon.getAttribute('viewBox'),
       paths: [...icon.querySelectorAll('path')].map((path) => path.getAttribute('d')),
     }))
-    return { ...rect, id: element.dataset.designNode, type: element.dataset.type, domain: element.dataset.domain, texts, icons }
+    return { ...rect, id: element.dataset.designNode || element.dataset.handoffChain, type: element.dataset.type || 'group', domain: element.dataset.domain, texts, icons }
   })
   if (!nodes.length) throw new Error('当前范围没有可导出的节点。')
   const edges = [...surface.querySelectorAll('[data-design-edge]')].map((element) => {
@@ -99,33 +99,7 @@ export function captureBusinessChainExport(surface, scale) {
 const rectSvg = (box, attributes = '') => `<rect x="${number(box.x)}" y="${number(box.y)}" width="${number(box.width)}" height="${number(box.height)}" ${attributes}/>`
 const textSvg = (run) => `<text x="${number(run.x)}" y="${number(run.y)}" font-size="${run.size}" font-weight="${escape(run.weight || '400')}" fill="${run.color || ink}" dominant-baseline="text-before-edge"${run.width > 0 ? ` textLength="${number(run.width)}" lengthAdjust="spacingAndGlyphs"` : ''}>${escape(run.text)}</text>`
 
-export function renderBusinessChainExport(snapshot, { title, context, exportedAt, includeLegend = true, includeOperations = true }, measureText) {
-  const left = Math.min(...snapshot.bounds.map((box) => box.x))
-  const top = Math.min(...snapshot.bounds.map((box) => box.y))
-  const right = Math.max(...snapshot.bounds.map((box) => box.x + box.width))
-  const bottom = Math.max(...snapshot.bounds.map((box) => box.y + box.height))
-  const padding = 28
-  const width = Math.ceil(Math.max(720, right - left + padding * 2))
-  const blocks = []
-  let cursor = padding
-  const paragraph = (text, size = 14, weight = '400', color = muted, inset = 0) => {
-    let line = ''
-    for (const char of new Intl.Segmenter('zh', { granularity: 'grapheme' }).segment(text)) {
-      if (line && measureText(line + char.segment, size, weight) > width - padding * 2 - inset) {
-        blocks.push(textSvg({ x: padding + inset, y: cursor, text: line, size, weight, color }))
-        cursor += size * 1.55
-        line = ''
-      }
-      line += char.segment
-    }
-    if (line) blocks.push(textSvg({ x: padding + inset, y: cursor, text: line, size, weight, color }))
-    cursor += size * 1.55
-  }
-  paragraph(title || '流程探索', 22, '600', ink)
-  paragraph(context)
-  paragraph(`规则示意 · ${snapshot.nodes.length} 个节点 · ${snapshot.edges.length} 条关系 · ${exportedAt}`, 12)
-  cursor += 22
-  const graphY = cursor
+function exportGraph(snapshot) {
   const graph = []
   for (const lane of snapshot.lanes) {
     graph.push(
@@ -147,8 +121,52 @@ export function renderBusinessChainExport(snapshot, { title, context, exportedAt
     for (const icon of node.icons) graph.push(`<svg x="${number(icon.x)}" y="${number(icon.y)}" width="${number(icon.width)}" height="${number(icon.height)}" viewBox="${escape(icon.viewBox)}" fill="${muted}">${icon.paths.map((d) => `<path d="${escape(d)}"/>`).join('')}</svg>`)
     graph.push(...node.texts.map(textSvg), '</g>')
   }
-  blocks.push(`<g data-export-graph="true" transform="translate(${number(padding - left)} ${number(graphY - top)})">${graph.join('')}</g>`)
-  cursor += bottom - top + 30
+  return graph.join('')
+}
+
+function graphBounds(snapshot) {
+  const left = Math.min(...snapshot.bounds.map((box) => box.x))
+  const top = Math.min(...snapshot.bounds.map((box) => box.y))
+  return {
+    left,
+top,
+    width: Math.max(...snapshot.bounds.map((box) => box.x + box.width)) - left,
+    height: Math.max(...snapshot.bounds.map((box) => box.y + box.height)) - top,
+  }
+}
+
+export function renderBusinessChainExport(snapshot, { title, context, exportedAt, includeLegend = true, includeOperations = true }, measureText) {
+  const main = graphBounds(snapshot)
+  const handoffs = snapshot.handoffs && graphBounds(snapshot.handoffs)
+  const padding = 28
+  const width = Math.ceil(Math.max(720, Math.max(main.width, handoffs?.width || 0) + padding * 2))
+  const blocks = []
+  let cursor = padding
+  const paragraph = (text, size = 14, weight = '400', color = muted, inset = 0) => {
+    let line = ''
+    for (const char of new Intl.Segmenter('zh', { granularity: 'grapheme' }).segment(text)) {
+      if (line && measureText(line + char.segment, size, weight) > width - padding * 2 - inset) {
+        blocks.push(textSvg({ x: padding + inset, y: cursor, text: line, size, weight, color }))
+        cursor += size * 1.55
+        line = ''
+      }
+      line += char.segment
+    }
+    if (line) blocks.push(textSvg({ x: padding + inset, y: cursor, text: line, size, weight, color }))
+    cursor += size * 1.55
+  }
+  paragraph(title || '流程探索', 22, '600', ink)
+  paragraph(context)
+  paragraph(`规则示意 · ${snapshot.nodes.length} 个节点 · ${snapshot.edges.length} 条关系 · ${exportedAt}`, 12)
+  cursor += 22
+  if (handoffs) {
+    paragraph(`对外交接 · ${snapshot.handoffs.edges.length} 条`, 16, '600', ink)
+    blocks.push(`<g data-export-handoffs="true" transform="translate(${number(padding - handoffs.left)} ${number(cursor - handoffs.top)})">${exportGraph(snapshot.handoffs)}</g>`)
+    cursor += handoffs.height + 22
+    paragraph('链内步骤', 16, '600', ink)
+  }
+  blocks.push(`<g data-export-graph="true" transform="translate(${number(padding - main.left)} ${number(cursor - main.top)})">${exportGraph(snapshot)}</g>`)
+  cursor += main.height + 30
   if (includeLegend || includeOperations) {
     blocks.push(`<path d="M ${padding} ${cursor} H ${width - padding}" stroke="#d5dfda"/>`)
     cursor += 18
@@ -162,7 +180,7 @@ export function renderBusinessChainExport(snapshot, { title, context, exportedAt
       paragraph(entry.label, 13, '400', muted, 22)
     }
     paragraph(`节点类型：${[...new Set(snapshot.nodes.map((node) => DIAGRAM_NODE_TYPES[node.type]))].filter(Boolean).join('、')}`, 13)
-    for (const kind of new Set(snapshot.edges.map((edge) => edge.kind))) {
+    for (const kind of new Set([...snapshot.edges, ...(snapshot.handoffs?.edges || [])].map((edge) => edge.kind))) {
       const style = relationStyle(kind)
       blocks.push(`<path d="M ${padding} ${cursor + 10} h 48" fill="none" stroke="${style.color}" stroke-width="1.5" stroke-dasharray="${style.dash || 'none'}"${kind !== 'unknown' ? ` marker-end="url(#export-arrow-${kind === 'exception' ? 'exception' : 'known'})"` : ''}/>`)
       paragraph(CHAIN_CANVAS_RELATIONS[kind], 13, '400', muted, 62)
@@ -218,7 +236,10 @@ export async function businessChainExportBlob(artifact, format) {
 
 export function createBusinessChainExport(surface, scale, options) {
   const context = document.createElement('canvas').getContext('2d')
-  return renderBusinessChainExport(captureBusinessChainExport(surface, scale), options, (text, size, weight) => {
+  const snapshot = captureBusinessChainExport(surface, scale)
+  const handoffs = surface.closest('.erp-chain-design__canvas-area')?.querySelector('.erp-chain-handoffs__plot')
+  if (handoffs) snapshot.handoffs = captureBusinessChainExport(handoffs, 1)
+  return renderBusinessChainExport(snapshot, options, (text, size, weight) => {
     context.font = `${weight} ${size}px ${font}`
     return context.measureText(text).width
   })

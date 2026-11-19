@@ -164,18 +164,20 @@ test('本地自动记录失败回滚标签页缓存，重试保留最新编辑�
   assert.deepEqual(JSON.parse(window.localStorage.getItem(workingKey)).draft, editor.value.draft)
 })
 
-test('岗位和显示范围随视图保存，切换阅读选项保留布局撤销及重做', async (t) => {
+test('岗位、显示范围和方向随视图保存，切换方向保留布局编辑的撤销及重做', async (t) => {
   const editor = await setup(t)
-  await editor.run((api) => api.change(canvas('初始')))
-  await editor.run((api) => api.change({ ...api.draft, nodes: [{ ...api.draft.nodes[0], x: 600 }] }))
+  await editor.run((api) => api.change({ ...canvas('初始'), presentation: { ...api.draft.presentation, layout: 'lanes' } }))
+  await editor.run((api) => api.change({ ...api.draft, nodes: [{ ...api.draft.nodes[0], x: 600 }], presentation: { ...api.draft.presentation, layout: 'flow' } }))
   await editor.run((api) => api.undo())
   const history = [editor.value.past.length, editor.value.future.length]
-  await editor.run((api) => api.changePresentation({ mode: 'all', role: 'quality' }))
+  await editor.run((api) => api.changePresentation({ mode: 'all', role: 'quality', direction: 'TB' }))
   assert.deepEqual([editor.value.past.length, editor.value.future.length], history)
+  assert.equal(editor.value.draft.presentation.layout, 'lanes')
   await editor.run((api) => api.redo())
   assert.equal(editor.value.draft.nodes[0].x, 600)
-  assert.deepEqual(editor.value.draft.presentation, { mode: 'all', role: 'quality' })
+  assert.equal(editor.value.draft.presentation.layout, 'flow')
+  assert.equal(editor.value.draft.presentation.direction, 'TB')
+  const working = editor.value.draft
   await editor.reload()
-  assert.equal(editor.value.draft.nodes[0].x, 600)
-  assert.deepEqual(editor.value.draft.presentation, { mode: 'all', role: 'quality' })
+  assert.deepEqual(editor.value.draft, working)
 })

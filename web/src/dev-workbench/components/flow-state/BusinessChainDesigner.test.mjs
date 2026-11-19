@@ -9,10 +9,14 @@ import { CHAIN_DESIGN_WORKING_KEY as workingKey } from './useBusinessChainDraft.
 
 registerMermaidTestRenderer()
 
-async function chooseAction(harness, name) {
+async function openActions(harness) {
   await harness.act(() => harness.container.querySelector('[aria-label="更多视图操作"]').click())
   await harness.flush()
-  const item = [...document.querySelectorAll('[role="menuitem"]')].find((node) => node.textContent === name)
+  return [...document.querySelectorAll('[role="menuitem"]')]
+}
+
+async function chooseAction(harness, name) {
+  const item = (await openActions(harness)).find((node) => node.textContent === name)
   assert(item, name)
   await harness.act(() => item.click())
   await harness.flush()
@@ -28,11 +32,10 @@ test('部分载入的视图切换颗粒度只改显示，保留关系、手动�
   await harness.render(h(Designer, { catalog }))
   const root = harness.container
   const working = () => JSON.parse(window.sessionStorage.getItem(workingKey)).draft
+  await harness.act(() => root.querySelector('button[data-picker="view"]').click())
+  await harness.flush()
   for (const [label, mode] of [['全部已载入节点', 'all'], ['链路概览', 'overview'], ['业务步骤', 'mainline']]) {
-    const control = root.querySelector('[aria-label="流程颗粒度"]').closest('.ant-select')
-    await harness.act(() => control.querySelector('.ant-select-selector').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
-    await harness.flush()
-    const option = [...document.querySelectorAll('.ant-select-item-option-content')].find((item) => item.textContent === label)
+    const option = document.querySelector(`[role="dialog"][aria-label="画布视图"] input[value="${mode}"]`)
     assert(option, label)
     await harness.act(() => option.click())
     await harness.flush()
@@ -41,10 +44,11 @@ test('部分载入的视图切换颗粒度只改显示，保留关系、手动�
     assert.deepEqual(working().edges, draft.edges)
     assert.equal(working().map, undefined, '切换显示不会隐式初始化范围或载入关联内容')
   }
-  await chooseAction(harness, '调整布局')
-  const undo = root.querySelector('button[aria-label="撤销"]')
+  await harness.act(() => document.querySelector('button[aria-label="关闭视图面板"]').click())
+  await harness.flush()
+  const undo = (await openActions(harness)).find((node) => node.textContent === '撤销')
   assert(undo)
-  assert.equal(undo.disabled, true, '显示切换不占布局撤销历史')
+  assert.equal(undo.getAttribute('aria-disabled'), 'true', '显示切换不占编辑历史')
   const saved = JSON.parse(window.localStorage.getItem(workingKey)).draft
   assert.deepEqual(saved.nodes, draft.nodes)
   assert.deepEqual(saved.edges, draft.edges)
@@ -151,15 +155,14 @@ test('拖入单个业务步骤即可探索规则、状态、任务并保存展�
   assert(working().nodes.length > 5)
   assert.deepEqual(working().nodes[0], originalPosition)
   await click('关闭画布说明')
-  await chooseAction(harness, '调整布局')
-  await click('撤销')
+  await chooseAction(harness, '撤销')
   assert.equal(working().map.visibleIds.length, 2)
-  await click('重做')
+  await chooseAction(harness, '重做')
   assert(working().nodes.length > 5)
   const expanded = working()
   await click('查看节点：IQC 确认本行检验通过')
   await click('移出画布')
-  await click('撤销')
+  await chooseAction(harness, '撤销')
   assert.deepEqual(working(), expanded)
   await harness.render(h(Designer, { catalog, key: 'reload' }))
   assert.deepEqual(working(), expanded)

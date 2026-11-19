@@ -1,6 +1,6 @@
-import { chooseDisplay, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 import fs from 'node:fs/promises'
 import { expect } from 'playwright/test'
+import { chooseChainScope, chooseViewOption, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 
 const workingKey = 'plush-workbench:business-chain-design:working'
 const draft = {
@@ -39,12 +39,21 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
         surface: document.querySelector('.erp-chain-design__surface').style.transform,
         nodes: [...document.querySelectorAll('[data-design-node]')].map((node) => [node.dataset.designNode, node.style.left, node.style.top]),
       }), workingKey)
-      const exportFile = async (format) => {
-        const download = page.waitForEvent('download')
-        await page.getByRole('button', { name: `导出 ${format}`, exact: true }).click()
-        return fs.readFile(await (await download).path())
+      const dialog = page.getByRole('dialog', { name: '导出当前范围', exact: true })
+      const openExport = async () => {
+        await chooseExplorerAction(page, '导出当前范围')
+        await expect(dialog.getByRole('checkbox', { name: '附带图例', exact: true })).toBeFocused()
       }
-      await chooseExplorerAction(page, '导出当前范围')
+      const exportFile = async (format) => {
+        const [download] = await Promise.all([
+          page.waitForEvent('download'),
+          dialog.getByRole('button', { name: `导出 ${format}`, exact: true }).click(),
+        ])
+        await expect(dialog).toBeHidden()
+        await expect(more).toBeFocused()
+        return fs.readFile(await download.path())
+      }
+      await openExport()
       await expect(page.getByRole('checkbox', { name: '附带图例', exact: true })).toBeChecked()
       await expect(page.getByRole('checkbox', { name: '附带操作说明', exact: true })).toBeChecked()
       const svg = (await exportFile('SVG')).toString()
@@ -63,7 +72,7 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
       const dimensions = svg.match(/<svg[^>]+width="(\d+)" height="(\d+)"/u)
       assert(dimensions)
       assert(Number(dimensions[2]) > 1528, '包含屏幕外节点以及页尾说明')
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       const png = await exportFile('PNG')
       assert.equal(png.subarray(1, 4).toString(), 'PNG')
       assert.equal(png.readUInt32BE(16), Number(dimensions[1]) * 2)
@@ -78,7 +87,7 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
         nodes: [...document.querySelectorAll('[data-design-node]')].map((node) => [node.dataset.designNode, node.style.left, node.style.top]),
       }), workingKey)
       assert.deepEqual(after, before, '导出不改动草稿、排布与镜头')
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       await page.getByRole('checkbox', { name: '附带图例', exact: true }).uncheck()
       await page.getByRole('checkbox', { name: '附带操作说明', exact: true }).uncheck()
       const plain = (await exportFile('SVG')).toString()
@@ -95,43 +104,53 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
       }, workingKey)
       await page.reload()
       await expect(page.locator('[data-design-node]')).toHaveCount(3)
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       await page.getByRole('button', { name: '导出 PNG', exact: true }).click()
       await expect(page.getByRole('alert').filter({ hasText: '当前图过大' })).toBeVisible()
       const largeSvg = (await exportFile('SVG')).toString()
       assert(Number(largeSvg.match(/<svg[^>]+width="(\d+)" height="(\d+)"/u)[2]) > 20000)
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       await page.getByRole('checkbox', { name: '附带图例', exact: true }).press('Escape')
       await expect(page.getByRole('dialog', { name: '导出当前范围', exact: true })).toBeHidden()
       await page.goto(new URL('/__dev/flow-explorer?new=blank', page.url()).href)
       await more.click()
       await expect(exportButton).toBeDisabled()
       await page.keyboard.press('Escape')
-      const choose = async (name, label) => {
-        await page.locator('.ant-select').filter({ has: page.getByRole('combobox', { name, exact: true }) }).locator('.ant-select-selector').click()
-        await page.locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
-      }
-      await choose('选择流程范围', '销售受理到生产准备')
-      await choose('流程布局', '业务泳道')
-      await chooseDisplay(page, '业务步骤')
+      await chooseChainScope(page, '销售受理到生产准备')
+      await chooseViewOption(page, '业务泳道')
+      await chooseViewOption(page, '业务步骤')
       await expect(page.locator('.erp-chain-design__lane').first()).toBeVisible()
       const count = await page.locator('[data-design-node]').count()
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       const salesSvg = (await exportFile('SVG')).toString()
       assert.equal((salesSvg.match(/data-export-node=/gu) || []).length, count)
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       const salesPng = await exportFile('PNG')
       if (process.env.STYLE_L1_OUTPUT_DIR) {
         await fs.writeFile(`${process.env.STYLE_L1_OUTPUT_DIR}/sales-lanes-export.svg`, salesSvg)
         await fs.writeFile(`${process.env.STYLE_L1_OUTPUT_DIR}/sales-lanes-export.png`, salesPng)
       }
+      await chooseChainScope(page, '采购下单到入库应付')
+      await page.getByRole('button', { name: '用途与交接', exact: true }).click()
+      await page.getByRole('button', { name: '在图上看交接', exact: true }).click()
+      await page.getByRole('button', { name: /^画布视图：/u }).click()
+      const panel = page.getByRole('dialog', { name: '画布视图', exact: true })
+      await panel.getByRole('checkbox', { name: '异常与回接' }).check()
+      await panel.getByRole('checkbox', { name: '主线与供给' }).uncheck()
+      await panel.getByRole('button', { name: '关闭视图面板' }).click()
+      await openExport()
+      const handoffSvg = (await exportFile('SVG')).toString()
+      assert(handoffSvg.includes('data-export-handoffs="true"'))
+      assert(handoffSvg.includes('采购下单到入库应付 → 采购拒收处置：质检拒绝进入处置'))
+      assert(handoffSvg.includes('采购拒收处置 → 采购下单到入库应付：补换待收重新进入收货与检验'))
+      assert(!handoffSvg.includes('用料批准后按厂商生成采购单'))
       await page.getByRole('button', { name: '全屏探索', exact: true }).click()
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       await page.getByRole('checkbox', { name: '附带图例', exact: true }).press('Escape')
       await expect(page.getByRole('dialog', { name: '导出当前范围', exact: true })).toBeHidden()
       await expect(page.getByRole('dialog', { name: '流程探索全屏', exact: true })).toBeVisible()
       await page.getByRole('button', { name: '退出全屏', exact: true }).click()
-      await chooseExplorerAction(page, '导出当前范围')
+      await openExport()
       await assertNoHorizontalOverflow(page)
       assert.deepEqual(writes.get(page), [], '导出只生成本地文件，不调用业务写接口')
     },

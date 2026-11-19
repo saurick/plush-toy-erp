@@ -74,12 +74,16 @@ export default function useBusinessChainDraft(library, initialRange, startBlank 
     if (equal(draft, previous.draft)) return
     publish({ ...previous, draft, past: [...previous.past.slice(-39), previous.draft], future: [] })
   }
-  const changePresentation = (presentation) => {
+  const changePresentation = (patch) => {
     const previous = current.current
-    const update = (draft) => ({ ...draft, presentation })
-    if (equal(previous.draft.presentation, presentation)) return
-    // Reading preferences persist with the view without replacing layout undo history.
-    publish({ ...previous, draft: update(previous.draft), past: previous.past.map(update), future: previous.future.map(update) })
+    const update = (snapshot) => ({
+      ...snapshot,
+      presentation: { mode: 'mainline', role: '', ...snapshot.presentation, ...patch },
+    })
+    const draft = update(previous.draft)
+    if (equal(previous.draft.presentation, draft.presentation)) return
+    // Keep the current reading preference without replacing other settings in edit history.
+    publish({ ...previous, draft, past: previous.past.map(update), future: previous.future.map(update) })
   }
   const undo = () => {
     const previous = current.current
