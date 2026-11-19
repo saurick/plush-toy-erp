@@ -138,9 +138,9 @@ Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标�
 
 质量门禁与版本中心读取 GitLab pipeline / job、不可变版本目录、发布状态和控制制品时使用独立的 `PLUSH_GITLAB_READ_TOKEN`，不复用发布与部署写凭据。macOS 本地启动从固定钥匙串项加载；Linux 从当前服务用户的受控凭据文件加载，来源与权限合同见 [前端启动脚本](../../web/scripts/README.md)。
 
-服务端只把令牌映射给不暴露发布方法的只读 GitLab Provider，浏览器、本机质量门禁和部署子进程均不得继承。创建新发布仍只使用短期 `PLUSH_GITLAB_TOKEN`；缺失时停用该按钮并在发布区说明，不作为全局读取故障。读取凭据缺失、API 失败或目录未通过核对时，页面明确显示读取未就绪；版本与流水线分别按实际取得的证据展示。
+服务端只把令牌映射给不暴露发布方法的只读 GitLab Provider，浏览器、本机质量门禁和部署子进程均不得继承。创建新发布使用专用 `PLUSH_GITLAB_TOKEN`。缺少发布凭据时停用该按钮并在发布区说明，读取功能按自身状态展示。读取凭据缺失、API 失败或目录未通过核对时，页面明确显示读取未就绪；版本与流水线分别按实际取得的证据展示。
 
-实例强制的最大有效期届满前需要按同一最小权限重新登记，不能以扩大为写权限换取自动轮换。
+发布凭据复用、有效期和换发按[发布令牌复用与轮换](../../scripts/deploy/README.md#release-credential-lifecycle)执行。
 
 `scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。
 
@@ -1276,7 +1276,7 @@ Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定�
 
 - 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。
 
-  版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider；只有创建新发布调用 GitLab 写 Provider，未加载短期 `PLUSH_GITLAB_TOKEN` 时页面保持可读并停用该动作。显式 `PLUSH_DELIVERY_PROVIDER=github` 只启用 GitHub 历史只读 adapter，其发布方法固定拒绝。
+  版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider。创建新发布通过 GitLab 写 Provider 使用专用 `PLUSH_GITLAB_TOKEN`。缺少发布凭据时页面保持可读并停用该动作。显式 `PLUSH_DELIVERY_PROVIDER=github` 只启用 GitHub 历史只读 adapter，其发布方法固定拒绝。
 - 命令行发布入口为 `scripts/deploy/gitlab-release-cli.mjs`，复用同一 Delivery Service 与 operation store；默认计划不读凭据、不触网，显式执行才按当前 clean SHA、完整 CI 与版本目录发起流水线。
 
   CLI 从独立 Keychain / 受控文件读取带到期日的项目发布身份，不把只读 token 当作写凭据，不调整既有 CI 机器人的权限；命令及凭据来源见 [部署脚本](../../scripts/deploy/README.md#命令行发起-gitlab-发布)。此入口只发布制品，目标提升仍独立执行。

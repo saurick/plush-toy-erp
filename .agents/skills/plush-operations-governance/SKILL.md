@@ -13,6 +13,7 @@ description: 实时环境与运行操作（plush-toy-erp），不用于仅核对
 
 - target、模块责任或运行入口不清时，才用 `README.md` 与 `docs/当前真源与交接顺序.md` 定位。
 - 诊断或错误治理按需读相关服务 README、错误码真源、日志、代码和测试；发布、迁移或回滚才读取部署约定、发布门禁、deploy README 和当前 Compose/config。
+- 发版前按[发布令牌复用与轮换](../../../scripts/deploy/README.md#release-credential-lifecycle)核对现有 GitLab 发布凭据，并按该合同处理换发和同用途凭据清理。
 - 诊断先确认 environment 和最小请求/错误证据，再按失败层补查版本、config、DB/migration 或日志；发布/回滚结论须完整绑定制品、配置、迁移和目标运行证据。
 - 本地启动或共享开发库迁移按[项目部署与迁移规则](../../../AGENTS.md#部署迁移与收口)及[迁移入口](../../../scripts/README.md#推荐顺序)执行。启动预检失败或超时时保留恢复页，不自动迁移；登记共享库使用同一次 ready 计划，经确认后才执行。隔离库和正式目标走各自登记入口。
 

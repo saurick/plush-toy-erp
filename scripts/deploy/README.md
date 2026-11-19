@@ -116,11 +116,19 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 
 `publish` 不带 `--execute` 时仍只输出计划。可用 `--sha` 绑定已审阅提交，用 `--version` 核对已审阅版本；指定值必须与当前源码和正式版本目录一致。已有流水线运行时只返回状态，已有失败发布或请求结果不确定时停止，不自动重试、不切换到浏览器。
 
-发布凭据与只读凭据分开。Mac 从当前用户的 Keychain 项 `plush-toy-erp.gitlab-release-api` 读取；Linux 默认读取 `~/.config/plush-toy-erp/gitlab-release-token`，也可显式设置 `PLUSH_GITLAB_TOKEN_FILE`。
+<a id="release-credential-lifecycle"></a>
+
+### 发布令牌复用与轮换
+
+命令行和工作台共用一枚项目发布令牌，用于发起制品发布和登记部署。令牌须为本项目带到期日的 Maintainer 项目访问令牌，权限范围为 `api`，并满足受保护 `main` 和流水线变量的权限要求。每次发版前在仓库根目录运行 `node scripts/deploy/gitlab-release-cli.mjs check-credentials`。返回 `status=passed` 后继续复用现有令牌。遇到网络或 GitLab API 暂时不可用时，恢复连通后复查同一枚令牌。
+
+Mac 从当前用户的 Keychain 项 `plush-toy-erp.gitlab-release-api` 读取。Linux 默认读取 `~/.config/plush-toy-erp/gitlab-release-token`，也可显式设置 `PLUSH_GITLAB_TOKEN_FILE`。
 
 文件必须为当前用户所有的普通文件、权限 `0400 / 0600`，拒绝符号链接。显式 `PLUSH_GITLAB_TOKEN` 仍沿用既有服务端输入合同；命令参数不接受 token，凭据不进入公开输出或仓库。
 
-专用身份使用本项目带到期日的 Maintainer API token，并受当前 protected-main 与流水线变量规则约束；不复用或提升 CI 发布机器人的权限。到期前通过正式 GitLab 凭据维护轮换此专用身份，并重新运行 `check-credentials`。只读查询继续沿用 `PLUSH_GITLAB_READ_TOKEN`、Mac 的 `plush-toy-erp.gitlab-read-api` 或既有受控只读文件。
+需要换发时，先核对 GitLab 实例和所属组对本项目生效的有效期上限，再通过 GitLab 按允许的最长有效期签发同项目、同角色、同权限范围的令牌。同步 Mac 钥匙串和服务器工作台的受控凭据来源，重新运行 `check-credentials`，并读回工作台实际加载的凭据。
+
+日常只保留一枚有效的项目发布令牌。换发期间可短暂保留旧令牌。各执行端验证新令牌且使用旧令牌的在途操作结束后，通过 GitLab 撤销同用途的旧令牌和已确认无引用的冗余令牌，保留审计记录。CI 制品发布、CI 和版本只读查询、目标机取件分别使用各自的专用凭据。只读查询沿用 `PLUSH_GITLAB_READ_TOKEN`、Mac 的 `plush-toy-erp.gitlab-read-api` 或既有受控只读文件。
 
 ## GitLab 部署登记与回执归档
 
