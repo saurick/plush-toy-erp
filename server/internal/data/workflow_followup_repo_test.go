@@ -79,9 +79,20 @@ func TestWorkflowFollowupLifecycleReceiptAndCreatorVisibility(t *testing.T) {
 	if _, err = uc.UpdateTaskStatus(ctx, status("", "followup-empty-feedback"), assignee, biz.QualityRoleKey); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("empty feedback=%v", err)
 	}
-	done, err := uc.UpdateTaskStatus(ctx, status("已核对，包装稿与实物一致", "followup-complete"), assignee, biz.QualityRoleKey)
-	if err != nil || done.Payload["feedback"] != "已核对，包装稿与实物一致" || done.Payload["description"] != input.Description {
+	feedback := "已核对，包装稿与实物一致"
+	mobileCompletion := status("", "followup-complete")
+	mobileCompletion.Payload = map[string]any{"feedback": feedback, "surface_key": "mobile_role_tasks"}
+	done, err := uc.UpdateTaskStatus(ctx, mobileCompletion, assignee, biz.QualityRoleKey)
+	if err != nil || done.Payload["feedback"] != feedback || done.Payload["description"] != input.Description {
 		t.Fatalf("complete=%#v err=%v", done, err)
+	}
+	query := biz.WorkflowTrackingQuery{ActorID: creatorID, VisibilityScope: &biz.WorkflowTaskVisibilityScope{FollowupCreatorID: &creatorID}}
+	tracking, err := uc.GetTracking(ctx, query, biz.WorkflowTrackingRef{Kind: "task", ID: done.ID}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tracking.Events) == 0 || stringValue(tracking.Events[0].Reason) != feedback || len(tracking.Events[0].Payload) != 0 {
+		t.Fatalf("tracking must expose recorded mobile result without receipt payload: %+v", tracking.Events)
 	}
 	if got := client.SalesOrder.GetX(ctx, order.ID).LifecycleStatus; got != "draft" {
 		t.Fatalf("task wrote source status: %s", got)

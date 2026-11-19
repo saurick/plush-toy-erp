@@ -234,6 +234,7 @@ export default function useBusinessStatistics({
   onOpenOrder,
   canOpen,
   navigate,
+  allowDocumentNavigation = true,
 }) {
   const canSales =
     canOpen('/erp/sales/project-orders/sales-orders') &&
@@ -501,35 +502,23 @@ export default function useBusinessStatistics({
         />
       )}
       {!ages && (
-        <div className="erp-statistics-delivery-period" role="group" aria-label="订单交期">
-          <FilterChipGroup
-            allowClear
-            className="erp-business-filter-control"
-            emptyValue="all"
-            label="订单交期"
-            aria-label="交期范围"
-            value={query.period}
-            options={[
+        <DateRangeFilter
+          options={[{ value: 'due_date', label: '订单交期' }]}
+          startValue={startDate}
+          endValue={endDate}
+          onRangeChange={(from, to) => updatePeriod('custom', from, to)}
+          shortcutFilter={{
+            exclusive: true,
+            emptyValue: 'all',
+            options: [
+              { value: 'all', label: '不限' },
               { value: 'month', label: '本月' },
               { value: 'soon', label: '未来 7 天' },
-              { value: 'custom', label: '自定义' },
-            ]}
-            onChange={(period) =>
-              period === 'custom'
-                ? updatePeriod(period, startDate, endDate)
-                : updatePeriod(period)
-            }
-          />
-          {query.period === 'custom' && (
-            <DateRangeFilter
-              customOnly
-              startValue={startDate}
-              endValue={endDate}
-              inputReadOnly={false}
-              onRangeChange={(from, to) => updatePeriod(from || to ? 'custom' : 'all', from, to)}
-            />
-          )}
-        </div>
+            ],
+            value: query.period,
+            onChange: updatePeriod,
+          }}
+        />
       )}
       <FilterChipGroup
         allowClear={false /* 不可清空：金额统计必须明确单一币种。 */}
@@ -841,7 +830,7 @@ export default function useBusinessStatistics({
       : []),
     ...(!ages ? [{ title: '业务负责人', dataIndex: 'owner', width: 130 }] : []),
   ]
-  if (ages && canOpen('/erp/finance/receivables')) {
+  if (allowDocumentNavigation && ages && canOpen('/erp/finance/receivables')) {
     sourceColumns[0].render = (_, row) => (
       <Button
         type="link"

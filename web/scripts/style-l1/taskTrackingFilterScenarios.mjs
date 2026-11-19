@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { expect } from 'playwright/test'
 import path from 'node:path'
+import { dateFilterButton, openDateFilter, visibleCalendarDays } from './dateFilterActions.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
@@ -135,18 +136,14 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
       await waitForFiniteAnimations(page)
       await page.screenshot({ path: path.join(outputDir, `task-tracking-filters-${themeMode}-4k.png`) })
-      await filterDialog.getByRole('button', { name: '自定义日期', exact: true }).click()
-      const dateInput = filterDialog.getByRole('textbox', { name: '开始日期', exact: true })
-      await dateInput.click()
-      const popup = page.locator('.ant-picker-dropdown:visible')
-      assert.equal(await popup.locator('.ant-picker-ok').count(), 0)
-      const cell = popup.locator('.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)[title]').nth(10)
-      const selected = await cell.getAttribute('title')
-      await change(() => cell.click(), (p) => p.date_from === selected)
-      await popup.waitFor({ state: 'hidden' })
-      await filterDialog.getByRole('textbox', { name: '结束日期', exact: true }).click()
-      await change(() => popup.locator(`[title="${selected}"]`).click(), (p) => p.date_from === selected && p.date_to === selected)
-      await popup.waitFor({ state: 'hidden' })
+      const dates = await openDateFilter(page, filterDialog)
+      const cell = visibleCalendarDays(dates).nth(10)
+      const selected = await cell.getAttribute('aria-label')
+      await cell.click()
+      assert.equal(await dateFilterButton(dates, '应用日期').isDisabled(), true)
+      await cell.click()
+      await change(() => dateFilterButton(dates, '应用日期').click(), (p) => p.date_from === selected && p.date_to === selected)
+      await filterDialog.waitFor()
       await waitForFiniteAnimations(page)
       await assertNoHorizontalOverflow(page)
       await closeFilters()

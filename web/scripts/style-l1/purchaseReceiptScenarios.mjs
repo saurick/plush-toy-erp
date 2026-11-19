@@ -1,3 +1,4 @@
+import { dateFilterButton, manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
 import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
 import { assertCompactLineNoteDisclosure } from './businessLineItemDisclosureAssertions.mjs'
 import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
@@ -93,103 +94,23 @@ export function createPurchaseReceiptScenarios(deps) {
     await tools.press('Escape')
   }
 
-  const assertPurchaseReceiptDateRangeSegmentedControl = async (
-    page,
-    scenarioName
-  ) => {
-    const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
-    if (!(await filterDialog.isVisible())) {
-      await page
-        .locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
-        .click()
-    }
-    await filterDialog.waitFor()
-    await filterDialog.getByRole('button', { name: '自定义日期', exact: true }).click()
+  const assertPurchaseReceiptDateRange = async (page, scenarioName) => {
+    const overview = page.getByRole('dialog', { name: '筛选条件' })
+    if (!(await overview.isVisible())) await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+    const trigger = overview.getByRole('button', { name: /^入库日期：/u })
+    const entry = await trigger.boundingBox()
+    assert(entry?.width > 0 && entry.height >= 34, `${scenarioName} 入库日期有可见边界`)
+    const dates = await openDateFilter(page, overview)
     await waitForFiniteAnimations(page)
-    const metrics = await page.evaluate(() => {
-      const control = Array.from(
-        document.querySelectorAll('.erp-business-date-range-filter')
-      ).find((node) => node.textContent?.includes('入库日期'))
-      const label = control?.querySelector(
-        '.erp-filter-field > legend'
-      )
-      const range = control?.querySelector(
-        '.erp-business-date-range-filter__range'
-      )
-      const dateInputs = Array.from(
-        control?.querySelectorAll('.erp-business-date-input.ant-picker') || []
-      )
-      const style = control ? window.getComputedStyle(control) : null
-      const controlBox = control?.getBoundingClientRect()
-      const labelBox = label?.getBoundingClientRect()
-      return {
-        controlWidth: controlBox?.width || 0,
-        controlHeight: controlBox?.height || 0,
-        labelText: label?.textContent?.trim() || '',
-        overflowX: style?.overflowX || '',
-        overflowY: style?.overflowY || '',
-        gap: Number.parseFloat(style?.gap || '0'),
-        controlScrollWidth: control?.scrollWidth || 0,
-        controlClientWidth: control?.clientWidth || 0,
-        rangeScrollWidth: range?.scrollWidth || 0,
-        rangeClientWidth: range?.clientWidth || 0,
-        labelBottom: labelBox?.bottom || 0,
-        periodTop: control?.querySelector('.erp-filter-chip-group')?.getBoundingClientRect().top || 0,
-        dateInputs: dateInputs.map((input) => {
-          const inputStyle = window.getComputedStyle(input)
-          const inputBox = input.getBoundingClientRect()
-          return {
-            width: inputBox.width,
-            height: inputBox.height,
-            border: inputStyle.borderColor,
-            radius: inputStyle.borderRadius,
-          }
-        }),
-        labelLeftDelta:
-          labelBox && controlBox
-            ? Math.abs(labelBox.left - controlBox.left)
-            : 0,
-        documentOverflow:
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
-      }
-    })
-    assert.equal(
-      metrics.labelText,
-      '入库日期',
-      `${scenarioName} 入库日期筛选应使用共享 DateRangeFilter 标签: ${JSON.stringify(
-        metrics
-      )}`
-    )
-    assert(
-      metrics.controlWidth > 0 && metrics.controlHeight > 0,
-      `${scenarioName} 入库日期筛选控件应可见: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.gap >= 6 &&
-        metrics.periodTop >= metrics.labelBottom &&
-        metrics.dateInputs.length === 2 &&
-        metrics.dateInputs.every(
-          (input) =>
-            input.width >= 120 &&
-            input.height === 34 &&
-            Number.parseFloat(input.radius) >= 8 &&
-            input.border !== 'rgba(0, 0, 0, 0)'
-        ) &&
-        metrics.controlScrollWidth <= metrics.controlClientWidth + 1 &&
-        metrics.rangeScrollWidth <= metrics.rangeClientWidth + 1,
-      `${scenarioName} 入库日期类型和起止日期应有独立边界且不挤压: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.documentOverflow,
-      0,
-      `${scenarioName} 入库日期筛选不应造成页面级横向溢出: ${JSON.stringify(
-        metrics
-      )}`
-    )
-    await filterDialog
-      .getByRole('button', { name: '收起', exact: true })
-      .click()
+    const { from, to } = await manualDateInputs(dates)
+    const inputs = await Promise.all([from, to].map((input) => input.evaluate((node) => ({
+      width: node.getBoundingClientRect().width, border: getComputedStyle(node).borderColor,
+    }))))
+    assert(inputs.every(({ width, border }) => width >= 120 && border !== 'rgba(0, 0, 0, 0)'), `${scenarioName} 起止输入应有独立边界`)
+    assert.equal(await dates.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true)
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0)
+    await dateFilterButton(dates, '取消').click()
+    await overview.getByRole('button', { name: '收起', exact: true }).click()
   }
 
   const assertPurchaseReceiptDetailsReadable = async (
@@ -419,7 +340,7 @@ export function createPurchaseReceiptScenarios(deps) {
           page,
           'purchase-receipts-table-control-columns-desktop'
         )
-        await assertPurchaseReceiptDateRangeSegmentedControl(
+        await assertPurchaseReceiptDateRange(
           page,
           'purchase-receipts-table-control-columns-desktop'
         )

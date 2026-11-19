@@ -1,14 +1,3 @@
-@media screen and (max-width: 480px) {
-  .erp-business-date-range-filter__range {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .erp-business-date-range-filter .erp-business-date-input.ant-picker {
-    flex: 0 0 auto;
-  }
-}
-
 /* stylelint-disable no-descending-specificity -- dark theme overrides must win over the existing light-theme component rules. */
 [data-erp-theme='dark'] {
   --erp-page-bg: #161a1e;
@@ -537,7 +526,6 @@
 }
 
 [data-erp-theme='dark'] .erp-business-action-modal__title small,
-[data-erp-theme='dark'] .erp-business-date-range-filter__separator,
 [data-erp-theme='dark'] .erp-business-status-transition-option span,
 [data-erp-theme='dark'] .erp-business-filter-panel__summary,
 [data-erp-theme='dark'] .erp-business-selection-action-bar__hint {
@@ -613,19 +601,9 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-business-date-range-filter--invalid {
-  --erp-business-control-border: #ff7875;
-}
-
 [data-erp-theme='dark'] .erp-business-date-input .ant-picker-input > input,
 [data-erp-theme='dark'] .erp-business-date-input .ant-picker-suffix {
   color: var(--erp-text);
-}
-
-[data-erp-theme='dark']
-  .erp-business-date-range-filter--invalid
-  .erp-business-date-range-filter__separator {
-  color: #ff7875;
 }
 
 [data-erp-theme='dark'] .erp-business-module-select-popup.ant-select-dropdown {

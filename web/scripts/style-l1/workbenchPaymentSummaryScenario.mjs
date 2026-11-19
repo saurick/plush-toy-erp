@@ -109,7 +109,7 @@ export function workbenchPaymentSummaryScenario(session) {
         await period.click()
         await expect(period).toHaveAttribute('aria-expanded', 'true')
         await expect(rangeDialog).toBeVisible()
-        await waitForFiniteAnimations(page, { selector: '.erp-payment-period-popover' })
+        await waitForFiniteAnimations(page, { selector: '.erp-filter-date-popover' })
       }
       const choosePreset = async (label) => {
         await openPeriod()
@@ -216,6 +216,26 @@ export function workbenchPaymentSummaryScenario(session) {
       await expect(scope(`收付日期：${today}`)).toBeVisible()
       await expect(currencyRow('CNY')).toHaveText(['CNY', '26.25', '21', '10.023456', '1'])
       assertSummaryCall(today, today)
+      const restoreMonth = region.getByRole('button', { name: '恢复本月', exact: true })
+      const iconStyle = (icon) => icon.evaluate((node) => {
+        const { width, height } = node.getBoundingClientRect()
+        return { shape: node.closest('[data-icon]').getAttribute('data-icon'), width, height, color: getComputedStyle(node).color }
+      })
+      assert.deepEqual(await iconStyle(restoreMonth.locator('svg')), await iconStyle(type.locator('.ant-select-clear svg')), '期间与汇总类型下拉使用同一清除图标')
+      const beforeReset = await period.boundingBox()
+      const beforeResetCalls = calls.length
+      await restoreMonth.hover()
+      await expect(page.getByRole('tooltip', { name: '恢复本月', exact: true })).toBeVisible()
+      await restoreMonth.press('Enter')
+      await expect(period).toHaveAccessibleName('统计期间：本月')
+      await expect(period).toBeFocused()
+      await expect(restoreMonth).toHaveCount(0)
+      await expect(rangeDialog).toBeHidden()
+      await expect(currencyRow('CNY')).toHaveText(['CNY', '31.25', '23', '10.023456', '1'])
+      assertSummaryCall(monthStart, today)
+      assert.equal(calls.length, beforeResetCalls + 1, '恢复本月只发出一次汇总请求')
+      const afterReset = await period.boundingBox()
+      assert(Object.keys(beforeReset).every((key) => Math.abs(beforeReset[key] - afterReset[key]) <= 1), '快速恢复保持日期入口位置与尺寸')
       await choosePreset('上月')
       await expect(region.getByRole('button', { name: '查看全部历史' })).toHaveCount(0)
       await region.getByRole('button', { name: '重新加载' }).click()
@@ -257,9 +277,8 @@ export function workbenchPaymentSummaryScenario(session) {
       await page.setViewportSize({ width: 320, height: 560 })
       const controlBoxes = await Promise.all([type, period, scope()].map((control) => control.boundingBox()))
       assert.ok(controlBoxes.every((box) => box && box.x >= 0 && box.x + box.width <= 320), '窄窗期间控件应完整可见')
-      assert.equal(await period.locator('.erp-payment-period__value').evaluate((value) =>
-        value.scrollWidth <= value.clientWidth && value.scrollHeight <= value.clientHeight &&
-        Array.from(value.children).every((date) => date.getClientRects().length === 1)
+      assert.equal(await period.locator('.erp-filter-date-trigger__value').evaluate((value) =>
+        value.scrollWidth <= value.clientWidth + 1 && value.scrollHeight <= value.clientHeight + 1
       ), true, '窄窗完整显示已选日期')
       await openPeriod()
       await expect(rangeDialog.getByText(`${lastMonthEnd} 至 ${monthStart}`, { exact: true })).toBeVisible()
@@ -272,7 +291,7 @@ export function workbenchPaymentSummaryScenario(session) {
         popup.x >= 0 && popup.x + popup.width <= 320 && popup.y >= 0 && popup.y + popup.height <= 560,
       '窄窗快捷项位于日历上方，浮层完整在视口内')
       const [anchorBox, popupBox] = await Promise.all([
-        period.boundingBox(), page.locator('.erp-payment-period-popover:visible').boundingBox(),
+        period.boundingBox(), page.locator('.erp-filter-date-popover:visible').boundingBox(),
       ])
       assert.ok(popupBox.y >= anchorBox.y + anchorBox.height ||
         popupBox.y + popupBox.height <= anchorBox.y, '空间不足时缩短浮层，避免盖住统计期间入口')
@@ -291,7 +310,7 @@ export function workbenchPaymentSummaryScenario(session) {
       await day(emptyDate).click()
       await expect(rangeDialog.getByText(`${emptyDate} 起，请选择结束日期`)).toBeVisible()
       await day(emptyDate).click()
-      await expect(rangeDialog.getByText(`${emptyDate} 至 ${emptyDate}`)).toBeVisible()
+      await expect(rangeDialog.getByRole('status')).toHaveText(emptyDate)
       await rangeDialog.hover()
       await page.mouse.wheel(0, 420)
       await expect(apply).toBeInViewport({ ratio: 1 })
@@ -340,6 +359,7 @@ export function workbenchPaymentSummaryScenario(session) {
       await expect(rangeDialog).toBeHidden()
       await openPeriod()
       await expect(rangeDialog.getByRole('status')).toHaveText('请选择开始日期')
+      await expect(rangeDialog).toBeFocused()
       await page.keyboard.press('Escape')
       await expect(rangeDialog).toBeHidden()
       await collapseBusinessSplit(page)

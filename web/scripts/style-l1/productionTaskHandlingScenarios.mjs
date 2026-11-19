@@ -1,7 +1,8 @@
+import path from 'node:path'
 import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
+import { readWorkflowTaskBoardFiltersFromSearch } from '../../src/erp/utils/workflowTaskBoard.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
-import path from 'node:path'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 
@@ -55,39 +56,52 @@ export function createProductionTaskHandlingScenarios(deps) {
       await row.waitFor()
       assert.equal(await row.evaluate((node) => [...node.parentElement.querySelectorAll(':scope > [data-task-id]')].indexOf(node)), expectedRowIndex)
       await row.scrollIntoViewIfNeeded()
-      const originURL = page.url()
-      const origin = await row.evaluate((node) => ({
-        top: node.getBoundingClientRect().top - node.closest('.erp-admin-content').getBoundingClientRect().top,
-      }))
+      const originURL = new URL(page.url())
+      const originFilters = readWorkflowTaskBoardFiltersFromSearch(originURL.searchParams)
+      const neighbor = row.locator('xpath=preceding-sibling::*[@data-task-id][1]')
+      const neighborID = tail ? null : await neighbor.getAttribute('data-task-id')
+      const visibleOffset = (taskRow) => taskRow.evaluate((node) =>
+        node.getBoundingClientRect().top - node.closest('.erp-admin-content').getBoundingClientRect().top
+      )
+      const originalOffset = tail ? null : await visibleOffset(neighbor)
       await row.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
-      await page.getByRole('button', { name: /进入单据办理$/u }).click()
-      const modal = page.getByRole('dialog').filter({ hasText: '包装版本' }).last()
-      await modal.getByLabel('包装版本', { exact: true }).waitFor()
+      const steps = page.getByRole('tablist', { name: '任务处理步骤', exact: true })
+      await steps.getByRole('tab', { name: /任务办理/u }).click()
+      const field = page.getByLabel('包装版本', { exact: true })
+      const confirm = page.getByRole('button', { name: '确认办理', exact: true })
+      const receiptTab = steps.getByRole('tab', { name: /结果回执/u })
+      await field.waitFor()
       assert.equal(await page.getByLabel('生产管理页面', { exact: true }).count(), 0)
-      await modal.getByLabel('包装版本', { exact: true }).fill('彩盒与唛头已核对')
-      await modal.getByRole('button', { name: '确认办理', exact: true }).click()
+      await field.fill('彩盒与唛头已核对')
+      await confirm.click()
       await page.waitForFunction(() => !document.querySelector('.ant-btn-loading'))
       assert.equal(attempts, 1)
-      assert.equal(await modal.getByLabel('包装版本', { exact: true }).inputValue(), '彩盒与唛头已核对')
-      assert.equal(await modal.getByRole('button', { name: '办完返回原任务' }).count(), 0)
-      await modal.locator('.ant-modal-footer').getByRole('button', { name: '关闭', exact: true }).click()
+      assert.equal(await field.inputValue(), '彩盒与唛头已核对')
+      assert.equal(await receiptTab.isEnabled(), false)
+      await page.getByRole('button', { name: '返回原任务', exact: true }).click()
       await page.getByRole('button', { name: '继续填写', exact: true }).click()
-      assert.equal(await modal.getByLabel('包装版本', { exact: true }).inputValue(), '彩盒与唛头已核对')
-      await modal.getByRole('button', { name: '确认办理', exact: true }).click()
-      await modal.getByRole('button', { name: '办完返回原任务' }).waitFor()
+      assert.equal(await field.inputValue(), '彩盒与唛头已核对')
+      await confirm.click()
+      await receiptTab.click()
+      const receipt = page.getByTestId('workflow-task-action-receipt')
+      await receipt.getByText('已完成', { exact: true }).waitFor()
+      await receipt.getByText(task.task_name, { exact: true }).waitFor()
       assert.equal(saved, true)
       assert.equal(attempts, 2)
-      await modal.getByRole('button', { name: '办完返回原任务' }).click()
-      await page.waitForURL(originURL)
-      const detail = page.locator('.ant-drawer:visible').last()
-      await detail.getByText('已完成', { exact: true }).first().waitFor()
-      await detail.getByRole('button', { name: '返回列表', exact: true }).click()
-      await row.getByText('刚办理，保留原位置', { exact: true }).waitFor()
-      assert.equal(await row.evaluate((node) => [...node.parentElement.querySelectorAll(':scope > [data-task-id]')].indexOf(node)), expectedRowIndex)
-      await row.getByText('已完成', { exact: true }).waitFor()
-      const returnedTop = await row.evaluate((node) => node.getBoundingClientRect().top - node.closest('.erp-admin-content').getBoundingClientRect().top)
-      assert.ok(Math.abs(returnedTop - origin.top) <= 3, `返回前后行位置应一致: ${origin.top} -> ${returnedTop}`)
-      if (tail) await page.getByText('原第 2 页位置，当前筛选共 20 项', { exact: true }).waitFor()
+      await steps.getByRole('tab', { name: /任务信息/u }).click()
+      await page.getByRole('heading', { name: task.task_name, exact: true }).waitFor()
+      await page.getByRole('dialog').getByRole('button', { name: '返回列表', exact: true }).click()
+      await page.getByRole('dialog').waitFor({ state: 'hidden' })
+      await row.waitFor({ state: 'detached' })
+      const expectedFilters = { ...originFilters, page: tail ? 1 : originFilters.page }
+      await page.waitForURL((url) => url.pathname === originURL.pathname &&
+        readWorkflowTaskBoardFiltersFromSearch(url.searchParams).page === expectedFilters.page)
+      assert.deepEqual(readWorkflowTaskBoardFiltersFromSearch(new URL(page.url()).searchParams), expectedFilters)
+      if (!tail) {
+        const remainingRow = page.locator(`[data-task-id="${neighborID}"]`)
+        const returnedOffset = await visibleOffset(remainingRow)
+        assert.ok(Math.abs(returnedOffset - originalOffset) <= 3, `返回前后相邻任务位置应一致: ${originalOffset} -> ${returnedOffset}`)
+      }
       await assertNoHorizontalOverflow(page, 'production-return-filter-position')
       await page.screenshot({ path: path.join(outputDir, tail ? 'production-task-return-tail-4k.png' : 'production-task-return-position-4k.png') })
   }
@@ -164,14 +178,27 @@ unit_id: 1,
 quantity: '20',
         wip_batch_no: 'WIP-FOCUS-CUTTING',
 unit_name: '只' }
-      if (shipment) inspection = { id: 701, inspection_no: 'QC-SHIP-701', status: 'DRAFT', result: '',
-        inspection_type: 'FINISHED_GOODS', source_type: 'SHIPMENT', source_no: 'SHIP-701', source_id: 93010, subject_type: 'PRODUCT', subject_id: 1,
-        inventory_lot_id: 5001, warehouse_id: 1, unit_id: 1, unit_name: '只' }
+      if (shipment) { inspection = { id: 701,
+inspection_no: 'QC-SHIP-701',
+status: 'DRAFT',
+result: '',
+        inspection_type: 'FINISHED_GOODS',
+source_type: 'SHIPMENT',
+source_no: 'SHIP-701',
+source_id: 93010,
+subject_type: 'PRODUCT',
+subject_id: 1,
+        inventory_lot_id: 5001,
+warehouse_id: 1,
+unit_id: 1,
+unit_name: '只' } }
       await base.beforeNavigate(page)
       await page.route('**/rpc/workflow', async (route) => {
         const { id, method } = route.request().postDataJSON()
         if (method === 'explain_action_access') {
-          return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ task_id: task.id,
+          return route.fulfill({ json: { jsonrpc: '2.0',
+id,
+result: styleRpcResult({ task_id: task.id,
             source_access: { applicable: true, resolved: true, allowed: true, reason_code: 'source_access_allowed', reason: '' },
             actions: [{ action_key: 'complete', allowed: false, owner_role_matched: true, owner_role_key: 'quality', required_permission: 'quality.inspection.update', reason_code: 'source_generated_only', reason: '在检验单判定后更新待办' }],
           }) } })
@@ -275,7 +302,7 @@ actions: permissions,
       if (mobile) await page.getByTestId('mobile-role-nav-tasks').click()
       const taskRow = page.locator(`[${mobile ? 'data-mobile-task-id' : 'data-task-id'}="${task.id}"]`)
       await taskRow.waitFor()
-      const originTop = await taskRow.evaluate(node => node.getBoundingClientRect().top)
+      const originTop = await taskRow.evaluate((node) => node.getBoundingClientRect().top)
       if (mobile) await clickTaskCardContent(taskRow, taskRow.getByText(task.task_name, { exact: true }))
       else await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
       const tabs = page.getByRole('tablist', { name: '任务处理步骤', exact: true }).getByRole('tab')
@@ -341,9 +368,9 @@ actions: permissions,
       await receipt.locator('dl > div').filter({ has: page.getByText('业务状态', { exact: true }) }).getByText('已过账', { exact: true }).waitFor()
       await page.getByRole('button', { name: mobile ? '返回任务列表' : '返回列表', exact: true }).filter({ visible: true }).last().click()
       await taskRow.waitFor({ state: 'visible' })
-      deps.assert.ok(Math.abs(await taskRow.evaluate(node => node.getBoundingClientRect().top) - originTop) <= 3)
+      deps.assert.ok(Math.abs(await taskRow.evaluate((node) => node.getBoundingClientRect().top) - originTop) <= 3)
     },
-  }})
+  } })
 }
 
 function createProductionExceptionTaskScenario(deps, base) {
@@ -354,7 +381,11 @@ function createProductionExceptionTaskScenario(deps, base) {
     ...base,
     name: 'production-exception-task-inline',
     workflowTaskFixtures: [task],
-    adminProfile: { ...base.adminProfile, erp_preferences: { hidden_columns: { 'production-exceptions-decisions': ['requested_quantity'] } }, roles: [{ role_key: 'production', name: '生产' }], permissions, menus: [
+    adminProfile: { ...base.adminProfile,
+erp_preferences: { hidden_columns: { 'production-exceptions-decisions': ['requested_quantity'] } },
+roles: [{ role_key: 'production', name: '生产' }],
+permissions,
+menus: [
       { key: 'task-board', path: '/erp/task-board', required_any: ['workflow.task.read'] },
       { key: 'production-exceptions', path: '/erp/production/exceptions', required_any: ['production.fact.read'] },
     ] },
@@ -392,7 +423,7 @@ function createProductionExceptionTaskScenario(deps, base) {
       await tabs.nth(0).click()
       await tabs.nth(1).click()
       deps.assert.equal(await form.getByLabel('执行原因', { exact: true }).inputValue(), '按本次批准方案执行')
-      await form.getByText('审批意见：' + record.decision_reason, { exact: true }).waitFor()
+      await form.getByText(`审批意见：${record.decision_reason}`, { exact: true }).waitFor()
       const closeTask = page.getByRole('button', { name: '返回列表', exact: true }).first()
       await closeTask.click()
       const discard = page.getByRole('dialog', { name: '放弃未保存的修改？' })
@@ -400,7 +431,7 @@ function createProductionExceptionTaskScenario(deps, base) {
       deps.assert.equal(await form.getByLabel('执行原因', { exact: true }).inputValue(), '按本次批准方案执行')
       await closeTask.click()
       await discard.getByRole('button', { name: '放弃修改', exact: true }).click()
-      await page.getByRole('button', { name: '查看' + task.task_name + '详情', exact: true }).click()
+      await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
       await tabs.nth(1).click()
       await page.getByRole('button', { name: '确认执行', exact: true }).click()
       deps.assert.equal(await form.getByLabel('执行原因', { exact: true }).inputValue(), '')

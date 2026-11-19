@@ -15,6 +15,11 @@ type progressAPIRepo struct {
 	err   error
 }
 
+func (r *progressAPIRepo) GetSalesDeliveryProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.SalesDeliveryProgress, error) {
+	r.query, r.calls = q, r.calls+1
+	return nil, biz.ErrSalesOrderNotFound
+}
+
 func (r *progressAPIRepo) ListBusinessProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressBoard, error) {
 	r.query, r.calls = q, r.calls+1
 	return &biz.BusinessProgressBoard{Rows: []*biz.BusinessProgressRow{}, SnapshotAt: q.SnapshotAt, Access: q.Access}, r.err
@@ -151,6 +156,51 @@ func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 		if err != nil || res.Code != want || r.calls != calls {
 			t.Fatalf("%s result=%+v calls=%d err=%v", state, res, r.calls, err)
 		}
+	}
+}
+
+func TestBusinessProgressSalesDeliveryScoped(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	for _, tc := range []struct {
+		name      string
+		withItems bool
+	}{{"order and items", true}, {"order only", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			withItems := tc.withItems
+			keys := []string{biz.PermissionSalesOrderRead, biz.PermissionPMCPlanRead, biz.PermissionWorkflowTaskRead}
+			if withItems {
+				keys = append(keys, biz.PermissionSalesOrderItemRead)
+			}
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, keys...)
+			repo := &progressAPIRepo{}
+			d.businessProgressUC = biz.NewBusinessProgressUsecase(repo)
+			params := map[string]any{"view": "orders", "display": "lines", "delivery_status": "overdue"}
+			_, res, err := d.handleBusiness(ctx, "list_progress", "sales", newDataStruct(params))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !withItems {
+				if res.Code != errcode.PermissionDenied.Code || repo.calls != 0 {
+					t.Fatalf("source permission missing: result=%v calls=%d", res, repo.calls)
+				}
+				return
+			}
+			if res.Code != 0 || repo.calls != 1 || !repo.query.Access.Sales || repo.query.Access.Production ||
+				repo.query.Access.Tasks || repo.query.TaskVisibility != nil || repo.query.Display != "lines" {
+				t.Fatalf("non-global delivery widened its scope: result=%v query=%+v", res, repo.query)
+			}
+			for _, method := range []string{"get_progress", "list_progress_owner_options", "list_progress_tasks"} {
+				_, result, err := d.handleBusiness(ctx, method, "global", newDataStruct(map[string]any{"view": "orders", "id": 1}))
+				if err != nil || result.Code != errcode.PermissionDenied.Code {
+					t.Fatalf("%s should require global access: %v %v", method, result, err)
+				}
+			}
+			params["owner_name"] = "其他岗位"
+			_, result, err := d.handleBusiness(ctx, "list_progress", "owner", newDataStruct(params))
+			if err != nil || result.Code != errcode.InvalidParam.Code || repo.calls != 1 {
+				t.Fatalf("non-global owner query: %v %v", result, err)
+			}
+		})
 	}
 }
 

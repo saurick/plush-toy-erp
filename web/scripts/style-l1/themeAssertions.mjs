@@ -645,7 +645,7 @@ async function assertDarkThemeNeutralInteractions(
     },
     {
       label: '日期筛选 hover',
-      selector: '.erp-business-date-range-filter',
+      selector: '.erp-filter-date-trigger',
       action: 'hover',
     },
     {

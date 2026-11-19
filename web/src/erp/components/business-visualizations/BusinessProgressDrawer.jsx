@@ -65,6 +65,7 @@ export default function BusinessProgressDrawer({
   suppressOpenMotion = false,
   onOpenTask,
   onOpenProduction,
+  onOpenSalesDelivery,
   onSectionChange,
   onRememberContext,
 }) {
@@ -246,6 +247,9 @@ export default function BusinessProgressDrawer({
       }
     >
       <Button onClick={onClose}>返回进度</Button>
+      {!mobile && data?.row.view === 'orders' && onOpenSalesDelivery && (
+        <Button onClick={() => onOpenSalesDelivery(data.row.id)}>跟踪本单</Button>
+      )}
       {!mobile && data?.row.view === 'orders' && canReadPurchaseFollowups(adminProfile) && canOpen(salesPurchaseFollowupPath(data.row.id)) && (
         <Button onClick={() => onNavigate(salesPurchaseFollowupPath(data.row.id), currentContext())}>本单采购跟进</Button>
       )}

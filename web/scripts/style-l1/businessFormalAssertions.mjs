@@ -1,4 +1,4 @@
-import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { dateFilterButton, manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
 
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 
@@ -346,110 +346,19 @@ export function createBusinessFormalAssertions(deps) {
     await assertCurrentOperationBarCompact(page, { scenarioName })
   }
 
-  const assertWorkflowDueDateRangeFilterLayout = async (
-    page,
-    { scenarioName }
-  ) => {
-    const dialog = page.getByRole('dialog', { name: '筛选条件' })
-    const opened = !(await dialog.isVisible())
-    if (opened) {
-      await page
-        .locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
-        .click()
-    }
-    await dialog.waitFor()
-    await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
-    await waitForFiniteAnimations(page)
-    const metrics = await page.evaluate(() => {
-      const panel = document.querySelector(
-        '.erp-business-filter-popover .erp-business-operation-panel__filters'
-      )
-      const range = panel?.querySelector('.erp-business-date-range-filter')
-      const typeLabel = range?.querySelector(
-        '.erp-filter-field > legend'
-      )
-      const dateInputs = range
-        ? Array.from(
-            range.querySelectorAll('.erp-business-date-input.ant-picker')
-          )
-        : []
-      const standaloneDateInputs = panel
-        ? Array.from(panel.children).filter((node) =>
-            node.classList?.contains('erp-business-date-input')
-          )
-        : []
-      const panelBox = panel?.getBoundingClientRect()
-      const rangeBox = range?.getBoundingClientRect()
-      const inputBoxes = dateInputs.map((node) => {
-        const box = node.getBoundingClientRect()
-        return {
-          x: box.x,
-          y: box.y,
-          width: box.width,
-          height: box.height,
-          scrollWidth: node.scrollWidth,
-          clientWidth: node.clientWidth,
-        }
-      })
-      return {
-        viewportWidth: document.documentElement.clientWidth,
-        panelWidth: panelBox?.width || 0,
-        rangeWidth: rangeBox?.width || 0,
-        rangeHeight: rangeBox?.height || 0,
-        rangeScrollWidth: range?.scrollWidth || 0,
-        rangeClientWidth: range?.clientWidth || 0,
-        typeLabelText: typeLabel?.textContent?.trim() || '',
-        dateInputCount: dateInputs.length,
-        standaloneDateInputCount: standaloneDateInputs.length,
-        inputBoxes,
-      }
-    })
-    assert.equal(
-      metrics.standaloneDateInputCount,
-      0,
-      `${scenarioName} 到期日期筛选不应使用两个独立 DateInput: ${JSON.stringify(
-        metrics
-      )}`
-    )
-    assert.equal(
-      metrics.typeLabelText,
-      '到期日期',
-      `${scenarioName} 到期日期筛选应显示日期类型标签: ${JSON.stringify(
-        metrics
-      )}`
-    )
-    assert.equal(
-      metrics.dateInputCount,
-      2,
-      `${scenarioName} 到期日期筛选应保留开始/结束两个日期输入: ${JSON.stringify(
-        metrics
-      )}`
-    )
-    assert(
-      metrics.rangeWidth > 0 &&
-        metrics.rangeWidth <= Math.max(metrics.panelWidth, 1) + 1,
-      `${scenarioName} 到期日期筛选不应溢出筛选栏: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.rangeScrollWidth <= metrics.rangeClientWidth + 1,
-      `${scenarioName} 到期日期筛选内部不应横向溢出: ${JSON.stringify(metrics)}`
-    )
-    if (metrics.viewportWidth >= 760) {
-      const [startInput, endInput] = metrics.inputBoxes
-      assert(
-        startInput &&
-          endInput &&
-          Math.abs(startInput.y - endInput.y) <= 2 &&
-          startInput.width >= 120 &&
-          endInput.width >= 120,
-        `${scenarioName} 宽屏下开始/结束日期应在同一行且保持可读宽度: ${JSON.stringify(
-          metrics
-        )}`
-      )
-    }
-    if (opened) {
-      await dialog.getByRole('button', { name: '收起', exact: true }).click()
-    }
+  const assertWorkflowDueDateRangeFilterLayout = async (page, { scenarioName }) => {
+    const overview = page.getByRole('dialog', { name: '筛选条件' })
+    const opened = !(await overview.isVisible())
+    if (opened) await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+    await overview.getByRole('button', { name: /^到期日期：/u }).waitFor()
+    const dates = await openDateFilter(page, overview)
+    assert.equal(await dates.getByRole('group', { name: '日期类型', exact: true }).count(), 0)
+    const { from, to } = await manualDateInputs(dates)
+    const [panel, start, end] = await Promise.all([dates, from, to].map((locator) => locator.boundingBox()))
+    assert([start, end].every((box) => box.width >= 120 && box.x >= panel.x && box.x + box.width <= panel.x + panel.width + 1), `${scenarioName} 起止日期完整留在同一气泡内`)
+    assert.equal(await dates.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true)
+    await dateFilterButton(dates, '取消').click()
+    if (opened) await overview.getByRole('button', { name: '收起', exact: true }).click()
   }
 
   const assertNoListDeleteTrashToolbar = async (page) => {

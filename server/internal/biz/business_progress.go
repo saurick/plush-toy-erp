@@ -151,6 +151,7 @@ type BusinessProgressOwnerOptions struct {
 }
 
 type BusinessProgressRepo interface {
+	GetSalesDeliveryProgress(context.Context, BusinessProgressQuery) (*SalesDeliveryProgress, error)
 	ListBusinessProgressOwners(context.Context, BusinessProgressQuery) (*BusinessProgressOwnerOptions, error)
 	ListBusinessProgressTasks(context.Context, BusinessProgressQuery) (*BusinessProgressTaskPage, error)
 	ListBusinessProgress(context.Context, BusinessProgressQuery) (*BusinessProgressBoard, error)

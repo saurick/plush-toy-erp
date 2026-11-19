@@ -1,7 +1,7 @@
+import { readFile } from 'node:fs/promises'
 import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { openUIDesignAppearance, openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
 import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
-import { readFile } from 'node:fs/promises'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { ERP_DARK_PALETTE } from '../../src/common/theme/erpThemePalette.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
@@ -126,7 +126,6 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
     assert.match(await frame.locator('.business-detail-modal').innerText(), /PO-20260924-013/)
     await frame.locator('.business-detail-modal [data-action="close-drawer"]').last().click()
     await closeTask()
-
   }
   return [
     ...createDevTaskGovernanceScenarios({ assert, outputDir, path }),
@@ -891,7 +890,23 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         await frame.getByRole('group', { name: '跟踪范围', exact: true }).getByRole('button', { name: '相关流程', exact: true }).click()
         assert.equal(await states.getByRole('button', { name: /^已结束/ }).getAttribute('aria-pressed'), 'true')
         await frame.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '清空筛选', exact: true }).click()
-        await frame.getByLabel('开始日期', { exact: true }).fill('2099-01-01')
+        await frame.getByRole('button', { name: '收起', exact: true }).click()
+      },
+    },
+    {
+      name: 'dev-ui-design-date-filter-pages',
+      path: '/__dev/ui-design',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const frame = await open(page)
+        await frame.locator('.nav-item[data-action="nav"][data-page="tasks"]').click()
+        await frame.getByRole('button', { name: '流程跟踪', exact: true }).click()
+        await frame.locator('[data-action="open-task-filter"]').click()
+        await frame.getByRole('button', { name: /^发起时间：/u }).click()
+        const dates = frame.getByRole('dialog', { name: '选择日期范围', exact: true })
+        await dates.getByRole('button', { name: '输入日期', exact: true }).click()
+        await dates.getByLabel('开始日期', { exact: true }).fill('2099-01-01')
+        await dates.getByRole('button', { name: '应用日期', exact: true }).click()
         await frame.getByText('当前筛选下没有记录', { exact: true }).waitFor()
         await frame.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '清空筛选', exact: true }).click()
         await frame.getByRole('button', { name: '收起', exact: true }).click()
@@ -900,10 +915,15 @@ export function createDevUIDesignWorkflowScenarios({ assert, assertNoHorizontalO
         await frame.locator('[data-action="open-filter"]').click()
         const filters = frame.locator('#filter-popover')
         assert.equal(await filters.getByRole('button', { name: '应用筛选', exact: true }).count(), 0)
-        await filters.getByLabel('开始日期', { exact: true }).fill('2099-01-01')
-        assert.equal(await frame.locator('#view tr[data-row]').count(), 0, '日期选择应立即更新列表')
-        await filters.getByLabel('开始日期', { exact: true }).fill('')
-        assert.ok(await frame.locator('#view tr[data-row]').count() > 0, '清空日期应立即恢复列表')
+        await filters.locator('.design-date-trigger').click()
+        await dates.getByRole('button', { name: '输入日期', exact: true }).click()
+        await dates.getByLabel('开始日期', { exact: true }).fill('2099-01-01')
+        assert.ok(await frame.locator('#view tr[data-row]').count() > 0, '日期草稿保留原列表')
+        await dates.getByRole('button', { name: '应用日期', exact: true }).click()
+        assert.equal(await frame.locator('#view tr[data-row]').count(), 0, '应用日期后更新列表')
+        await filters.getByRole('button', { name: '清除计划交付', exact: true }).click()
+        assert.equal(await dates.isVisible(), false, '单项清除直接更新筛选')
+        assert.ok(await frame.locator('#view tr[data-row]').count() > 0, '清空日期后恢复列表')
       },
     },
     {

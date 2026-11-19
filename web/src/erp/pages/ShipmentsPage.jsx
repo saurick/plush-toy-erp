@@ -1515,13 +1515,10 @@ export default function ShipmentsPage() {
             <DateRangeFilter
               options={SHIPMENT_DATE_FILTER_OPTIONS}
               value={dateFilterField}
-              onTypeChange={(value) => {
-                setDateFilterField(value || 'planned_ship_at')
-                resetBusinessPaginationCurrent(setPagination)
-              }}
               startValue={dateFilterStart}
               endValue={dateFilterEnd}
-              onRangeChange={(from, to) => {
+              onRangeChange={(from, to, field) => {
+                setDateFilterField(field)
                 setDateFilterStart(from)
                 setDateFilterEnd(to)
                 resetBusinessPaginationCurrent(setPagination)

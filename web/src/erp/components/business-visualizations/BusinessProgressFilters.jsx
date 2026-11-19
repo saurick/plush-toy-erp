@@ -12,6 +12,7 @@ import FilterField from '@/common/components/navigation/FilterField.jsx'
 import { savedTextFilterValue, withSavedTextFilter } from '../../utils/businessFilterPresentation.mjs'
 import { canReadReference } from '../../utils/remoteReferences.mjs'
 import MobileFilterChoices from '../../mobile/components/MobileFilterChoices.jsx'
+import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
   PROGRESS_DELIVERY_STATUS_OPTIONS,
@@ -140,10 +141,10 @@ export default function BusinessProgressFilterFields({
   counts,
   taskAccess,
   onChange,
-  onDateRange,
   compact = false,
   open,
   adminProfile,
+  allowOwnerFilter = true,
 }) {
   const fields = (
     <>
@@ -195,7 +196,7 @@ export default function BusinessProgressFilterFields({
           </FilterChip>
         </FilterField>
       )}
-      {!compact && open && (
+      {!compact && open && allowOwnerFilter && (
         <ProgressOwnerFilter
           key={`${query.view}:${workflowTaskAdminAccessRequestIdentity(adminProfile)}`}
           query={query}
@@ -203,11 +204,14 @@ export default function BusinessProgressFilterFields({
         />
       )}
       {!compact && (
-        <FilterField label="交期范围">
-          <Button block onClick={onDateRange}>
-            {query.date_from || query.date_to ? `${query.date_from || '不限'} 至 ${query.date_to || '不限'}` : '自定义交期日期'}
-          </Button>
-        </FilterField>
+        <DateRangeFilter
+          options={[{ value: 'due_date', label: '交期', upcoming: true }]}
+          startValue={query.date_from}
+          endValue={query.date_to}
+          allowManual={false}
+          allowPartial={false}
+          onRangeChange={(from, to) => onChange({ from, to })}
+        />
       )}
     </>
   )

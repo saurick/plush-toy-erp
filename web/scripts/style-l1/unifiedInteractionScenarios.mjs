@@ -748,8 +748,100 @@ export function createUnifiedInteractionScenarios({
       },
     },
   ]
+  const purchase = scenarios.find((scenario) => scenario.name === 'unified-purchase-interactions')
   const finance = scenarios.find((scenario) => scenario.name === 'unified-finance-interactions')
   return [...scenarios, {
+    ...purchase,
+    name: 'purchase-filter-rows',
+    verify: async (page) => {
+      await expectHeading(page, '采购订单')
+      await page.getByRole('button', { name: '筛选', exact: true }).click()
+      const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+      await filters.waitFor()
+      for (const width of [1440, 740]) {
+        await page.setViewportSize({ width, height: 760 })
+        await waitForFiniteAnimations(page)
+        const layout = await filters.evaluate((dialog) => {
+          const body = dialog.querySelector('.erp-business-operation-panel__filters')
+          const box = (node) => {
+            const { left, top, bottom, width } = node.getBoundingClientRect()
+            return { left, top, bottom, width }
+          }
+          const rows = [...body.children].filter((node) => node.offsetHeight > 0 && !node.matches('.app-scroll-edges'))
+          const scopeButtons = body.querySelectorAll('[aria-label="记录范围"] button')
+          return {
+            width: body.clientWidth,
+            rows: rows.map(box),
+            dateIndex: rows.findIndex((row) => row.matches('.erp-business-date-range-filter')),
+            supplierIndex: rows.findIndex((row) => row.querySelector('[aria-label="供应商"]')),
+            controls: [
+              box(body.querySelector('[aria-label="供应商"]').closest('.ant-select')),
+              box(body.querySelector('.erp-filter-date-trigger')),
+            ],
+            options: [box(scopeButtons[0]), box(scopeButtons[1])],
+          }
+        })
+        const rowWidth = width > 768 ? 260 : layout.width
+        const separateRows = layout.rows.every((row, index) => !index || row.top >= layout.rows[index - 1].bottom - 1)
+        assert.ok(
+          separateRows && layout.supplierIndex >= 0 && layout.dateIndex === layout.supplierIndex + 1,
+          `${width}px 每个条件各占一行，日期在供应商下一行 ${JSON.stringify(layout.rows)}`
+        )
+        const [supplier, date] = layout.controls
+        assert.ok(Math.abs(supplier.left - date.left) <= 1 && layout.controls.every((control) => Math.abs(control.width - rowWidth) <= 1),
+          `${width}px 供应商和日期左对齐并沿用字段宽度 ${JSON.stringify(layout.controls)}`)
+        const [first, second] = layout.options
+        assert.ok(Math.abs(first.top - second.top) <= 1 && second.left > first.left + first.width - 1,
+          `${width}px 记录范围内的按钮横排`)
+      }
+      await filters.locator('.erp-filter-date-trigger').click()
+      const dates = page.getByRole('dialog', { name: '选择日期范围', exact: true })
+      await dates.getByRole('button', { name: '返回筛选', exact: true }).click()
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
+      await filters.waitFor({ state: 'hidden' })
+    },
+  }, {
+    ...finance,
+    name: 'finance-filter-rows',
+    verify: async (page) => {
+      const modules = page.locator('.erp-business-module-tabs')
+      const toolbar = page.locator('.erp-business-operation-panel__command')
+      const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+      for (const tabName of ['应收', '应付']) {
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await expectHeading(page, '财务管理')
+        await modules.getByRole('tab', { name: tabName, exact: true }).click()
+        await page.getByRole('tab', { name: '到期顺序', exact: true }).click()
+        await page.getByRole('region', { name: '财务到期顺序' }).locator('tbody tr[data-row-key]').first().waitFor()
+        await toolbar.getByRole('button', { name: '筛选', exact: true }).click()
+        await filters.waitFor()
+        for (const width of [1440, 740]) {
+          await page.setViewportSize({ width, height: 900 })
+          await waitForFiniteAnimations(page)
+          const layout = await filters.evaluate((dialog) => {
+            const body = dialog.querySelector('.erp-business-operation-panel__filters')
+            const box = (field) => {
+              const { top, bottom, width } = field.getBoundingClientRect()
+              return { top, bottom, width }
+            }
+            const group = (label) => body.querySelector(`[role="group"][aria-label="${label}"]`).closest('fieldset')
+            return {
+              width: body.clientWidth,
+              status: box(group('单据状态')),
+              due: box(group('其他到期情况')),
+              date: box(body.querySelector('.erp-business-date-range-filter')),
+            }
+          })
+          assert.ok(layout.due.top >= layout.status.bottom && [layout.status, layout.due].every((group) => Math.abs(group.width - layout.width) <= 1),
+            `${tabName} ${width}px 的两组选项各占一行 ${JSON.stringify(layout)}`)
+          assert.ok(Math.abs(layout.date.width - (width > 768 ? 260 : layout.width)) <= 1,
+            `${tabName} ${width}px 的日期摘要使用单字段宽度 ${JSON.stringify(layout)}`)
+        }
+        await filters.getByRole('button', { name: '收起', exact: true }).click()
+        await filters.waitFor({ state: 'hidden' })
+      }
+    },
+  }, {
     ...finance,
     name: 'finance-source-return',
     verify: async (page) => {

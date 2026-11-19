@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
+import { dateFilterButton, manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
 import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
@@ -289,8 +290,8 @@ export function createAuditLogScenarios({
         ['发生时间', '操作人', '动作', '业务对象', '风险', '操作来源', '详情']
       )
       await page.getByRole('button', { name: '筛选', exact: true }).click()
-      const dates = filters.getByRole('group', { name: '操作时间', exact: true })
-      const periods = dates.getByRole('group', { name: '时间范围', exact: true })
+      const dates = await openDateFilter(page, filters)
+      const periods = dates.getByRole('group', { name: '快捷期间', exact: true })
       const today = currentBusinessDate()
       assert.equal(await periods.getByRole('button', { name: '不限', pressed: true }).count(), 1)
       assert.equal(await dates.getByRole('textbox').count(), 0)
@@ -302,12 +303,12 @@ export function createAuditLogScenarios({
       const dateParams = dateRead.request().postDataJSON().params
       assert.equal(dateParams.created_from, `${today}T00:00:00+08:00`)
       assert.equal(dateParams.created_to, `${today}T23:59:59.999999999+08:00`)
-      await periods.getByRole('button', { name: '自定义日期', exact: true }).click()
-      assert.deepEqual(await dates.getByRole('textbox').evaluateAll((nodes) => nodes.map((node) => node.value)),
-        [today.replaceAll('-', '/'), today.replaceAll('-', '/')])
+      await openDateFilter(page, filters)
+      const { from, to } = await manualDateInputs(dates)
+      assert.deepEqual(await Promise.all([from.inputValue(), to.inputValue()]), [today, today])
+      await dateFilterButton(dates, '取消').click()
       await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
-      await periods.getByRole('button', { name: '不限', pressed: true }).waitFor()
-      assert.equal(await dates.getByRole('textbox').count(), 0)
+      await filters.getByRole('button', { name: '操作时间：不限', exact: true }).waitFor()
       await filters.getByRole('button', { name: '收起', exact: true }).click()
       await assertNoHorizontalOverflow(page, 'system-audit-logs-desktop')
     },

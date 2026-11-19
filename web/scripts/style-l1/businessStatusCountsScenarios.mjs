@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { dateFilterButton, openDateFilter, visibleCalendarDays } from './dateFilterActions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { DEFAULT_BUSINESS_PAGE_SIZE } from '../../src/erp/utils/businessPagination.mjs'
 
@@ -111,16 +112,12 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
   }
   const shared = { path: salesPath, auth: 'admin', effectiveSession: customerRuntimeEffectiveSession, beforeNavigate: installRoute }
   const applyDateRange = async (page, filters) => {
-    await filters.getByRole('button', { name: '自定义日期', exact: true }).click()
-    await filters.getByRole('textbox', { name: '开始日期', exact: true }).click()
-    const picker = page.locator('.ant-picker-dropdown:visible')
-    const day = picker.locator('td.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)[title]').nth(10)
-    const date = await day.getAttribute('title')
-    await day.locator('.ant-picker-cell-inner').click()
-    await picker.waitFor({ state: 'hidden' })
-    await filters.getByRole('textbox', { name: '结束日期', exact: true }).click()
-    await picker.locator(`td[title="${date}"] .ant-picker-cell-inner`).click()
-    await picker.waitFor({ state: 'hidden' })
+    const dates = await openDateFilter(page, filters)
+    const day = visibleCalendarDays(dates).nth(10)
+    await day.click()
+    await day.click()
+    await dateFilterButton(dates, '应用日期').click()
+    await filters.waitFor()
   }
   return [
     {
@@ -149,8 +146,7 @@ export function createBusinessStatusCountsScenarios({ assert, customerRuntimeEff
         await trigger.click()
         await applyDateRange(page, filters)
         assert.equal(await trigger.getAttribute('aria-label'), '筛选，已应用 1 项', '日期范围按一项计数')
-        await filters.getByRole('combobox', { name: '排序方式', exact: true }).press('ArrowDown')
-        await page.locator('.ant-select-dropdown:visible').getByText('最早优先', { exact: true }).click()
+        await filters.getByRole('group', { name: '排序方式', exact: true }).getByRole('button', { name: '最早优先', exact: true }).press('Enter')
         assert.equal(await trigger.getAttribute('aria-label'), '筛选，已应用 2 项', '非默认排序按一项计数')
         await filters.getByRole('group', { name: '记录范围', exact: true }).getByRole('button', { name: '不限', exact: true }).click()
         await ready(page, 2)

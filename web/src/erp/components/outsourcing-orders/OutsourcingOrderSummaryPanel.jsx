@@ -325,10 +325,9 @@ export default forwardRef((
             <DateRangeFilter
               value={filters.date_field}
               options={OUTSOURCING_ORDER_DATE_FILTER_OPTIONS}
-              onTypeChange={(date) => update({ date })}
               startValue={filters.date_from?.slice(0, 10) || ''}
               endValue={filters.date_to?.slice(0, 10) || ''}
-              onRangeChange={(from, to) => update({ from, to })}
+              onRangeChange={(from, to, date) => update({ date, from, to })}
             />
           </>
         }

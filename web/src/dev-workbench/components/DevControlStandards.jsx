@@ -262,9 +262,9 @@ const TOPICS = [
     rules: [
       ['单个日期', 'DateInput', '整框打开日历，选值立即回填，清空后保留空值。'],
       ['日期时间', 'DateTimeInput', '分钟选择即时生效；快捷截止沿用跟进任务的同一构造函数。'],
-      ['起止筛选', 'DateRangeFilter', '单字段按业务名称分组，多字段先选日期类型，再点时间范围。计划日期可查未来 7 天；自定义展开起止输入，切换类型保留日期并校验倒置范围。'],
+      ['起止筛选', 'DateRangeFilter', '从日期摘要进入日历。快捷项直接应用，自选日期点应用。箭头左侧的 × 单独清除已应用的日期。宽窗双月，窄窗单月。'],
     ],
-    checks: ['选择日期和分钟，核对下方值即时变化。', '使用截止快捷项，再切换禁用和错误。', '切换日期类型，查看倒置范围并清空、重置。'],
+    checks: ['选择日期和分钟，核对下方值即时变化。', '使用截止快捷项，再切换禁用和错误。', '打开日期范围，切换类型，核对应用、取消和起止校验。'],
     componentRefs: ['DateInput', 'DateTimeInput', 'DateRangeFilter'],
     source: 'erp/components/business-list/BusinessDateInputs.jsx · erp/utils/dateRange.mjs · erp/utils/workflowTaskTiming.mjs',
     consumer: { ...PURCHASE_PAGE, task: '核对列表日期范围，以及编辑页下单、到货日期的选择和清空。' },

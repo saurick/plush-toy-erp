@@ -20,10 +20,12 @@ type OutsourcingFact struct {
 	ProductSkuID *int
 	// SKUCodeSnapshot is a read projection from the immutable source order line.
 	// It is not persisted on outsourcing_facts and must not be inferred from an ID.
-	SKUCodeSnapshot          *string
-	WarehouseID              int
-	UnitID                   int
-	LotID                    *int
+	SKUCodeSnapshot *string
+	WarehouseID     int
+	UnitID          int
+	LotID           *int
+	// LotNo identifies the inventory lot linked to a readable outsourcing fact.
+	LotNo                    *string
 	Quantity                 decimal.Decimal
 	SupplierID               *int
 	SupplierName             *string

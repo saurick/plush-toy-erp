@@ -22,6 +22,12 @@ export const PRODUCTION_WIP_ACTION = Object.freeze({
   CONFIRM_PACKAGING_MATERIAL: 'CONFIRM_PACKAGING_MATERIAL',
 })
 
+export function isProductionBatchActionEntry(batchID, action) {
+  return Boolean(batchID && (
+    action === 'completion' || Object.values(PRODUCTION_WIP_ACTION).includes(action)
+  ))
+}
+
 export const PRODUCTION_WIP_EXECUTION_MODE = Object.freeze({
   IN_HOUSE: 'IN_HOUSE',
   OUTSOURCED: 'OUTSOURCED',

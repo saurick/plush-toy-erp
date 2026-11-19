@@ -1194,13 +1194,10 @@ export default function QualityInspectionsPage() {
             <DateRangeFilter
               options={QUALITY_DATE_FILTER_OPTIONS}
               value={dateFilterField}
-              onTypeChange={(nextField) => {
-                setDateFilterField(nextField || 'inspected_at')
-                resetBusinessPaginationCurrent(setPagination)
-              }}
               startValue={dateFilterStart}
               endValue={dateFilterEnd}
-              onRangeChange={(from, to) => {
+              onRangeChange={(from, to, field) => {
+                setDateFilterField(field)
                 setDateFilterStart(from)
                 setDateFilterEnd(to)
                 resetBusinessPaginationCurrent(setPagination)

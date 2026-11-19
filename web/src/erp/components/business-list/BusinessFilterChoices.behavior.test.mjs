@@ -222,37 +222,102 @@ test('手机单据类型超过四项仍直接点选，保留当前选择和清�
   assert.deepEqual(changes, [{ sourceType: 'purchase_order' }, { sourceType: '' }])
 })
 
-test('日期快捷项成对提交、清空和回显，自定义保留单边日期，财务期间须选日期', async (t) => {
+test('日期在原气泡编辑，类型和范围一次提交，取消无需查询', async (t) => {
   const ui = await businessFormHarness(t)
   const { DateRangeFilter } = await import('./BusinessDateInputs.jsx')
+  const { BusinessOperationPanel } = await import('./BusinessListLayout.jsx')
   const { currentBusinessDate } = await import('../../utils/businessDate.mjs')
   const changes = []
-  const render = (startValue, endValue, required = false) => ui.render(createElement(DateRangeFilter, {
-    startValue,
-    endValue,
-    required,
-    onRangeChange: (from, to) => changes.push([from, to]),
-    value: 'due',
-    options: [{ value: 'due', label: '交期', upcoming: true }],
+  const render = (startValue, endValue, required = false) => ui.render(createElement(BusinessOperationPanel, {
+    filtersOpen: true,
+    filters: createElement(DateRangeFilter, {
+      startValue,
+      endValue,
+      required,
+      onRangeChange: (...values) => changes.push(values),
+      value: 'order',
+      options: [{ value: 'order', label: '下单日期' }, { value: 'due', label: '交期', upcoming: true }],
+    }),
   }))
+  const trigger = () => document.querySelector('.erp-filter-date-trigger')
+  const detail = () => document.querySelector('[role="dialog"][aria-label="选择日期范围"]')
   const today = currentBusinessDate()
   await render('', '')
-  assert.equal(document.querySelectorAll('.ant-picker').length, 0)
+  const overview = document.querySelector('[role="dialog"][aria-label="筛选条件"]')
+  assert.equal(trigger().getAttribute('aria-label'), '下单日期：不限')
+  await ui.click(trigger())
+  assert.equal(detail() === overview, true)
+  assert.equal(ui.button('未来 7 天').disabled, true)
+  await ui.click(ui.button('交期'))
+  assert.equal(ui.button('未来 7 天').disabled, false)
+  assert.deepEqual(changes, [])
+  await ui.click(ui.button('取消'))
+  assert.equal(document.activeElement === trigger(), true)
+  assert.equal(trigger().getAttribute('aria-label'), '下单日期：不限')
+
+  await ui.click(trigger())
+  await ui.click(ui.button('交期'))
   await ui.click(ui.button('今天'))
-  assert.deepEqual(changes, [[today, today]])
+  assert.deepEqual(changes, [[today, today, 'due']])
   await render(today, today)
-  assert.equal(ui.button('今天').getAttribute('aria-pressed'), 'true')
-  await ui.click(ui.button('自定义日期'))
-  assert.equal(document.querySelectorAll('.ant-picker').length, 2)
-  assert.equal(changes.length, 1)
-  await ui.click(ui.button('不限'))
-  assert.deepEqual(changes.at(-1), ['', ''])
-  await render('', '2026-10-03')
-  assert.equal(ui.button('自定义日期').getAttribute('aria-pressed'), 'true')
-  assert.equal(document.querySelector('[aria-label="结束日期"]').value, '2026/10/03')
+  await ui.click(trigger())
+  assert.equal(detail().querySelector('[aria-label="快捷期间"] [aria-pressed="true"]')?.textContent, '今天')
+  await ui.click(ui.button('输入日期'))
+  const from = detail().querySelector('input[placeholder="YYYY-MM-DD"]')
+  await ui.fill(from, '9999-12-31')
+  assert.equal(ui.button('应用日期').disabled, true)
+  await ui.fill(from, '')
+  await ui.click(ui.button('应用日期'))
+  assert.deepEqual(changes.at(-1), ['', today, 'order'])
+
+  await render('', today)
+  const clearDate = () => document.querySelector('button[aria-label="清除下单日期"]')
+  assert.equal(clearDate().previousElementSibling === trigger(), true)
+  await ui.click(clearDate())
+  assert.deepEqual(changes.at(-1), ['', '', 'order'])
+  assert.equal(Boolean(detail()), false)
+  assert.equal(document.activeElement === trigger(), true)
   await render('', '')
-  assert.equal(ui.button('不限').getAttribute('aria-pressed'), 'true')
+  assert.equal(Boolean(clearDate()), false)
+
+  await render(today, today, true)
+  assert.equal(Boolean(clearDate()), false)
   await render('', '', true)
+  await ui.click(trigger())
   assert.equal(Boolean(ui.button('不限')), false)
-  assert.equal(document.querySelectorAll('.ant-picker').length, 2)
+  await ui.click(detail().querySelector(`button[aria-label="${today}"]`))
+  assert.equal(ui.button('应用日期').disabled, true)
+  await ui.click(detail().querySelector(`button[aria-label="${today}"]`))
+  await ui.click(ui.button('应用日期'))
+  assert.deepEqual(changes.at(-1), [today, today, 'order'])
+})
+
+test('独立日期快捷期间清除时恢复不限并保留日历入口', async (t) => {
+  const ui = await businessFormHarness(t)
+  const { DateRangeFilter } = await import('./BusinessDateInputs.jsx')
+  const selections = []
+  const render = (period) => ui.render(createElement(DateRangeFilter, {
+    options: [{ value: 'due_date', label: '订单交期' }],
+    startValue: '2026-11-01',
+    endValue: '2026-11-19',
+    onRangeChange: () => assert.fail('清除统计期间应使用既有快捷期间入口'),
+    shortcutFilter: {
+      exclusive: true,
+      emptyValue: 'all',
+      value: period,
+      options: [{ value: 'all', label: '不限' }, { value: 'month', label: '本月' }],
+      onChange: (value) => selections.push(value),
+    },
+  }))
+  const clear = () => document.querySelector('button[aria-label="清除订单交期"]')
+  await render('month')
+  await ui.click(clear())
+  assert.deepEqual(selections, ['all'])
+  const trigger = document.querySelector('.erp-filter-date-trigger')
+  assert.equal(trigger.getAttribute('aria-expanded'), 'false')
+  assert.equal(document.activeElement === trigger, true)
+  await render('all')
+  assert.equal(Boolean(clear()), false, '上一期结果范围仍在时也按当前已应用的期间显示清除入口')
+  await ui.click(trigger)
+  assert.equal(trigger.getAttribute('aria-expanded'), 'true')
 })

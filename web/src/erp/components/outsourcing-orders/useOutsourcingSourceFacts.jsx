@@ -4,7 +4,7 @@ import { Button, Input, Space } from 'antd'
 import { operationalFactActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { outsourcingTaskFactMatches, outsourcingTaskScope } from '../../utils/outsourcingTaskScope.mjs'
-import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
+import { OperationalFactStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
 import { message, useModal } from '@/common/utils/antdApp'
@@ -60,6 +60,8 @@ import {
   isPostedOutsourcingReturn,
 } from '../../utils/qualityInspectionSourceAction.mjs'
 import { relatedDocumentRoute } from '../../utils/relatedDocumentNavigation.mjs'
+import { PRODUCTION_WIP_ACTION } from '../../utils/productionWipModel.mjs'
+import { routeWithQuery } from '../../utils/routeQuery.mjs'
 import {
   OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS,
   buildOperationalFactDraftSavePayload,
@@ -187,7 +189,7 @@ export function useOutsourcingSourceFacts({
   )
 
   const loadRelatedOutsourcingQualityInspections = useCallback(
-    async (facts) => {
+    async (facts, options) => {
       if (
         !canReadQualityInspection ||
         !facts?.some(isPostedOutsourcingReturn)
@@ -197,7 +199,8 @@ export function useOutsourcingSourceFacts({
       const postedFacts = facts.filter(isPostedOutsourcingReturn)
       const data = await listOutsourcingReturnQualityInspectionsForFacts(
         postedFacts.map((fact) => fact.id),
-        { customer_key: activeCustomerKey || undefined }
+        { customer_key: activeCustomerKey || undefined },
+        options
       )
       const inspections = data.quality_inspections
       return groupOutsourcingReturnQualityInspections(inspections, facts)
@@ -766,6 +769,7 @@ export function useOutsourcingSourceFacts({
       ? { type: OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE, label: '委外发料', allowed: canCreateMaterialIssue }
       : { type: OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT, label: '登记回货', allowed: canCreateReturnReceipt }
     const stage = Number(item?.production_wip_batch_id) > 0 && Number(item?.production_order_id) > 0
+    const canHandleStageReturn = !taskBusiness && canCreateReturnReceipt && item?.production_wip_status === ProductionWIPStatus.OUTSOURCED
     const canCreateFact = (!taskScope || (taskScope.writable && taskScope.create && taskScope.factType === action.type)) && action.allowed && isOutsourcingSourceActionEligible(action.type, order, item)
     const canBill = !taskScope && stage && canCreateStagePayable && item.production_wip_status === 'ACCEPTED' && ['confirmed', 'closed'].includes(order.lifecycle_status)
     if (!canCreateFact && (taskScope || (!(stage && canReadWIP) && !canBill && !(stage && canViewPayable)))) return null
@@ -783,8 +787,15 @@ export function useOutsourcingSourceFacts({
           </Button>
         )}
         {!taskScope && stage && canReadWIP && (
-          <Button size="small" onClick={() => navigate(`${BUSINESS_ROUTE_PATHS.productionOrders}?production_order_id=${item.production_order_id}&wip_batch_id=${item.production_wip_batch_id}`)}>
-            {taskBusiness ? '查看工序任务' : item.production_wip_status === 'OUTSOURCED' ? '办理工序回货' : '查看工序'}
+          <Button
+            size="small"
+            onClick={() => navigate(routeWithQuery(BUSINESS_ROUTE_PATHS.productionOrders, {
+              production_order_id: item.production_order_id,
+              wip_batch_id: item.production_wip_batch_id,
+              wip_action: canHandleStageReturn ? PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN : undefined,
+            }))}
+          >
+            {taskBusiness ? '查看工序任务' : canHandleStageReturn ? '办理工序回货' : '查看工序'}
           </Button>
         )}
         {canBill && <Button size="small" onClick={() => openOutsourcingOrderPayable(order)}>生成合同应付</Button>}
@@ -1129,6 +1140,7 @@ export function useOutsourcingSourceFacts({
     getOutsourcingOrderItemFields,
     getOutsourcingHandlingItemFields,
     loadOutsourcingOrderDetailsItems,
+    loadRelatedOutsourcingQualityInspections,
     submitOutsourcingSourceFact,
   }
 }

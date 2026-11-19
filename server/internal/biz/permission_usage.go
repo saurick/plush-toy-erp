@@ -339,7 +339,9 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	// Sales orders.
 	salesOrderReadMethods := append(permissionMethods("sales_order", "get_sales_order", "list_sales_orders", "export_sales_orders"), permissionMethods("customer_config", "get_sales_order_acceptance_process", "start_sales_order_acceptance_process")...)
+	salesDeliverySurface := menuPermissionSurface("sales-orders", "sales-order-actions", "销售订单", "sales-delivery-progress", "查看交付进度", permissionControlSection, "核对本单实际出货、待交和办理记录", permissionMethods("sales_order", "get_delivery_progress"), []string{"销售订单模块可读，同时具备销售订单与明细读取权限"})
 	add(PermissionSalesOrderRead,
+		salesDeliverySurface,
 		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_sales_order_summary_filter_options"), businessUsageConditions),
 		menuPermissionSurface("sales-orders", "sales-orders", "销售订单", "sales-order-list", "销售订单列表和详情", permissionControlPage, "允许进入并查看", salesOrderReadMethods, businessUsageConditions),
 		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-order-reference", "出货单可导入的销售订单", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
@@ -360,6 +362,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionSalesOrderClose, "sales-orders", "sales-order-actions", "订单动作", "close-sales-order", "关闭销售订单", permissionControlButton, "显示并允许关闭", permissionMethods("sales_order", "close_sales_order"), businessUsageConditions)
 	addMenu(PermissionSalesOrderCancel, "sales-orders", "sales-order-actions", "订单动作", "cancel-sales-order", "取消销售订单", permissionControlButton, "显示并允许取消", permissionMethods("sales_order", "cancel_sales_order"), businessUsageConditions)
 	add(PermissionSalesOrderItemRead,
+		salesDeliverySurface,
 		menuPermissionSurface("global-dashboard", "workbench-summary", "工作台汇总", "sales-order-summary-items", "销售订单产品明细汇总", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_summary", "list_sales_order_summary_filter_options"), businessUsageConditions),
 		menuPermissionSurface("sales-orders", "sales-order-items", "订单明细", "sales-order-item-list", "销售订单明细", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_items"), businessUsageConditions),
 		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-item-reference", "出货单可导入的销售订单行", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
@@ -382,6 +385,8 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		workflowTaskReadSurfaces = append(workflowTaskReadSurfaces, menuPermissionSurface(pageKey, "record-tasks", "单据任务", "related-tasks", "相关任务", permissionControlButton, "允许查看当前单据的可见任务", permissionMethods("workflow", "get_task_create_options", "list_tasks", "get_task", "list_task_events"), workflowUsageConditions))
 	}
 	add(PermissionWorkflowTaskCreate, workflowTaskCreateSurfaces...)
+	workflowTaskReadSurfaces = append(workflowTaskReadSurfaces,
+		menuPermissionSurface("business-dashboard", "role-progress", "岗位进度", "my-role-progress", "查看本岗进度", permissionControlPage, "查看本岗临期、受阻、无人接手及处理结果", permissionMethods("workflow", "get_task_board", "get_tracking"), []string{"当前岗位及既有任务责任范围；菜单仍受客户启用范围限制"}))
 	add(PermissionWorkflowTaskRead, workflowTaskReadSurfaces...)
 	add(PermissionWorkflowTaskSupervise,
 		menuPermissionSurface("task-board", "task-supervision", "协同任务", "cross-role-task-list", "跨岗位任务监督", permissionControlSection, "允许只读查看其他责任岗位任务", permissionMethods("workflow", "list_tasks", "get_task_board", "get_workbench"), workflowUsageConditions),
@@ -597,7 +602,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	for _, permission := range []string{PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionPMCPlanRead, PermissionProductionWIPRead, PermissionWorkflowTaskRead} {
 		usage := out[permission]
-		usage.Surfaces = append(usage.Surfaces, menuPermissionSurface("business-dashboard", "progress-sources", "来源进度", "progress-source-read", "按来源权限查看进度", permissionControlSection, "允许查看对应来源环节", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress", "list_progress_tasks"), []string{"页面入口仍需进度看板权限；订单同时要求销售单与明细读取，工序及质检另需生产读取；任务沿用 revision 与责任可见范围"}))
+		usage.Surfaces = append(usage.Surfaces, menuPermissionSurface("business-dashboard", "progress-sources", "来源进度", "progress-source-read", "按来源权限查看进度", permissionControlSection, "允许查看对应来源环节", permissionMethods("business", "list_progress", "list_progress_owner_options", "get_progress", "list_progress_tasks"), []string{"订单交付明细同时要求销售订单与明细读取；整单、生产与关联任务聚合另需全局看板权限"}))
 		out[permission] = usage
 	}
 	applySourceActionReadPermissionUsages(out)

@@ -116,6 +116,12 @@ function validProgressLine(line) {
     ['overdue', 'due_soon', 'undated', 'closed', 'unknown', 'delivered', 'open', 'canceled'].includes(line.delivery_status))
 }
 
+export function validSalesDeliveryRows(rows, total) {
+  return Array.isArray(rows) && integer(total) && rows.length <= total &&
+    rows.every((row) => validRow(row) && row.view === 'orders' && validProgressLine(row.line)) &&
+    new Set(rows.map((row) => row.id)).size === rows.length
+}
+
 export function progressProductLabel(row) {
   if (row.product_match_count > 0) {
     return `${row.product}（命中 ${row.product_match_count} 款，共 ${row.product_type_count} 款）`

@@ -359,6 +359,8 @@ func workflowTaskBoardStatusFilterPredicate(filter biz.WorkflowTaskBoardQuery) (
 	switch filter.Status {
 	case "", "all":
 		return nil, nil
+	case "open":
+		return workflowTaskBoardUnsettledStatusPredicate(), nil
 	case "overdue":
 		return workflowtask.And(
 			workflowTaskBoardUnsettledStatusPredicate(),

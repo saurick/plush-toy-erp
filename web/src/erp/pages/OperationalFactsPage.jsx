@@ -1041,17 +1041,10 @@ export function OperationalFactWorkspace({
             <DateRangeFilter
               options={activeConfig.dateOptions || OCCURRED_DATE_FILTER_OPTIONS}
               value={activeDateField}
-              onTypeChange={(nextField) => {
-                setDateFieldByKey((prev) => ({
-                  ...prev,
-                  [currentActiveKey]:
-                    nextField || activeConfig.defaultDateField,
-                }))
-                resetPaginationForKey()
-              }}
               startValue={activeDateRange[0] || ''}
               endValue={activeDateRange[1] || ''}
-              onRangeChange={(from, to) => {
+              onRangeChange={(from, to, field) => {
+                setDateFieldByKey((prev) => ({ ...prev, [currentActiveKey]: field }))
                 setDateRangeByKey((prev) => ({ ...prev, [currentActiveKey]: [from, to] }))
                 resetPaginationForKey()
               }}

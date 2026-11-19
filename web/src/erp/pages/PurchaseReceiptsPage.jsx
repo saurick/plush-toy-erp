@@ -1231,13 +1231,10 @@ export default function PurchaseReceiptsPage() {
             <DateRangeFilter
               options={DATE_FILTER_OPTIONS}
               value={dateFilterField}
-              onTypeChange={(nextField) => {
-                setDateFilterField(nextField || 'received_at')
-                resetBusinessPaginationCurrent(setPagination)
-              }}
               startValue={dateFilterStart}
               endValue={dateFilterEnd}
-              onRangeChange={(from, to) => {
+              onRangeChange={(from, to, field) => {
+                setDateFilterField(field)
                 setDateFilterStart(from)
                 setDateFilterEnd(to)
                 resetBusinessPaginationCurrent(setPagination)

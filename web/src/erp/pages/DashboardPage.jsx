@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Alert, Button, Card, Tag } from 'antd'
+import { Alert, Button, Card } from 'antd'
 import {
   useLocation,
   useNavigate,
@@ -21,19 +21,26 @@ import {
   getWorkflowTaskStableKey,
 } from '../components/workflow/WorkflowDashboardViews.jsx'
 import { WORKFLOW_HISTORY_PERIOD_OPTIONS } from '../utils/workflowRoleTaskHistory.mjs'
-import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
 import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import WorkflowTaskLinkDrawer from '../components/workflow/WorkflowTaskLinkDrawer.jsx'
 import WorkflowExactTaskEntry from '../components/workflow/WorkflowExactTaskEntry.jsx'
 import WorkflowTaskDiscoveryFilters from '../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
 import WorkflowTaskDocumentFilter from '../components/workflow/WorkflowTaskDocumentFilter.jsx'
-import WorkflowTaskCalendar from '../components/workflow/WorkflowTaskCalendar.jsx'
+import { WorkflowTaskCalendarContent } from '../components/workflow/WorkflowTaskCalendar.jsx'
+import useWorkflowTaskCalendarData from '../hooks/useWorkflowTaskCalendarData.js'
 import useWorkflowTaskCalendarView from '../hooks/useWorkflowTaskCalendarView.js'
+import {
+  defaultTaskCalendarDate,
+  TASK_CALENDAR_SELECTION_OPTIONS,
+  taskCalendarSelectionMode,
+  writeTaskCalendarStateToSearch,
+} from '../utils/workflowTaskCalendar.mjs'
 import WorkflowExceptionPanel from '../components/workflow/WorkflowExceptionPanel.jsx'
 import { TRACKING_VIEW_OPTIONS } from '../utils/workflowTrackingFilters.mjs'
 import useReturnedWorkflowTask from '../hooks/useReturnedWorkflowTask.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 
 import { message } from '@/common/utils/antdApp'
@@ -171,12 +178,7 @@ export default function DashboardPage() {
     }
   }, [])
 
-  const [historyDateOpen, setHistoryDateOpen] = useState(false)
   const [taskFiltersOpen, setTaskFiltersOpen] = useState(false)
-  const openHistoryDate = () => {
-    setTaskFiltersOpen(false)
-    setHistoryDateOpen(true)
-  }
   const taskViewsRef = useRef(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [returnedBusinessTask, setReturnedBusinessTask] = useState(null)
@@ -335,10 +337,12 @@ export default function DashboardPage() {
     setSearchParams,
   ])
 
-  const activeFilterCount = useMemo(
-    () => workflowTaskBoardExtraFilterCount(filters, { calendar: calendarView }),
-    [calendarView, filters]
-  )
+  const calendarMode = taskCalendarSelectionMode(calendarState.selection)
+  const activeDeadlineLabel = calendarView && calendarMode !== 'date'
+    ? TASK_CALENDAR_SELECTION_OPTIONS.find(({ value }) => value === calendarMode).label
+    : ''
+  const activeFilterCount = workflowTaskBoardExtraFilterCount(filters, { calendar: calendarView }) +
+    Number(Boolean(activeDeadlineLabel))
   const taskBoardResponse = useMemo(
     () =>
       resolveWorkflowTaskBoardResponseState(
@@ -369,6 +373,14 @@ export default function DashboardPage() {
     !taskBoardHasLoaded &&
     !taskBoardResponse &&
     !taskBoardLoadError
+  const calendarData = useWorkflowTaskCalendarData({
+    state: calendarState,
+    query: calendarView && !trackingScope && !exceptionsView && !taskBoardInitialLoading
+      ? buildWorkflowTaskBoardRequest({ ...filters, lane: 'all', due: 'all', page: 1 }, { calendar: true })
+      : null,
+    scopeKey: workflowWorkbenchScopeKey,
+    refreshKey: trackingRefresh,
+  })
   const taskBoardUpdating =
     taskBoardHasLoaded &&
     (loading || !taskBoardResponse) &&
@@ -613,12 +625,10 @@ export default function DashboardPage() {
     preserveTaskBoardTransitionHeight(
       buildWorkflowTaskBoardRequest(nextFilters)
     )
-    setSearchParams(
-      writeWorkflowTaskBoardFiltersToSearch(searchParams, nextFilters),
-      {
-        replace: true,
-      }
-    )
+    const nextParams = writeWorkflowTaskBoardFiltersToSearch(searchParams, nextFilters)
+    setSearchParams(calendarView
+      ? writeTaskCalendarStateToSearch(nextParams, { selection: defaultTaskCalendarDate(calendarState.month) })
+      : nextParams, { replace: true })
   }
 
   const selectTaskView = (view, restoreTrackingView = false) => {
@@ -1079,21 +1089,6 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="erp-dashboard-block">
-                {historyDateOpen && (
-                  <FilterDateRangePicker
-                    title="选择处理日期范围"
-                    dateFrom={filters.dateFrom}
-                    dateTo={filters.dateTo}
-                    onCancel={() => {
-                      setHistoryDateOpen(false)
-                      setTaskFiltersOpen(true)
-                    }}
-                    onApply={(range) => {
-                      updateFilter({ period: 'custom', ...range })
-                      setHistoryDateOpen(false)
-                    }}
-                  />
-                )}
                 <div className="erp-task-board-controls" data-page-table-toolbar>
                   <div className="erp-task-board-filters">
                     <BusinessOperationPanel
@@ -1114,6 +1109,7 @@ export default function DashboardPage() {
                       onFiltersOpenChange={setTaskFiltersOpen}
                       onClearFilters={clearFilters}
                       activeFilterCount={activeFilterCount}
+                      activeFilterLabel={activeDeadlineLabel}
                       filters={
                         <>
                           {!calendarView && (
@@ -1178,41 +1174,20 @@ export default function DashboardPage() {
                             />
                           ) : null}
                           {filters.lane === 'finished' && (
-                            <>
-                              <SelectFilter
-                                aria-label="处理时间"
-                                value={filters.period || ''}
-                                options={[
-                                  ...WORKFLOW_HISTORY_PERIOD_OPTIONS,
-                                  { value: 'custom', label: '自定义日期' },
-                                ]}
-                                onChange={(period) =>
-                                  period === 'custom'
-                                    ? openHistoryDate()
-                                    : updateFilter({
-                                        period,
-                                        dateFrom: '',
-                                        dateTo: '',
-                                      })
-                                }
-                              />
-                              {filters.period === 'custom' && (
-                                <Tag
-                                  closable
-                                  onClose={() =>
-                                    updateFilter({
-                                      period: '',
-                                      dateFrom: '',
-                                      dateTo: '',
-                                    })
-                                  }
-                                >
-                                  <Button type="link" onClick={openHistoryDate}>
-                                    {filters.dateFrom} 至 {filters.dateTo}
-                                  </Button>
-                                </Tag>
-                              )}
-                            </>
+                            <DateRangeFilter
+                              options={[{ value: 'processed', label: '处理时间' }]}
+                              startValue={filters.dateFrom}
+                              endValue={filters.dateTo}
+                              allowManual={false}
+                              allowPartial={false}
+                              onRangeChange={(dateFrom, dateTo) => updateFilter({ period: 'custom', dateFrom, dateTo })}
+                              shortcutFilter={{
+                                exclusive: true,
+                                options: WORKFLOW_HISTORY_PERIOD_OPTIONS,
+                                value: filters.period || '',
+                                onChange: (period) => updateFilter({ period, dateFrom: '', dateTo: '' }),
+                              }}
+                            />
                           )}
                           {!calendarView && filters.lane !== 'finished' && (
                             <DateRangeFilter
@@ -1227,6 +1202,20 @@ export default function DashboardPage() {
                               }}
                             />
                           )}
+                          {calendarView && (
+                            <FilterChipGroup
+                              label="任务截止"
+                              className="erp-business-filter-field--choices"
+                              value={calendarMode}
+                              options={TASK_CALENDAR_SELECTION_OPTIONS.map((option) => ({
+                                ...option,
+                                count: calendarData.monthCalendar?.[option.value],
+                              }))}
+                              onChange={(value) => calendarState.change({
+                                selection: value === 'date' ? defaultTaskCalendarDate(calendarState.month) : value,
+                              })}
+                            />
+                          )}
                         </>
                       }
 
@@ -1235,16 +1224,10 @@ export default function DashboardPage() {
                 </div>
                 <Card className="erp-business-data-table-card erp-work-center-results">
                   {calendarView ? (
-                    <WorkflowTaskCalendar
+                    <WorkflowTaskCalendarContent
                       state={calendarState}
-                      query={buildWorkflowTaskBoardRequest({
-                        ...filters,
-                        lane: 'all',
-                        due: 'all',
-                        page: 1,
-                      }, { calendar: true })}
-                      scopeKey={workflowWorkbenchScopeKey}
-                      refreshKey={trackingRefresh}
+                      data={calendarData}
+                      keyword={filters.keyword}
                       onOpenTask={openTaskDrawer}
                     />
                   ) : taskBoardLoadError ? (

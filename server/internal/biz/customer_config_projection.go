@@ -1,6 +1,7 @@
 package biz
 
 import (
+	"slices"
 	"sort"
 	"strings"
 )
@@ -524,8 +525,12 @@ func effectivePageKeysForRoles(pageKeys []string, snapshot map[string]any, roleK
 		}
 	}
 	out := make([]string, 0, len(pageKeys))
+	_, roleCanUseTasks := allowed["task-board"]
 	for _, pageKey := range pageKeys {
-		if _, ok := allowed[pageKey]; ok {
+		_, explicitlyAllowed := allowed[pageKey]
+		// Role progress is a view of the same work-center tasks. The page must
+		// still pass the account/menu and customer/module checks in pageKeys.
+		if explicitlyAllowed || pageKey == "business-dashboard" && roleCanUseTasks && slices.Contains(pageKeys, "task-board") {
 			out = append(out, pageKey)
 		}
 	}

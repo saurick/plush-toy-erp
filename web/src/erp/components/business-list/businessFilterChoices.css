@@ -3,7 +3,3 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-
-.erp-business-filter-popover .erp-business-operation-panel__filters > .erp-business-filter-field--choices {
-  flex-basis: 100%;
-}

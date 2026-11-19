@@ -1,3 +1,4 @@
+import { expect } from 'playwright/test'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -117,6 +118,10 @@ export function createProductionWipScenarios(deps) {
           .locator('.ant-modal:visible')
           .filter({ hasText: '生产工序办理' })
           .last()
+        await expect(page.getByText('当前仅查看这张订单', { exact: true })).toBeVisible()
+        await expect(page.getByText('已选择 MO-STYLE-L1-20260713', { exact: true })).toBeVisible()
+        await expect(modal).toHaveCount(0)
+        await clickVisibleAction(page, '工序办理')
         await modal.waitFor({ state: 'visible' })
         await expectText(page, '当前：布料加工')
         assert.equal(
@@ -147,6 +152,19 @@ export function createProductionWipScenarios(deps) {
         })
       },
     })),
+    {
+      name: 'production-explicit-wip-action-entry-desktop',
+      path: '/erp/production/orders?production_order_id=71&wip_batch_id=91021&wip_action=ASSIGN_EXECUTION',
+      auth: 'admin',
+      productionOrderReleased: true,
+      effectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const modal = page.getByRole('dialog', { name: '安排本厂或外发加工' })
+        await expect(modal.getByRole('button', { name: '确认办理', exact: true })).toBeVisible()
+        await expect(modal.getByRole('rowgroup').getByText(/WIP-STYLE-91021/u)).toBeVisible()
+      },
+    },
     {
       name: 'production-wip-prepare-outsourcing-desktop',
       path: '/erp/production/orders',

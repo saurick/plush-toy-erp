@@ -44,26 +44,26 @@ function useBusinessLineItems(config, open, record) {
       return undefined
     }
     if (Array.isArray(embeddedItems)) {
-      setLoadState({ status: 'success', items: embeddedItems })
+      setLoadState({ status: 'success', record, items: embeddedItems })
       return undefined
     }
     if (typeof loadItems !== 'function') {
-      setLoadState({ status: 'success', items: EMPTY_LINE_ITEMS })
+      setLoadState({ status: 'success', record, items: EMPTY_LINE_ITEMS })
       return undefined
     }
 
     const controller = new AbortController()
-    setLoadState({ status: 'loading', items: EMPTY_LINE_ITEMS })
+    setLoadState({ status: 'loading', record, items: EMPTY_LINE_ITEMS })
     Promise.resolve(loadItems(record, { signal: controller.signal }))
       .then(normalizeLineItems)
       .then((items) => {
         if (!controller.signal.aborted) {
-          setLoadState({ status: 'success', items })
+          setLoadState({ status: 'success', record, items })
         }
       })
       .catch((error) => {
         if (!controller.signal.aborted && !isRpcAbortError(error)) {
-          setLoadState({ status: 'error', error, items: EMPTY_LINE_ITEMS })
+          setLoadState({ status: 'error', record, error, items: EMPTY_LINE_ITEMS })
         }
       })
 
@@ -180,6 +180,7 @@ export default function BusinessDetailsModal({
   onClose,
   open,
   record,
+  renderAfterSummary,
   title = '记录详情',
   width = lineItems
     ? ERP_MODAL_WIDTHS.lineItems
@@ -220,6 +221,11 @@ export default function BusinessDetailsModal({
           <BusinessRecordDetails columns={columns} record={record} />
         </BusinessFormSection>
       ) : <BusinessRecordDetails columns={columns} record={record} />}
+      {renderAfterSummary?.(
+        lineItemsState.loadState.record === record
+          ? lineItemsState.loadState
+          : { status: 'loading', items: EMPTY_LINE_ITEMS }
+      )}
       {lineItems ? (
         <BusinessLineItems
           config={lineItems}

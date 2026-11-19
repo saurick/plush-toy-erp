@@ -9,7 +9,6 @@ import {
   DateTimeInput,
   DateRangeFilter,
 } from '@/erp/components/business-list/BusinessDateInputs.jsx'
-import { isDateInputRangeReversed } from '@/erp/utils/dateRange.mjs'
 import { buildWorkflowDeadlineQuickOptions } from '@/erp/utils/workflowTaskTiming.mjs'
 import { buildHistorySourceSelectOptions } from '@/erp/utils/historySourceSelectOptions.mjs'
 
@@ -194,7 +193,6 @@ export function DateInputExample() {
     setValues((current) => ({ ...current, [key]: value }))
   const disabled = state === 'disabled'
   const status = state === 'error' ? 'error' : undefined
-  const rangeInvalid = isDateInputRangeReversed(values.start, values.end)
   return (
     <div className="erp-control-example-stack">
       <Segmented
@@ -242,17 +240,13 @@ export function DateInputExample() {
             { value: 'delivery', label: '交货日期', upcoming: true },
           ]}
           value={values.type}
-          onTypeChange={(value) => update('type', value)}
           startValue={values.start}
           endValue={values.end}
-          onRangeChange={(start, end) => setValues((current) => ({ ...current, start, end }))}
+          onRangeChange={(start, end, type) => setValues((current) => ({ ...current, start, end, type }))}
         />
         <output aria-label="日期范围当前值">
           {values.start || '未设置'} 至 {values.end || '未设置'}
         </output>
-        {rangeInvalid && (
-          <p role="alert">开始日期不能晚于结束日期，请调整或清空范围。</p>
-        )}
         <div className="erp-control-example-row">
           <Button
             onClick={() =>

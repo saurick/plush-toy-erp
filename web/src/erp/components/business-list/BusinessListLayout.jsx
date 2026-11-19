@@ -38,6 +38,7 @@ import FilterField from '@/common/components/navigation/FilterField.jsx'
 import BusinessSwitchContent from '../BusinessSwitchContent.jsx'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
 import BusinessFilterPopoverContent, { businessFilterPopoverOverflow } from './BusinessFilterPopoverContent.jsx'
+import { BusinessFilterPanelContext } from './BusinessFilterPanelContext.mjs'
 import './businessFilterChoices.css'
 import BusinessRecordDetails from './BusinessRecordDetails.jsx'
 import { taskBusinessActionNode } from './taskBusinessActions.mjs'
@@ -59,7 +60,6 @@ import {
 
 const { Text } = Typography
 export const SelectionActionOverlayContext = React.createContext(null)
-const BusinessFilterPanelContext = React.createContext(false)
 const BusinessSelectionAvailabilityContext = React.createContext(null)
 const BusinessToolbarContext = React.createContext(null)
 
@@ -987,7 +987,7 @@ export function SelectFilter({
       style={inFilterPanel ? undefined : style}
       aria-label={restProps['aria-label'] || filterLabel}
       className={joinClassNames(
-        'erp-business-filter-control erp-business-filter-control--select erp-business-filter-control--compact-select',
+        'erp-business-filter-control erp-business-filter-control--select',
         className
       )}
       value={value}
@@ -1075,6 +1075,7 @@ export function BusinessOperationPanel({
   primaryAction = null,
   onClearFilters = null,
   activeFilterCount = 0,
+  activeFilterLabel = '',
   children,
   showSelection = true,
   compact = false,
@@ -1089,6 +1090,9 @@ export function BusinessOperationPanel({
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
   const hasActiveFilters = activeFilterCount > 0
+  const filterSummary = activeFilterLabel && activeFilterCount > 1
+    ? `${activeFilterLabel} +${activeFilterCount - 1}`
+    : activeFilterLabel || activeFilterCount
   const childActions = React.Children.toArray(flattenSelectionActions(children))
   const hasSelectedRecord = childActions.some((child) => child.type === SelectionActionBar && Number(child.props.selectedCount) > 0)
   const hasRecordActions = childActions.some((child) =>
@@ -1167,12 +1171,10 @@ export function BusinessOperationPanel({
                 triggerRef={filterTriggerRef}
                 open={filtersOpen}
                 onDismiss={closeFilters}
-                onClear={hasClearFilters ? onClearFilters : undefined}
+                onClear={onClearFilters}
                 clearDisabled={!hasActiveFilters}
               >
-                <BusinessFilterPanelContext.Provider value>
-                  {additionalFilters}
-                </BusinessFilterPanelContext.Provider>
+                {additionalFilters}
               </BusinessFilterPopoverContent>
             }
           >
@@ -1181,13 +1183,13 @@ export function BusinessOperationPanel({
                 <Button
                   ref={filterTriggerRef}
                   icon={<FilterOutlined aria-hidden />}
-                  aria-label={hasActiveFilters ? `筛选，已应用 ${activeFilterCount} 项` : '筛选'}
+                  aria-label={hasActiveFilters ? `筛选${activeFilterLabel ? `，${activeFilterLabel}` : ''}，已应用 ${activeFilterCount} 项` : '筛选'}
                   aria-haspopup="dialog"
                   aria-controls={filtersOpen ? filterPanelId : undefined}
                   aria-expanded={filtersOpen}
                   className={hasActiveFilters ? 'erp-business-filter-trigger--active' : ''}
                 >
-                  筛选{hasActiveFilters ? ` · ${activeFilterCount}` : ''}
+                  筛选{hasActiveFilters ? ` · ${filterSummary}` : ''}
                 </Button>
                 {hasActiveFilters && hasClearFilters ? (
                   <Tooltip title="清空额外条件，保留搜索与快捷筛选">

@@ -2015,8 +2015,11 @@ export async function installFactRpcMocks(page, context) {
           (!params.warehouse_id || inventoryBalance.warehouse_id === Number(params.warehouse_id)) &&
           (!params.subject_id || inventoryBalance.subject_id === Number(params.subject_id))
         data = { distribution: { warehouses: matches ? [{
-          warehouse_id: inventoryBalance.warehouse_id, warehouse_name: '成品仓', warehouse_code: 'WH-F',
-          record_count: 1, stock_count: 1,
+          warehouse_id: inventoryBalance.warehouse_id,
+warehouse_name: '成品仓',
+warehouse_code: 'WH-F',
+          record_count: 1,
+stock_count: 1,
           available_record_count: Number(inventoryBalance.available_quantity) > 0 ? 1 : 0,
           unavailable_record_count: Number(inventoryBalance.available_quantity) > 0 ? 0 : 1,
         }] : [] } }
@@ -2842,6 +2845,8 @@ export async function installFactRpcMocks(page, context) {
         if (
           params.todo_only !== true &&
           !params.owner_role_key &&
+          !params.assignee &&
+          (!params.status || params.status === 'all') &&
           Number(params.limit) === 1 &&
           Number(params.offset || 0) === 0
         ) {

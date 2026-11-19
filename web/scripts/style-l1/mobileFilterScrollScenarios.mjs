@@ -63,6 +63,7 @@ export function createMobileFilterScrollScenarios({
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         const panel = page.getByTestId('mobile-progress-panel')
+        await panel.getByRole('tab', { name: role === 'pmc' ? '生产执行' : '订单交付', exact: true }).click()
         await panel.locator('.mobile-progress-card').first().waitFor()
         await page.evaluate(() => document.fonts.ready)
         await page.setViewportSize({ width: 320, height: 844 })

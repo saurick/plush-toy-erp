@@ -2,8 +2,70 @@ package biz
 
 import (
 	"context"
+	"slices"
 	"testing"
 )
+
+func TestCustomerConfigRoleProgressSharesTaskBoardProjection(t *testing.T) {
+	snapshot := map[string]any{"rolePageProjections": map[string]any{
+		SalesRoleKey: []any{"task-board"}, FinanceRoleKey: []any{"receivables"},
+	}}
+	pages := []string{"task-board", "business-dashboard", "receivables"}
+	for _, tc := range []struct {
+		name, role  string
+		input, want []string
+	}{
+		{"published task workspace", SalesRoleKey, pages, []string{"business-dashboard", "task-board"}},
+		{"dashboard disabled by customer", SalesRoleKey, []string{"task-board"}, []string{"task-board"}},
+		{"task workspace not available", SalesRoleKey, []string{"business-dashboard"}, nil},
+		{"unrelated role", FinanceRoleKey, pages, []string{"receivables"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := effectivePageKeysForRoles(tc.input, snapshot, []string{tc.role}); !slices.Equal(got, tc.want) {
+				t.Fatalf("effective pages = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCustomerConfigProgressMenuForDefaultBusinessRoles(t *testing.T) {
+	for _, role := range BuiltinRoles() {
+		mobile := MobileRoleAccessPermission(role.Key)
+		if mobile == "" {
+			continue
+		}
+		t.Run(role.Key, func(t *testing.T) {
+			global := role.Key == BossRoleKey || role.Key == PMCRoleKey
+			projected := []any{"task-board"}
+			if global {
+				projected = append(projected, "business-dashboard")
+			}
+			revision := &CustomerConfigRevision{CompiledSnapshot: map[string]any{
+				"pages":               []any{"task-board", "business-dashboard"},
+				"rolePageProjections": map[string]any{role.Key: projected},
+			}}
+			admin := &AdminUser{ID: 1, Roles: []AdminRole{{Key: role.Key}}, Permissions: role.Permissions}
+			moduleKeys := customerConfigModuleDependencyClosure(append([]string{"workflow_tasks"}, customerConfigModulesForAction(mobile)...))
+			var modules []DeploymentModuleStateInput
+			for _, key := range moduleKeys {
+				modules = append(modules, DeploymentModuleStateInput{ModuleKey: key, State: "enabled"})
+			}
+			grants := []AccessEntitlementInput{
+				{RoleKey: role.Key, CapabilityKey: PermissionWorkflowTaskRead, Enabled: true},
+				{RoleKey: role.Key, CapabilityKey: mobile, Enabled: true},
+			}
+			if global {
+				grants = append(grants, AccessEntitlementInput{RoleKey: role.Key, CapabilityKey: PermissionERPBusinessDashboardRead, Enabled: true})
+			}
+			session := buildEffectiveSessionFromRevision("yoyoosun", revision, admin, []string{role.Key}, modules,
+				[]RoleProfileInput{{RoleKey: role.Key}}, grants, nil, nil)
+			if !slices.Contains(session.Pages, "business-dashboard") || !slices.Contains(session.Actions, mobile) ||
+				slices.Contains(session.Actions, PermissionERPBusinessDashboardRead) != global {
+				t.Fatalf("page or scope mismatch for %s: pages=%v actions=%v", role.Key, session.Pages, session.Actions)
+			}
+		})
+	}
+}
 
 func TestExplainRoleEffectiveAccessRequiresActiveRevisionForFixedCustomer(t *testing.T) {
 	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())

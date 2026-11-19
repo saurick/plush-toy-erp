@@ -241,6 +241,7 @@ export function createMobileSurfaceScenarios({
           '风险数据区'
         )
         await page.getByTestId('mobile-role-nav-progress').click()
+        await page.getByTestId('mobile-progress-panel').getByRole('tab', { name: '订单交付', exact: true }).click()
         await assertSurface(
           page.locator('.mobile-progress-controls'),
           '--erp-page-bg',

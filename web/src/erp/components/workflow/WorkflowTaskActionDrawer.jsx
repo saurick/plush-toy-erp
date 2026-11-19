@@ -974,7 +974,7 @@ roleKey: task.owner_role_key,
               {activeStepKey === 'action' && isTerminal ? <Button type="primary" onClick={() => selectStep('confirm')}>结果回执</Button> : null}
               {activeStepKey === 'confirm' ? (
                 <Button type="primary" disabled={actionSaving} onClick={() => leaveTask(onClose)}>
-                  返回列表
+                  {closeLabel}
                 </Button>
               ) : activeStepKey === 'context' && canChooseActions ? (
                 <Button

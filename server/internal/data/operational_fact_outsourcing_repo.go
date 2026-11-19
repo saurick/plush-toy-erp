@@ -9,6 +9,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
@@ -681,6 +682,9 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	if err := hydrateOutsourcingFactProjections(ctx, r.data.postgres, out); err != nil {
 		return nil, 0, err
 	}
+	if err := hydrateOutsourcingFactLotNos(ctx, r.data.postgres, out); err != nil {
+		return nil, 0, err
+	}
 	references := make([]businessSourceReference, 0, len(rows))
 	for _, row := range rows {
 		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
@@ -694,6 +698,33 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
 	}
 	return out, total, nil
+}
+
+func hydrateOutsourcingFactLotNos(ctx context.Context, client *ent.Client, facts []*biz.OutsourcingFact) error {
+	lotIDs := make([]int, 0, len(facts))
+	for _, fact := range facts {
+		if fact.LotID != nil {
+			lotIDs = append(lotIDs, *fact.LotID)
+		}
+	}
+	if len(lotIDs) == 0 {
+		return nil
+	}
+	lots, err := client.InventoryLot.Query().Where(inventorylot.IDIn(lotIDs...)).
+		Select(inventorylot.FieldID, inventorylot.FieldLotNo).All(ctx)
+	if err != nil {
+		return err
+	}
+	names := make(map[int]*string, len(lots))
+	for _, lot := range lots {
+		names[lot.ID] = &lot.LotNo
+	}
+	for _, fact := range facts {
+		if fact.LotID != nil {
+			fact.LotNo = names[*fact.LotID]
+		}
+	}
+	return nil
 }
 
 func hydrateOutsourcingFactProjections(

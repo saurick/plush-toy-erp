@@ -17,7 +17,9 @@ export function createDensityCompletionScenarios(scenarios, deps) {
     await page.screenshot({ path: path.join(outputDir, `completion-${key}.png`), animations: 'disabled' })
     if (region) await region.screenshot({ path: path.join(outputDir, `completion-${key}-region.png`), animations: 'disabled' })
     const metrics = await page.evaluate(() => ({
-      width: innerWidth, height: innerHeight, dpr: devicePixelRatio,
+      width: innerWidth,
+height: innerHeight,
+dpr: devicePixelRatio,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       panel: [...document.querySelectorAll('.mobile-filter-panel')].filter((node) => node.getClientRects().length).map((node) => ({
         height: node.getBoundingClientRect().height,
@@ -28,12 +30,14 @@ export function createDensityCompletionScenarios(scenarios, deps) {
     }))
     await fs.writeFile(path.join(outputDir, `completion-${key}.json`), JSON.stringify(metrics, null, 2))
     await assertNoHorizontalOverflow(page, key)
-    if (!baseline) for (const panel of metrics.panel) {
+    if (!baseline) { for (const panel of metrics.panel) {
       assert(panel.controls.every((control) => control.height >= 43.5), JSON.stringify(panel))
-    }
+    } }
   }
   const add = (base, key, verify, options = {}) => ({
-    ...base, ...options, name: `density-completion-${key}`,
+    ...base,
+...options,
+name: `density-completion-${key}`,
     verify: async (page) => { page.setDefaultTimeout(12000); await verify(page) },
   })
   const result = []
@@ -99,6 +103,7 @@ export function createDensityCompletionScenarios(scenarios, deps) {
     const progress = find('mobile-progress-boss')
     result.push(add(progress, `recent-${width}`, async (page) => {
       await page.getByTestId('mobile-role-nav-progress').click()
+      await page.getByTestId('mobile-progress-panel').getByRole('tab', { name: '订单交付', exact: true }).click()
       await page.getByRole('button', { name: '查看 SO-0001 进度', exact: true }).click()
       const recent = page.getByRole('region', { name: '最近记录', exact: true })
       await recent.getByText('规格和包装已复核。', { exact: false }).waitFor()

@@ -64,6 +64,9 @@ import { salesOrderLineGroupKey } from '../utils/sourceDocumentLineGroupKeys.mjs
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
+import SalesDeliveryWorkspace from '../components/sales-orders/SalesDeliveryWorkspace.jsx'
+import { useSalesDeliveryWorkspace } from '../components/sales-orders/useSalesDeliveryWorkspace.js'
+import { progressBoardAccess } from '../utils/progressBoardAccess.mjs'
 import { useSalesOrderEditor } from '../components/sales-orders/useSalesOrderEditor.mjs'
 import { useSalesOrderReservation } from '../components/sales-orders/useSalesOrderReservation.mjs'
 import {
@@ -308,24 +311,25 @@ export default function SalesOrdersPage() {
     adminProfile,
     PermissionCode.SALES_ORDER_ITEM_READ
   )
-  const canOpenOrderProgress =
+  const deliveryWorkspace = useSalesDeliveryWorkspace(
+    adminProfile,
+    location.pathname === BUSINESS_ROUTE_PATHS.salesOrders && !outletContext?.taskBusiness
+  )
+  const canOpenBoardFromOrder =
     location.pathname === BUSINESS_ROUTE_PATHS.salesOrders &&
     canReadOrderItems &&
     hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_READ) &&
-    hasActionPermission(
-      adminProfile,
-      PermissionCode.ERP_BUSINESS_DASHBOARD_READ
-    ) &&
+    progressBoardAccess(adminProfile).sales &&
     (adminProfile.is_super_admin ||
       allowedMenuPaths.includes(BUSINESS_ROUTE_PATHS.businessDashboard)) &&
     effectiveSessionAllowsPage(adminProfile, 'business-dashboard', {
       isLocalDev: false,
       isSuperAdmin: adminProfile.is_super_admin === true,
     })
-  const goToOrderProgress = (order) => {
-    if (!canOpenOrderProgress || !order?.id || saving) return
+  const goToOrderProgress = (orderID) => {
+    if (!canOpenBoardFromOrder || !orderID || saving) return
     const selection = {
-      orderID: order.id,
+      orderID,
       draft: searchInputRef.current?.input?.value,
     }
     setSavedProgressReturn(selection)
@@ -333,7 +337,7 @@ export default function SalesOrdersPage() {
       view: 'orders',
       display: 'lines',
       scope: 'all',
-      sales_order_id: String(order.id),
+      sales_order_id: String(orderID),
     })
     navigate(`${BUSINESS_ROUTE_PATHS.businessDashboard}?${params}`, {
       state: {
@@ -1189,13 +1193,10 @@ export default function SalesOrdersPage() {
             <DateRangeFilter
               options={SALES_ORDER_DATE_FILTER_OPTIONS}
               value={dateFilterField}
-              onTypeChange={(nextField) => {
-                setDateFilterField(nextField)
-                resetBusinessPaginationCurrent(setPagination)
-              }}
               startValue={dateFilterStart}
               endValue={dateFilterEnd}
-              onRangeChange={(from, to) => {
+              onRangeChange={(from, to, field) => {
+                setDateFilterField(field)
                 setDateFilterStart(from)
                 setDateFilterEnd(to)
                 resetBusinessPaginationCurrent(setPagination)
@@ -1369,7 +1370,7 @@ export default function SalesOrdersPage() {
               查看详情
             </Button>
           </BusinessActionTooltip>
-          {canOpenOrderProgress && (
+          {deliveryWorkspace.enabled && (
             <Button
               ref={progressTriggerRef}
               data-business-action-key="view-delivery-progress"
@@ -1377,7 +1378,7 @@ export default function SalesOrdersPage() {
               size="small"
               icon={<BarChartOutlined aria-hidden="true" />}
               disabled={!selectedOrder || loading || saving}
-              onClick={() => goToOrderProgress(selectedOrder)}
+              onClick={() => deliveryWorkspace.openProgress(selectedOrder.id)}
             >
               查看交付进度
             </Button>
@@ -1545,16 +1546,24 @@ export default function SalesOrdersPage() {
         title={`${getBusinessDocumentTitle('sales_order')}详情`}
         onClose={() => setDetailOrder(null)}
         extraActions={
-          canOpenOrderProgress &&
+          deliveryWorkspace.enabled &&
           detailOrder && (
             <Button
-              onClick={() => goToOrderProgress(detailOrder)}
+              onClick={() => {
+                deliveryWorkspace.openProgress(detailOrder.id)
+                setDetailOrder(null)
+              }}
               icon={<BarChartOutlined aria-hidden="true" />}
             >
               查看交付进度
             </Button>
           )
         }
+      />
+
+      <SalesDeliveryWorkspace
+        workspace={deliveryWorkspace}
+        onOpenDashboard={canOpenBoardFromOrder ? goToOrderProgress : undefined}
       />
 
       {columnOrderModal}

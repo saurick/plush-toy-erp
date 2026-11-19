@@ -11,6 +11,7 @@ import { createTaskTrackingFilterScenarios } from './taskTrackingFilterScenarios
 import { workflowExceptionScenario } from './workflowExceptionScenario.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertCompactBusinessFilter } from './businessListAssertions.mjs'
+import { dateFilterButton, openDateFilter } from './dateFilterActions.mjs'
 
 async function assertDocumentFilterLayout(page, filters, assert, change) {
   await waitForFiniteAnimations(page)
@@ -2305,14 +2306,17 @@ export function createDashboardTaskScenarios({
         )
         await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
         const extraFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        for (const label of ['任务状态', '截止时间', '单据类型']) {
+        for (const label of ['任务状态', '单据类型']) {
           await extraFilters.getByText(label, { exact: true }).waitFor()
         }
+        await extraFilters.getByRole('button', { name: /^截止时间：/u }).waitFor()
         assert.equal(await extraFilters.getByLabel('负责岗位', { exact: true }).count(), 0)
         assert.equal(await extraFilters.getByRole('combobox', { name: '办理事项', exact: true }).count(), 0)
         assert.equal(new URL(page.url()).searchParams.has('task_group'), false)
         await page.getByText('第 1-20 条 / 共 43 条', { exact: true }).waitFor()
-        const documents = extraFilters.locator('.workflow-task-document-filter')
+        const documents = extraFilters.locator('fieldset').filter({
+          has: page.getByRole('tablist', { name: '单据所属业务模块', exact: true }),
+        })
         const moduleTabs = documents.getByRole('tablist', { name: '单据所属业务模块' })
         const documentTypes = documents.getByRole('group', { name: '单据类型', exact: true })
         assert.equal(await documents.getByRole('combobox').count(), 0)
@@ -2383,9 +2387,17 @@ export function createDashboardTaskScenarios({
         'production_exception_decision', 'production_packaging_confirmation',
         'inventory_operation', 'quality_inspection', 'shipment', 'finance_payment',
       ].map((source, index) => ({
-        id: 9500 + index, task_code: `STYLE-DOCUMENT-${index}`, task_name: `单据筛选回归 ${index}`,
-        task_group: 'trial_warehouse_work', source_type: source, source_id: index + 1,
-        source_no: `STYLE-DOCUMENT-${index}`, owner_role_key: index % 2 ? 'warehouse' : 'quality', task_status_key: 'ready', version: 1, payload: {},
+        id: 9500 + index,
+task_code: `STYLE-DOCUMENT-${index}`,
+task_name: `单据筛选回归 ${index}`,
+        task_group: 'trial_warehouse_work',
+source_type: source,
+source_id: index + 1,
+        source_no: `STYLE-DOCUMENT-${index}`,
+owner_role_key: index % 2 ? 'warehouse' : 'quality',
+task_status_key: 'ready',
+version: 1,
+payload: {},
       })),
       viewport: { width: 1440, height: 900 },
       deviceScaleFactor: 2,
@@ -2395,7 +2407,9 @@ export function createDashboardTaskScenarios({
         await assertCompactBusinessFilter(trigger)
         await trigger.click()
         const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        const documents = filters.locator('.workflow-task-document-filter')
+        const documents = filters.locator('fieldset').filter({
+          has: page.getByRole('tablist', { name: '单据所属业务模块', exact: true }),
+        })
         const modules = documents.getByRole('tablist', { name: '单据所属业务模块' })
         const types = documents.getByRole('group', { name: '单据类型', exact: true })
         assert.equal(await modules.getByRole('tab').count(), 10)
@@ -2438,8 +2452,11 @@ export function createDashboardTaskScenarios({
           await result(1)
           await types.getByRole('button', { name: '质量检验记录' }).click()
           await page.waitForURL((url) => url.searchParams.get('source') === 'quality_inspection')
-          await filters.getByRole('button', { name: '已超时', exact: true }).click()
-          await page.getByText('当前范围暂无匹配任务', { exact: true }).waitFor()
+        })
+        const dates = await openDateFilter(page, filters)
+        await dateFilterButton(dates, '已超时').click()
+        await page.getByText('当前范围暂无匹配任务', { exact: true }).waitFor()
+        await assertDocumentFilterLayout(page, filters, assert, async () => {
           await reset.click()
           await result(16)
           const lastType = types.getByRole('button').last()

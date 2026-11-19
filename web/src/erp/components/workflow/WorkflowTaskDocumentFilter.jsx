@@ -16,7 +16,7 @@ export default function WorkflowTaskDocumentFilter({ section = 'all', value = 'a
   ]
   const types = options.filter(({ value: source }) => source !== 'all' && (section === 'all' || getBusinessDocumentSectionKey(source) === section))
   return (
-    <FilterField label="单据类型" className="workflow-task-document-filter erp-business-filter-field--choices">
+    <FilterField label="单据类型" className="erp-business-filter-field--choices">
       <SlidingTabList className="erp-navigation-tabs erp-navigation-tabs--options workflow-task-document-filter__modules" aria-label="单据所属业务模块">
         {sections.map((item) => (
           <button

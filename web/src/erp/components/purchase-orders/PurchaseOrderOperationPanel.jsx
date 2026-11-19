@@ -195,13 +195,10 @@ export default function PurchaseOrderOperationPanel({
           <DateRangeFilter
             options={PURCHASE_ORDER_DATE_FILTER_OPTIONS}
             value={dateFilterField}
-            onTypeChange={(value) => {
-              resetPagination()
-              setDateFilterField(value || 'purchase_date')
-            }}
             startValue={dateFilterStart}
             endValue={dateFilterEnd}
-            onRangeChange={(from, to) => {
+            onRangeChange={(from, to, field) => {
+              setDateFilterField(field)
               setDateFilterStart(from)
               setDateFilterEnd(to)
               resetPagination()

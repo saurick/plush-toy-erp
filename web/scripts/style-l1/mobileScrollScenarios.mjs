@@ -203,7 +203,7 @@ export function createMobileScrollScenarios(deps) {
       await page.route('**/rpc/workflow', async (route) => {
         const body = route.request().postDataJSON()
         if (body.method !== 'list_exceptions' || body.params.tracking_kind)
-          return route.fallback()
+          { return route.fallback() }
         const items = Array.from({ length: 35 }, (_, index) => ({
           key: `quality:${70000 + index}`,
           number: `EX-SCROLL-${index + 1}`,
@@ -302,6 +302,7 @@ export function createMobileScrollScenarios(deps) {
         const panel = page.getByTestId('mobile-progress-panel')
         const scroll = panel.locator('.mobile-progress-scroll')
         const controls = panel.locator('.mobile-progress-controls')
+        await panel.getByRole('tab', { name: '生产执行', exact: true }).click()
         await panel
           .getByRole('button', { name: '查看 MO-0001 进度', exact: true })
           .waitFor()

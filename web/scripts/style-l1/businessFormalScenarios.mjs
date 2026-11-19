@@ -10,6 +10,7 @@ import { createBOMMaterialGroupsScenarios } from './bomMaterialGroupsScenarios.m
 import { createLineItemStickyHeaderScenarios } from './lineItemStickyHeaderScenarios.mjs'
 
 import { createOutsourcingSourceFactScenarios } from './outsourcingSourceFactScenarios.mjs'
+import { createOutsourcingReturnProgressScenarios } from './outsourcingReturnProgressScenarios.mjs'
 import { createProductionSourceInboundLotScenarios } from './productionSourceInboundLotScenarios.mjs'
 import { createProductionReworkScenarios } from './productionReworkScenarios.mjs'
 import { createProductImageSlotScenarios } from './productImageSlotScenarios.mjs'
@@ -61,6 +62,7 @@ export function createBusinessFormalScenarios(deps) {
     ...createWarehouseDraftPageScenarios(deps),
     ...createOrderEngineeringScenarios(deps),
     ...createOutsourcingSourceFactScenarios(deps),
+    ...createOutsourcingReturnProgressScenarios(deps),
     ...createProductionSourceInboundLotScenarios(deps),
     ...createProductionReworkScenarios(deps),
     ...createProductionWipScenarios(deps),

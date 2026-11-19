@@ -170,28 +170,16 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
       if (node.matches('.erp-item-field-unit-suffix')) continue
 
       // A clipped compact group owns the visible outline; its children meet at square seams.
-      const dateRange = node.closest('.erp-business-date-range-filter')
       const compactGroup =
-        dateRange ||
-        (node.parentElement?.matches('.ant-space-compact')
+        node.parentElement?.matches('.ant-space-compact')
           ? node.parentElement
-          : null)
+          : null
       const groupStyle = compactGroup && window.getComputedStyle(compactGroup)
       const groupClips =
         groupStyle &&
         ['hidden', 'clip'].includes(groupStyle.overflowX) &&
         ['hidden', 'clip'].includes(groupStyle.overflowY)
       const style = groupClips ? groupStyle : window.getComputedStyle(node)
-      if (
-        dateRange &&
-        groupClips &&
-        Number.parseFloat(getComputedStyle(node).borderRadius) !== 0
-      ) {
-        failures.push({
-          ...describe(node),
-          reason: 'compound-control-inner-seam-must-be-square',
-        })
-      }
       const radii = [
         style.borderTopLeftRadius,
         style.borderTopRightRadius,
@@ -585,8 +573,6 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         )
       const focusStyle = hasOverlayOutline ? outlineLayer : ownerStyle
       const nodeStyle = window.getComputedStyle(node)
-      const dateRange = owner.closest('.erp-business-date-range-filter')
-      const dateRangeStyle = dateRange ? window.getComputedStyle(dateRange) : null
       const classes =
         typeof owner.className === 'string'
           ? owner.className.trim().split(/\s+/).filter(Boolean).slice(0, 6)
@@ -656,12 +642,6 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         targetBackground: nodeStyle.backgroundColor,
         targetOutlineWidth: nodeStyle.outlineWidth,
         isAffixInput: node.matches('.ant-input-affix-wrapper > input'),
-        duplicateDateRangeFocus: Boolean(
-          dateRangeStyle &&
-          (dateRangeStyle.boxShadow !== 'none' ||
-            (dateRangeStyle.outlineStyle !== 'none' &&
-              Number.parseFloat(dateRangeStyle.outlineWidth) > 0))
-        ),
         activeTagName: document.activeElement?.tagName || '',
         activeClassName: String(document.activeElement?.className || ''),
         theme: document.documentElement.dataset.erpTheme || 'light',
@@ -744,10 +724,6 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
     )}`
   )
   metrics.forEach((item) => {
-    assert(
-      !item.duplicateDateRangeFocus,
-      `${scenarioName} 起止日期各自显示焦点，日期范围容器不能重复绘制: ${JSON.stringify(item)}`
-    )
     if (item.isAffixInput) {
       assertAffixInputMetric(
         {
@@ -1217,22 +1193,25 @@ async function assertVisibleDateFilterGeometry(page, scenarioName) {
   const issues = await page.evaluate(() =>
     [
       ...document.querySelectorAll(
-        '.erp-business-date-range-filter .erp-business-date-input'
+        '.erp-filter-date-trigger'
       ),
     ].flatMap((element) => {
       const rect = element.getBoundingClientRect()
       if (!rect.width || !rect.height) return []
       const style = getComputedStyle(element)
-      const expected = parseFloat(
-        style.getPropertyValue('--erp-business-control-height')
-      )
-      return Math.abs(rect.height - expected) <= 1
+      const text = element.querySelector('.erp-filter-date-trigger__text').getBoundingClientRect()
+      const value = element.querySelector('.erp-filter-date-trigger__value')
+      const chrome = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((total, key) => total + parseFloat(style[key]), 0)
+      const expected = Math.max(parseFloat(style.minHeight), text.height + chrome)
+      return Math.abs(rect.height - expected) <= 1 && value.scrollWidth <= value.clientWidth + 1
         ? []
         : [
             {
               className: element.className,
               height: rect.height,
               expected,
+              valueWidth: value.clientWidth,
+              valueScrollWidth: value.scrollWidth,
               flexBasis: style.flexBasis,
               direction: getComputedStyle(element.parentElement).flexDirection,
             },

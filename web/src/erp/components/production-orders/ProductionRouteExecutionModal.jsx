@@ -50,6 +50,7 @@ import {
   buildProductionWipOutsourcingCandidateOptions,
   compareProductionWipQuantity,
   currentProductionWipOperation,
+  isProductionBatchActionEntry,
   nextProductionWipOperation,
   normalizeProductionWipQuantity,
   positiveSafeInteger,
@@ -168,7 +169,7 @@ export default function ProductionRouteExecutionModal({
     actionForm
   )
   const orderID = Number(productionOrder?.id || 0)
-  const hasProcessEntry = Boolean(!handling && initialBatchID && (initialAction === 'completion' || Object.values(PRODUCTION_WIP_ACTION).includes(initialAction)))
+  const hasProcessEntry = !handling && isProductionBatchActionEntry(initialBatchID, initialAction)
   const focusedEntry = Boolean(handling || hasProcessEntry)
   const authoritativeOrder = aggregate?.productionOrder || productionOrder
   const orderStatus = String(authoritativeOrder?.status || '')
@@ -1201,7 +1202,7 @@ onCancel: () => resolve(false),
       confirmLoading={saving}
       size={focusedEntry || assignmentOnly ? 'localAction' : 'lineItems'}
       title={
-        focusedEntry ? activeActionTitle || '生产事项办理' : assignmentOnly
+        focusedEntry ? activeActionTitle || (readOnly ? '查看本次生产资料' : '生产事项办理') : assignmentOnly
           ? '安排本厂或外发加工'
           : (
             <BusinessHelpLabel
@@ -1224,7 +1225,7 @@ onCancel: () => resolve(false),
       icon={<BranchesOutlined />}
       footer={
         <Space>
-          <Button disabled={saving} onClick={close}>{outlet?.taskBusiness ? '返回办理' : '关闭'}</Button>
+          <Button disabled={saving} onClick={close}>{sourceTask && handling ? '返回原任务' : outlet?.taskBusiness ? '返回办理' : '关闭'}</Button>
           {outlet?.taskBusiness && activeAction && !readOnly ? <Button type="primary" aria-label="确认办理" loading={saving} onClick={submitAction}>确认办理</Button> : null}
           {taskNavigation?.businessReceipt ? <Button type="primary" onClick={outlet?.taskBusiness?.viewResult || returnToTask}>{outlet?.taskBusiness ? '查看办理结果' : '办完返回原任务'}</Button> : null}
           {!handling && onReturnToExecution ? <Button type={entrySaved ? 'primary' : 'default'} disabled={saving} onClick={async () => { if (await confirmLeave()) onReturnToExecution() }}>{entrySaved ? '办完返回生产执行' : '返回生产执行'}</Button> : null}

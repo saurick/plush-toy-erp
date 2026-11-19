@@ -32,7 +32,7 @@ function TrackingExceptions({ trackingRef, onOpenTask, refreshKey }) {
   )
 }
 
-export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTask, onAfterClose, refreshKey = '', closeLabel = '返回列表', open = Boolean(trackingRef), overview = null, overviewFooter = null, navigation = null }) {
+export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTask, onAfterClose, refreshKey = '', closeLabel = '返回列表', open = Boolean(trackingRef), overview = null, overviewFooter = null, navigation = null, preferredTaskID, sourceAction, showNextStep = false }) {
   const [result, setResult] = useState(null)
   const [reload, setReload] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -77,7 +77,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
     const access = data.current_task_access.find((item) => item.task_id === task.task_id)
     return access?.can_read ? [{ ...task, canHandle: access.can_handle }] : []
   }) : []
-  const selectedTask = availableTasks.length === 1 ? availableTasks[0] : availableTasks.find((task) => task.task_id === selectedTaskID)
+  const selectedTask = availableTasks.length === 1 ? availableTasks[0] : availableTasks.find((task) => task.task_id === (selectedTaskID ?? preferredTaskID))
   const taskName = selectedTask ? getWorkflowTaskDisplayName(selectedTask) : ''
   const taskActionLabel = !selectedTask ? '选择任务后继续' : selectedTask.canHandle
     ? isWorkflowApprovalTask(selectedTask) && selectedTask.status === 'ready' ? `去审批${availableTasks.length > 1 ? ` · ${taskName}` : ''}` : `去处理${taskName}`
@@ -130,6 +130,12 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
     }
   }
   const summary = data?.summary
+  const nextStep = showNextStep && summary && !summary.completed_at && (
+    selectedTask?.status === 'blocked' ? '解除受阻后继续办理' :
+      selectedTask?.canHandle ? getWorkflowTaskDisplayName(selectedTask) :
+        summary.current_tasks.some((task) => !task.assignee_name) ? '等待负责岗位接手' :
+          trackingHandoff(summary)
+  )
   const identity = getWorkflowTaskIdentity(summary || {})
   const stageModel = data && summary.kind === 'process' ? buildTrackingStageModel(data) : null
   const eventItems = data?.events.map((event) => {
@@ -163,6 +169,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
       footer={trackingRef ? (
         <div className="erp-workflow-tracking-footer">
           {taskError ? <p role="alert" className="erp-workflow-tracking-task-error">{taskError}</p> : null}
+          {nextStep && <p className="erp-workflow-tracking-meta"><strong>下一步</strong> · {nextStep}</p>}
           {availableTasks.length > 1 ? (
             <Select
               label="选择当前任务"
@@ -184,6 +191,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
             >
               刷新进度
             </Button>
+            {summary ? sourceAction : null}
             {availableTasks.length ? <Button type={selectedTask?.canHandle ? 'primary' : 'default'} className="erp-workflow-tracking-open-task" aria-label={taskActionLabel} aria-haspopup="dialog" disabled={!selectedTask} loading={Boolean(openingTask)} onClick={() => openTask(selectedTask.task_id)}>{taskActionLabel}</Button> : null}
           </div>
         </div>
@@ -211,6 +219,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
                     <strong>{getWorkflowTaskDisplayName(task)}</strong>
                     {' · '}
                     <WorkflowResponsibilities items={[trackingResponsibilityParts(task)]} />
+                    {showNextStep && !task.assignee_name ? ' · 未指定办理人' : null}
                   </p>
                 )) : <p>{trackingHandoff(summary)}</p>}
               </div>

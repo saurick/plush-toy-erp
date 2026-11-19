@@ -670,7 +670,6 @@ body
   }
 
   .erp-business-filter-panel__grid,
-  .erp-business-operation-panel__filters,
   .erp-business-operation-panel__actions,
   .erp-business-operation-panel__primary,
   .erp-business-filter-panel__aside,
@@ -685,32 +684,10 @@ body
       .ant-select,
       .ant-btn,
       .erp-business-date-range-filter
-    ),
-  .erp-business-operation-panel__filters
-    > :where(
-      .ant-input-affix-wrapper,
-      .ant-select,
-      .ant-btn,
-      .erp-business-date-range-filter
     ) {
     flex: 1 1 100%;
     width: 100%;
     max-width: none;
-  }
-
-  .erp-business-date-range-filter {
-    min-width: 0;
-    max-width: none;
-  }
-
-  .erp-business-date-range-filter__range {
-    width: 100%;
-    min-width: 0;
-    flex: 0 0 auto;
-  }
-
-  .erp-business-date-range-filter .erp-business-date-input.ant-picker {
-    min-width: 0;
   }
 
   .erp-business-operation-panel__primary {

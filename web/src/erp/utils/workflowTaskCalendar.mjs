@@ -53,6 +53,15 @@ export function readTaskCalendarState(
   }
 }
 
+export function writeTaskCalendarStateToSearch(search, { layout, month, selection }) {
+  const params = new URLSearchParams(search)
+  if (layout === 'list') params.delete('layout')
+  else if (layout) params.set('layout', layout)
+  if (month) params.set('month', month)
+  if (selection) params.set('day', selection)
+  return params
+}
+
 export function shiftCalendarMonth(month, amount) {
   const date = new Date(`${month}-01T00:00:00Z`)
   date.setUTCMonth(date.getUTCMonth() + amount)

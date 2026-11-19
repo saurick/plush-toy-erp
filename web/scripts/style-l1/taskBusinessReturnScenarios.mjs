@@ -1,4 +1,3 @@
-import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { WORKFLOW_TASK_BOARD_LANE_KEYS } from '../../src/erp/utils/workflowTaskBoardContract.mjs'
 
 async function assertOrderDirection(assert, chain) {
@@ -32,6 +31,10 @@ async function assertOrderDirection(assert, chain) {
           parseFloat(line.width) === 1
       }),
       separated: !main.querySelector('.workflow-business-chain__exceptions, .workflow-business-chain__unclassified'),
+      compact: groups.every((group) => {
+        const header = group.querySelector('.workflow-business-chain__node')
+        return header.ariaExpanded !== 'false' || Math.abs(group.getBoundingClientRect().height - header.getBoundingClientRect().height) <= 1
+      }),
       branch: !exception || (getComputedStyle(exception).borderTopStyle === 'dashed' && Boolean(exception.querySelector('[aria-label="branches"]')) && exception.querySelector('.workflow-business-chain__branch-label')?.textContent === '分支'),
       overflow: root.scrollWidth - root.clientWidth,
     }
@@ -41,6 +44,7 @@ async function assertOrderDirection(assert, chain) {
   assert.doesNotMatch(await chain.innerText(), /阶段顺序/u)
   assert.ok(geometry.headers.every((header) => header.centerDelta <= 1 && header.rightGap <= 1 && Math.abs(header.width - 12) <= 1 && Math.abs(header.height - 12) <= 1), `展开与收起图标均与阶段标题、状态和节点居中对齐: ${JSON.stringify(geometry.headers)}`)
   assert.ok(geometry.forward && geometry.continuous && geometry.separated && geometry.branch && geometry.overflow <= 1, `阶段方向或异常分支不清晰: ${JSON.stringify(geometry)}`)
+  assert.ok(geometry.compact, '收起的阶段只占一行标题的高度')
   return geometry
 }
 
@@ -67,7 +71,7 @@ priority: 0,
     const permissions = ['workflow.task.read', 'production.wip.read', 'production.packaging_material.confirm', 'mobile.sales.access']
     let saved = false
     let detailReads = 0
-    let chainReads = 0
+    let failFocusedRead = false
     return {
       name: `task-business-return-${mobile ? 'mobile' : 'desktop'}`,
       path: mobile ? '/m/sales/tasks' : '/erp/task-board',
@@ -87,10 +91,12 @@ menus: [
       beforeNavigate: async (page) => {
         saved = false
         detailReads = 0
-        chainReads = 0
+        failFocusedRead = false
         await page.route('**/rpc/production_wip', async (route) => {
-          const { params } = route.request().postDataJSON()
-          if (params?.action === 'CONFIRM_PACKAGING_MATERIAL') {
+          const { method, params } = route.request().postDataJSON()
+          if (method === 'execute_production_wip_action' && params.action === 'CONFIRM_PACKAGING_MATERIAL') {
+            assert.equal(params.production_order_id, 71)
+            assert.equal(params.production_order_item_id, 7101)
             assert.equal(params.packaging_version_snapshot, '彩盒与唛头已核对')
             saved = true
           }
@@ -99,9 +105,10 @@ menus: [
         await page.route('**/rpc/workflow', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           let data
-          if (method === 'get_task_handling_chain') {
-            chainReads += 1
-            if (chainReads === 1) return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 500, message: '读取失败' } } })
+          if (method === 'get_task_handling_chain' && params.task_id === task.id) {
+            if (params.view === 'task' && failFocusedRead) {
+              return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 500, message: '读取失败' } } })
+            }
             const item = (id, task_name, patch = {}) => ({ id, task_name, task_group: '', task_status_key: 'ready', owner_role_key: 'sales', source_type: 'production_wip_batch', source_no: 'MO-STYLE-L1-20260713', discovery: { stage_key: 'packaging_version' }, operation_code: '', batch_no: '', exception_id: 0, ...patch })
             data = { truncated: false,
 items: [
@@ -113,9 +120,21 @@ items: [
               item(98004, '换厂返工回货复检', { discovery: { stage_key: 'cutting_exception' }, exception_id: 7, exception_no: 'EX-007', exception_operation_code: 'FABRIC_PROCESSING', operation_code: 'SEWING', task_status_key: 'blocked', batch_no: '返工批次-尺寸颜色规格核对-'.repeat(4) }),
             ] }
             if (params.view === 'task') data.items = data.items.filter((item) => item.id === task.id)
-          } else if (method === 'explain_action_access') {
-            data = { task_id: task.id, source_access: { applicable: true, resolved: true, allowed: true, reason_code: 'source_access_allowed', reason: '' }, actions: [{ action_key: 'complete', allowed: false, reason: '当前账号缺少执行该动作所需权限。', reason_code: 'missing_permission', required_permission: 'production.packaging_material.confirm', owner_role_key: 'sales' }] }
-          } else if (method === 'get_task') {
+          } else if (method === 'explain_action_access' && params.task_id === task.id) {
+            data = {
+              task_id: task.id,
+              source_access: { applicable: true, resolved: true, allowed: true },
+              actions: [{
+                action_key: 'complete',
+                allowed: false,
+                owner_role_matched: !mobile,
+                owner_role_key: 'sales',
+                required_permission: 'workflow.task.complete',
+                reason_code: mobile ? 'not_owner_or_assignee' : 'source_business_required',
+                reason: mobile ? '当前账号不属于任务责任角色，也不是该任务的指定处理人。' : '请通过生产工序办理。',
+              }],
+            }
+          } else if (method === 'get_task' && params.task_id === task.id) {
             detailReads += 1
             data = { task: { ...task, ...(saved ? { task_status_key: 'done', version: 2, completed_at: 1791648100 } : {}) } }
           } else if (saved && method === 'list_role_tasks') {
@@ -127,19 +146,20 @@ items: [
         })
       },
       verify: async (page) => {
-        if (mobile) {
-          const card = page.locator('.erp-mobile-list-item').filter({ hasText: taskName })
-          await clickTaskCardContent(card, card.getByText(taskName, { exact: true }))
-        }
-        else await page.getByRole('button', { name: `查看${taskName}详情`, exact: true }).click()
+        failFocusedRead = true
+        if (mobile) await page.getByTestId('mobile-role-nav-tasks').click()
+        await page.getByRole('button', { name: `查看${taskName}详情`, exact: true }).click()
         const focus = page.getByLabel('本任务处理进度', { exact: true })
-        await focus.getByRole('button', { name: '重新读取', exact: true }).click()
+        const retry = focus.getByRole('button', { name: '重新读取', exact: true })
+        await retry.waitFor()
+        failFocusedRead = false
+        await retry.click()
         await focus.getByText('当前暂无其他关联任务。', { exact: true }).waitFor()
         assert.equal(await focus.locator('li').count(), 0, '当前任务已在信息卡中展示，不重复绘制')
         assert.equal(await focus.locator('details').count(), 0)
         assert.equal(await page.getByLabel('订单任务链', { exact: true }).count(), 0)
         await page.screenshot({ path: path.join(outputDir, `task-chain-focused-${mobile ? 'mobile' : 'desktop-4k'}.png`) })
-        await page.getByRole('button', { name: '查看订单全流程', exact: true }).click()
+        await page.getByRole('button', { name: '查看整单进度', exact: true }).click()
         const chain = page.getByLabel('订单任务链', { exact: true })
         await chain.getByText(taskName, { exact: true }).waitFor()
         assert.equal(await chain.getByLabel('异常分支', { exact: true }).locator('.workflow-business-chain__group').count(), 1)
@@ -154,7 +174,7 @@ items: [
         assert.equal(await related.getAttribute('open'), null)
         assert.ok((await related.locator('summary').boundingBox()).height >= 44, '关联任务展开入口保留触控尺寸')
         assert.equal(await chain.getByText('MO-PARALLEL-2', { exact: true }).isVisible(), false)
-        const steps = page.getByRole(mobile ? 'navigation' : 'tablist', { name: '任务处理步骤', exact: true })
+        const steps = page.getByRole('tablist', { name: '任务处理步骤', exact: true })
         assert.equal(await steps.isVisible(), true, '任务详情保留三步引导')
         await page.screenshot({ path: path.join(outputDir, `task-chain-compact-${mobile ? 'mobile' : 'desktop-4k'}.png`) })
         await related.locator('summary').click()
@@ -179,9 +199,6 @@ items: [
         await chain.locator('.workflow-business-chain__rules > summary').click()
         await chain.getByText('成品检验及规定质量关口', { exact: true }).waitFor()
         await chain.locator('.workflow-business-chain__rules > summary').click()
-        const metrics = await chain.evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth, height: node.getBoundingClientRect().height }))
-        assert.ok(metrics.scroll <= metrics.width + 1)
-        assert.ok(metrics.height < (mobile ? 760 : 660), `七个阶段和当前任务保持紧凑高度: ${JSON.stringify(metrics)}`)
         await assertOrderDirection(assert, chain)
         if (mobile) {
           await page.setViewportSize({ width: 320, height: 720 })
@@ -198,10 +215,23 @@ items: [
         await page.getByRole('button', { name: '返回本任务', exact: true }).click()
         await focus.getByText('当前暂无其他关联任务。', { exact: true }).waitFor()
         assert.equal(await page.getByLabel('订单任务链', { exact: true }).count(), 0)
+        const originURL = page.url()
+        const informationTab = steps.getByRole('tab', { name: /任务信息/u })
+        const actionTab = steps.getByRole('tab', { name: /任务办理/u })
+        const receiptTab = steps.getByRole('tab', { name: /结果回执/u })
+        const originalTask = page.getByRole('heading', { name: taskName, exact: true })
+        assert.equal(await receiptTab.isEnabled(), false)
+        await actionTab.click()
+        const business = page.getByTestId('mobile-task-fact-form').filter({ visible: true })
+        await business.getByText(task.source_no, { exact: true }).waitFor()
+        assert.equal(await business.getAttribute('data-source-id'), String(task.source_id))
+        assert.equal(page.url(), originURL)
+        assert.equal(saved, false, '打开办理只读取生产资料')
         if (mobile) {
-          await page.getByText('当前账号缺少执行该动作所需权限。', { exact: true }).waitFor()
-          assert.equal(await page.getByRole('button', { name: /进入单据办理$/u }).count(), 0)
-          assert.equal(await page.getByTestId('mobile-task-detail-screen').locator('.workflow-task-source button').count(), 0)
+          await business.getByRole('heading', { name: '查看本次生产资料', exact: true }).waitFor()
+          assert.equal(await page.getByRole('button', { name: '确认办理', exact: true }).count(), 0)
+          await informationTab.click()
+          await originalTask.waitFor()
           assert.equal(await steps.locator('[data-step-key]').count(), 3)
           assert.equal(saved, false, '查看和追踪不能旁路写入生产事实')
           await page.getByRole('button', { name: '返回任务列表', exact: true }).click()
@@ -210,21 +240,30 @@ items: [
           await assertNoHorizontalOverflow(page, '手机生产任务返回原列表')
           return
         }
-        await page.getByRole('button', { name: /进入单据办理$/u }).click()
-        await page.waitForURL(mobile ? /\/m\/sales\/handle\/production\/orders/u : /\/erp\/production\/orders/u)
-        const modal = page.getByRole('dialog').filter({ hasText: '确认包材要求' }).last()
-        await modal.getByLabel('包装版本', { exact: true }).waitFor()
-        await modal.getByLabel('包装版本', { exact: true }).fill('彩盒与唛头已核对')
-        await modal.getByRole('button', { name: '确认办理', exact: true }).click()
-        await page.getByTestId('task-source-return').getByText('包材要求已确认', { exact: true }).waitFor()
+        const field = business.getByLabel('包装版本', { exact: true })
+        const returnButton = page.getByRole('button', { name: '返回原任务', exact: true })
+        await field.waitFor()
+        await returnButton.click()
+        await originalTask.waitFor()
+        assert.equal(await informationTab.getAttribute('aria-selected'), 'true')
+        assert.equal(page.url(), originURL)
+        await actionTab.click()
+        await field.fill('彩盒与唛头已核对')
+        const beforeSaveReads = detailReads
+        await page.getByRole('button', { name: '确认办理', exact: true }).click()
+        await receiptTab.click()
+        const receipt = page.getByTestId('workflow-task-action-receipt')
+        await receipt.getByRole('heading', { name: '包材要求已确认', exact: true }).waitFor()
+        await receipt.getByText(taskName, { exact: true }).waitFor()
+        await receipt.getByText('已完成', { exact: true }).waitFor()
         assert.equal(saved, true)
-        const beforeReturnReads = detailReads
-        await page.locator('.ant-modal:visible').getByRole('button', { name: '办完返回原任务', exact: true }).click()
-        await page.waitForURL(mobile ? /\/m\/sales\/tasks/u : /\/erp\/task-board/u)
-        const detail = mobile ? page.getByTestId('mobile-task-detail-screen') : page.locator('.ant-drawer:visible')
-        await detail.getByText(taskName, { exact: true }).first().waitFor()
-        await detail.getByText('已完成', { exact: true }).first().waitFor()
-        assert.ok(detailReads > beforeReturnReads, '返回时须重新读取任务，即使已从待办列表移除')
+        assert.ok(detailReads > beforeSaveReads, '提交后重新读取同一任务，即使它已移出待办列表')
+        await informationTab.click()
+        await originalTask.waitFor()
+        assert.equal(page.url(), originURL)
+        await page.getByRole('dialog').getByRole('button', { name: '返回列表', exact: true }).click()
+        await originalTask.waitFor({ state: 'hidden' })
+        assert.equal(await page.locator(`[data-task-id="${task.id}"]`).count(), 0)
         assert.equal(await page.evaluate(() => window.history.state?.usr?.workflowTaskReturn ?? null), null)
         await assertNoHorizontalOverflow(page, `task-business-return-${mobile ? 'mobile' : 'desktop'}`)
       },
@@ -365,20 +404,11 @@ function createFocusedExceptionScenarios({
         })
       },
       verify: async (page) => {
-        if (mobile) {
-          const card = page
-            .locator('.erp-mobile-list-item')
-            .filter({ hasText: task.task_name })
-          await clickTaskCardContent(
-            card,
-            card.getByText(task.task_name, { exact: true })
-          )
-        } else {
-          await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
-        }
+        if (mobile) await page.getByTestId('mobile-role-nav-tasks').click()
+        await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
         const focus = page.getByLabel('本任务处理进度', { exact: true })
         await focus.getByText('本次返工回货复检', { exact: true }).waitFor()
-        assert.deepEqual(views, ['task'])
+        assert.deepEqual([...new Set(views)], ['task'])
         assert.equal(await focus.locator('li').count(), 2)
         assert.equal(await focus.locator('li[aria-current="step"]').count(), 0, '当前任务只在原信息卡展示')
         const info = page.locator('.workflow-task-info-card')
@@ -417,7 +447,7 @@ function createFocusedExceptionScenarios({
         assert.equal(rows.length, 1, '手动收起历史后只保留关联待办')
         assert.equal(rows[0].background, 'rgba(0, 0, 0, 0)', '关联待办使用紧凑行，当前任务保留上方原信息卡')
         const toggle = page.getByRole('button', {
-          name: '查看订单全流程',
+          name: '查看整单进度',
           exact: true,
         })
         assert.ok((await toggle.boundingBox()).height >= (mobile ? 44 : 32), '手机保留触控高度，桌面沿用紧凑按钮')
@@ -454,7 +484,7 @@ function createFocusedExceptionScenarios({
         await otherTasks.locator('summary').click()
         await orderChain.getByText('同订单其他单据任务 1', { exact: true }).waitFor()
         await otherTasks.locator('summary').click()
-        assert.deepEqual(views, ['task', 'order'])
+        assert.deepEqual([...new Set(views)], ['task', 'order'])
         const back = page.getByRole('button', {
           name: '返回本任务',
           exact: true,
@@ -468,7 +498,7 @@ function createFocusedExceptionScenarios({
         )
         assert.equal(
           await page
-            .getByRole('button', { name: '查看订单全流程', exact: true })
+            .getByRole('button', { name: '查看整单进度', exact: true })
             .evaluate((button) => button === document.activeElement),
           true
         )

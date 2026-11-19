@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { dateFilterButton, openDateFilter, visibleCalendarDays } from './dateFilterActions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { DEFAULT_BUSINESS_PAGE_SIZE } from '../../src/erp/utils/businessPagination.mjs'
 import { productionExceptionHandlingKey } from '../../src/erp/utils/productionExceptionListModel.mjs'
@@ -6,9 +7,15 @@ import { productionExceptionHandlingKey } from '../../src/erp/utils/productionEx
 const receiptPath = '/erp/warehouse/inbound'
 const receiptCount = DEFAULT_BUSINESS_PAGE_SIZE + 3
 const receipts = Array.from({ length: receiptCount }, (_, index) => ({
-  id: index + 1, receipt_no: `QUICK-RCV-${index + 1}`, supplier_name: index < 2 ? '指定供应商' : '统计供应商',
-  status: index < receiptCount - 1 ? 'DRAFT' : 'POSTED', received_at: 1790430000, created_at: 1790430000,
-  updated_at: 1790430000, items: [], item_count: 0,
+  id: index + 1,
+receipt_no: `QUICK-RCV-${index + 1}`,
+supplier_name: index < 2 ? '指定供应商' : '统计供应商',
+  status: index < receiptCount - 1 ? 'DRAFT' : 'POSTED',
+received_at: 1790430000,
+created_at: 1790430000,
+  updated_at: 1790430000,
+items: [],
+item_count: 0,
 }))
 const exceptions = ['SUBMITTED', 'APPROVED:PENDING', 'APPROVED:APPLIED', 'APPROVED:REVERSED', 'REJECTED', 'CANCELLED'].map((key, index) => {
   const [status, execution_status = 'PENDING'] = key.split(':')
@@ -66,7 +73,10 @@ export function createBusinessQuickCountsScenarios({ assert, customerRuntimeEffe
   const shared = { auth: 'admin', effectiveSession: customerRuntimeEffectiveSession, beforeNavigate: installQuickCountsRoute }
   return [
     {
-      ...shared, name: 'business-quick-counts-pages', path: '/erp/warehouse/inventory?view=lots', viewport: { width: 1440, height: 900 },
+      ...shared,
+name: 'business-quick-counts-pages',
+path: '/erp/warehouse/inventory?view=lots',
+viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const cases = [
           ['/erp/warehouse/inventory?view=lots', '批次状态', 'list_inventory_lots'],
@@ -119,7 +129,11 @@ export function createBusinessQuickCountsScenarios({ assert, customerRuntimeEffe
       },
     },
     {
-      ...shared, name: 'business-quick-counts-receipts', path: receiptPath, viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2,
+      ...shared,
+name: 'business-quick-counts-receipts',
+path: receiptPath,
+viewport: { width: 1920, height: 1080 },
+deviceScaleFactor: 2,
       verify: async (page) => {
         const filter = await ready(page, receiptCount)
         assert.equal(await page.locator('.ant-table-tbody tr[data-row-key]').count(), DEFAULT_BUSINESS_PAGE_SIZE)
@@ -144,11 +158,11 @@ export function createBusinessQuickCountsScenarios({ assert, customerRuntimeEffe
         const trigger = operation.getByRole('button', { name: /^筛选(?:，已应用 \d+ 项)?$/u })
         await trigger.click()
         const dialog = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
-        await dialog.getByRole('textbox', { name: '开始日期', exact: true }).click()
-        const picker = page.locator('.ant-picker-dropdown:visible')
-        await picker.locator('td.ant-picker-cell-in-view:not(.ant-picker-cell-disabled) .ant-picker-cell-inner').nth(10).click()
-        await picker.waitFor({ state: 'hidden' })
+        const dates = await openDateFilter(page, dialog)
+        const day = visibleCalendarDays(dates).nth(10)
+        await day.click()
+        await day.click()
+        await dateFilterButton(dates, '应用日期').click()
         await dialog.getByRole('button', { name: '清空筛选', exact: true }).click()
         await dialog.getByRole('button', { name: '收起', exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })

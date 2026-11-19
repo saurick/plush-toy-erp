@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Form, Input, Space, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
 import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import { documentProductGalleryColumn } from '../components/business-list/BusinessDocumentProductGallery.jsx'
 import { DOCUMENT_PRODUCT_SOURCES } from '../utils/businessProductGallery.mjs'
 import { applyBusinessFormReadback } from '../utils/businessFormReadback.mjs'
-import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useBusinessPageContext, { TaskBusinessStepVisibleContext } from '../hooks/useBusinessPageContext.js'
 import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
@@ -81,7 +81,7 @@ import {
   productionReferenceSnapshotOptions,
   resolveProductionOrderDetailAccess,
 } from '../utils/productionOrderPermissionAccess.mjs'
-import { PRODUCTION_WIP_ROUTE_CODE } from '../utils/productionWipModel.mjs'
+import { isProductionBatchActionEntry, PRODUCTION_WIP_ROUTE_CODE } from '../utils/productionWipModel.mjs'
 import { routeWithQuery, searchParamPositiveInt } from '../utils/routeQuery.mjs'
 import {
   canOpenRelatedDocumentPath,
@@ -218,6 +218,8 @@ function draftParams(values) {
 export default function ProductionOrdersPage() {
   const modal = useModal()
   const outletContext = useBusinessPageContext()
+  const taskBusiness = outletContext?.taskBusiness
+  const taskStepVisible = useContext(TaskBusinessStepVisibleContext)
   const taskSource =
     outletContext?.taskCommand?.kind === 'production_plan'
       ? outletContext.taskCommand
@@ -254,6 +256,15 @@ export default function ProductionOrdersPage() {
   useWorkflowTaskBusinessBusy(mutationLoading)
   const [selected, setSelected] = useState(null)
   const [aggregate, setAggregate] = useState(null)
+  const previousLinkedOrder = useRef(routeProductionOrderID)
+  useEffect(() => {
+    if (previousLinkedOrder.current > 0 && previousLinkedOrder.current !== routeProductionOrderID) {
+      setSelected(null)
+      setAggregate(null)
+      setProductionRouteOpen(false)
+    }
+    previousLinkedOrder.current = routeProductionOrderID
+  }, [routeProductionOrderID])
   const resolvedRouteKeyword =
     routeProductionOrderID &&
     Number(selected?.id || 0) === Number(routeProductionOrderID)
@@ -269,19 +280,12 @@ export default function ProductionOrdersPage() {
     searchParams,
     'production_order_item_id'
   )
-  useEffect(() => {
-    if (
-      (linkedWipBatchID || linkedProductionItemID) &&
-      Number(selected?.id) === Number(routeProductionOrderID)
-    ) {
-      setProductionRouteOpen(true)
-    }
-  }, [
-    linkedWipBatchID,
-    linkedProductionItemID,
-    selected?.id,
-    routeProductionOrderID,
-  ])
+  const linkedWipAction = searchParams.get('wip_action') || ''
+  const taskRouteEntry = Boolean((linkedWipBatchID || linkedProductionItemID) && (
+    taskBusiness
+      ? taskBusiness.mode === 'source' && taskBusiness.contract?.actionKeys.includes('route-execution')
+      : outletContext?.workflowTaskNavigation?.productionHandling
+  ))
   const [overIssueRequirement, setOverIssueRequirement] = useState(null)
   const attemptsRef = useRef(createProductionOrderAttemptStore())
   const inFlightRef = useRef(false)
@@ -379,6 +383,26 @@ export default function ProductionOrdersPage() {
     PRODUCTION_ORDER_STATUS.RELEASED,
     PRODUCTION_ORDER_STATUS.CLOSED,
   ].includes(selected?.status)
+  useEffect(() => {
+    if (
+      canReadProductionWip &&
+      selectedProductionRouteRelevant &&
+      (isProductionBatchActionEntry(linkedWipBatchID, linkedWipAction) ||
+        (taskRouteEntry && taskStepVisible)) &&
+      Number(selected?.id) === routeProductionOrderID
+    ) {
+      setProductionRouteOpen(true)
+    }
+  }, [
+    canReadProductionWip,
+    selectedProductionRouteRelevant,
+    linkedWipBatchID,
+    linkedWipAction,
+    taskRouteEntry,
+    taskStepVisible,
+    selected?.id,
+    routeProductionOrderID,
+  ])
   const productionRouteActionAvailability = productionRouteReadOnly
     ? resolveContextualBusinessActionAvailability({
         authorized: canReadProductionWip,
@@ -447,6 +471,21 @@ export default function ProductionOrdersPage() {
     },
     [query, setSearchParams, taskSource]
   )
+
+  const showAllProductionOrders = () => {
+    setListResult(null)
+    setStatusCounts(null)
+    setLoading(true)
+    writeQuery({
+      keyword: '',
+      scope: LIFECYCLE_SCOPE.ALL,
+      status: '',
+      date_field: DEFAULT_QUERY.date_field,
+      date_from: '',
+      date_to: '',
+      page: 1,
+    })
+  }
 
   const productionOrderListParams = useMemo(
     () => ({
@@ -1104,6 +1143,20 @@ export default function ProductionOrdersPage() {
         helpKey="production-orders"
         title={getBusinessDocumentTitle('production_order')}
       />
+      {routeProductionOrderID > 0 && !taskSource && !outletContext?.taskBusiness && (
+        <Alert
+          type="info"
+          showIcon
+          message={(
+            <Space wrap size={8}>
+              <span>当前仅查看这张订单</span>
+              <Button type="link" size="small" onClick={showAllProductionOrders}>
+                查看全部生产订单
+              </Button>
+            </Space>
+          )}
+        />
+      )}
       <BusinessOperationPanel
         showSelection
         filters={
@@ -1143,11 +1196,8 @@ export default function ProductionOrdersPage() {
               value={query.date_field}
               startValue={query.date_from}
               endValue={query.date_to}
-              onTypeChange={(value) =>
-                writeQuery({ date_field: value, page: 1 })
-              }
-              onRangeChange={(from, to) =>
-                writeQuery({ date_from: from, date_to: to, page: 1 })
+              onRangeChange={(from, to, field) =>
+                writeQuery({ date_field: field, date_from: from, date_to: to, page: 1 })
               }
             />
           </>
@@ -1655,7 +1705,7 @@ export default function ProductionOrdersPage() {
         onCreateCompletion={openProductionCompletion}
         initialBatchID={linkedWipBatchID}
         initialItemID={linkedProductionItemID}
-        initialAction={searchParams.get('wip_action') || ''}
+        initialAction={linkedWipAction}
         onReturnToExecution={
           canReturnToExecution
             ? () =>
@@ -1671,7 +1721,10 @@ export default function ProductionOrdersPage() {
         }
         canConfirmPackaging={canConfirmPackagingMaterial}
         canReadOutsourcingContracts={canReadOutsourcingContracts}
-        onCancel={() => setProductionRouteOpen(false)}
+        onCancel={() => {
+          setProductionRouteOpen(false)
+          if (taskBusiness && taskRouteEntry) navigate(-1)
+        }}
         onChanged={() => {
           if (selected) selectRecord(selected)
         }}

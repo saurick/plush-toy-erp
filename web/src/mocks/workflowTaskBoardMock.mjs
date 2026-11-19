@@ -14,6 +14,7 @@ const ACTIVE_TASK_STATUS_KEYS = new Set(['ready'])
 const FINISHED_TASK_STATUS_KEYS = new Set(['done', 'rejected', 'withdrawn'])
 const TASK_BOARD_STATUS_FILTER_KEYS = new Set([
   'all',
+  'open',
   'ready',
   'blocked',
   'rejected',
@@ -134,6 +135,7 @@ export function workflowTaskMockNumberKeyword(keyword) {
 function matchesStatus(task, status, snapshotAt) {
   const statusKey = taskStatus(task)
   if (status === 'all') return true
+  if (status === 'open') return UNSETTLED_TASK_STATUS_KEYS.has(statusKey)
   if (status === 'overdue') {
     return isTaskOverdue(task, snapshotAt)
   }
@@ -220,6 +222,7 @@ export function buildWorkflowTaskBoardMock({
     ),
   ].sort((left, right) => left.localeCompare(right))
   const sourceType = getBusinessDocumentTypeKey(params.source_type)
+  const assignee = normalizeText(params.assignee)
   const dayStart = Math.floor((normalizedSnapshotAt + 8 * 3600) / 86400) * 86400 - 8 * 3600
   const periodDays = { today: 1, '7d': 7, '30d': 30 }[params.period]
   const from = periodDays ? dayStart - (periodDays - 1) * 86400 : params.period === 'custom' ? Date.parse(`${params.date_from}T00:00:00+08:00`) / 1000 : null
@@ -235,6 +238,7 @@ export function buildWorkflowTaskBoardMock({
         matchesKeyword(task, params.keyword) &&
         matchesStatus(task, status, normalizedSnapshotAt) &&
         matchesDue(task, due, normalizedSnapshotAt) &&
+        (!assignee || (assignee === 'unassigned' ? !task.assignee_id : Number(assignee) === task.assignee_id)) &&
         (!sourceType || getBusinessDocumentTypeKey(task.source_type) === sourceType) &&
         (!params.source_section || params.source_section === 'all' || getBusinessDocumentSectionKey(task.source_type) === params.source_section)
     )

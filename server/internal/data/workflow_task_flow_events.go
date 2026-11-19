@@ -16,6 +16,16 @@ import (
 	"server/internal/data/model/ent/workflowtaskevent"
 )
 
+func workflowEventResultText(eventType, status, reason, feedback string) string {
+	if reason = strings.TrimSpace(reason); reason != "" {
+		return reason
+	}
+	if eventType == "status_changed" && status == "done" {
+		return strings.TrimSpace(feedback)
+	}
+	return ""
+}
+
 func (r *workflowRepo) ListWorkflowTaskFlowEvents(ctx context.Context, taskID, limit, beforeEventID int, scope *biz.WorkflowTaskVisibilityScope) ([]*biz.WorkflowTaskFlowEvent, error) {
 	if r == nil || r.data == nil || r.data.sqldb == nil || taskID <= 0 || limit < 1 || limit > biz.WorkflowTaskEventPageMaxLimit+1 || beforeEventID < 0 || scope == nil {
 		return nil, biz.ErrBadParam

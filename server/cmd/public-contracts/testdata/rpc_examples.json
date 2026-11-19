@@ -17079,6 +17079,7 @@
   "operational_fact.list_outsourcing_facts": {
     "basis": "handler-fixture",
     "data": {
+      "full_warehouse_scope": true,
       "limit": 20,
       "offset": 0,
       "outsourcing_facts": [],
@@ -21708,6 +21709,30 @@
       "id": 1
     },
     "test": "TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides"
+  },
+  "sales_order.get_delivery_progress": {
+    "basis": "handler-fixture",
+    "code": 0,
+    "data": {
+      "current": null,
+      "customer": "",
+      "label": "SO-DEMO-7",
+      "lines": [],
+      "order_id": 7,
+      "owner": "",
+      "recent": [],
+      "snapshot_at": "2026-11-19T09:00:00Z",
+      "status": "active",
+      "tasks_available": false,
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "id": 7,
+      "limit": 20,
+      "offset": 0
+    },
+    "test": "TestSalesDeliveryProgressRequiresOrderAndLineReadsWithoutDashboard"
   },
   "sales_order.get_engineering_material_request": {
     "basis": "backend-wire-shape",

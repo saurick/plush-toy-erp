@@ -49,7 +49,7 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
   if (
     counts.some((count) => !isNonNegativeSafeInteger(count)) ||
     counts.reduce((sum, count) => sum + count, 0) !== response.total ||
-    (request.todo_only === true && response.counts.finished !== 0)
+    ((request.todo_only === true || request.status === 'open') && response.counts.finished !== 0)
   ) {
     return invalidTaskBoardResponse()
   }

@@ -87,4 +87,14 @@ func TestBusinessDocumentSearchPostgresProgress(t *testing.T) {
 	if board, err = uc.List(ctx, q); err != nil || board.Total != 0 {
 		t.Fatalf("literal search=%+v %v", board, err)
 	}
+	completed := client.WorkflowTask.Create().SetTaskCode("delivery-complete-" + suffix).SetTaskName("出货预约已确认").
+		SetTaskGroup("test").SetSourceType("sales_order").SetSourceID(so.ID).SetOwnerRoleKey("sales").SetTaskStatusKey("done").SetCompletedAt(due).SaveX(ctx)
+	feedback := "预约单已核对"
+	client.WorkflowTaskEvent.Create().SetTaskID(completed.ID).SetEventType("status_changed").SetToStatusKey("done").SetPayload(map[string]any{"feedback": feedback}).SaveX(ctx)
+	salesView := &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{"sales"}}
+	delivery, err := uc.SalesDelivery(ctx, so.ID, 20, 0, salesView)
+	if err != nil || delivery.Total != 1 || delivery.Current == nil || delivery.Current.Status != "blocked" ||
+		delivery.Current.Label == "等待确认" || delivery.Lines[0].Line.OrderID != so.ID || len(delivery.Recent) != 1 || delivery.Recent[0].Reason != feedback {
+		t.Fatalf("scoped sales progress=%+v err=%v", delivery, err)
+	}
 }

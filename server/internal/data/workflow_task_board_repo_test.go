@@ -344,7 +344,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardTodoCountsUnsettledResponsibilitiesOnc
 	}{
 		{status: "ready", role: biz.SalesRoleKey, assignee: &actorID},
 		{status: "ready", role: biz.SalesRoleKey},
-		{status: "blocked", role: biz.QualityRoleKey, assignee: &actorID},
+		{status: "blocked", role: biz.SalesRoleKey},
 		{status: "ready", role: biz.QualityRoleKey, assignee: &actorID, due: &dueAt},
 		{status: "ready", role: biz.QualityRoleKey},
 		{status: "done", role: biz.SalesRoleKey},
@@ -398,6 +398,22 @@ func TestWorkflowRepo_GetWorkflowTaskBoardTodoCountsUnsettledResponsibilitiesOnc
 	all, err := repo.GetWorkflowTaskBoard(ctx, query)
 	if err != nil || all.Total != 7 || all.Counts.Finished != 3 {
 		t.Fatalf("all view must keep finished history: %#v err=%v", all, err)
+	}
+	query.OwnerRoleKey = biz.SalesRoleKey
+	query.Status = "open"
+	query.Assignee = "unassigned"
+	seenUnassigned := map[string]bool{}
+	for offset := 0; offset < 2; offset++ {
+		query.Offset = offset
+		page, err := repo.GetWorkflowTaskBoard(ctx, query)
+		if err != nil || page.Total != 2 || page.Counts != (biz.WorkflowTaskBoardCounts{Actionable: 1, Exception: 1}) || len(page.Lanes) != 1 || len(page.Lanes[0].Tasks) != 1 {
+			t.Fatalf("unassigned open tasks must be counted before pagination: %+v err=%v", page, err)
+		}
+		task := page.Lanes[0].Tasks[0]
+		if task.AssigneeID != nil || task.OwnerRoleKey != biz.SalesRoleKey || seenUnassigned[task.TaskStatusKey] {
+			t.Fatalf("unassigned pagination must retain role scope and distinct tasks: %+v", task)
+		}
+		seenUnassigned[task.TaskStatusKey] = true
 	}
 }
 
@@ -967,6 +983,13 @@ func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t
 	}
 	if len(board.SourceTypes) != 1 || board.SourceTypes[0] != sourceType {
 		t.Fatalf("postgres source types must be SELECT DISTINCT, got %#v", board.SourceTypes)
+	}
+	unassigned, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{
+		OwnerRoleKey: biz.DebugOperatorRoleKey, SourceType: sourceType, Status: "open", WorkflowTaskDiscoveryFilter: biz.WorkflowTaskDiscoveryFilter{Assignee: "unassigned"},
+		LaneKey: biz.WorkflowTaskBoardLaneAll, Limit: 5, SnapshotAt: snapshotAt,
+	})
+	if err != nil || unassigned.Total != 397 || unassigned.Counts.Finished != 0 || len(unassigned.Lanes[0].Tasks) != 5 {
+		t.Fatalf("postgres open unassigned board=%#v err=%v", unassigned, err)
 	}
 
 	projectionReason := "状态原因-" + suffix

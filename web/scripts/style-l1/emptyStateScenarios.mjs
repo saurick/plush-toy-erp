@@ -87,6 +87,7 @@ export function createEmptyStateScenarios({
           .click()
         await inspectEmpty(page, '暂无超时任务')
         await page.getByTestId('mobile-role-nav-progress').click()
+        await page.getByTestId('mobile-progress-panel').getByRole('tab', { name: '订单交付', exact: true }).click()
         await inspectEmpty(page, '当前范围暂无记录')
         for (const width of [320, 430]) {
           await page.setViewportSize({ width, height: 844 })

@@ -1,7 +1,3 @@
-.workflow-task-document-filter {
-  flex-basis: 100%;
-}
-
 .workflow-task-document-filter__modules,
 .workflow-task-document-filter__types {
   margin-inline-start: 12px;

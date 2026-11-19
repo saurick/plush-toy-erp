@@ -140,14 +140,6 @@
     background: var(--erp-primary-soft);
   }
 }
-.workflow-task-calendar__buckets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--erp-border);
-}
 .workflow-task-calendar__items {
   display: grid;
   gap: 8px;

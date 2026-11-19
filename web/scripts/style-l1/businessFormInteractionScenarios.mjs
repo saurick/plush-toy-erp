@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
 import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
 import { withDeadline } from './boundedWait.mjs'
@@ -50,16 +51,17 @@ export function createBusinessFormInteractionScenarios({
     await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
     const filters = page.getByRole('dialog', { name: '筛选条件' })
     await filters.waitFor()
-    const dateTypes = filters.getByRole('group', { name: '日期类型', exact: true })
+    const dates = await openDateFilter(page, filters)
+    const dateTypes = dates.getByRole('group', { name: '日期类型', exact: true })
     await dateTypes.getByRole('button', { name: '计划出货日期', exact: true }).waitFor()
     await dateTypes.getByRole('button', { name: '实际出货日期', exact: true }).waitFor()
     for (const label of ['实际出货日期', '计划出货日期']) {
       await waitForFiniteAnimations(page)
       await dateTypes.getByRole('button', { name: label, exact: true }).click()
       assert.equal(await dateTypes.getByRole('button', { name: label, exact: true }).getAttribute('aria-pressed'), 'true')
-      await filters.getByRole('group', { name: label, exact: true }).waitFor()
     }
     await waitForFiniteAnimations(page)
+    return dates
   }
   const assertResponsiveSelectionActionBar = async (
     page,
@@ -1387,46 +1389,12 @@ export function createBusinessFormInteractionScenarios({
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
-        await openShipmentDateFilters(page)
-        await page.getByRole('group', { name: '时间范围', exact: true }).getByRole('button', { name: '自定义日期', exact: true }).click()
-        const metrics = await page.evaluate(() => {
-          const control = document.querySelector(
-            '.erp-business-date-range-filter'
-          )
-          const inputs = Array.from(
-            control?.querySelectorAll('.erp-business-date-input') || []
-          ).map((input) => {
-            const inputElement = input.querySelector('input') || input
-            const rect = input.getBoundingClientRect()
-            return {
-              top: rect.top,
-              bottom: rect.bottom,
-              width: rect.width,
-              clientWidth: inputElement.clientWidth,
-              scrollWidth: inputElement.scrollWidth,
-            }
-          })
-          return {
-            controlWidth: control?.getBoundingClientRect().width || 0,
-            inputs,
-          }
-        })
-        assert(
-          metrics.controlWidth > 0 && metrics.controlWidth <= 358,
-          `shipment-date-filter-mobile 日期筛选控件应适配窄屏宽度: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.inputs.length === 2 &&
-            metrics.inputs[1].top >= metrics.inputs[0].bottom,
-          `shipment-date-filter-mobile 起止日期在窄屏应改为上下排列: ${JSON.stringify(metrics)}`
-        )
-        assert(
-          metrics.inputs.length === 2 &&
-            metrics.inputs.every(
-              (item) => item.scrollWidth <= item.clientWidth + 1
-            ),
-          `shipment-date-filter-mobile 日期输入不应裁切: ${JSON.stringify(metrics)}`
-        )
+        const dates = await openShipmentDateFilters(page)
+        assert.equal(await dates.locator('.erp-filter-date-days:visible').count(), 1)
+        const { from, to } = await manualDateInputs(dates)
+        const [panel, first, last] = await Promise.all([dates, from, to].map((locator) => locator.boundingBox()))
+        assert(panel.width <= 358 && last.y >= first.y + first.height, '窄窗单月和起止日期均完整显示')
+        assert([first, last].every((box) => box.x >= panel.x && box.x + box.width <= panel.x + panel.width + 1), '日期输入留在浮层内')
         await assertNoHorizontalOverflow(page, 'shipment-date-filter-mobile')
       },
     },

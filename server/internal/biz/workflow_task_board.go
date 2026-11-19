@@ -34,6 +34,7 @@ var workflowTaskBoardLaneKeys = []string{
 var workflowTaskBoardFilterStatuses = map[string]struct{}{
 	"":          {},
 	"all":       {},
+	"open":      {},
 	"ready":     {},
 	"blocked":   {},
 	"rejected":  {},

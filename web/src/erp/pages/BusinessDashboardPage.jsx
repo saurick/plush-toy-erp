@@ -18,6 +18,7 @@ import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listBusinessProgress } from '../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import { canOpenRelatedDocumentPath } from '../utils/relatedDocumentNavigation.mjs'
 import { BUSINESS_ROUTE_PATHS } from '../utils/masterDataOrderView.mjs'
 import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
@@ -42,6 +43,10 @@ import ProgressDeliveryLines from '../components/business-visualizations/Progres
 import ProgressSortHeader from '../components/business-visualizations/ProgressSortHeader.jsx'
 import { BusinessProgressSort } from '@/common/consts/statuses.generated.mjs'
 import BusinessProgressDrawer from '../components/business-visualizations/BusinessProgressDrawer.jsx'
+import RoleProgressPanel from '../components/business-visualizations/RoleProgressPanel.jsx'
+import { progressBoardAccess, progressBoardViews, scopeProgressBoardQuery } from '../utils/progressBoardAccess.mjs'
+import SalesDeliveryWorkspace from '../components/sales-orders/SalesDeliveryWorkspace.jsx'
+import { useSalesDeliveryWorkspace } from '../components/sales-orders/useSalesDeliveryWorkspace.js'
 import {
   ProgressIdentity,
   ProgressDue,
@@ -50,7 +55,6 @@ import {
 } from '../components/business-visualizations/ProgressCompactContent.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
-import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
 import BusinessFilterPopoverContent, { businessFilterPopoverOverflow } from '../components/business-list/BusinessFilterPopoverContent.jsx'
 import '../styles/app/progress-board.css'
 
@@ -65,10 +69,19 @@ export default function BusinessDashboardPage() {
     (next, options) => setSearchParams(next, { state: { ...location.state, progressReturn: undefined }, ...options }),
     [setSearchParams, location.state]
   )
-  const statisticsActive = params.get('view') === 'statistics'
-  const queryKey = JSON.stringify(progressQueryFromURL(params))
+  const boardAccess = useMemo(() => progressBoardAccess(adminProfile), [adminProfile])
+  const deliveryWorkspace = useSalesDeliveryWorkspace(adminProfile, boardAccess.sales)
+  const openDeliveryProgress = deliveryWorkspace.openProgress
+  const views = progressBoardViews(boardAccess)
+  const selectedView = params.get('view')
+  const view = views.find(({ value }) => value === selectedView)?.value || views[0]?.value || ''
+  const statisticsActive = view === 'statistics'
+  const roleActive = view === 'role'
+  const listActive = view === 'orders' || view === 'production'
+  const [roleProgressState, setRoleProgressState] = useBusinessPageState('roleProgress', {})
+  const updateRoleProgress = useCallback((changes) => setRoleProgressState((previous) => ({ ...previous, ...changes })), [setRoleProgressState])
+  const queryKey = JSON.stringify(scopeProgressBoardQuery(progressQueryFromURL(params), view, boardAccess))
   const query = useMemo(() => JSON.parse(queryKey), [queryKey])
-  const [dateOpen, setDateOpen] = useState(false)
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -96,11 +109,6 @@ export default function BusinessDashboardPage() {
     state?.key === queryKey && state?.profile === adminProfile
       ? state.data
       : null
-  const view =
-    (statisticsActive ? 'statistics' : query.view) ||
-    (data && !data.access.sales && data.access.production
-      ? 'production'
-      : 'orders')
   const access = data?.access
   const lines = view === 'orders' && query.display === 'lines'
   const [moreOpen, setMoreOpen] = useState(false)
@@ -151,7 +159,7 @@ export default function BusinessDashboardPage() {
     keys.forEach((key) => previous.delete(key))
     for (const [key, value] of Object.entries(viewQueries.current[nextView] || {})) previous.set(key, value)
     previous.set('view', nextView)
-    setParams(nextView === 'statistics' ? previous : withProgressFilters(previous, {}))
+    setParams(nextView === 'statistics' || nextView === 'role' ? previous : withProgressFilters(previous, {}))
     setSelection(null)
   }
   const changeDeliveryDisplay = (display) => {
@@ -178,7 +186,7 @@ export default function BusinessDashboardPage() {
   }
   const load = useCallback(async () => {
     const request = begin('business-progress')
-    if (statisticsActive || !adminProfile?.id) {
+    if (!listActive || !adminProfile?.id) {
       setLoading(false)
       request.finish()
       return false
@@ -204,7 +212,7 @@ export default function BusinessDashboardPage() {
         request.finish()
       }
     }
-  }, [adminProfile, begin, query, queryKey, statisticsActive])
+  }, [adminProfile, begin, listActive, query, queryKey])
   useEffect(() => {
     load()
   }, [load])
@@ -214,9 +222,11 @@ export default function BusinessDashboardPage() {
     }
   }, [data, query.offset, query.limit, update])
   useEffect(() => {
-    if (!statisticsActive) return outlet?.registerPageRefresh?.(load)
+    if (listActive) {
+      return outlet?.registerPageRefresh?.(load)
+    }
     return undefined
-  }, [load, outlet, statisticsActive])
+  }, [listActive, load, outlet])
   useEffect(() => {
     setSelection(null)
     viewQueries.current = {}
@@ -232,6 +242,10 @@ export default function BusinessDashboardPage() {
         },
         { replace: true }
       )
+      if (boardAccess.scopedDelivery && row.view === 'orders') {
+        openDeliveryProgress(row.line?.sales_order_id || row.id)
+        return
+      }
       setSelection({
         id: row.line?.sales_order_id || row.id,
         lineID: row.line ? row.id : undefined,
@@ -241,7 +255,7 @@ export default function BusinessDashboardPage() {
         profile: adminProfile,
       })
     },
-    [adminProfile, setParams]
+    [adminProfile, boardAccess.scopedDelivery, openDeliveryProgress, setParams]
   )
   const canOpen = useCallback(
     (path) => {
@@ -318,50 +332,24 @@ export default function BusinessDashboardPage() {
       className={`erp-progress-board${statisticsActive ? ' erp-progress-board--statistics' : ''}`}
       aria-label="进度看板"
     >
-      {dateOpen && (
-        <FilterDateRangePicker
-          title="选择交期日期范围"
-          dateFrom={query.date_from}
-          dateTo={query.date_to}
-          onCancel={() => {
-            setDateOpen(false)
-            setMoreOpen(true)
-          }}
-          onApply={({ dateFrom, dateTo }) => {
-            update({ from: dateFrom, to: dateTo })
-            setDateOpen(false)
-          }}
-        />
-      )}
       <PageHeaderCard
         compact
         title="进度看板"
-        viewSwitch={
+        viewSwitch={views.length > 1 && (
           <SlidingTabList
             aria-label="进度查看方式"
             value={view}
             onChange={changeView}
-            options={[
-              {
-                label: '订单交付',
-                value: 'orders',
-                disabled: access?.sales === false,
-              },
-              {
-                label: '生产执行',
-                value: 'production',
-                disabled: access?.production === false,
-              },
-              {
-                label: '经营统计',
-                value: 'statistics',
-                disabled: !statistics.canUse,
-              },
-            ]}
+            options={views.map((tab) => ({
+              ...tab,
+              disabled: tab.value === 'orders' && access?.sales === false ||
+                tab.value === 'production' && access?.production === false ||
+                tab.value === 'statistics' && !statistics.canUse,
+            }))}
           />
-        }
+        )}
       />
-      {!statisticsActive && (
+      {listActive && (
         <div className="erp-progress-controls">
           {(canReturnToSales || query.id) && (
             <div className="erp-progress-order-context">
@@ -374,7 +362,7 @@ export default function BusinessDashboardPage() {
             </div>
           )}
           <div className={`erp-progress-toolbar${lines ? ' erp-progress-toolbar--delivery' : ''}`}>
-            {view === 'orders' && <ProgressDeliverySwitch query={filterQuery} onChange={changeDeliveryDisplay} />}
+            {view === 'orders' && !boardAccess.scopedDelivery && <ProgressDeliverySwitch query={filterQuery} onChange={changeDeliveryDisplay} />}
             {!lines && (
               <div
                 className="erp-progress-metric-row"
@@ -434,12 +422,9 @@ export default function BusinessDashboardPage() {
                         query={filterQuery}
                         counts={filterCounts}
                         taskAccess={access?.tasks}
+                        allowOwnerFilter={!boardAccess.scopedDelivery}
                         open={moreOpen}
                         onChange={update}
-                        onDateRange={() => {
-                          setMoreOpen(false)
-                          setDateOpen(true)
-                        }}
                       />
                     </BusinessFilterPopoverContent>
                   }
@@ -494,8 +479,25 @@ export default function BusinessDashboardPage() {
           ) : null}
         </div>
       )}
-      {statisticsActive ? (
+      {roleActive ? (
+        <RoleProgressPanel
+          active
+          adminProfile={adminProfile}
+          roles={boardAccess.roles}
+          allowGlobal={boardAccess.supervise}
+          state={roleProgressState}
+          onStateChange={updateRoleProgress}
+          registerRefresh={outlet?.registerPageRefresh}
+          onOpenTask={canOpen('/erp/task-board') ? (task) => navigateFromProgress(progressSourcePath({ kind: 'task', id: task.id })) : undefined}
+          onOpenDelivery={deliveryWorkspace.enabled ? openDeliveryProgress : undefined}
+          canOpenSource={canOpen}
+          onOpenSource={navigateFromProgress}
+          suspendDetails={Boolean(deliveryWorkspace.frame)}
+        />
+      ) : statisticsActive ? (
         statistics.content
+      ) : !listActive ? (
+        <Empty description="当前账号没有可查看的进度视图" />
       ) : error ? (
         <Alert
           className="erp-progress-error"
@@ -637,7 +639,12 @@ export default function BusinessDashboardPage() {
         adminProfile={adminProfile}
         canOpen={canOpen}
         onNavigate={navigateFromProgress}
+        onOpenSalesDelivery={deliveryWorkspace.enabled ? (id) => {
+          setSelection(null)
+          deliveryWorkspace.openProgress(id)
+        } : undefined}
       />
+      <SalesDeliveryWorkspace workspace={deliveryWorkspace} />
     </section>
   )
 }

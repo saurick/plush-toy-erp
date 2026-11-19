@@ -167,10 +167,18 @@ function outsourcingSourceActionProcessedUnits(
       return total
     }
     const effective = normalizedAction === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
-      ? subtractNumeric20Scale6Units(quantityUnits(fact?.quantity), quantityUnits(fact?.returned_to_vendor_quantity))
+      ? outsourcingReturnEffectiveUnits(fact)
       : quantityUnits(fact?.quantity)
     return addNumeric20Scale6Units(total, effective)
   }, '0')
+}
+
+function outsourcingReturnEffectiveUnits(fact) {
+  return subtractNumeric20Scale6Units(quantityUnits(fact?.quantity), quantityUnits(fact?.returned_to_vendor_quantity))
+}
+
+export function outsourcingReturnEffectiveQuantity(fact) {
+  return positiveUnitsText(outsourcingReturnEffectiveUnits(fact)) || '0'
 }
 
 export function outsourcingSourceActionQuantitySummary(

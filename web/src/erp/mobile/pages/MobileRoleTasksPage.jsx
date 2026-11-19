@@ -139,8 +139,8 @@ export default function MobileRoleTasksPage() {
   const { adminProfile, canEnterDesktop, handleLogout, loggingOut, mobileRoleOptions, handleSwitchMobileRole } = shellContext
   const returnedTaskID = readWorkflowTaskReturn(location.state, adminProfile?.id)?.taskID
   const progressAccess = useMemo(
-    () => mobileProgressAccess(adminProfile),
-    [adminProfile]
+    () => mobileProgressAccess(adminProfile, activeRoleKey),
+    [activeRoleKey, adminProfile]
   )
   const runtimeBuildIdentity = useRuntimeBuildIdentity()
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
@@ -151,7 +151,7 @@ export default function MobileRoleTasksPage() {
   const taskAccessScopeKey = `${activeRoleKey}|access:${taskAccessIdentity}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
   const initialHistoryStateRef = useRef(readMobileTaskHistoryState())
   const initialHistoryCandidate = initialHistoryStateRef.current
-  const defaultMainTabKey = progressAccess.enabled
+  const defaultMainTabKey = progressAccess.enabled && progressAccess.global
     ? MOBILE_MAIN_TAB_KEYS.PROGRESS
     : MOBILE_MAIN_TAB_KEYS.TODO
   const initialTaskQueryOptions = readMobileTaskQueryHistory(

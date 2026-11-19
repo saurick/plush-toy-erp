@@ -1,4 +1,5 @@
 import { setTimeout as pause } from 'node:timers/promises'
+import { dateFilterButton, manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
 import { statisticsFixtureData } from './businessStatisticsFixtures.mjs'
 
@@ -257,59 +258,46 @@ export function createBusinessStatisticsScenarios({
           await verifyToolbarRows(stats, assert)
           await page.setViewportSize({ ...desktopViewport, width: 1280 })
           const toolbar = stats.locator('.erp-statistics-filters')
-          const start = toolbar.getByRole('textbox', { name: '开始日期', exact: true })
-          const end = toolbar.getByRole('textbox', { name: '结束日期', exact: true })
-          assert.equal(await start.count(), 0, '预设交期只显示一个控件')
+          assert.equal(await toolbar.locator('.erp-filter-date-trigger').count(), 1, '交期显示一个日期入口')
           const controlPosition = (field) => field.evaluate((input) => {
-            const { x, y, right, bottom, height } = input.closest('.erp-filter-field, .ant-picker, .ant-select, .ant-input-affix-wrapper').getBoundingClientRect()
-            return { x, y, right, bottom, center: y + height / 2 }
+            const { x, y, right, bottom } = input.closest('.erp-filter-field, .ant-select, .ant-input-affix-wrapper').getBoundingClientRect()
+            return { x, y, right, bottom }
           })
           const filterBoxes = await Promise.all([
             toolbar.getByRole('group', { name: '汇总维度', exact: true }),
-            toolbar.getByRole('group', { name: '交期范围', exact: true }),
+            toolbar.locator('.erp-filter-date-trigger'),
             toolbar.getByRole('group', { name: '统计币种', exact: true }),
             toolbar.getByRole('textbox', { name: '搜索客户', exact: true }),
             toolbar.getByRole('group', { name: '统计排序', exact: true }),
           ].map(controlPosition))
           assert(filterBoxes.every((box, index) => index === 0 || (Math.abs(box.bottom - filterBoxes[index - 1].bottom) <= 2 ? box.x >= filterBoxes[index - 1].right - 1 : box.y >= filterBoxes[index - 1].bottom - 1)), '筛选和排序按阅读顺序自然换行，不相互覆盖')
           assert.equal(await toolbar.getByRole('combobox').count(), 0, '固定统计条件直接点选')
-          await verifyToolbarRows(stats, assert, { wrapped: true })
           await page.setViewportSize(desktopViewport)
-          await select(page, '交期范围', '自定义')
-          const customToolbar = await verifyToolbarRows(stats, assert, { wrapped: true })
-          assert.deepEqual(customToolbar.controlHeights, defaultToolbar.controlHeights, '自定义换行不压缩筛选控件')
-          assert.equal(customToolbar.views.height, defaultToolbar.views.height)
-          const [startBox, endBox] = await Promise.all([start, end].map(controlPosition))
-          assert(startBox.x < endBox.x && Math.abs(startBox.center - endBox.center) <= 2, '自定义起止日期应成组换行')
-          assert.equal(await start.inputValue(), '2026/10/01')
-          assert.equal(await end.inputValue(), '2026/10/31')
-          for (const [input, date, field, otherField, otherDate] of [
-            [start, '2026/10/04', 'date_from', 'date_to', '2026-10-31'],
-            [end, '2026/10/28', 'date_to', 'date_from', '2026-10-04'],
-          ]) {
-            const [request] = await Promise.all([
-              page.waitForRequest((request) => {
-                if (!request.url().endsWith('/rpc/business') || request.method() !== 'POST') return false
-                const { method, params } = request.postDataJSON()
-                return method === 'get_delivery_statistics' && params[field] === date.replaceAll('/', '-')
-              }),
-              (async () => {
-                await input.click()
-                await input.press('ControlOrMeta+a')
-                await input.pressSequentially(date)
-                await input.press('Enter')
-              })(),
-            ])
-            const { params: dates } = request.postDataJSON()
-            assert.equal(dates.period, 'custom')
-            assert.equal(dates[otherField], otherDate)
-          }
-          await toolbar.getByRole('group', { name: '交期范围', exact: true }).getByRole('button', { name: '不限', exact: true }).click()
+          const dates = await openDateFilter(page, toolbar)
+          const { from, to } = await manualDateInputs(dates)
+          assert.equal(await from.inputValue(), '2026-10-01')
+          assert.equal(await to.inputValue(), '2026-10-31')
+          const beforeDates = calls.length
+          await from.fill('2026-10-04')
+          await to.fill('2026-10-28')
+          assert.equal(calls.length, beforeDates, '只编辑草稿无需查询')
+          const [request] = await Promise.all([
+            page.waitForRequest((request) => {
+              if (!request.url().endsWith('/rpc/business') || request.method() !== 'POST') return false
+              const { method, params } = request.postDataJSON()
+              return method === 'get_delivery_statistics' && params.date_from === '2026-10-04' && params.date_to === '2026-10-28'
+            }),
+            dateFilterButton(dates, '应用日期').click(),
+          ])
+          assert.equal(request.postDataJSON().params.period, 'custom')
+          await dates.waitFor({ state: 'hidden' })
+          await toolbar.getByRole('button', { name: '清除订单交期', exact: true }).click()
           await page.waitForURL((url) => url.searchParams.get('period') === 'all')
-          await start.waitFor({ state: 'detached' })
+          assert.equal(await dates.isVisible(), false)
           const clearedQuery = new URL(page.url()).searchParams
-          assert(!clearedQuery.has('stfrom') && !clearedQuery.has('stto'), '清空范围后不留自定义日期')
-          await select(page, '交期范围', '本月')
+          assert(!clearedQuery.has('stfrom') && !clearedQuery.has('stto'), '清空范围后同步清除起止日期')
+          await openDateFilter(page, toolbar)
+          await dateFilterButton(dates, '本月').click()
           await verifyToolbarRows(stats, assert)
           const delivered = stats.getByRole('button', { name: /已交齐.*18/ })
           await delivered.click()
@@ -424,9 +412,9 @@ export function createBusinessStatisticsScenarios({
             )
             await assertNoHorizontalOverflow(page)
           } else {
-            await select(page, '交期范围', '自定义')
-            const dates = stats.getByRole('group', { name: '订单交期', exact: true }).getByRole('textbox')
-            assert.deepEqual(await dates.evaluateAll((inputs) => inputs.map((input) => input.readOnly)), [false, false])
+            const dates = await openDateFilter(page, stats.locator('.erp-statistics-filters'))
+            await manualDateInputs(dates)
+            assert.deepEqual(await dates.getByRole('textbox').evaluateAll((inputs) => inputs.map((input) => input.readOnly)), [false, false])
           }
           return
         }
@@ -598,7 +586,7 @@ export function createBusinessStatisticsScenarios({
             ?.textContent.includes('358,100.00')
         )
         assert.equal(
-          await stats.getByRole('group', { name: '交期范围' }).count(),
+          await stats.getByRole('button', { name: /^订单交期：/u }).count(),
           0
         )
         assert.equal(await reports.getByRole('tab', { name: '应收账龄', selected: true }).count(), 1)
@@ -642,7 +630,7 @@ export function createBusinessStatisticsScenarios({
           .click()
         await reports.getByRole('tab', { name: '交付汇总', exact: true }).click()
         await page.waitForURL((url) => url.searchParams.get('report') === 'delivery')
-        await stats.getByRole('group', { name: '订单交期', exact: true }).waitFor()
+        await stats.getByRole('button', { name: /^订单交期：/u }).waitFor()
         assert.equal(calls.at(-1).params.group_by, 'product', '返回交付恢复原汇总维度')
         await select(page, '汇总维度', '按客户')
         const search = stats.getByRole('textbox', { name: '搜索客户' })
@@ -710,7 +698,7 @@ export function createBusinessStatisticsScenarios({
           .waitFor()
         await page.getByRole('button', { name: /全屏预览/ }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame.locator('[data-action="nav"][data-page="progress"]').click()
+        await frame.locator('.nav-item[data-action="nav"][data-page="progress"]').click()
         await frame.getByRole('tab', { name: '经营统计', exact: true }).click()
         await frame
           .locator('.statistics-design-table tbody tr')
@@ -721,9 +709,11 @@ export function createBusinessStatisticsScenarios({
           /订单总数\s*48/
         )
         await verifyToolbarRows(frame, assert)
-        await frame.getByRole('group', { name: '交期范围', exact: true }).getByRole('button', { name: '自定义', exact: true }).click()
-        await verifyToolbarRows(frame, assert, { wrapped: true })
-        await frame.getByRole('group', { name: '交期范围', exact: true }).getByRole('button', { name: '本月', exact: true }).click()
+        await frame.getByRole('button', { name: /^订单交期：/u }).click()
+        const dateEditor = frame.getByRole('dialog', { name: '选择日期范围', exact: true })
+        await dateEditor.getByRole('group', { name: '快捷期间', exact: true }).waitFor()
+        await verifyToolbarRows(frame, assert)
+        await dateFilterButton(dateEditor, '本月').click()
         const displayModes = frame.getByRole('group', { name: '统计展示方式', exact: true })
         await displayModes.getByRole('button', { name: '图表', exact: true }).click()
         const designSegment = frame.locator('[data-statistics-tooltip]').first()

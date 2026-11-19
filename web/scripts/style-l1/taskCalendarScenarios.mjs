@@ -176,6 +176,11 @@ revision,
       },
       verify: async (page) => {
         const switcher = '[aria-label="待办显示方式"]'
+        const desktopTools = page.locator('.erp-task-board-filters')
+        const desktopFilterTrigger = desktopTools.getByRole('button', { name: /^筛选/u })
+        const desktopFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+        const desktopDeadline = desktopFilters.getByRole('group', { name: '任务截止', exact: true })
+        const deadlineChoice = (label) => desktopDeadline.getByRole('button', { name: new RegExp(`^${label}`, 'u') })
         const verifyLayout = async (layout) => {
           if (mobile) {
             const button = page.getByRole('button', { name: layout === 'calendar' ? '切换到列表' : '切换到日历', exact: true })
@@ -231,7 +236,13 @@ revision,
         const selectBucket = async (selection) => {
           const label = selection === 'undated' ? '未设置截止' : selection === 'overdue' ? '已逾期' : '按日期'
           if (!mobile) {
-            await calendar.getByRole('button', { name: new RegExp(`^${label}`) }).click()
+            await desktopFilterTrigger.click()
+            const option = deadlineChoice(label)
+            await option.click()
+            await option.and(page.locator('[aria-pressed="true"]')).waitFor()
+            await desktopFilters.getByRole('button', { name: '收起', exact: true }).click()
+            await desktopFilters.waitFor({ state: 'hidden' })
+            if (selection !== 'date') assert((await desktopFilterTrigger.innerText()).includes(label))
             return
           }
           await page.getByTestId('mobile-task-list-filter-trigger').click()
@@ -240,7 +251,6 @@ revision,
           await filters.getByLabel('任务截止筛选', { exact: true }).getByText(label, { exact: true }).click()
           await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
           await filters.waitFor({ state: 'hidden' })
-          assert.equal(await calendar.locator('.workflow-task-calendar__buckets').count(), 0, 'mobile has one deadline filter entry')
           assert.equal(await calendar.locator('.workflow-task-calendar__month').count(), selection === 'date' ? 1 : 0, 'cross-date results hide the month')
           if (selection !== 'date') assert((await page.getByTestId('mobile-task-list-filter-trigger').getAttribute('title')).includes(label))
         }
@@ -255,11 +265,25 @@ revision,
           assert.deepEqual(await rows.evaluateAll((nodes) => nodes.map((node) => node.dataset.taskId)), listPageTaskIDs, '从日历返回恢复同一页待办')
           await verifyMobileNavigationMotion(page, assert, switcher, 1, true)
           await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
-          await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
-          const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
-          assert.equal(await filters.getByText('截止时间', { exact: true }).count(), 0, 'desktop calendar has one date condition')
-          await filters.getByRole('button', { name: '收起', exact: true }).click()
-          await page.locator('.erp-business-filter-popover:visible').waitFor({ state: 'hidden' })
+          await desktopFilterTrigger.click()
+          assert.equal(await desktopFilters.getByText('截止时间', { exact: true }).count(), 0, 'desktop calendar has one date condition')
+          assert.equal(await deadlineChoice('按日期').getAttribute('aria-pressed'), 'true')
+          assert.equal(await deadlineChoice('已逾期').locator('.erp-filter-chip__count').textContent(), '1')
+          assert.equal(await deadlineChoice('未设置截止').locator('.erp-filter-chip__count').textContent(), '1')
+          const deadlineLayout = await desktopDeadline.evaluate((group) => {
+            const field = group.closest('fieldset')
+            const status = field.parentElement.querySelector('[role="group"][aria-label="任务状态"]').closest('fieldset')
+            const deadlineBounds = field.getBoundingClientRect()
+            const statusBounds = status.getBoundingClientRect()
+            return {
+              last: field === field.parentElement.lastElementChild,
+              aligned: Math.abs(deadlineBounds.left - statusBounds.left) <= 1 && Math.abs(deadlineBounds.width - statusBounds.width) <= 1,
+              rows: new Set(Array.from(group.querySelectorAll('button'), (button) => button.offsetTop)).size,
+            }
+          })
+          assert.deepEqual(deadlineLayout, { last: true, aligned: true, rows: 1 }, '任务截止位于筛选末尾并与任务状态等宽')
+          await desktopFilters.getByRole('button', { name: '收起', exact: true }).click()
+          await desktopFilters.waitFor({ state: 'hidden' })
         }
         assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30)
         const captureInsets = !mobile && themeMode === 'light'
@@ -357,6 +381,13 @@ revision,
         try {
           assert.equal(await calendar.locator('.workflow-task-calendar__count').count(), 0, 'changed filters cannot reuse totals from the previous scope')
           assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 0, 'changed filters cannot reuse the previous agenda')
+          if (!mobile) {
+            await desktopFilterTrigger.click()
+            await desktopDeadline.waitFor()
+            assert.equal(await desktopDeadline.locator('.erp-filter-chip__count').count(), 0, 'changed filters cannot reuse deadline counts from the previous scope')
+            await desktopFilters.getByRole('button', { name: '收起', exact: true }).click()
+            await desktopFilters.waitFor({ state: 'hidden' })
+          }
         } finally {
           filtered.release.resolve()
         }
@@ -441,7 +472,7 @@ revision,
           await page.getByRole('button', { name: '返回列表', exact: true }).click()
         }
         if (mobile) assert((await page.getByTestId('mobile-task-list-filter-trigger').getAttribute('title')).includes('未设置截止'))
-        else await calendar.getByRole('button', { name: /^未设置截止/, pressed: true }).waitFor()
+        else await desktopTools.getByRole('button', { name: /筛选，未设置截止/u }).waitFor()
         await page.reload()
         await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
         await verifyLayout('calendar')
@@ -466,7 +497,44 @@ revision,
         await calendar.getByRole('button', { name: '下个月', exact: true }).click()
         await calendar.getByText('下月跟进', { exact: true }).waitFor()
         await verifyCalendarAlignment(calendar, assert)
-        assert.equal(await calendar.getByRole('button', { name: /已逾期/ }).count(), mobile ? 0 : 1)
+        assert.equal(await calendar.getByRole('button', { name: /^(已逾期|未设置截止)/u }).count(), 0, 'calendar shows deadline choices only in filters')
+        if (!mobile) {
+          await selectBucket('undated')
+          await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
+          await desktopTools.getByRole('button', { name: '清空筛选', exact: true }).click()
+          await calendar.locator(`button[data-date="${nextMonth}-01"][aria-pressed="true"]`).waitFor()
+          assert.equal(await desktopFilterTrigger.innerText(), '筛选')
+
+          await search.fill('跟进')
+          await search.press('Enter')
+          await selectBucket('overdue')
+          await calendar.getByText('上月尚未处理的跟进', { exact: true }).waitFor()
+          await desktopFilterTrigger.click()
+          await desktopFilters.getByRole('button', { name: '阻塞', exact: true }).click()
+          await deadlineChoice('已逾期').getByText('0', { exact: true }).waitFor()
+          await desktopFilters.getByRole('button', { name: '收起', exact: true }).click()
+          await desktopFilters.waitFor({ state: 'hidden' })
+          assert.equal(await desktopFilterTrigger.innerText(), '筛选 · 已逾期 +1')
+          await desktopFilterTrigger.click()
+          await desktopFilters.getByRole('button', { name: '清空筛选', exact: true }).click()
+          await calendar.locator(`button[data-date="${nextMonth}-01"][aria-pressed="true"]`).waitFor()
+          assert.equal(await deadlineChoice('按日期').getAttribute('aria-pressed'), 'true')
+          assert.equal(await search.inputValue(), '跟进')
+          await desktopFilters.getByRole('button', { name: '收起', exact: true }).click()
+          await desktopFilters.waitFor({ state: 'hidden' })
+          const searchCleared = {
+            expectedSelection: `${nextMonth}-01`,
+            expectedKeyword: '',
+            started: Promise.withResolvers(),
+            release: Promise.withResolvers(),
+          }
+          heldNext = searchCleared
+          await search.fill('')
+          await search.press('Enter')
+          await searchCleared.started.promise
+          searchCleared.release.resolve()
+          await calendar.getByText('下月跟进', { exact: true }).waitFor()
+        }
         failNext = true
         await calendar.locator(`button[data-date="${nextMonth}-02"]`).click()
         await calendar.getByRole('alert').waitFor()
@@ -624,17 +692,32 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
       })
       assert(agendaGeometry.calendarOverflow <= 1 && agendaGeometry.pageOverflow <= 1 && agendaGeometry.agendaLeft >= agendaGeometry.monthRight && agendaGeometry.tableRight <= agendaGeometry.agendaRight + 1, `日历任务表格在议程内滚动并与月份并排：${JSON.stringify(agendaGeometry)}`)
       await calendar.getByRole('button', { name: '下个月', exact: true }).click()
-      await calendar.getByRole('button', { name: /^2026-11-01/ }).waitFor()
+      const novemberFirst = calendar.getByRole('button', { name: /^2026-11-01/, pressed: true })
+      await novemberFirst.waitFor()
+      assert.equal(await calendar.getByRole('button', { name: /^(已逾期|未设置截止)/u }).count(), 0)
+      await frame.getByRole('button', { name: '筛选', exact: true }).click()
+      const filters = frame.getByRole('dialog', { name: '筛选条件', exact: true })
+      const deadline = filters.getByRole('group', { name: '任务截止', exact: true })
+      await deadline.getByRole('button', { name: '按日期', pressed: true }).waitFor()
+      assert(await deadline.evaluate((group) => {
+        const field = group.parentElement
+        const body = field.parentElement
+        return field === body.lastElementChild && getComputedStyle(body).overflowY === 'auto'
+          && body.nextElementSibling?.classList.contains('popover-foot')
+      }), '设计示例将任务截止放在可滚动条件区末尾，收起位于区外')
+      const undated = deadline.getByRole('button', { name: /^未设置截止/u })
+      const undatedCount = await undated.locator('.filter-chip-count').textContent()
+      assert.match(undatedCount, /^\d+$/u)
+      await undated.click()
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
+      await calendar.getByText(`未设置截止日期 · ${undatedCount} 项`, { exact: true }).waitFor()
+      assert.match(await frame.getByRole('button', { name: /^筛选，未设置截止/u }).innerText(), /未设置截止/u)
+      await frame.getByRole('button', { name: '清空筛选', exact: true }).click()
+      await novemberFirst.waitFor()
       await calendar.getByRole('button', { name: '今天', exact: true }).click()
       await frame.locator('.nav-item[data-page="dashboard"]').click()
       await frame.locator('.nav-item[data-page="tasks"]').click()
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
-      await frame.getByRole('button', { name: '筛选', exact: true }).click()
-      const filters = frame.getByRole('dialog', { name: '筛选条件', exact: true })
-      const conditions = filters.locator('.task-filter-body')
-      assert(await conditions.evaluate((node) => getComputedStyle(node).overflowY === 'auto'
-        && node.nextElementSibling?.classList.contains('popover-foot')), '设计示例的收起位于条件滚动区外')
-      await filters.getByRole('button', { name: '收起', exact: true }).click()
       await page.screenshot({ path: path.join(outputDir, 'task-calendar-design-desktop-4k.png') })
       await page.goto(new URL('/__dev/ui-design?page=mobile-tasks', page.url()).href)
       const switchMobileLayout = async (layout) => {
@@ -653,7 +736,6 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
       await frame.getByRole('button', { name: '关闭筛选', exact: true }).click()
       await calendar.getByText(/未设置截止日期/).waitFor()
       assert.equal(await calendar.locator('.task-calendar-demo-month').count(), 0)
-      assert.equal(await calendar.locator('.task-calendar-demo-buckets').count(), 0)
       await frame.getByRole('button', { name: '清空任务筛选', exact: true }).click()
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
       await switchMobileLayout('list')

@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { dateFilterButton, manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
 import { BusinessTextPolicy } from '../../src/common/consts/policies.generated.mjs'
 import { assertControlPreviewThemeIsolation } from './controlThemeAssertions.mjs'
 import { createDevPaginationScenarios } from './devPaginationScenarios.mjs'
@@ -441,31 +442,33 @@ export function createDevSharedComponentScenarios({
           exact: true,
         })
         await waitForFiniteAnimations(page)
-        const dateTypes = range.getByRole('group', { name: '日期类型', exact: true })
-        assert.equal(await range.getByRole('combobox', { name: '日期类型', exact: true }).count(), 0)
-        await dateTypes.getByRole('button', { name: '交货日期', exact: true }).click()
-        assert.equal(await dateTypes.getByRole('button', { name: '交货日期', exact: true }).getAttribute('aria-pressed'), 'true')
-        assert.equal(
-          await range
-            .getByRole('group', { name: '交货日期', exact: true })
-            .count(),
-          1
-        )
-        await range.locator('.erp-business-date-input').nth(1).click()
+        const dates = await openDateFilter(page, range)
+        await waitForFiniteAnimations(page)
+        const [previousMonth, nextMonth, monthHeadings] = await Promise.all([
+          dateFilterButton(dates, '上个月').boundingBox(),
+          dateFilterButton(dates, '下个月').boundingBox(),
+          dates.locator('.erp-filter-date-calendar__headings').boundingBox(),
+        ])
+        assert(previousMonth && nextMonth && monthHeadings, '翻月按钮和月份标题均可见')
+        const centerY = (box) => box.y + box.height / 2
         assert(
-          (
-            await popup
-              .locator('.ant-picker-cell-in-view[title="2026-10-07"]')
-              .getAttribute('class')
-          ).includes('ant-picker-cell-disabled'),
-          '结束日期不能早于开始日期'
+          [previousMonth, nextMonth].every((button) => Math.abs(centerY(button) - centerY(monthHeadings)) <= 1),
+          `左右翻月按钮与月份标题同行 ${JSON.stringify({ previousMonth, nextMonth, monthHeadings })}`
         )
-        await page.keyboard.press('Escape')
-        await stage
-          .getByRole('button', { name: '查看倒置范围', exact: true })
-          .click()
-        await range.getByRole('alert').waitFor()
-        assert.equal(await range.locator('.ant-picker-status-error').count(), 2)
+        const dateTypes = dates.getByRole('group', { name: '日期类型', exact: true })
+        await dateFilterButton(dateTypes, '交货日期').click()
+        assert.equal(await dateFilterButton(dateTypes, '交货日期').getAttribute('aria-pressed'), 'true')
+        const { from, to } = await manualDateInputs(dates)
+        assert.equal(await from.inputValue(), '2026-10-08')
+        await to.fill('2026-10-07')
+        assert.equal(await dateFilterButton(dates, '应用日期').isDisabled(), true)
+        await dates.getByText('结束日期不能早于开始日期', { exact: true }).waitFor()
+        await dateFilterButton(dates, '取消').click()
+        await stage.getByRole('button', { name: '查看倒置范围', exact: true }).click()
+        await openDateFilter(page, range)
+        await dates.getByText('结束日期不能早于开始日期', { exact: true }).waitFor()
+        assert.equal(await dateFilterButton(dates, '应用日期').isDisabled(), true)
+        await dateFilterButton(dates, '取消').click()
         await stage
           .getByRole('button', { name: '清空范围', exact: true })
           .click()

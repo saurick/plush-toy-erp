@@ -523,17 +523,18 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
       "task-board",
     ),
   );
-  for (const [pageKey, expectedOwners] of [
-    ["business-dashboard", ["boss", "pmc"]],
-  ]) {
-    const owners = Object.entries(
-      manifest.compiled_snapshot.rolePageProjections,
-    )
-      .filter(([, pageKeys]) => pageKeys.includes(pageKey))
-      .map(([roleKey]) => roleKey)
-      .sort();
-    assert.deepEqual(owners, expectedOwners);
-  }
+  const progressOwners = Object.entries(manifest.compiled_snapshot.rolePageProjections)
+    .filter(([, pageKeys]) => pageKeys.includes("business-dashboard"))
+    .map(([roleKey]) => roleKey)
+    .sort();
+  assert.deepEqual(progressOwners, [
+    "boss", "engineering", "finance", "pmc", "production", "purchase", "quality", "sales", "warehouse",
+  ]);
+  const globalProgressOwners = manifest.access_entitlements
+    .filter((item) => item.capability_key === "erp.business_dashboard.read" && item.enabled)
+    .map((item) => item.role_key)
+    .sort();
+  assert.deepEqual(globalProgressOwners, ["boss", "pmc"]);
   assert.equal(manifest.module_states.length, customerPackageCatalog.modules.length);
   assert.equal(
     new Set(manifest.module_states.map((item) => item.module_key)).size,

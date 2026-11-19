@@ -1,26 +1,12 @@
-import React, { useLayoutEffect, useState } from 'react'
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, theme } from 'antd'
 import { RollbackOutlined } from '@ant-design/icons'
-import { hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
+import { canRestoreOverlayFocus, hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
+import { BusinessFilterPanelContext } from './BusinessFilterPanelContext.mjs'
 
 export const businessFilterPopoverOverflow = { adjustX: true, adjustY: true, shiftX: true, shiftY: true }
 
-function handleFilterPanelTab(event) {
-  if (event.key !== 'Tab') return
-  const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')]
-    .filter((node) => !node.closest('[hidden]') && node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden')
-  const first = controls[0]
-  const last = controls.at(-1)
-  if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) {
-    event.preventDefault()
-    last?.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first?.focus()
-  }
-}
-
-export default function BusinessFilterPopoverContent({ open, id, panelRef, triggerRef, label = '筛选条件', onClear, clearDisabled, onDismiss, children }) {
+export function useFilterPopoverMaxHeight(open, triggerRef) {
   const overlay = useOverlayScope()
   const pane = overlay?.enabled ? overlay.host : null
   const { token } = theme.useToken()
@@ -50,13 +36,60 @@ export default function BusinessFilterPopoverContent({ open, id, panelRef, trigg
     }
   }, [open, pane, popupSpacing, triggerRef])
 
+  return maxHeight
+}
+
+export function handleFilterPanelTab(event) {
+  if (event.key !== 'Tab') return
+  const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]')]
+    .filter((node) => !node.closest('[hidden]') && node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden')
+  const first = controls[0]
+  const last = controls.at(-1)
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) {
+    event.preventDefault()
+    last?.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first?.focus()
+  }
+}
+
+export default function BusinessFilterPopoverContent({ open, id, panelRef, triggerRef, label = '筛选条件', onClear, clearDisabled, onDismiss, children }) {
+  const fieldsRef = useRef(null)
+  const overlay = useOverlayScope()
+  const maxHeight = useFilterPopoverMaxHeight(open, triggerRef)
+  const [detail, setDetail] = useState(null)
+  const returnFocus = useRef(null)
+  const activeDetail = open ? detail : null
+  const openDetail = useCallback((key, title, trigger) => setDetail({ key, title, trigger, scrollTop: fieldsRef.current.scrollTop }), [])
+  const closeDetail = useCallback(() => {
+    returnFocus.current = activeDetail
+    setDetail(null)
+  }, [activeDetail])
+  const context = useMemo(() => ({ detail: activeDetail, openDetail, closeDetail, panelRef }), [activeDetail, openDetail, closeDetail, panelRef])
+
+  useLayoutEffect(() => {
+    if (!open) {
+      if (detail) setDetail(null)
+      returnFocus.current = null
+    } else if (detail) {
+      panelRef.current.scrollTop = 0
+      panelRef.current.focus({ preventScroll: true })
+    } else if (returnFocus.current) {
+      const { scrollTop, trigger } = returnFocus.current
+      returnFocus.current = null
+      fieldsRef.current.scrollTop = scrollTop
+      if (canRestoreOverlayFocus(overlay)) trigger.focus({ preventScroll: true })
+    }
+  }, [detail, open, overlay, panelRef])
+
   return (
     <section
       id={id}
       ref={panelRef}
-      className="erp-business-filter-popover__content"
+      className={`erp-business-filter-popover__content${activeDetail ? ' erp-business-filter-popover__content--date' : ''}`}
       style={{ '--erp-filter-available-height': maxHeight && `${maxHeight}px` }}
-      aria-label={label}
+      aria-label={activeDetail?.title || label}
       role="dialog"
       tabIndex={-1}
       onKeyDownCapture={(event) => {
@@ -64,36 +97,41 @@ export default function BusinessFilterPopoverContent({ open, id, panelRef, trigg
         if (event.key === 'Escape') {
           event.preventDefault()
           event.stopPropagation()
-          onDismiss()
+          if (activeDetail) closeDetail()
+          else onDismiss()
           return
         }
         handleFilterPanelTab(event)
       }}
     >
-      <header>
-        <strong>筛选条件</strong>
-        {onClear ? (
-          <Button
-            aria-label="清空筛选"
-            size="small"
-            type="text"
-            disabled={clearDisabled}
-            icon={<RollbackOutlined aria-hidden />}
-            onClick={() => {
-              onClear()
-              panelRef.current.focus({ preventScroll: true })
-            }}
-          >
-            清空筛选
-          </Button>
-        ) : null}
-      </header>
-      <div className="erp-business-operation-panel__filters">
-        {children}
-      </div>
-      <footer>
-        <Button type="primary" onClick={onDismiss}>收起</Button>
-      </footer>
+      <BusinessFilterPanelContext.Provider value={context}>
+        <div className="erp-business-filter-popover__overview" hidden={Boolean(activeDetail)}>
+          <header>
+            <strong>筛选条件</strong>
+            {onClear ? (
+              <Button
+                aria-label="清空筛选"
+                size="small"
+                type="text"
+                disabled={clearDisabled}
+                icon={<RollbackOutlined aria-hidden />}
+                onClick={() => {
+                  onClear()
+                  panelRef.current.focus({ preventScroll: true })
+                }}
+              >
+                清空筛选
+              </Button>
+            ) : null}
+          </header>
+          <div className="erp-business-operation-panel__filters" ref={fieldsRef}>
+            {children}
+          </div>
+          <footer>
+            <Button type="primary" onClick={onDismiss}>收起</Button>
+          </footer>
+        </div>
+      </BusinessFilterPanelContext.Provider>
     </section>
   )
 }

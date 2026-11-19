@@ -12,12 +12,15 @@ import (
 )
 
 func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, id string, params *structpb.Struct) (string, *v1.JsonrpcResult, error) {
-	if res := d.RequireAdminPermission(ctx, biz.PermissionERPBusinessDashboardRead); res != nil {
-		return id, res, nil
-	}
 	pm := map[string]any{}
 	if params != nil {
 		pm = params.AsMap()
+	}
+	dashboardDenial := d.RequireAdminPermission(ctx, biz.PermissionERPBusinessDashboardRead)
+	salesDelivery := dashboardDenial != nil && dashboardDenial.Code == errcode.PermissionDenied.Code &&
+		method == "list_progress" && getString(pm, "view") == "orders" && getString(pm, "display") == "lines"
+	if dashboardDenial != nil && !salesDelivery {
+		return id, dashboardDenial, nil
 	}
 	allowed := []string{"view", "keyword", "scope", "due_status", "blocked_only", "unlinked_only", "owner", "date_from", "date_to", "limit", "offset", "id", "customer_id", "display", "delivery_status"}
 	if method == "list_progress" {
@@ -96,23 +99,32 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 	keys := biz.PermissionKeySet(permissions)
 	q.Access.Sales = biz.PermissionSetHasAny(keys, biz.PermissionSalesOrderRead) && biz.PermissionSetHasAny(keys, biz.PermissionSalesOrderItemRead) &&
 		d.requireCustomerConfigModulesReadable(ctx, "sales_orders") == nil
-	q.Access.Production = biz.PermissionSetHasAny(keys, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead) &&
-		d.requireCustomerConfigModulesReadable(ctx, productionOrderModuleKey) == nil
-	q.Access.WIP = q.Access.Production && biz.PermissionSetHasAny(keys, biz.PermissionProductionWIPRead) && d.requireCustomerConfigModulesReadable(ctx, "quality_inspections") == nil
-	rbac, res := d.CurrentAdminPermissions(ctx)
-	if res != nil {
-		return id, res, nil
-	}
-	// Historical process revisions retain the task-board visibility contract.
-	q.Access.Tasks = biz.PermissionSetHasAny(biz.PermissionKeySet(rbac), biz.PermissionWorkflowTaskRead)
-	if q.Access.Tasks {
-		admin, res := d.CurrentAdmin(ctx)
+	if salesDelivery {
+		if !q.Access.Sales {
+			return id, dashboardDenial, nil
+		}
+		if q.BlockedOnly || q.UnlinkedOnly || q.Owner != "" || q.OwnerName != "" {
+			return id, invalidParamResult(), nil
+		}
+	} else {
+		q.Access.Production = biz.PermissionSetHasAny(keys, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead) &&
+			d.requireCustomerConfigModulesReadable(ctx, productionOrderModuleKey) == nil
+		q.Access.WIP = q.Access.Production && biz.PermissionSetHasAny(keys, biz.PermissionProductionWIPRead) && d.requireCustomerConfigModulesReadable(ctx, "quality_inspections") == nil
+		rbac, res := d.CurrentAdminPermissions(ctx)
 		if res != nil {
 			return id, res, nil
 		}
-		q.TaskVisibility, res = d.workflowTaskReadVisibilityScope(ctx, admin)
-		if res != nil {
-			return id, res, nil
+		// Historical process revisions retain the task-board visibility contract.
+		q.Access.Tasks = biz.PermissionSetHasAny(biz.PermissionKeySet(rbac), biz.PermissionWorkflowTaskRead)
+		if q.Access.Tasks {
+			admin, res := d.CurrentAdmin(ctx)
+			if res != nil {
+				return id, res, nil
+			}
+			q.TaskVisibility, res = d.workflowTaskReadVisibilityScope(ctx, admin)
+			if res != nil {
+				return id, res, nil
+			}
 		}
 	}
 	if q.View == "" && q.Display == "" && q.CustomerID == 0 && !q.Access.Sales && q.Access.Production {

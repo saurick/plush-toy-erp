@@ -1048,6 +1048,7 @@ export default function MobileTaskListScreen({
 
       {progressAccess?.enabled && (
         <MobileProgressPanel
+          key={accessScopeKey}
           active={isProgress}
           access={progressAccess}
           scopeKey={accessScopeKey}

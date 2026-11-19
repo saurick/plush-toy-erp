@@ -1479,6 +1479,9 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 	if listRes == nil || listRes.Code != errcode.OK.Code {
 		t.Fatalf("expected list_outsourcing_facts to remain available for historical read, got %#v", listRes)
 	}
+	if scope, denied := j.currentWarehouseDataScope(ctx); denied != nil || listRes.Data.AsMap()["full_warehouse_scope"] != scope.IsAll() {
+		t.Fatalf("outsourcing list must report if the warehouse scope is complete: %v", listRes.Data.AsMap()["full_warehouse_scope"])
+	}
 
 	readOnlyOutsourcingConfig := customerConfigPublishParamsWithRevisionAndModuleState(
 		t,

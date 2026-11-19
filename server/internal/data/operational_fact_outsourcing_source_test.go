@@ -128,6 +128,18 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 		if item.ID == receipt.ID && (item.SubjectName != "合同小熊" || item.SubjectCode != "OUT-PHOTO-01") {
 			t.Fatalf("return must display the bound contract's product identity: %+v", item)
 		}
+		if item.ID == receipt.ID && (item.LotNo == nil || *item.LotNo != receiptLotNo) {
+			t.Fatalf("returned lot number must come from the fact's inventory lot: %+v", item)
+		}
+	}
+	singleWarehouse := biz.WithWarehouseDataScope(ctx, biz.WarehouseDataScope{
+		Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{fixtures.warehouseID},
+	})
+	scoped, scopedTotal, err := uc.ListOutsourcingFacts(singleWarehouse, biz.OperationalFactFilter{
+		SourceType: biz.OutsourcingOrderSourceType, SourceID: source.order.ID,
+	})
+	if err != nil || scopedTotal != 1 || len(scoped) != 1 || scoped[0].ID != issue.ID {
+		t.Fatalf("visible facts include an out-of-scope return: length=%d, total=%d, err=%v", len(scoped), scopedTotal, err)
 	}
 	assertListedSnapshot := func(rows []*biz.OutsourcingFact, factID int, want *string) {
 		t.Helper()

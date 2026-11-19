@@ -31,6 +31,8 @@ func (d *jsonrpcDispatcher) handleSalesOrder(
 		return id, d.exportSalesOrders(ctx, pm), nil
 	case "list_sales_order_summary", "list_sales_order_summary_filter_options":
 		return d.handleSalesOrderSummary(ctx, method, id, pm)
+	case "get_delivery_progress":
+		return d.handleSalesDeliveryProgress(ctx, id, pm)
 	case "list_engineering_material_requests", "get_engineering_material_request", "submit_engineering_material_request", "boss_review_engineering_material_request", "finance_review_engineering_material_request":
 		return d.handleEngineeringMaterialRequest(ctx, method, id, pm, claims.UserID)
 	case "save_sales_order_engineering":

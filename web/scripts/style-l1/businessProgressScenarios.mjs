@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { openDateFilter } from './dateFilterActions.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
@@ -461,9 +462,7 @@ export function createBusinessProgressScenarios({
         await page.getByRole('combobox', { name: '处理人或业务负责人', exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, `${name}-filters-open`)
         if (narrow) {
-          await page.getByRole('button', { name: '自定义交期日期', exact: true }).click()
-          const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
-          await dates.waitFor()
+          const dates = await openDateFilter(page, page.getByRole('dialog', { name: '筛选进度', exact: true }))
           await assertNoHorizontalOverflow(page, `${name}-date-filter`)
           await dates.getByRole('button', { name: '取消', exact: true }).click()
         }

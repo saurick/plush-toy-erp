@@ -312,8 +312,10 @@ func (r *workflowRepo) GetWorkflowTracking(ctx context.Context, q biz.WorkflowTr
 		}
 		for _, event := range events {
 			// Receipt payloads can contain full task snapshots. The tracking view
-			// receives only the actual action, actor, timestamp, and reason.
-			entry.Events = append(entry.Events, &biz.WorkflowTaskEvent{ID: event.ID, TaskID: event.TaskID, TaskVersion: event.TaskVersion, EventType: event.EventType, FromStatusKey: event.FromStatusKey, ToStatusKey: event.ToStatusKey, ActorRoleKey: event.ActorRoleKey, ActorID: event.ActorID, Reason: event.Reason, CreatedAt: event.CreatedAt})
+			// projects only the human result text from completion feedback.
+			feedback, _ := event.Payload["feedback"].(string)
+			reason := workflowEventResultText(event.EventType, stringValue(event.ToStatusKey), stringValue(event.Reason), feedback)
+			entry.Events = append(entry.Events, &biz.WorkflowTaskEvent{ID: event.ID, TaskID: event.TaskID, TaskVersion: event.TaskVersion, EventType: event.EventType, FromStatusKey: event.FromStatusKey, ToStatusKey: event.ToStatusKey, ActorRoleKey: event.ActorRoleKey, ActorID: event.ActorID, Reason: stringPtrOrNil(reason), CreatedAt: event.CreatedAt})
 		}
 		return loadTrackingPeople(ctx, client, []*biz.WorkflowTrackingEntry{entry})
 	})

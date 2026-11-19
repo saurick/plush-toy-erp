@@ -19,7 +19,6 @@ export function dateFilterPresets(upcoming, today = currentBusinessDate()) {
       to: option.value ? today : '',
     })),
     ...(upcoming ? [{ value: 'next7d', label: '未来 7 天', from: today, to: shift(6) }] : []),
-    { value: 'custom', label: '自定义日期' },
   ]
 }
 
@@ -37,4 +36,10 @@ export function selectDateRangeDay(current, value) {
     return { dateFrom: value, dateTo: '' }
   }
   return { dateFrom: current.dateFrom, dateTo: value }
+}
+
+export function formatFilterDateRange({ dateFrom, dateTo }, emptyLabel = '不限') {
+  if (dateFrom && dateTo) return dateFrom === dateTo ? dateFrom : `${dateFrom} 至 ${dateTo}`
+  if (dateFrom) return `${dateFrom} 起`
+  return dateTo ? `截至 ${dateTo}` : emptyLabel
 }

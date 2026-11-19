@@ -441,13 +441,26 @@
 .erp-business-filter-popover__content {
   display: flex;
   flex-direction: column;
-  width: min(560px, calc(var(--erp-overlay-width, 100vw) - 48px));
+  width: min(var(--erp-filter-content-width, 560px), calc(var(--erp-overlay-width, 100vw) - 48px));
   max-height: min(600px, var(--erp-filter-available-height, calc(100dvh - 140px)));
   overflow: hidden;
 }
 
-.erp-business-filter-popover__content > header,
-.erp-business-filter-popover__content > footer {
+.erp-business-filter-popover__content--date {
+  --erp-filter-content-width: 664px;
+
+  display: block;
+  overflow-y: auto;
+}
+
+.erp-business-filter-popover__overview:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.erp-business-filter-popover__overview > header,
+.erp-business-filter-popover__overview > footer {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -456,7 +469,7 @@
   padding: 4px 0 10px;
 }
 
-.erp-business-filter-popover__content > footer {
+.erp-business-filter-popover__overview > footer {
   justify-content: flex-end;
   padding: 10px 0 0;
 }
@@ -522,26 +535,45 @@
   padding: 0;
 }
 
+/* 每个直接子项按顺序占一行，组内选项由控件自行排列。 */
 .erp-business-operation-panel__filters {
-  display: flex;
+  --erp-filter-field-width: 260px;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  align-items: flex-start;
+  align-content: start;
   gap: 10px;
   overflow-y: auto;
 }
 
-.erp-business-operation-panel__filters
-  > :where(
-    .ant-input-affix-wrapper,
-    .ant-select,
-    .ant-btn,
-    .erp-business-date-range-filter
-  ) {
-  width: auto;
+.erp-business-operation-panel__filters > :not(.app-scroll-edges) {
+  justify-self: start;
+  width: min(100%, var(--erp-filter-field-width));
   min-width: 0;
+  max-width: 100%;
+}
+
+.erp-business-operation-panel__filters
+  > :is(
+    .erp-business-filter-field--choices,
+    .erp-filter-chip-group,
+    .erp-business-status-filters,
+    .ant-select-multiple,
+    .erp-filter-field:has(> :is(.erp-filter-chip-group, .erp-business-status-filters, .ant-select-multiple))
+  ) {
+  --erp-filter-field-width: 100%;
+}
+
+.erp-business-operation-panel__filters > .erp-filter-field > .erp-filter-chip {
+  justify-self: start;
+}
+
+@media (max-width: 768px) {
+  .erp-business-operation-panel__filters {
+    --erp-filter-field-width: 100%;
+  }
 }
 
 .erp-business-operation-panel__toolbar {
@@ -906,40 +938,6 @@
   min-width: 180px;
 }
 
-.erp-business-filter-control--clear.ant-btn {
-  flex: 0 0 auto;
-}
-
-@media screen and (min-width: 769px) {
-  .erp-business-operation-panel__filters
-    > .erp-business-filter-control--search.ant-input-affix-wrapper {
-    flex: 0 1 260px;
-    max-width: 300px;
-  }
-
-  .erp-business-operation-panel__filters
-    > .erp-business-filter-control--compact-select.ant-select {
-    flex: 0 0 150px;
-    width: 150px;
-    max-width: 220px;
-  }
-
-  .erp-business-operation-panel__filters
-    > .erp-business-filter-control--status.ant-select {
-    flex-basis: 150px;
-  }
-
-  .erp-business-operation-panel__filters
-    > .erp-business-filter-control--clear.ant-btn {
-    flex: 0 0 auto;
-  }
-
-  .erp-business-operation-panel__filters > .erp-business-date-range-filter {
-    flex: 0 0 500px;
-    max-width: none;
-  }
-}
-
 .erp-business-filter-panel__aside {
   display: flex;
   flex: 1 1 380px;
@@ -967,14 +965,12 @@
 }
 
 .erp-business-filter-control.ant-input-affix-wrapper,
-:where(.erp-business-filter-control.ant-select) .ant-select-selector,
-.erp-business-date-range-filter {
+:where(.erp-business-filter-control.ant-select) .ant-select-selector {
   border-color: var(--erp-business-control-border);
 }
 
 .erp-business-filter-control.ant-input-affix-wrapper:hover,
-:where(.erp-business-filter-control.ant-select:hover) .ant-select-selector,
-:where(.erp-business-date-range-filter:hover) {
+:where(.erp-business-filter-control.ant-select:hover) .ant-select-selector {
   border-color: var(--erp-business-control-hover);
 }
 
@@ -1237,15 +1233,6 @@
   align-items: center;
 }
 
-.erp-business-date-range-filter {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  flex: 1 0 500px;
-  min-width: 0;
-  max-width: 560px;
-  gap: 8px;
-}
-
 .erp-business-date-input.ant-picker {
   width: 100%;
   min-width: 0;
@@ -1394,33 +1381,6 @@
   .erp-business-date-time-picker-dropdown .erp-business-date-picker-quick-options {
     padding-inline: 8px;
   }
-}
-
-.erp-business-date-range-filter__range {
-  display: flex;
-  flex: 1 1 360px;
-  min-width: 360px;
-  align-items: center;
-  gap: 6px;
-}
-
-.erp-business-date-range-filter__separator {
-  flex: none;
-  color: #7b8c7e;
-  font-size: var(--erp-font-small);
-}
-
-.erp-business-date-range-filter--invalid
-  .erp-business-date-range-filter__separator {
-  color: #d4380d;
-}
-
-.erp-business-date-range-filter .erp-business-date-input.ant-picker {
-  flex: 1 1 160px;
-  min-width: 160px;
-  border-color: var(--erp-business-control-border);
-  background: var(--erp-surface-bg);
-  box-shadow: none;
 }
 
 .erp-business-list-toolbar__row {
@@ -1993,28 +1953,6 @@
   .erp-business-row-item-card__field[data-tone='negative']
   dd {
   color: #fca5a5;
-}
-
-.erp-business-filter-popover .erp-business-operation-panel__filters > * {
-  flex: 0 1 260px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.erp-business-operation-panel__filters > .erp-filter-field > .erp-filter-chip {
-  justify-self: start;
-}
-
-.erp-business-filter-popover .erp-business-date-range-filter,
-.erp-business-filter-popover .erp-business-operation-panel__filters > .ant-select-multiple,
-.erp-business-filter-popover .erp-filter-field:has(> .ant-select-multiple) {
-  flex-basis: 100%;
-}
-
-@media (max-width: 768px) {
-  .erp-business-filter-popover .erp-business-operation-panel__filters > * {
-    flex-basis: 100%;
-  }
 }
 
 .erp-business-details-pagination {

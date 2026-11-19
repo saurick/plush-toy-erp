@@ -119,7 +119,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"outsourcing_facts": outsourcingFactsToAny(items), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(map[string]any{"outsourcing_facts": outsourcingFactsToAny(items), "full_warehouse_scope": scope.IsAll(), "total": total, "limit": normalizedBusinessListLimit(pm), "offset": normalizedOffset(pm)}), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}
@@ -198,7 +198,7 @@ func operationalFactOutsourcingFactResult(ctx context.Context, d *jsonrpcDispatc
 func outsourcingFactsToAny(items []*biz.OutsourcingFact) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
-		out = append(out, outsourcingFactToAny(item))
+		out = append(out, outsourcingFactListItemToAny(item))
 	}
 	return out
 }
@@ -208,4 +208,12 @@ func outsourcingFactToAny(item *biz.OutsourcingFact) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "subject_name": item.SubjectName, "subject_code": item.SubjectCode, "product_sku_id": optionalIntToAny(item.ProductSkuID), "sku_code_snapshot": optionalStringToAny(item.SKUCodeSnapshot), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "returned_to_vendor_quantity": item.ReturnedToVendorQuantity.String(), "supplier_id": optionalIntToAny(item.SupplierID), "supplier_name": optionalStringToAny(item.SupplierName), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalTimeUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalTimeUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+}
+
+func outsourcingFactListItemToAny(item *biz.OutsourcingFact) map[string]any {
+	entry := outsourcingFactToAny(item)
+	if item != nil {
+		entry["lot_no"] = optionalStringToAny(item.LotNo)
+	}
+	return entry
 }

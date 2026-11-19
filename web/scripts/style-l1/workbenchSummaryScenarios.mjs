@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { dateFilterButton, openDateFilter } from './dateFilterActions.mjs'
 import { exerciseTableScrollControls, exerciseTableScrollPagination } from './tableScrollControlAssertions.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -12,7 +13,6 @@ import { workbenchPaymentSummaryScenario } from './workbenchPaymentSummaryScenar
 const baseActions = ['erp.workbench.read', 'workflow.task.read']
 const salesActions = ['sales_order.read', 'sales_order_item.read']
 const materialsActions = ['sales_order.read', 'engineering.material.read']
-
 const salesAndMaterialsActions = [
   ...salesActions,
   ...materialsActions,
@@ -453,28 +453,54 @@ export function createWorkbenchSummaryScenarios({
         }
         await customer.waitFor()
         await owner.waitFor()
-        const dateRange = filterDialog.locator(
-          '.erp-business-date-range-filter'
-        )
         await waitForFiniteAnimations(page)
-        const dateTitle = dateRange.getByText('日期类型', { exact: true })
-        await dateTitle.waitFor({ state: 'visible', timeout: 2000 })
+        const dateEntry = filterDialog.locator('.erp-business-date-range-filter')
         const statusBox = await filterDialog.getByRole('group', { name: '订单状态', exact: true }).boundingBox()
-        const titleBox = await dateTitle.boundingBox()
-        const typesBox = await dateRange.getByRole('group', { name: '日期类型', exact: true }).boundingBox()
-        assert(statusBox && titleBox && typesBox && titleBox.y > statusBox.y + statusBox.height && typesBox.y >= titleBox.y + titleBox.height, `日期类型标题位于订单状态下方、类型按钮上方: ${JSON.stringify({ statusBox, titleBox, typesBox })}`)
-        assert.equal(await filterDialog.locator('.erp-business-filter-field--choices .erp-business-date-range-filter').count(), 0, '日期范围不嵌套在订单状态组内')
-        await dateRange.getByRole('button', { name: '自定义日期', exact: true }).click()
-        await filterDialog.screenshot({ path: path.join(outputDir, `${name}-date-filter-groups.png`) })
-        assert.deepEqual(
-          await dateRange
-            .locator('.erp-business-date-input')
-            .evaluateAll((nodes) =>
-              nodes.map((node) => getComputedStyle(node).borderTopWidth)
-            ),
-          ['1px', '1px'],
-          '起止日期各自保留清晰边框'
-        )
+        const entryBox = await dateEntry.boundingBox()
+        assert(statusBox && entryBox && entryBox.y >= statusBox.y + statusBox.height, `日期摘要与订单状态使用独立筛选字段 ${JSON.stringify({ statusBox, entryBox })}`)
+        assert.equal(await filterDialog.getByRole('group', { name: '日期类型', exact: true }).count(), 0)
+        const originalViewport = page.viewportSize()
+        await page.setViewportSize({ width: 460, height: 680 })
+        const dates = await openDateFilter(page, filterDialog)
+        await waitForFiniteAnimations(page)
+        const beforeDateCalls = calls.length
+        const frames = page.evaluate(() => new Promise((resolve) => {
+          const snapshots = []
+          const capture = () => {
+            const dialog = document.querySelector('.erp-business-filter-popover__content--date')
+            const footer = dialog.querySelector('.erp-filter-date-actions')
+            const rect = (node) => {
+              const { x, y, width, height } = node.getBoundingClientRect()
+              return [x, y, width, height]
+            }
+            snapshots.push({
+              dialog: rect(dialog),
+              footer: rect(footer),
+              rows: document.querySelectorAll('.erp-workbench-summaries tr.ant-table-row').length,
+            })
+            if (snapshots.length < 24) requestAnimationFrame(capture)
+            else resolve(snapshots)
+          }
+          requestAnimationFrame(capture)
+        }))
+        await dateFilterButton(dates, '计划交付日期').click()
+        const observed = await frames
+        assert(observed[0].rows > 0 && observed.every(({ dialog, footer, rows }) =>
+          rows === observed[0].rows && dialog.every((value, index) => Math.abs(value - observed[0].dialog[index]) <= 1) &&
+          footer.every((value, index) => Math.abs(value - observed[0].footer[index]) <= 1)
+        ), `日期类型切换期间气泡、底部动作及已有行保持稳定: ${JSON.stringify(observed)}`)
+        assert.equal(calls.length, beforeDateCalls, '仅切换草稿字段无需查询')
+        await dateFilterButton(dates, '不限').click()
+        await filterDialog.getByRole('button', { name: '计划交付日期：不限', exact: true }).waitFor()
+        assert.equal(calls.length, beforeDateCalls, '没有范围时应用日期类型无需查询')
+        await openDateFilter(page, filterDialog)
+        await dateFilterButton(dates, '下单日期').click()
+        await dateFilterButton(dates, '不限').click()
+        await page.setViewportSize(originalViewport)
+        await openDateFilter(page, filterDialog)
+        await waitForFiniteAnimations(page)
+        await dates.screenshot({ path: path.join(outputDir, `${name}-date-filter-panel.png`) })
+        await dateFilterButton(dates, '取消').click()
         await filterDialog
           .getByRole('button', { name: '收起', exact: true })
           .click()

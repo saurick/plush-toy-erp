@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { dateFilterButton, manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
-import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertAntdModalCentered } from './modalAssertions.mjs'
 import {
   expectHeading,
@@ -1346,153 +1346,34 @@ export function createBusinessListAssertions({ outputDir }) {
     )
   }
 
-  async function assertBusinessModuleToolbarControlStyle(
-    page,
-    { scenarioName, requireSearch = true }
-  ) {
-    const trigger = page.locator(
-      '.erp-business-operation-panel button[aria-haspopup="dialog"]'
-    )
+  async function assertBusinessModuleToolbarControlStyle(page, { scenarioName, requireSearch = true }) {
+    const trigger = page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
     const dialog = page.getByRole('dialog', { name: '筛选条件' })
-    const opened = (await trigger.count()) > 0 && !(await dialog.isVisible())
-    if (opened) {
-      await trigger.click()
-      await dialog.waitFor()
-    }
-    await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
-    await waitForFiniteAnimations(page)
-    assert.equal(await dialog.getByRole('button', { name: '搜索', exact: true }).count(), 0, '筛选面板无需单独提交搜索')
+    const opened = !(await dialog.isVisible())
+    if (opened) await trigger.click()
+    await dialog.waitFor()
+    assert.equal(await dialog.getByRole('button', { name: '搜索', exact: true }).count(), 0)
+    assert.equal(await dialog.locator('.erp-filter-date-trigger').count(), 1, `${scenarioName} 日期范围使用一个共享入口`)
     const metrics = await page.evaluate(() => {
-      const read = (node) => {
-        if (!node) return null
-        const box = node.getBoundingClientRect()
-        const style = getComputedStyle(node)
-        return {
-          top: box.top,
-          bottom: box.bottom,
-          width: box.width,
-          height: box.height,
-          radius: style.borderRadius,
-          border: style.borderColor,
-          cursor: style.cursor,
-          scrollWidth: node.scrollWidth,
-          clientWidth: node.clientWidth,
-        }
-      }
-      const roots = [
-        '.erp-business-operation-panel__search',
-        '.erp-business-operation-panel__filters',
-        '.erp-business-filter-panel__grid',
-      ]
-      const selector = (suffix) =>
-        roots
-          .flatMap((root) =>
-            suffix.split(',').map((part) => `${root} ${part.trim()}`)
-          )
-          .join(', ')
-      const date = document.querySelector(
-        selector('.erp-business-date-range-filter')
-      )
-      const inputs = [
-        ...(date?.querySelectorAll('.erp-business-date-input') || []),
-      ]
-      const periods = date?.querySelector('[role="group"][aria-label="时间范围"]')
-      const dateRange = date?.querySelector(
-        '.erp-business-date-range-filter__range'
-      )
-      const controls = [
-        ...document.querySelectorAll(
-          selector('.ant-input-affix-wrapper, .ant-select-selector')
-        ),
-      ].filter(
-        (node) =>
-          node.checkVisibility() &&
-          !node.closest('.erp-business-date-range-filter')
-      )
+      const selector = '.erp-business-operation-panel__filters :is(.ant-select-selector, .ant-input-affix-wrapper)'
       return {
-        search: read(
-          document.querySelector(
-            '.erp-business-operation-panel__search .ant-input-affix-wrapper'
-          )
-        ),
-        date: read(date),
-        periods: read(periods),
-        dateRange: read(dateRange),
-        dateRangeGap: dateRange
-          ? Number.parseFloat(getComputedStyle(dateRange).gap || '0')
-          : 0,
-        dateCount: document.querySelectorAll(
-          selector('.erp-business-date-range-filter')
-        ).length,
-        dateInputs: inputs.map((node) => ({
-          ...read(node),
-          input: read(node.querySelector('input')),
+        search: Boolean(document.querySelector('.erp-business-operation-panel__search .ant-input-affix-wrapper')),
+        status: Boolean(document.querySelector('.erp-business-filter-control--status, .erp-business-operation-panel__quick .ant-segmented')),
+        action: Boolean(document.querySelector('.erp-business-operation-panel__toolbar .ant-btn, .erp-business-module-toolbar .ant-btn')),
+        controls: [...document.querySelectorAll(selector)].filter((node) => node.checkVisibility()).map((node) => ({
+          height: node.getBoundingClientRect().height,
+          radius: getComputedStyle(node).borderRadius,
         })),
-        controls: controls.map(read),
-        status: read(
-          document.querySelector(
-            '.erp-business-filter-control--status .ant-select-selector, .erp-business-operation-panel__quick .ant-segmented'
-          )
-        ),
-        action: read(
-          document.querySelector(
-            '.erp-business-operation-panel__toolbar .ant-btn, .erp-business-module-toolbar .ant-btn'
-          )
-        ),
       }
     })
-    const evidence = `${scenarioName}: ${JSON.stringify(metrics)}`
-    const isNominalControlHeight = (height) => Math.abs(height - 34) <= 0.5
-    assert(!requireSearch || metrics.search, `保留主要搜索入口 ${evidence}`)
-    assert(
-      metrics.status && metrics.action,
-      `状态筛选与整表操作必须可见 ${evidence}`
-    )
-    assert.equal(metrics.dateCount, 1, `日期范围使用一个共享组件 ${evidence}`)
-    assert.equal(
-      metrics.dateInputs.length,
-      2,
-      `日期范围保留起止输入 ${evidence}`
-    )
-    assert(
-      metrics.periods && metrics.periods.scrollWidth <= metrics.periods.clientWidth + 1 &&
-        metrics.dateRange.top >= metrics.periods.bottom,
-      `时间范围按钮完整显示，自定义起止日期另起一行 ${evidence}`
-    )
-    assert(
-      metrics.controls.every(
-        (control) =>
-          isNominalControlHeight(control.height) && control.radius === '8px'
-      ),
-      `筛选控件的高度与圆角一致 ${evidence}`
-    )
-    assert(
-      metrics.dateInputs.every(
-        (control) =>
-          control.width >= 132 &&
-          isNominalControlHeight(control.height) &&
-          control.radius === '8px' &&
-          control.border !== 'rgba(0, 0, 0, 0)' &&
-          control.input.scrollWidth <= control.input.clientWidth + 1
-      ),
-      `起止日期应各自完整可读并保留可点击边界 ${evidence}`
-    )
-    assert(
-      metrics.dateRangeGap >= 6,
-      `起止日期之间应保留清晰分隔 ${evidence}`
-    )
-    assert(
-      metrics.dateInputs.every(
-        (control) =>
-          control.cursor === 'pointer' && control.input.cursor === 'pointer'
-      ),
-      `日期输入有可点击光标 ${evidence}`
-    )
-    assert.equal(
-      metrics.action.cursor,
-      'pointer',
-      `动作保留可点击光标 ${evidence}`
-    )
+    assert(!requireSearch || metrics.search, `${scenarioName} 保留主要搜索入口`)
+    assert(metrics.status && metrics.action, `${scenarioName} 保留状态筛选与表格工具`)
+    assert(metrics.controls.every(({ height, radius }) => Math.abs(height - 34) <= 0.5 && radius === '8px'), JSON.stringify(metrics.controls))
+    const date = await dialog.locator('.erp-filter-date-trigger').evaluate((node) => {
+      const style = getComputedStyle(node)
+      return { height: node.getBoundingClientRect().height, min: parseFloat(style.minHeight), radius: style.borderRadius }
+    })
+    assert(date.height >= date.min && date.radius === '8px', '日期摘要可换行并沿用普通筛选控件边框')
     await assertBusinessDateRangePickerOrderGuard(page, { scenarioName })
     if (opened) {
       await dialog.getByRole('button', { name: '收起', exact: true }).click()
@@ -1500,70 +1381,20 @@ export function createBusinessListAssertions({ outputDir }) {
     }
   }
 
-  async function assertBusinessDateRangePickerOrderGuard(
-    page,
-    { scenarioName }
-  ) {
-    const dateInputs = page.locator(
-      '.erp-business-date-range-filter .erp-business-date-input'
-    )
-    await dateInputs.first().click({ position: { x: 16, y: 16 } })
-    const startDateTitle = await page
-      .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-      .evaluate((dropdown) => {
-        const titles = Array.from(
-          dropdown.querySelectorAll('.ant-picker-cell-in-view[title]')
-        )
-          .filter(
-            (cell) =>
-              !cell.className.includes('ant-picker-cell-disabled') &&
-              cell.getAttribute('aria-disabled') !== 'true'
-          )
-          .map((cell) => cell.getAttribute('title'))
-          .filter(Boolean)
-          .sort()
-        if (titles.length < 2) {
-          throw new Error('date range guard needs at least two selectable days')
-        }
-        return titles[Math.min(15, titles.length - 1)]
-      })
-    const earlierEndDateTitle = await page
-      .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-      .evaluate((dropdown, selectedTitle) => {
-        const titles = Array.from(
-          dropdown.querySelectorAll('.ant-picker-cell-in-view[title]')
-        )
-          .map((cell) => cell.getAttribute('title'))
-          .filter((title) => title && title < selectedTitle)
-          .sort()
-        if (titles.length < 1) {
-          throw new Error('date range guard needs an earlier visible day')
-        }
-        return titles[0]
-      }, startDateTitle)
-    await page
-      .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-      .locator(`.ant-picker-cell[title="${startDateTitle}"]`)
-      .click()
-    assert.equal(await dateInputs.first().locator('input').inputValue(), startDateTitle.replaceAll('-', '/'), `${scenarioName} 日期选择应立即回填`)
-    await page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').waitFor({ state: 'hidden' })
-    await dateInputs.nth(1).click({ position: { x: 16, y: 16 } })
-    const earlierEndCell = page
-      .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-      .locator(`.ant-picker-cell[title="${earlierEndDateTitle}"]`)
-      .last()
-    await earlierEndCell.waitFor({ state: 'visible', timeout: 1500 })
-    const earlierEndMetrics = await earlierEndCell.evaluate((node) => ({
-      className: node.className,
-      ariaDisabled: node.getAttribute('aria-disabled'),
-      title: node.getAttribute('title'),
-    }))
-    assert(
-      earlierEndMetrics.className.includes('ant-picker-cell-disabled') ||
-        earlierEndMetrics.ariaDisabled === 'true',
-      `${scenarioName} 结束日期不能选择早于开始日期的日期: ${JSON.stringify(earlierEndMetrics)}`
-    )
-    await page.keyboard.press('Escape')
+  async function assertBusinessDateRangePickerOrderGuard(page, { scenarioName }) {
+    const overview = page.getByRole('dialog', { name: '筛选条件' })
+    const dates = await openDateFilter(page, overview)
+    assert.equal(await dates.locator('.erp-filter-date-days:visible').count(), 2)
+    assert.equal(await dates.locator('.erp-filter-date-panel input').count(), 0)
+    const { from, to } = await manualDateInputs(dates)
+    const bounds = await Promise.all([from, to].map((input) => input.boundingBox()))
+    assert(bounds.every((box) => box.width >= 132) && Math.abs(bounds[0].y - bounds[1].y) <= 1, `${scenarioName} 起止输入应并排且完整可读`)
+    await from.fill('2026-10-17')
+    await to.fill('2026-10-05')
+    assert.equal(await dateFilterButton(dates, '应用日期').isDisabled(), true)
+    assert.equal(await dates.getByRole('status').innerText(), '结束日期不能早于开始日期')
+    await dateFilterButton(dates, '取消').click()
+    await overview.waitFor()
   }
 
   async function assertPaginationSizeChangerFocusStyle(page, { scenarioName }) {

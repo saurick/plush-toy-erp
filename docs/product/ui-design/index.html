@@ -608,10 +608,22 @@
     .payment-period-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
     .payment-period-footer > span { color: var(--text-2); }
     .payment-period-actions { display: flex; gap: 8px; margin-inline-start: auto; }
+    .design-date-range { display: block; }
+    .design-date-range .popover-head { margin-bottom: 10px; }
+    .design-date-range .payment-period-body { display: grid; grid-template-columns: 110px minmax(0,1fr); gap: 12px; }
+    .design-date-control { position: relative; display: inline-grid; max-width: 100%; }
+    .design-date-control .design-date-trigger { justify-content: flex-start; height: auto; max-width: 100%; padding-inline-end: 40px; white-space: normal; }
+    .design-date-control .design-date-clear { position: absolute; inset-block-start: 50%; inset-inline-end: 21px; width: 24px; min-height: 24px; height: 24px; padding: 0; color: var(--text-2); transform: translateY(-50%); }
+    .design-date-clear > span { display: grid; place-items: center; width: 12px; height: 12px; border-radius: 50%; background: currentColor; }
+    .design-date-clear > span svg { width: 9px; height: 9px; color: var(--surface); }
+    .design-date-arrow { position: absolute; inset-inline-end: 8px; }
+    .design-date-manual { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 8px; }
+    .design-date-manual input { width: 100%; min-width: 0; }
     #dashboard-payment-period { max-width: 100%; height: auto; white-space: normal; }
     #dashboard-payment-period strong > span { white-space: nowrap; }
     @media (max-width: 672px) {
       .payment-period-popover, .payment-period-months { grid-template-columns: minmax(0,1fr); }
+      .design-date-range .payment-period-body, .design-date-manual { grid-template-columns: minmax(0,1fr); }
       .payment-period-previous { display: none; }
       .payment-period-presets { flex-flow: row wrap; }
       .payment-period-calendar { padding: 8px 0 0; border-inline-start: 0; border-block-start: 1px solid var(--line); }
@@ -619,7 +631,20 @@
     @media (pointer: coarse) {
       .payment-period-month-nav, .payment-period-popover :is(.btn, .filter-chip, .payment-period-days > button) { min-height: 44px; }
     }
-    .filter-grid { min-height: 0; padding-right: 2px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow: auto; }
+    .filter-grid, #task-filter-popover .task-discovery-controls {
+      --filter-field-width: 260px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+    .filter-grid { min-height: 0; padding-right: 2px; overflow: auto; }
+    .filter-grid > .field, #task-filter-popover .task-discovery-controls > label {
+      width: min(100%, var(--filter-field-width));
+      min-width: 0;
+    }
+    @media (max-width: 768px) {
+      .filter-grid, #task-filter-popover .task-discovery-controls { --filter-field-width: 100%; }
+    }
     .field { display: grid; align-content: start; gap: 6px; }
     .field.span-2 { grid-column: 1 / -1; }
     .approval-settings-editor { display:grid; gap:14px; }
@@ -645,11 +670,6 @@
     .remark-count[hidden] { display: none; }
     .field input:focus, .field ui-select:focus, .field textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(var(--brand-rgb), .1); }
     .field input:is([type="date"], [type="datetime-local"]) { cursor: pointer; }
-    .date-range-control { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
-    .date-range-control--typed { grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); }
-    @media (max-width: 480px) { .date-range-control--typed { grid-template-columns: auto minmax(0, 1fr); } }
-    .date-range-control > span { color: var(--text-3); font-size: 12px; }
-    .date-range-control > input { min-width: 0; }
     .popover-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 6px; }
 
     .overlay {
@@ -1050,9 +1070,8 @@
     #task-filter-popover > :is(.popover-head, .popover-foot) { flex-shrink: 0; }
     .task-filter-body { min-height: 0; overflow-y: auto; }
     @media (max-width: 640px) { #task-filter-popover { --task-filter-top: 145px; } }
-    #task-filter-popover .task-discovery-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
-    #task-filter-popover .task-discovery-controls label { min-width:0; height:auto; align-items:stretch; flex-direction:column; padding:6px 10px; }
-    @media(max-width:480px) { #task-filter-popover .task-discovery-controls { grid-template-columns:minmax(0,1fr); } }
+    #task-filter-popover .task-discovery-controls { justify-items: start; margin-bottom: 12px; }
+    #task-filter-popover .task-discovery-controls label { height:auto; align-items:stretch; flex-direction:column; padding:6px 10px; }
     .task-handling-context { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); }
     .task-handling-context .task-context-copy { flex:1; min-width:0; }
     .task-handling-context .task-context-copy strong { color:var(--brand-strong); }
@@ -3243,22 +3262,6 @@
   align-items: flex-end;
   gap: 8px;
 }
-.erp-statistics-delivery-period {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  min-width: 0;
-  max-width: 100%;
-  gap: 8px;
-}
-.erp-statistics-delivery-period > ui-select {
-  min-width: 154px;
-}
-.erp-statistics-delivery-period > .erp-business-date-range-filter {
-  flex: 0 1 360px;
-  width: 360px;
-  min-width: min(360px, 100%);
-}
 .erp-statistics-currency {
   min-width: 96px;
 }
@@ -3561,7 +3564,6 @@
     .task-calendar-demo-grid button:focus-visible { outline:none; }
     .task-calendar-demo-grid button:focus-visible .task-calendar-demo-date { outline:2px solid var(--brand);outline-offset:2px; }
     @media(hover:hover){.task-calendar-demo-grid button:not(.active):hover .task-calendar-demo-date{background:var(--brand-soft);}}
-    .task-calendar-demo-buckets { display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line); }
     .task-calendar-demo-items { display:grid;gap:10px;min-width:0; }
     .task-calendar-demo-items > strong { font-size:16px; }
     @media(min-width:761px){.task-calendar-demo:not(.task-calendar-demo--mobile) .task-calendar-demo-items > strong{position:sticky;top:0;z-index:2;padding-block:8px;background:var(--surface);}}
@@ -5824,7 +5826,7 @@
       {key:'core', purpose:'能力范围与当前边界', area:'engineering', title:'产品能力', source:'产品能力与领域边界', status:'已核对', detail:'主数据、采购、库存、质检、生产、出货和财务分别保留唯一事实真源。', path:'docs/architecture/'},
       {key:'permissions', purpose:'岗位权限、实际侧栏与数据范围', area:'engineering', title:'权限关系', source:'岗位、账号与正式菜单', status:'已核对', detail:'选择岗位或账号，初始查看权限总览，可切换具体模块或清空后重新选择；明细按模块筛选，未授予时明确提示，统计覆盖全部模块。配置变更回正式权限管理。', path:'/__dev/permission-relationships'},
       {key:'flows', purpose:'业务交接与运行路径', area:'engineering', title:'业务链路', source:'流程定义与运行实例', status:'待核对', detail:'业务结构查看订单全流程、专项链路与异常；专项链路按动作核对规则和验证证据，实例跟踪查询实际记录。', path:'/__dev/status-flows'},
-      {key:'explorer', purpose:'看懂链路用途、交接与具体规则', area:'engineering', title:'流程探索', source:'现有业务链路、规则与岗位目录', status:'待核对', detail:'先看业务全流程地图；流程范围中的正式链路按销售、生产与出货，采购、委外与库存，异常与返工，收付款与业务纠正分组；有跨链关系的范围继续通过独立入口控制连线类型。新视图进入单链默认采用业务泳道和正常主线，分支按需展开，阶段排布可选；泳道按领域以底色和边界区分，恢复探索时沿用原布局。状态和审批路径按结果阅读。画布默认展开；页头提交搜索、点快捷筛选或应用组合条件后打开节点库，第二行直接切换范围、显示、布局和岗位高亮。查看与加入分开；当前探索自动保留，关闭后可继续。新建默认在当前页，已有改动时可确认替换或取消，也可在新标签页新建。跨链返回恢复阅读位置；导出 PNG／SVG 保留完整范围与排布，默认附带图例和操作说明。员工定位以独立模拟示例演示，不改变真实业务。', path:'/__dev/flow-explorer'},
+      {key:'explorer', purpose:'看懂链路用途、交接与具体规则', area:'engineering', title:'流程探索', source:'现有业务链路、规则与岗位目录', status:'待核对', detail:'先看业务全流程地图；点击当前范围打开单选面板，点选即切换并收起；全流程地图置顶，正式链路按销售、生产与出货，采购、委外与库存，异常与返工，收付款与业务纠正分组；总图通过“画布视图 → 跨链关系”选择连线类型。单链从“用途与交接 → 在图上看交接”开启本链交接图，同一面板按本链统计送出和接入的关系。新视图进入单链默认采用业务泳道和正常主线，分支按需展开，阶段排布可选；全流程地图和单链阶段排布可在“适应全图”旁切换横竖，切换后适应全图并保留范围、展开与选中。泳道按领域以底色和边界区分，恢复探索时沿用布局和方向。状态和审批路径按结果阅读。画布默认展开；页头提交搜索、点快捷筛选或应用组合条件后打开节点库，第二行可切换范围，画布视图面板合并显示与布局并实时生效；岗位高亮按本图有无相关节点分组，可查看各岗位的匹配数。查看与加入分开；“更多”提供撤销或重做加节点和编辑连线等操作；当前探索自动保留，关闭后可继续。新建默认在当前页，已有改动时可确认替换或取消，也可在新标签页新建。跨链返回恢复阅读位置；导出 PNG／SVG 保留完整范围与排布，默认附带图例和操作说明。员工定位以独立模拟示例演示，不改变真实业务。', path:'/__dev/flow-explorer'},
       {key:'rules', purpose:'状态、动作条件与纠正', area:'engineering', title:'业务规则', source:'状态、流程与事实的同源目录', status:'待核对', detail:'独立查阅状态流转、流程定义、事实规则与财务口径；关联查看保留原对象与返回位置。', path:'/__dev/business-rules'},
       {key:'handling', purpose:'岗位任务与电脑、手机支持范围', area:'engineering', title:'任务办理', source:'正式任务目录与共享分类', status:'待核对', detail:'直接显示筛选、任务清单和事项详情；电脑覆盖同权限下手机的办理能力，筛选清空即取消条件。', path:'/__dev/task-handling'},
       {key:'integration', purpose:'接口清单、权限、合同与验证缺口', area:'resources', title:'接口与集成', source:'生成接口、只读权限登记与正式合同', status:'只读核对', detail:'按业务域和方法搜索，核对权限、合同与验证来源；缺失明确标注，整体门禁不证明逐接口通过。', path:'/__dev/integration'},
@@ -7529,7 +7531,8 @@ active = new Set()
       const caption = period==='custom' ? (spansDays ? `${from} 至 ${to}` : from) : dashboardPaymentPeriods[period];
       const value = spansDays ? `<span>${from}</span> 至 <span>${to}</span>` : caption;
       const scope = period === 'custom' || period === 'all' ? '仅已入账' : dashboardPaymentScope();
-      return `<button type="button" class="btn" id="dashboard-payment-period" data-action="dashboard-payment-open" aria-label="统计期间：${caption}" aria-haspopup="dialog" aria-controls="dashboard-payment-range" aria-expanded="${state.overlay==='dashboard-payment-range'}">统计期间 <strong>${value}</strong></button><span role="status" class="data-note">${escapeHTML(scope)}</span><span class="data-note">样例数据</span>`;
+      const trigger = `<button type="button" class="btn design-date-trigger" id="dashboard-payment-period" data-action="dashboard-payment-open" aria-label="统计期间：${caption}" aria-haspopup="dialog" aria-controls="dashboard-payment-range" aria-expanded="${state.overlay==='dashboard-payment-range'}">统计期间 <strong>${value}</strong><span class="design-date-arrow">${icon('chevron')}</span></button>`;
+      return `${renderDesignDateControl(trigger,period!=='month','恢复本月','dashboard-payment-restore')}<span role="status" class="data-note">${escapeHTML(scope)}</span><span class="data-note">样例数据</span>`;
     }
     function shiftDashboardPaymentMonth(month, delta) {
       const value = new Date(month);
@@ -7539,21 +7542,27 @@ active = new Set()
     function dashboardPaymentMonthLabel(month) {
       return `${month.slice(0,4)} 年 ${Number(month.slice(5,7))} 月`;
     }
-    function renderDashboardPaymentMonth(month, previous) {
-      const [from,to] = dashboardPaymentEditor.range;
+    function renderDesignDateMonth(month, previous, [from,to], dayAction) {
       const start = new Date(month);
       const leading = (start.getUTCDay()+6)%7;
       const weekdays = [...'一二三四五六日'].map(day=>`<span aria-hidden="true">${day}</span>`).join('');
       const days = Array.from({length:42}, (_,index)=>{
         const date = new Date(Number(start)+(index-leading)*864e5).toISOString().slice(0,10);
         if(date.slice(0,7)!==month.slice(0,7))return '<span aria-hidden="true"></span>';
-        return `<button type="button" data-action="dashboard-payment-day" data-value="${date}" aria-label="${date}" aria-pressed="${date===from||date===to}" data-in-range="${date>from&&date<to}">${Number(date.slice(-2))}</button>`;
+        return `<button type="button" data-action="${dayAction}" data-value="${date}" aria-label="${date}" aria-pressed="${date===from||date===to}" data-in-range="${date>from&&date<to}">${Number(date.slice(-2))}</button>`;
       }).join('');
       return `<div class="payment-period-days${previous?' payment-period-previous':''}" role="group" aria-label="${dashboardPaymentMonthLabel(month)}">${weekdays}${days}</div>`;
     }
-    function renderDashboardPaymentRange() {
-      const {month, range:[from,to]} = dashboardPaymentEditor;
+    function renderDesignDateCalendar({month,range}, action) {
       const previous = shiftDashboardPaymentMonth(month,-1);
+      return `<div class="payment-period-month-nav">
+        <button class="btn icon-btn" data-action="${action}-month" data-value="-1" aria-label="上个月">${icon('left')}</button>
+        <div class="payment-period-months"><strong class="payment-period-previous">${dashboardPaymentMonthLabel(previous)}</strong><strong>${dashboardPaymentMonthLabel(month)}</strong></div>
+        <button class="btn icon-btn" data-action="${action}-month" data-value="1" aria-label="下个月">${icon('chevron')}</button>
+      </div><div class="payment-period-months">${renderDesignDateMonth(previous,true,range,action+'-day')}${renderDesignDateMonth(month,false,range,action+'-day')}</div>`;
+    }
+    function renderDashboardPaymentRange() {
+      const [from,to] = dashboardPaymentEditor.range;
       const feedback = to ? `${from} 至 ${to}` : from ? `${from} 起，请选择结束日期` : '请选择开始日期';
       const shortcuts = Object.entries(dashboardPaymentPeriods).map(([key,label])=>
         `<button class="filter-chip" data-action="dashboard-payment-preset" data-value="${key}" aria-pressed="${key===(state.dashboardPaymentPeriod||'month')}">${label}</button>`
@@ -7561,20 +7570,12 @@ active = new Set()
       return `<section class="payment-period-popover" id="dashboard-payment-range" role="dialog" aria-label="选择收付日期范围">
         <div class="payment-period-presets" role="group" aria-label="快捷期间">${shortcuts}</div>
         <div class="payment-period-calendar">
-          <div class="payment-period-month-nav">
-            <button class="btn icon-btn" data-action="dashboard-payment-month" data-value="-1" aria-label="上个月">${icon('left')}</button>
-            <div class="payment-period-months"><strong class="payment-period-previous">${dashboardPaymentMonthLabel(previous)}</strong><strong>${dashboardPaymentMonthLabel(month)}</strong></div>
-            <button class="btn icon-btn" data-action="dashboard-payment-month" data-value="1" aria-label="下个月">${icon('chevron')}</button>
-          </div>
-          <div class="payment-period-months">${renderDashboardPaymentMonth(previous,true)}${renderDashboardPaymentMonth(month,false)}</div>
+          ${renderDesignDateCalendar(dashboardPaymentEditor,'dashboard-payment')}
           <footer class="payment-period-footer"><span role="status">${feedback}</span><div class="payment-period-actions"><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="dashboard-payment-apply-range"${to?'':' disabled'}>应用日期</button></div></footer>
         </div>
       </section>`;
     }
-    function positionDashboardPaymentRange() {
-      if(state.overlay!=='dashboard-payment-range')return;
-      const popup = document.querySelector('#dashboard-payment-range');
-      const trigger = document.querySelector('#dashboard-payment-period');
+    function positionDesignDatePopup(popup, trigger) {
       if(!popup||!trigger)return;
       const box = trigger.getBoundingClientRect();
       const below = box.bottom+6;
@@ -7584,6 +7585,81 @@ active = new Set()
       const top = below+popup.offsetHeight<=innerHeight-8 ? below : Math.max(8,above);
       popup.style.left = Math.max(8,Math.min(box.left,innerWidth-popup.offsetWidth-8))+'px';
       popup.style.top = top+'px';
+    }
+    function positionDashboardPaymentRange() {
+      if (state.overlay==='dashboard-payment-range') {
+        positionDesignDatePopup(document.querySelector('#dashboard-payment-range'),document.querySelector('#dashboard-payment-period'));
+      } else if (state.overlay==='design-date-range') {
+        const {kind,origin} = designDateEditor;
+        const trigger = origin ? document.querySelector(`[data-action="open-${origin}"]`) : document.getElementById(`design-date-${kind}`);
+        positionDesignDatePopup(document.querySelector('#design-date-range'),trigger);
+      }
+    }
+
+    let designDateEditor;
+    const statisticsDatePresets = [['all','不限','',''],['month','本月','2026-10-01','2026-10-31'],['soon','未来 7 天','2026-10-02','2026-10-08']];
+    const designDateText = ([from,to], empty='不限') => from ? (to ? (from===to ? from : `${from} 至 ${to}`) : `${from} 起`) : (to ? `截至 ${to}` : empty);
+    function renderDesignDateControl(trigger,active,label,action,value='') {
+      const clear = active ? `<button class="btn ghost design-date-clear" type="button" data-action="${action}" data-value="${value}" aria-label="${escapeHTML(label)}" title="${escapeHTML(label)}"><span aria-hidden="true">${icon('close')}</span></button>` : '';
+      return `<span class="design-date-control">${trigger}${clear}</span>`;
+    }
+    function renderDesignDateTrigger(kind,label,range,caption=designDateText(range)) {
+      const text = kind === 'statistics' ? `${label} · ${caption}` : caption;
+      const trigger = `<button type="button" class="btn design-date-trigger" id="design-date-${kind}" data-action="design-date-open" data-value="${kind}" aria-label="${escapeHTML(label+'：'+caption)}" aria-haspopup="dialog">${icon('calendar')} ${escapeHTML(text)}<span class="design-date-arrow">${icon('chevron')}</span></button>`;
+      return renderDesignDateControl(trigger,range.some(Boolean),`清除${label}`,'design-date-clear',kind);
+    }
+    function startDesignDateRange(kind) {
+      const stats = statisticsDesignState;
+      const tracking = state.trackingFilters[state.boardMode] || {};
+      const production = currentPageConfig()?.key === 'production';
+      const profile = kind === 'statistics'
+        ? {range:[stats.from,stats.to],label:'订单交期',period:stats.period}
+        : kind === 'tracking'
+          ? {range:[tracking.from||'',tracking.to||''],label:'发起时间',origin:'task-filter'}
+          : {range:[state.filterDateFrom,state.filterDateTo],label:production?'日期范围':currentPageConfig()?.dateLabel||'业务日期',origin:'filter',fields:production?[['start','计划开始'],['end','计划结束']]:[],field:state.productionDateField};
+      const [from,to] = profile.range;
+      designDateEditor = {kind,...profile,month:(to||from||paymentSummarySampleDate).slice(0,7)+'-01',manual:false,awaitingEnd:false};
+      state.overlay='design-date-range';
+      renderFloating();
+    }
+    function renderDesignDateRange() {
+      const editor=designDateEditor;
+      const {kind,label,range:[from,to],origin,awaitingEnd,manual,fields=[],field,period} = editor;
+      const now = paymentSummarySampleDate;
+      const shift = days => new Date(Date.parse(now)+days*864e5).toISOString().slice(0,10);
+      const presets = kind === 'statistics' ? statisticsDatePresets : [
+        ['all','不限','',''],['today','今天',now,now],['week','近 7 天',shift(-6),now],['recent','近 30 天',shift(-29),now],
+        ...(fields.length ? [['soon','未来 7 天',now,shift(6)]] : []),
+      ];
+      const shortcuts=presets.map(([key,text,start,end])=>`<button class="filter-chip" data-action="design-date-preset" data-period="${key}" data-from="${start}" data-to="${end}" aria-pressed="${period?period===key:from===start&&to===end}">${text}</button>`).join('');
+      const type=fields.length?renderDirectFilterChoices('日期类型',field,fields,'design-date-field','date') : '';
+      const invalid = from && to && from > to;
+      const summary = invalid ? '结束日期不能早于开始日期' : awaitingEnd ? `${from} 起，请选择结束日期` : designDateText([from,to],'请选择开始日期');
+      const manualFields = manual ? `<div class="design-date-manual"><label>开始日期<input type="date" aria-label="开始日期" data-design-date-bound="0" value="${from}" /></label><label>结束日期<input type="date" aria-label="结束日期" data-design-date-bound="1" value="${to}" /></label></div>` : '';
+      return `<section class="payment-period-popover design-date-range" id="design-date-range" role="dialog" aria-label="选择日期范围">
+        <div class="popover-head">${origin?'<button class="btn" data-action="design-date-back">返回筛选</button>':''}<strong>${label}</strong>${type}</div>
+        <div class="payment-period-body"><div class="payment-period-presets" role="group" aria-label="快捷期间">${shortcuts}</div>
+          <div class="payment-period-calendar">${renderDesignDateCalendar(editor,'design-date')}${manualFields}
+            <footer class="payment-period-footer"><span role="status">${summary}</span><button class="btn ghost" data-action="design-date-manual">${manual?'收起日期输入':'输入日期'}</button><div class="payment-period-actions"><button class="btn" data-action="design-date-back">取消</button><button class="btn primary" data-action="design-date-apply" ${awaitingEnd||invalid||!(from||to)?'disabled':''}>应用日期</button></div></footer>
+          </div></div>
+      </section>`;
+    }
+    function applyDesignDateRange(kind,field,[from,to],period) {
+      if (kind==='statistics') Object.assign(statisticsDesignState,{period,from,to,selected:'',page:1,sourcePage:1,scroll:0});
+      else if (kind==='tracking') state.trackingFilters[state.boardMode]=normalizeTrackingDemoFilters({...state.trackingFilters[state.boardMode],from,to});
+      else {
+        Object.assign(state,{filterDateFrom:from,filterDateTo:to,productionDateField:field,pageNo:1});
+        state.selected.clear();
+      }
+      renderView();
+    }
+    function finishDesignDateRange(range,period='custom') {
+      const {kind,origin,field}=designDateEditor;
+      if (range) applyDesignDateRange(kind,field,range,period);
+      state.overlay=origin||null;
+      designDateEditor=null;
+      renderFloating();
+      document.getElementById(`design-date-${kind}`)?.focus({preventScroll:true});
     }
     window.addEventListener('resize',positionDashboardPaymentRange);
     window.addEventListener('scroll',positionDashboardPaymentRange,true);
@@ -7810,10 +7886,7 @@ return {orders,financeCustomers};})();
       const pagedGroups=grouped.slice((s.page-1)*s.pageSize,s.page*s.pageSize);
       const sum=(records)=>records.reduce((n,o)=>n+o.amount,0),metric=ages?[['all','未结应收',sum(base)],['overdue','逾期未结',sum(base.filter(o=>statisticsMatches(o,'overdue')))],['not_due','未到期',sum(base.filter(o=>o.status==='not_due'))],['undated','未定到期日',0]]:[['all','订单总数',base.length],['done','已交齐',base.filter(o=>o.status==='done').length],['pending','待交付',base.filter(o=>['pending','overdue'].includes(o.status)).length],['overdue','当前逾期',base.filter(o=>o.status==='overdue').length]];
       const select=(id,value,options,label)=>renderDirectFilterChoices(label,value,options.map(([key,text])=>[key,key==='all'?'不限':text]),'statistics-field-choice',id);
-      const deliveryPeriod=ages?'':`<div class="erp-statistics-delivery-period" role="group" aria-label="订单交期">
-        ${select('statistics-period',s.period,[['month','本月'],['soon','未来 7 天'],['all','全部交期'],['custom','自定义']],'交期范围')}
-        ${s.period==='custom'?`<div class="erp-business-date-range-filter"><input id="statistics-from" type="date" aria-label="开始日期" value="${s.from}" max="${s.to}"/><span class="data-note" aria-hidden="true">至</span><input id="statistics-to" type="date" aria-label="结束日期" value="${s.to}" min="${s.from}"/></div>`:''}
-      </div>`;
+      const deliveryPeriod=ages?'':renderDesignDateTrigger('statistics','订单交期',[s.from,s.to],statisticsDatePresets.find(([key])=>key===s.period)?.[1]||designDateText([s.from,s.to]));
       const searchLabel=!ages&&s.group==='product'?'搜索产品':'搜索客户';
       const filters=`<div class="erp-statistics-filters" role="group" aria-label="统计筛选">
         ${ages?'':select('statistics-group',s.group,[['customer','按客户'],['product','按产品']],'汇总维度')}${deliveryPeriod}
@@ -7892,11 +7965,11 @@ return {orders,financeCustomers};})();
       }else if(!event.target.closest('#statistics-chart-tooltip'))hideStatisticsChartTooltip();
     },true);
     document.addEventListener('scroll',hideStatisticsChartTooltip,true);
-    const statisticsInputFields={'statistics-group':'group','statistics-period':'period','statistics-from':'from','statistics-to':'to','statistics-currency':'currency','statistics-sort':'sort','statistics-source-status':'sourceStatus'};
+    const statisticsInputFields={'statistics-group':'group','statistics-currency':'currency','statistics-sort':'sort','statistics-source-status':'sourceStatus'};
     function changeStatisticsInput(id,value) {
       const s=statisticsDesignState,key=statisticsInputFields[id];
       if(key==='sort')workCenterDemoSort.statistics={field:value,direction:value==='name'?'asc':'desc'};
-      s[key]=value;if(key==='group')s.keyword='';if(key==='period'){const dates={month:['2026-10-01','2026-10-31'],soon:['2026-10-02','2026-10-08'],all:['','']}[s.period];if(dates)[s.from,s.to]=dates;}if(['from','to'].includes(key))s.period=s.from||s.to?'custom':'all';if(key==='sourceStatus')s.sourcePage=1;else{s.selected='';s.page=1;s.sourcePage=1;s.scroll=0;}renderView();
+      s[key]=value;if(key==='group')s.keyword='';if(key==='sourceStatus')s.sourcePage=1;else{s.selected='';s.page=1;s.sourcePage=1;s.scroll=0;}renderView();
     }
     function bindStatisticsDesignInputs() {
       const s=statisticsDesignState;
@@ -7908,7 +7981,6 @@ return {orders,financeCustomers};})();
         if(next===undefined)return;
         event.preventDefault();tabs[next].click();tabs[next].focus({preventScroll:true});
       };
-      for(const id of ['statistics-from','statistics-to']){const input=document.getElementById(id);if(input)input.addEventListener('change',()=>changeStatisticsInput(id,input.value));}
       const search=document.getElementById('statistics-search');bindSubmittedSearch(search,()=>{s.keyword=search.value;s.selected='';s.page=1;s.sourcePage=1;s.scroll=0;const start=search.selectionStart;renderView();const next=document.getElementById('statistics-search');next?.focus({preventScroll:true});next?.setSelectionRange(start,start);});
       const pageSize=document.getElementById('statistics-page-size');if(pageSize)pageSize.addEventListener('change',()=>{if(s.selected){s.sourcePageSize=Number(pageSize.value);s.sourcePage=1;}else{s.pageSize=Number(pageSize.value);s.page=1;s.scroll=0;}renderView();});
       const body=document.getElementById('statistics-result-body');if(body&&!s.selected){body.scrollTop=s.scroll;body.addEventListener('scroll',()=>{s.scroll=body.scrollTop;},{passive:true});}
@@ -12728,7 +12800,7 @@ return {orders,financeCustomers};})();
         "title": "工作台中的业务汇总",
         "paragraphs": [
           "在工作台的“汇总类型”选择销售订单、材料或收付款汇总，选项按查看权限显示。没有汇总权限且可进入任务管理的岗位，登录电脑版后直接进入“待我处理”。",
-          "销售订单汇总按每张订单的产品明细展示，可在主搜索查单号、产品或款号，在筛选中选择客户、跟单业务人员、订单状态和日期。选中或清空立即更新，「收起」关闭筛选面板。选择“导出当前筛选”下载 CSV，或打开原销售订单核对。生产数量包含订单数量与船头版数量，未出货数根据实际出货记录计算，计划交付日期优先采用明细交期。单价等商业资料仍按账号权限显示。",
+          "销售订单汇总按每张订单的产品明细展示，可在主搜索查单号、产品或款号，在筛选中选择客户、跟单业务人员、订单状态和日期。点日期摘要，在同一气泡切换下单日期或计划交付日期。快捷项直接更新结果，自选范围点「应用日期」。选择“导出当前筛选”下载 CSV，或打开原销售订单核对。生产数量包含订单数量与船头版数量，未出货数根据实际出货记录计算，计划交付日期优先采用明细交期。单价等商业资料仍按账号权限显示。",
           "收付款汇总默认查看本月 1 日至今天（中国业务日期）。点开「统计期间」，选本月、今天、上月或全部历史会立即更新。也可在同一浮层的日历上选起止日，再点「应用日期」。窄屏一次显示一个月，可用左右箭头翻月。按实际收付日期只统计已入账单据，各币种分开显示。点金额分页查看对应收付日期、单号、账户摘要、凭据和金额，关闭后继续查看原期间。收付款列表的“表格工具 → 查看金额汇总”仍可核对任意筛选范围。",
           "材料汇总按已提交的用料审批记录查找，筛选订单或审批状态后打开本次提交详情，核对冻结材料、数量和审批进度；未提交的编制草稿不会出现在该清单。汇总查询不生成采购、库存或财务记录。"
         ]
@@ -12737,8 +12809,11 @@ return {orders,financeCustomers};})();
         "key": "tracking",
         "title": "跟踪进度与异常",
         "paragraphs": [
-          "进度看板的「订单交付」可在「整单」和「产品明细」间切换。整单看交期、阻塞和处理人；明细按产品核对已出货与剩余待交。电脑端在「订单交付」和「生产执行」的筛选中都可按姓名查找处理人或业务负责人。选中后立即更新，点「收起」返回看板。销售订单选中一单后可直达，返回保留原筛选与选中订单。",
-          "进度看板的「经营统计」可按权限查看「交付汇总」和「应收账龄」。先选主题，再在同一栏设定条件；交期选择「自定义」可录入具体日期。默认看表格和表尾合计，切换到「图表」可比较当前页的分布。点名称、状态数字或图表分段核对来源，返回后继续查看原结果。",
+          "在电脑的「工作中心 → 进度看板」或手机的「进度」打开岗位进度。首页显示本岗受阻、临期、无人接手和待跟进事项，点事项可查处理人、下一步和流转记录。按权限进入办理，回到看板后核对处理结果。点「处理结果」查看已完成、退回和撤回的事项。",
+          "在进度看板切换到「订单交付」，查看权限内产品行的交期、实际出货和待交数量。点相应订单核对当前卡点和处理结果。也可以从销售订单选中一单并点「查看交付进度」。管理层按授权切换全局整单、生产和经营统计。",
+          "进度看板的「订单交付」可在「整单」和「产品明细」间切换。整单看交期、阻塞和处理人，明细按产品核对已出货与剩余待交。电脑端在「订单交付」和「生产执行」的筛选中都可按姓名查找处理人或业务负责人。选中后立即更新，点「收起」返回看板。",
+          "在「委外管理」选中加工合同并点「查看详情」，从「回货进度」核对预计回货日期、已回和待回数量。点批次号可在当行下查看回货记录和有权读取的质检结果。已回货扣除已入账的退回数量，仓库范围受限时只显示可查看的回货批次。工序委外从生产执行核对。",
+          "进度看板的「经营统计」可按权限查看「交付汇总」和「应收账龄」。先选主题，再在同一栏设定条件。点「订单交期」后可选快捷期间，或在日历中选择并应用起止日期。默认看表格和表尾合计，切换到「图表」可比较当前页的分布。点名称、状态数字或图表分段核对来源，返回后继续查看原结果。",
           "查看任务或业务记录中的流程、异常与历史记录，核对同一来源和本次对象。有差异时保留来源单号，交对应责任岗位处理。"
         ]
       },
@@ -17099,10 +17174,11 @@ return {orders,financeCustomers};})();
         return help?`<span class="filter-chip filter-chip--with-help" data-selected="${selected}">${button}<button type="button" data-appearance-help="${help}" aria-label="查看${text}说明" ${disabled?'disabled':''}>${icon('info')}</button></span>`:button;
       }).join('')}</div></div>`;
     }
-    function renderFilterTrigger(count, openAction='open-task-filter', clearAction='task-filter-clear-direct') {
+    function renderFilterTrigger(count, openAction='open-task-filter', clearAction='task-filter-clear-direct', activeLabel='') {
       const active=count>0;
       const expanded=state.overlay===(openAction==='open-filter'?'filter':'task-filter');
-      return `<span class="filter-trigger-group" role="group" aria-label="筛选操作"><button class="control ${active?'filter-active':''}" data-action="${openAction}" aria-label="筛选${active?`，已应用 ${count} 项`:''}" aria-haspopup="dialog" aria-expanded="${expanded}">${icon('filter')}筛选${active?` · ${count}`:''}</button>${active?`<button class="control filter-active filter-trigger-clear" data-action="${clearAction}" aria-label="清空筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</span>`;
+      const summary = activeLabel && count > 1 ? `${activeLabel} +${count - 1}` : activeLabel || count;
+      return `<span class="filter-trigger-group" role="group" aria-label="筛选操作"><button class="control ${active?'filter-active':''}" data-action="${openAction}" aria-label="筛选${activeLabel?`，${activeLabel}`:''}${active?`，已应用 ${count} 项`:''}" aria-haspopup="dialog" aria-expanded="${expanded}">${icon('filter')}筛选${active?` · ${summary}`:''}</button>${active?`<button class="control filter-active filter-trigger-clear" data-action="${clearAction}" aria-label="清空筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</span>`;
     }
     function renderTaskFilterPopover() {
       const tracking = ['visible','started','participated'].includes(state.boardMode);
@@ -17113,17 +17189,29 @@ return {orders,financeCustomers};})();
           ${select('role','当前岗位',[['','全部当前岗位'],['老板','老板'],['业务','业务'],['采购','采购'],['工程','工程'],['生产','生产'],['仓库','仓库'],['财务','财务'],['PMC','PMC'],['品质','品质']])}
           ${select('source','单据类型',[['','全部单据类型'],...taskDiscoveryCatalog.documents.filter(item=>['sales_order','purchase_order','production_order','outsourcing_order','shipment','purchase_receipt','finance_payment','inventory_operation','production_exception_decision','production_fact','quality_inspection','bom_header','engineering_material_request'].includes(item.key)).map(item=>[item.key,item.label])])}
           ${select('attention','关注事项',[['','全部情况'],['overdue','只看逾期'],['blocked','只看受阻']])}
-          <label class="control"><span>发起时间</span><input data-tracking-filter="from" type="date" aria-label="开始日期" value="${f.from || ''}" max="${f.to || ''}"/><span>至</span><input data-tracking-filter="to" type="date" aria-label="结束日期" value="${f.to || ''}" min="${f.from || ''}"/></label>` : renderDirectFilterChoices('负责岗位',state.boardRole,[['all','不限'],...[...new Set(tasks.map(task=>task.role))].map(role=>[role,role])],'board-role-filter','role');
+          <div class="field"><label>日期范围 · 发起时间</label>${renderDesignDateTrigger('tracking','发起时间',[f.from||'',f.to||''])}</div>` : renderDirectFilterChoices('负责岗位',state.boardRole,[['all','不限'],...[...new Set(tasks.map(task=>task.role))].map(role=>[role,role])],'board-role-filter','role');
       const trigger = document.querySelector('[data-action="open-task-filter"]')?.getBoundingClientRect();
       const top = Math.min((trigger?.bottom || 130) + 8, Math.max(12, innerHeight - 360));
       const right = Math.max(12, innerWidth - (trigger?.right || innerWidth - 12));
-      const active = tracking ? [f.role,f.source,f.attention,f.from||f.to].some(Boolean) : Boolean(state.boardRole !== 'all' || Object.values(taskDiscoveryDemo).some(Boolean));
+      const calendar = isDesktopTaskCalendarDemo();
+      const deadline = calendar && taskCalendarDeadlineOptions.find(([key]) => key === taskCalendarDemo.desktop.selection);
+      const active = tracking ? [f.role,f.source,f.attention,f.from||f.to].some(Boolean) : Boolean(deadline || state.boardRole !== 'all' || Object.values(taskDiscoveryDemo).some(Boolean));
+      let deadlineField = '';
+      if (calendar) {
+        const { overdue, undated } = taskCalendarDemoBuckets(desktopTaskCalendarDemoRows());
+        const counts = { overdue: overdue.length, undated: undated.length };
+        const options = taskCalendarDeadlineOptions.map(([key, label]) => [
+          key, key === 'date' ? label : `${label}<span class="filter-chip-count">${counts[key]}</span>`,
+        ]);
+        deadlineField = renderDirectFilterChoices('任务截止', deadline?.[0] || 'date', options, 'task-calendar-deadline', 'deadline');
+      }
       return `<section class="popover" id="task-filter-popover" role="dialog" aria-label="筛选条件"
         style="--task-filter-anchor-top:${top}px;right:${right}px;width:min(560px,calc(100vw - 24px))">
         <div class="popover-head"><strong>筛选条件</strong><button class="btn ghost" data-action="task-filter-clear" ${active?'':'disabled'}>清空筛选</button></div>
         <div class="task-filter-body">
           ${tracking?'':renderTaskDiscoveryControls()}
           <div class="filter-grid">${fields}</div>
+          ${deadlineField}
         </div>
         <div class="popover-foot"><button class="btn primary" data-action="close-overlay">收起</button></div>
       </section>`;
@@ -17456,6 +17544,7 @@ return {orders,financeCustomers};})();
       desktop: { layout: 'list', month: '2026-10', selection: '2026-10-14' },
       mobile: { layout: 'list', month: '2026-10', selection: '2026-10-14' },
     };
+    const taskCalendarDeadlineOptions = [['date', '按日期'], ['overdue', '已逾期'], ['undated', '未设置截止']];
     // Fixed fictional deadlines for the interactive design, independent of runtime data.
     const taskCalendarDemoDates = { T01:'2026-10-14', T02:'2026-10-14', T03:'2026-10-20', H01:'2026-10-14', H02:'2026-10-14', H03:'2026-09-30', H04:'2026-10-20', H05:'2026-11-01', M01:'2026-10-15', M03:'2026-10-14', M05:'2026-10-14', M06:'2026-09-30', M07:'2026-10-14', M08:'2026-11-01', M12:'2026-10-14', M13:'2026-10-15' };
     function renderTaskCalendarSwitch(mobile=false) {
@@ -17463,16 +17552,32 @@ return {orders,financeCustomers};})();
       if(mobile)return `<button class="rm-calendar-toggle" data-action="task-calendar-layout" data-device="mobile" data-value="${value==='calendar'?'list':'calendar'}" aria-label="切换到${value==='calendar'?'列表':'日历'}">${icon(value==='calendar'?'menu':'task')}</button>`;
       return `<div class="task-toolbar-view-switch"><div class="segment task-calendar-switch" data-device="${device}" aria-label="待办显示方式">${[['list','列表'],['calendar','日历']].map(([key,label])=>`<button data-action="task-calendar-layout" data-device="${device}" data-value="${key}" class="${value===key?'active':''}" aria-pressed="${value===key}">${label}</button>`).join('')}</div></div>`;
     }
+    function isDesktopTaskCalendarDemo() {
+      return state.boardMode === 'todo' && taskCalendarDemo.desktop.layout === 'calendar';
+    }
+    function desktopTaskCalendarDemoRows() {
+      const keyword = state.boardSearch.trim().toLowerCase();
+      return tasks.filter(task => matchTaskDiscovery(task) && (state.boardRole === 'all' || task.role === state.boardRole) && demoTaskMatchesSearch(task, keyword));
+    }
+    function taskCalendarDemoDefaultDate(month) {
+      return month === '2026-10' ? '2026-10-14' : `${month}-01`;
+    }
+    function taskCalendarDemoBuckets(rows) {
+      const active = rows.filter(task => task.lane !== 'done' && task.status !== 'done');
+      const overdue = active.filter(task => taskCalendarDemoDates[task.id] && taskCalendarDemoDates[task.id] < '2026-10-14');
+      const undated = active.filter(task => !taskCalendarDemoDates[task.id]);
+      return { active, overdue, undated };
+    }
     function renderTaskCalendarDemo(rows,mobile=false) {
       const device=mobile?'mobile':'desktop', view=taskCalendarDemo[device];
-      const active=rows.filter(task=>task.lane!=='done'&&task.status!=='done');
-      const days={}, overdue=active.filter(task=>taskCalendarDemoDates[task.id]&&taskCalendarDemoDates[task.id]<'2026-10-14'), undated=active.filter(task=>!taskCalendarDemoDates[task.id]);
+      const { active, overdue, undated } = taskCalendarDemoBuckets(rows);
+      const days = {};
       active.forEach(task=>{const date=taskCalendarDemoDates[task.id];if(date?.startsWith(view.month))days[date]=(days[date]||0)+1;});
       const selected=view.selection==='overdue'?overdue:view.selection==='undated'?undated:active.filter(task=>taskCalendarDemoDates[task.id]===view.selection);
       const first=new Date(`${view.month}-01T00:00:00Z`), offset=(first.getUTCDay()+6)%7;
       const grid=Array.from({length:42},(_,i)=>{const date=new Date(first);date.setUTCDate(i-offset+1);const key=date.toISOString().slice(0,10);return key.startsWith(view.month)?`<button data-action="task-calendar-date" data-device="${device}" data-value="${key}" aria-label="${key}，${days[key]||0} 项待办" aria-pressed="${key===view.selection}" ${key==='2026-10-14'?'aria-current="date"':''} class="${key===view.selection?'active':''}"><span class="task-calendar-demo-date"><span>${date.getUTCDate()}</span></span>${days[key]?`<small aria-hidden="true">${days[key]>99?'99+':`${days[key]} 项`}</small>`:''}</button>`:'<span></span>';}).join('');
       const agenda = mobile ? selected.map(renderMobileTaskCard).join('') : `<div class="table-wrap"><table class="task-board-table" aria-label="待办任务"><thead><tr><th>任务与关联内容</th><th>任务时间</th><th>状态与说明</th><th>负责岗位 / 承接方式</th></tr></thead><tbody>${selected.map(renderTaskBoardRow).join('')}</tbody></table></div>`;
-      return `<section class="task-calendar-demo ${mobile?'task-calendar-demo--mobile':''}" aria-label="待办日历">${!mobile||!['overdue','undated'].includes(view.selection)?`<div class="task-calendar-demo-month"><div class="task-calendar-demo-head"><button class="btn" aria-label="上个月" data-action="task-calendar-month" data-device="${device}" data-value="-1">‹</button><strong>${Number(view.month.slice(0,4))} 年 ${Number(view.month.slice(5))} 月</strong><div class="task-calendar-demo-navigation"><button class="btn" aria-label="下个月" data-action="task-calendar-month" data-device="${device}" data-value="1">›</button><button class="btn task-calendar-demo-today" data-action="task-calendar-month" data-device="${device}" data-value="0">今天</button></div></div><div class="task-calendar-demo-week">${['一','二','三','四','五','六','日'].map(day=>`<span>${day}</span>`).join('')}</div><div class="task-calendar-demo-grid">${grid}</div>${mobile?'':`<div class="task-calendar-demo-buckets">${[['overdue','已逾期',overdue.length],['undated','未设置截止',undated.length]].map(([key,label,count])=>`<button class="btn ${view.selection===key?'active':''}" data-action="task-calendar-date" data-device="${device}" data-value="${key}">${label} ${count}</button>`).join('')}</div>`}</div>`:''}<div class="task-calendar-demo-items"><strong>${view.selection==='overdue'?'已逾期待办':view.selection==='undated'?'未设置截止日期':`${view.selection} 到期`} · ${selected.length} 项</strong>${selected.length?agenda:'<div class="empty">当前筛选下暂无待办</div>'}</div></section>`;
+      return `<section class="task-calendar-demo ${mobile?'task-calendar-demo--mobile':''}" aria-label="待办日历">${!mobile||!['overdue','undated'].includes(view.selection)?`<div class="task-calendar-demo-month"><div class="task-calendar-demo-head"><button class="btn" aria-label="上个月" data-action="task-calendar-month" data-device="${device}" data-value="-1">‹</button><strong>${Number(view.month.slice(0,4))} 年 ${Number(view.month.slice(5))} 月</strong><div class="task-calendar-demo-navigation"><button class="btn" aria-label="下个月" data-action="task-calendar-month" data-device="${device}" data-value="1">›</button><button class="btn task-calendar-demo-today" data-action="task-calendar-month" data-device="${device}" data-value="0">今天</button></div></div><div class="task-calendar-demo-week">${['一','二','三','四','五','六','日'].map(day=>`<span>${day}</span>`).join('')}</div><div class="task-calendar-demo-grid">${grid}</div></div>`:''}<div class="task-calendar-demo-items"><strong>${view.selection==='overdue'?'已逾期待办':view.selection==='undated'?'未设置截止日期':`${view.selection} 到期`} · ${selected.length} 项</strong>${selected.length?agenda:'<div class="empty">当前筛选下暂无待办</div>'}</div></section>`;
     }
 
     function renderTaskBoard() {
@@ -17500,9 +17605,10 @@ return {orders,financeCustomers};})();
       const boardPage = Math.min(state.boardPage || 1, boardPageCount);
       const displayedTasks = workCenterDemoRows(filtered, 'tasks').slice((boardPage - 1) * boardPageSize, boardPage * boardPageSize);
       const boardPager = `<nav class="statistics-pagination erp-task-pagination" aria-label="任务分页"><span role="status">第 ${filtered.length ? (boardPage-1)*boardPageSize+1 : 0}–${Math.min(boardPage*boardPageSize,filtered.length)} 条，共 ${filtered.length} 条</span><div class="statistics-pager"><button class="btn" data-action="board-page" data-page="${boardPage-1}" ${boardPage<=1?'disabled':''}>← 上一页</button><span>${boardPage} / ${boardPageCount}</span><button class="btn" data-action="board-page" data-page="${boardPage+1}" ${boardPage>=boardPageCount?'disabled':''}>下一页 →</button><ui-select data-board-page-size aria-label="每页任务数" data-required-selection>${[20,50,100].map(size=>`<option value="${size}" ${size===boardPageSize?'selected':''}>${size} 条 / 页</option>`).join('')}</ui-select></div></nav>`;
-      if(state.boardMode==='todo'&&taskCalendarDemo.desktop.layout==='calendar') {
-        const rows=tasks.filter(task=>matchTaskDiscovery(task)&&task.lane!=='done'&&(state.boardRole==='all'||task.role===state.boardRole)&&demoTaskMatchesSearch(task,q));
-        return `${header}<section class="surface operation-surface"><div class="command-row">${calendarSwitch}<label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="搜索订单、产品、任务" /></label>${renderFilterTrigger(Number(state.boardRole!=='all')+Object.values(taskDiscoveryDemo).filter(Boolean).length)}</div></section><section class="surface board-surface">${renderTaskCalendarDemo(rows)}</section>`;
+      if (isDesktopTaskCalendarDemo()) {
+        const deadline = taskCalendarDeadlineOptions.find(([key]) => key === taskCalendarDemo.desktop.selection);
+        const filterCount = Number(Boolean(deadline)) + Number(state.boardRole !== 'all') + Object.values(taskDiscoveryDemo).filter(Boolean).length;
+        return `${header}<section class="surface operation-surface"><div class="command-row">${calendarSwitch}<label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="搜索订单、产品、任务" /></label>${renderFilterTrigger(filterCount, 'open-task-filter', 'task-filter-clear-direct', deadline?.[1])}</div></section><section class="surface board-surface">${renderTaskCalendarDemo(desktopTaskCalendarDemoRows())}</section>`;
       }
       if(taskHandlingPreview) {
         const categories=[['all',state.boardMode==='todo'?'全部待办':state.boardMode==='approval'?'全部审批':'全部分类'],['normal','常规待办'],['blocked','异常处理'],['due','到期提醒'],...(state.boardMode==='all'?[['done','已结束']]:[])];
@@ -19435,15 +19541,18 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }));
       document.querySelectorAll('#floating [data-fulfillment-role]').forEach(input=>input.onchange=event=>{state.fulfillmentRole=event.target.value;state.fulfillmentStage='';renderAll();});
       document.querySelector('[data-tracking-scope]')?.addEventListener('change',event=>{state.boardMode=event.target.value;state.trackingLastScope=event.target.value;renderView();renderFloating();});
-      document.querySelectorAll('#task-filter-popover [data-tracking-filter]').forEach(input=>input.addEventListener('change',event=>{
-        const key=input.dataset.trackingFilter;
-        state.trackingFilters[state.boardMode]=normalizeTrackingDemoFilters({...state.trackingFilters[state.boardMode],[key]:event.target.value});
-        renderView();renderFloating();document.querySelector(`#task-filter-popover [data-tracking-filter="${key}"]`)?.focus();
+      document.querySelectorAll('[data-design-date-bound]').forEach(input=>input.addEventListener('change',()=>{
+        const bound=input.dataset.designDateBound;
+        designDateEditor.range[Number(bound)]=input.value;
+        designDateEditor.awaitingEnd=false;
+        if(input.value)designDateEditor.month=input.value.slice(0,7)+'-01';
+        renderFloating();
+        document.querySelector(`[data-design-date-bound="${bound}"]`)?.focus({preventScroll:true});
       }));
       document.querySelectorAll('[data-summary-party]').forEach(input=>input.addEventListener('change',()=>{ state[input.dataset.summaryParty]=input.value; renderView(); renderFloating(); }));
       document.querySelectorAll('#filter-popover input, #filter-popover ui-select').forEach(input=>input.addEventListener(input.id==='filter-party'?'input':'change',()=>{
-        state.filterParty=(document.querySelector('#filter-party')?.value||'').trim();state.filterOwner=document.querySelector('#filter-owner')?.value||'all';state.filterDateFrom=document.querySelector('#filter-date-from')?.value||'';state.filterDateTo=document.querySelector('#filter-date-to')?.value||'';state.pageNo=1;state.selected.clear();
-        document.querySelector('#filter-date-from').max=state.filterDateTo;document.querySelector('#filter-date-to').min=state.filterDateFrom;renderView();
+        state.filterParty=(document.querySelector('#filter-party')?.value||'').trim();state.filterOwner=document.querySelector('#filter-owner')?.value||'all';state.pageNo=1;state.selected.clear();
+        renderView();
       }));
       document.querySelectorAll('[data-approval-mode]').forEach(input=>input.addEventListener('change',event=>{document.querySelector('[data-approval-condition-fields]').hidden=event.target.value!=='amount';}));
       document.querySelectorAll('#attachment-input, #attachment-photo-input, #attachment-camera-input').forEach(input => input.addEventListener('change', e => queueAttachmentFiles(e.target.files)));
@@ -19467,10 +19576,14 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const root = document.querySelector('#floating');
       document.querySelector('#dashboard-payment-period')?.setAttribute('aria-expanded',String(state.overlay==='dashboard-payment-range'));
       document.querySelectorAll('[data-action="open-account"]').forEach(button => button.setAttribute('aria-expanded', String(state.overlay === 'account')));
-      document.querySelectorAll('.filter-trigger-group [aria-haspopup="dialog"]').forEach(button => button.setAttribute('aria-expanded', String(state.overlay===(button.dataset.action==='open-filter'?'filter':'task-filter'))));
+      document.querySelectorAll('.filter-trigger-group [aria-haspopup="dialog"]').forEach(button => {
+        const origin=button.dataset.action==='open-filter'?'filter':'task-filter';
+        button.setAttribute('aria-expanded', String(state.overlay===origin || state.overlay==='design-date-range'&&designDateEditor?.origin===origin));
+      });
       const previousFocus = root.contains(document.activeElement) ? document.activeElement : null;
       let html = '';
       if (state.overlay === 'dashboard-payment-range') html += renderDashboardPaymentRange();
+      if (state.overlay === 'design-date-range') html += renderDesignDateRange();
       if (state.overlay === 'dashboard-payment-details') html += renderDashboardPaymentDetails();
       if (state.overlay === 'task-associations') html += renderTaskAssociationsModal();
       if (state.overlay === 'filter') html += renderFilterPopover();
@@ -19561,11 +19674,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const qualityResults = config?.key==='quality' ? renderDirectFilterChoices('检验结果',state.qualityResult||'',[['','不限'],['PASS','合格'],['CONCESSION','让步接收','quality-concession'],['REJECT','不合格']],'demo-filter-choice','qualityResult') : '';
       const party = config?.party || '业务对象';
       const productionDates = config?.key === 'production';
-      const dateLabel = productionDates ? '日期范围' : (config?.dateLabel || '业务日期') + '范围';
-      const dateType = productionDates
-        ? renderDirectFilterChoices('日期类型', state.productionDateField, [['start','计划开始'],['end','计划结束']], 'demo-filter-choice', 'productionDateField')
-        : `<label>${dateLabel}</label>`;
-      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${dueFields}${qualityResults}<div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><ui-select id="filter-owner" data-empty-value="all"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</ui-select></div>${renderDirectFilterChoices('业务提醒',state.filterRisk,[['all','全部'],['正常','正常'],['near','临近日期'],['已逾期','已逾期'],['blocked','阻塞']],'demo-filter-choice','filterRisk')}${renderDirectFilterChoices('包含结束记录',state.filterIncludeEnded?'yes':'no',[['no','否'],['yes','是']],'demo-filter-choice','filterIncludeEnded')}<div class="field span-2">${dateType}<div class="date-range-control${productionDates?' date-range-control--typed':''}" role="group" aria-label="${dateLabel}">${productionDates?'<span aria-hidden="true">从</span>':''}<input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}" max="${state.filterDateTo}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}" min="${state.filterDateFrom}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
+      const dateLabel = productionDates ? (state.productionDateField==='end' ? '计划结束' : '计划开始') : config?.dateLabel || '业务日期';
+      const dateTrigger = renderDesignDateTrigger('module',dateLabel,[state.filterDateFrom,state.filterDateTo]);
+      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid">${dueFields}${qualityResults}<div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><ui-select id="filter-owner" data-empty-value="all"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</ui-select></div>${renderDirectFilterChoices('业务提醒',state.filterRisk,[['all','全部'],['正常','正常'],['near','临近日期'],['已逾期','已逾期'],['blocked','阻塞']],'demo-filter-choice','filterRisk')}${renderDirectFilterChoices('包含结束记录',state.filterIncludeEnded?'yes':'no',[['no','否'],['yes','是']],'demo-filter-choice','filterIncludeEnded')}<div class="field"><label>日期范围 · ${escapeHTML(dateLabel)}</label>${dateTrigger}</div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
     }
 
     function renderColumnsModal() {
@@ -20317,6 +20428,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
 
     document.addEventListener('click', event => {
       if(state.overlay==='dashboard-payment-range'&&!event.target.closest('#dashboard-payment-period, #dashboard-payment-range'))dismissOverlay();
+      if(state.overlay==='design-date-range'&&!event.target.closest('#design-date-range,[data-action="design-date-open"]'))dismissOverlay();
       const target = event.target.closest('[data-action]');
       if (!target) return;
       const action = target.dataset.action;
@@ -20528,7 +20640,22 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'tracking-view') { state.trackingLastView=target.dataset.value;state.boardMode=target.dataset.value==='tracking'?(state.trackingLastScope||'visible'):'exceptions';state.overlay=null;renderView();renderFloating(); }
       else if (action === 'open-task-filter') { state.overlay='task-filter'; renderFloating(); }
       else if (action === 'board-role-filter') { state.boardRole=target.dataset.value; state.boardPage=1; renderView(); renderFloating(); }
-      else if (action === 'task-filter-clear' || action === 'task-filter-clear-direct') { const direct=action==='task-filter-clear-direct'; if(['visible','started','participated'].includes(state.boardMode)) state.trackingFilters[state.boardMode]={keyword:state.trackingFilters[state.boardMode]?.keyword||'',status:state.trackingFilters[state.boardMode]?.status||''}; else {state.boardRole='all';state.boardPage=1;Object.keys(taskDiscoveryDemo).forEach(key=>delete taskDiscoveryDemo[key]);} if(direct) state.overlay=null; renderView(); renderFloating(); if(direct) document.querySelector('[data-action="open-task-filter"]')?.focus(); }
+      else if (action === 'task-filter-clear' || action === 'task-filter-clear-direct') {
+        const direct = action === 'task-filter-clear-direct';
+        if (['visible','started','participated'].includes(state.boardMode)) {
+          const filters = state.trackingFilters[state.boardMode];
+          state.trackingFilters[state.boardMode] = { keyword: filters?.keyword || '', status: filters?.status || '' };
+        } else {
+          state.boardRole = 'all';
+          state.boardPage = 1;
+          Object.keys(taskDiscoveryDemo).forEach(key => delete taskDiscoveryDemo[key]);
+          if (isDesktopTaskCalendarDemo()) taskCalendarDemo.desktop.selection = taskCalendarDemoDefaultDate(taskCalendarDemo.desktop.month);
+        }
+        if (direct) state.overlay = null;
+        renderView();
+        renderFloating();
+        if (direct) document.querySelector('[data-action="open-task-filter"]')?.focus();
+      }
       else if (action === 'work-center-sort') {
         const {scope, key: field} = target.dataset;
         const previous = workCenterDemoSort[scope];
@@ -20840,14 +20967,48 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'task-choice') { const task=state.drawer?.task; if(!task||!taskActions(task).includes(target.dataset.value))return;state.taskAction=target.dataset.value;state.taskNote='';state.taskTarget='';state.taskError='';renderFloating(); }
       else if (action === 'dashboard-drill') navigate('progress');
       else if (action === 'task-calendar-layout') {taskCalendarDemo[target.dataset.device].layout=target.dataset.value;renderView();}
+      else if (action === 'task-calendar-deadline') {
+        if (target.getAttribute('aria-pressed') === 'true') return;
+        const view = taskCalendarDemo.desktop;
+        view.selection = target.dataset.value === 'date' ? taskCalendarDemoDefaultDate(view.month) : target.dataset.value;
+        renderView();
+        renderFloating();
+        document.querySelector('#task-filter-popover [data-action="task-calendar-deadline"][aria-pressed="true"]')?.focus({ preventScroll: true });
+      }
       else if (action === 'task-calendar-date') {taskCalendarDemo[target.dataset.device].selection=target.dataset.value;renderView();}
       else if (action === 'task-calendar-month') {const view=taskCalendarDemo[target.dataset.device],delta=Number(target.dataset.value);if(!delta){view.month='2026-10';view.selection='2026-10-14';}else{const date=new Date(`${view.month}-01T00:00:00Z`);date.setUTCMonth(date.getUTCMonth()+delta);view.month=date.toISOString().slice(0,7);view.selection=`${view.month}-01`;}renderView();}
+      else if (action === 'design-date-open') startDesignDateRange(target.dataset.value);
+      else if (action === 'design-date-clear') {
+        const kind=target.dataset.value;
+        applyDesignDateRange(kind,state.productionDateField,['',''],'all');
+        renderFloating();
+        document.getElementById(`design-date-${kind}`)?.focus({preventScroll:true});
+      }
+      else if (action === 'design-date-back') finishDesignDateRange();
+      else if (action === 'design-date-field') {designDateEditor.field=target.dataset.value;renderFloating();}
+      else if (action === 'design-date-month') {designDateEditor.month=shiftDashboardPaymentMonth(designDateEditor.month,Number(target.dataset.value));renderFloating();}
+      else if (action === 'design-date-manual') {designDateEditor.manual=!designDateEditor.manual;renderFloating();}
+      else if (action === 'design-date-preset') finishDesignDateRange([target.dataset.from,target.dataset.to],target.dataset.period);
+      else if (action === 'design-date-day') {
+        const date=target.dataset.value;
+        const from=designDateEditor.range[0];
+        designDateEditor.range=designDateEditor.awaitingEnd&&date>=from ? [from,date] : [date,''];
+        designDateEditor.awaitingEnd=!designDateEditor.range[1];
+        renderFloating();
+      }
+      else if (action === 'design-date-apply') finishDesignDateRange(designDateEditor.range);
       else if (action === 'dashboard-payment-open') {
         if(state.overlay==='dashboard-payment-range'){dismissOverlay();return;}
         const range=dashboardPaymentRange();
         dashboardPaymentEditor={range,month:(range[1]||paymentSummarySampleDate).slice(0,7)+'-01'};
         state.overlay='dashboard-payment-range';
         renderFloating();
+      }
+      else if (action === 'dashboard-payment-restore') {
+        state.dashboardPaymentPeriod='month';
+        state.dashboardPaymentCustomRange=['',''];
+        renderView();
+        document.querySelector('#dashboard-payment-period')?.focus({preventScroll:true});
       }
       else if (action === 'dashboard-payment-preset') {
         state.dashboardPaymentPeriod=target.dataset.value;
@@ -20982,7 +21143,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         if(classification){classification.open=false;classification.querySelector('summary')?.focus();return;}
         const copyMenu=document.querySelector('.task-copy-menu[open]');
         if(copyMenu){copyMenu.open=false;copyMenu.querySelector('summary')?.focus();return;}
-        if (state.overlay) dismissOverlay();
+        if (state.overlay==='design-date-range') finishDesignDateRange();
+        else if (state.overlay) dismissOverlay();
         else if (state.drawer) closeLinkedDrawer();
         else if (state.permissionFullscreen) setPermissionFullscreen(false);
         else if (formFullscreen) setFormFullscreen(false);

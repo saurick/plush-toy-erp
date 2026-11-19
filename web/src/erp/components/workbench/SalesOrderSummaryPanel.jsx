@@ -58,19 +58,27 @@ export default function SalesOrderSummaryPanel({
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const filters = useMemo(() => readSalesSummaryFilters(params), [params])
-  const requestKey = JSON.stringify(filters)
+  const hasDateRange = Boolean(filters.date_from || filters.date_to)
+  const requestFilters = hasDateRange ? filters : { ...filters, date_field: 'order_date' }
+  const requestKey = JSON.stringify(requestFilters)
   const [result, setResult] = useState({ items: [], total: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
   const update = (values) =>
     setParams(updateSummarySearch(params, 'sales', values), { replace: true })
+  const applyDateRange = (from, to, date) => {
+    if (!hasDateRange && !from && !to) {
+      update({ date, page: params.get('sales.page') })
+      return
+    }
+    update({ date, from, to })
+  }
 
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
     setError('')
-    setResult({ items: [], total: 0 })
     listSalesOrderSummary(JSON.parse(requestKey), { signal: controller.signal })
       .then((data) => {
         if (!controller.signal.aborted) setResult(data)
@@ -255,7 +263,7 @@ export default function SalesOrderSummaryPanel({
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: `sales-summary:${requestKey}`,
     loadRows: async (options) =>
-      (await listAllSalesOrderSummary(filters, options)).items,
+      (await listAllSalesOrderSummary(requestFilters, options)).items,
     filename: () => `销售订单汇总-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: '产品明细',
@@ -292,10 +300,9 @@ export default function SalesOrderSummaryPanel({
             <DateRangeFilter
               value={filters.date_field}
               options={SALES_ORDER_DATE_FILTER_OPTIONS}
-              onTypeChange={(date) => update({ date })}
               startValue={filters.date_from?.slice(0, 10) || ''}
               endValue={filters.date_to?.slice(0, 10) || ''}
-              onRangeChange={(from, to) => update({ from, to })}
+              onRangeChange={applyDateRange}
             />
           </>
         }

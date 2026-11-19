@@ -3174,7 +3174,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 70,
+          line: 73,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'boolean',
@@ -3184,7 +3184,7 @@ export const RpcInspection = Object.freeze({
         name: 'customer_id',
         required: '可选',
         source: Object.freeze({
-          line: 89,
+          line: 92,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3194,7 +3194,7 @@ export const RpcInspection = Object.freeze({
         name: 'date_from',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3204,7 +3204,7 @@ export const RpcInspection = Object.freeze({
         name: 'date_to',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3214,7 +3214,7 @@ export const RpcInspection = Object.freeze({
         name: 'delivery_status',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3224,7 +3224,7 @@ export const RpcInspection = Object.freeze({
         name: 'display',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3234,7 +3234,7 @@ export const RpcInspection = Object.freeze({
         name: 'due_status',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3244,7 +3244,7 @@ export const RpcInspection = Object.freeze({
         name: 'id',
         required: '必填',
         source: Object.freeze({
-          line: 84,
+          line: 87,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3254,7 +3254,7 @@ export const RpcInspection = Object.freeze({
         name: 'keyword',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3264,7 +3264,7 @@ export const RpcInspection = Object.freeze({
         name: 'limit',
         required: '可选',
         source: Object.freeze({
-          line: 75,
+          line: 78,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3274,7 +3274,7 @@ export const RpcInspection = Object.freeze({
         name: 'offset',
         required: '可选',
         source: Object.freeze({
-          line: 78,
+          line: 81,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3284,7 +3284,7 @@ export const RpcInspection = Object.freeze({
         name: 'owner',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3294,7 +3294,7 @@ export const RpcInspection = Object.freeze({
         name: 'scope',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3308,7 +3308,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 70,
+          line: 73,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'boolean',
@@ -3318,7 +3318,7 @@ export const RpcInspection = Object.freeze({
         name: 'view',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3622,7 +3622,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 70,
+          line: 73,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'boolean',
@@ -3632,7 +3632,7 @@ export const RpcInspection = Object.freeze({
         name: 'customer_id',
         required: '可选',
         source: Object.freeze({
-          line: 89,
+          line: 92,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3642,7 +3642,7 @@ export const RpcInspection = Object.freeze({
         name: 'date_from',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3652,7 +3652,7 @@ export const RpcInspection = Object.freeze({
         name: 'date_to',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3662,7 +3662,7 @@ export const RpcInspection = Object.freeze({
         name: 'delivery_status',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3672,7 +3672,7 @@ export const RpcInspection = Object.freeze({
         name: 'display',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3682,7 +3682,7 @@ export const RpcInspection = Object.freeze({
         name: 'due_status',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3692,7 +3692,7 @@ export const RpcInspection = Object.freeze({
         name: 'id',
         required: '可选',
         source: Object.freeze({
-          line: 82,
+          line: 85,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3702,7 +3702,7 @@ export const RpcInspection = Object.freeze({
         name: 'keyword',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3712,7 +3712,7 @@ export const RpcInspection = Object.freeze({
         name: 'limit',
         required: '可选',
         source: Object.freeze({
-          line: 75,
+          line: 78,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3722,7 +3722,7 @@ export const RpcInspection = Object.freeze({
         name: 'offset',
         required: '可选',
         source: Object.freeze({
-          line: 78,
+          line: 81,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3732,7 +3732,7 @@ export const RpcInspection = Object.freeze({
         name: 'owner',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3742,7 +3742,7 @@ export const RpcInspection = Object.freeze({
         name: 'owner_name',
         required: '可选',
         source: Object.freeze({
-          line: 47,
+          line: 50,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3752,7 +3752,7 @@ export const RpcInspection = Object.freeze({
         name: 'scope',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3762,7 +3762,7 @@ export const RpcInspection = Object.freeze({
         name: 'sort_by',
         required: '可选',
         source: Object.freeze({
-          line: 51,
+          line: 54,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3772,7 +3772,7 @@ export const RpcInspection = Object.freeze({
         name: 'sort_direction',
         required: '可选',
         source: Object.freeze({
-          line: 55,
+          line: 58,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3786,7 +3786,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 70,
+          line: 73,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'boolean',
@@ -3796,7 +3796,7 @@ export const RpcInspection = Object.freeze({
         name: 'view',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3816,7 +3816,7 @@ export const RpcInspection = Object.freeze({
         name: 'view',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3836,7 +3836,7 @@ export const RpcInspection = Object.freeze({
         name: 'id',
         required: '必填',
         source: Object.freeze({
-          line: 84,
+          line: 87,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3846,7 +3846,7 @@ export const RpcInspection = Object.freeze({
         name: 'limit',
         required: '可选',
         source: Object.freeze({
-          line: 75,
+          line: 78,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3856,7 +3856,7 @@ export const RpcInspection = Object.freeze({
         name: 'offset',
         required: '可选',
         source: Object.freeze({
-          line: 78,
+          line: 81,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'integer',
@@ -3866,7 +3866,7 @@ export const RpcInspection = Object.freeze({
         name: 'owner_role_key',
         required: '可选',
         source: Object.freeze({
-          line: 41,
+          line: 44,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3876,7 +3876,7 @@ export const RpcInspection = Object.freeze({
         name: 'task_status',
         required: '可选',
         source: Object.freeze({
-          line: 38,
+          line: 41,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -3886,7 +3886,7 @@ export const RpcInspection = Object.freeze({
         name: 'view',
         required: '可选',
         source: Object.freeze({
-          line: 61,
+          line: 64,
           path: 'server/internal/service/jsonrpc_business_progress.go',
         }),
         type: 'string',
@@ -27703,7 +27703,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 34,
+        line: 36,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -27794,7 +27794,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 42,
+        line: 44,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -27888,7 +27888,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 42,
+        line: 44,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -28128,7 +28128,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 34,
+        line: 36,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -28215,11 +28215,51 @@ export const RpcInspection = Object.freeze({
       })]),
       response: Object.freeze([]),
     }),
-    get_engineering_material_request: Object.freeze({
+    get_delivery_progress: Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
         line: 34,
+        path: 'server/internal/service/jsonrpc_sales_order.go',
+      }),
+      parameters: Object.freeze([Object.freeze({
+        description: '解析器 `getRequiredJSONRPCPositiveInt`；调用 `getRequiredJSONRPCPositiveInt(pm, "id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。 拒绝条件：“!okID || !okLimit || !okOffset”。',
+        expression: 'getRequiredJSONRPCPositiveInt(pm, "id")',
+        name: 'id',
+        required: '必填',
+        source: Object.freeze({
+          line: 26,
+          path: 'server/internal/service/jsonrpc_sales_delivery_progress.go',
+        }),
+        type: 'integer',
+      }), Object.freeze({
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "limit", biz.WorkCenterDefaultLimit, 1)',
+        name: 'limit',
+        required: '可选',
+        source: Object.freeze({
+          line: 27,
+          path: 'server/internal/service/jsonrpc_sales_delivery_progress.go',
+        }),
+        type: 'integer',
+      }), Object.freeze({
+        description: '解析器 `getOptionalWorkflowTaskBoardInteger`；调用 `getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)`。',
+        expression: 'getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)',
+        name: 'offset',
+        required: '可选',
+        source: Object.freeze({
+          line: 28,
+          path: 'server/internal/service/jsonrpc_sales_delivery_progress.go',
+        }),
+        type: 'integer',
+      })]),
+      response: Object.freeze([]),
+    }),
+    get_engineering_material_request: Object.freeze({
+      emptyData: false,
+      emptyParameters: false,
+      entry: Object.freeze({
+        line: 36,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -28278,7 +28318,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 38,
+        line: 40,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -28306,7 +28346,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 34,
+        line: 36,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -28411,7 +28451,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 45,
+        line: 47,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -28759,7 +28799,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 38,
+        line: 40,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -28939,7 +28979,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 36,
+        line: 38,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -29083,7 +29123,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 38,
+        line: 40,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({
@@ -29608,7 +29648,7 @@ export const RpcInspection = Object.freeze({
       emptyData: false,
       emptyParameters: false,
       entry: Object.freeze({
-        line: 34,
+        line: 36,
         path: 'server/internal/service/jsonrpc_sales_order.go',
       }),
       parameters: Object.freeze([Object.freeze({

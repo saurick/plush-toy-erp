@@ -63,6 +63,7 @@ import OutsourcingOrderSourceFactModal from '../components/outsourcing-orders/Ou
 import OutsourcingOrderSummaryPanel from '../components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx'
 import OutsourcingOrderHandlingItems from '../components/outsourcing-orders/OutsourcingOrderHandlingItems.jsx'
 import OutsourcingReturnRecordsModal from '../components/outsourcing-orders/OutsourcingReturnRecordsModal.jsx'
+import OutsourcingReturnProgress from '../components/outsourcing-orders/OutsourcingReturnProgress.jsx'
 import OutsourcingReturnQualityInspectionModal from '../components/quality-inspections/OutsourcingReturnQualityInspectionModal.jsx'
 import OutsourcingReturnDispositionModal from '../components/quality-inspections/OutsourcingReturnDispositionModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
@@ -126,6 +127,7 @@ import {
 } from '../utils/relatedDocumentNavigation.mjs'
 
 import { inspectOutsourcingContractReadiness } from '../utils/outsourcingContractReadiness.mjs'
+import { workflowTaskAdminAccessRequestIdentity } from '../utils/workflowTaskActionAccess.mjs'
 import {
   lifecycleScopeIncludesStatus,
   withLifecycleScopeSearchParam,
@@ -335,6 +337,7 @@ export default function OutsourcingOrdersPage() {
     getOutsourcingOrderItemFields,
     getOutsourcingHandlingItemFields,
     loadOutsourcingOrderDetailsItems,
+    loadRelatedOutsourcingQualityInspections,
     submitOutsourcingSourceFact,
   } = useOutsourcingSourceFacts({
     canCreateStagePayable,
@@ -793,13 +796,10 @@ export default function OutsourcingOrdersPage() {
                   <DateRangeFilter
                     options={OUTSOURCING_ORDER_DATE_FILTER_OPTIONS}
                     value={dateField}
-                    onTypeChange={(value) => {
-                      setDateField(value || 'order_date')
-                      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-                    }}
                     startValue={dateRange?.[0] || ''}
                     endValue={dateRange?.[1] || ''}
-                    onRangeChange={(from, to) => {
+                    onRangeChange={(from, to, field) => {
+                      setDateField(field)
                       setDateRange([from, to])
                       setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
                     }}
@@ -1103,6 +1103,25 @@ export default function OutsourcingOrdersPage() {
         }
         open={Boolean(detailOrder)}
         record={detailOrder}
+        renderAfterSummary={detailOrder?.id && canRead && canReadOutsourcingFacts
+          ? (lineItemsState) => (
+            <OutsourcingReturnProgress
+              key={`${detailOrder.id}:${detailOrder.version}:${workflowTaskAdminAccessRequestIdentity(adminProfile)}`}
+              order={detailOrder}
+              lineItemsState={lineItemsState}
+              unitOptions={unitOptions}
+              canReadQuality={canReadQualityInspection}
+              loadQuality={loadRelatedOutsourcingQualityInspections}
+              onViewStage={canReadWIP ? (line) => {
+                setDetailOrder(null)
+                const path = BUSINESS_ROUTE_PATHS.productionOrders
+                navigate(line?.production_order_id
+                  ? `${path}?production_order_id=${line.production_order_id}&wip_batch_id=${line.production_wip_batch_id}`
+                  : path)
+              } : undefined}
+            />
+            )
+          : undefined}
         title="加工合同详情"
         onClose={() => setDetailOrder(null)}
       >

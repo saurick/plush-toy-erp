@@ -57,8 +57,8 @@ const navItemRegistry = {
     sidebarArea: 'work',
     label: '进度看板',
     path: '/erp/business-dashboard',
-    shortLabel: '业务',
-    description: '按业务记录、部门待处理和风险预警看整体运行状态。',
+    shortLabel: '进度',
+    description: '查本岗临期、受阻、待跟进和处理结果，按权限查看业务全局。',
   },
   'print-center': {
     key: 'print-center',

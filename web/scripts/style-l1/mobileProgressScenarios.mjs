@@ -12,6 +12,7 @@ import {
   assertMobileSearchAffordance,
 } from './controlAffordanceAssertions.mjs'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
+import { statisticsFixtureData } from './businessStatisticsFixtures.mjs'
 import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAssertions.mjs'
 import { createMobileFilterScrollScenarios } from './mobileFilterScrollScenarios.mjs'
 import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
@@ -348,7 +349,10 @@ export function createMobileProgressScenarios({
           if (method === 'list_progress_tasks' && longDetail && params.offset === 20) {
             calls.push({ method, params })
             const sample = progressFixtureData(params, { detail: true }).sections.tasks[0]
-            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, data: {
+            return route.fulfill({ json: { jsonrpc: '2.0',
+id,
+result: { code: 0,
+data: {
               total: 21, rows: [{ ...sample, id: 101, number: 'TASK-NEXT-101', label: '工程资料' }],
             } } } })
           }
@@ -456,15 +460,15 @@ export function createMobileProgressScenarios({
                 (item) => item.getAttribute('aria-label')?.split('，')[0]
               )
             ),
-          allowed ? ['进度', '任务管理', '风险', '我的'] : ['任务管理', '风险', '我的']
+          ['进度', '任务管理', '风险', '我的']
         )
         if (!allowed) {
           assert.equal(calls.length, 0)
           assert.equal(imageCalls.length, 0)
-          assert.equal(
-            await page.getByTestId('mobile-progress-panel').count(),
-            0
-          )
+          await nav.getByRole('tab', { name: '进度', exact: true }).click()
+          await page.getByRole('region', { name: '本岗进度', exact: true }).waitFor()
+          assert.equal(await page.getByRole('tab', { name: '经营统计', exact: true }).count(), 0)
+          await page.getByTestId('mobile-role-nav-tasks').click()
           await page
             .getByLabel('任务状态', { exact: true })
             .getByText('已办', { exact: true })
@@ -484,6 +488,8 @@ export function createMobileProgressScenarios({
         }
         const panel = page.getByTestId('mobile-progress-panel')
         const prefix = role === 'pmc' ? 'MO' : 'SO'
+        await panel.getByRole('tab', { name: '岗位进度', selected: true }).waitFor()
+        await panel.getByRole('tab', { name: role === 'pmc' ? '生产执行' : '订单交付', exact: true }).click()
         await panel
           .getByRole('button', {
             name: `查看 ${prefix}-0001 进度`,
@@ -1642,7 +1648,59 @@ export function createMobileProgressScenarios({
       },
     }
   })
-  return [...scenarios, ...createMobileTaskBlockerScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...createMobileCardFooterScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...['light', 'dark'].map((themeMode) => ({
+  const boss = scenarios.find((scenario) => scenario.name === 'mobile-progress-boss')
+  const managementPermissions = ['workflow.task.supervise', 'field.sales_commercial.read', 'finance.receivable.read', 'field.finance_settlement.read']
+  const managerStatistics = {
+    ...boss,
+    name: 'mobile-management-progress-statistics',
+    adminProfile: {
+      ...boss.adminProfile,
+      permissions: [...boss.adminProfile.permissions, ...managementPermissions],
+      menus: [
+        { key: 'sales-orders', path: '/erp/sales/project-orders/sales-orders', label: '销售订单' },
+        { key: 'receivables', path: '/erp/finance/receivables', label: '应收管理' },
+      ],
+    },
+    effectiveSession: {
+      ...boss.effectiveSession,
+      actions: [...boss.effectiveSession.actions, ...managementPermissions],
+    },
+    workflowTaskFixtures: [...boss.workflowTaskFixtures, {
+      ...boss.workflowTaskFixtures[0],
+      id: 102,
+task_code: 'TASK-0102',
+task_name: '核对成品入库异常',
+owner_role_key: 'warehouse',
+    }],
+    beforeNavigate: async (page) => {
+      await boss.beforeNavigate(page)
+      await page.route('**/rpc/business', (route) => {
+        const { id, method, params = {} } = route.request().postDataJSON()
+        if (!['get_delivery_statistics', 'get_receivable_statistics'].includes(method)) return route.fallback()
+        const data = statisticsFixtureData(params, { ages: method === 'get_receivable_statistics' })
+        return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data } } })
+      })
+    },
+    verify: async (page) => {
+      const panel = page.getByTestId('mobile-progress-panel')
+      await panel.getByRole('tab', { name: '岗位进度', selected: true }).waitFor()
+      const roleProgress = panel.getByRole('region', { name: '本岗进度', exact: true })
+      const exceptions = roleProgress.getByRole('region', { name: '受阻与异常', exact: true })
+      await exceptions.getByText('确认面料交期', { exact: true }).waitFor()
+      const warehouseItem = exceptions.getByText('核对成品入库异常', { exact: true })
+      assert.equal(await warehouseItem.count(), 0, '岗位首屏使用老板岗位范围')
+      await roleProgress.locator('.ant-select-selector').click()
+      await page.locator('.ant-select-dropdown:visible').getByText('全局跟进', { exact: true }).click()
+      await warehouseItem.waitFor()
+      await panel.getByRole('tab', { name: '经营统计', exact: true }).click()
+      await panel.getByRole('group', { name: '交付状态筛选', exact: true }).waitFor()
+      await panel.getByRole('tab', { name: '应收账龄', exact: true }).click()
+      await panel.getByRole('group', { name: '账龄筛选', exact: true }).waitFor()
+      assert.equal(new URL(page.url()).pathname, '/m/boss/tasks')
+      await assertNoHorizontalOverflow(page, 'mobile-management-progress-statistics')
+    },
+  }
+  return [...scenarios, managerStatistics, ...createMobileTaskBlockerScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...createMobileCardFooterScenarios({ base: scenarios[0], assert, assertNoHorizontalOverflow, outputDir }), ...['light', 'dark'].map((themeMode) => ({
     ...scenarios.find((scenario) => scenario.name === 'mobile-progress-boss'),
     name: `mobile-primary-tab-geometry-${themeMode}`,
     themeMode,
@@ -1652,6 +1710,7 @@ export function createMobileProgressScenarios({
     name: 'mobile-progress-status-counts',
     verify: async (page) => {
       const panel = page.getByTestId('mobile-progress-panel')
+      await panel.getByRole('tab', { name: '生产执行', exact: true }).click()
       await panel.getByRole('button', { name: '查看 MO-0001 进度', exact: true }).waitFor()
       await panel.getByRole('button', { name: '筛选进度', exact: true }).click()
       const filters = page.getByRole('dialog', { name: '筛选进度', exact: true })

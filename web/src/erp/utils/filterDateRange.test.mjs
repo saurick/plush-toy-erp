@@ -41,7 +41,6 @@ test('进度两端共用日期恢复规则，拒绝不存在日期及倒置范�
 
 test('时间范围包含当天，跨月、跨年和闰日仍覆盖约定的自然日数', () => {
   const ranges = (date, upcoming) => Object.fromEntries(dateFilterPresets(upcoming, date)
-    .filter((option) => option.value !== 'custom')
     .map(({ value, from, to }) => [value, [from, to]]))
   assert.deepEqual(ranges('2026-01-01', true), {
     '': ['', ''],
