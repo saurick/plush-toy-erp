@@ -131,14 +131,6 @@ func operationalFactStockReservationResult(ctx context.Context, d *jsonrpcDispat
 	return okData(map[string]any{"stock_reservation": stockReservationToAny(item)})
 }
 
-func stockReservationsToAny(items []*biz.StockReservation) []any {
-	out := make([]any, 0, len(items))
-	for _, item := range items {
-		out = append(out, stockReservationToAny(item))
-	}
-	return out
-}
-
 func stockReservationsForAccessToAny(items []*biz.StockReservation, scope biz.StockReservationReadScope) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {

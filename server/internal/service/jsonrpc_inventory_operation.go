@@ -219,10 +219,10 @@ func inventoryOperationCreateFromParams(pm map[string]any, actorID int) (*biz.In
 		subjectID, subjectOK := getRequiredJSONRPCPositiveInt(m, "subject_id")
 		fromWarehouseID, warehouseOK := getRequiredJSONRPCPositiveInt(m, "from_warehouse_id")
 		unitID, unitOK := getRequiredJSONRPCPositiveInt(m, "unit_id")
-		productSkuID, skuOK := getOptionalInventoryOperationPositiveInt(m, "product_sku_id")
-		fromLotID, fromLotOK := getOptionalInventoryOperationPositiveInt(m, "from_lot_id")
-		toWarehouseID, toWarehouseOK := getOptionalInventoryOperationPositiveInt(m, "to_warehouse_id")
-		toLotID, toLotOK := getOptionalInventoryOperationPositiveInt(m, "to_lot_id")
+		productSkuID, skuOK := getOptionalJSONRPCPositiveInt(m, "product_sku_id")
+		fromLotID, fromLotOK := getOptionalJSONRPCPositiveInt(m, "from_lot_id")
+		toWarehouseID, toWarehouseOK := getOptionalJSONRPCPositiveInt(m, "to_warehouse_id")
+		toLotID, toLotOK := getOptionalJSONRPCPositiveInt(m, "to_lot_id")
 		if !ok1 || !ok2 || !ok3 || !ok4 || !subjectOK || !warehouseOK || !unitOK || !skuOK || !fromLotOK || !toWarehouseOK || !toLotOK {
 			return nil, false
 		}
@@ -257,7 +257,7 @@ func inventoryOperationDraftSaveFromParams(pm map[string]any) (*biz.InventoryOpe
 		}
 		counted, countedOK := getOptionalJSONRPCDecimalString(params, "counted_quantity")
 		adjustment, adjustmentOK := getOptionalInventoryOperationDecimal(params, "adjustment_quantity")
-		toWarehouseID, toWarehouseOK := getOptionalInventoryOperationPositiveInt(params, "to_warehouse_id")
+		toWarehouseID, toWarehouseOK := getOptionalJSONRPCPositiveInt(params, "to_warehouse_id")
 		note, noteOK := optionalJSONRPCString(params, "note")
 		if !countedOK || !adjustmentOK || !toWarehouseOK || !noteOK {
 			return nil, false
@@ -286,17 +286,6 @@ func getOptionalInventoryOperationDecimal(pm map[string]any, key string) (decima
 		return decimal.Zero, true
 	}
 	return getRequiredJSONRPCNumeric20Scale6(pm, key)
-}
-func getOptionalInventoryOperationPositiveInt(pm map[string]any, key string) (*int, bool) {
-	raw, ok := pm[key]
-	if !ok || raw == nil {
-		return nil, true
-	}
-	value, ok := getRequiredJSONRPCPositiveInt(pm, key)
-	if !ok {
-		return nil, false
-	}
-	return &value, true
 }
 func optionalDecimalToAny(value *decimal.Decimal) any {
 	if value == nil {

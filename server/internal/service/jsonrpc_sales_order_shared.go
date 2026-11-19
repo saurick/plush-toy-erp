@@ -292,13 +292,6 @@ func salesOrderMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *b
 	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"sales_order": salesOrderToMap(item)})}
 }
 
-func salesOrderItemMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.SalesOrderItem, err error) *v1.JsonrpcResult {
-	if err != nil {
-		return d.mapSalesOrderError(ctx, err)
-	}
-	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"sales_order_item": salesOrderItemToMap(item)})}
-}
-
 func salesOrderWithItemsMutationResult(ctx context.Context, d *jsonrpcDispatcher, result *biz.SalesOrderWithItems, err error) *v1.JsonrpcResult {
 	if err != nil {
 		return d.mapSalesOrderError(ctx, err)

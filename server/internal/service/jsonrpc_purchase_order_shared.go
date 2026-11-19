@@ -190,13 +190,6 @@ func purchaseOrderMutationResult(ctx context.Context, d *jsonrpcDispatcher, item
 	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"purchase_order": purchaseOrderToMap(item)})}
 }
 
-func purchaseOrderItemMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.PurchaseOrderItem, err error) *v1.JsonrpcResult {
-	if err != nil {
-		return d.mapPurchaseOrderError(ctx, err)
-	}
-	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"purchase_order_item": purchaseOrderItemToMap(item)})}
-}
-
 func purchaseOrderWithItemsMutationResult(ctx context.Context, d *jsonrpcDispatcher, result *biz.PurchaseOrderWithItems, err error) *v1.JsonrpcResult {
 	if err != nil {
 		return d.mapPurchaseOrderError(ctx, err)

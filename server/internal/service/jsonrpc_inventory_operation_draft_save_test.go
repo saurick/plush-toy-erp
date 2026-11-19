@@ -71,11 +71,23 @@ func TestInventoryOperationDraftSaveJSONRPCKeepsServerTruthAndStrictParams(t *te
 		t.Fatalf("strict params result=%#v err=%v", invalid, err)
 	}
 	delete(params, "unexpected")
+	params["expected_version"] = float64(created.Version + 1)
 	params["items"] = []any{map[string]any{
-		"id": float64(created.Items[0].ID), "counted_quantity": "7", "to_warehouse_id": "not-an-id",
+		"id": float64(created.Items[0].ID), "counted_quantity": "4", "note": "再次复核", "to_warehouse_id": "not-an-id",
 	}}
 	_, invalid, err = dispatcher.handleInventory(workflowJSONRPCAdminContext(), "save_inventory_operation_draft", "invalid-target", mustJSONRPCStruct(t, params))
 	if err != nil || invalid == nil || invalid.Code != errcode.InvalidParam.Code {
 		t.Fatalf("strict target warehouse result=%#v err=%v", invalid, err)
+	}
+	current, err := uc.GetInventoryOperation(ctx, created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Version != created.Version+1 || len(current.Items) != 1 {
+		t.Fatalf("invalid request changed draft: %#v", current)
+	}
+	line := current.Items[0]
+	if line.CountedQuantity == nil || !line.CountedQuantity.Equal(decimal.NewFromInt(7)) || line.Note == nil || *line.Note != "复核" {
+		t.Fatalf("invalid target warehouse overwrote draft line: %#v", line)
 	}
 }

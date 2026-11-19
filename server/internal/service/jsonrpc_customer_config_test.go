@@ -30,10 +30,6 @@ func newCustomerConfigTestDispatcherWithInventoryRepo(admin *biz.AdminUser, role
 	return newCustomerConfigTestDispatcherWithRepos(admin, roleKeys, newDefaultServiceSalesOrderRepo(), inventoryRepo, nil)
 }
 
-func newCustomerConfigTestDispatcherWithOperationalFactRepo(admin *biz.AdminUser, roleKeys []string, operationalFactRepo biz.OperationalFactRepo) *jsonrpcDispatcher {
-	return newCustomerConfigTestDispatcherWithRepos(admin, roleKeys, newDefaultServiceSalesOrderRepo(), nil, operationalFactRepo)
-}
-
 func newCustomerConfigTestDispatcherWithRuntimeRepo(admin *biz.AdminUser, roleKeys []string) (*jsonrpcDispatcher, *serviceProcessRuntimeRepo) {
 	return newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, newDefaultServiceSalesOrderRepo(), nil, nil)
 }
@@ -2870,61 +2866,6 @@ func TestCustomerConfigJSONRPCRetiredQualityCommandRejectsFrozenNode(t *testing.
 	if res.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("code = %d, want unknown retired method", res.Code)
 	}
-}
-
-type serviceFinishedGoodsQualityInventoryRepoStub struct {
-	biz.InventoryRepo
-	inspection  *biz.QualityInspection
-	passInput   *biz.QualityInspectionDecision
-	rejectInput *biz.QualityInspectionDecision
-}
-
-func (r *serviceFinishedGoodsQualityInventoryRepoStub) GetQualityInspection(_ context.Context, id int) (*biz.QualityInspection, error) {
-	if r.inspection == nil || r.inspection.ID != id {
-		return nil, biz.ErrQualityInspectionNotFound
-	}
-	copied := *r.inspection
-	return &copied, nil
-}
-
-func (r *serviceFinishedGoodsQualityInventoryRepoStub) PassQualityInspection(_ context.Context, in *biz.QualityInspectionDecision) (*biz.QualityInspection, error) {
-	if in == nil {
-		return nil, biz.ErrBadParam
-	}
-	copiedInput := *in
-	r.passInput = &copiedInput
-	return &biz.QualityInspection{
-		ID:             in.InspectionID,
-		InventoryLotID: r.inspection.InventoryLotID,
-		SourceType:     r.inspection.SourceType,
-		SourceID:       r.inspection.SourceID,
-		InspectionType: r.inspection.InspectionType,
-		Status:         biz.QualityInspectionStatusPassed,
-		Result:         &copiedInput.Result,
-		InspectedAt:    &copiedInput.InspectedAt,
-		InspectorID:    copiedInput.InspectorID,
-		DecisionNote:   copiedInput.DecisionNote,
-	}, nil
-}
-
-func (r *serviceFinishedGoodsQualityInventoryRepoStub) RejectQualityInspection(_ context.Context, in *biz.QualityInspectionDecision) (*biz.QualityInspection, error) {
-	if in == nil {
-		return nil, biz.ErrBadParam
-	}
-	copiedInput := *in
-	r.rejectInput = &copiedInput
-	return &biz.QualityInspection{
-		ID:             in.InspectionID,
-		InventoryLotID: r.inspection.InventoryLotID,
-		SourceType:     r.inspection.SourceType,
-		SourceID:       r.inspection.SourceID,
-		InspectionType: r.inspection.InspectionType,
-		Status:         biz.QualityInspectionStatusRejected,
-		Result:         &copiedInput.Result,
-		InspectedAt:    &copiedInput.InspectedAt,
-		InspectorID:    copiedInput.InspectorID,
-		DecisionNote:   copiedInput.DecisionNote,
-	}, nil
 }
 
 func createFinishedGoodsDeliveryFinanceReleaseActiveFixture(t *testing.T, runtimeRepo *serviceProcessRuntimeRepo, ctx context.Context) (*biz.ProcessInstance, []*biz.ProcessNodeInstance) {

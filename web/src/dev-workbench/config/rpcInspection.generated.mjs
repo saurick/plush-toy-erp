@@ -6162,7 +6162,7 @@ export const RpcInspection = Object.freeze({
         name: 'access_entitlements',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1019,
+          line: 1006,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -6172,7 +6172,7 @@ export const RpcInspection = Object.freeze({
         name: 'access_entitlements[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1131,
+          line: 1118,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -6183,7 +6183,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1137,
+          line: 1124,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6194,7 +6194,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1140,
+          line: 1127,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -6205,7 +6205,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1141,
+          line: 1128,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -6216,7 +6216,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1136,
+          line: 1123,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6227,7 +6227,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1138,
+          line: 1125,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6238,7 +6238,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1139,
+          line: 1126,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6249,7 +6249,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 987,
+          line: 974,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -6260,7 +6260,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1013,
+          line: 1000,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6270,7 +6270,7 @@ export const RpcInspection = Object.freeze({
         name: 'manifest_schema_version',
         required: '必填',
         source: Object.freeze({
-          line: 1047,
+          line: 1034,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6280,7 +6280,7 @@ export const RpcInspection = Object.freeze({
         name: 'manifest_status',
         required: '必填',
         source: Object.freeze({
-          line: 1047,
+          line: 1034,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6290,7 +6290,7 @@ export const RpcInspection = Object.freeze({
         name: 'module_states',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1017,
+          line: 1004,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -6300,7 +6300,7 @@ export const RpcInspection = Object.freeze({
         name: 'module_states[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1081,
+          line: 1068,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -6311,7 +6311,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1087,
+          line: 1074,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6322,7 +6322,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1086,
+          line: 1073,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6333,7 +6333,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1089,
+          line: 1076,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6344,7 +6344,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1088,
+          line: 1075,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6354,7 +6354,7 @@ export const RpcInspection = Object.freeze({
         name: 'process_contract_version',
         required: '必填',
         source: Object.freeze({
-          line: 1047,
+          line: 1034,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6365,7 +6365,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1015,
+          line: 1002,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6375,7 +6375,7 @@ export const RpcInspection = Object.freeze({
         name: 'publishable',
         required: '必填',
         source: Object.freeze({
-          line: 1062,
+          line: 1049,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -6386,7 +6386,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1014,
+          line: 1001,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6396,7 +6396,7 @@ export const RpcInspection = Object.freeze({
         name: 'role_profiles',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1018,
+          line: 1005,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -6406,7 +6406,7 @@ export const RpcInspection = Object.freeze({
         name: 'role_profiles[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1116,
+          line: 1103,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -6417,7 +6417,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1107,
+          line: 1094,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -6428,7 +6428,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1106,
+          line: 1093,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -6439,7 +6439,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1105,
+          line: 1092,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6449,7 +6449,7 @@ export const RpcInspection = Object.freeze({
         name: 'role_profiles[].grants',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1120,
+          line: 1107,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'json',
@@ -6460,7 +6460,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1108,
+          line: 1095,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -6471,7 +6471,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1104,
+          line: 1091,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6481,7 +6481,7 @@ export const RpcInspection = Object.freeze({
         name: 'runtime_enabled',
         required: '必填',
         source: Object.freeze({
-          line: 1062,
+          line: 1049,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -6491,7 +6491,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pool_memberships',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1021,
+          line: 1008,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -6501,7 +6501,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pool_memberships[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1169,
+          line: 1156,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -6512,7 +6512,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1179,
+          line: 1166,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -6523,7 +6523,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1174,
+          line: 1161,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6534,7 +6534,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1178,
+          line: 1165,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'integer',
@@ -6545,7 +6545,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1175,
+          line: 1162,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6556,7 +6556,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1177,
+          line: 1164,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6567,7 +6567,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1176,
+          line: 1163,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'integer',
@@ -6577,7 +6577,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pools',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1020,
+          line: 1007,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -6587,7 +6587,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pools[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1151,
+          line: 1138,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -6598,7 +6598,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1159,
+          line: 1146,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6609,7 +6609,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1158,
+          line: 1145,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6620,7 +6620,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1157,
+          line: 1144,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -6631,7 +6631,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1156,
+          line: 1143,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7575,7 +7575,7 @@ export const RpcInspection = Object.freeze({
         name: 'access_entitlements',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1019,
+          line: 1006,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -7585,7 +7585,7 @@ export const RpcInspection = Object.freeze({
         name: 'access_entitlements[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1131,
+          line: 1118,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -7596,7 +7596,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1137,
+          line: 1124,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7607,7 +7607,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1140,
+          line: 1127,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -7618,7 +7618,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1141,
+          line: 1128,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -7629,7 +7629,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1136,
+          line: 1123,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7640,7 +7640,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1138,
+          line: 1125,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7651,7 +7651,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1139,
+          line: 1126,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7662,7 +7662,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 987,
+          line: 974,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -7673,7 +7673,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1013,
+          line: 1000,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7683,7 +7683,7 @@ export const RpcInspection = Object.freeze({
         name: 'manifest_schema_version',
         required: '必填',
         source: Object.freeze({
-          line: 1047,
+          line: 1034,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7693,7 +7693,7 @@ export const RpcInspection = Object.freeze({
         name: 'manifest_status',
         required: '必填',
         source: Object.freeze({
-          line: 1047,
+          line: 1034,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7703,7 +7703,7 @@ export const RpcInspection = Object.freeze({
         name: 'module_states',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1017,
+          line: 1004,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -7713,7 +7713,7 @@ export const RpcInspection = Object.freeze({
         name: 'module_states[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1081,
+          line: 1068,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -7724,7 +7724,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1087,
+          line: 1074,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7735,7 +7735,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1086,
+          line: 1073,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7746,7 +7746,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1089,
+          line: 1076,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7757,7 +7757,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1088,
+          line: 1075,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7767,7 +7767,7 @@ export const RpcInspection = Object.freeze({
         name: 'process_contract_version',
         required: '必填',
         source: Object.freeze({
-          line: 1047,
+          line: 1034,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7778,7 +7778,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1015,
+          line: 1002,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7788,7 +7788,7 @@ export const RpcInspection = Object.freeze({
         name: 'publishable',
         required: '必填',
         source: Object.freeze({
-          line: 1062,
+          line: 1049,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -7799,7 +7799,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1014,
+          line: 1001,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7809,7 +7809,7 @@ export const RpcInspection = Object.freeze({
         name: 'role_profiles',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1018,
+          line: 1005,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -7819,7 +7819,7 @@ export const RpcInspection = Object.freeze({
         name: 'role_profiles[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1116,
+          line: 1103,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -7830,7 +7830,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1107,
+          line: 1094,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -7841,7 +7841,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1106,
+          line: 1093,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -7852,7 +7852,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1105,
+          line: 1092,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7862,7 +7862,7 @@ export const RpcInspection = Object.freeze({
         name: 'role_profiles[].grants',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1120,
+          line: 1107,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'json',
@@ -7873,7 +7873,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1108,
+          line: 1095,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -7884,7 +7884,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1104,
+          line: 1091,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7894,7 +7894,7 @@ export const RpcInspection = Object.freeze({
         name: 'runtime_enabled',
         required: '必填',
         source: Object.freeze({
-          line: 1062,
+          line: 1049,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -7904,7 +7904,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pool_memberships',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1021,
+          line: 1008,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -7914,7 +7914,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pool_memberships[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1169,
+          line: 1156,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -7925,7 +7925,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 1179,
+          line: 1166,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'boolean',
@@ -7936,7 +7936,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1174,
+          line: 1161,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7947,7 +7947,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1178,
+          line: 1165,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'integer',
@@ -7958,7 +7958,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1175,
+          line: 1162,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7969,7 +7969,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1177,
+          line: 1164,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -7980,7 +7980,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1176,
+          line: 1163,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'integer',
@@ -7990,7 +7990,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pools',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1020,
+          line: 1007,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'array',
@@ -8000,7 +8000,7 @@ export const RpcInspection = Object.freeze({
         name: 'work_pools[]',
         required: '按业务条件',
         source: Object.freeze({
-          line: 1151,
+          line: 1138,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'object',
@@ -8011,7 +8011,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1159,
+          line: 1146,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -8022,7 +8022,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1158,
+          line: 1145,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -8033,7 +8033,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1157,
+          line: 1144,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -8044,7 +8044,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 1156,
+          line: 1143,
           path: 'server/internal/service/jsonrpc_customer_config.go',
         }),
         type: 'string',
@@ -8310,8 +8310,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalInventoryOperationPositiveInt`；调用 `getOptionalInventoryOperationPositiveInt(m, "from_lot_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
-        expression: 'getOptionalInventoryOperationPositiveInt(m, "from_lot_id")',
+        description: '解析器 `getOptionalJSONRPCPositiveInt`；调用 `getOptionalJSONRPCPositiveInt(m, "from_lot_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
+        expression: 'getOptionalJSONRPCPositiveInt(m, "from_lot_id")',
         name: 'items[].from_lot_id',
         nullable: true,
         required: '可选',
@@ -8353,8 +8353,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalInventoryOperationPositiveInt`；调用 `getOptionalInventoryOperationPositiveInt(m, "product_sku_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
-        expression: 'getOptionalInventoryOperationPositiveInt(m, "product_sku_id")',
+        description: '解析器 `getOptionalJSONRPCPositiveInt`；调用 `getOptionalJSONRPCPositiveInt(m, "product_sku_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
+        expression: 'getOptionalJSONRPCPositiveInt(m, "product_sku_id")',
         name: 'items[].product_sku_id',
         nullable: true,
         required: '可选',
@@ -8385,8 +8385,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalInventoryOperationPositiveInt`；调用 `getOptionalInventoryOperationPositiveInt(m, "to_lot_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
-        expression: 'getOptionalInventoryOperationPositiveInt(m, "to_lot_id")',
+        description: '解析器 `getOptionalJSONRPCPositiveInt`；调用 `getOptionalJSONRPCPositiveInt(m, "to_lot_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
+        expression: 'getOptionalJSONRPCPositiveInt(m, "to_lot_id")',
         name: 'items[].to_lot_id',
         nullable: true,
         required: '可选',
@@ -8396,8 +8396,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'integer',
       }), Object.freeze({
-        description: '解析器 `getOptionalInventoryOperationPositiveInt`；调用 `getOptionalInventoryOperationPositiveInt(m, "to_warehouse_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
-        expression: 'getOptionalInventoryOperationPositiveInt(m, "to_warehouse_id")',
+        description: '解析器 `getOptionalJSONRPCPositiveInt`；调用 `getOptionalJSONRPCPositiveInt(m, "to_warehouse_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
+        expression: 'getOptionalJSONRPCPositiveInt(m, "to_warehouse_id")',
         name: 'items[].to_warehouse_id',
         nullable: true,
         required: '可选',
@@ -9227,8 +9227,8 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalInventoryOperationPositiveInt`；调用 `getOptionalInventoryOperationPositiveInt(params, "to_warehouse_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
-        expression: 'getOptionalInventoryOperationPositiveInt(params, "to_warehouse_id")',
+        description: '解析器 `getOptionalJSONRPCPositiveInt`；调用 `getOptionalJSONRPCPositiveInt(params, "to_warehouse_id")`。 正 JSON 安全整数；对象存在性和可操作状态由所属业务校验。',
+        expression: 'getOptionalJSONRPCPositiveInt(params, "to_warehouse_id")',
         name: 'items[].to_warehouse_id',
         nullable: true,
         required: '可选',
@@ -26044,7 +26044,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(result.Order)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 205,
+          line: 198,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -26052,7 +26052,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order_items": purchaseOrderItemsToAny(result.Items)',
         name: 'result.data.purchase_order_items',
         source: Object.freeze({
-          line: 206,
+          line: 199,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -29590,7 +29590,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(result.Order)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 307,
+          line: 300,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -29598,7 +29598,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order_items": salesOrderItemsToAny(result.Items)',
         name: 'result.data.sales_order_items',
         source: Object.freeze({
-          line: 308,
+          line: 301,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',

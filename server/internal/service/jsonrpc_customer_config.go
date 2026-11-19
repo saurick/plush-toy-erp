@@ -940,19 +940,6 @@ func finishedGoodsDeliveryProcessInputFromParams(pm map[string]any) (biz.Process
 	}, true
 }
 
-func putPositiveIntPayload(payload map[string]any, key string, value int) {
-	if value > 0 {
-		payload[key] = value
-	}
-}
-
-func putStringPayload(payload map[string]any, key string, value string) {
-	value = strings.TrimSpace(value)
-	if value != "" {
-		payload[key] = value
-	}
-}
-
 func optionalRPCStringPointer(value string) *string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
