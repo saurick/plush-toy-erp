@@ -1103,7 +1103,7 @@ func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Conte
 		return nil, err
 	}
 	for _, item := range normalized.Items {
-		if err := uc.validateShipmentItemActiveReferences(ctx, item); err != nil {
+		if err := uc.validateSalesLineReferences(ctx, item.SalesOrderItemID, item.ProductID, item.ProductSkuID, item.UnitID, item.WarehouseID); err != nil {
 			return nil, err
 		}
 	}
@@ -1141,7 +1141,7 @@ func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context
 		return nil, err
 	}
 	for _, item := range normalized.Items {
-		if err := uc.validateShipmentItemActiveReferences(ctx, item); err != nil {
+		if err := uc.validateSalesLineReferences(ctx, item.SalesOrderItemID, item.ProductID, item.ProductSkuID, item.UnitID, item.WarehouseID); err != nil {
 			return nil, err
 		}
 	}
@@ -1247,7 +1247,7 @@ func (uc *OperationalFactUsecase) CreateStockReservation(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateStockReservationActiveReferences(ctx, normalized); err != nil {
+	if err := uc.validateSalesLineReferences(ctx, normalized.SalesOrderItemID, normalized.ProductID, normalized.ProductSkuID, normalized.UnitID, normalized.WarehouseID); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateStockReservation(ctx, normalized)
@@ -2305,40 +2305,4 @@ func (uc *OperationalFactUsecase) validateShipmentHeaderActiveReferences(ctx con
 		return nil
 	}
 	return requireOptionalActiveReference(ctx, in.CustomerID, uc.repo.CustomerIsActive, ErrCustomerInactive)
-}
-
-func (uc *OperationalFactUsecase) validateShipmentItemActiveReferences(ctx context.Context, in *ShipmentItemCreate) error {
-	if in == nil {
-		return ErrBadParam
-	}
-	if in.SalesOrderItemID == nil {
-		if err := requireActiveReference(ctx, in.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
-			return err
-		}
-		if err := requireOptionalActiveReference(ctx, in.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
-			return err
-		}
-		if err := requireActiveReference(ctx, in.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
-			return err
-		}
-	}
-	return requireActiveReference(ctx, in.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
-}
-
-func (uc *OperationalFactUsecase) validateStockReservationActiveReferences(ctx context.Context, in *StockReservationCreate) error {
-	if in == nil {
-		return ErrBadParam
-	}
-	if in.SalesOrderItemID == nil {
-		if err := requireActiveReference(ctx, in.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
-			return err
-		}
-		if err := requireOptionalActiveReference(ctx, in.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
-			return err
-		}
-		if err := requireActiveReference(ctx, in.UnitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
-			return err
-		}
-	}
-	return requireActiveReference(ctx, in.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
 }

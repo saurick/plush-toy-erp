@@ -33,3 +33,18 @@ func requireOptionalActiveReference(ctx context.Context, id *int, check activeRe
 	}
 	return requireActiveReference(ctx, *id, check, inactiveErr)
 }
+
+func (uc *OperationalFactUsecase) validateSalesLineReferences(ctx context.Context, sourceItemID *int, productID int, skuID *int, unitID, warehouseID int) error {
+	if sourceItemID == nil {
+		if err := requireActiveReference(ctx, productID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+			return err
+		}
+		if err := requireOptionalActiveReference(ctx, skuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
+			return err
+		}
+		if err := requireActiveReference(ctx, unitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
+			return err
+		}
+	}
+	return requireActiveReference(ctx, warehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
+}
