@@ -1,7 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 
 function ReviewHeader({ review }) {
   const date = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(review.generatedAt))

@@ -5,7 +5,7 @@ import { DEV_FLOW_STATE_CATALOG as catalog } from './devFlowStateCatalog.mjs'
 import { WorkflowTaskDiscoveryCatalog as tasks } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentExceptionGraph } from './devFulfillmentExceptionGraph.mjs'
 import { buildFulfillmentSubflow } from './devFulfillmentSubflow.mjs'
-import { buildBusinessFlowMermaid, splitBusinessFlowForPrint } from '../../common/components/markdown/mermaidGraph.mjs'
+import { buildBusinessFlowMermaid, splitBusinessFlowForPrint } from '../../common/components/diagram/mermaidGraph.mjs'
 import { buildFulfillmentOverview } from './devFulfillmentPresentation.mjs'
 import { buildMasterLifecycleGraph, buildFactRuleGraph } from './devBusinessRuleGraphs.mjs'
 

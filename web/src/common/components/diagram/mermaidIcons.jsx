@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import DiagramNodeIcon from '../diagram/DiagramNodeIcon.jsx'
-import { DIAGRAM_NODE_TYPES } from '../diagram/diagramSemantics.mjs'
+import DiagramNodeIcon from './DiagramNodeIcon.jsx'
+import { DIAGRAM_NODE_TYPES } from './diagramSemantics.mjs'
 
 // Mermaid's inline icon syntax uses registered packs. Reuse our local Ant icons;
 // no icon font, network request or second copy of the SVG paths is needed.

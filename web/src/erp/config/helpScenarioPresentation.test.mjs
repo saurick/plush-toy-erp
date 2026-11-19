@@ -15,7 +15,7 @@ import {
   getHelpScenarioPresentation,
   buildHelpScenarioGraph,
 } from './helpScenarioPresentation.mjs'
-import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
+import { buildBusinessFlowMermaid } from '../../common/components/diagram/mermaidGraph.mjs'
 
 const sceneFor = (role, key) =>
   getRoleHelpScenarios(getRoleHelpGuide(role)).find(

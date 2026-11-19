@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Button, Descriptions, Space, Tag, Typography } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import DevTimestamp from '../DevTimestamp.jsx'
 import {
   buildQualityGateStageDurationComposition,

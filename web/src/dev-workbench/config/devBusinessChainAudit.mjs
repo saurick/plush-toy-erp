@@ -1,5 +1,5 @@
 import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
-import { formatBusinessGraphLabel } from '../../common/components/markdown/mermaidGraph.mjs'
+import { formatBusinessGraphLabel } from '../../common/components/diagram/mermaidGraph.mjs'
 
 export const DEV_CHAIN_AUDIT_API = '/__dev/api/qa/business-chain-audit'
 export const CHAIN_AUDIT_BATCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/u

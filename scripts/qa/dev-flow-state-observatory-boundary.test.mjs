@@ -488,7 +488,7 @@ test("dev flow state observatory: Runtime completion never promotes Workflow or 
 
   assert.match(chain, /item\.processKeys\.includes\(runtimeProcessKey\)/u);
   assert.match(chain, /runtimeKey=\{currentRuntimeNode\?\.key\}/u);
-  assert(read('web/src/common/components/markdown/mermaidGraph.mjs').includes("'runtime-current': node.key === runtimeKey"), 'Mermaid runtime highlight is limited to the exact current node');
+  assert(read('web/src/common/components/diagram/mermaidGraph.mjs').includes("'runtime-current': node.key === runtimeKey"), 'Mermaid runtime highlight is limited to the exact current node');
   assert.match(overview, /matchingChain\?\.key/u);
   assert.match(overview, /总图最多只高亮这笔任务所属的一条业务链/u);
   assert.match(overview, /只证明定位到所属链；尚未证明上下游完成/u);
@@ -549,7 +549,7 @@ test("dev flow state observatory: state rules explain exceptional paths without 
   assert.match(presentation, /branch: getDevFlowStateTransitionPresentation\(flow, transition\)\.isExceptional/u);
   const diagram = read("web/src/dev-workbench/components/flow-state/BusinessFlowDiagram.jsx");
   assert.match(diagram, /buildBusinessFlowMermaid\(/u);
-  const renderer = read("web/src/common/components/markdown/mermaidGraph.mjs");
+  const renderer = read("web/src/common/components/diagram/mermaidGraph.mjs");
   assert.match(renderer, /edge\.branch/u);
   assert.match(renderer, /branch \? '-\.->' : '-->'/u);
 });

@@ -115,9 +115,9 @@ test("frontend error message boundary: PDF server errors do not expose response 
   assert(!source.includes("await response.text()"));
 });
 
-test("frontend error message boundary: Markdown Mermaid errors do not expose parser messages", () => {
+test("frontend error message boundary: shared Mermaid errors do not expose parser messages", () => {
   const source = readFileSync(
-    path.join(repoRoot, "web/src/common/components/markdown/index.jsx"),
+    path.join(repoRoot, "web/src/common/components/diagram/MermaidDiagram.jsx"),
     "utf8",
   );
 

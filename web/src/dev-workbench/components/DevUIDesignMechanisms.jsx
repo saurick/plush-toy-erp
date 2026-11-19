@@ -4,7 +4,7 @@ import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { Loading } from '@/common/components/loading'
 import SearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import DevUIDesignCallouts from './DevUIDesignCallouts.jsx'
 

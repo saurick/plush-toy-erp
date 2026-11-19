@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
+import { buildBusinessFlowMermaid } from '../../common/components/diagram/mermaidGraph.mjs'
 
 import {
   DEV_FLOW_PATH_KINDS,

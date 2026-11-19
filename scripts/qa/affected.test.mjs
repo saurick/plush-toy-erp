@@ -23,12 +23,24 @@ function ids(plan) {
 }
 
 test("shared diagram semantics select workbench and ERP consumer verification", () => {
-  for (const file of ["web/src/common/components/diagram/diagramSemantics.mjs", "web/src/common/components/markdown/mermaidIcons.jsx", "web/src/common/theme/erpThemePalette.mjs"]) {
+  for (const file of [
+    "web/src/common/components/diagram/diagramSemantics.mjs",
+    "web/src/common/components/diagram/mermaidIcons.jsx",
+    "web/src/common/components/diagram/MermaidDiagram.jsx",
+    "web/src/common/components/markdown/index.jsx",
+    "web/src/common/theme/erpThemePalette.mjs",
+  ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const followUp = plan.followUps.find(({ id }) => id === "shared-visual-semantics-browser");
     assert.ok(followUp, file);
-    for (const scenario of ["help-center-mermaid-mobile", "dev-business-chain-customer-review-print", "finance-visual-status-semantics"]) assert.ok(followUp.text.includes(scenario), `${file}: ${scenario}`);
-    assert.ok(plan.commands.some(({ args }) => args?.includes("web/src/common/components/markdown/mermaidSemantics.test.mjs")), file);
+    for (const scenario of ["dev-page-docs-desktop-light", "help-center-mermaid-mobile", "dev-business-chain-customer-review-print", "finance-visual-status-semantics"]) assert.ok(followUp.text.includes(scenario), `${file}: ${scenario}`);
+    for (const testFile of [
+      "web/src/common/components/diagram/mermaid.test.mjs",
+      "web/src/common/components/diagram/mermaidSemantics.test.mjs",
+      "web/src/common/components/markdown/markdown.test.mjs",
+    ]) {
+      assert.ok(plan.commands.some(({ args }) => args?.includes(testFile)), file);
+    }
   }
 });
 

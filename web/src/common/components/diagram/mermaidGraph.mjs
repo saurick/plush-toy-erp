@@ -1,4 +1,4 @@
-import { DIAGRAM_NODE_TYPES, DIAGRAM_DOMAINS, diagramIconLabel, diagramNodeType } from '../diagram/diagramSemantics.mjs'
+import { DIAGRAM_NODE_TYPES, DIAGRAM_DOMAINS, diagramIconLabel, diagramNodeType } from './diagramSemantics.mjs'
 
 // IDs are generated locally; business keys and labels never become executable Mermaid syntax.
 export const escapeBusinessGraphLabel = (value) =>

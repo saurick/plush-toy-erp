@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { ERP_DARK_PALETTE, ERP_LIGHT_PALETTE } from '../../theme/erpThemePalette.mjs'
-import { diagramIconLabel, diagramNodeType } from '../diagram/diagramSemantics.mjs'
+import { diagramIconLabel, diagramNodeType } from './diagramSemantics.mjs'
 import { buildBusinessFlowMermaid } from './mermaidGraph.mjs'
 import { prepareMermaidSource } from './mermaidSemantics.mjs'
 

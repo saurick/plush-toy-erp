@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Markdown, MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
+import { Markdown } from '@/common/components/markdown'
 import { PROJECT_SKILL_STEP_FIELDS } from '../config/devProjectSkills.mjs'
 import { buildDevDocsLocation } from '../pages/devDocsNavigation.mjs'
 

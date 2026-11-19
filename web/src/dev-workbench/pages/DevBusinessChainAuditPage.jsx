@@ -16,7 +16,7 @@ import { DEV_PAGE_TITLE_BY_ROUTE, DEV_BUSINESS_CHAIN_AUDIT_ROUTE } from '../conf
 import Select from '@/common/components/select/AppSelect'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import { DevReadingReturn } from '../components/DevReadingNavigation.jsx'

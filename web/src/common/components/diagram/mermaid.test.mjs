@@ -10,11 +10,11 @@ import {
 } from './mermaidViewport.mjs'
 
 const componentSource = readFileSync(
-  new URL('./index.jsx', import.meta.url),
+  new URL('./MermaidDiagram.jsx', import.meta.url),
   'utf8'
 )
 const css = readFileSync(new URL('./mermaid.css', import.meta.url), 'utf8')
-const controlsCss = readFileSync(new URL('../diagram/diagramViewControls.css', import.meta.url), 'utf8')
+const controlsCss = readFileSync(new URL('./diagramViewControls.css', import.meta.url), 'utf8')
 
 test('initial fit-width stays distinct from full fit and manual zoom', () => {
   assert.equal(getInitialMermaidZoomMode('fit'), 'fit-all')

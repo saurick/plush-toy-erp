@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Window } from 'happy-dom'
-import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
+import { buildBusinessFlowMermaid } from '../../common/components/diagram/mermaidGraph.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { ROLE_DISPLAY_NAMES } from '../../erp/utils/roleKeys.mjs'
 import { fulfillmentExceptionPath } from '../../erp/utils/workflowFulfillment.mjs'

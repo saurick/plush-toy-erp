@@ -1,5 +1,5 @@
 import { Alert, Tag, Typography } from 'antd'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import DevCiWorkflowGuide from '../../../components/DevCiWorkflowGuide.jsx'
 import {
   DEV_DELIVERY_TARGETS,

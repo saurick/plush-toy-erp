@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 
 const UPGRADE_FLOW = `flowchart TB
   candidate("固定候选版本<br/>在演练库升级并验证")

@@ -6,8 +6,8 @@ import {
   getHelpScenarioPresentation,
   buildHelpScenarioGraph,
 } from '../../config/helpScenarioPresentation.mjs'
-import { MermaidDiagram } from '@/common/components/markdown'
-import { buildBusinessFlowMermaid } from '@/common/components/markdown/mermaidGraph.mjs'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
+import { buildBusinessFlowMermaid } from '@/common/components/diagram/mermaidGraph.mjs'
 import DiagramTypeLegend from '@/common/components/diagram/DiagramTypeLegend.jsx'
 import HelpScenarioIllustration from './HelpScenarioIllustration'
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import { getProjectGraphNodeContext } from '../config/devProjectGraph.mjs'
 import '../styles/dev-project-relationships.css'
 

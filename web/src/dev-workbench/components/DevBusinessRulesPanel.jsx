@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import { readIntegrationEvidence } from '../config/devIntegration.mjs'
 import {
   BUSINESS_RULE_CATEGORIES,

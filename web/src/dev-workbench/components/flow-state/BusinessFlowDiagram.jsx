@@ -1,10 +1,10 @@
 import React, { useContext, useMemo, useState } from 'react'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import DiagramTypeLegend from '@/common/components/diagram/DiagramTypeLegend.jsx'
 import {
   buildBusinessFlowMermaid,
   splitBusinessFlowForPrint,
-} from '@/common/components/markdown/mermaidGraph.mjs'
+} from '@/common/components/diagram/mermaidGraph.mjs'
 import { FlowDiagramPrintContext } from './FlowDiagramPrintContext.mjs'
 import { getFulfillmentSubstepCopy } from '../../config/devFulfillmentPresentation.mjs'
 import './businessFlowDiagram.css'

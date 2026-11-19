@@ -1,5 +1,5 @@
 import { ERP_DARK_PALETTE, ERP_LIGHT_PALETTE } from '../../theme/erpThemePalette.mjs'
-import { DIAGRAM_DOMAINS, DIAGRAM_NODE_TYPES } from '../diagram/diagramSemantics.mjs'
+import { DIAGRAM_DOMAINS, DIAGRAM_NODE_TYPES } from './diagramSemantics.mjs'
 import { getMermaidDirection } from './mermaidViewport.mjs'
 
 export function prepareMermaidSource(source, { mode, htmlLabels = true } = {}) {

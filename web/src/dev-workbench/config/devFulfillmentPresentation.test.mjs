@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildBusinessFlowMermaid } from '../../common/components/markdown/mermaidGraph.mjs'
+import { buildBusinessFlowMermaid } from '../../common/components/diagram/mermaidGraph.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentSubflow } from './devFulfillmentSubflow.mjs'
 import { buildFulfillmentExceptionDirectory, buildFulfillmentOverview, getFulfillmentStageContext, getFulfillmentSupplement, selectFulfillmentSubstep, selectFulfillmentException } from './devFulfillmentPresentation.mjs'

@@ -5,7 +5,7 @@ import {
 } from './devBusinessChainProjection.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentOverview } from './devFulfillmentPresentation.mjs'
-import { buildBusinessFlowMermaid, splitBusinessFlowForPrint } from '../../common/components/markdown/mermaidGraph.mjs'
+import { buildBusinessFlowMermaid, splitBusinessFlowForPrint } from '../../common/components/diagram/mermaidGraph.mjs'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 

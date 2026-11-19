@@ -1,6 +1,6 @@
 import React from 'react'
 import { Collapse, Typography } from 'antd'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 
 import {
   CI_WORKFLOW_SECTIONS,

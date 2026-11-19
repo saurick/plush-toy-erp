@@ -3,7 +3,7 @@ import { Button, Space, Tag, Typography } from 'antd'
 import Table from '@/common/components/table/AppTable'
 import Select from '@/common/components/select/AppSelect.jsx'
 import SearchInput from '@/common/components/SearchInput'
-import { MermaidDiagram } from '@/common/components/markdown'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import DevTaskNav from '../DevTaskNav.jsx'
 import DevTimestamp from '../DevTimestamp.jsx'
 import {
