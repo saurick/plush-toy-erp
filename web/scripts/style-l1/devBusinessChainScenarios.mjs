@@ -164,7 +164,7 @@ export function createDevBusinessChainScenarios({ assert, assertNoHorizontalOver
         await expect(page.locator('.erp-markdown-mermaid__inspection')).toContainText('当前样品和材料与提交资料一致')
         await edge.press('Escape')
         await expect(page.locator('.erp-markdown-mermaid__inspection')).toHaveCount(0)
-        await graph.locator('[data-mermaid-layout-action]').click()
+        await graph.locator('[data-diagram-layout-action]').click()
         await assertBusinessMermaidGraph(graph)
         await graph.locator('[data-diagram-fullscreen-action="open"]').click()
         await expect(graph.locator('[data-mermaid-fullscreen="true"]')).toBeVisible()

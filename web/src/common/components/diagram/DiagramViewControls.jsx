@@ -5,10 +5,35 @@ import {
   FullscreenOutlined,
   FullscreenExitOutlined,
   OneToOneOutlined,
+  SwapOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
 } from '@ant-design/icons'
+import { Tooltip } from 'antd'
 import './diagramViewControls.css'
+
+function DiagramControlButton({ tooltip, buttonRef, children, ...buttonProps }) {
+  // Keep the popup anchored during toolbar reflow and inside the fullscreen surface.
+  return (
+    <Tooltip
+      title={tooltip}
+      trigger={['hover', 'focus']}
+      placement="bottom"
+      getPopupContainer={(trigger) => trigger}
+    >
+      <span className="erp-diagram-view-controls__trigger">
+        <button
+          ref={buttonRef}
+          type="button"
+          className="erp-diagram-view-controls__button"
+          {...buttonProps}
+        >
+          {children}
+        </button>
+      </span>
+    </Tooltip>
+  )
+}
 
 export default function DiagramViewControls({
   label,
@@ -17,6 +42,8 @@ export default function DiagramViewControls({
   minZoom,
   maxZoom,
   onFit,
+  nextLayoutDirection,
+  onSwitchLayout,
   onZoomOut,
   onZoomIn,
   onReset,
@@ -27,8 +54,8 @@ export default function DiagramViewControls({
   exitFullscreenLabel = `退出${label}全屏`,
   disabled = false,
   fitDisabled = false,
-  children,
 }) {
+  const nextLayout = ['LR', 'RL'].includes(nextLayoutDirection) ? '横向' : '纵向'
   return (
     <div
       className="erp-diagram-view-controls"
@@ -36,80 +63,78 @@ export default function DiagramViewControls({
       aria-label={`${label}视图操作`}
       data-fullscreen={fullscreen ? 'true' : 'false'}
     >
-      {children}
-      <button
-        type="button"
-        className="erp-diagram-view-controls__button"
+      {nextLayoutDirection ? (
+        <DiagramControlButton
+          tooltip={`切换为${nextLayout}布局`}
+          data-diagram-layout-action="toggle"
+          aria-label={`切换${label}为${nextLayout}布局`}
+          disabled={disabled || fitDisabled}
+          onClick={onSwitchLayout}
+        >
+          <SwapOutlined aria-hidden="true" />
+        </DiagramControlButton>
+      ) : null}
+      <DiagramControlButton
+        tooltip="适应全图"
         data-diagram-zoom-action="fit-all"
-        title="适应全图"
         aria-label={`适应${label}全图`}
         aria-pressed={zoomMode === 'fit-all'}
         disabled={disabled || fitDisabled}
         onClick={() => onFit('fit-all')}
       >
-        <FullscreenOutlined />
-      </button>
-      <button
-        type="button"
-        className="erp-diagram-view-controls__button"
+        <FullscreenOutlined aria-hidden="true" />
+      </DiagramControlButton>
+      <DiagramControlButton
+        tooltip="适配宽度"
         data-diagram-zoom-action="fit"
-        title="适配宽度"
         aria-label={`适配${label}宽度`}
         aria-pressed={zoomMode === 'fit-width'}
         disabled={disabled || fitDisabled}
         onClick={() => onFit('fit-width')}
       >
-        <ColumnWidthOutlined />
-      </button>
-      <button
-        type="button"
-        className="erp-diagram-view-controls__button"
+        <ColumnWidthOutlined aria-hidden="true" />
+      </DiagramControlButton>
+      <DiagramControlButton
+        tooltip="缩小"
         data-diagram-zoom-action="zoom-out"
-        title="缩小"
         aria-label={`缩小${label}`}
         disabled={disabled || zoom <= minZoom}
         onClick={onZoomOut}
       >
-        <ZoomOutOutlined />
-      </button>
+        <ZoomOutOutlined aria-hidden="true" />
+      </DiagramControlButton>
       <span className="erp-diagram-view-controls__zoom-label" data-diagram-zoom-label>
         {Number((zoom * 100).toFixed(zoom < 0.01 ? 2 : 0))}%
       </span>
-      <button
-        type="button"
-        className="erp-diagram-view-controls__button"
+      <DiagramControlButton
+        tooltip="放大"
         data-diagram-zoom-action="zoom-in"
-        title="放大"
         aria-label={`放大${label}`}
         disabled={disabled || zoom >= maxZoom}
         onClick={onZoomIn}
       >
-        <ZoomInOutlined />
-      </button>
-      <button
-        type="button"
-        className="erp-diagram-view-controls__button"
+        <ZoomInOutlined aria-hidden="true" />
+      </DiagramControlButton>
+      <DiagramControlButton
+        tooltip="重置 100%"
         data-diagram-zoom-action="reset"
-        title="重置 100%"
         aria-label={`重置${label}为 100%`}
         aria-pressed={zoomMode === 'manual' && zoom === 1}
         disabled={disabled}
         onClick={onReset}
       >
-        <OneToOneOutlined />
-      </button>
-      <button
-        ref={fullscreenButtonRef}
-        type="button"
-        className="erp-diagram-view-controls__button"
+        <OneToOneOutlined aria-hidden="true" />
+      </DiagramControlButton>
+      <DiagramControlButton
+        buttonRef={fullscreenButtonRef}
+        tooltip={fullscreen ? '退出全屏' : '进入全屏'}
         data-diagram-fullscreen-action={fullscreen ? 'close' : 'open'}
-        title={fullscreen ? '退出全屏' : fullscreenLabel}
         aria-label={fullscreen ? exitFullscreenLabel : fullscreenLabel}
         aria-pressed={fullscreen}
         onClick={onFullscreen}
       >
-        {fullscreen ? <FullscreenExitOutlined /> : <ArrowsAltOutlined />}
-      </button>
+        {fullscreen ? <FullscreenExitOutlined aria-hidden="true" /> : <ArrowsAltOutlined aria-hidden="true" />}
+      </DiagramControlButton>
     </div>
   )
 }

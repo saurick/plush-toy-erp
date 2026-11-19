@@ -6,6 +6,16 @@
   gap: 8px;
 }
 
+.erp-diagram-view-controls__trigger {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.erp-diagram-view-controls__trigger:has(> .erp-diagram-view-controls__button:disabled) {
+  cursor: not-allowed;
+}
+
 .erp-diagram-view-controls__button {
   display: inline-flex;
   flex: 0 0 auto;
@@ -31,7 +41,7 @@
 }
 
 .erp-diagram-view-controls__button:disabled {
-  cursor: not-allowed;
+  pointer-events: none;
   opacity: 0.45;
 }
 
@@ -79,11 +89,4 @@
   .erp-diagram-view-controls[data-fullscreen='true'] .erp-diagram-view-controls__zoom-label {
     min-width: 44px;
   }
-}
-
-.erp-diagram-view-controls .erp-diagram-view-controls__button--text {
-  width: auto;
-  gap: 6px;
-  padding: 0 10px;
-  font-size: var(--erp-font-small);
 }

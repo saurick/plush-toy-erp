@@ -6,10 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import {
-  CloseOutlined,
-  SwapOutlined,
-} from '@ant-design/icons'
+import { CloseOutlined } from '@ant-design/icons'
 import { Popover } from 'antd'
 import DiagramViewControls from './DiagramViewControls.jsx'
 import { canRestoreOverlayFocus, useOverlayScope } from '../overlay/OverlayScopeContext.mjs'
@@ -530,27 +527,15 @@ export function MermaidDiagram({
               minZoom={MERMAID_ZOOM.min}
               maxZoom={MERMAID_ZOOM.max}
               onFit={fitToView}
+              nextLayoutDirection={nextDirection}
+              onSwitchLayout={switchLayout}
               onZoomOut={() => setNextZoom(activeZoom - MERMAID_ZOOM.step)}
               onZoomIn={() => setNextZoom(activeZoom + MERMAID_ZOOM.step)}
               onReset={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
               fullscreen={fullscreenOpen}
               fullscreenButtonRef={fullscreenOpen ? fullscreenExitRef : fullscreenOpenRef}
               onFullscreen={fullscreenOpen ? () => setFullscreenOpen(false) : openFullscreen}
-            >
-              {nextDirection ? (
-                <button
-                  type="button"
-                  className="erp-diagram-view-controls__button erp-diagram-view-controls__button--text"
-                  data-mermaid-layout-action="toggle"
-                  title={`切换为${['LR', 'RL'].includes(nextDirection) ? '左右' : '上下'}布局`}
-                  aria-label={`切换${displayLabel}为${['LR', 'RL'].includes(nextDirection) ? '左右' : '上下'}布局`}
-                  onClick={switchLayout}
-                >
-                  <SwapOutlined />
-                  <span>切换布局</span>
-                </button>
-              ) : null}
-            </DiagramViewControls>
+            />
           </div>
           {/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- 图内滚动区域需要键盘聚焦，方向键沿用浏览器原生滚动。 */}
           <div

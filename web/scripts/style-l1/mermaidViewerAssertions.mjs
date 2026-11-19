@@ -1,6 +1,7 @@
 import { openERPAppearance } from './themeAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
+import { expectDiagramControlTooltip, verifyDiagramControlTooltips } from './diagramViewControlsAssertions.mjs'
 
 export async function assertMermaidEdgeLabelContrast(diagram, assert) {
   const labels = await diagram.evaluate((root) =>
@@ -56,7 +57,7 @@ export async function assertMermaidDefaultView(page, diagram, assert) {
   const controls = await diagram
     .locator('.erp-markdown-mermaid__toolbar button')
     .evaluateAll((buttons) => buttons.map((button) =>
-      button.dataset.mermaidLayoutAction ||
+      button.dataset.diagramLayoutAction ||
       button.dataset.diagramZoomAction ||
       button.dataset.diagramFullscreenAction
     ))
@@ -162,7 +163,7 @@ export async function switchMermaidLayout(
   { rapid = false, advanceFocus = false } = {}
 ) {
   await waitForFiniteAnimations(page)
-  const button = diagram.locator('[data-mermaid-layout-action="toggle"]')
+  const button = diagram.locator('[data-diagram-layout-action="toggle"]')
   await button.scrollIntoViewIfNeeded()
   const svg = diagram.locator('.erp-markdown-mermaid__canvas > svg')
   const previous = await svg.getAttribute('id')
@@ -452,7 +453,12 @@ export async function verifyMermaidViewer(page, diagram, assert) {
   const svg = diagram.locator('.erp-markdown-mermaid__canvas > svg')
   const viewport = diagram.locator('.erp-markdown-mermaid__viewport')
   const canvas = diagram.locator('.erp-markdown-mermaid__canvas')
+  const controls = diagram.getByRole('group', { name: /视图操作$/u })
   await assertMermaidDefaultView(page, diagram, assert)
+  const direction = await diagram.getAttribute('data-mermaid-direction')
+  const horizontal = ['LR', 'RL'].includes(direction)
+  const layoutTooltip = horizontal ? '切换为纵向布局' : '切换为横向布局'
+  await verifyDiagramControlTooltips(page, controls, direction ? layoutTooltip : undefined)
   await verifyMermaidZoomModes(page, diagram, assert)
   const initialViewport = page.viewportSize()
   await page.setViewportSize({
@@ -505,10 +511,11 @@ export async function verifyMermaidViewer(page, diagram, assert) {
   const fit = () => fitMermaidDiagram(diagram, assert)
   await fit()
 
-  const direction = await diagram.getAttribute('data-mermaid-direction')
   if (direction) {
     for (let i = 0; i < 2; i += 1) {
       await switchMermaidLayout(page, diagram, assert)
+      const tooltip = i === 0 ? (horizontal ? '切换为横向布局' : '切换为纵向布局') : layoutTooltip
+      await expectDiagramControlTooltip(controls, tooltip)
       assert.deepEqual(
         await svg
           .locator('.node')
@@ -519,7 +526,7 @@ export async function verifyMermaidViewer(page, diagram, assert) {
       )
       assert.equal(
         await diagram
-          .locator('[data-mermaid-layout-action="toggle"]')
+          .locator('[data-diagram-layout-action="toggle"]')
           .evaluate((node) => node === document.activeElement),
         true
       )
@@ -539,7 +546,8 @@ export async function verifyMermaidViewer(page, diagram, assert) {
     .scrollIntoViewIfNeeded()
   await verifyStableMermaidScroll(page, diagram, assert, async () => {
     await diagram.locator('[data-diagram-fullscreen-action="open"]').click()
-    await diagram.locator('[data-diagram-fullscreen-action="close"]').waitFor()
+    await diagram.locator('[data-diagram-fullscreen-action="close"]').hover()
+    await expectDiagramControlTooltip(controls, '退出全屏')
     await fit()
     if (direction) {
       await switchMermaidLayout(page, diagram, assert)

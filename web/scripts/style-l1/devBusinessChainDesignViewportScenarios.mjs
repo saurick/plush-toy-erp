@@ -1,6 +1,7 @@
 import { chooseDisplay, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
 import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
+import { expectDiagramControlTooltip } from './diagramViewControlsAssertions.mjs'
 
 const contentWithoutCamera = (raw) => {
   const value = JSON.parse(raw)
@@ -41,9 +42,11 @@ export function createDevBusinessChainDesignViewportScenarios({
         // Object-level gestures remain available through the complete node library.
         await chooseChainNodeView(page, editor, '全部')
         await chooseDisplay(editor, '全部已载入节点')
-        await expect(
-          editor.getByRole('button', { name: '适应画布全图', exact: true })
-        ).toBeDisabled()
+        const controls = editor.getByRole('group', { name: '画布视图操作', exact: true })
+        const fitAll = controls.getByRole('button', { name: '适应画布全图', exact: true })
+        await expect(fitAll).toBeDisabled()
+        await fitAll.locator('..').hover()
+        await expectDiagramControlTooltip(controls, '适应全图')
         for (const name of ['销售订单', '提交后启动受理', '销售订单受理流程']) {
           await editor
             .getByRole('button', { name: `加入：${name}`, exact: true })
@@ -59,12 +62,13 @@ export function createDevBusinessChainDesignViewportScenarios({
         await editor
           .getByRole('button', { name: '全屏探索', exact: true })
           .click()
+        const exitFullscreen = controls.getByRole('button', { name: '退出全屏', exact: true })
+        await exitFullscreen.hover()
+        await expectDiagramControlTooltip(controls, '退出全屏')
         await editor
           .getByRole('button', { name: '适应画布全图', exact: true })
           .click()
-        await editor
-          .getByRole('button', { name: '退出全屏', exact: true })
-          .click()
+        await exitFullscreen.click()
         assert.deepEqual(await editor.boundingBox(), normalBounds, '退出全屏恢复占满页面的布局')
         assert.deepEqual(
           writes.get(page),
@@ -268,6 +272,11 @@ async function assertChainDesignPageHeight(page, editor, assert) {
     { width: 1920, height: 1440 },
     { width: 1440, height: 900 },
   ]) {
+    if (viewport.width === 1440) {
+      const controls = editor.getByRole('group', { name: '画布视图操作', exact: true })
+      await controls.getByRole('button', { name: '全屏探索', exact: true }).hover()
+      await expectDiagramControlTooltip(controls, '进入全屏')
+    }
     await page.setViewportSize(viewport)
     await page.evaluate(() => window.scrollTo(0, 0))
     const layout = await page.evaluate(() => {
@@ -332,8 +341,8 @@ async function assertChainDesignNavigation(page, editor, assert) {
   assert.deepEqual(
     await controls
       .locator('button')
-      .evaluateAll((buttons) => buttons.map((button) => button.title)),
-    ['适应全图', '适配宽度', '缩小', '放大', '重置 100%', '全屏探索'],
+      .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
+    ['适应画布全图', '适配画布宽度', '缩小画布', '放大画布', '重置画布为 100%', '全屏探索'],
     '画布沿用 Mermaid 的工具顺序，比例为独立显示'
   )
   const controlSize = await controls.locator('button').first().boundingBox()
