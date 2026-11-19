@@ -64,11 +64,6 @@ func CanChangeSalesOrderLifecycle(current string, next string) bool {
 	}
 }
 
-func IsSalesOrderSettled(status string) bool {
-	status = NormalizeSalesOrderStatus(status)
-	return status == SalesOrderClosed || status == SalesOrderCanceled
-}
-
 func IsSalesOrderEditable(status string) bool {
 	return NormalizeSalesOrderStatus(status) == SalesOrderDraft
 }

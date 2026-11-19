@@ -1,9 +1,7 @@
 package biz
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
@@ -225,119 +223,4 @@ func customerConfigTransitionDisabledModules(active, target []DeploymentModuleSt
 		out = append(out, moduleKey)
 	}
 	return normalizeStringList(out)
-}
-
-func customerConfigTransitionChangedProcessKeys(active, target map[string]any) []string {
-	activeDefinitions := customerConfigTransitionProcessDefinitions(active)
-	targetDefinitions := customerConfigTransitionProcessDefinitions(target)
-	keys := make([]string, 0, len(activeDefinitions)+len(targetDefinitions))
-	for key := range activeDefinitions {
-		keys = append(keys, key)
-	}
-	for key := range targetDefinitions {
-		keys = append(keys, key)
-	}
-	keys = normalizeStringList(keys)
-	changed := []string{}
-	for _, key := range keys {
-		activePayload, activeOK := activeDefinitions[key]
-		targetPayload, targetOK := targetDefinitions[key]
-		if !activeOK || !targetOK || !bytes.Equal(activePayload, targetPayload) {
-			changed = append(changed, key)
-		}
-	}
-	return changed
-}
-
-func customerConfigTransitionProcessDefinitions(snapshot map[string]any) map[string]json.RawMessage {
-	out := map[string]json.RawMessage{}
-	if len(snapshot) == 0 {
-		return out
-	}
-	raw, ok := snapshot["processDefinitions"].(map[string]any)
-	if !ok {
-		return out
-	}
-	for processKey, definition := range raw {
-		processKey = strings.TrimSpace(processKey)
-		payload, err := json.Marshal(definition)
-		if processKey == "" || err != nil {
-			continue
-		}
-		out[processKey] = payload
-	}
-	return out
-}
-
-type customerConfigTransitionResponsibility struct {
-	RoleProfiles        []json.RawMessage `json:"role_profiles"`
-	WorkPools           []json.RawMessage `json:"work_pools"`
-	WorkPoolMemberships []json.RawMessage `json:"work_pool_memberships"`
-}
-
-func (uc *CustomerConfigUsecase) customerConfigTransitionResponsibilityChanged(
-	ctx context.Context,
-	customerKey, activeRevision, targetRevision string,
-) (bool, []string, []string, error) {
-	active, activePools, activeRoles, err := uc.loadCustomerConfigTransitionResponsibility(ctx, customerKey, activeRevision)
-	if err != nil {
-		return false, nil, nil, err
-	}
-	target, _, _, err := uc.loadCustomerConfigTransitionResponsibility(ctx, customerKey, targetRevision)
-	if err != nil {
-		return false, nil, nil, err
-	}
-	activePayload, err := json.Marshal(active)
-	if err != nil {
-		return false, nil, nil, err
-	}
-	targetPayload, err := json.Marshal(target)
-	if err != nil {
-		return false, nil, nil, err
-	}
-	return !bytes.Equal(activePayload, targetPayload), activePools, activeRoles, nil
-}
-
-func (uc *CustomerConfigUsecase) loadCustomerConfigTransitionResponsibility(
-	ctx context.Context,
-	customerKey, revision string,
-) (customerConfigTransitionResponsibility, []string, []string, error) {
-	roles, err := uc.repo.ListRoleProfiles(ctx, customerKey, revision)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, nil, err
-	}
-	roleKeys := []string{}
-	for _, item := range roles {
-		roleKeys = append(roleKeys, item.RoleKey)
-	}
-	pools, err := uc.repo.ListWorkPools(ctx, customerKey, revision)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, nil, err
-	}
-	poolKeys := []string{}
-	for _, item := range pools {
-		poolKeys = append(poolKeys, item.PoolKey)
-	}
-	poolKeys = normalizeStringList(poolKeys)
-	memberships, err := uc.repo.ListWorkPoolMembershipsByPools(ctx, customerKey, revision, poolKeys)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, nil, err
-	}
-	canonicalRoles, err := canonicalCustomerConfigList(roles)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, nil, err
-	}
-	canonicalPools, err := canonicalCustomerConfigList(pools)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, nil, err
-	}
-	canonicalMemberships, err := canonicalCustomerConfigList(memberships)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, nil, err
-	}
-	return customerConfigTransitionResponsibility{
-		RoleProfiles:        canonicalRoles,
-		WorkPools:           canonicalPools,
-		WorkPoolMemberships: canonicalMemberships,
-	}, poolKeys, NormalizeAdminRoleKeys(roleKeys), nil
 }

@@ -433,16 +433,3 @@ func exceptionProcessCommandInput(
 		Payload:        payload,
 	}
 }
-
-func cloneExceptionProcessCommandInput(in *ProcessDomainCommandInput) *ProcessDomainCommandInput {
-	copy := *in
-	instance := *in.ProcessInstance
-	node := *in.Node
-	copy.ProcessInstance = &instance
-	copy.Node = &node
-	copy.Payload = make(map[string]any, len(in.Payload))
-	for key, value := range in.Payload {
-		copy.Payload[key] = value
-	}
-	return &copy
-}

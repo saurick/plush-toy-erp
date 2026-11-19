@@ -215,10 +215,6 @@ func (uc *ProcessRuntimeUsecase) advanceAfterNodeCompletionWithPayload(
 	return err
 }
 
-func (uc *ProcessRuntimeUsecase) handleActivatedSequentialNode(ctx context.Context, activatedNode *ProcessNodeInstance, actorID int) error {
-	return uc.handleActivatedSequentialNodeWithPayload(ctx, activatedNode, actorID, nil)
-}
-
 func (uc *ProcessRuntimeUsecase) handleActivatedSequentialNodeWithPayload(
 	ctx context.Context,
 	activatedNode *ProcessNodeInstance,

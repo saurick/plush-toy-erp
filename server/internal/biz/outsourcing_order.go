@@ -688,15 +688,6 @@ func IsOutsourcingOrderLifecycleTransitionAllowed(current string, next string) b
 	}
 }
 
-func isOutsourcingOrderSettled(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case OutsourcingOrderStatusClosed, OutsourcingOrderStatusCanceled:
-		return true
-	default:
-		return false
-	}
-}
-
 func isOutsourcingOrderEditable(status string) bool {
 	return strings.EqualFold(strings.TrimSpace(status), OutsourcingOrderStatusDraft)
 }

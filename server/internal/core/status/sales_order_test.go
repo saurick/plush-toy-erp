@@ -47,19 +47,6 @@ func TestCanChangeSalesOrderLifecycle(t *testing.T) {
 	}
 }
 
-func TestIsSalesOrderSettled(t *testing.T) {
-	for _, value := range []string{SalesOrderClosed, SalesOrderCanceled, " closed "} {
-		if !IsSalesOrderSettled(value) {
-			t.Fatalf("expected %q to be settled", value)
-		}
-	}
-	for _, value := range []string{SalesOrderDraft, SalesOrderSubmitted, SalesOrderActive, "shipped"} {
-		if IsSalesOrderSettled(value) {
-			t.Fatalf("expected %q not to be settled", value)
-		}
-	}
-}
-
 func TestIsSalesOrderEditableOnlyAllowsDraft(t *testing.T) {
 	if !IsSalesOrderEditable(SalesOrderDraft) {
 		t.Fatal("draft sales order must be editable")

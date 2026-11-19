@@ -62,11 +62,6 @@ func CanChangePurchaseOrderLifecycle(current string, next string) bool {
 	}
 }
 
-func IsPurchaseOrderSettled(status string) bool {
-	status = NormalizePurchaseOrderStatus(status)
-	return status == PurchaseOrderClosed || status == PurchaseOrderCanceled
-}
-
 func IsPurchaseOrderEditable(status string) bool {
 	return NormalizePurchaseOrderStatus(status) == PurchaseOrderDraft
 }

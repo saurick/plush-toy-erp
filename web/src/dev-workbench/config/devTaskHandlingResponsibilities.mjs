@@ -1,5 +1,5 @@
 // Read-only descriptions of the task owners in fulfillment_tasks.go,
-// workflow_derived_tasks.go, workflow_downstream_tasks.go and the domain chains.
+// workflow_downstream_tasks.go and the domain chains.
 // They describe one task's work, never a whole flow's participants or live access.
 const relationRefs = {
   finished_goods_qc: [['finished_quality', 'quality']],

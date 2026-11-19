@@ -6,40 +6,6 @@ import (
 	"time"
 )
 
-type workflowOrderRelatedDocumentOptions struct {
-	includeMaterialBOM bool
-	includeArtwork     bool
-}
-
-func workflowOrderRelatedDocuments(current *WorkflowTask, options workflowOrderRelatedDocumentOptions) []string {
-	if current == nil {
-		return nil
-	}
-	documents := make([]string, 0, 6)
-	if sourceNo := workflowSourceNoValue(current); sourceNo != "" {
-		documents = append(documents, "订单/款式立项记录："+sourceNo)
-	}
-	if customerName := workflowPayloadString(current.Payload, "customer_name"); customerName != "" {
-		documents = append(documents, "客户："+customerName)
-	}
-	if styleNo := workflowPayloadString(current.Payload, "style_no"); styleNo != "" {
-		documents = append(documents, "款式："+styleNo)
-	}
-	if productName := workflowPayloadString(current.Payload, "product_name"); productName != "" {
-		documents = append(documents, "产品："+productName)
-	}
-	if dueDate := workflowPayloadString(current.Payload, "due_date"); dueDate != "" {
-		documents = append(documents, "交期："+dueDate)
-	}
-	if options.includeMaterialBOM {
-		documents = append(documents, "材料 BOM：待工程资料补齐")
-	}
-	if options.includeArtwork {
-		documents = append(documents, "款图/资料：随订单资料检查")
-	}
-	return documents
-}
-
 type workflowPurchaseInboundRelatedDocumentOptions struct {
 	qcResult string
 	reason   string
@@ -276,25 +242,6 @@ func workflowSourceNoValue(task *WorkflowTask) string {
 	return ""
 }
 
-func workflowOrderRecordTitle(task *WorkflowTask) string {
-	if task == nil {
-		return "订单/款式立项记录"
-	}
-	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "style_no"); title != "" {
-		return title
-	}
-	if title := workflowSourceNoValue(task); title != "" {
-		return title
-	}
-	return "订单/款式立项记录"
-}
-
 func workflowRecordTitle(task *WorkflowTask, fallback string, keys ...string) string {
 	if task != nil {
 		for _, key := range keys {
@@ -398,38 +345,6 @@ func ensureWorkflowPayload(payload *map[string]any) {
 
 func workflowTaskCode(prefix string, sourceID int) string {
 	return fmt.Sprintf("%s-%d-%d", prefix, sourceID, time.Now().UnixNano())
-}
-
-func resolveEngineeringDueAt(payload map[string]any, now time.Time) time.Time {
-	defaultDueAt := now.Add(24 * time.Hour)
-	orderDueAt, ok := parseBusinessDateEnd(payload)
-	if !ok {
-		return defaultDueAt
-	}
-	if !orderDueAt.After(now.Add(12 * time.Hour)) {
-		return now.Add(4 * time.Hour)
-	}
-	if !orderDueAt.After(now.Add(48 * time.Hour)) {
-		minDueAt := now.Add(4 * time.Hour)
-		dueAt := orderDueAt.Add(-12 * time.Hour)
-		if dueAt.Before(minDueAt) {
-			return minDueAt
-		}
-		return dueAt
-	}
-	return defaultDueAt
-}
-
-func parseBusinessDateEnd(payload map[string]any) (time.Time, bool) {
-	dueDate := workflowPayloadString(payload, "due_date")
-	if dueDate == "" {
-		return time.Time{}, false
-	}
-	day, err := time.ParseInLocation("2006-01-02", dueDate, time.Local)
-	if err != nil {
-		return time.Time{}, false
-	}
-	return time.Date(day.Year(), day.Month(), day.Day(), 23, 59, 59, 0, time.Local), true
 }
 
 func workflowPayableDueAt(payload map[string]any, now time.Time) time.Time {

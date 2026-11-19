@@ -45,19 +45,6 @@ func TestCanChangePurchaseOrderLifecycle(t *testing.T) {
 	}
 }
 
-func TestIsPurchaseOrderSettled(t *testing.T) {
-	for _, value := range []string{PurchaseOrderClosed, PurchaseOrderCanceled, " closed "} {
-		if !IsPurchaseOrderSettled(value) {
-			t.Fatalf("expected %q to be settled", value)
-		}
-	}
-	for _, value := range []string{PurchaseOrderDraft, PurchaseOrderSubmitted, PurchaseOrderApproved, "posted"} {
-		if IsPurchaseOrderSettled(value) {
-			t.Fatalf("expected %q to be unsettled", value)
-		}
-	}
-}
-
 func TestIsPurchaseOrderEditableOnlyAllowsDraft(t *testing.T) {
 	if !IsPurchaseOrderEditable(PurchaseOrderDraft) {
 		t.Fatal("draft purchase order must be editable")

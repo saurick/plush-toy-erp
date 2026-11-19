@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const workflowProjectOrderModuleKey = "project-orders"
+
 var workflowTestMutationSequence uint64
 
 type stubWorkflowRepo struct {
@@ -1340,7 +1342,7 @@ func TestWorkflowUsecase_SameNameNonShipmentReleaseTaskDoesNotDerive(t *testing.
 			name: "wrong owner",
 			task: &WorkflowTask{
 				ID:                1501,
-				TaskGroup:         workflowShipmentReleaseTaskGroup,
+				TaskGroup:         WorkflowSourceTaskShipmentReleaseGroup,
 				TaskName:          "出货放行 / 出货准备",
 				SourceType:        workflowShippingReleaseModuleKey,
 				SourceID:          101,
@@ -1354,7 +1356,7 @@ func TestWorkflowUsecase_SameNameNonShipmentReleaseTaskDoesNotDerive(t *testing.
 			name: "wrong source",
 			task: &WorkflowTask{
 				ID:                1502,
-				TaskGroup:         workflowShipmentReleaseTaskGroup,
+				TaskGroup:         WorkflowSourceTaskShipmentReleaseGroup,
 				TaskName:          "出货放行 / 出货准备",
 				SourceType:        "receivables",
 				SourceID:          101,
@@ -1368,7 +1370,7 @@ func TestWorkflowUsecase_SameNameNonShipmentReleaseTaskDoesNotDerive(t *testing.
 			name: "missing shipment marker",
 			task: &WorkflowTask{
 				ID:                1503,
-				TaskGroup:         workflowShipmentReleaseTaskGroup,
+				TaskGroup:         WorkflowSourceTaskShipmentReleaseGroup,
 				TaskName:          "出货放行 / 出货准备",
 				SourceType:        workflowShippingReleaseModuleKey,
 				SourceID:          101,
@@ -1382,7 +1384,7 @@ func TestWorkflowUsecase_SameNameNonShipmentReleaseTaskDoesNotDerive(t *testing.
 			name: "settled business status",
 			task: &WorkflowTask{
 				ID:                1504,
-				TaskGroup:         workflowShipmentReleaseTaskGroup,
+				TaskGroup:         WorkflowSourceTaskShipmentReleaseGroup,
 				TaskName:          "出货放行 / 出货准备",
 				SourceType:        workflowShippingReleaseModuleKey,
 				SourceID:          101,
@@ -1621,7 +1623,7 @@ func TestWorkflowUsecase_UrgeTaskAcceptsSupportedActions(t *testing.T) {
 
 func bossApprovalWorkflowTask() *WorkflowTask {
 	sourceNo := "PO-20260425-001"
-	statusKey := workflowOrderApprovalStatusKey
+	statusKey := "project_pending"
 	capability := PermissionWorkflowTaskApprove
 	return &WorkflowTask{
 		ID:                    101,
@@ -1940,7 +1942,7 @@ func shipmentReleaseWorkflowTask() *WorkflowTask {
 	return &WorkflowTask{
 		ID:                1401,
 		TaskCode:          WorkflowSourceTaskCode(WorkflowSourceTaskShipmentReleaseGroup, 101),
-		TaskGroup:         workflowShipmentReleaseTaskGroup,
+		TaskGroup:         WorkflowSourceTaskShipmentReleaseGroup,
 		TaskName:          "出货放行 / 出货准备",
 		SourceType:        WorkflowSourceTaskShipmentSourceType,
 		SourceID:          101,
@@ -1975,47 +1977,6 @@ func shipmentReleaseWorkflowTask() *WorkflowTask {
 
 func ptrString(value string) *string {
 	return &value
-}
-
-func assertRevisionTask(t *testing.T, task *WorkflowTaskCreate, decision string, reason string) {
-	t.Helper()
-	if task == nil {
-		t.Fatalf("expected revision task")
-	}
-	if task.TaskGroup != workflowOrderRevisionTaskGroup ||
-		task.TaskName != "补充订单资料后重新提交" ||
-		task.OwnerRoleKey != SalesRoleKey ||
-		task.TaskStatusKey != "ready" {
-		t.Fatalf("unexpected revision task %#v", task)
-	}
-	if task.BusinessStatusKey == nil || *task.BusinessStatusKey != workflowOrderApprovalStatusKey {
-		t.Fatalf("expected project_pending, got %#v", task.BusinessStatusKey)
-	}
-	if task.SourceType != workflowProjectOrderModuleKey || task.SourceID != 88 {
-		t.Fatalf("expected project order source, got %s/%d", task.SourceType, task.SourceID)
-	}
-	if task.Payload["decision"] != decision || task.Payload["transition_status"] != decision {
-		t.Fatalf("expected decision %q payload, got %#v", decision, task.Payload)
-	}
-	if decision == "blocked" {
-		if task.Payload["blocked_reason"] != reason {
-			t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
-		}
-		if _, ok := task.Payload["rejected_reason"]; ok {
-			t.Fatalf("expected blocked revision task to omit rejected_reason, got %#v", task.Payload)
-		}
-	} else {
-		if task.Payload["rejected_reason"] != reason {
-			t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
-		}
-		if _, ok := task.Payload["blocked_reason"]; ok {
-			t.Fatalf("expected rejected revision task to omit blocked_reason, got %#v", task.Payload)
-		}
-	}
-	if task.Payload["notification_type"] != "task_rejected" ||
-		task.Payload["alert_type"] != "approval_pending" {
-		t.Fatalf("expected rejection alert payload, got %#v", task.Payload)
-	}
 }
 
 func assertPurchaseQualityExceptionTask(t *testing.T, task *WorkflowTaskCreate, decision string, reason string) {

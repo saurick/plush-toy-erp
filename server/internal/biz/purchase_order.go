@@ -809,7 +809,3 @@ func IsValidPurchaseOrderItemStatus(value string) bool {
 func IsPurchaseOrderLifecycleTransitionAllowed(current string, next string) bool {
 	return corestatus.CanChangePurchaseOrderLifecycle(current, next)
 }
-
-func isPurchaseOrderSettled(status string) bool {
-	return corestatus.IsPurchaseOrderSettled(status)
-}

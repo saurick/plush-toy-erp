@@ -824,7 +824,3 @@ func IsValidSalesOrderItemStatus(value string) bool {
 func IsSalesOrderLifecycleTransitionAllowed(current string, next string) bool {
 	return corestatus.CanChangeSalesOrderLifecycle(current, next)
 }
-
-func isSalesOrderSettled(status string) bool {
-	return corestatus.IsSalesOrderSettled(status)
-}
