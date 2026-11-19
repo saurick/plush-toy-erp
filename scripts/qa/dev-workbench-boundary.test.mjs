@@ -273,6 +273,7 @@ const businessSampleFormStateDependencies = [
   "components/business-list/BusinessSplitContext.jsx",
   "components/ReferenceRecordsContext.jsx",
   "components/business-list/BusinessEditorGroup.jsx",
+  "hooks/useConfirmBlockedNavigation.js",
   "components/business-list/businessFormReadOnly.mjs",
   "components/business-list/businessLineItemDisclosure.mjs",
   "components/business-list/BusinessLineItemDisclosureContext.js",
