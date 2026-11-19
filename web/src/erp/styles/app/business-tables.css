@@ -461,7 +461,12 @@
   padding: 10px 0 0;
 }
 
-.erp-business-filter-trigger-group {
+.erp-business-operation-panel__filter,
+.erp-business-filter-trigger-anchor {
+  display: flex;
+}
+
+.erp-business-operation-panel__filter {
   flex: 0 0 auto;
 }
 

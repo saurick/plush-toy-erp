@@ -11,6 +11,37 @@ import {
   assertButtonDisabled,
 } from './pageAssertions.mjs'
 
+export async function assertCompactBusinessFilter(trigger) {
+  const geometry = await trigger.evaluate((button) => {
+    const pixels = (value) => parseFloat(value) || 0
+    const style = getComputedStyle(button)
+    const buttonBox = button.getBoundingClientRect()
+    const content = [...button.children].map((child) => child.getBoundingClientRect().width).filter(Boolean)
+    const expectedWidth = content.reduce((total, width) => total + width, 0) +
+      (content.length - 1) * pixels(style.columnGap) +
+      pixels(style.paddingLeft) + pixels(style.paddingRight) +
+      pixels(style.borderLeftWidth) + pixels(style.borderRightWidth)
+    const group = button.closest('.erp-business-filter-trigger-group')
+    const command = group.closest('.erp-business-operation-panel__command')
+    const next = command.querySelector(':scope > .erp-business-operation-panel__toolbar, :scope > [data-table-scroll-toolbar]:not(:empty)')
+    const commandStyle = getComputedStyle(command)
+    const rightEdge = next ? next.getBoundingClientRect().left : command.getBoundingClientRect().right
+    return {
+      width: buttonBox.width,
+      expectedWidth,
+      groupWidth: group.getBoundingClientRect().width,
+      rightGap: rightEdge - buttonBox.right,
+      expectedGap: pixels(next ? commandStyle.columnGap : commandStyle.paddingRight),
+    }
+  })
+  assert.ok(
+    Math.abs(geometry.width - geometry.expectedWidth) <= 1 &&
+    Math.abs(geometry.groupWidth - geometry.width) <= 1 &&
+    Math.abs(geometry.rightGap - geometry.expectedGap) <= 1,
+    `默认筛选应按内容定宽，右侧使用工具栏标准间距 ${JSON.stringify(geometry)}`
+  )
+}
+
 export function createBusinessListAssertions({ outputDir }) {
   async function assertOrderLifecycleActionsConsolidated(
     page,

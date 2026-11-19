@@ -1142,14 +1142,10 @@ export function BusinessOperationPanel({
         </div>
       ) : null}
       {additionalFilters.length > 0 ? (
-        <Space.Compact
-          className="erp-business-filter-trigger-group"
-          role="group"
-          aria-label="筛选操作"
-        >
+        <div className="erp-business-operation-panel__filter">
           <Popover
             trigger="click"
-            placement="bottomLeft"
+            placement="bottomRight"
             autoAdjustOverflow={businessFilterPopoverOverflow}
             open={filtersOpen}
             onOpenChange={setFiltersOpen}
@@ -1180,34 +1176,37 @@ export function BusinessOperationPanel({
               </BusinessFilterPopoverContent>
             }
           >
-            <Button
-              ref={filterTriggerRef}
-              icon={<FilterOutlined aria-hidden />}
-              aria-label={hasActiveFilters ? `筛选，已应用 ${activeFilterCount} 项` : '筛选'}
-              aria-haspopup="dialog"
-              aria-controls={filtersOpen ? filterPanelId : undefined}
-              aria-expanded={filtersOpen}
-              className={
-                hasActiveFilters ? 'erp-business-filter-trigger--active' : ''
-              }
-            >
-              筛选{hasActiveFilters ? ` · ${activeFilterCount}` : ''}
-            </Button>
+            <div className="erp-business-filter-trigger-anchor">
+              <Space.Compact className="erp-business-filter-trigger-group" role="group" aria-label="筛选操作">
+                <Button
+                  ref={filterTriggerRef}
+                  icon={<FilterOutlined aria-hidden />}
+                  aria-label={hasActiveFilters ? `筛选，已应用 ${activeFilterCount} 项` : '筛选'}
+                  aria-haspopup="dialog"
+                  aria-controls={filtersOpen ? filterPanelId : undefined}
+                  aria-expanded={filtersOpen}
+                  className={hasActiveFilters ? 'erp-business-filter-trigger--active' : ''}
+                >
+                  筛选{hasActiveFilters ? ` · ${activeFilterCount}` : ''}
+                </Button>
+                {hasActiveFilters && hasClearFilters ? (
+                  <Tooltip title="清空额外条件，保留搜索与快捷筛选">
+                    <Button
+                      className="erp-business-filter-clear"
+                      aria-label="清空筛选"
+                      icon={<CloseOutlined aria-hidden />}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onClearFilters()
+                        closeFilters()
+                      }}
+                    />
+                  </Tooltip>
+                ) : null}
+              </Space.Compact>
+            </div>
           </Popover>
-          {hasActiveFilters && hasClearFilters ? (
-            <Tooltip title="清空额外条件，保留搜索与快捷筛选">
-              <Button
-                className="erp-business-filter-clear"
-                aria-label="清空筛选"
-                icon={<CloseOutlined aria-hidden />}
-                onClick={() => {
-                  onClearFilters()
-                  closeFilters()
-                }}
-              />
-            </Tooltip>
-          ) : null}
-        </Space.Compact>
+        </div>
       ) : null}
       {!actions ? <span data-table-scroll-toolbar /> : null}
       {hasToolbar ? (

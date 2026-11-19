@@ -5,12 +5,21 @@ import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertTableSemanticAlignment } from './businessTableAssertions.mjs'
+import { assertCompactBusinessFilter } from './businessListAssertions.mjs'
 import { createMaterialSummaryScenarios } from './materialSummaryScenarios.mjs'
 import { workbenchPaymentSummaryScenario } from './workbenchPaymentSummaryScenario.mjs'
 
 const baseActions = ['erp.workbench.read', 'workflow.task.read']
 const salesActions = ['sales_order.read', 'sales_order_item.read']
 const materialsActions = ['sales_order.read', 'engineering.material.read']
+
+const salesAndMaterialsActions = [
+  ...salesActions,
+  ...materialsActions,
+  'field.sales_commercial.read',
+  'field.finance_settlement.read',
+  'engineering.material.submit',
+]
 
 export function createWorkbenchSummaryScenarios({
   assert,
@@ -719,17 +728,42 @@ export function createWorkbenchSummaryScenarios({
         assert.deepEqual(await headerLabels(), defaultHeaders)
       },
     },
-    makeScenario(
-      'erp-workbench-summaries-desktop',
-      [
-        ...salesActions,
-        ...materialsActions,
-        'field.sales_commercial.read',
-        'field.finance_settlement.read',
-        'engineering.material.submit',
-      ],
-      'both'
-    ),
+    makeScenario('erp-workbench-summaries-desktop', salesAndMaterialsActions, 'both'),
+    {
+      ...makeScenario('erp-workbench-summary-filter-toolbar', salesAndMaterialsActions, 'both'),
+      verify: async (page) => {
+        const region = page.getByRole('region', { name: '工作台汇总' })
+        const trigger = region.getByRole('button', { name: '筛选', exact: true })
+        const search = region.getByRole('searchbox', { name: '搜索订单号、产品名称或款号' })
+        const filteredOutRow = region.getByText('模拟产品 2', { exact: true })
+        await region.getByRole('combobox', { name: '汇总类型' }).waitFor()
+        await filteredOutRow.waitFor()
+        await assertCompactBusinessFilter(trigger)
+        await search.fill('模拟产品')
+        await search.press('Enter')
+        await trigger.press('Enter')
+        const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+        await filters.waitFor()
+        await waitForFiniteAnimations(page)
+        const openedFilter = await filters.boundingBox()
+        await filters.getByRole('button', { name: '已取消', exact: true }).click()
+        await region.getByRole('button', { name: '筛选，已应用 1 项', exact: true }).waitFor()
+        await region.getByText('模拟产品 1', { exact: true }).waitFor()
+        await filteredOutRow.waitFor({ state: 'hidden' })
+        await waitForFiniteAnimations(page)
+        const appliedFilter = await filters.boundingBox()
+        assert(openedFilter && appliedFilter && Math.abs(openedFilter.x - appliedFilter.x) <= 1, '应用条件时筛选面板横向位置保持稳定')
+        const clear = region.getByRole('button', { name: '清空筛选', exact: true })
+        await clear.click()
+        await filteredOutRow.waitFor()
+        await filters.waitFor({ state: 'hidden' })
+        assert.equal(await clear.count(), 0)
+        assert.equal(await search.inputValue(), '模拟产品')
+        assert.equal(await trigger.evaluate((node) => node === document.activeElement), true)
+        await assertCompactBusinessFilter(trigger)
+        await assertNoHorizontalOverflow(page)
+      },
+    },
     makeScenario('erp-workbench-summary-sales-light', salesActions, 'sales'),
     makeScenario(
       'erp-workbench-summary-sales-limited-dark',

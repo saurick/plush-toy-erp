@@ -10,24 +10,30 @@ import { createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
 import { createTaskTrackingFilterScenarios } from './taskTrackingFilterScenarios.mjs'
 import { workflowExceptionScenario } from './workflowExceptionScenario.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertCompactBusinessFilter } from './businessListAssertions.mjs'
 
 async function assertDocumentFilterLayout(page, filters, assert, change) {
   await waitForFiniteAnimations(page)
   const monitor = await filters.evaluateHandle((panel) => {
-    const nodes = [
-      ...panel.querySelectorAll('[role="tab"]'),
-      document.querySelector('.erp-task-board-filters [aria-haspopup="dialog"]'),
-      document.querySelector('.erp-task-board-filters .erp-business-operation-panel__search'),
+    const controls = document.querySelector('.erp-task-board-filters')
+    const triggerGroup = controls.querySelector('.erp-business-filter-trigger-group')
+    const search = controls.querySelector('.erp-business-operation-panel__search')
+    const filterEdge = triggerGroup.getBoundingClientRect().top >= search.getBoundingClientRect().bottom ? 'left' : 'right'
+    const watched = [
+      ...[...panel.querySelectorAll('[role="tab"]')].map((node) => [node, ['x', 'y', 'width', 'height']]),
+      [panel.closest('.erp-business-filter-popover'), ['left', 'right']],
+      [triggerGroup, [filterEdge, 'top', 'bottom']],
+      [search, ['left', 'top', 'bottom']],
     ]
-    const boxes = nodes.map((node) => node.getBoundingClientRect())
+    const boxes = watched.map(([node]) => node.getBoundingClientRect())
     let frame
     let failure
     const sample = () => {
-      for (const [index, node] of nodes.entries()) {
+      for (const [index, [node, dimensions]] of watched.entries()) {
         const box = node.getBoundingClientRect()
-        const delta = Math.max(...['x', 'y', 'width', 'height'].map((key) => Math.abs(box[key] - boxes[index][key])))
-        if (!node.isConnected || delta > 1) {
-          failure = { control: node.getAttribute('aria-label') || node.textContent.trim().slice(0, 12), connected: node.isConnected, delta }
+        const axis = dimensions.find((key) => Math.abs(box[key] - boxes[index][key]) > 1)
+        if (!node.isConnected || axis) {
+          failure = { control: node.getAttribute('aria-label') || node.className, connected: node.isConnected, viewport: window.innerWidth, axis, before: boxes[index][axis], after: box[axis] }
           return
         }
       }
@@ -44,7 +50,7 @@ async function assertDocumentFilterLayout(page, filters, assert, change) {
     movement = await monitor.evaluate((stop) => stop())
     await monitor.dispose()
   }
-  assert.equal(movement, undefined, `单据筛选切换期间模块页签和工具栏应留在原位：${JSON.stringify(movement)}`)
+  assert.equal(movement, undefined, `单据筛选切换期间浮层、模块页签及工具栏对齐应保持稳定 ${JSON.stringify(movement)}`)
 }
 
 async function assertNarrowScreenAccountAccess(page) {
@@ -2385,7 +2391,9 @@ export function createDashboardTaskScenarios({
       deviceScaleFactor: 2,
       verify: async (page) => {
         await page.getByText('第 1-16 条 / 共 16 条', { exact: true }).waitFor()
-        await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
+        const trigger = page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ })
+        await assertCompactBusinessFilter(trigger)
+        await trigger.click()
         const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         const documents = filters.locator('.workflow-task-document-filter')
         const modules = documents.getByRole('tablist', { name: '单据所属业务模块' })
@@ -2488,8 +2496,15 @@ export function createDashboardTaskScenarios({
         await waitForFiniteAnimations(page)
         await assertTypesFit()
         const close = filters.getByRole('button', { name: '收起', exact: true })
-        await close.scrollIntoViewIfNeeded()
-        assert(await filters.evaluate((panel) => panel.scrollTop > 0), '矮窗口应能滚动筛选面板到达底部操作')
+        const initialCloseBox = await close.boundingBox()
+        const scrollTop = await filters.locator('.erp-business-operation-panel__filters').evaluate((fields) => {
+          fields.scrollTop = fields.scrollHeight
+          return fields.scrollTop
+        })
+        assert(scrollTop > 0 && initialCloseBox && initialCloseBox.y + initialCloseBox.height <= page.viewportSize().height + 1,
+          '矮窗口应能滚动条件区，收起按钮应在可见范围内')
+        const scrolledCloseBox = await close.boundingBox()
+        assert(scrolledCloseBox && Math.abs(scrolledCloseBox.y - initialCloseBox.y) <= 1, '滚动条件区时收起按钮保持原位')
         await close.click()
         assert.equal(await page.locator('.erp-task-board-filters [aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
         await originalModules.dispose()

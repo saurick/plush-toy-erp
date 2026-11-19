@@ -160,16 +160,6 @@
   min-width: 0;
 }
 
-/* Keep the popover anchor in place when its count and adjacent clear action appear. */
-.erp-task-board-filters .erp-business-filter-trigger-group {
-  display: grid;
-  grid-template-columns: minmax(7.5em, max-content) max(var(--erp-business-control-height), var(--erp-touch-target, 0px));
-}
-
-.erp-task-board-filters .erp-business-filter-trigger-group > [aria-haspopup='dialog'] {
-  inline-size: 100%;
-}
-
 .erp-task-board-controls .erp-task-progress-rail {
   flex-wrap: wrap;
   overflow: visible;
