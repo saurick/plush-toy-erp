@@ -19,7 +19,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, method,
 		return id, res, nil
 	}
 	if method == "list_sales_order_summary_filter_options" {
-		if !sourceOrderAllowsOnly(pm, "customer_key") {
+		if !jsonRPCParamsAllowed(pm, "customer_key") {
 			return id, invalidParamResult(), nil
 		}
 		options, err := d.salesOrderUC.ListSalesOrderSummaryFilterOptions(ctx)
@@ -34,7 +34,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderSummary(ctx context.Context, method,
 			"customers": customers, "sales_owners": toAnySliceString(options.SalesOwners),
 		})}, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "customer_id", "customer", "sales_owner", "sales_owner_name", "lifecycle_status", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "keyword", "customer_id", "customer", "sales_owner", "sales_owner_name", "lifecycle_status", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	filter := biz.SalesOrderSummaryFilter{SalesOrderFilter: biz.SalesOrderFilter{Limit: 20, LifecycleScope: "all"}}

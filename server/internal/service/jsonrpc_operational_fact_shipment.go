@@ -128,7 +128,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
 			return id, res, nil
 		}
-		if !shipmentItemAllowsOnly(pm, "id") {
+		if !jsonRPCParamsAllowed(pm, "id") {
 			return id, invalidParamResult(), nil
 		}
 		shipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
@@ -279,7 +279,7 @@ func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 }
 
 func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, bool) {
-	if !shipmentItemAllowsOnly(pm,
+	if !jsonRPCParamsAllowed(pm,
 		"sales_order_item_id",
 		"product_id",
 		"product_sku_id",
@@ -347,21 +347,8 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 	}, true
 }
 
-func shipmentItemAllowsOnly(pm map[string]any, keys ...string) bool {
-	allowed := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
 func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWithItems, bool) {
-	if !shipmentItemAllowsOnly(pm,
+	if !jsonRPCParamsAllowed(pm,
 		"customer_key",
 		"shipment_no",
 		"sales_order_id",
@@ -417,7 +404,7 @@ func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWi
 }
 
 func shipmentDraftSaveFromParams(pm map[string]any) (*biz.ShipmentDraftSave, bool) {
-	if !shipmentItemAllowsOnly(pm,
+	if !jsonRPCParamsAllowed(pm,
 		"customer_key",
 		"id",
 		"expected_version",
@@ -500,7 +487,7 @@ func shipmentDraftSaveFromParams(pm map[string]any) (*biz.ShipmentDraftSave, boo
 }
 
 func shipmentSourceCandidateFilterFromParams(pm map[string]any) (biz.ShipmentSourceCandidateFilter, bool) {
-	if !shipmentItemAllowsOnly(pm, "keyword", "sales_order_id", "customer_id", "selectable", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "keyword", "sales_order_id", "customer_id", "selectable", "limit", "offset") {
 		return biz.ShipmentSourceCandidateFilter{}, false
 	}
 	keyword := ""
@@ -722,14 +709,14 @@ func shipmentToAny(item *biz.Shipment) map[string]any {
 		"version":                             item.Version,
 		"finance_release_status":              item.FinanceReleaseStatus,
 		"finance_release_version":             item.FinanceReleaseVersion,
-		"finance_released_at":                 optionalUnix(item.FinanceReleasedAt),
+		"finance_released_at":                 optionalTimeUnix(item.FinanceReleasedAt),
 		"finance_released_by":                 optionalIntToAny(item.FinanceReleasedBy),
 		"finance_release_process_instance_id": optionalIntToAny(item.FinanceReleaseProcessInstanceID),
 		"finance_release_process_node_id":     optionalIntToAny(item.FinanceReleaseProcessNodeID),
 		"finance_release_note":                optionalStringToAny(item.FinanceReleaseNote),
 		"idempotency_key":                     item.IdempotencyKey,
-		"planned_ship_at":                     optionalUnix(item.PlannedShipAt),
-		"shipped_at":                          optionalUnix(item.ShippedAt),
+		"planned_ship_at":                     optionalTimeUnix(item.PlannedShipAt),
+		"shipped_at":                          optionalTimeUnix(item.ShippedAt),
 		"transport_method":                    optionalStringToAny(item.TransportMethod),
 		"carrier_name":                        optionalStringToAny(item.CarrierName),
 		"tracking_no":                         optionalStringToAny(item.TrackingNo),

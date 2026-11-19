@@ -40,7 +40,7 @@ func (d *jsonrpcDispatcher) handleProductionWIP(ctx context.Context, method, id 
 }
 
 func (d *jsonrpcDispatcher) getProductionWIP(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "production_order_id") {
+	if !jsonRPCParamsAllowed(pm, "production_order_id") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionProductionWIPRead); res != nil {
@@ -63,7 +63,7 @@ func (d *jsonrpcDispatcher) executeProductionWIPAction(ctx context.Context, pm m
 		return invalidParamResult()
 	}
 	permission, modules, allowed, ok := productionWIPActionContract(action)
-	if !ok || !productionOrderAllowsOnly(pm, allowed...) {
+	if !ok || !jsonRPCParamsAllowed(pm, allowed...) {
 		return invalidParamResult()
 	}
 	admin, res := d.CurrentAdmin(ctx)
@@ -222,7 +222,7 @@ func productionWIPOutsourcingAllocationsFromParams(raw any) ([]biz.ProductionWIP
 	allocations := make([]biz.ProductionWIPOutsourcingAllocationInput, 0, len(values))
 	for _, value := range values {
 		item, ok := value.(map[string]any)
-		if !ok || !productionOrderAllowsOnly(item, "outsourcing_order_item_id", "production_order_material_requirement_id") {
+		if !ok || !jsonRPCParamsAllowed(item, "outsourcing_order_item_id", "production_order_material_requirement_id") {
 			return nil, false
 		}
 		outsourcingItemID, ok := productionOrderRequiredPositiveInt(item, "outsourcing_order_item_id")
@@ -249,7 +249,7 @@ func productionWIPSplitsFromParams(raw any) ([]biz.ProductionWIPSplit, bool) {
 	splits := make([]biz.ProductionWIPSplit, 0, len(values))
 	for _, value := range values {
 		item, ok := value.(map[string]any)
-		if !ok || !productionOrderAllowsOnly(item, "quantity") {
+		if !ok || !jsonRPCParamsAllowed(item, "quantity") {
 			return nil, false
 		}
 		quantity, ok := productionOrderRequiredDecimalString(item, "quantity")

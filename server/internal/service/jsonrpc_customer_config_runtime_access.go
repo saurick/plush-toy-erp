@@ -29,7 +29,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigRuntimeAccess(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "get_process_recovery_context":
-		if !customerConfigAllowsOnly(pm, "process_instance_id") {
+		if !jsonRPCParamsAllowed(pm, "process_instance_id") {
 			return id, invalidParamResult(), nil
 		}
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRuntimeRecover); res != nil {
@@ -63,7 +63,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigRuntimeAccess(
 			ExpectedResultHash:       getString(pm, "expected_result_hash"),
 			ExpectedCompensationHash: getString(pm, "expected_compensation_hash"),
 		}
-		if !customerConfigAllowsOnly(pm, "process_instance_id", "process_node_instance_id", "expected_version", "decision", "expected_result_hash", "expected_compensation_hash") {
+		if !jsonRPCParamsAllowed(pm, "process_instance_id", "process_node_instance_id", "expected_version", "decision", "expected_result_hash", "expected_compensation_hash") {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
 		item, err := d.processRuntimeUC.RecoverCompensatedDomainCommand(ctx, in, admin.ID)
@@ -77,7 +77,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigRuntimeAccess(
 		}, nil
 
 	case "resume_blocked_process_node":
-		if !customerConfigAllowsOnly(pm, "process_instance_id", "process_node_instance_id", "expected_version", "reason") {
+		if !jsonRPCParamsAllowed(pm, "process_instance_id", "process_node_instance_id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRuntimeRecover); res != nil {

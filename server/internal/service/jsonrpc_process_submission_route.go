@@ -7,7 +7,7 @@ import (
 )
 
 func (d *jsonrpcDispatcher) getProcessSubmissionRoute(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !customerConfigAllowsOnly(pm, "customer_key", "process_key") {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "process_key") {
 		return invalidParamResult()
 	}
 	processKey := getString(pm, "process_key")

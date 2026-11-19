@@ -402,13 +402,6 @@ func optionalStringToAny(value *string) any {
 	return *value
 }
 
-func optionalUnix(value *time.Time) any {
-	if value == nil {
-		return nil
-	}
-	return value.Unix()
-}
-
 func productionMaterialUsageErrorResult(err error) *v1.JsonrpcResult {
 	if errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded) {
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "普通领料与委外发料合计超过可领数量，请核对已发数量或先办理超领审批"}

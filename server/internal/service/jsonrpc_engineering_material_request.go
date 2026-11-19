@@ -51,7 +51,7 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 		if res := d.RequireAdminPermission(ctx, biz.PermissionERPWorkbenchRead); res != nil {
 			return id, res, nil
 		}
-		if !sourceOrderAllowsOnly(pm, "customer_key", "keyword", "status", "sort_by", "sort_direction", "page", "limit") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "keyword", "status", "sort_by", "sort_direction", "page", "limit") {
 			return id, invalidParamResult(), nil
 		}
 		filter := biz.EngineeringMaterialListFilter{Page: 1, Limit: 20, IncludeProductRefs: d.RequireAdminPermission(ctx, biz.PermissionProductRead) == nil}
@@ -75,7 +75,7 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 		}
 		result, err = d.salesOrderUC.ListEngineeringMaterialRequests(ctx, filter)
 	case "get_engineering_material_request":
-		if !sourceOrderAllowsOnly(pm, "customer_key", "sales_order_id", "request_id", "preview") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "sales_order_id", "request_id", "preview") {
 			return id, invalidParamResult(), nil
 		}
 		orderID, ok := getRequiredJSONRPCPositiveInt(pm, "sales_order_id")
@@ -100,7 +100,7 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 			result, err = d.salesOrderUC.GetEngineeringMaterialRequest(ctx, orderID, preview)
 		}
 	case "submit_engineering_material_request":
-		if !sourceOrderAllowsOnly(pm, "customer_key", "sales_order_id", "expected_version", "expected_source_hash", "task_id", "expected_task_version") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "sales_order_id", "expected_version", "expected_source_hash", "task_id", "expected_task_version") {
 			return id, invalidParamResult(), nil
 		}
 		orderID, ok := getRequiredJSONRPCPositiveInt(pm, "sales_order_id")
@@ -113,7 +113,7 @@ func (d *jsonrpcDispatcher) handleEngineeringMaterialRequest(ctx context.Context
 		}
 		result, err = d.salesOrderUC.SubmitEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialSubmit{SalesOrderID: orderID, ExpectedVersion: version, ExpectedSourceHash: getString(pm, "expected_source_hash"), ActorID: actorID, WorkflowTaskID: taskID, ExpectedTaskVersion: taskVersion})
 	default:
-		if !sourceOrderAllowsOnly(pm, "customer_key", "id", "expected_version", "action", "note", "task_id", "expected_task_version") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "action", "note", "task_id", "expected_task_version") {
 			return id, invalidParamResult(), nil
 		}
 		requestID, ok := getRequiredJSONRPCPositiveInt(pm, "id")

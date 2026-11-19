@@ -4158,7 +4158,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members", "condition")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(itemMap, "approval_key", "enabled", "members", "condition")”。',
         expression: 'rawItem.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -4240,7 +4240,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(memberMap, "role_key", "user_id", "strategy", "enabled")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(memberMap, "role_key", "user_id", "strategy", "enabled")”。',
         expression: 'rawMember.(map[string]any)',
         name: 'items[].members[]',
         required: '必填',
@@ -4415,7 +4415,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -4542,7 +4542,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -4669,7 +4669,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -4895,7 +4895,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -5255,7 +5255,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -5382,7 +5382,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -5562,7 +5562,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -5778,7 +5778,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members", "condition")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(itemMap, "approval_key", "enabled", "members", "condition")”。',
         expression: 'rawItem.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -5860,7 +5860,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(memberMap, "role_key", "user_id", "strategy", "enabled")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(memberMap, "role_key", "user_id", "strategy", "enabled")”。',
         expression: 'rawMember.(map[string]any)',
         name: 'items[].members[]',
         required: '必填',
@@ -5993,7 +5993,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members", "condition")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(itemMap, "approval_key", "enabled", "members", "condition")”。',
         expression: 'rawItem.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -6075,7 +6075,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(memberMap, "role_key", "user_id", "strategy", "enabled")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(memberMap, "role_key", "user_id", "strategy", "enabled")”。',
         expression: 'rawMember.(map[string]any)',
         name: 'items[].members[]',
         required: '必填',
@@ -6882,7 +6882,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -7114,7 +7114,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -7348,7 +7348,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount")”。',
         expression: 'value.(map[string]any)',
         name: 'allocations[]',
         required: '条件必填',
@@ -8268,7 +8268,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !inventoryOperationAllowsOnly(m, "line_no", "subject_type", "subject_id", "product_sku_id", "from_warehouse_id", "from_lot_id", "to_warehouse_id", "to_lot_id", "unit_id", "expected_quantity", "counted_quantity", "adjustment_quantity", "note")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(m, "line_no", "subject_type", "subject_id", "product_sku_id", "from_warehouse_id", "from_lot_id", "to_warehouse_id", "to_lot_id", "unit_id", "expected_quantity", "counted_quantity", "adjustment_quantity", "note")”。',
         expression: 'value.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -9175,7 +9175,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !inventoryOperationAllowsOnly(params, "id", "counted_quantity", "adjustment_quantity", "to_warehouse_id", "note")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(params, "id", "counted_quantity", "adjustment_quantity", "to_warehouse_id", "note")”。',
         expression: 'raw.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -16344,7 +16344,7 @@ export const RpcInspection = Object.freeze({
         name: 'items',
         required: '必填',
         source: Object.freeze({
-          line: 393,
+          line: 380,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'array',
@@ -16354,7 +16354,7 @@ export const RpcInspection = Object.freeze({
         name: 'items[]',
         required: '必填',
         source: Object.freeze({
-          line: 399,
+          line: 386,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'object',
@@ -16950,7 +16950,7 @@ export const RpcInspection = Object.freeze({
         type: 'string',
       }), Object.freeze({
         description: '当前参数白名单接受此键，但该方法未读取其值；不能据此改变业务对象或版本。',
-        expression: 'productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version")',
+        expression: 'jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version")',
         name: 'expected_version',
         required: '不参与业务赋值',
         source: Object.freeze({
@@ -18327,7 +18327,7 @@ export const RpcInspection = Object.freeze({
       }),
       parameters: Object.freeze([Object.freeze({
         description: '当前参数白名单接受此键，但该方法未读取其值；不能据此改变业务对象或版本。',
-        expression: 'productionCompletionAllowsOnly(pm, "customer_key", "production_order_id")',
+        expression: 'jsonRPCParamsAllowed(pm, "customer_key", "production_order_id")',
         name: 'customer_key',
         required: '不参与业务赋值',
         source: Object.freeze({
@@ -18366,7 +18366,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 524,
+          line: 511,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -18380,7 +18380,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 508,
+          line: 495,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'string',
@@ -18394,7 +18394,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 540,
+          line: 527,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -18408,7 +18408,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 548,
+          line: 535,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -18422,7 +18422,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 516,
+          line: 503,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -18436,7 +18436,7 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 532,
+          line: 519,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'boolean',
@@ -19900,7 +19900,7 @@ export const RpcInspection = Object.freeze({
         name: 'expected_version',
         required: '必填',
         source: Object.freeze({
-          line: 454,
+          line: 441,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -19943,7 +19943,7 @@ export const RpcInspection = Object.freeze({
         name: 'id',
         required: '必填',
         source: Object.freeze({
-          line: 450,
+          line: 437,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'integer',
@@ -19953,7 +19953,7 @@ export const RpcInspection = Object.freeze({
         name: 'items',
         required: '必填',
         source: Object.freeze({
-          line: 458,
+          line: 445,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'array',
@@ -19963,7 +19963,7 @@ export const RpcInspection = Object.freeze({
         name: 'items[]',
         required: '必填',
         source: Object.freeze({
-          line: 464,
+          line: 451,
           path: 'server/internal/service/jsonrpc_operational_fact_shipment.go',
         }),
         type: 'object',
@@ -20497,7 +20497,7 @@ export const RpcInspection = Object.freeze({
         expression: '"outsourcing_order": outsourcingOrderToMap(item)',
         name: 'result.data.outsourcing_order',
         source: Object.freeze({
-          line: 255,
+          line: 219,
           path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
         }),
         type: '待核对',
@@ -20591,7 +20591,7 @@ export const RpcInspection = Object.freeze({
         expression: '"outsourcing_order": outsourcingOrderToMap(item)',
         name: 'result.data.outsourcing_order',
         source: Object.freeze({
-          line: 255,
+          line: 219,
           path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
         }),
         type: '待核对',
@@ -20685,7 +20685,7 @@ export const RpcInspection = Object.freeze({
         expression: '"outsourcing_order": outsourcingOrderToMap(item)',
         name: 'result.data.outsourcing_order',
         source: Object.freeze({
-          line: 255,
+          line: 219,
           path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
         }),
         type: '待核对',
@@ -20713,7 +20713,7 @@ export const RpcInspection = Object.freeze({
         expression: '"outsourcing_order": outsourcingOrderToMap(item)',
         name: 'result.data.outsourcing_order',
         source: Object.freeze({
-          line: 255,
+          line: 219,
           path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
         }),
         type: '待核对',
@@ -21201,13 +21201,13 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 158,
-          path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
+          line: 322,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'array',
       }), Object.freeze({
         description: ' 拒绝条件：“!ok”。',
-        expression: 'rawItem.(map[string]any)',
+        expression: 'rawRow.(map[string]any)',
         name: 'items[]',
         required: '条件必填（items 有值）',
         requiredWhen: Object.freeze([Object.freeze({
@@ -21215,8 +21215,8 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 164,
-          path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
+          line: 328,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'object',
       }), Object.freeze({
@@ -21242,13 +21242,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'integer | string',
       }), Object.freeze({
-        description: '解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(itemMap, "id")`。',
-        expression: 'getOptionalJSONRPCID(itemMap, "id")',
+        description: '解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(fields, "id")`。',
+        expression: 'getOptionalJSONRPCID(fields, "id")',
         name: 'items[].id',
         required: '可选',
         source: Object.freeze({
-          line: 172,
-          path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
+          line: 332,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
       }), Object.freeze({
@@ -21432,7 +21432,7 @@ export const RpcInspection = Object.freeze({
         type: 'integer',
       }), Object.freeze({
         description: '当前参数白名单接受此键，但该方法未读取其值；不能据此改变业务对象或版本。',
-        expression: 'sourceOrderAllowsOnly(pm,\n\t"id",\n\t"outsourcing_order_id",\n\t"line_no",\n\t"subject_type",\n\t"product_id",\n\t"product_sku_id",\n\t"material_id",\n\t"process_id",\n\t"unit_id",\n\t"product_no_snapshot",\n\t"sku_code_snapshot",\n\t"product_order_no_snapshot",\n\t"product_name_snapshot",\n\t"material_code_snapshot",\n\t"material_name_snapshot",\n\t"processing_item",\n\t"process_name_snapshot",\n\t"process_category_snapshot",\n\t"unit_name_snapshot",\n\t"outsourcing_quantity",\n\t"unit_price",\n\t"amount",\n\t"expected_return_date",\n\t"note",\n)',
+        expression: 'jsonRPCParamsAllowed(pm,\n\t"id",\n\t"outsourcing_order_id",\n\t"line_no",\n\t"subject_type",\n\t"product_id",\n\t"product_sku_id",\n\t"material_id",\n\t"process_id",\n\t"unit_id",\n\t"product_no_snapshot",\n\t"sku_code_snapshot",\n\t"product_order_no_snapshot",\n\t"product_name_snapshot",\n\t"material_code_snapshot",\n\t"material_name_snapshot",\n\t"processing_item",\n\t"process_name_snapshot",\n\t"process_category_snapshot",\n\t"unit_name_snapshot",\n\t"outsourcing_quantity",\n\t"unit_price",\n\t"amount",\n\t"expected_return_date",\n\t"note",\n)',
         name: 'items[].sku_code_snapshot',
         required: '不参与业务赋值',
         source: Object.freeze({
@@ -21564,7 +21564,7 @@ export const RpcInspection = Object.freeze({
         expression: '"outsourcing_order": outsourcingOrderToMap(result.Order)',
         name: 'result.data.outsourcing_order',
         source: Object.freeze({
-          line: 263,
+          line: 227,
           path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
         }),
         type: '待核对',
@@ -21572,7 +21572,7 @@ export const RpcInspection = Object.freeze({
         expression: '"outsourcing_order_items": outsourcingOrderItemsToAny(result.Items)',
         name: 'result.data.outsourcing_order_items',
         source: Object.freeze({
-          line: 264,
+          line: 228,
           path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
         }),
         type: '待核对',
@@ -21666,7 +21666,7 @@ export const RpcInspection = Object.freeze({
         expression: '"outsourcing_order": outsourcingOrderToMap(item)',
         name: 'result.data.outsourcing_order',
         source: Object.freeze({
-          line: 255,
+          line: 219,
           path: 'server/internal/service/jsonrpc_outsourcing_order_shared.go',
         }),
         type: '待核对',
@@ -22024,7 +22024,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !productionOrderAllowsOnly(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "route_code", "customer_inspection_required", "note")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "route_code", "customer_inspection_required", "note")”。',
         expression: 'raw.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -22539,7 +22539,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !productionOrderAllowsOnly(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "route_code", "customer_inspection_required", "note")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "route_code", "customer_inspection_required", "note")”。',
         expression: 'raw.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -22719,7 +22719,7 @@ export const RpcInspection = Object.freeze({
         path: 'server/internal/service/jsonrpc_production_wip.go',
       }),
       parameters: Object.freeze([Object.freeze({
-        description: '解析器 `productionWIPActionContract`；调用 `productionWIPActionContract(action)`。 拒绝条件：“!ok || !productionOrderAllowsOnly(pm, allowed...)”。',
+        description: '解析器 `productionWIPActionContract`；调用 `productionWIPActionContract(action)`。 拒绝条件：“!ok || !jsonRPCParamsAllowed(pm, allowed...)”。',
         expression: 'productionWIPActionContract(action)',
         name: 'action',
         required: '必填',
@@ -22796,7 +22796,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !productionOrderAllowsOnly(item, "outsourcing_order_item_id", "production_order_material_requirement_id")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "outsourcing_order_item_id", "production_order_material_requirement_id")”。',
         expression: 'value.(map[string]any)',
         name: 'outsourcing_allocations[]',
         required: '条件必填（action=ASSIGN_EXECUTION）',
@@ -22919,7 +22919,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !productionOrderAllowsOnly(item, "quantity")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(item, "quantity")”。',
         expression: 'value.(map[string]any)',
         name: 'splits[]',
         required: '条件必填（action=SPLIT_BATCH）',
@@ -25019,7 +25019,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 205,
+          line: 182,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -25113,7 +25113,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 205,
+          line: 182,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -25247,7 +25247,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 205,
+          line: 182,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -25275,7 +25275,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 205,
+          line: 182,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -25750,13 +25750,13 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 113,
-          path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
+          line: 322,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'array',
       }), Object.freeze({
         description: ' 拒绝条件：“!ok”。',
-        expression: 'rawItem.(map[string]any)',
+        expression: 'rawRow.(map[string]any)',
         name: 'items[]',
         required: '条件必填（items 有值）',
         requiredWhen: Object.freeze([Object.freeze({
@@ -25764,8 +25764,8 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 119,
-          path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
+          line: 328,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'object',
       }), Object.freeze({
@@ -25802,13 +25802,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'integer | string',
       }), Object.freeze({
-        description: '解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(itemMap, "id")`。',
-        expression: 'getOptionalJSONRPCID(itemMap, "id")',
+        description: '解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(fields, "id")`。',
+        expression: 'getOptionalJSONRPCID(fields, "id")',
         name: 'items[].id',
         required: '可选',
         source: Object.freeze({
-          line: 127,
-          path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
+          line: 332,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
       }), Object.freeze({
@@ -26048,7 +26048,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(result.Order)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 220,
+          line: 197,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -26056,7 +26056,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order_items": purchaseOrderItemsToAny(result.Items)',
         name: 'result.data.purchase_order_items',
         source: Object.freeze({
-          line: 221,
+          line: 198,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -26179,7 +26179,7 @@ export const RpcInspection = Object.freeze({
         expression: '"purchase_order": purchaseOrderToMap(item)',
         name: 'result.data.purchase_order',
         source: Object.freeze({
-          line: 205,
+          line: 182,
           path: 'server/internal/service/jsonrpc_purchase_order_shared.go',
         }),
         type: '待核对',
@@ -27882,7 +27882,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(item)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 303,
+          line: 280,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -27976,7 +27976,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(item)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 303,
+          line: 280,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -28300,7 +28300,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(item)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 303,
+          line: 280,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -29002,7 +29002,7 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'array',
       }), Object.freeze({
-        description: ' 拒绝条件：“!ok || !sourceOrderAllowsOnly(fields, "id", "product_id", "product_sku_id", "bom_id", "expected_bom_version")”。',
+        description: ' 拒绝条件：“!ok || !jsonRPCParamsAllowed(fields, "id", "product_id", "product_sku_id", "bom_id", "expected_bom_version")”。',
         expression: 'raw.(map[string]any)',
         name: 'items[]',
         required: '必填',
@@ -29218,13 +29218,13 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '可选',
         source: Object.freeze({
-          line: 161,
-          path: 'server/internal/service/jsonrpc_sales_order_shared.go',
+          line: 322,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'array',
       }), Object.freeze({
         description: ' 拒绝条件：“!ok”。',
-        expression: 'rawItem.(map[string]any)',
+        expression: 'rawRow.(map[string]any)',
         name: 'items[]',
         required: '条件必填（items 有值）',
         requiredWhen: Object.freeze([Object.freeze({
@@ -29232,8 +29232,8 @@ export const RpcInspection = Object.freeze({
           presence: 'present',
         })]),
         source: Object.freeze({
-          line: 167,
-          path: 'server/internal/service/jsonrpc_sales_order_shared.go',
+          line: 328,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'object',
       }), Object.freeze({
@@ -29270,13 +29270,13 @@ export const RpcInspection = Object.freeze({
         }),
         type: 'string',
       }), Object.freeze({
-        description: '解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(itemMap, "id")`。',
-        expression: 'getOptionalJSONRPCID(itemMap, "id")',
+        description: '解析器 `getOptionalJSONRPCID`；调用 `getOptionalJSONRPCID(fields, "id")`。',
+        expression: 'getOptionalJSONRPCID(fields, "id")',
         name: 'items[].id',
         required: '可选',
         source: Object.freeze({
-          line: 175,
-          path: 'server/internal/service/jsonrpc_sales_order_shared.go',
+          line: 332,
+          path: 'server/internal/service/jsonrpc_params.go',
         }),
         type: 'integer',
       }), Object.freeze({
@@ -29594,7 +29594,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order": salesOrderToMap(result.Order)',
         name: 'result.data.sales_order',
         source: Object.freeze({
-          line: 318,
+          line: 295,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -29602,7 +29602,7 @@ export const RpcInspection = Object.freeze({
         expression: '"sales_order_items": salesOrderItemsToAny(result.Items)',
         name: 'result.data.sales_order_items',
         source: Object.freeze({
-          line: 319,
+          line: 296,
           path: 'server/internal/service/jsonrpc_sales_order_shared.go',
         }),
         type: '待核对',
@@ -30074,7 +30074,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 396,
+          line: 389,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -30210,7 +30210,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 396,
+          line: 389,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -31061,7 +31061,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 412,
+          line: 405,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -31072,7 +31072,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 423,
+          line: 416,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -31765,7 +31765,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 404,
+          line: 397,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',
@@ -31776,7 +31776,7 @@ export const RpcInspection = Object.freeze({
         nullable: true,
         required: '按业务条件',
         source: Object.freeze({
-          line: 423,
+          line: 416,
           path: 'server/internal/service/jsonrpc_workflow_shared.go',
         }),
         type: 'integer',

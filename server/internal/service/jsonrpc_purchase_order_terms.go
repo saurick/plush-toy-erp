@@ -25,7 +25,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDelivery(ctx context.Context, id 
 		return id, invalidParamResult(), nil
 	}
 	for _, raw := range pm["items"].([]any) {
-		if !sourceOrderAllowsOnly(raw.(map[string]any), "id", "expected_arrival_date") {
+		if !jsonRPCParamsAllowed(raw.(map[string]any), "id", "expected_arrival_date") {
 			return id, invalidParamResult(), nil
 		}
 	}
@@ -54,7 +54,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderTerms(ctx context.Context, id str
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if !sourceOrderAllowsOnly(item, "id", "unit_price", "expected_arrival_date") {
+		if !jsonRPCParamsAllowed(item, "id", "unit_price", "expected_arrival_date") {
 			return id, invalidParamResult(), nil
 		}
 		price, ok := getOptionalJSONRPCDecimalString(item, "unit_price")
@@ -69,7 +69,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderTerms(ctx context.Context, id str
 
 // Date parsing is shared; each public command admits only its own mutable fields.
 func parsePurchaseOrderSchedule(pm map[string]any, actorID int) (*biz.PurchaseOrderTermsCompletion, bool) {
-	if !sourceOrderAllowsOnly(pm, "customer_key", "id", "expected_version", "idempotency_key", "expected_arrival_date", "supplier_confirmed_arrival_date", "items") {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "idempotency_key", "expected_arrival_date", "supplier_confirmed_arrival_date", "items") {
 		return nil, false
 	}
 	if _, ok := pm["expected_arrival_date"]; !ok {

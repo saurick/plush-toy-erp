@@ -12,7 +12,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderSummary(ctx context.Context, i
 	if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {
 		return id, res, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "keyword", "supplier_id", "process_id", "lifecycle_status", "lifecycle_scope", "date_field", "date_from", "date_to", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "keyword", "supplier_id", "process_id", "lifecycle_status", "lifecycle_scope", "date_field", "date_from", "date_to", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	filter := biz.OutsourcingOrderSummaryFilter{OutsourcingOrderFilter: biz.OutsourcingOrderFilter{Limit: 20}}

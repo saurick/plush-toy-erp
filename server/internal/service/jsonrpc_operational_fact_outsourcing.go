@@ -76,7 +76,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		item, err := save(ctx, in)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "post_outsourcing_fact":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
 		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, false)
@@ -92,7 +92,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		item, err := d.operationalFactUC.PostOutsourcingFact(ctx, mutation)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "cancel_outsourcing_fact":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
 		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, true)
@@ -126,7 +126,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 }
 
 func outsourcingFactFromOrderCreateFromParams(pm map[string]any) (*biz.OutsourcingFactFromOrderCreate, bool) {
-	if !productionCompletionAllowsOnly(
+	if !jsonRPCParamsAllowed(
 		pm,
 		"customer_key",
 		"fact_no",
@@ -169,7 +169,7 @@ func outsourcingFactDraftSaveFromParams(pm map[string]any, method string) (*biz.
 	if method == "save_outsourcing_return_receipt_draft" {
 		keys = append(keys, "new_lot_no")
 	}
-	if !productionCompletionAllowsOnly(pm, keys...) {
+	if !jsonRPCParamsAllowed(pm, keys...) {
 		return nil, false
 	}
 	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
@@ -207,5 +207,5 @@ func outsourcingFactToAny(item *biz.OutsourcingFact) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "subject_name": item.SubjectName, "subject_code": item.SubjectCode, "product_sku_id": optionalIntToAny(item.ProductSkuID), "sku_code_snapshot": optionalStringToAny(item.SKUCodeSnapshot), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "returned_to_vendor_quantity": item.ReturnedToVendorQuantity.String(), "supplier_id": optionalIntToAny(item.SupplierID), "supplier_name": optionalStringToAny(item.SupplierName), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "subject_name": item.SubjectName, "subject_code": item.SubjectCode, "product_sku_id": optionalIntToAny(item.ProductSkuID), "sku_code_snapshot": optionalStringToAny(item.SKUCodeSnapshot), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "returned_to_vendor_quantity": item.ReturnedToVendorQuantity.String(), "supplier_id": optionalIntToAny(item.SupplierID), "supplier_name": optionalStringToAny(item.SupplierName), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalTimeUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalTimeUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

@@ -317,9 +317,9 @@ func inventoryLotToAny(item *biz.InventoryLot) map[string]any {
 		"version":           item.Version,
 		"status_action":     optionalStringToAny(item.StatusAction),
 		"status_reason":     optionalStringToAny(item.StatusReason),
-		"status_changed_at": optionalUnix(item.StatusChangedAt),
+		"status_changed_at": optionalTimeUnix(item.StatusChangedAt),
 		"status_changed_by": optionalIntToAny(item.StatusChangedBy),
-		"received_at":       optionalUnix(item.ReceivedAt),
+		"received_at":       optionalTimeUnix(item.ReceivedAt),
 		"created_at":        item.CreatedAt.Unix(),
 		"updated_at":        item.UpdatedAt.Unix(),
 	}

@@ -88,7 +88,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 }
 
 func stockReservationFromSalesOrderCreateFromParams(pm map[string]any) (*biz.StockReservationFromSalesOrderCreate, bool) {
-	if !stockReservationFromSalesOrderAllowsOnly(
+	if !jsonRPCParamsAllowed(
 		pm,
 		"customer_key",
 		"reservation_no",
@@ -122,19 +122,6 @@ func stockReservationFromSalesOrderCreateFromParams(pm map[string]any) (*biz.Sto
 		ReservedAt:       optionalTimeValue(reservedAt),
 		Note:             getWorkflowStringPtr(pm, "note"),
 	}, true
-}
-
-func stockReservationFromSalesOrderAllowsOnly(pm map[string]any, keys ...string) bool {
-	allowed := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func operationalFactStockReservationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.StockReservation, err error) *v1.JsonrpcResult {
@@ -180,5 +167,5 @@ func stockReservationToAny(item *biz.StockReservation) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "reservation_no": item.ReservationNo, "status": item.Status, "sales_order_id": optionalIntToAny(item.SalesOrderID), "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "idempotency_key": item.IdempotencyKey, "reserved_at": item.ReservedAt.Unix(), "released_at": optionalUnix(item.ReleasedAt), "consumed_at": optionalUnix(item.ConsumedAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "reservation_no": item.ReservationNo, "status": item.Status, "sales_order_id": optionalIntToAny(item.SalesOrderID), "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "idempotency_key": item.IdempotencyKey, "reserved_at": item.ReservedAt.Unix(), "released_at": optionalTimeUnix(item.ReleasedAt), "consumed_at": optionalTimeUnix(item.ConsumedAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

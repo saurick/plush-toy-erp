@@ -36,7 +36,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigLifecycle(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
 			return id, res, nil
 		}
-		if !customerConfigAllowsOnly(pm, "customer_key") {
+		if !jsonRPCParamsAllowed(pm, "customer_key") {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
 		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))

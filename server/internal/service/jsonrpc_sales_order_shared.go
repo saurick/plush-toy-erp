@@ -19,7 +19,7 @@ func unknownSalesOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, bool) {
-	if !sourceOrderAllowsOnly(pm,
+	if !jsonRPCParamsAllowed(pm,
 		"customer_key", "id", "expected_version", "order_no", "customer_id", "currency",
 		"customer_order_no", "customer_snapshot", "sales_owner", "contact_snapshot",
 		"delivery_snapshot", "payment_method", "payment_term_days", "price_condition_note",
@@ -89,7 +89,7 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 }
 
 func salesOrderItemMutationFromParams(pm map[string]any) (*biz.SalesOrderItemMutation, bool) {
-	if !sourceOrderAllowsOnly(pm, "id", "sales_order_id", "line_no", "product_id", "product_sku_id", "unit_id", "requested_product_name", "customer_product_no", "order_category", "pre_shipment_sample_quantity", "process_requirement", "import_source", "product_code_snapshot", "product_name_snapshot", "color_snapshot", "ordered_quantity", "unit_price", "amount", "planned_delivery_date", "note") {
+	if !jsonRPCParamsAllowed(pm, "id", "sales_order_id", "line_no", "product_id", "product_sku_id", "unit_id", "requested_product_name", "customer_product_no", "order_category", "pre_shipment_sample_quantity", "process_requirement", "import_source", "product_code_snapshot", "product_name_snapshot", "color_snapshot", "ordered_quantity", "unit_price", "amount", "planned_delivery_date", "note") {
 		return nil, false
 	}
 	if source, present := pm["import_source"]; present && source != nil {
@@ -153,35 +153,12 @@ func salesOrderItemMutationFromParams(pm map[string]any) (*biz.SalesOrderItemMut
 	return in, true
 }
 
-func salesOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.SalesOrderItemSaveMutation, bool) {
-	raw, ok := pm["items"]
-	if !ok || raw == nil {
-		return []*biz.SalesOrderItemSaveMutation{}, true
-	}
-	rawItems, ok := raw.([]any)
+func salesOrderItemSaveRow(fields map[string]any, id int) (*biz.SalesOrderItemSaveMutation, bool) {
+	mutation, ok := salesOrderItemMutationFromParams(fields)
 	if !ok {
 		return nil, false
 	}
-	items := make([]*biz.SalesOrderItemSaveMutation, 0, len(rawItems))
-	for _, rawItem := range rawItems {
-		itemMap, ok := rawItem.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		mutation, ok := salesOrderItemMutationFromParams(itemMap)
-		if !ok {
-			return nil, false
-		}
-		itemID, valid := getOptionalJSONRPCID(itemMap, "id")
-		if !valid {
-			return nil, false
-		}
-		items = append(items, &biz.SalesOrderItemSaveMutation{
-			ID:                     itemID,
-			SalesOrderItemMutation: *mutation,
-		})
-	}
-	return items, true
+	return &biz.SalesOrderItemSaveMutation{ID: id, SalesOrderItemMutation: *mutation}, true
 }
 
 func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *v1.JsonrpcResult {

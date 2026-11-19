@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderEngineering(ctx context.Context, id 
 	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
 		return id, res, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "customer_key", "id", "expected_version", "items", "complete") {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "items", "complete") {
 		return id, invalidParamResult(), nil
 	}
 	complete := false
@@ -45,7 +45,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderEngineering(ctx context.Context, id 
 	in := &biz.SalesOrderEngineeringMutation{SalesOrderID: orderID, ExpectedVersion: version, ActorID: actorID, Complete: complete}
 	for _, raw := range rawItems {
 		fields, ok := raw.(map[string]any)
-		if !ok || !sourceOrderAllowsOnly(fields, "id", "product_id", "product_sku_id", "bom_id", "expected_bom_version") {
+		if !ok || !jsonRPCParamsAllowed(fields, "id", "product_id", "product_sku_id", "bom_id", "expected_bom_version") {
 			return id, invalidParamResult(), nil
 		}
 		itemID, ok := getRequiredJSONRPCPositiveInt(fields, "id")

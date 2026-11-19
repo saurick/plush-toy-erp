@@ -299,7 +299,7 @@ func purchaseReceiptToAny(item *biz.PurchaseReceipt) map[string]any {
 		"pending_inbound_lines": item.PendingInboundLines,
 		"can_post":              item.CanPost,
 		"received_at":           item.ReceivedAt.Unix(),
-		"posted_at":             optionalUnix(item.PostedAt),
+		"posted_at":             optionalTimeUnix(item.PostedAt),
 		"note":                  optionalStringToAny(item.Note),
 		"items":                 lines,
 		"quality_inspections":   qualityInspections,

@@ -54,7 +54,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		item, err := d.inventoryUC.SaveInventoryOperationDraft(ctx, in, actorID)
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "post_inventory_operation":
-		if !inventoryOperationAllowsOnly(pm, "id", "expected_version") {
+		if !jsonRPCParamsAllowed(pm, "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
 		operationID, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
@@ -73,7 +73,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		item, err := d.inventoryUC.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operationID, ExpectedVersion: expectedVersion, ActorID: actorID})
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "cancel_inventory_operation":
-		if !inventoryOperationAllowsOnly(pm, "id", "expected_version", "reason") {
+		if !jsonRPCParamsAllowed(pm, "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
 		operationID, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
@@ -87,7 +87,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		item, err := d.inventoryUC.CancelInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operationID, ExpectedVersion: expectedVersion, ActorID: actorID, Reason: getString(pm, "reason")})
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "get_inventory_operation":
-		if !inventoryOperationAllowsOnly(pm, "id") {
+		if !jsonRPCParamsAllowed(pm, "id") {
 			return id, invalidParamResult(), nil
 		}
 		operationID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
@@ -97,7 +97,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		item, err := d.getInventoryOperationForScope(ctx, operationID, scope)
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "list_inventory_operations":
-		if !inventoryOperationAllowsOnly(pm, "operation_type", "status", "created_by", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "operation_type", "status", "created_by", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		createdBy, ok := getOptionalJSONRPCNonNegativeInt(pm, "created_by")
@@ -199,7 +199,7 @@ func (d *jsonrpcDispatcher) getInventoryOperationForScope(ctx context.Context, i
 }
 
 func inventoryOperationCreateFromParams(pm map[string]any, actorID int) (*biz.InventoryOperationCreate, bool) {
-	if !inventoryOperationAllowsOnly(pm, "operation_no", "operation_type", "reason", "idempotency_key", "items") {
+	if !jsonRPCParamsAllowed(pm, "operation_no", "operation_type", "reason", "idempotency_key", "items") {
 		return nil, false
 	}
 	raw, ok := pm["items"].([]any)
@@ -209,7 +209,7 @@ func inventoryOperationCreateFromParams(pm map[string]any, actorID int) (*biz.In
 	in := &biz.InventoryOperationCreate{OperationNo: getString(pm, "operation_no"), OperationType: getString(pm, "operation_type"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), CreatedBy: actorID}
 	for _, value := range raw {
 		m, ok := value.(map[string]any)
-		if !ok || !inventoryOperationAllowsOnly(m, "line_no", "subject_type", "subject_id", "product_sku_id", "from_warehouse_id", "from_lot_id", "to_warehouse_id", "to_lot_id", "unit_id", "expected_quantity", "counted_quantity", "adjustment_quantity", "note") {
+		if !ok || !jsonRPCParamsAllowed(m, "line_no", "subject_type", "subject_id", "product_sku_id", "from_warehouse_id", "from_lot_id", "to_warehouse_id", "to_lot_id", "unit_id", "expected_quantity", "counted_quantity", "adjustment_quantity", "note") {
 			return nil, false
 		}
 		expected, ok1 := getOptionalJSONRPCDecimalString(m, "expected_quantity")
@@ -233,7 +233,7 @@ func inventoryOperationCreateFromParams(pm map[string]any, actorID int) (*biz.In
 }
 
 func inventoryOperationDraftSaveFromParams(pm map[string]any) (*biz.InventoryOperationDraftSave, bool) {
-	if !inventoryOperationAllowsOnly(pm, "id", "expected_version", "operation_no", "reason", "items") {
+	if !jsonRPCParamsAllowed(pm, "id", "expected_version", "operation_no", "reason", "items") {
 		return nil, false
 	}
 	id, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
@@ -248,7 +248,7 @@ func inventoryOperationDraftSaveFromParams(pm map[string]any) (*biz.InventoryOpe
 	}
 	for _, raw := range rawItems {
 		params, ok := raw.(map[string]any)
-		if !ok || !inventoryOperationAllowsOnly(params, "id", "counted_quantity", "adjustment_quantity", "to_warehouse_id", "note") {
+		if !ok || !jsonRPCParamsAllowed(params, "id", "counted_quantity", "adjustment_quantity", "to_warehouse_id", "note") {
 			return nil, false
 		}
 		itemID, ok := getRequiredJSONRPCPositiveInt(params, "id")
@@ -270,18 +270,6 @@ func inventoryOperationDraftSaveFromParams(pm map[string]any) (*biz.InventoryOpe
 	return in, true
 }
 
-func inventoryOperationAllowsOnly(pm map[string]any, keys ...string) bool {
-	allowed := map[string]struct{}{}
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
-}
 func optionalJSONRPCString(pm map[string]any, key string) (*string, bool) {
 	v, ok := pm[key]
 	if !ok || v == nil {
@@ -330,5 +318,5 @@ func inventoryOperationToAny(item *biz.InventoryOperation) map[string]any {
 	for _, line := range item.Items {
 		items = append(items, map[string]any{"id": line.ID, "line_no": line.LineNo, "subject_type": line.SubjectType, "stock_category": line.StockCategory, "subject_name": line.SubjectName, "sku_code": line.SKUCode, "warehouse_name": line.WarehouseName, "to_warehouse_name": line.ToWarehouseName, "lot_no": line.LotNo, "unit_name": line.UnitName, "subject_id": line.SubjectID, "product_sku_id": optionalIntToAny(line.ProductSkuID), "from_warehouse_id": line.FromWarehouseID, "from_lot_id": optionalIntToAny(line.FromLotID), "to_warehouse_id": optionalIntToAny(line.ToWarehouseID), "to_lot_id": optionalIntToAny(line.ToLotID), "unit_id": line.UnitID, "expected_quantity": optionalDecimalToAny(line.ExpectedQuantity), "counted_quantity": optionalDecimalToAny(line.CountedQuantity), "adjustment_quantity": line.AdjustmentQuantity.String(), "note": optionalStringToAny(line.Note)})
 	}
-	return map[string]any{"id": item.ID, "operation_no": item.OperationNo, "operation_type": item.OperationType, "status": item.Status, "reason": item.Reason, "version": item.Version, "submitted_at": optionalUnix(item.SubmittedAt), "submitted_by": optionalIntToAny(item.SubmittedBy), "approved_at": optionalUnix(item.ApprovedAt), "approved_by": optionalIntToAny(item.ApprovedBy), "rejected_at": optionalUnix(item.RejectedAt), "rejected_by": optionalIntToAny(item.RejectedBy), "reject_reason": optionalStringToAny(item.RejectReason), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancel_reason": optionalStringToAny(item.CancelReason), "created_by": item.CreatedBy, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix(), "items": items}
+	return map[string]any{"id": item.ID, "operation_no": item.OperationNo, "operation_type": item.OperationType, "status": item.Status, "reason": item.Reason, "version": item.Version, "submitted_at": optionalTimeUnix(item.SubmittedAt), "submitted_by": optionalIntToAny(item.SubmittedBy), "approved_at": optionalTimeUnix(item.ApprovedAt), "approved_by": optionalIntToAny(item.ApprovedBy), "rejected_at": optionalTimeUnix(item.RejectedAt), "rejected_by": optionalIntToAny(item.RejectedBy), "reject_reason": optionalStringToAny(item.RejectReason), "posted_at": optionalTimeUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "cancelled_at": optionalTimeUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancel_reason": optionalStringToAny(item.CancelReason), "created_by": item.CreatedBy, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix(), "items": items}
 }

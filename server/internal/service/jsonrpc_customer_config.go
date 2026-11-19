@@ -321,7 +321,7 @@ func customerConfigProcessRuntimeBoundary(revision string, boundary map[string]a
 }
 
 func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSettingsRevisionInput, bool) {
-	if !customerConfigAllowsOnly(
+	if !jsonRPCParamsAllowed(
 		pm,
 		"customer_key",
 		"revision",
@@ -338,7 +338,7 @@ func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSet
 	items := make([]biz.ApprovalSettingItemInput, 0, len(rawItems))
 	for _, rawItem := range rawItems {
 		itemMap, ok := rawItem.(map[string]any)
-		if !ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members", "condition") {
+		if !ok || !jsonRPCParamsAllowed(itemMap, "approval_key", "enabled", "members", "condition") {
 			return biz.ApprovalSettingsRevisionInput{}, false
 		}
 		rawMembers, ok := itemMap["members"].([]any)
@@ -348,7 +348,7 @@ func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSet
 		members := make([]biz.ApprovalSettingMemberInput, 0, len(rawMembers))
 		for _, rawMember := range rawMembers {
 			memberMap, ok := rawMember.(map[string]any)
-			if !ok || !customerConfigAllowsOnly(memberMap, "role_key", "user_id", "strategy", "enabled") {
+			if !ok || !jsonRPCParamsAllowed(memberMap, "role_key", "user_id", "strategy", "enabled") {
 				return biz.ApprovalSettingsRevisionInput{}, false
 			}
 			enabled, ok := memberMap["enabled"].(bool)
@@ -1458,17 +1458,4 @@ func toAnyMapStringString(values map[string]string) map[string]any {
 		out[key] = value
 	}
 	return out
-}
-
-func customerConfigAllowsOnly(pm map[string]any, keys ...string) bool {
-	allowed := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
 }

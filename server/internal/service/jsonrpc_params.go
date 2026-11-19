@@ -298,3 +298,46 @@ func normalizedOffset(pm map[string]any) int {
 	}
 	return offset
 }
+
+func jsonRPCParamsAllowed(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// Omitted items represent an empty replacement list. New rows may omit their
+// ID; a supplied ID is checked before the domain parser handles the row.
+func parseSourceOrderItems[T any](pm map[string]any, parseRow func(map[string]any, int) (*T, bool)) ([]*T, bool) {
+	raw, exists := pm["items"]
+	if !exists || raw == nil {
+		return []*T{}, true
+	}
+	rows, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	result := make([]*T, 0, len(rows))
+	for _, rawRow := range rows {
+		fields, ok := rawRow.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		id, ok := getOptionalJSONRPCID(fields, "id")
+		if !ok {
+			return nil, false
+		}
+		row, ok := parseRow(fields, id)
+		if !ok {
+			return nil, false
+		}
+		result = append(result, row)
+	}
+	return result, true
+}

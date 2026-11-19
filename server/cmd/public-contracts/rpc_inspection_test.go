@@ -141,6 +141,15 @@ func TestRPCInspectionRetainsOmissionNullAndConditionalRules(t *testing.T) {
 		t.Fatalf("missing %s.%s.%s", domain, method, name)
 		return rpcSourceField{}
 	}
+	for domain, quantity := range map[string]string{"sales_order": "ordered_quantity", "purchase_order": "purchased_quantity", "outsourcing_order": "outsourcing_quantity"} {
+		method := "save_" + domain + "_with_items"
+		for _, name := range []string{"items[]", "items[]." + quantity} {
+			if field := find(domain, method, name); field.Required != "条件必填（items 有值）" {
+				t.Fatalf("%s.%s lost its per-item input condition: %s", method, name, field.Required)
+			}
+		}
+		find(domain, method, "items[].id")
+	}
 	for _, item := range [][3]string{
 		{"masterdata", "update_product_sku", "default_unit_id"},
 		{"masterdata", "update_product_sku", "unit_net_weight_g"},

@@ -43,7 +43,7 @@ func TestLifecycleScopeParsers(t *testing.T) {
 func TestProductionOrderLifecycleScopeIsStrictlyParsed(t *testing.T) {
 	t.Parallel()
 
-	if productionOrderAllowsOnly(map[string]any{"lifecycle_scope": "history"}, "keyword") {
+	if jsonRPCParamsAllowed(map[string]any{"lifecycle_scope": "history"}, "keyword") {
 		t.Fatal("strict-key guard accepted lifecycle_scope when it was not declared")
 	}
 	if _, ok := productionOrderFilterFromParams(map[string]any{

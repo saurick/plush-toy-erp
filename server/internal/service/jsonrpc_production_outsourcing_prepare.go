@@ -25,7 +25,7 @@ func (d *jsonrpcDispatcher) prepareProductionOutsourcing(ctx context.Context, pm
 	if res := d.requireCustomerConfigModulesEnabled(ctx, "", productionOrderModuleKey, "outsourcing_orders"); res != nil {
 		return res
 	}
-	if !productionOrderAllowsOnly(pm, "production_wip_batch_id", "expected_version", "supplier_id", "requirement_ids", "expected_return_date") {
+	if !jsonRPCParamsAllowed(pm, "production_wip_batch_id", "expected_version", "supplier_id", "requirement_ids", "expected_return_date") {
 		return invalidParamResult()
 	}
 	batch, ok := getRequiredJSONRPCPositiveInt(pm, "production_wip_batch_id")

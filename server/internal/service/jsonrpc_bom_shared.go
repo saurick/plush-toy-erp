@@ -236,7 +236,7 @@ func bomHeaderToAny(item *biz.BOMHeader) map[string]any {
 		"source_order_no": optionalStringToAny(item.SourceOrderNo),
 		"quantity_text":   optionalStringToAny(item.QuantityText),
 		"spare_text":      optionalStringToAny(item.SpareText),
-		"print_date":      optionalUnix(item.PrintDate),
+		"print_date":      optionalTimeUnix(item.PrintDate),
 		"designer":        optionalStringToAny(item.Designer),
 		"maker":           optionalStringToAny(item.Maker),
 		"auditor":         optionalStringToAny(item.Auditor),

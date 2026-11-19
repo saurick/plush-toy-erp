@@ -43,7 +43,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 			return id, invalidParamResult(), nil
 		}
 		in.ExpectedVersion = expectedVersion
-		items, ok := outsourcingOrderItemSaveMutationsFromParams(pm)
+		items, ok := parseSourceOrderItems(pm, outsourcingOrderItemSaveRow)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}

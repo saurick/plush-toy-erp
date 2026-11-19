@@ -33,7 +33,7 @@ test('integration field tables preserve nullable unions, conditions and escaped 
   const unit = product.fields.find((field) => field.name === 'default_unit_id')
   assert.equal(unit.type, 'integer | null')
   assert.equal(unit.required, '可选')
-  assert.match(unit.description, /getOptionalPositiveIntPtr/u)
+  assert.match(unit.description, /正 JSON 安全整数/u)
   const source = [
     '#### 示例 `admin.set_disabled`', '', '##### 请求参数', '',
     '| 字段 | 类型 | 必填条件 | 说明 |', '| --- | --- | --- | --- |',

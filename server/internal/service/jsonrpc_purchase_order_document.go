@@ -42,7 +42,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 			return id, invalidParamResult(), nil
 		}
 		in.ExpectedVersion = expectedVersion
-		items, ok := purchaseOrderItemSaveMutationsFromParams(pm)
+		items, ok := parseSourceOrderItems(pm, purchaseOrderItemSaveRow)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}

@@ -58,7 +58,7 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 	var err error
 	switch method {
 	case "get_production_exception_context":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "quality_inspection_id") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "quality_inspection_id") {
 			return id, invalidParamResult(), nil
 		}
 		inspectionID, valid := getRequiredJSONRPCPositiveInt(pm, "quality_inspection_id")
@@ -94,7 +94,7 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method, condition); res != nil {
 			return id, res, nil
 		}
-		if !productionCompletionAllowsOnly(pm, "customer_key", "decision_no", "decision_type", "production_order_id", "production_order_item_id", "production_material_requirement_id", "production_wip_batch_id", "quality_inspection_id", "target_operation_id", "target_supplier_id", "requested_quantity", "reason", "idempotency_key") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "decision_no", "decision_type", "production_order_id", "production_order_item_id", "production_material_requirement_id", "production_wip_batch_id", "quality_inspection_id", "target_operation_id", "target_supplier_id", "requested_quantity", "reason", "idempotency_key") {
 			return id, invalidParamResult(), nil
 		}
 		quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "requested_quantity")
@@ -125,12 +125,12 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		mutation.WarehouseScope = &scope
 		item, err = d.operationalFactUC.ReverseProductionException(ctx, mutation)
 	case "get_production_exception":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
 		item, err = d.operationalFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
 	case "list_production_exceptions":
-		if !productionCompletionAllowsOnly(pm, "keyword", "include_status_counts", "handling_status", "customer_key", "status", "execution_status", "decision_type", "production_order_id", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "keyword", "include_status_counts", "handling_status", "customer_key", "status", "execution_status", "decision_type", "production_order_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		filter := biz.ProductionExceptionFilter{Keyword: getString(pm, "keyword"), HandlingStatus: getString(pm, "handling_status"), Status: getString(pm, "status"), ExecutionStatus: getString(pm, "execution_status"), DecisionType: getString(pm, "decision_type"), ProductionOrderID: getInt(pm, "production_order_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
@@ -161,7 +161,7 @@ func productionExceptionMutationFromParams(pm map[string]any, actorID int, appro
 	if approval {
 		allowed = append(allowed, "approved_quantity")
 	}
-	if !productionCompletionAllowsOnly(pm, allowed...) {
+	if !jsonRPCParamsAllowed(pm, allowed...) {
 		return nil, false
 	}
 	var approved *decimal.Decimal
@@ -179,7 +179,7 @@ func productionExceptionToAny(item *biz.ProductionExceptionDecision) map[string]
 	if item == nil {
 		return nil
 	}
-	return map[string]any{"id": item.ID, "decision_no": item.DecisionNo, "decision_type": item.DecisionType, "status": item.Status, "execution_status": item.ExecutionStatus, "stock_disposition_required": item.StockDispositionRequired, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID, "production_material_requirement_id": optionalIntToAny(item.ProductionMaterialRequirementID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "quality_inspection_id": optionalIntToAny(item.QualityInspectionID), "target_operation_id": optionalIntToAny(item.TargetOperationID), "target_supplier_id": optionalIntToAny(item.TargetSupplierID), "requested_quantity": item.RequestedQuantity.String(), "approved_quantity": optionalDecimalToAny(item.ApprovedQuantity), "reason": item.Reason, "version": item.Version, "requested_by": item.RequestedBy, "requested_at": item.RequestedAt.Unix(), "decided_by": optionalIntToAny(item.DecidedBy), "decided_at": optionalUnix(item.DecidedAt), "decision_reason": optionalStringToAny(item.DecisionReason), "executed_by": optionalIntToAny(item.ExecutedBy), "executed_at": optionalUnix(item.ExecutedAt), "execution_reason": optionalStringToAny(item.ExecutionReason), "reversed_by": optionalIntToAny(item.ReversedBy), "reversed_at": optionalUnix(item.ReversedAt), "reverse_reason": optionalStringToAny(item.ReverseReason), "source_identity": productionExceptionSourceIdentityToAny(item.SourceIdentity)}
+	return map[string]any{"id": item.ID, "decision_no": item.DecisionNo, "decision_type": item.DecisionType, "status": item.Status, "execution_status": item.ExecutionStatus, "stock_disposition_required": item.StockDispositionRequired, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID, "production_material_requirement_id": optionalIntToAny(item.ProductionMaterialRequirementID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "quality_inspection_id": optionalIntToAny(item.QualityInspectionID), "target_operation_id": optionalIntToAny(item.TargetOperationID), "target_supplier_id": optionalIntToAny(item.TargetSupplierID), "requested_quantity": item.RequestedQuantity.String(), "approved_quantity": optionalDecimalToAny(item.ApprovedQuantity), "reason": item.Reason, "version": item.Version, "requested_by": item.RequestedBy, "requested_at": item.RequestedAt.Unix(), "decided_by": optionalIntToAny(item.DecidedBy), "decided_at": optionalTimeUnix(item.DecidedAt), "decision_reason": optionalStringToAny(item.DecisionReason), "executed_by": optionalIntToAny(item.ExecutedBy), "executed_at": optionalTimeUnix(item.ExecutedAt), "execution_reason": optionalStringToAny(item.ExecutionReason), "reversed_by": optionalIntToAny(item.ReversedBy), "reversed_at": optionalTimeUnix(item.ReversedAt), "reverse_reason": optionalStringToAny(item.ReverseReason), "source_identity": productionExceptionSourceIdentityToAny(item.SourceIdentity)}
 }
 
 func productionExceptionSourceIdentityToAny(item *biz.ProductionExceptionSourceIdentity) any {
@@ -215,7 +215,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingReturnDisposition(ctx context.Conte
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
-		if !productionCompletionAllowsOnly(pm, "customer_key", "disposition_no", "quality_inspection_id", "disposition_type", "quantity", "production_wip_batch_id", "reason", "idempotency_key") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "disposition_no", "quality_inspection_id", "disposition_type", "quantity", "production_wip_batch_id", "reason", "idempotency_key") {
 			return id, invalidParamResult(), nil
 		}
 		quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
@@ -224,22 +224,22 @@ func (d *jsonrpcDispatcher) handleOutsourcingReturnDisposition(ctx context.Conte
 		}
 		item, err = d.operationalFactUC.CreateOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionCreate{DispositionNo: getString(pm, "disposition_no"), QualityInspectionID: getInt(pm, "quality_inspection_id", 0), DispositionType: getString(pm, "disposition_type"), Quantity: quantity, ProductionWIPBatchID: getOptionalInt(pm, "production_wip_batch_id"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), CreatedBy: actorID})
 	case "post_outsourcing_return_disposition":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
 		item, err = d.operationalFactUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID})
 	case "cancel_outsourcing_return_disposition":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
 		item, err = d.operationalFactUC.CancelOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID, Reason: getString(pm, "reason")})
 	case "get_outsourcing_return_disposition":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "id") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id") {
 			return id, invalidParamResult(), nil
 		}
 		item, err = d.operationalFactUC.GetOutsourcingReturnDisposition(ctx, getInt(pm, "id", 0))
 	case "list_outsourcing_return_dispositions":
-		if !productionCompletionAllowsOnly(pm, "customer_key", "quality_inspection_id", "outsourcing_return_fact_id", "status", "limit", "offset") {
+		if !jsonRPCParamsAllowed(pm, "customer_key", "quality_inspection_id", "outsourcing_return_fact_id", "status", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		items, total, listErr := d.operationalFactUC.ListOutsourcingReturnDispositions(ctx, biz.OutsourcingReturnDispositionFilter{QualityInspectionID: getInt(pm, "quality_inspection_id", 0), OutsourcingReturnFactID: getInt(pm, "outsourcing_return_fact_id", 0), Status: getString(pm, "status"), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
@@ -262,5 +262,5 @@ func outsourcingDispositionToAny(item *biz.OutsourcingReturnDisposition) map[str
 	if item == nil {
 		return nil
 	}
-	return map[string]any{"id": item.ID, "disposition_no": item.DispositionNo, "quality_inspection_id": item.QualityInspectionID, "outsourcing_return_fact_id": item.OutsourcingReturnFactID, "disposition_type": item.DispositionType, "status": item.Status, "quantity": item.Quantity.String(), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "result_wip_batch_id": optionalIntToAny(item.ResultWIPBatchID), "reason": item.Reason, "version": item.Version, "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancel_reason": optionalStringToAny(item.CancelReason), "created_by": item.CreatedBy}
+	return map[string]any{"id": item.ID, "disposition_no": item.DispositionNo, "quality_inspection_id": item.QualityInspectionID, "outsourcing_return_fact_id": item.OutsourcingReturnFactID, "disposition_type": item.DispositionType, "status": item.Status, "quantity": item.Quantity.String(), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "result_wip_batch_id": optionalIntToAny(item.ResultWIPBatchID), "reason": item.Reason, "version": item.Version, "posted_at": optionalTimeUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "cancelled_at": optionalTimeUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancel_reason": optionalStringToAny(item.CancelReason), "created_by": item.CreatedBy}
 }

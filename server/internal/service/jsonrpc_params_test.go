@@ -56,9 +56,12 @@ func TestSourceDocumentLineIdentifiersDoNotCoerce(t *testing.T) {
 		line  map[string]any
 		parse func(map[string]any) bool
 	}{
-		{"sales", map[string]any{"product_id": 1, "unit_id": 1, "line_no": 1, "ordered_quantity": "1"}, func(pm map[string]any) bool { _, ok := salesOrderItemSaveMutationsFromParams(pm); return ok }},
-		{"purchase", map[string]any{"material_id": 1, "unit_id": 1, "line_no": 1, "purchased_quantity": "1"}, func(pm map[string]any) bool { _, ok := purchaseOrderItemSaveMutationsFromParams(pm); return ok }},
-		{"outsourcing", map[string]any{"subject_type": "PRODUCT", "product_id": 1, "unit_id": 1, "line_no": 1, "outsourcing_quantity": "1"}, func(pm map[string]any) bool { _, ok := outsourcingOrderItemSaveMutationsFromParams(pm); return ok }},
+		{"sales", map[string]any{"product_id": 1, "unit_id": 1, "line_no": 1, "ordered_quantity": "1"}, func(pm map[string]any) bool { _, ok := parseSourceOrderItems(pm, salesOrderItemSaveRow); return ok }},
+		{"purchase", map[string]any{"material_id": 1, "unit_id": 1, "line_no": 1, "purchased_quantity": "1"}, func(pm map[string]any) bool { _, ok := parseSourceOrderItems(pm, purchaseOrderItemSaveRow); return ok }},
+		{"outsourcing", map[string]any{"subject_type": "PRODUCT", "product_id": 1, "unit_id": 1, "line_no": 1, "outsourcing_quantity": "1"}, func(pm map[string]any) bool {
+			_, ok := parseSourceOrderItems(pm, outsourcingOrderItemSaveRow)
+			return ok
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if !tc.parse(map[string]any{"items": []any{tc.line}}) {

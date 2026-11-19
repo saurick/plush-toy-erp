@@ -18,7 +18,7 @@ func unknownOutsourcingOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderMutation, bool) {
-	if !sourceOrderAllowsOnly(pm,
+	if !jsonRPCParamsAllowed(pm,
 		"customer_key",
 		"id",
 		"expected_version",
@@ -67,7 +67,7 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 }
 
 func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderItemMutation, bool) {
-	if !sourceOrderAllowsOnly(pm,
+	if !jsonRPCParamsAllowed(pm,
 		"id",
 		"outsourcing_order_id",
 		"line_no",
@@ -137,48 +137,12 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 	}, true
 }
 
-func sourceOrderAllowsOnly(pm map[string]any, keys ...string) bool {
-	allowed := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-func outsourcingOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.OutsourcingOrderItemSaveMutation, bool) {
-	raw, ok := pm["items"]
-	if !ok || raw == nil {
-		return []*biz.OutsourcingOrderItemSaveMutation{}, true
-	}
-	rawItems, ok := raw.([]any)
+func outsourcingOrderItemSaveRow(fields map[string]any, id int) (*biz.OutsourcingOrderItemSaveMutation, bool) {
+	mutation, ok := outsourcingOrderItemMutationFromParams(fields)
 	if !ok {
 		return nil, false
 	}
-	items := make([]*biz.OutsourcingOrderItemSaveMutation, 0, len(rawItems))
-	for _, rawItem := range rawItems {
-		itemMap, ok := rawItem.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		mutation, ok := outsourcingOrderItemMutationFromParams(itemMap)
-		if !ok {
-			return nil, false
-		}
-		itemID, valid := getOptionalJSONRPCID(itemMap, "id")
-		if !valid {
-			return nil, false
-		}
-		items = append(items, &biz.OutsourcingOrderItemSaveMutation{
-			ID:                           itemID,
-			OutsourcingOrderItemMutation: *mutation,
-		})
-	}
-	return items, true
+	return &biz.OutsourcingOrderItemSaveMutation{ID: id, OutsourcingOrderItemMutation: *mutation}, true
 }
 
 func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
@@ -280,13 +244,13 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"source_order_no":         optionalStringValue(item.SourceOrderNo),
 		"source_wip_batch_id":     optionalIntValue(item.SourceWIPBatchID),
 		"order_date":              item.OrderDate.Unix(),
-		"expected_return_date":    optionalUnix(item.ExpectedReturnDate),
+		"expected_return_date":    optionalTimeUnix(item.ExpectedReturnDate),
 		"lifecycle_status":        item.LifecycleStatus,
 		"version":                 item.Version,
 		"settlement_action":       optionalStringValue(item.SettlementAction),
 		"settlement_mode":         optionalStringValue(item.SettlementMode),
 		"settlement_reason":       optionalStringValue(item.SettlementReason),
-		"settled_at":              optionalUnix(item.SettledAt),
+		"settled_at":              optionalTimeUnix(item.SettledAt),
 		"settled_by":              optionalIntValue(item.SettledBy),
 		"note":                    optionalStringValue(item.Note),
 		"created_at":              item.CreatedAt.Unix(),
@@ -336,7 +300,7 @@ func outsourcingOrderItemToMap(item *biz.OutsourcingOrderItem) map[string]any {
 		"outsourcing_quantity":      item.OutsourcingQuantity.String(),
 		"unit_price":                optionalDecimalString(item.UnitPrice),
 		"amount":                    optionalDecimalString(item.Amount),
-		"expected_return_date":      optionalUnix(item.ExpectedReturnDate),
+		"expected_return_date":      optionalTimeUnix(item.ExpectedReturnDate),
 		"line_status":               item.LineStatus,
 		"note":                      optionalStringValue(item.Note),
 		"created_at":                item.CreatedAt.Unix(),

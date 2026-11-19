@@ -49,7 +49,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if orderID == 0 {
 			in.ActorID = actorID
 		}
-		items, ok := salesOrderItemSaveMutationsFromParams(pm)
+		items, ok := parseSourceOrderItems(pm, salesOrderItemSaveRow)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}

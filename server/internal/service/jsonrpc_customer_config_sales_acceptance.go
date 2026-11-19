@@ -13,7 +13,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigGetSalesOrderAcceptanceProcess(c
 	if res := d.requireSourceActionReadPermissions(ctx, "customer_config", method); res != nil {
 		return id, res, nil
 	}
-	if !customerConfigAllowsOnly(pm, "customer_key", "sales_order_id") {
+	if !jsonRPCParamsAllowed(pm, "customer_key", "sales_order_id") {
 		return id, invalidParamResult(), nil
 	}
 	salesOrderID := getInt(pm, "sales_order_id", 0)

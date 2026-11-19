@@ -107,7 +107,7 @@ func (d *jsonrpcDispatcher) startCustomerConfigExceptionProcess(
 	pm map[string]any,
 	admin *biz.AdminUser,
 ) *v1.JsonrpcResult {
-	if !customerConfigAllowsOnly(
+	if !jsonRPCParamsAllowed(
 		pm,
 		"customer_key",
 		contract.idParam,
@@ -244,7 +244,7 @@ func (d *jsonrpcDispatcher) getCustomerConfigExceptionProcess(
 	pm map[string]any,
 	_ *biz.AdminUser,
 ) *v1.JsonrpcResult {
-	if !customerConfigAllowsOnly(pm, "customer_key", contract.idParam) {
+	if !jsonRPCParamsAllowed(pm, "customer_key", contract.idParam) {
 		return invalidParamResult()
 	}
 	businessRefID := exceptionProcessBusinessRefID(pm, contract.idParam)
@@ -381,7 +381,7 @@ func exceptionProcessDomainCommandExecutionFromParams(
 	case biz.ProcessDomainCommandProductionExceptionExecute:
 		allowed = append(allowed, "reason")
 	}
-	if !customerConfigAllowsOnly(pm, allowed...) {
+	if !jsonRPCParamsAllowed(pm, allowed...) {
 		return nil, false
 	}
 	processInstanceID := getInt(pm, "process_instance_id", 0)
@@ -409,7 +409,7 @@ func exceptionProcessDomainCommandExecutionFromParams(
 		allocations := make([]any, 0, len(raw))
 		for _, value := range raw {
 			item, ok := value.(map[string]any)
-			if !ok || !customerConfigAllowsOnly(item, "finance_fact_id", "amount") {
+			if !ok || !jsonRPCParamsAllowed(item, "finance_fact_id", "amount") {
 				return nil, false
 			}
 			amount, ok := getRequiredJSONRPCNumeric20Scale6(item, "amount")

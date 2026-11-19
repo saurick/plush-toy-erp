@@ -55,7 +55,7 @@ func (d *jsonrpcDispatcher) handlePartner(ctx context.Context, method, id string
 		}
 		items := make([]any, 0, len(result.Items))
 		for _, item := range result.Items {
-			items = append(items, map[string]any{"id": item.ID, "line_no": item.LineNo, "unit_id": item.UnitID, "material_code": optionalStringValue(item.MaterialCodeSnapshot), "material_name": optionalStringValue(item.MaterialNameSnapshot), "color": optionalStringValue(item.ColorSnapshot), "quantity": item.PurchasedQuantity.String(), "unit_price": optionalDecimalString(item.UnitPrice), "amount": optionalDecimalString(item.Amount), "expected_arrival_date": optionalUnix(item.ExpectedArrivalDate)})
+			items = append(items, map[string]any{"id": item.ID, "line_no": item.LineNo, "unit_id": item.UnitID, "material_code": optionalStringValue(item.MaterialCodeSnapshot), "material_name": optionalStringValue(item.MaterialNameSnapshot), "color": optionalStringValue(item.ColorSnapshot), "quantity": item.PurchasedQuantity.String(), "unit_price": optionalDecimalString(item.UnitPrice), "amount": optionalDecimalString(item.Amount), "expected_arrival_date": optionalTimeUnix(item.ExpectedArrivalDate)})
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"purchase_order": partnerPurchaseOrderToMap(result.Order), "items": items})}, nil
 	case "list_sales_orders":
@@ -137,7 +137,7 @@ func partnerAccountToMap(a *biz.AdminUser) map[string]any {
 	return map[string]any{"id": a.ID, "username": a.Username, "display_name": a.DisplayName, "account_kind": a.AccountKind.String(), "supplier_id": optionalIntValue(a.SupplierID), "customer_id": optionalIntValue(a.CustomerID)}
 }
 func partnerPurchaseOrderToMap(a *biz.PurchaseOrder) map[string]any {
-	return map[string]any{"id": a.ID, "order_no": a.PurchaseOrderNo, "supplier_purchase_order_no": optionalStringValue(a.SupplierPurchaseOrderNo), "currency": a.Currency, "purchase_date": a.PurchaseDate.Unix(), "expected_arrival_date": optionalUnix(a.ExpectedArrivalDate), "lifecycle_status": a.LifecycleStatus}
+	return map[string]any{"id": a.ID, "order_no": a.PurchaseOrderNo, "supplier_purchase_order_no": optionalStringValue(a.SupplierPurchaseOrderNo), "currency": a.Currency, "purchase_date": a.PurchaseDate.Unix(), "expected_arrival_date": optionalTimeUnix(a.ExpectedArrivalDate), "lifecycle_status": a.LifecycleStatus}
 }
 func partnerSalesOrderToMap(a *biz.SalesOrder) map[string]any {
 	return map[string]any{"id": a.ID, "order_no": a.OrderNo, "customer_order_no": optionalStringValue(a.CustomerOrderNo), "currency": a.Currency, "order_date": a.OrderDate.Unix(), "planned_delivery_date": optionalTimeUnix(a.PlannedDeliveryDate), "lifecycle_status": a.LifecycleStatus}

@@ -53,6 +53,7 @@ type rpcInspectionFunction struct {
 	path string
 }
 type rpcInspectionEnv struct {
+	callbacks   map[string]string
 	strings     map[string]string
 	maps        map[string]string
 	lists       map[string][]string
@@ -88,6 +89,18 @@ func rpcInspectionName(expr ast.Expr) string {
 		return x.Sel.Name
 	}
 	return ""
+}
+func rpcInspectionCallbackParam(fn *ast.FuncDecl, name string) bool {
+	for _, field := range fn.Type.Params.List {
+		if _, ok := field.Type.(*ast.FuncType); ok {
+			for _, param := range field.Names {
+				if param.Name == name {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 func rpcInspectionParams(fn *ast.FuncDecl) []string {
 	var names []string
@@ -552,6 +565,9 @@ func (s *rpcInspector) walk(node ast.Node, env rpcInspectionEnv) {
 			}
 		case *ast.CallExpr:
 			name := rpcInspectionName(x.Fun)
+			if id, ok := x.Fun.(*ast.Ident); ok && env.callbacks[id.Name] != "" {
+				name = env.callbacks[id.Name]
+			}
 			s.parameterRule(name, x, env)
 			if name == "decodeIQCEvidence" && len(x.Args) == 2 {
 				if field, ok := s.field(x.Args[0], env); ok {
@@ -621,6 +637,12 @@ func (s *rpcInspector) walk(node ast.Node, env rpcInspectionEnv) {
 					}
 				}
 				if id, ok := arg.(*ast.Ident); ok {
+					if _, known := s.functions[id.Name]; known && rpcInspectionCallbackParam(target.fn, names[i]) {
+						if child.callbacks == nil {
+							child.callbacks = map[string]string{}
+						}
+						child.callbacks[names[i]] = id.Name
+					}
 					for key, value := range env.strings {
 						if strings.HasPrefix(key, id.Name+".") {
 							child.strings[names[i]+strings.TrimPrefix(key, id.Name)] = value
@@ -719,6 +741,14 @@ func (s *rpcInspector) follow(name string, env rpcInspectionEnv) {
 	}
 	signature := name
 	keys := []string{}
+	for key := range env.callbacks {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		signature += "|callback:" + key + "=" + env.callbacks[key]
+	}
+	keys = nil
 	for key := range env.strings {
 		keys = append(keys, key)
 	}

@@ -110,7 +110,7 @@ func workflowTrackingPerson(entry *biz.WorkflowTrackingEntry, id *int) string {
 }
 
 func workflowTrackingTask(task *biz.WorkflowTask, entry *biz.WorkflowTrackingEntry) map[string]any {
-	return map[string]any{"task_id": task.ID, "task_name": task.TaskName, "node_instance_id": workflowIntValue(task.ProcessNodeInstanceID), "owner_role_key": task.OwnerRoleKey, "assignee_name": workflowTrackingPerson(entry, task.AssigneeID), "required_capability_key": workflowStringValue(task.RequiredCapabilityKey), "status": task.TaskStatusKey, "created_at": task.CreatedAt.Unix(), "completed_at": workflowUnixValue(task.CompletedAt), "due_at": workflowUnixValue(task.DueAt)}
+	return map[string]any{"task_id": task.ID, "task_name": task.TaskName, "node_instance_id": workflowIntValue(task.ProcessNodeInstanceID), "owner_role_key": task.OwnerRoleKey, "assignee_name": workflowTrackingPerson(entry, task.AssigneeID), "required_capability_key": workflowStringValue(task.RequiredCapabilityKey), "status": task.TaskStatusKey, "created_at": task.CreatedAt.Unix(), "completed_at": optionalTimeUnix(task.CompletedAt), "due_at": optionalTimeUnix(task.DueAt)}
 }
 
 func workflowTrackingCurrentTasks(entry *biz.WorkflowTrackingEntry) []*biz.WorkflowTask {
@@ -137,14 +137,14 @@ func workflowTrackingSummary(entry *biz.WorkflowTrackingEntry) map[string]any {
 		result["process_key"], result["title"] = p.ProcessKey, ""
 		result["source_type"], result["source_id"], result["source_no"] = p.BusinessRefType, p.BusinessRefID, workflowStringValue(p.BusinessRefNo)
 		result["status"], result["resolution_kind"] = p.Status, workflowStringValue(p.ResolutionKind)
-		result["updated_at"], result["completed_at"] = p.UpdatedAt.Unix(), workflowUnixValue(p.CompletedAt)
+		result["updated_at"], result["completed_at"] = p.UpdatedAt.Unix(), optionalTimeUnix(p.CompletedAt)
 		result["initiator_name"] = workflowTrackingPerson(entry, p.CreatedBy)
 	} else {
 		t := entry.Task
 		result["process_key"], result["title"] = "", t.TaskName
 		result["source_type"], result["source_id"], result["source_no"] = t.SourceType, t.SourceID, workflowStringValue(t.SourceNo)
 		result["status"], result["resolution_kind"] = t.TaskStatusKey, nil
-		result["updated_at"], result["completed_at"] = t.UpdatedAt.Unix(), workflowUnixValue(t.CompletedAt)
+		result["updated_at"], result["completed_at"] = t.UpdatedAt.Unix(), optionalTimeUnix(t.CompletedAt)
 		result["initiator_name"] = workflowTrackingPerson(entry, t.CreatedBy)
 	}
 	for _, t := range workflowTrackingCurrentTasks(entry) {

@@ -128,13 +128,13 @@ func workflowTaskToMap(task *biz.WorkflowTask) map[string]any {
 		"blocked_reason":           workflowStringValue(task.BlockedReason),
 		"critical_path":            task.CriticalPath,
 		"urge_count":               task.UrgeCount,
-		"last_urged_at":            workflowUnixValue(task.LastUrgedAt),
+		"last_urged_at":            optionalTimeUnix(task.LastUrgedAt),
 		"last_urged_by":            workflowIntValue(task.LastUrgedBy),
 		"last_urged_by_role_key":   workflowStringValue(task.LastUrgedByRoleKey),
-		"escalated_at":             workflowUnixValue(task.EscalatedAt),
+		"escalated_at":             optionalTimeUnix(task.EscalatedAt),
 		"escalate_target_role_key": workflowStringValue(task.EscalateTargetRoleKey),
-		"due_at":                   workflowUnixValue(task.DueAt),
-		"completed_at":             workflowUnixValue(task.CompletedAt),
+		"due_at":                   optionalTimeUnix(task.DueAt),
+		"completed_at":             optionalTimeUnix(task.CompletedAt),
 		"payload":                  workflowMapValue(task.Payload),
 		"display_context":          workflowTaskDisplayContextToMap(task.DisplayContext),
 		"discovery":                workflowTaskDiscoveryToMap(task.Discovery),
@@ -234,10 +234,10 @@ func workflowProcessInstanceSummaryToMap(instance *biz.ProcessInstance) map[stri
 		"process_version":   instance.ProcessVersion,
 		"status":            instance.Status,
 		"started_at":        instance.StartedAt.Unix(),
-		"completed_at":      workflowUnixValue(instance.CompletedAt),
+		"completed_at":      optionalTimeUnix(instance.CompletedAt),
 		"resolution_kind":   workflowStringValue(instance.ResolutionKind),
 		"resolution_reason": workflowStringValue(instance.ResolutionReason),
-		"resolved_at":       workflowUnixValue(instance.ResolvedAt),
+		"resolved_at":       optionalTimeUnix(instance.ResolvedAt),
 	}
 }
 
@@ -268,8 +268,8 @@ func workflowProcessNodeToMap(node *biz.ProcessNodeInstance) map[string]any {
 		"required_capability_key": workflowStringValue(node.RequiredCapabilityKey),
 		"form_profile_key":        workflowStringValue(node.FormProfileKey),
 		"action_set_key":          workflowStringValue(node.ActionSetKey),
-		"started_at":              workflowUnixValue(node.StartedAt),
-		"completed_at":            workflowUnixValue(node.CompletedAt),
+		"started_at":              optionalTimeUnix(node.StartedAt),
+		"completed_at":            optionalTimeUnix(node.CompletedAt),
 		"outcome":                 workflowStringValue(node.Outcome),
 	}
 }
@@ -342,13 +342,6 @@ func workflowIntValue(value *int) any {
 		return nil
 	}
 	return *value
-}
-
-func workflowUnixValue(value *time.Time) any {
-	if value == nil {
-		return nil
-	}
-	return value.Unix()
 }
 
 func workflowMapValue(value map[string]any) map[string]any {

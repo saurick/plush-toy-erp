@@ -8,7 +8,7 @@ import (
 )
 
 func (d *jsonrpcDispatcher) listWarehouseProductionWork(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "kind", "stage", "keyword", "limit", "offset", "sort_by", "sort_direction") {
+	if !jsonRPCParamsAllowed(pm, "kind", "stage", "keyword", "limit", "offset", "sort_by", "sort_direction") {
 		return invalidParamResult()
 	}
 	kind, ok := productionOrderRequiredString(pm, "kind", 32)

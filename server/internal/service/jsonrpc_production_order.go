@@ -55,7 +55,7 @@ func (d *jsonrpcDispatcher) handleProductionOrder(ctx context.Context, method, i
 }
 
 func (d *jsonrpcDispatcher) createProductionOrder(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "order_no", "planned_start_at", "planned_end_at", "note", "items", "idempotency_key") {
+	if !jsonRPCParamsAllowed(pm, "order_no", "planned_start_at", "planned_end_at", "note", "items", "idempotency_key") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanCreate); res != nil {
@@ -85,7 +85,7 @@ func (d *jsonrpcDispatcher) createProductionOrder(ctx context.Context, pm map[st
 }
 
 func (d *jsonrpcDispatcher) saveProductionOrder(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "production_order_id", "expected_version", "order_no", "planned_start_at", "planned_end_at", "note", "items", "idempotency_key") {
+	if !jsonRPCParamsAllowed(pm, "production_order_id", "expected_version", "order_no", "planned_start_at", "planned_end_at", "note", "items", "idempotency_key") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanUpdate); res != nil {
@@ -127,7 +127,7 @@ func (d *jsonrpcDispatcher) applyProductionOrderAction(ctx context.Context, pm m
 	if command == biz.ProductionOrderCommandClose || command == biz.ProductionOrderCommandCancel {
 		allowed = append(allowed, "reason")
 	}
-	if !productionOrderAllowsOnly(pm, allowed...) {
+	if !jsonRPCParamsAllowed(pm, allowed...) {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanUpdate); res != nil {
@@ -183,7 +183,7 @@ func (d *jsonrpcDispatcher) applyProductionOrderAction(ctx context.Context, pm m
 }
 
 func (d *jsonrpcDispatcher) getProductionOrder(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "production_order_id") {
+	if !jsonRPCParamsAllowed(pm, "production_order_id") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead); res != nil {
@@ -201,7 +201,7 @@ func (d *jsonrpcDispatcher) getProductionOrder(ctx context.Context, pm map[strin
 }
 
 func (d *jsonrpcDispatcher) listProductionOrders(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "include_status_counts", "keyword", "status", "lifecycle_scope", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "include_status_counts", "keyword", "status", "lifecycle_scope", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead); res != nil {
@@ -233,7 +233,7 @@ func (d *jsonrpcDispatcher) listProductionOrders(ctx context.Context, pm map[str
 }
 
 func (d *jsonrpcDispatcher) listProductionOrderReferenceOptions(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "reference_type", "keyword", "product_id", "product_sku_id", "unit_id", "production_order_id", "selected_ids", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "reference_type", "keyword", "product_id", "product_sku_id", "unit_id", "production_order_id", "selected_ids", "limit", "offset") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanRead); res != nil {
@@ -359,7 +359,7 @@ func productionOrderDraftFromParams(pm map[string]any) (biz.ProductionOrderDraft
 	draftItems := make([]biz.ProductionOrderDraftItem, 0, len(items))
 	for _, raw := range items {
 		item, ok := raw.(map[string]any)
-		if !ok || !productionOrderAllowsOnly(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "route_code", "customer_inspection_required", "note") {
+		if !ok || !jsonRPCParamsAllowed(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "route_code", "customer_inspection_required", "note") {
 			return biz.ProductionOrderDraft{}, "", false
 		}
 		lineNo, ok1 := productionOrderRequiredPositiveInt(item, "line_no")
@@ -426,19 +426,6 @@ func productionOrderFilterFromParams(pm map[string]any) (biz.ProductionOrderFilt
 		return biz.ProductionOrderFilter{}, false
 	}
 	return biz.ProductionOrderFilter{Keyword: keyword, Status: status, LifecycleScope: lifecycleScope, DateField: dateField, DateFrom: dateFrom, DateTo: dateTo, SortBy: sortBy, SortDirection: sortDirection, Limit: limit, Offset: offset}, true
-}
-
-func productionOrderAllowsOnly(pm map[string]any, keys ...string) bool {
-	allowed := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func productionOrderRequiredString(pm map[string]any, key string, maxLen int) (string, bool) {

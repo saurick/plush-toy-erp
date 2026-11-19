@@ -195,19 +195,6 @@ func purchaseReceiptAdjustmentFilterFromParams(pm map[string]any) (biz.PurchaseR
 	}, true
 }
 
-func jsonRPCParamsAllowed(pm map[string]any, keys ...string) bool {
-	allowed := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		allowed[key] = struct{}{}
-	}
-	for key := range pm {
-		if _, ok := allowed[key]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
 func purchaseReturnResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.PurchaseReturn, err error) *v1.JsonrpcResult {
 	if err != nil {
 		return d.mapPurchaseError(ctx, err)
@@ -247,7 +234,7 @@ func purchaseReturnToAny(item *biz.PurchaseReturn) map[string]any {
 		"return_reason":         optionalStringToAny(item.ReturnReason),
 		"status":                item.Status,
 		"returned_at":           item.ReturnedAt.Unix(),
-		"posted_at":             optionalUnix(item.PostedAt),
+		"posted_at":             optionalTimeUnix(item.PostedAt),
 		"note":                  optionalStringToAny(item.Note),
 		"items":                 items,
 		"created_at":            item.CreatedAt.Unix(),
@@ -300,7 +287,7 @@ func purchaseReceiptAdjustmentToAny(item *biz.PurchaseReceiptAdjustment) map[str
 		"reason":              optionalStringToAny(item.Reason),
 		"status":              item.Status,
 		"adjusted_at":         item.AdjustedAt.Unix(),
-		"posted_at":           optionalUnix(item.PostedAt),
+		"posted_at":           optionalTimeUnix(item.PostedAt),
 		"note":                optionalStringToAny(item.Note),
 		"items":               items,
 		"created_at":          item.CreatedAt.Unix(),

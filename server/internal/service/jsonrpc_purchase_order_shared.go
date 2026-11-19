@@ -18,7 +18,7 @@ func unknownPurchaseOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutation, bool) {
-	if !sourceOrderAllowsOnly(pm,
+	if !jsonRPCParamsAllowed(pm,
 		"customer_key", "id", "expected_version", "purchase_order_no", "supplier_id", "currency",
 		"payment_term_days", "supplier_purchase_order_no", "supplier_snapshot", "contract_party_snapshot",
 		"payment_method", "invoice_required", "invoice_category", "purchase_date", "expected_arrival_date",
@@ -105,35 +105,12 @@ func purchaseOrderItemMutationFromParams(pm map[string]any) (*biz.PurchaseOrderI
 	}, true
 }
 
-func purchaseOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.PurchaseOrderItemSaveMutation, bool) {
-	raw, ok := pm["items"]
-	if !ok || raw == nil {
-		return []*biz.PurchaseOrderItemSaveMutation{}, true
-	}
-	rawItems, ok := raw.([]any)
+func purchaseOrderItemSaveRow(fields map[string]any, id int) (*biz.PurchaseOrderItemSaveMutation, bool) {
+	mutation, ok := purchaseOrderItemMutationFromParams(fields)
 	if !ok {
 		return nil, false
 	}
-	items := make([]*biz.PurchaseOrderItemSaveMutation, 0, len(rawItems))
-	for _, rawItem := range rawItems {
-		itemMap, ok := rawItem.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		mutation, ok := purchaseOrderItemMutationFromParams(itemMap)
-		if !ok {
-			return nil, false
-		}
-		itemID, valid := getOptionalJSONRPCID(itemMap, "id")
-		if !valid {
-			return nil, false
-		}
-		items = append(items, &biz.PurchaseOrderItemSaveMutation{
-			ID:                        itemID,
-			PurchaseOrderItemMutation: *mutation,
-		})
-	}
-	return items, true
+	return &biz.PurchaseOrderItemSaveMutation{ID: id, PurchaseOrderItemMutation: *mutation}, true
 }
 
 func (d *jsonrpcDispatcher) mapPurchaseOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
@@ -289,15 +266,15 @@ func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 		"supplier_snapshot":               item.SupplierSnapshot,
 		"contract_party_snapshot":         item.ContractPartySnapshot,
 		"purchase_date":                   item.PurchaseDate.Unix(),
-		"expected_arrival_date":           optionalUnix(item.ExpectedArrivalDate),
-		"supplier_confirmed_arrival_date": optionalUnix(item.SupplierConfirmedArrivalDate),
+		"expected_arrival_date":           optionalTimeUnix(item.ExpectedArrivalDate),
+		"supplier_confirmed_arrival_date": optionalTimeUnix(item.SupplierConfirmedArrivalDate),
 		"delivery_address":                optionalStringValue(item.DeliveryAddress),
 		"lifecycle_status":                item.LifecycleStatus,
 		"version":                         item.Version,
 		"settlement_action":               optionalStringValue(item.SettlementAction),
 		"settlement_mode":                 optionalStringValue(item.SettlementMode),
 		"settlement_reason":               optionalStringValue(item.SettlementReason),
-		"settled_at":                      optionalUnix(item.SettledAt),
+		"settled_at":                      optionalTimeUnix(item.SettledAt),
 		"settled_by":                      optionalIntValue(item.SettledBy),
 		"note":                            optionalStringValue(item.Note),
 		"created_at":                      item.CreatedAt.Unix(),
@@ -339,7 +316,7 @@ func purchaseOrderItemToMap(item *biz.PurchaseOrderItem) map[string]any {
 		"purchased_quantity":        item.PurchasedQuantity.String(),
 		"unit_price":                optionalDecimalString(item.UnitPrice),
 		"amount":                    optionalDecimalString(item.Amount),
-		"expected_arrival_date":     optionalUnix(item.ExpectedArrivalDate),
+		"expected_arrival_date":     optionalTimeUnix(item.ExpectedArrivalDate),
 		"line_status":               item.LineStatus,
 		"note":                      optionalStringValue(item.Note),
 		"created_at":                item.CreatedAt.Unix(),

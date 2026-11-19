@@ -20,7 +20,7 @@ func (d *jsonrpcDispatcher) handlePurchaseFollowups(ctx context.Context, id stri
 	if res := d.requireCustomerConfigModulesReadable(ctx, "purchase_orders", "purchase_receipts"); res != nil {
 		return id, res, nil
 	}
-	if !sourceOrderAllowsOnly(pm, "kind", "keyword", "confirmation", "start_date", "selected_date", "supplier_id", "order_id", "sales_order_id", "limit", "offset") {
+	if !jsonRPCParamsAllowed(pm, "kind", "keyword", "confirmation", "start_date", "selected_date", "supplier_id", "order_id", "sales_order_id", "limit", "offset") {
 		return id, invalidParamResult(), nil
 	}
 	q := biz.PurchaseFollowupQuery{}
