@@ -17,7 +17,7 @@ export function inventoryLotStatusLabel(status) {
   return INVENTORY_LOT_STATUS_LABELS[key] || (key ? '批次状态待核对' : '')
 }
 
-function positiveID(value) {
+export function referenceOptionID(value) {
   const id = Number(value || 0)
   return Number.isFinite(id) && id > 0 ? id : undefined
 }
@@ -33,7 +33,7 @@ export function uniqueReferenceOptions(records, toOption) {
   const seen = new Set()
   const options = (Array.isArray(records) ? records : [])
     .map(toOption)
-    .filter((option) => option && positiveID(option.value))
+    .filter((option) => option && referenceOptionID(option.value))
     .filter((option) => {
       const key = Number(option.value)
       if (seen.has(key)) return false
@@ -44,7 +44,7 @@ export function uniqueReferenceOptions(records, toOption) {
 }
 
 export function referenceLabel(options, value, fallbackPrefix = '记录', { emptyText = '-' } = {}) {
-  const normalizedValue = positiveID(value)
+  const normalizedValue = referenceOptionID(value)
   if (!normalizedValue) return emptyText
   const matched = (Array.isArray(options) ? options : []).find(
     (option) => option?.value === normalizedValue
@@ -65,7 +65,7 @@ export function businessSubjectLabel(subjectType, fallback = '') {
 }
 
 export function materialOption(material = {}) {
-  const value = positiveID(material.id)
+  const value = referenceOptionID(material.id)
   if (!value) return null
   return {
     value,
@@ -82,7 +82,7 @@ export function materialOption(material = {}) {
 }
 
 export function productOption(product = {}) {
-  const value = positiveID(product.id)
+  const value = referenceOptionID(product.id)
   if (!value) return null
   return {
     value,
@@ -96,7 +96,7 @@ export function productOption(product = {}) {
 }
 
 export function productSKUOption(sku = {}) {
-  const value = positiveID(sku.id)
+  const value = referenceOptionID(sku.id)
   if (!value) return null
   return {
     value,
@@ -111,7 +111,7 @@ export function productSKUOption(sku = {}) {
 }
 
 export function unitOption(unit = {}) {
-  const value = positiveID(unit.id)
+  const value = referenceOptionID(unit.id)
   if (!value) return null
   const name = String(unit.name ?? '').trim()
   const code = String(unit.code ?? '').trim()
@@ -138,7 +138,7 @@ export function sortUnitOptions(options) {
 }
 
 function partyOption(party, fallbackLabel) {
-  const value = positiveID(party.id)
+  const value = referenceOptionID(party.id)
   if (!value) return null
   const name = String(party.name ?? '').trim()
   const shortName = String(party.short_name ?? '').trim()
@@ -162,7 +162,7 @@ export function supplierOption(supplier = {}) {
 }
 
 export function processOption(process = {}) {
-  const value = positiveID(process.id)
+  const value = referenceOptionID(process.id)
   if (!value) return null
   return {
     value,
@@ -178,7 +178,7 @@ export function processOption(process = {}) {
 }
 
 export function salesOrderOption(order = {}) {
-  const value = positiveID(order.id)
+  const value = referenceOptionID(order.id)
   if (!value) return null
   return {
     value,
@@ -190,7 +190,7 @@ export function salesOrderOption(order = {}) {
 }
 
 export function salesOrderItemOption(item = {}) {
-  const value = positiveID(item.id)
+  const value = referenceOptionID(item.id)
   if (!value) return null
   return {
     value,
@@ -203,7 +203,7 @@ export function salesOrderItemOption(item = {}) {
 }
 
 export function purchaseOrderItemOption(item = {}) {
-  const value = positiveID(item.id)
+  const value = referenceOptionID(item.id)
   if (!value) return null
   return {
     value,
@@ -216,7 +216,7 @@ export function purchaseOrderItemOption(item = {}) {
 }
 
 export function purchaseReceiptOption(receipt = {}) {
-  const value = positiveID(receipt.id)
+  const value = referenceOptionID(receipt.id)
   if (!value) return null
   return {
     value,
@@ -229,7 +229,7 @@ export function purchaseReceiptOption(receipt = {}) {
 }
 
 export function shipmentOption(shipment = {}) {
-  const value = positiveID(shipment.id)
+  const value = referenceOptionID(shipment.id)
   if (!value) return null
   return {
     value,
@@ -242,7 +242,7 @@ export function shipmentOption(shipment = {}) {
 }
 
 export function purchaseReceiptItemOption(item = {}) {
-  const value = positiveID(item.id)
+  const value = referenceOptionID(item.id)
   if (!value) return null
   return {
     value,
@@ -256,7 +256,7 @@ export function purchaseReceiptItemOption(item = {}) {
 }
 
 export function inventoryLotOption(lot = {}) {
-  const value = positiveID(lot.id || lot.lot_id)
+  const value = referenceOptionID(lot.id || lot.lot_id)
   if (!value) return null
   return {
     value,
@@ -270,7 +270,7 @@ export function inventoryLotOption(lot = {}) {
 }
 
 export function warehouseOptionFromRecord(record = {}) {
-  const value = positiveID(record.warehouse_id || record.id)
+  const value = referenceOptionID(record.warehouse_id || record.id)
   if (!value) return null
   const warehouseName = record.warehouse_name || record.name
   const warehouseCode = record.warehouse_code || record.code

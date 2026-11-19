@@ -1,12 +1,8 @@
 import React from 'react'
+import { referenceOptionID } from '../../utils/referenceSelectOptions.mjs'
 
 function normalizeText(value) {
   return String(value ?? '').trim()
-}
-
-function positiveID(value) {
-  const id = Number(value || 0)
-  return Number.isFinite(id) && id > 0 ? id : undefined
 }
 
 export function unitSuffixTextFromOptions(
@@ -14,7 +10,7 @@ export function unitSuffixTextFromOptions(
   unitID,
   fallbackText = ''
 ) {
-  const normalizedID = positiveID(unitID)
+  const normalizedID = referenceOptionID(unitID)
   const matched = normalizedID
     ? (Array.isArray(unitOptions) ? unitOptions : []).find(
         (option) => Number(option?.value || 0) === normalizedID

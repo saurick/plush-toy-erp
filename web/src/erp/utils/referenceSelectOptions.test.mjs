@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { registerJSXTestLoader } from '../../../scripts/test/reactRuntime.mjs'
 import { purchaseMaterialOption } from './purchaseMaterialSupplier.mjs'
 
 import {
@@ -15,6 +16,20 @@ import {
   inventoryLotOption,
   inventoryLotStatusLabel,
 } from './referenceSelectOptions.mjs'
+
+test('单位候选与字段后缀按相同的引用值匹配', async () => {
+  registerJSXTestLoader()
+  const { unitSuffixTextFromOptions } = await import('../components/business-list/FieldWithUnitSuffix.jsx')
+  for (const id of [7, '7', '2.5']) {
+    const option = unitOption({ id, name: '件' })
+    assert.equal(option.value, Number(id))
+    assert.equal(unitSuffixTextFromOptions([option], id, '备用单位'), '件')
+  }
+  for (const id of [undefined, null, '', 0, -1, '无效', Infinity]) {
+    assert.equal(unitOption({ id, name: '件' }), null)
+    assert.equal(unitSuffixTextFromOptions([{ value: id, label: '件' }], id, '备用单位'), '备用单位')
+  }
+})
 
 test('inventory lot choices translate known states and keep unknown states unresolved', () => {
   for (const [status, label] of [['ACTIVE', '可用'], ['HOLD', '冻结'], ['REJECTED', '不合格'], ['DISABLED', '停用']]) {
