@@ -265,7 +265,26 @@ const businessSamplePresentationImports = new Set([
   "components/business-list/BusinessDateInputs.jsx",
   "components/business-list/SourceImportPickerModal.jsx",
 ]);
+const businessDateRangeDependencies = [
+  ["components/business-list/DateRangeFilter.jsx", new Set([
+    "react", "react-dom", "@/common/components/navigation/FilterField.jsx",
+    "../../utils/filterDateRange.mjs", "./BusinessFilterPanelContext.mjs", "./FilterDateRangePicker.jsx",
+  ])],
+  ["components/business-list/FilterDateRangePicker.jsx", new Set([
+    "react", "antd", "@ant-design/icons", "@/common/components/navigation/FilterChip.jsx",
+    "@/common/components/navigation/FilterChipGroup.jsx", "@/common/components/overlay/OverlayScopeContext.mjs",
+    "../../utils/businessDate.mjs", "../../utils/dateRange.mjs", "../../utils/filterDateRange.mjs",
+    "./BusinessFilterPopoverContent.jsx", "./filterDateRangePicker.css",
+  ])],
+  ["components/business-list/BusinessFilterPopoverContent.jsx", new Set([
+    "react", "antd", "@ant-design/icons", "@/common/components/overlay/OverlayScopeContext.mjs",
+    "./BusinessFilterPanelContext.mjs",
+  ])],
+  ["components/business-list/BusinessFilterPanelContext.mjs", new Set(["react"])],
+  ["components/business-list/filterDateRangePicker.css", new Set()],
+];
 const businessSampleFormStateDependencies = [
+  ...businessDateRangeDependencies.map(([file]) => file),
   "components/BusinessSplitHeader.jsx",
   "components/BusinessSplitCollapseButton.jsx",
   "components/businessSplitHeader.css",
@@ -1021,9 +1040,9 @@ test("date and mobile filter samples keep shared controls free of business I/O",
   }
   const dependencies = new Map([
     ["web/src/erp/components/business-list/BusinessDateInputs.jsx", new Set([
-      "react", "antd", "@ant-design/icons", "../../utils/dateRange.mjs", "../../utils/filterDateRange.mjs",
-      "@/common/components/navigation/FilterChipGroup.jsx", "@/common/components/navigation/FilterField.jsx",
+      "react", "antd", "@ant-design/icons", "../../utils/dateRange.mjs", "./DateRangeFilter.jsx",
     ])],
+    ...businessDateRangeDependencies.map(([file, imports]) => [`web/src/erp/${file}`, imports]),
     ["web/src/erp/utils/filterDateRange.mjs", new Set(["./businessDate.mjs", "./dateRange.mjs"])],
     ["web/src/erp/utils/businessDate.mjs", new Set()],
     ["web/src/erp/mobile/components/MobileFilterPopover.jsx", new Set([
@@ -1061,7 +1080,7 @@ test("date and mobile filter samples keep shared controls free of business I/O",
   for (const [file, allowed] of dependencies) {
     const source = read(file);
     for (const match of source.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)) {
-      assert(allowed.has(match[1]), `${file} imports a non-presentation dependency`);
+      assert(allowed.has(match[1]), `${file} imports a non-presentation dependency: ${match[1]}`);
     }
     assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
   }
