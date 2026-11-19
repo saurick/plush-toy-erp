@@ -1,5 +1,12 @@
 // Presentation only: every condensed path retains its original draft edges.
 export const CHAIN_DESIGN_NODE_SIZE = Object.freeze({ width: 176, height: 88 })
+
+// The same mapping converts a vertical drop position back to the saved coordinates.
+export function orientBusinessChainPoint(point, direction) {
+  if (direction !== 'TB') return point
+  const { width, height } = CHAIN_DESIGN_NODE_SIZE
+  return { x: point.y * (width / height), y: point.x * (height / width) }
+}
 const stepTypes = new Set(['business_action', 'system'])
 export const isBusinessChainStep = (node) =>
   !node.splitInto &&
@@ -263,89 +270,129 @@ export function layoutBusinessChainDraft(draft, library, mode = 'mainline') {
   }
 }
 
-// Orthogonal routes use gaps between columns; returns run outside the node rows.
-export function routeBusinessChainEdges(graph) {
+const routeClearance = 8
+const routeLaneGap = 16
+const routeLeads = [24, 16, 32]
+
+function businessChainRoutingSpace(nodes, width, height) {
+  return {
+    nodes,
+    width,
+    height,
+    positions: new Map(nodes.map((node) => [node.id, node])),
+    tracks: [...new Set(nodes.flatMap(({ y }) => [y - routeLaneGap, y + height + routeLaneGap]))],
+    usedBends: new Map(),
+  }
+}
+
+function routeBetweenCards({ nodes, width, height, tracks, usedBends }, from, to) {
+  const start = { x: from.x + width, y: from.y + height / 2 }
+  const end = { x: to.x, y: to.y + height / 2 }
+  const clear = (points) => points.slice(1).every((next, index) => {
+    const previous = points[index]
+    const left = Math.min(previous.x, next.x)
+    const right = Math.max(previous.x, next.x)
+    const top = Math.min(previous.y, next.y)
+    const bottom = Math.max(previous.y, next.y)
+    return !nodes.some((node) =>
+      !(node === from && index === 0) &&
+      !(node === to && index === points.length - 2) &&
+      right > node.x - routeClearance && left < node.x + width + routeClearance &&
+      bottom > node.y - routeClearance && top < node.y + height + routeClearance)
+  })
+  const gap = end.x - start.x
+  const middleX = (start.x + end.x) / 2
+  if (gap >= routeClearance * 2) {
+    const top = Math.min(start.y, end.y)
+    const bottom = Math.max(start.y, end.y)
+    const overlapsBend = (x) => usedBends.get(x)?.some(([low, high]) => top < high && bottom > low) ?? false
+    const bends = gap >= routeLaneGap * 2
+      ? [middleX, start.x + routeLaneGap, end.x - routeLaneGap]
+      : [middleX]
+    // Separate parallel turns within the same gap when there is room.
+    for (const x of bends.sort((a, b) => Number(overlapsBend(a)) - Number(overlapsBend(b)))) {
+      const points = start.y === end.y
+        ? [start, end]
+        : [start, { x, y: start.y }, { x, y: end.y }, end]
+      if (!clear(points)) continue
+      if (top < bottom) usedBends.set(x, [...(usedBends.get(x) || []), [top, bottom]])
+      return points
+    }
+  }
+  const middleY = (start.y + end.y) / 2
+  // Try the nearby gaps first. Distant cards should not determine the detour.
+  for (const y of [middleY, ...tracks].sort((a, b) => Math.abs(a - middleY) - Math.abs(b - middleY))) {
+    for (const out of routeLeads) {
+      for (const into of routeLeads) {
+        const startX = start.x + out
+        const endX = end.x - into
+        const points = [
+          start,
+          { x: startX, y: start.y },
+          { x: startX, y },
+          { x: endX, y },
+          { x: endX, y: end.y },
+          end,
+        ]
+        if (clear(points)) return points
+      }
+    }
+  }
+  return null
+}
+
+function renderBusinessChainRoute(edge, points, direction) {
+  let previous = orientBusinessChainPoint(points[0], direction)
+  const d = [`M ${previous.x} ${previous.y}`]
+  let longest = 0
+  let labelX = previous.x
+  let labelY = previous.y
+  for (const point of points.slice(1)) {
+    const next = orientBusinessChainPoint(point, direction)
+    const horizontal = previous.y === next.y
+    const length = Math.abs(horizontal ? next.x - previous.x : next.y - previous.y)
+    if (length === 0) continue
+    d.push(horizontal ? `H ${next.x}` : `V ${next.y}`)
+    if (length > longest) {
+      longest = length
+      labelX = (previous.x + next.x) / 2
+      labelY = (previous.y + next.y) / 2 + (horizontal ? -8 : 4)
+    }
+    previous = next
+  }
+  return { ...edge, d: d.join(' '), labelX, labelY }
+}
+
+// Choose gaps in the saved coordinate system so both directions use the same route.
+export function routeBusinessChainEdges(graph, direction = 'LR') {
   const { width, height } = CHAIN_DESIGN_NODE_SIZE
-  const positions = new Map(graph.nodes.map((node) => [node.id, node]))
-  const bottom = graph.nodes.length
-    ? Math.max(...graph.nodes.map(({ y }) => y + height))
-    : 0
-  let outer = 0
-  return graph.edges.map((edge) => {
-    const from = positions.get(edge.from)
-    const to = positions.get(edge.to)
-    const a = { x: from.x + width, y: from.y + height / 2 }
-    const b = { x: to.x, y: to.y + height / 2 }
-    const middle = (a.x + b.x) / 2
-    const intersects = (x1, y1, x2, y2) =>
-      graph.nodes.some((node) => {
-        if ([edge.from, edge.to].includes(node.id)) return false
-        return x1 === x2
-          ? x1 > node.x - 8 &&
-              x1 < node.x + width + 8 &&
-              Math.max(y1, y2) > node.y - 8 &&
-              Math.min(y1, y2) < node.y + height + 8
-          : y1 > node.y - 8 &&
-              y1 < node.y + height + 8 &&
-              Math.max(x1, x2) > node.x - 8 &&
-              Math.min(x1, x2) < node.x + width + 8
-      })
-    const direct =
-      edge.kind !== 'exception' &&
-      b.x - a.x >= 40 &&
-      !intersects(a.x, a.y, middle, a.y) &&
-      !intersects(middle, a.y, middle, b.y) &&
-      !intersects(middle, b.y, b.x, b.y)
-    const center = from.x + width / 2
-    if (Math.abs(from.x - to.x) < 1 && to.y > from.y + height + 12 &&
-        !intersects(center, from.y + height, center, to.y)) {
-      return {
-        ...edge,
-        d: `M ${center} ${from.y + height} V ${to.y}`,
-        labelX: center + 20,
-        labelY: (from.y + height + to.y) / 2,
-      }
+  const { nodes, edges } = graph
+  const forward = businessChainRoutingSpace(nodes, width, height)
+  const sideways = ({ x, y }) => ({ x: y, y: x })
+  const cross = businessChainRoutingSpace(
+    nodes.map((node) => ({ id: node.id, ...sideways(node) })), height, width
+  )
+  return edges.map((edge) => {
+    const from = forward.positions.get(edge.from)
+    const to = forward.positions.get(edge.to)
+    const sideFrom = cross.positions.get(edge.from)
+    const sideTo = cross.positions.get(edge.to)
+    const across = () => {
+      const reverse = from.y > to.y
+      const points = reverse ? routeBetweenCards(cross, sideTo, sideFrom) : routeBetweenCards(cross, sideFrom, sideTo)
+      return points && (reverse ? points.reverse() : points).map(sideways)
     }
-    if (Math.abs(from.x - to.x) < 1) {
-      const side = a.x + 24
-      const beforeTarget = to.y - 20
-      const entry = b.x - 24
-      if (!intersects(a.x, a.y, side, a.y) && !intersects(side, a.y, side, beforeTarget) &&
-          !intersects(side, beforeTarget, entry, beforeTarget) && !intersects(entry, beforeTarget, entry, b.y)) {
-        return {
-          ...edge,
-          d: `M ${a.x} ${a.y} H ${side} V ${beforeTarget} H ${entry} V ${b.y} H ${b.x}`,
-          labelX: side + 12,
-          labelY: (a.y + beforeTarget) / 2,
-        }
-      }
-    }
-    if (direct) {
-      return {
-        ...edge,
-        d: `M ${a.x} ${a.y} H ${middle} V ${b.y} H ${b.x}`,
-        labelX: middle,
-        labelY: (a.y + b.y) / 2 - 10,
-      }
-    }
-    if (edge.overview) {
-      const gap = 18 + (outer++ % 4) * 6
-      const lane = Math.min(from.y, to.y) - gap
-      return {
-        ...edge,
-        d: `M ${a.x} ${a.y} H ${a.x + gap} V ${lane} H ${b.x - gap} V ${b.y} H ${b.x}`,
-        labelX: middle,
-        labelY: lane - 8,
-      }
-    }
-    const lane = bottom + 32 + outer++ * 24
-    const startX = a.x + 24
-    const endX = b.x - 24
-    return {
-      ...edge,
-      d: `M ${a.x} ${a.y} H ${startX} V ${lane} H ${endX} V ${b.y} H ${b.x}`,
-      labelX: (startX + endX) / 2,
-      labelY: lane - 8,
-    }
+    // Same-stage cards read across the flow. Use facing sides if the main ports are blocked.
+    const points = Math.abs(from.x - to.x) < 1 && to.y - from.y >= height
+      ? across() || routeBetweenCards(forward, from, to)
+      : routeBetweenCards(forward, from, to) || across()
+    if (points) return renderBusinessChainRoute(edge, points, direction)
+    // Hand-placed cards can overlap and leave no unobstructed route.
+    const start = { x: from.x + width, y: from.y + height / 2 }
+    const end = { x: to.x, y: to.y + height / 2 }
+    const middle = (start.x + end.x) / 2
+    return renderBusinessChainRoute(edge, [
+      start, { x: middle, y: start.y }, { x: middle, y: end.y }, end,
+    ], direction)
   })
 }
