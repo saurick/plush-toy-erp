@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Button, Input, Spin } from 'antd'
 import { CommentOutlined } from '@ant-design/icons'
 import { useBlocker } from 'react-router-dom'
+import useConfirmBlockedNavigation from '../../hooks/useConfirmBlockedNavigation.js'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import { useModal } from '../../../common/utils/antdApp'
 import { isRpcAbortError } from '../../../common/utils/jsonRpc.js'
@@ -26,16 +27,7 @@ const time = (value) =>
 
 function ContributionNavigationGuard({ dirty, busy, confirmLeave }) {
   const blocker = useBlocker(dirty || busy)
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return undefined
-    let active = true
-    confirmLeave().then((allowed) => {
-      if (!active) return
-      if (allowed) blocker.proceed()
-      else blocker.reset()
-    })
-    return () => { active = false }
-  }, [blocker, confirmLeave])
+  useConfirmBlockedNavigation(blocker, confirmLeave)
   return null
 }
 

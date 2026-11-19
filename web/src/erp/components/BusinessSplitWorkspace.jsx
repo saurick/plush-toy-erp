@@ -1,6 +1,7 @@
 import React, { forwardRef, Suspense, useCallback, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ConfigProvider, Grid, Splitter } from 'antd'
 import { createPath, resolvePath, UNSAFE_NavigationContext as RouterNavigationContext, UNSAFE_RouteContext as RouterRouteContext, useBlocker } from 'react-router-dom'
+import useConfirmBlockedNavigation from '../hooks/useConfirmBlockedNavigation.js'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { Loading } from '@/common/components/loading'
@@ -51,16 +52,8 @@ function SplitNavigationGuard({ current }) {
     }
     return Boolean(current.current.leftGuard || (!nextLocation.pathname.startsWith('/erp/') && current.current.rightGuard))
   })
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return undefined
-    let active = true
-    current.current.confirmOuter(blocker.location).then((allowed) => {
-      if (!active) return
-      if (allowed) blocker.proceed()
-      else blocker.reset()
-    })
-    return () => { active = false }
-  }, [blocker, current])
+  const confirmLeave = useCallback(() => current.current.confirmOuter(blocker.location), [current, blocker.location])
+  useConfirmBlockedNavigation(blocker, confirmLeave)
   return null
 }
 

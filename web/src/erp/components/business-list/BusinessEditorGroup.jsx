@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
+import useConfirmBlockedNavigation from '../../hooks/useConfirmBlockedNavigation.js'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { useBusinessSplit } from './BusinessSplitContext.jsx'
 
@@ -7,16 +8,7 @@ const BusinessEditorGroupContext = createContext(null)
 
 function GroupNavigationGuard({ confirmLeave }) {
   const blocker = useBlocker(({ currentLocation, nextLocation }) => currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search || currentLocation.hash !== nextLocation.hash)
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return undefined
-    let active = true
-    confirmLeave().then((allowed) => {
-      if (!active) return
-      if (allowed) blocker.proceed()
-      else blocker.reset()
-    })
-    return () => { active = false }
-  }, [blocker, confirmLeave])
+  useConfirmBlockedNavigation(blocker, confirmLeave)
   return null
 }
 

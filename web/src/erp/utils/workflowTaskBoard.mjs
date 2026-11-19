@@ -1,7 +1,9 @@
+import { workflowTaskPayload } from './workflowTaskPayload.mjs'
 import { businessDocumentSectionOptions, getBusinessDocumentSectionKey, getBusinessDocumentTypeKey } from '../config/businessModules.mjs'
 import { WorkflowTaskBoardSort, WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { WorkCenterPaginationPolicy } from '../../common/consts/policies.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
+import { isCompleteDateRange } from './filterDateRange.mjs'
 import { isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
 import { DISCOVERY_FILTER_KEYS, DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
@@ -165,6 +167,8 @@ const FILTER_QUERY_KEYS = Object.freeze({
   period: 'period',
   dateFrom: 'date_from',
   dateTo: 'date_to',
+  dueDateFrom: 'due_date_from',
+  dueDateTo: 'due_date_to',
   keyword: 'q',
   status: 'status',
   role: 'role',
@@ -212,10 +216,6 @@ const BUSINESS_STATUS_VISIBLE_LABEL_OVERRIDES = Object.freeze({
   结算协同已完成: '结算跟进已完成',
 })
 
-function payloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 export function getTaskStatusKey(task = {}) {
   return String(task.task_status_key || '').trim()
 }
@@ -230,7 +230,7 @@ export function getWorkflowTaskOwnerRoleLabel(task = {}) {
 }
 
 export function getWorkflowTaskBusinessStatusLabel(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   const explicitLabel = String(
     task.business_status_label ||
       payload.business_status_label ||
@@ -330,6 +330,9 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
     : getBusinessDocumentSectionKey(sourceType) || 'all'
   return {
     ...normalizeTaskDiscoveryFilters(filters, { includeStage: true }),
+    ...(lane !== 'finished' && due === 'all' && isCompleteDateRange({ dateFrom: filters.dueDateFrom, dateTo: filters.dueDateTo })
+      ? { dueDateFrom: filters.dueDateFrom, dueDateTo: filters.dueDateTo }
+      : {}),
     ...(lane === 'finished' && isWorkflowHistoryDateFilter(filters) && filters.period ? { period: filters.period, dateFrom: filters.dateFrom || '', dateTo: filters.dateTo || '' } : {}),
     keyword: String(filters.keyword || '').trim(),
     status: getWorkflowTaskBoardStatusOptions(lane, mode).some(
@@ -357,6 +360,7 @@ export function hasActiveWorkflowTaskBoardFilters(filters = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
   return (
     Boolean(normalized.period) ||
+    Boolean(normalized.dueDateFrom) ||
     DISCOVERY_FILTER_KEYS.some((key) => Boolean(normalized[key])) ||
     normalized.keyword !== DEFAULT_TASK_BOARD_FILTERS.keyword ||
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status ||
@@ -375,7 +379,7 @@ export function workflowTaskBoardExtraFilterCount(filters = {}, { calendar = fal
     ...DISCOVERY_FILTER_KEYS.map((key) => normalized[key]),
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status,
     normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role,
-    !calendar && normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due,
+    !calendar && (normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due || normalized.dueDateFrom),
     normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType || normalized.sourceSection !== DEFAULT_TASK_BOARD_FILTERS.sourceSection,
   ].filter(Boolean).length
 }
@@ -390,6 +394,8 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
     period: params.get(FILTER_QUERY_KEYS.period) || '',
     dateFrom: params.get(FILTER_QUERY_KEYS.dateFrom) || '',
     dateTo: params.get(FILTER_QUERY_KEYS.dateTo) || '',
+    dueDateFrom: params.get(FILTER_QUERY_KEYS.dueDateFrom),
+    dueDateTo: params.get(FILTER_QUERY_KEYS.dueDateTo),
     keyword: params.get(FILTER_QUERY_KEYS.keyword),
     status: params.get(FILTER_QUERY_KEYS.status),
     role: params.get(FILTER_QUERY_KEYS.role),
@@ -418,7 +424,7 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   for (const key of ['module_key', 'chain_key', 'task_group']) params.delete(key)
   DISCOVERY_FILTER_KEYS.forEach((key) => { params.delete(DISCOVERY_REQUEST_KEYS[key]); if (normalized[key]) params.set(DISCOVERY_REQUEST_KEYS[key], normalized[key]) })
 
-  for (const key of ['period', 'dateFrom', 'dateTo']) {
+  for (const key of ['period', 'dateFrom', 'dateTo', 'dueDateFrom', 'dueDateTo']) {
     if (normalized[key]) params.set(FILTER_QUERY_KEYS[key], normalized[key])
   }
   if (normalized.keyword) {
@@ -469,6 +475,10 @@ export function buildWorkflowTaskBoardRequest(filters = {}, { calendar = false }
   if (normalized.period) params.period = normalized.period
   if (normalized.dateFrom) params.date_from = normalized.dateFrom
   if (normalized.dateTo) params.date_to = normalized.dateTo
+  if (!calendar && normalized.dueDateFrom) {
+    params.due_date_from = normalized.dueDateFrom
+    params.due_date_to = normalized.dueDateTo
+  }
   if (normalized.keyword) params.keyword = normalized.keyword
   if (normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status) {
     params.status = normalized.status

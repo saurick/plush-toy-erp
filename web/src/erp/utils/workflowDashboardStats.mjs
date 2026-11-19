@@ -1,3 +1,4 @@
+import { workflowTaskPayload } from './workflowTaskPayload.mjs'
 import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
 import { normalizeRoleKey } from './roleKeys.mjs'
 import { formatWorkflowTaskSource } from './dashboardTaskDisplay.mjs'
@@ -75,10 +76,6 @@ function normalizeSourceType(task = {}) {
   return String(task.source_type || '').trim()
 }
 
-function payloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 function textIncludesAny(value, keywords = []) {
   const text = String(value || '').toLowerCase()
   return keywords.some((keyword) => text.includes(keyword.toLowerCase()))
@@ -104,7 +101,7 @@ export function isHighPriorityWorkflowTask(task = {}) {
 }
 
 export function isCriticalPathWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return payload.critical_path === true || payload.is_critical_path === true
 }
 
@@ -123,7 +120,7 @@ export function isEscalatedToBossWorkflowTask(task = {}) {
 }
 
 export function isFinanceWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     FINANCE_MODULE_KEYS.has(normalizeSourceType(task)) ||
     FINANCE_TASK_GROUP_KEYS.has(String(task.task_group || '').trim()) ||
@@ -154,7 +151,7 @@ export function isQualityWorkflowTask(task = {}) {
 }
 
 export function isQcFailedWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   if (
     payload.alert_type === 'qc_failed' ||
     payload.notification_type === 'qc_failed' ||
@@ -171,7 +168,7 @@ export function isQcFailedWorkflowTask(task = {}) {
 }
 
 export function isMaterialShortageWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     payload.material_shortage === true ||
     payload.shortage === true ||
@@ -185,7 +182,7 @@ export function isMaterialShortageWorkflowTask(task = {}) {
 }
 
 export function isVendorDelayWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     normalizeSourceType(task) === 'processing-contracts' &&
     (payload.outsource_delay === true ||
@@ -202,7 +199,7 @@ export function isVendorDelayWorkflowTask(task = {}) {
 }
 
 export function isOutsourceReturnWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     OUTSOURCE_RETURN_TASK_GROUP_KEYS.has(
       String(task.task_group || '').trim()
@@ -217,7 +214,7 @@ export function isOutsourceReworkWorkflowTask(task = {}) {
 }
 
 export function isOutsourceReturnPendingWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'outsource_return_tracking' ||
     payload.alert_type === 'outsource_return_pending'
@@ -225,7 +222,7 @@ export function isOutsourceReturnPendingWorkflowTask(task = {}) {
 }
 
 export function isOutsourceReturnQcPendingWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'outsource_return_qc' ||
     payload.alert_type === 'outsource_return_qc_pending'
@@ -233,7 +230,7 @@ export function isOutsourceReturnQcPendingWorkflowTask(task = {}) {
 }
 
 export function isFinishedGoodsWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     FINISHED_GOODS_TASK_GROUP_KEYS.has(String(task.task_group || '').trim()) ||
     payload.finished_goods === true
@@ -241,7 +238,7 @@ export function isFinishedGoodsWorkflowTask(task = {}) {
 }
 
 export function isProductionSchedulingPendingWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'production_scheduling' ||
     payload.alert_type === 'production_scheduling_pending'
@@ -249,7 +246,7 @@ export function isProductionSchedulingPendingWorkflowTask(task = {}) {
 }
 
 export function isProductionExceptionWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'production_exception' ||
     payload.alert_type === 'rework_pending'
@@ -261,7 +258,7 @@ export function isFinishedGoodsReworkWorkflowTask(task = {}) {
 }
 
 export function isFinishedGoodsQcPendingWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'finished_goods_qc' ||
     payload.alert_type === 'finished_goods_qc_pending'
@@ -269,7 +266,7 @@ export function isFinishedGoodsQcPendingWorkflowTask(task = {}) {
 }
 
 export function isFinishedGoodsInboundPendingWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'finished_goods_inbound' ||
     payload.alert_type === 'finished_goods_inbound_pending'
@@ -277,7 +274,7 @@ export function isFinishedGoodsInboundPendingWorkflowTask(task = {}) {
 }
 
 export function isShipmentPendingWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     payload.alert_type === 'shipment_pending' ||
     String(task.business_status_key || '').trim() === WorkflowBusinessStatus.SHIPMENT_PENDING
@@ -285,7 +282,7 @@ export function isShipmentPendingWorkflowTask(task = {}) {
 }
 
 export function isShipmentWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     normalizeSourceType(task) === 'shipment' ||
     normalizeSourceType(task) === 'outbound' ||
@@ -296,7 +293,7 @@ export function isShipmentWorkflowTask(task = {}) {
 }
 
 export function isReceivableRegistrationWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'receivable_registration' ||
     payload.alert_type === 'finance_pending'
@@ -304,7 +301,7 @@ export function isReceivableRegistrationWorkflowTask(task = {}) {
 }
 
 export function isInvoiceRegistrationWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     String(task.task_group || '').trim() === 'invoice_registration' ||
     payload.alert_type === 'invoice_pending'
@@ -312,7 +309,7 @@ export function isInvoiceRegistrationWorkflowTask(task = {}) {
 }
 
 export function isPayableRegistrationWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     [
       'purchase_payable_registration',
@@ -323,7 +320,7 @@ export function isPayableRegistrationWorkflowTask(task = {}) {
 }
 
 export function isReconciliationPendingWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     ['purchase_reconciliation', 'outsource_reconciliation'].includes(
       String(task.task_group || '').trim()
@@ -332,7 +329,7 @@ export function isReconciliationPendingWorkflowTask(task = {}) {
 }
 
 export function isApprovalWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   return (
     payload.notification_type === 'approval_required' ||
     payload.alert_type === 'approval_pending' ||
@@ -347,7 +344,7 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
 
   const nowMs = Number(options.nowMs || Date.now())
   const dueStatus = getWorkflowTaskDueStatus(task, nowMs)
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   const sourceType = normalizeSourceType(task)
   const base = {
     task,

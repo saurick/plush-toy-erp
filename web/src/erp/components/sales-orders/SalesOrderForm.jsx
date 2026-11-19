@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react'
 
 import { AutoComplete, Form, Input, InputNumber, Space } from 'antd'
+import { getNextLineNo, createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
@@ -51,12 +52,11 @@ import {
   salesOrderProductionQuantity,
   salesOrderRequirementName,
 } from '../../utils/salesOrderRequirements.mjs'
-import { paymentConditionCompleteness } from '../../utils/paymentConditions.mjs'
+import { paymentConditionRule } from '../../utils/paymentConditions.mjs'
 import {
   optionalContactEmailRule,
   optionalContactPhoneRule,
 } from '../../utils/contactValidation.mjs'
-import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 import {
   formatNumeric20Scale6Summary,
   numeric20Scale6Units,
@@ -156,14 +156,6 @@ export function normalizeSalesOrderItemFormValue(item = {}) {
   }
 }
 
-function getNextLineNo(lines = []) {
-  const maxLineNo = lines.reduce((maxValue, line) => {
-    const lineNo = Number(line?.line_no || 0)
-    return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
-  }, 0)
-  return maxLineNo + 1
-}
-
 function setOrderLineSourceFromSKU(form, lineIndex, sku) {
   const currentLines = form.getFieldValue('items') || []
   const nextLines = [...currentLines]
@@ -173,27 +165,6 @@ function setOrderLineSourceFromSKU(form, lineIndex, sku) {
     ...(!sku?.id ? { unit_id: nextLines[lineIndex]?.unit_id } : {}),
   }
   form.setFieldsValue({ items: nextLines })
-}
-
-function paymentConditionRule({ form, methodField, termDaysField, field }) {
-  return {
-    validator: async (_, value) => {
-      if (!form) {
-        return
-      }
-      const completeness = paymentConditionCompleteness({
-        method: field === 'method' ? value : form.getFieldValue(methodField),
-        termDays:
-          field === 'termDays' ? value : form.getFieldValue(termDaysField),
-      })
-      if (field === 'method' && completeness.methodRequired) {
-        throw new Error('请填写付款方式')
-      }
-      if (field === 'termDays' && completeness.termDaysRequired) {
-        throw new Error('请填写付款周期(天)')
-      }
-    },
-  }
 }
 
 function quantityPrecisionRule({ form, fieldName, unitOptions }) {

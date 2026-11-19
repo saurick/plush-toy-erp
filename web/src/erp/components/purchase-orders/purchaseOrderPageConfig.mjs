@@ -108,10 +108,6 @@ export function todayInputValue() {
   return currentBusinessDate()
 }
 
-export function workflowPayloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 export const buildInboundDraftPreviewRows = buildPurchaseInboundDraftPreviewRows
 
 export function getSingleSelectedPurchaseOrder({

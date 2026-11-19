@@ -1,3 +1,4 @@
+import { positiveID } from './sourceDocumentValues.mjs'
 import { InventoryLotStatus, QualityInspectionStatus, ShipmentStatus } from '../../common/consts/statuses.generated.mjs'
 import { normalizeShipmentQuantity } from './shipmentWeight.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
@@ -5,11 +6,6 @@ import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 const FINISHED_GOODS_SOURCE_TYPE = 'SHIPMENT'
 const FINISHED_GOODS_INSPECTION_TYPE = 'FINISHED_GOODS'
 const FINISHED_GOODS_SUBJECT_TYPE = 'PRODUCT'
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
-}
 
 function optionalPositiveID(value) {
   return positiveID(value) || null

@@ -1,3 +1,5 @@
+import { positiveID } from './sourceDocumentValues.mjs'
+import { optionalOccurredAt } from './factOccurredAt.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import {
   InventoryLotStatus,
@@ -11,9 +13,9 @@ import {
   normalizeSourceInboundLotRequestFields,
 } from './sourceInboundLotSelection.mjs'
 import {
+  positiveUnitsText,
   addNumeric20Scale6Units,
   compareNumeric20Scale6Units,
-  isPositiveNumeric20Scale6Units,
   normalizePositiveNumeric20Scale6,
   numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
@@ -47,17 +49,6 @@ function quantityUnits(value) {
   return numeric20Scale6Units(value) ?? '0'
 }
 
-function positiveUnitsText(value) {
-  return isPositiveNumeric20Scale6Units(value)
-    ? numeric20Scale6TextFromUnits(value)
-    : ''
-}
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
-}
-
 function requiredID(value) {
   const parsed = positiveID(value)
   if (!parsed) throw invalidContract()
@@ -83,14 +74,6 @@ function optionalText(value, maxLength = 255) {
   const text = value.trim()
   if (!text || [...text].length > maxLength) throw invalidContract()
   return text
-}
-
-function optionalOccurredAt(value) {
-  if (value === undefined || value === null || value === '') return undefined
-  if (typeof value !== 'string' || !value.trim()) throw invalidContract()
-  const date = new Date(value)
-  if (!Number.isFinite(date.getTime())) throw invalidContract()
-  return date.toISOString()
 }
 
 function normalizedActionType(value) {
@@ -308,7 +291,7 @@ export function normalizeOutsourcingSourceFactCreateRequest(
     throw invalidContract('委外业务批次有误，请重新选择或填写')
   }
   const customerKey = optionalText(params.customer_key, 64)
-  const occurredAt = optionalOccurredAt(params.occurred_at)
+  const occurredAt = optionalOccurredAt(params.occurred_at, invalidContract)
   const note = optionalText(params.note, BusinessTextPolicy.noteMaxCharacters)
   const quantity = normalizePositiveNumeric20Scale6(params.quantity)
   if (!quantity) throw invalidContract()

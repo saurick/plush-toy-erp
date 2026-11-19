@@ -46,6 +46,7 @@ import {
 } from '../../utils/masterDataOrderView.mjs'
 import { buildPurchaseOrderItemSourceValuesFromMaterial } from '../../utils/sourceOrderLineValues.mjs'
 import {
+  getNextLineNo,
   createDuplicatedDraftLineItem,
   withoutBlankPurchaseOrderDraftLines,
 } from '../../utils/businessLineItems.mjs'
@@ -79,14 +80,6 @@ const PURCHASE_ORDER_COLUMNS = [
   },
   { label: '预计到货日期', width: 150 },
 ]
-
-function getNextLineNo(lines = []) {
-  const maxLineNo = lines.reduce((maxValue, line) => {
-    const lineNo = Number(line?.line_no || 0)
-    return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
-  }, 0)
-  return maxLineNo + 1
-}
 
 function materialLabel(material = {}) {
   return (

@@ -7,6 +7,7 @@ import {
   Radio,
   Typography,
 } from 'antd'
+import { submitValidatedForm } from '../../utils/submitValidatedForm.mjs'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
 import { ProductionOrderStatus } from '../../../common/consts/statuses.generated.mjs'
@@ -148,14 +149,7 @@ export default function ProductionCompletionModal({
     })
   }
 
-  const submit = async () => {
-    try {
-      const values = await form.validateFields()
-      await onSubmit?.(values)
-    } catch (error) {
-      if (!error?.errorFields) throw error
-    }
-  }
+  const submit = () => submitValidatedForm(form, onSubmit)
 
   return (
     <Editor

@@ -1,3 +1,4 @@
+import { workflowTaskPayload } from './workflowTaskPayload.mjs'
 import { getBusinessStatusLabel } from '../config/workflowStatus.mjs'
 import { getWorkflowTaskStatusMeta } from './workflowTaskBoard.mjs'
 import {
@@ -90,10 +91,6 @@ const RELATED_DOCUMENT_RESULT_LABELS = Object.freeze({
   待检: '待检',
 })
 
-function payloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 function normalizeSourceType(task = {}) {
   return String(task.source_type || '').trim()
 }
@@ -135,7 +132,7 @@ function mobileTaskActionDisplayLabel(action = {}) {
 }
 
 function hasVisibilityPayloadSignal(taskView = {}) {
-  const payload = payloadOf(taskView)
+  const payload = workflowTaskPayload(taskView)
   return Boolean(
     payload.alert_type ||
       payload.notification_type ||
@@ -209,7 +206,7 @@ export function buildMobileTaskActionPayload({ feedback = '' } = {}) {
 
 export function buildMobileTaskView(task = {}, options = {}) {
   const nowMs = Number(options.nowMs || Date.now())
-  const payload = normalizeRolePayload(payloadOf(task))
+  const payload = normalizeRolePayload(workflowTaskPayload(task))
   const mobileAction =
     payload.mobile_action && typeof payload.mobile_action === 'object'
       ? {
@@ -292,7 +289,7 @@ function isPmcMobileVisible(taskView = {}) {
 }
 
 function isBossMobileVisible(taskView = {}) {
-  const payload = payloadOf(taskView)
+  const payload = workflowTaskPayload(taskView)
   return (
     taskView.owner_role_key === 'boss' ||
     isHighPriorityWorkflowTask(taskView) ||
@@ -333,7 +330,7 @@ function isQualityMobileVisible(taskView = {}) {
 }
 
 function isProductionMobileVisible(taskView = {}) {
-  const payload = payloadOf(taskView)
+  const payload = workflowTaskPayload(taskView)
   return (
     taskView.owner_role_key === 'production' ||
     ['outsource_return_tracking', 'outsource_rework'].includes(
@@ -349,7 +346,7 @@ function isProductionMobileVisible(taskView = {}) {
 }
 
 function isBusinessMobileVisible(taskView = {}) {
-  const payload = payloadOf(taskView)
+  const payload = workflowTaskPayload(taskView)
   return (
     isRoleKeyMatch(taskView.owner_role_key, 'sales') ||
     isRoleKeyMatch(payload.confirm_role_key, 'sales') ||
@@ -385,7 +382,7 @@ export function explainMobileTaskVisibility(
 ) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
   const taskView = buildMobileTaskView(task, options)
-  const payload = payloadOf(taskView)
+  const payload = workflowTaskPayload(taskView)
   const reasons = []
   const blockers = []
   const warnings = []

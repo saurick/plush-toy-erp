@@ -1,10 +1,7 @@
+import { positiveID } from './sourceDocumentValues.mjs'
+
 function normalizedUpperText(value) {
   return String(value ?? '').trim().toUpperCase()
-}
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
 }
 
 export function hasRequiredOperationalFactDraftSource(viewKey, fact = {}) {

@@ -80,7 +80,7 @@ test('outsourcing return receipt chooses an existing lot or a new lot number', (
   assert.match(source, /新批次号不能超过 64 个字符/u)
   assert.match(source, /暂无匹配的已有产品批次/u)
   assert.match(source, /lot_id:[\s\S]*new_lot_no: undefined/u)
-  assert.match(source, /if \(!error\?\.errorFields\) throw error/u)
+  assert.match(source, /submitValidatedForm\(form, onSubmit\)/u)
 })
 
 test('outsourcing material issue remains existing-lot only', () => {

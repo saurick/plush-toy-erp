@@ -66,7 +66,7 @@ test('production completion requires one bounded lot input and handles validatio
   assert.match(source, /请选择拟使用的已有入库批次/u)
   assert.match(source, /请填写本次完工的新批次号/u)
   assert.match(source, /max: 64/u)
-  assert.match(source, /if \(!error\?\.errorFields\) throw error/u)
+  assert.match(source, /submitValidatedForm\(form, onSubmit\)/u)
   assert.match(source, /disabled=\{loading\}/u)
 })
 

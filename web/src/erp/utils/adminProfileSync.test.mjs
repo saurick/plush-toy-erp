@@ -58,11 +58,11 @@ test('ERPLayout: 管理员 profile 后台同步调度合同', () => {
   )
   assert.match(
     source,
-    /loadCurrentSyncRead\(\s*\(\) => adminRpc\.call\('me', \{\}\),\s*bootstrapRetryDelays\s*\)/u
+    /loadProfileSyncReadWithRetry\(\s*\(\) => adminRpc\.call\('me', \{\}\),\s*\{ retryDelaysMs: bootstrapRetryDelays, isCurrent: isCurrentSync \}\s*\)/u
   )
   assert.match(
     source,
-    /const effectiveSession = await loadCurrentSyncRead\(\s*\(\) =>\s*getEffectiveSession\(\{\s*customer_key: effectiveSessionCustomerKey,\s*\}\),\s*bootstrapRetryDelays\s*\)/u
+    /const effectiveSession = await loadProfileSyncReadWithRetry\(\s*\(\) =>\s*getEffectiveSession\(\{\s*customer_key: effectiveSessionCustomerKey,\s*\}\),\s*\{ retryDelaysMs: bootstrapRetryDelays, isCurrent: isCurrentSync \}\s*\)/u
   )
   assert.match(
     source,
@@ -77,11 +77,6 @@ test('ERPLayout: 管理员 profile 后台同步调度合同', () => {
   assert.match(
     source,
     /const isCurrentGeneration = \(\) =>\s*profileSyncActiveRef\.current &&\s*profileSyncGenerationRef\.current === syncGeneration/u
-  )
-  assert.match(
-    source,
-    /const loadCurrentSyncRead = \(load, retryDelaysMs\) =>[\s\S]*?if \(!isCurrentSync\(\)\) \{[\s\S]*?isAbortError: true/u,
-    'each retry attempt must stop before issuing an RPC after unmount'
   )
   assert.match(
     source,
@@ -1779,4 +1774,21 @@ test('adminProfileSync: 未登记路由 fallback 不授予菜单或页面访问'
     }),
     false
   )
+})
+
+test('profile retry stops before reading under a different session', async () => {
+  let current = true
+  let reads = 0
+  await assert.rejects(
+    loadProfileSyncReadWithRetry(async () => {
+      reads += 1
+      throw Object.assign(new Error('offline'), { isNetworkError: true })
+    }, {
+      isCurrent: () => current,
+      retryDelaysMs: [0],
+      wait: async () => { current = false },
+    }),
+    (error) => error.isAbortError === true
+  )
+  assert.equal(reads, 1)
 })

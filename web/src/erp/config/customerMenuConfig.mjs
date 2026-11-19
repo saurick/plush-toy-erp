@@ -1,3 +1,5 @@
+import { readRuntimeCustomerConfig } from '../../common/consts/runtimeCustomerConfig.mjs'
+
 function normalizeStringList(values = []) {
   if (!Array.isArray(values)) {
     return []
@@ -5,16 +7,6 @@ function normalizeStringList(values = []) {
   return values
     .map((value) => String(value || '').trim())
     .filter((value) => value)
-}
-
-function readRuntimeCustomerConfig() {
-  if (typeof window === 'undefined') {
-    return null
-  }
-  const runtimeConfig = window.__PLUSH_ERP_CUSTOMER_CONFIG__
-  return runtimeConfig && typeof runtimeConfig === 'object'
-    ? runtimeConfig
-    : null
 }
 
 export function getActiveCustomerMenuConfig() {

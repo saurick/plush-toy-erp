@@ -1,3 +1,4 @@
+import { positiveID } from './sourceDocumentValues.mjs'
 import { normalizePositiveNumeric20Scale6 } from './numeric20Scale6.mjs'
 
 export const PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS = Object.freeze([
@@ -10,11 +11,6 @@ export const PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS = Object.freeze([
 const ADJUSTMENT_TYPES = new Set(
   PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS.map((item) => item.value)
 )
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
-}
 
 function quantityText(value) {
   return normalizePositiveNumeric20Scale6(value)

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { submitValidatedForm } from '../../utils/submitValidatedForm.mjs'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -125,14 +126,7 @@ export default function FinanceBusinessSourceModal({
       : undefined,
   }
 
-  const submit = async () => {
-    try {
-      const values = await form.validateFields()
-      await onSubmit?.(values)
-    } catch (error) {
-      if (!error?.errorFields) throw error
-    }
-  }
+  const submit = () => submitValidatedForm(form, onSubmit)
 
   return (
     <BusinessModal

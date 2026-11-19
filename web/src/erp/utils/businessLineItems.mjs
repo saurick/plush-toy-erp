@@ -281,3 +281,11 @@ export function createBlankShipmentItem() {
     note: '',
   }
 }
+
+export function getNextLineNo(lines = []) {
+  const maxLineNo = lines.reduce((maxValue, line) => {
+    const lineNo = Number(line?.line_no || 0)
+    return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
+  }, 0)
+  return maxLineNo + 1
+}

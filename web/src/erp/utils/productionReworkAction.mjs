@@ -1,10 +1,12 @@
+import { positiveID } from './sourceDocumentValues.mjs'
+import { optionalOccurredAtFromForm } from './factOccurredAt.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
+  positiveUnitsText,
   addNumeric20Scale6Units,
   compareNumeric20Scale6Units,
   isPositiveNumeric20Scale6Units,
   normalizePositiveNumeric20Scale6,
-  numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
   subtractNumeric20Scale6Units,
 } from './numeric20Scale6.mjs'
@@ -21,19 +23,8 @@ function normalizedUpperText(value) {
   return normalizedText(value).toUpperCase()
 }
 
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
-}
-
 function quantityUnits(value) {
   return numeric20Scale6Units(value) ?? '0'
-}
-
-function positiveUnitsText(value) {
-  return isPositiveNumeric20Scale6Units(value)
-    ? numeric20Scale6TextFromUnits(value)
-    : ''
 }
 
 function invalidResponse(message = '返工记录返回结果无法确认') {
@@ -49,16 +40,6 @@ function boundedText(value, label, maxLength) {
     throw new Error(`${label}不能超过 ${maxLength} 个字符`)
   }
   return text
-}
-
-function optionalOccurredAt(value) {
-  const text = normalizedText(value)
-  if (!text) return undefined
-  const parsed = new Date(text)
-  if (!Number.isFinite(parsed.getTime())) {
-    throw new Error('发生时间无效，请重新选择')
-  }
-  return parsed.toISOString()
 }
 
 function sameQuantity(left, right) {
@@ -149,7 +130,7 @@ export function buildProductionReworkPayload(
   }
   const factNo = boundedText(values.fact_no, '返工业务编号', MAX_FACT_NO_LENGTH)
   const reason = boundedText(values.reason, '返工原因', MAX_REASON_LENGTH)
-  const occurredAt = optionalOccurredAt(values.occurred_at)
+  const occurredAt = optionalOccurredAtFromForm(values.occurred_at)
   return {
     fact_no: factNo,
     source_completion_fact_id: positiveID(source.id),
@@ -191,7 +172,7 @@ export function normalizeProductionReworkRequest(params = {}) {
   ) {
     throw invalidResponse('返工内容有误，请刷新页面后重新填写')
   }
-  const occurredAt = optionalOccurredAt(params.occurred_at)
+  const occurredAt = optionalOccurredAtFromForm(params.occurred_at)
   return {
     ...(customerKey ? { customer_key: customerKey } : {}),
     fact_no: boundedText(params.fact_no, '返工业务编号', MAX_FACT_NO_LENGTH),

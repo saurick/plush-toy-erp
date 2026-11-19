@@ -1,9 +1,5 @@
+import { positiveID } from './sourceDocumentValues.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
-}
 
 function normalizedUpperText(value) {
   return String(value || '')

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { submitValidatedForm } from '../../utils/submitValidatedForm.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -58,14 +59,7 @@ export default function ProductionReworkModal({
     summary.remaining,
   ])
 
-  const submit = async () => {
-    try {
-      const values = await form.validateFields()
-      await onSubmit?.(values)
-    } catch (error) {
-      if (!error?.errorFields) throw error
-    }
-  }
+  const submit = () => submitValidatedForm(form, onSubmit)
 
   return (
     <Editor

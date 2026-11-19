@@ -1,3 +1,4 @@
+import { positiveID } from './sourceDocumentValues.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
@@ -33,11 +34,6 @@ function invalidContract(message = '草稿内容不完整，请刷新后重新�
   const error = new Error(message)
   error.isInvalidResponse = true
   return error
-}
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
 }
 
 function requiredOccurredAt(value) {

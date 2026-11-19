@@ -588,18 +588,6 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
         profileSyncGenerationRef.current === syncGeneration
       const isCurrentSync = () =>
         isCurrentGeneration() && getToken(AUTH_SCOPE.ADMIN) === syncToken
-      const loadCurrentSyncRead = (load, retryDelaysMs) =>
-        loadProfileSyncReadWithRetry(
-          () => {
-            if (!isCurrentSync()) {
-              throw Object.assign(new Error('Profile sync inactive'), {
-                isAbortError: true,
-              })
-            }
-            return load()
-          },
-          { retryDelaysMs }
-        )
       const syncPromise = (async () => {
         let verifiedProfile = null
         setProfileSyncing(true)
@@ -611,9 +599,9 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
           const bootstrapRetryDelays = showLoading
             ? PROFILE_BOOTSTRAP_RETRY_DELAYS_MS
             : []
-          const result = await loadCurrentSyncRead(
+          const result = await loadProfileSyncReadWithRetry(
             () => adminRpc.call('me', {}),
-            bootstrapRetryDelays
+            { retryDelaysMs: bootstrapRetryDelays, isCurrent: isCurrentSync }
           )
           if (!isCurrentSync()) {
             return
@@ -628,12 +616,12 @@ export default function ERPLayout({ legalNotice, renderSplitPage }) {
                 nextProfile =
                   attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
               } else {
-                const effectiveSession = await loadCurrentSyncRead(
+                const effectiveSession = await loadProfileSyncReadWithRetry(
                   () =>
                     getEffectiveSession({
                       customer_key: effectiveSessionCustomerKey,
                     }),
-                  bootstrapRetryDelays
+                  { retryDelaysMs: bootstrapRetryDelays, isCurrent: isCurrentSync }
                 )
                 if (!isCurrentSync()) {
                   return

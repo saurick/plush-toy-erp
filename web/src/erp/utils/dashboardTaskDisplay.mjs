@@ -1,3 +1,4 @@
+import { workflowTaskPayload } from './workflowTaskPayload.mjs'
 import { fulfillmentTaskEntryPath, isFulfillmentTask } from './fulfillmentTask.mjs'
 import { businessModuleDefinitions, getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
@@ -231,10 +232,6 @@ function buildDashboardTaskQuery({ keyword, sourceKey, matchFields } = {}) {
   return params.toString()
 }
 
-function payloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 function standaloneSourceTaskContract(task = {}) {
   const taskGroup = String(task.task_group || '')
     .trim()
@@ -245,7 +242,7 @@ function standaloneSourceTaskContract(task = {}) {
 function isTrustedStandaloneSourceTask(task = {}) {
   const contract = standaloneSourceTaskContract(task)
   if (!contract) return false
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   const sourceID = task.source_id
   return Boolean(
     Number.isSafeInteger(sourceID) &&
@@ -311,7 +308,7 @@ export function resolveWorkflowTaskEntryPath(task = {}) {
   if (sourceEntryPath) {
     return sourceEntryPath
   }
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   const entryPath = String(payload.entry_path || '').trim()
   const sourceType = String(task.source_type || '')
     .trim()

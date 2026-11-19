@@ -1,3 +1,5 @@
+import { readRuntimeCustomerConfig } from './runtimeCustomerConfig.mjs'
+
 export const ERP_BRAND_MARK = '绒'
 export const ERP_COMPANY_NAME = '毛绒玩具管理系统'
 export const ERP_ADMIN_SYSTEM_NAME = '业务管理'
@@ -39,16 +41,6 @@ function normalizeCustomerKey(runtimeConfig = {}) {
     runtimeConfig.customerKey.trim()
     ? runtimeConfig.customerKey.trim()
     : undefined
-}
-
-function readRuntimeCustomerConfig() {
-  if (typeof window === 'undefined') {
-    return null
-  }
-  const runtimeConfig = window.__PLUSH_ERP_CUSTOMER_CONFIG__
-  return runtimeConfig && typeof runtimeConfig === 'object'
-    ? runtimeConfig
-    : null
 }
 
 export function getActiveERPBrand() {

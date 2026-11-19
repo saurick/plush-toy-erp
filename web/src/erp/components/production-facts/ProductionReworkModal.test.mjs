@@ -68,5 +68,5 @@ test('production rework modal resets closed form state and handles validation lo
   assert.match(source, /useEffect\(\(\) => \{/u)
   assert.match(source, /if \(!open\) return/u)
   assert.match(source, /form\.resetFields\(\)/u)
-  assert.match(source, /if \(!error\?\.errorFields\) throw error/u)
+  assert.match(source, /submitValidatedForm\(form, onSubmit\)/u)
 })

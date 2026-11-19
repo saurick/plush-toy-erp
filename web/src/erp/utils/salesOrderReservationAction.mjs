@@ -1,3 +1,4 @@
+import { positiveID } from './sourceDocumentValues.mjs'
 import {
   SalesOrderItemStatus,
   SalesOrderStatus,
@@ -5,29 +6,18 @@ import {
   StockReservationStatus,
 } from '../../common/consts/statuses.generated.mjs'
 import {
+  positiveUnitsText,
   addNumeric20Scale6Units,
   compareNumeric20Scale6Units,
   isPositiveNumeric20Scale6Units,
   minNumeric20Scale6Units,
   normalizePositiveNumeric20Scale6,
-  numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
   subtractNumeric20Scale6Units,
 } from './numeric20Scale6.mjs'
 
 function quantityUnits(value) {
   return numeric20Scale6Units(value) ?? '0'
-}
-
-function positiveUnitsText(value) {
-  return isPositiveNumeric20Scale6Units(value)
-    ? numeric20Scale6TextFromUnits(value)
-    : ''
-}
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
 }
 
 export function buildSalesOrderReservationItemChoices(

@@ -163,6 +163,27 @@ export function createMobileTaskScenarios({
         })),
       ],
       beforeNavigate: async (page) => {
+        // The cover in the task summary and the full album must refer to the same product.
+        await page.route('**/rpc/attachment', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'list_attachments' || params.owner_type !== 'product' || params.owner_id !== 7) {
+            return route.fallback()
+          }
+          await route.fulfill({
+            json: {
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 0,
+                data: {
+                  attachments: [{
+                    id: 8801, owner_type: 'product', owner_id: 7, attachment_type: 'product_image', slot_key: 'primary', mime_type: 'image/png',
+                  }],
+                },
+              },
+            },
+          })
+        })
         page.__imageReads = []
         page.__taskSearchReads = []
         page.on('request', (request) => {

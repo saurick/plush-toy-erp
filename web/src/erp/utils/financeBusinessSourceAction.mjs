@@ -1,3 +1,5 @@
+import { positiveID } from './sourceDocumentValues.mjs'
+import { optionalOccurredAtFromForm } from './factOccurredAt.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 
@@ -75,11 +77,6 @@ function normalizedUpperText(value) {
   return normalizedText(value).toUpperCase()
 }
 
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
-}
-
 export function hasValidFinanceTransitionSource(fact = {}) {
   const record = fact && typeof fact === 'object' ? fact : {}
   const sourceTypes =
@@ -99,16 +96,6 @@ function boundedFactNo(value) {
   return factNo
 }
 
-function optionalOccurredAt(value) {
-  const text = normalizedText(value)
-  if (!text) return undefined
-  const parsed = new Date(text)
-  if (!Number.isFinite(parsed.getTime())) {
-    throw new Error('发生时间无效，请重新选择')
-  }
-  return parsed.toISOString()
-}
-
 function optionalNote(value) {
   const note = normalizedText(value)
   if ([...note].length > MAX_NOTE_LENGTH) {
@@ -120,7 +107,7 @@ function optionalNote(value) {
 function operatorFields(values = {}, includeOccurredAt = false) {
   const factNo = boundedFactNo(values.fact_no)
   const occurredAt = includeOccurredAt
-    ? optionalOccurredAt(values.occurred_at)
+    ? optionalOccurredAtFromForm(values.occurred_at)
     : undefined
   const note = optionalNote(values.note)
   return {

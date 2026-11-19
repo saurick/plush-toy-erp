@@ -1,15 +1,12 @@
+import { workflowTaskPayload } from './workflowTaskPayload.mjs'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
-
-function payloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
 
 function cleanText(value) {
   return String(value || '').trim()
 }
 
 export function getWorkflowTaskReasonMeta(task = {}) {
-  const payload = payloadOf(task)
+  const payload = workflowTaskPayload(task)
   const statusKey = cleanText(task.task_status_key)
   const blockedReason =
     cleanText(task.blocked_reason) || cleanText(payload.blocked_reason)

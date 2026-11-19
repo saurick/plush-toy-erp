@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import { Alert, Descriptions, Form, Input, Radio } from 'antd'
+import { submitValidatedForm } from '../../utils/submitValidatedForm.mjs'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
@@ -154,14 +155,7 @@ export default function OutsourcingOrderSourceFactModal({
     form.setFieldsValue(openDefaultsRef.current)
   }, [form, open, sourceContextKey])
 
-  const submit = async () => {
-    try {
-      const values = await form.validateFields()
-      await onSubmit?.(values)
-    } catch (error) {
-      if (!error?.errorFields) throw error
-    }
-  }
+  const submit = () => submitValidatedForm(form, onSubmit)
 
   return (
     <BusinessFormPage

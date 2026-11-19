@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import './outsourcingContractForm.css'
 
 import { AutoComplete, Form, Input, InputNumber, Space } from 'antd'
+import { getNextLineNo, createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 import BusinessLineItemActionButton from '../business-list/BusinessLineItemActionButton.jsx'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import { outsourcingOrderLineGroupKey } from '../../utils/sourceDocumentLineGroupKeys.mjs'
@@ -39,7 +40,6 @@ import {
   deriveOutsourcingOrderItemAmount,
   summarizeOutsourcingOrderFormLines,
 } from '../../utils/sourceOrderAmounts.mjs'
-import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
 import {
   formatNumeric20Scale6Summary,
   numeric20Scale6Units,
@@ -102,15 +102,6 @@ function quantityPrecisionRule({ form, fieldName, unitOptions }) {
       }
     },
   }
-}
-
-function getNextLineNo(lines = []) {
-  return (
-    lines.reduce((maxValue, line) => {
-      const lineNo = Number(line?.line_no || 0)
-      return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
-    }, 0) + 1
-  )
 }
 
 export function supplierLabel(supplier = {}) {

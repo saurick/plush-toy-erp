@@ -117,10 +117,6 @@ export function parseOutsourcingOrderSortValue(value = 'updated_at:desc') {
   return { sortBy, sortDirection }
 }
 
-export function workflowPayloadOf(task = {}) {
-  return task.payload && typeof task.payload === 'object' ? task.payload : {}
-}
-
 export function canEditOutsourcingOrder(record) {
   return Boolean(isDraftSourceDocument(record))
 }

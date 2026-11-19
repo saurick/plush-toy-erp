@@ -13,7 +13,7 @@ import {
   PURCHASE_INVOICE_CATEGORY_OPTIONS,
   PURCHASE_INVOICE_REQUIRED_OPTIONS,
 } from '../../utils/masterDataOrderView.mjs'
-import { paymentConditionCompleteness } from '../../utils/paymentConditions.mjs'
+import { paymentConditionRule } from '../../utils/paymentConditions.mjs'
 import { normalizeNetWeightG } from '../../utils/shipmentWeight.mjs'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import MaterialSupplierSelect from './MaterialSupplierSelect.jsx'
@@ -200,27 +200,6 @@ export function mergeTextSuggestionOptions(
       seen.add(option.value)
       return true
     })
-}
-
-function paymentConditionRule({ form, methodField, termDaysField, field }) {
-  return {
-    validator: async (_, value) => {
-      if (!form) {
-        return
-      }
-      const completeness = paymentConditionCompleteness({
-        method: field === 'method' ? value : form.getFieldValue(methodField),
-        termDays:
-          field === 'termDays' ? value : form.getFieldValue(termDaysField),
-      })
-      if (field === 'method' && completeness.methodRequired) {
-        throw new Error('请填写付款方式')
-      }
-      if (field === 'termDays' && completeness.termDaysRequired) {
-        throw new Error('请填写付款周期(天)')
-      }
-    },
-  }
 }
 
 export function MasterDataFormFields({

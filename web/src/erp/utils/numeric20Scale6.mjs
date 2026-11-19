@@ -219,3 +219,9 @@ export function formatNumeric20Scale6Summary(value, minimumFractionDigits = 0) {
   const paddedFraction = fractionText.padEnd(safeMinimum, '0')
   return paddedFraction ? `${integerText}.${paddedFraction}` : integerText
 }
+
+export function positiveUnitsText(value) {
+  return isPositiveNumeric20Scale6Units(value)
+    ? numeric20Scale6TextFromUnits(value)
+    : ''
+}

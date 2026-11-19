@@ -1,3 +1,4 @@
+import { optionalOccurredAt } from './factOccurredAt.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { InventoryLotStatus, OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
@@ -88,14 +89,6 @@ function requiredID(value) {
   const parsed = Number(value || 0)
   if (!Number.isSafeInteger(parsed) || parsed <= 0) throw invalidContract()
   return parsed
-}
-
-function optionalOccurredAt(value) {
-  if (value === undefined || value === null || value === '') return undefined
-  if (typeof value !== 'string' || !value.trim()) throw invalidContract()
-  const date = new Date(value)
-  if (!Number.isFinite(date.getTime())) throw invalidContract()
-  return date.toISOString()
 }
 
 function normalizedQuantity(value) {
@@ -416,7 +409,7 @@ export function normalizeProductionCompletionCreateRequest(params = {}) {
   requireAllowedKeys(source, CREATE_REQUEST_KEYS)
   const customerKey = optionalText(source.customer_key, 64)
   const note = optionalText(source.note, BusinessTextPolicy.noteMaxCharacters)
-  const occurredAt = optionalOccurredAt(source.occurred_at)
+  const occurredAt = optionalOccurredAt(source.occurred_at, invalidContract)
   const quantity = normalizedQuantity(source.quantity)
   if (!quantity) throw invalidContract()
   let lotFields

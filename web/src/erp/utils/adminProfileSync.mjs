@@ -721,6 +721,7 @@ export async function loadProfileSyncReadWithRetry(
   load,
   {
     retryDelaysMs = [],
+    isCurrent,
     wait = (delayMs) =>
       new Promise((resolve) => globalThis.setTimeout(resolve, delayMs)),
   } = {}
@@ -735,6 +736,9 @@ export async function loadProfileSyncReadWithRetry(
     : []
   let retryIndex = 0
   while (true) {
+    if (isCurrent && !isCurrent()) {
+      throw Object.assign(new Error('Profile sync inactive'), { isAbortError: true })
+    }
     try {
       return await load()
     } catch (error) {

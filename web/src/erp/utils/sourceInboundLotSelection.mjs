@@ -1,12 +1,9 @@
+import { positiveID } from './sourceDocumentValues.mjs'
+
 export const SOURCE_INBOUND_LOT_SELECTION = Object.freeze({
   EXISTING: 'EXISTING',
   NEW: 'NEW',
 })
-
-function positiveID(value) {
-  const parsed = Number(value || 0)
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
-}
 
 function optionalLotNo(value) {
   if (value === undefined || value === null || value === '') return ''

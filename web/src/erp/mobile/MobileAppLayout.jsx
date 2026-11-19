@@ -231,18 +231,6 @@ function MobileAppContent({ legalNotice }) {
       )
       const isCurrentSync = () =>
         profileSyncActiveRef.current && getToken(AUTH_SCOPE.ADMIN) === syncToken
-      const loadCurrentSyncRead = (load, retryDelaysMs) =>
-        loadProfileSyncReadWithRetry(
-          () => {
-            if (!isCurrentSync()) {
-              throw Object.assign(new Error('Profile sync inactive'), {
-                isAbortError: true,
-              })
-            }
-            return load()
-          },
-          { retryDelaysMs }
-        )
       const syncPromise = (async () => {
         if (showLoading) {
           setProfileSyncCompleted(false)
@@ -253,9 +241,9 @@ function MobileAppContent({ legalNotice }) {
           const bootstrapRetryDelays = showLoading
             ? PROFILE_BOOTSTRAP_RETRY_DELAYS_MS
             : []
-          const result = await loadCurrentSyncRead(
+          const result = await loadProfileSyncReadWithRetry(
             () => adminRpc.call('me', {}),
-            bootstrapRetryDelays
+            { retryDelaysMs: bootstrapRetryDelays, isCurrent: isCurrentSync }
           )
           if (!isCurrentSync()) return
 
@@ -271,9 +259,9 @@ function MobileAppContent({ legalNotice }) {
               attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
           } else {
             try {
-              const effectiveSession = await loadCurrentSyncRead(
+              const effectiveSession = await loadProfileSyncReadWithRetry(
                 () => getEffectiveSession({ customer_key: customerKey }),
-                bootstrapRetryDelays
+                { retryDelaysMs: bootstrapRetryDelays, isCurrent: isCurrentSync }
               )
               if (!isCurrentSync()) return
               nextProfile = attachEffectiveSessionToAdminProfile(

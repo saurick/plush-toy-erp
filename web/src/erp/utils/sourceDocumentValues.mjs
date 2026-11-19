@@ -31,3 +31,8 @@ export {
   normalizeOptionalNonNegativeInteger,
   compactParams,
 }
+
+export function positiveID(value) {
+  const parsed = Number(value || 0)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
+}
