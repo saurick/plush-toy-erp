@@ -10,7 +10,7 @@
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `docs/archive/progress-2026-11-15-completed-history.md` | 仓储管理与盘点闭环的实现、迁移、运行复验及原 Git 交接边界原文 |
 | `docs/archive/progress-2026-11-03-completed-history.md` | 财务接入、验收目录、付款方式推荐及 CI / 工作台升级的已完成过程原文；含 11 月 4 日固定版本发布与工作台部署原始过程 |
-| `docs/archive/progress-2026-11-02-completed-history.md` | 业务数据标记清理、前三项性能优化及制品 / 备份轮换的已完成过程原文 |
+| `docs/archive/progress-2026-11-02-completed-history.md` | 业务数据标记清理、前三项性能优化、制品 / 备份轮换及业务字段精简的已完成过程原文 |
 | `docs/archive/progress-2026-10-29-ci-workbench-history.md` | CI 修复与工作台升级前，已完成的原生测试报告及工作台分工过程原文 |
 | `docs/archive/progress-2026-10-28-bom-attachment-history.md` | 2026-10-27～28 BOM 来源核对、完整精度与附件 200MB 阶段过程原文 |
 | `docs/archive/progress-2026-10-27-data-model-history.md` | 2026-10-17 已完成的数据模型治理与开发库恢复过程原文，200MB 迁移记录前显式归档 |
