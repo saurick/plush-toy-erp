@@ -462,6 +462,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     '材料档案',
     '物料清单（BOM）',
     '任务管理',
+    '进度看板',
     '模板打印中心',
     '历史记录中心',
   ])

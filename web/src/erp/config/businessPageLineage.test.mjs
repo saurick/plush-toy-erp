@@ -74,6 +74,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'get_production_exception',
   'get_purchase_rejection_disposition',
   'get_sales_order',
+  'get_delivery_progress',
   'get_shipment',
   'get_supplier',
   'list_bom_versions',
