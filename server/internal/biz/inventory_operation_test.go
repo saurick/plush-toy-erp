@@ -79,15 +79,6 @@ func (r *inventoryOperationUsecaseRepoStub) CreateInventoryOperation(_ context.C
 func (r *inventoryOperationUsecaseRepoStub) PostInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
 	return nil, nil
 }
-func (r *inventoryOperationUsecaseRepoStub) SubmitInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
-	return nil, nil
-}
-func (r *inventoryOperationUsecaseRepoStub) ApproveInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
-	return nil, nil
-}
-func (r *inventoryOperationUsecaseRepoStub) RejectInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
-	return nil, nil
-}
 func (r *inventoryOperationUsecaseRepoStub) CancelInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
 	return nil, nil
 }

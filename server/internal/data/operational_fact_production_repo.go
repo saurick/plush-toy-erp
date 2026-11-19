@@ -361,11 +361,11 @@ func updateProductionFactDraft(ctx context.Context, tx *inventoryDBTx, row *ent.
 	if in.FactType == biz.ProductionFactRework {
 		p := inventorySQLPlaceholders(tx.dialect, 8)
 		query = fmt.Sprintf(`UPDATE production_facts SET fact_no = %s, quantity = %s, occurred_at = %s, occurred_at_specified = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
-		args = []any{in.FactNo, in.Quantity, in.OccurredAt, true, optionalStringSQLValue(in.Note), time.Now(), row.ID, in.ExpectedVersion}
+		args = []any{in.FactNo, in.Quantity, in.OccurredAt, true, optionalSQLValue(in.Note), time.Now(), row.ID, in.ExpectedVersion}
 	} else {
 		p := inventorySQLPlaceholders(tx.dialect, 9)
 		query = fmt.Sprintf(`UPDATE production_facts SET warehouse_id = %s, lot_id = %s, quantity = %s, occurred_at = %s, occurred_at_specified = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8])
-		args = []any{in.WarehouseID, optionalIntSQLValue(in.LotID), in.Quantity, in.OccurredAt, true, optionalStringSQLValue(in.Note), time.Now(), row.ID, in.ExpectedVersion}
+		args = []any{in.WarehouseID, optionalSQLValue(in.LotID), in.Quantity, in.OccurredAt, true, optionalSQLValue(in.Note), time.Now(), row.ID, in.ExpectedVersion}
 	}
 	result, err := tx.sqlTx.ExecContext(ctx, query, args...)
 	if err != nil {

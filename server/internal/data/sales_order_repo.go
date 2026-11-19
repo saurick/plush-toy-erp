@@ -7,10 +7,8 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/processinstance"
-	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productsku"
@@ -19,7 +17,6 @@ import (
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
-	"server/internal/data/model/ent/unit"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
@@ -169,7 +166,7 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 	} else {
 		update.SetPriceConditionNote(*in.PriceConditionNote)
 	}
-	setSalesOrderCommercialFieldsOnUpdateOne(update, in)
+	setSalesOrderCommercialFields(update.Mutation(), in)
 	if in.PlannedDeliveryDate == nil {
 		update.ClearPlannedDeliveryDate()
 	} else {
@@ -1251,7 +1248,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		} else {
 			update.SetPriceConditionNote(*in.PriceConditionNote)
 		}
-		setSalesOrderCommercialFieldsOnUpdate(update, in)
+		setSalesOrderCommercialFields(update.Mutation(), in)
 		if in.PlannedDeliveryDate == nil {
 			update.ClearPlannedDeliveryDate()
 		} else {
@@ -1444,29 +1441,11 @@ func salesOrderLifecyclePredecessors(next string) []string {
 }
 
 func (r *salesOrderRepo) CustomerIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Customer.Query().
-		Where(customer.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrCustomerNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.customerIsActive(ctx, id)
 }
 
 func (r *salesOrderRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Product.Query().
-		Where(product.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrProductNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.productIsActive(ctx, id)
 }
 
 func (r *salesOrderRepo) ProductSKUIsActiveForProduct(ctx context.Context, skuID int, productID int) (bool, error) {
@@ -1481,16 +1460,7 @@ func (r *salesOrderRepo) ProductSKUIsActiveForProduct(ctx context.Context, skuID
 }
 
 func (r *salesOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Unit.Query().
-		Where(unit.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrUnitNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.unitIsActive(ctx, id)
 }
 
 func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Client, id int, displayOrder int, in *biz.SalesOrderItemMutation) (*ent.SalesOrderItem, error) {
@@ -1749,45 +1719,7 @@ func recalculateSalesOrderAmountsWithClient(ctx context.Context, client *ent.Cli
 	return err
 }
 
-func setSalesOrderCommercialFieldsOnUpdateOne(update *ent.SalesOrderUpdateOne, in *biz.SalesOrderMutation) {
-	if in.TaxMode == nil {
-		update.ClearTaxMode()
-	} else {
-		update.SetTaxMode(*in.TaxMode)
-	}
-	if in.TaxRate == nil {
-		update.ClearTaxRate()
-	} else {
-		update.SetTaxRate(*in.TaxRate)
-	}
-	if in.FreightTerms == nil {
-		update.ClearFreightTerms()
-	} else {
-		update.SetFreightTerms(*in.FreightTerms)
-	}
-	if in.QuotedFreightAmount == nil {
-		update.ClearQuotedFreightAmount()
-	} else {
-		update.SetQuotedFreightAmount(*in.QuotedFreightAmount)
-	}
-	if in.GoodsAmount == nil {
-		update.ClearGoodsAmount()
-	} else {
-		update.SetGoodsAmount(*in.GoodsAmount)
-	}
-	if in.TaxAmount == nil {
-		update.ClearTaxAmount()
-	} else {
-		update.SetTaxAmount(*in.TaxAmount)
-	}
-	if in.OrderTotal == nil {
-		update.ClearOrderTotal()
-	} else {
-		update.SetOrderTotal(*in.OrderTotal)
-	}
-}
-
-func setSalesOrderCommercialFieldsOnUpdate(update *ent.SalesOrderUpdate, in *biz.SalesOrderMutation) {
+func setSalesOrderCommercialFields(update *ent.SalesOrderMutation, in *biz.SalesOrderMutation) {
 	if in.TaxMode == nil {
 		update.ClearTaxMode()
 	} else {

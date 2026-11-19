@@ -1084,10 +1084,10 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         '盘点或人工调整提交复核',
         'starts_process',
         {
-          action: 'InventoryUsecase.SubmitInventoryOperation',
+          action: 'customer_config.start_inventory_adjustment_approval_process',
           condition: '盘点与人工调整必须复核，创建人不能自审；调拨不经过此分支。',
           factBoundary: 'inventory_operation_source_only',
-          sourceRefs: ['server/internal/biz/inventory_operation.go'],
+          sourceRefs: ['server/internal/service/jsonrpc_customer_config_exception_process.go', 'server/internal/biz/customer_process_contracts.go'],
         }
       ),
       chainEdge(

@@ -13,6 +13,26 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func TestRetiredProcessWritesHaveNoDirectRPC(t *testing.T) {
+	admin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionFinancePaymentRead)
+	admin.IsSuperAdmin = true
+	dispatcher := newOperationalFactJSONRPCTestData(t, admin)
+	dispatcher.inventoryUC = biz.NewInventoryUsecase(nil)
+	for domain, methods := range map[string][]string{
+		"inventory":        {"submit_inventory_operation", "approve_inventory_operation", "reject_inventory_operation"},
+		"operational_fact": {"post_finance_payment", "approve_production_exception", "reject_production_exception", "execute_production_exception"},
+	} {
+		for _, method := range methods {
+			t.Run(method, func(t *testing.T) {
+				_, result, err := dispatcher.Handle(workflowJSONRPCAdminContext(), domain, "2.0", method, "retired", mustJSONRPCStruct(t, map[string]any{"id": 1}))
+				if err != nil || result == nil || result.Code != errcode.UnknownMethod.Code {
+					t.Fatalf("unexpected direct write result: %v, %v", result, err)
+				}
+			})
+		}
+	}
+}
+
 func TestCustomerConfigExceptionProcessMethodContractsAreExact(t *testing.T) {
 	tests := []struct {
 		method          string
@@ -273,14 +293,6 @@ func (r *exceptionProcessServiceOperationalFactRepo) CancelFinancePayment(
 	return nil, biz.ErrBadParam
 }
 
-func (r *exceptionProcessServiceOperationalFactRepo) PostFinancePayment(
-	context.Context,
-	*biz.FinancePaymentPost,
-	int,
-) (*biz.FinancePayment, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
 func (r *exceptionProcessServiceOperationalFactRepo) ReverseFinancePayment(
 	context.Context,
 	*biz.FinancePaymentReverse,
@@ -408,32 +420,11 @@ func (r *exceptionProcessServiceOperationalFactRepo) SubmitProductionException(
 	return nil, biz.ErrBadParam
 }
 
-func (r *exceptionProcessServiceOperationalFactRepo) ApproveProductionException(
-	context.Context,
-	*biz.ProductionExceptionMutation,
-) (*biz.ProductionExceptionDecision, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) RejectProductionException(
-	context.Context,
-	*biz.ProductionExceptionMutation,
-) (*biz.ProductionExceptionDecision, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
 func (r *exceptionProcessServiceOperationalFactRepo) CancelProductionException(
 	context.Context,
 	*biz.ProductionExceptionMutation,
 ) (*biz.ProductionExceptionDecision, error) {
 	return nil, biz.ErrBadParam
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) ExecuteProductionException(
-	context.Context,
-	*biz.ProductionExceptionMutation,
-) (*biz.ProductionExceptionDecision, error) {
-	return nil, biz.ErrProcessRuntimeRequired
 }
 
 func (r *exceptionProcessServiceOperationalFactRepo) ReverseProductionException(
@@ -536,27 +527,6 @@ func (r *exceptionProcessServiceInventoryRepo) CreateInventoryOperation(
 	string,
 ) (*biz.InventoryOperation, error) {
 	return nil, biz.ErrBadParam
-}
-
-func (r *exceptionProcessServiceInventoryRepo) SubmitInventoryOperation(
-	context.Context,
-	*biz.InventoryOperationMutation,
-) (*biz.InventoryOperation, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
-func (r *exceptionProcessServiceInventoryRepo) ApproveInventoryOperation(
-	context.Context,
-	*biz.InventoryOperationMutation,
-) (*biz.InventoryOperation, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
-func (r *exceptionProcessServiceInventoryRepo) RejectInventoryOperation(
-	context.Context,
-	*biz.InventoryOperationMutation,
-) (*biz.InventoryOperation, error) {
-	return nil, biz.ErrProcessRuntimeRequired
 }
 
 func (r *exceptionProcessServiceInventoryRepo) PostInventoryOperation(

@@ -234,7 +234,7 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateSupplierActive(ctx, normalizedOrder.SupplierID); err != nil {
+	if err := requireActiveReference(ctx, normalizedOrder.SupplierID, uc.repo.SupplierIsActive, ErrSupplierInactive); err != nil {
 		return nil, err
 	}
 	if id == 0 {
@@ -427,17 +427,6 @@ func snapshotString(snapshot map[string]any, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
-}
-
-func (uc *OutsourcingOrderUsecase) validateSupplierActive(ctx context.Context, id int) error {
-	active, err := uc.repo.SupplierIsActive(ctx, id)
-	if err != nil {
-		return err
-	}
-	if !active {
-		return ErrSupplierInactive
-	}
-	return nil
 }
 
 func (uc *OutsourcingOrderUsecase) validateSubjectProcessAndUnit(ctx context.Context, subjectType string, productID, productSKUID, materialID *int, processID int, unitID int) error {
@@ -650,12 +639,7 @@ func normalizeOutsourcingOrderItemFilter(in OutsourcingOrderItemFilter) (Outsour
 	if in.LineStatus != "" && !IsValidOutsourcingOrderItemStatus(in.LineStatus) {
 		return OutsourcingOrderItemFilter{}, ErrBadParam
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
-	if in.Offset < 0 {
-		in.Offset = 0
-	}
+	in.Limit, in.Offset = normalizeOrderItemPagination(in.Limit, in.Offset)
 	return in, nil
 }
 

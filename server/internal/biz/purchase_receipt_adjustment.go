@@ -350,21 +350,13 @@ func purchaseReceiptAdjustmentSourceLineNo(source *PurchaseReceiptItem, adjustTy
 	return base + suffix
 }
 
-func validatePurchaseReceiptAdjustmentAggregate(items []*PurchaseReceiptAdjustmentItemCreate) error {
-	groups := make(map[string][]*PurchaseReceiptAdjustmentItemCreate)
-	for _, item := range items {
-		if item == nil {
-			return ErrBadParam
-		}
-		if isPurchaseReceiptCorrectionType(item.AdjustType) {
-			if item.CorrectionGroup == nil {
-				return ErrBadParam
-			}
-			groups[*item.CorrectionGroup] = append(groups[*item.CorrectionGroup], item)
-		} else if item.CorrectionGroup != nil {
-			return ErrBadParam
-		}
-	}
+type receiptCorrectionLine struct {
+	PurchaseReceiptItemID int
+	AdjustType            string
+	Quantity              decimal.Decimal
+}
+
+func validateReceiptCorrectionPairs(groups map[string][]receiptCorrectionLine) error {
 	for _, pair := range groups {
 		if len(pair) != 2 || pair[0].PurchaseReceiptItemID != pair[1].PurchaseReceiptItemID || pair[0].Quantity.Cmp(pair[1].Quantity) != 0 {
 			return ErrBadParam
@@ -379,6 +371,24 @@ func validatePurchaseReceiptAdjustmentAggregate(items []*PurchaseReceiptAdjustme
 		}
 	}
 	return nil
+}
+
+func validatePurchaseReceiptAdjustmentAggregate(items []*PurchaseReceiptAdjustmentItemCreate) error {
+	groups := make(map[string][]receiptCorrectionLine)
+	for _, item := range items {
+		if item == nil {
+			return ErrBadParam
+		}
+		if isPurchaseReceiptCorrectionType(item.AdjustType) {
+			if item.CorrectionGroup == nil {
+				return ErrBadParam
+			}
+			groups[*item.CorrectionGroup] = append(groups[*item.CorrectionGroup], receiptCorrectionLine{item.PurchaseReceiptItemID, item.AdjustType, item.Quantity})
+		} else if item.CorrectionGroup != nil {
+			return ErrBadParam
+		}
+	}
+	return validateReceiptCorrectionPairs(groups)
 }
 
 func normalizePurchaseReceiptAdjustmentFilter(in PurchaseReceiptAdjustmentFilter) (PurchaseReceiptAdjustmentFilter, error) {

@@ -250,3 +250,27 @@ func (r *purchaseCorrectionAggregateRepoStub) CreatePurchaseReceiptAdjustmentWit
 	r.adjustmentItems = items
 	return &PurchaseReceiptAdjustment{ID: 201, AdjustmentNo: in.AdjustmentNo, Status: PurchaseReceiptAdjustmentStatusDraft, Items: []*PurchaseReceiptAdjustmentItem{{ID: 202}}}, nil
 }
+
+func TestReceiptCorrectionPairsKeepSourceQuantityAndDirection(t *testing.T) {
+	one := decimal.NewFromInt(1)
+	for _, kinds := range [][2]string{
+		{PurchaseReceiptAdjustmentLotCorrectionOut, PurchaseReceiptAdjustmentLotCorrectionIn},
+		{PurchaseReceiptAdjustmentWarehouseCorrectionOut, PurchaseReceiptAdjustmentWarehouseCorrectionIn},
+	} {
+		first := receiptCorrectionLine{1, kinds[0], one}
+		second := receiptCorrectionLine{1, kinds[1], one}
+		for _, pair := range [][]receiptCorrectionLine{{first, second}, {second, first}} {
+			if err := validateReceiptCorrectionPairs(map[string][]receiptCorrectionLine{"g": pair}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, pair := range [][]receiptCorrectionLine{
+			{first}, {first, first}, {first, {2, kinds[1], one}}, {first, {1, kinds[1], one.Add(one)}},
+			{{1, PurchaseReceiptAdjustmentLotCorrectionOut, one}, {1, PurchaseReceiptAdjustmentWarehouseCorrectionIn, one}},
+		} {
+			if err := validateReceiptCorrectionPairs(map[string][]receiptCorrectionLine{"g": pair}); err != ErrBadParam {
+				t.Fatalf("invalid correction pair accepted: %+v", pair)
+			}
+		}
+	}
+}

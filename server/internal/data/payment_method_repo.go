@@ -144,7 +144,7 @@ func (r *masterDataRepo) CreatePaymentMethod(ctx context.Context, method string,
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if err := lockPaymentMethodCatalogue(ctx, tx.Client(), r.data.sqlDialect); err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (r *masterDataRepo) UpdatePaymentMethod(ctx context.Context, change biz.Pay
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if err := lockPaymentMethodCatalogue(ctx, tx.Client(), r.data.sqlDialect); err != nil {
 		return nil, err
 	}
@@ -241,7 +241,7 @@ func (r *masterDataRepo) DeletePaymentMethod(ctx context.Context, id, version in
 	if err != nil {
 		return err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if err := lockPaymentMethodCatalogue(ctx, tx.Client(), r.data.sqlDialect); err != nil {
 		return err
 	}

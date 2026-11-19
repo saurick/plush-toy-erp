@@ -21,7 +21,6 @@ type financePaymentBehaviorRepo struct {
 	reversals   []FinancePaymentReverse
 	allocations []FinancePaymentAllocate
 	reversed    []FinanceAllocationReverse
-	postCalls   int
 	err         error
 }
 
@@ -41,11 +40,6 @@ func (r *financePaymentBehaviorRepo) CancelFinancePayment(_ context.Context, in 
 func (r *financePaymentBehaviorRepo) ReverseFinancePayment(_ context.Context, in *FinancePaymentReverse, actor int) (*FinancePayment, error) {
 	r.reversals, r.actor = append(r.reversals, *in), actor
 	return nil, r.err
-}
-
-func (r *financePaymentBehaviorRepo) PostFinancePayment(context.Context, *FinancePaymentPost, int) (*FinancePayment, error) {
-	r.postCalls++
-	return nil, nil
 }
 
 func (r *financePaymentBehaviorRepo) FinancePaymentAllocationCandidates(context.Context, int) ([]*FinanceFact, error) {
@@ -168,19 +162,6 @@ func TestFinancePaymentUsecasePaymentKindsBindDirectionAndSource(t *testing.T) {
 				t.Fatalf("invalid payment reached storage: err=%v calls=%d", err, len(repo.created))
 			}
 		})
-	}
-}
-
-func TestFinancePaymentUsecasePostingCannotBypassProcessRuntime(t *testing.T) {
-	repo := &financePaymentBehaviorRepo{}
-	uc := NewOperationalFactUsecase(repo)
-	valid := FinancePaymentPost{ID: 12, ExpectedVersion: 3, Allocations: []FinancePaymentAllocationInput{{FinanceFactID: 8, Amount: decimal.RequireFromString("0.3")}}}
-	if _, err := uc.PostFinancePayment(context.Background(), &valid, 7); !errors.Is(err, ErrProcessRuntimeRequired) || repo.postCalls != 0 {
-		t.Fatalf("direct posting bypassed process runtime: err=%v writes=%d", err, repo.postCalls)
-	}
-	valid.Allocations = append(valid.Allocations, valid.Allocations[0])
-	if _, err := uc.PostFinancePayment(context.Background(), &valid, 7); !errors.Is(err, ErrBadParam) || repo.postCalls != 0 {
-		t.Fatalf("duplicate allocation was accepted: %v", err)
 	}
 }
 

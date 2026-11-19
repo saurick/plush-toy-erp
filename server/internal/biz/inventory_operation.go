@@ -123,9 +123,6 @@ type InventoryOperationFilter struct {
 
 type InventoryOperationRepo interface {
 	CreateInventoryOperation(context.Context, *InventoryOperationCreate, string) (*InventoryOperation, error)
-	SubmitInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
-	ApproveInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
-	RejectInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
 	PostInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
 	CancelInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
 	GetInventoryOperation(context.Context, int) (*InventoryOperation, error)
@@ -164,40 +161,6 @@ func (uc *InventoryUsecase) SaveInventoryOperationDraft(ctx context.Context, in 
 		return nil, err
 	}
 	return repo.SaveInventoryOperationDraft(ctx, normalized)
-}
-func (uc *InventoryUsecase) SubmitInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
-	if !validInventoryOperationMutation(uc, in) {
-		return nil, ErrBadParam
-	}
-	_, ok := any(uc.repo).(InventoryOperationRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
-	return nil, ErrProcessRuntimeRequired
-}
-func (uc *InventoryUsecase) ApproveInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
-	if !validInventoryOperationMutation(uc, in) {
-		return nil, ErrBadParam
-	}
-	_, ok := any(uc.repo).(InventoryOperationRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
-	return nil, ErrProcessRuntimeRequired
-}
-func (uc *InventoryUsecase) RejectInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
-	if !validInventoryOperationMutation(uc, in) {
-		return nil, ErrBadParam
-	}
-	in.Reason = strings.TrimSpace(in.Reason)
-	if in.Reason == "" || len([]rune(in.Reason)) > 255 {
-		return nil, ErrBadParam
-	}
-	_, ok := any(uc.repo).(InventoryOperationRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
-	return nil, ErrProcessRuntimeRequired
 }
 func (uc *InventoryUsecase) PostInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
 	if !validInventoryOperationMutation(uc, in) {

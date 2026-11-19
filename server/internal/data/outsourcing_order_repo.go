@@ -17,7 +17,6 @@ import (
 	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
-	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 
 	"entgo.io/ent/dialect/sql"
@@ -826,16 +825,7 @@ func (r *outsourcingOrderRepo) GetOutsourcingOrderItem(ctx context.Context, id i
 }
 
 func (r *outsourcingOrderRepo) SupplierIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Supplier.Query().
-		Where(supplier.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrSupplierNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.supplierIsActive(ctx, id)
 }
 
 func (r *outsourcingOrderRepo) SupplierDefaultPaymentTermDays(ctx context.Context, id int) (int, error) {
@@ -850,16 +840,7 @@ func (r *outsourcingOrderRepo) SupplierDefaultPaymentTermDays(ctx context.Contex
 }
 
 func (r *outsourcingOrderRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Product.Query().
-		Where(product.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrProductNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.productIsActive(ctx, id)
 }
 
 func (r *outsourcingOrderRepo) ProductSKUIsActiveForProductAndUnit(ctx context.Context, id, productID, unitID int) (bool, error) {
@@ -877,29 +858,11 @@ func (r *outsourcingOrderRepo) ProductSKUIsActiveForProductAndUnit(ctx context.C
 }
 
 func (r *outsourcingOrderRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Material.Query().
-		Where(material.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrMaterialNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.materialIsActive(ctx, id)
 }
 
 func (r *outsourcingOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Unit.Query().
-		Where(unit.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrUnitNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.unitIsActive(ctx, id)
 }
 
 func (r *outsourcingOrderRepo) ProcessIsUsableForOutsourcing(ctx context.Context, id int) (bool, bool, error) {

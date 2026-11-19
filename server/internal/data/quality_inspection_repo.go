@@ -1838,10 +1838,10 @@ func updateQualityInspectionDecision(ctx context.Context, tx *inventoryDBTx, ins
 		status,
 		result,
 		inspectedAt,
-		optionalIntSQLValue(inspectorID),
-		optionalStringSQLValue(defectRateOperator),
-		optionalDecimalSQLValue(defectRatePercent),
-		optionalStringSQLValue(decisionNote),
+		optionalSQLValue(inspectorID),
+		optionalSQLValue(defectRateOperator),
+		optionalSQLValue(defectRatePercent),
+		optionalSQLValue(decisionNote),
 		time.Now(),
 		string(evidence),
 		inspectionID,
@@ -1861,7 +1861,7 @@ func updateQualityInspectionCancelled(ctx context.Context, tx *inventoryDBTx, in
 	)
 	result, err := tx.sqlTx.ExecContext(ctx, query,
 		biz.QualityInspectionStatusCancelled,
-		optionalStringSQLValue(decisionNote),
+		optionalSQLValue(decisionNote),
 		time.Now(),
 		inspectionID,
 		biz.QualityInspectionStatusDraft,
@@ -1890,27 +1890,6 @@ func parsePositiveIntOrZero(value string) int {
 		return 0
 	}
 	return parsed
-}
-
-func optionalIntSQLValue(value *int) any {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
-func optionalStringSQLValue(value *string) any {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
-func optionalDecimalSQLValue(value *decimal.Decimal) any {
-	if value == nil {
-		return nil
-	}
-	return *value
 }
 
 func optionalStringValueOrEmpty(value *string) string {

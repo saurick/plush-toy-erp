@@ -391,8 +391,8 @@ const BASE_GO_BUSINESS_SCENARIOS = Object.freeze({
     ),
     goScenario(
       "payment-process-posting-boundary",
-      "server/internal/biz",
-      "TestFinancePaymentUsecasePostingCannotBypassProcessRuntime",
+      "server/internal/service",
+      "TestRetiredProcessWritesHaveNoDirectRPC",
       "过账必须经过受控流程",
     ),
     goScenario(

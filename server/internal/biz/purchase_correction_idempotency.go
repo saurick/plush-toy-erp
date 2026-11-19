@@ -125,7 +125,7 @@ func normalizePurchaseReceiptAdjustmentFromReceiptCreate(in PurchaseReceiptAdjus
 	}
 	items := append([]PurchaseReceiptAdjustmentFromReceiptItemCreate(nil), in.Items...)
 	seen := make(map[string]struct{}, len(items))
-	groups := make(map[string][]PurchaseReceiptAdjustmentFromReceiptItemCreate)
+	groups := make(map[string][]receiptCorrectionLine)
 	for index := range items {
 		item := &items[index]
 		item.AdjustType = strings.ToUpper(strings.TrimSpace(item.AdjustType))
@@ -154,33 +154,23 @@ func normalizePurchaseReceiptAdjustmentFromReceiptCreate(in PurchaseReceiptAdjus
 			if item.WarehouseID > 0 || item.LotID != nil || item.CorrectionGroup == nil {
 				return PurchaseReceiptAdjustmentFromReceiptCreate{}, ErrBadParam
 			}
-			groups[*item.CorrectionGroup] = append(groups[*item.CorrectionGroup], *item)
 		case PurchaseReceiptAdjustmentLotCorrectionIn:
 			if item.WarehouseID > 0 || item.LotID == nil || item.CorrectionGroup == nil {
 				return PurchaseReceiptAdjustmentFromReceiptCreate{}, ErrBadParam
 			}
-			groups[*item.CorrectionGroup] = append(groups[*item.CorrectionGroup], *item)
 		case PurchaseReceiptAdjustmentWarehouseCorrectionIn:
 			if item.WarehouseID <= 0 || item.LotID != nil || item.CorrectionGroup == nil {
 				return PurchaseReceiptAdjustmentFromReceiptCreate{}, ErrBadParam
 			}
-			groups[*item.CorrectionGroup] = append(groups[*item.CorrectionGroup], *item)
 		default:
 			return PurchaseReceiptAdjustmentFromReceiptCreate{}, ErrBadParam
 		}
+		if item.CorrectionGroup != nil {
+			groups[*item.CorrectionGroup] = append(groups[*item.CorrectionGroup], receiptCorrectionLine{item.PurchaseReceiptItemID, item.AdjustType, item.Quantity})
+		}
 	}
-	for _, pair := range groups {
-		if len(pair) != 2 || pair[0].PurchaseReceiptItemID != pair[1].PurchaseReceiptItemID || pair[0].Quantity.Cmp(pair[1].Quantity) != 0 {
-			return PurchaseReceiptAdjustmentFromReceiptCreate{}, ErrBadParam
-		}
-		a, b := pair[0].AdjustType, pair[1].AdjustType
-		lotPair := (a == PurchaseReceiptAdjustmentLotCorrectionOut && b == PurchaseReceiptAdjustmentLotCorrectionIn) ||
-			(a == PurchaseReceiptAdjustmentLotCorrectionIn && b == PurchaseReceiptAdjustmentLotCorrectionOut)
-		warehousePair := (a == PurchaseReceiptAdjustmentWarehouseCorrectionOut && b == PurchaseReceiptAdjustmentWarehouseCorrectionIn) ||
-			(a == PurchaseReceiptAdjustmentWarehouseCorrectionIn && b == PurchaseReceiptAdjustmentWarehouseCorrectionOut)
-		if !lotPair && !warehousePair {
-			return PurchaseReceiptAdjustmentFromReceiptCreate{}, ErrBadParam
-		}
+	if err := validateReceiptCorrectionPairs(groups); err != nil {
+		return PurchaseReceiptAdjustmentFromReceiptCreate{}, err
 	}
 	sort.Slice(items, func(i, j int) bool {
 		return adjustmentRequestLineKey(items[i]) < adjustmentRequestLineKey(items[j])

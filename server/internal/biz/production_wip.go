@@ -516,9 +516,9 @@ func normalizeProductionWIPAction(in ProductionWIPAction) (ProductionWIPAction, 
 	in.Action = strings.ToUpper(strings.TrimSpace(in.Action))
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
 	in.ExecutionMode = strings.ToUpper(strings.TrimSpace(in.ExecutionMode))
-	in.Reason = normalizeOptionalProductionOrderText(in.Reason)
-	in.PackagingVersionSnapshot = normalizeOptionalProductionOrderText(in.PackagingVersionSnapshot)
-	in.Note = normalizeOptionalProductionOrderText(in.Note)
+	in.Reason = normalizeOptionalString(in.Reason)
+	in.PackagingVersionSnapshot = normalizeOptionalString(in.PackagingVersionSnapshot)
+	in.Note = normalizeOptionalString(in.Note)
 	if in.FinishedGoodsReceiptID < 0 || (in.FinishedGoodsReceiptID != 0 && in.Action != ProductionWIPActionTransferToNextOperation) {
 		return ProductionWIPAction{}, ErrBadParam
 	}

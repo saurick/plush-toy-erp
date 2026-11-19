@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"sort"
 	"strings"
 	"time"
 
@@ -205,7 +204,6 @@ type FinanceCreditNoteFilter struct {
 type FinancePaymentRepo interface {
 	CreateFinancePayment(ctx context.Context, in *FinancePaymentCreate, actorID int, payloadHash string) (*FinancePayment, error)
 	CancelFinancePayment(ctx context.Context, in *FinancePaymentTransition, actorID int) (*FinancePayment, error)
-	PostFinancePayment(ctx context.Context, in *FinancePaymentPost, actorID int) (*FinancePayment, error)
 	ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (*FinancePayment, error)
 	CreateFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteCreate, actorID int, payloadHash string) (*FinanceCreditNote, error)
 	ReverseFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteReverse, actorID int, payloadHash string) (*FinanceCreditNote, error)
@@ -236,26 +234,6 @@ func (uc *OperationalFactUsecase) CancelFinancePayment(ctx context.Context, in *
 		return nil, ErrBadParam
 	}
 	return repo.CancelFinancePayment(ctx, in, actorID)
-}
-func (uc *OperationalFactUsecase) PostFinancePayment(ctx context.Context, in *FinancePaymentPost, actorID int) (_ *FinancePayment, err error) {
-	_, finish := startBusinessTrace(ctx, "finance.post_payment")
-	defer func() { finish(err) }()
-	_, ok := uc.financePaymentRepo()
-	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || len(in.Allocations) == 0 {
-		return nil, ErrBadParam
-	}
-	sort.Slice(in.Allocations, func(i, j int) bool { return in.Allocations[i].FinanceFactID < in.Allocations[j].FinanceFactID })
-	seen := map[int]struct{}{}
-	for _, a := range in.Allocations {
-		if a.FinanceFactID <= 0 || !a.Amount.IsPositive() {
-			return nil, ErrBadParam
-		}
-		if _, exists := seen[a.FinanceFactID]; exists {
-			return nil, ErrBadParam
-		}
-		seen[a.FinanceFactID] = struct{}{}
-	}
-	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (_ *FinancePayment, err error) {
 	ctx, finish := startBusinessTrace(ctx, "finance.reverse_payment")

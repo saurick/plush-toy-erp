@@ -295,121 +295,42 @@ func workflowOrderRecordTitle(task *WorkflowTask) string {
 	return "订单/款式立项记录"
 }
 
+func workflowRecordTitle(task *WorkflowTask, fallback string, keys ...string) string {
+	if task != nil {
+		for _, key := range keys {
+			if title := workflowPayloadString(task.Payload, key); title != "" {
+				return title
+			}
+		}
+		if sourceNo := workflowSourceNoValue(task); sourceNo != "" {
+			return sourceNo
+		}
+	}
+	return fallback
+}
+
 func workflowPurchaseInboundRecordTitle(task *WorkflowTask) string {
-	if task == nil {
-		return "采购到货 / 入库通知"
-	}
-	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "material_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
-		return title
-	}
-	if title := workflowSourceNoValue(task); title != "" {
-		return title
-	}
-	return "采购到货 / 入库通知"
+	return workflowRecordTitle(task, "采购到货 / 入库通知", "record_title", "material_name", "product_name")
 }
 
 func workflowOutsourceReturnRecordTitle(task *WorkflowTask) string {
-	if task == nil {
-		return "委外回货检验"
-	}
-	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "material_name"); title != "" {
-		return title
-	}
-	if title := workflowSourceNoValue(task); title != "" {
-		return title
-	}
-	return "委外回货检验"
+	return workflowRecordTitle(task, "委外回货检验", "record_title", "product_name", "material_name")
 }
 
 func workflowFinishedGoodsRecordTitle(task *WorkflowTask) string {
-	if task == nil {
-		return "成品抽检"
-	}
-	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "style_no"); title != "" {
-		return title
-	}
-	if title := workflowSourceNoValue(task); title != "" {
-		return title
-	}
-	return "成品抽检"
+	return workflowRecordTitle(task, "成品抽检", "record_title", "product_name", "style_no")
 }
 
 func workflowShipmentReleaseRecordTitle(task *WorkflowTask) string {
-	if task == nil {
-		return "出货放行"
-	}
-	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "customer_name"); title != "" {
-		return title
-	}
-	if title := workflowSourceNoValue(task); title != "" {
-		return title
-	}
-	return "出货放行"
+	return workflowRecordTitle(task, "出货放行", "record_title", "product_name", "customer_name")
 }
 
 func workflowShipmentFinanceRecordTitle(task *WorkflowTask) string {
-	if task == nil {
-		return "财务登记"
-	}
-	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "customer_name"); title != "" {
-		return title
-	}
-	if title := workflowSourceNoValue(task); title != "" {
-		return title
-	}
-	return "财务登记"
+	return workflowRecordTitle(task, "财务登记", "record_title", "product_name", "customer_name")
 }
 
 func workflowPayableRecordTitle(task *WorkflowTask) string {
-	if task == nil {
-		return "财务应付 / 对账"
-	}
-	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "supplier_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
-		return title
-	}
-	if title := workflowPayloadString(task.Payload, "material_name"); title != "" {
-		return title
-	}
-	if title := workflowSourceNoValue(task); title != "" {
-		return title
-	}
-	return "财务应付 / 对账"
+	return workflowRecordTitle(task, "财务应付 / 对账", "record_title", "supplier_name", "product_name", "material_name")
 }
 
 func workflowPayloadString(payload map[string]any, key string) string {

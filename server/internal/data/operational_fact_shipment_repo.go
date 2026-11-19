@@ -230,23 +230,23 @@ func replaceShipmentDraftHeader(
 		ctx,
 		query,
 		in.ShipmentNo,
-		optionalIntSQLValue(in.SalesOrderID),
-		optionalIntSQLValue(in.CustomerID),
-		optionalStringSQLValue(in.CustomerSnapshot),
+		optionalSQLValue(in.SalesOrderID),
+		optionalSQLValue(in.CustomerID),
+		optionalSQLValue(in.CustomerSnapshot),
 		string(deliverySnapshot),
-		optionalTimeSQLValue(in.PlannedShipAt),
-		optionalStringSQLValue(in.TransportMethod),
-		optionalStringSQLValue(in.CarrierName),
-		optionalStringSQLValue(in.TrackingNo),
-		optionalIntSQLValue(in.PackageCount),
-		optionalDecimalSQLValue(in.GrossWeightKg),
-		optionalDecimalSQLValue(in.VolumeM3),
-		optionalStringSQLValue(in.ShippingMark),
-		optionalDecimalSQLValue(in.FreightAmount),
-		optionalStringSQLValue(in.FreightCurrency),
-		optionalDecimalSQLValue(in.TotalNetWeightG),
-		optionalDecimalSQLValue(in.TotalNetWeightG),
-		optionalStringSQLValue(in.Note),
+		optionalSQLValue(in.PlannedShipAt),
+		optionalSQLValue(in.TransportMethod),
+		optionalSQLValue(in.CarrierName),
+		optionalSQLValue(in.TrackingNo),
+		optionalSQLValue(in.PackageCount),
+		optionalSQLValue(in.GrossWeightKg),
+		optionalSQLValue(in.VolumeM3),
+		optionalSQLValue(in.ShippingMark),
+		optionalSQLValue(in.FreightAmount),
+		optionalSQLValue(in.FreightCurrency),
+		optionalSQLValue(in.TotalNetWeightG),
+		optionalSQLValue(in.TotalNetWeightG),
+		optionalSQLValue(in.Note),
 		time.Now(),
 		current.ID,
 		expectedVersion,
@@ -271,13 +271,6 @@ func deleteShipmentDraftItems(ctx context.Context, tx *inventoryDBTx, shipmentID
 	p := inventorySQLPlaceholders(tx.dialect, 1)
 	_, err := tx.sqlTx.ExecContext(ctx, fmt.Sprintf(`DELETE FROM shipment_items WHERE shipment_id = %s`, p[0]), shipmentID)
 	return err
-}
-
-func optionalTimeSQLValue(value *time.Time) any {
-	if value == nil {
-		return nil
-	}
-	return *value
 }
 
 func canonicalSalesDeliveryShipmentCreateIntent(in *biz.ShipmentCreate) (*biz.ShipmentCreate, error) {

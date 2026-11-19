@@ -39,7 +39,7 @@ func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMut
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	row, err := createCustomerWithClient(ctx, tx.Client(), r.data.sqlDialect, in)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (r *masterDataRepo) UpdateCustomer(ctx context.Context, id int, in *biz.Cus
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	row, err := updateCustomerWithClient(ctx, tx.Client(), r.data.sqlDialect, id, in)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func (r *masterDataRepo) SaveCustomerWithContacts(ctx context.Context, id int, i
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	var customerRow *ent.Customer
 	if id > 0 {
@@ -160,7 +160,7 @@ func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMut
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	row, err := createSupplierWithClient(ctx, tx.Client(), r.data.sqlDialect, in)
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.Sup
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	row, err := updateSupplierWithClient(ctx, tx.Client(), r.data.sqlDialect, id, in)
 	if err != nil {
 		return nil, err
@@ -204,7 +204,7 @@ func (r *masterDataRepo) SaveSupplierWithContacts(ctx context.Context, id int, i
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	var supplierRow *ent.Supplier
 	if id > 0 {
@@ -344,7 +344,7 @@ func (r *masterDataRepo) CreateMaterial(ctx context.Context, in *biz.MaterialMut
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if err := validateMaterialWarehouseChange(ctx, tx.Client(), 0, in); err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func (r *masterDataRepo) UpdateMaterial(ctx context.Context, id int, in *biz.Mat
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	if err := validateMaterialWarehouseChange(ctx, tx.Client(), id, in); err != nil {
 		return nil, err
 	}
@@ -697,14 +697,7 @@ func (r *masterDataRepo) SetProcessActive(ctx context.Context, id int, active bo
 }
 
 func (r *masterDataRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Unit.Query().Where(unit.ID(id)).Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrUnitNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.unitIsActive(ctx, id)
 }
 
 func (r *masterDataRepo) CreateProduct(ctx context.Context, in *biz.ProductMutation) (*biz.Product, error) {
@@ -818,14 +811,7 @@ func (r *masterDataRepo) SetProductActive(ctx context.Context, id int, active bo
 }
 
 func (r *masterDataRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Product.Query().Where(product.ID(id)).Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrProductNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.productIsActive(ctx, id)
 }
 
 func (r *masterDataRepo) CreateProductSKU(ctx context.Context, in *biz.ProductSKUMutation) (*biz.ProductSKU, error) {
@@ -972,7 +958,7 @@ func (r *masterDataRepo) CreateContact(ctx context.Context, in *biz.ContactMutat
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	if in.IsPrimary {
 		if _, err := tx.Contact.Update().
@@ -1009,7 +995,7 @@ func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.Cont
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	if err := ensureContactOwner(ctx, tx.Client(), id, in.OwnerType, in.OwnerID); err != nil {
 		return nil, err
@@ -1101,7 +1087,7 @@ func (r *masterDataRepo) SetPrimaryContact(ctx context.Context, id int) (*biz.Co
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
 	row, err := tx.Contact.Get(ctx, id)
 	if err != nil {
@@ -1462,15 +1448,6 @@ func listActiveContactsForOwner(ctx context.Context, client *ent.Client, ownerTy
 		return nil, err
 	}
 	return entContactsToBiz(rows), nil
-}
-
-func rollbackMasterDataEntTx(ctx context.Context, tx *ent.Tx, logger *log.Helper) {
-	if tx == nil {
-		return
-	}
-	if err := tx.Rollback(); err != nil && logger != nil {
-		logger.WithContext(ctx).Warnf("rollback ent tx failed err=%v", err)
-	}
 }
 
 func entCustomerToBiz(row *ent.Customer) *biz.Customer {

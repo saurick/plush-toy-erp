@@ -59,12 +59,6 @@ func (r *productionExceptionRepoStub) SubmitProductionException(_ context.Contex
 	r.submitted, r.hash = in, hash
 	return &ProductionExceptionDecision{ID: 1, DecisionNo: in.DecisionNo, DecisionType: in.DecisionType, Status: ProductionExceptionSubmitted, Version: 1}, nil
 }
-func (*productionExceptionRepoStub) ApproveProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
-	return nil, nil
-}
-func (*productionExceptionRepoStub) RejectProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
-	return nil, nil
-}
 func (*productionExceptionRepoStub) CancelProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
 	return nil, nil
 }

@@ -131,9 +131,6 @@ func (r *financePaymentServiceRepo) CreateFinancePayment(_ context.Context, in *
 	r.item = &biz.FinancePayment{ID: 31, PaymentNo: in.PaymentNo, Direction: in.Direction, Status: biz.FinancePaymentStatusDraft, CounterpartyType: in.CounterpartyType, CounterpartyID: in.CounterpartyID, Amount: in.Amount, Currency: in.Currency, AccountRef: in.AccountRef, EvidenceRef: in.EvidenceRef, Version: 1, OccurredAt: now, CreatedBy: actorID, CreatedAt: now, UpdatedAt: now}
 	return r.item, nil
 }
-func (r *financePaymentServiceRepo) PostFinancePayment(_ context.Context, _ *biz.FinancePaymentPost, _ int) (*biz.FinancePayment, error) {
-	return r.item, nil
-}
 func (r *financePaymentServiceRepo) CancelFinancePayment(_ context.Context, in *biz.FinancePaymentTransition, actorID int) (*biz.FinancePayment, error) {
 	now := time.Now()
 	r.item.Status = biz.FinancePaymentStatusCancelled

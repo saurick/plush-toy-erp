@@ -22,3 +22,10 @@ func validBusinessListSort(field, direction string, fields ...string) bool {
 	}
 	return slices.Contains(fields, field) && (direction == "" || direction == "asc" || direction == "desc")
 }
+
+func normalizeOrderItemPagination(limit, offset int) (int, int) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	return limit, max(offset, 0)
+}

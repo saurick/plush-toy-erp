@@ -143,12 +143,6 @@ func productionExceptionWIPSource(ctx context.Context, client *ent.Client, batch
 	return batch, inspection, nil
 }
 
-func (r *operationalFactRepo) ApproveProductionException(ctx context.Context, in *biz.ProductionExceptionMutation) (*biz.ProductionExceptionDecision, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-func (r *operationalFactRepo) RejectProductionException(ctx context.Context, in *biz.ProductionExceptionMutation) (*biz.ProductionExceptionDecision, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
 func (r *operationalFactRepo) CancelProductionException(ctx context.Context, in *biz.ProductionExceptionMutation) (*biz.ProductionExceptionDecision, error) {
 	return r.decideProductionException(ctx, in, biz.ProductionExceptionCancelled, nil, nil)
 }
@@ -304,10 +298,6 @@ func validateProductionOverIssueApprovalCapacity(
 		return biz.ErrProductionExceptionApprovalAmount
 	}
 	return nil
-}
-
-func (r *operationalFactRepo) ExecuteProductionException(ctx context.Context, in *biz.ProductionExceptionMutation) (*biz.ProductionExceptionDecision, error) {
-	return nil, biz.ErrProcessRuntimeRequired
 }
 
 func (r *operationalFactRepo) ExecuteProductionExceptionForProcessCommand(

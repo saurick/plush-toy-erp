@@ -10,15 +10,9 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
-	"server/internal/data/model/ent/material"
-	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productsku"
-	"server/internal/data/model/ent/supplier"
-	"server/internal/data/model/ent/unit"
-	"server/internal/data/model/ent/warehouse"
 
 	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
@@ -50,42 +44,15 @@ var _ biz.FinanceFactFromShipmentRepo = (*operationalFactRepo)(nil)
 var _ biz.OutsourcingFactFromOrderRepo = (*operationalFactRepo)(nil)
 
 func (r *operationalFactRepo) CustomerIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Customer.Query().
-		Where(customer.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrCustomerNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.customerIsActive(ctx, id)
 }
 
 func (r *operationalFactRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Material.Query().
-		Where(material.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrMaterialNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.materialIsActive(ctx, id)
 }
 
 func (r *operationalFactRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Product.Query().
-		Where(product.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrProductNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.productIsActive(ctx, id)
 }
 
 func (r *operationalFactRepo) ProductSKUIsActive(ctx context.Context, id int) (bool, error) {
@@ -102,42 +69,15 @@ func (r *operationalFactRepo) ProductSKUIsActive(ctx context.Context, id int) (b
 }
 
 func (r *operationalFactRepo) SupplierIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Supplier.Query().
-		Where(supplier.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrSupplierNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.supplierIsActive(ctx, id)
 }
 
 func (r *operationalFactRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Unit.Query().
-		Where(unit.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrUnitNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.unitIsActive(ctx, id)
 }
 
 func (r *operationalFactRepo) WarehouseIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Warehouse.Query().
-		Where(warehouse.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrWarehouseNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.warehouseIsActive(ctx, id)
 }
 
 func validateOperationalFactSKUAndLot(ctx context.Context, client *ent.Client, subjectType string, subjectID int, productSkuID, lotID *int) error {

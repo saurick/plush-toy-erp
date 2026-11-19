@@ -809,12 +809,7 @@ func normalizeSalesOrderItemFilter(in SalesOrderItemFilter) (SalesOrderItemFilte
 	if in.LineStatus != "" && !IsValidSalesOrderItemStatus(in.LineStatus) {
 		return SalesOrderItemFilter{}, ErrBadParam
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
-	if in.Offset < 0 {
-		in.Offset = 0
-	}
+	in.Limit, in.Offset = normalizeOrderItemPagination(in.Limit, in.Offset)
 	return in, nil
 }
 

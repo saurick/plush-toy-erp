@@ -102,7 +102,7 @@ func (r *masterDataRepo) SaveWarehouse(ctx context.Context, id int, in *biz.Ware
 	if err != nil {
 		return nil, err
 	}
-	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	client := tx.Client()
 	var row *ent.Warehouse
 	if id == 0 {

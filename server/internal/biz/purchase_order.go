@@ -250,7 +250,7 @@ func (uc *PurchaseOrderUsecase) CreatePurchaseOrder(ctx context.Context, in *Pur
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateSupplierActive(ctx, normalized.SupplierID); err != nil {
+	if err := requireActiveReference(ctx, normalized.SupplierID, uc.repo.SupplierIsActive, ErrSupplierInactive); err != nil {
 		return nil, err
 	}
 	normalized.PaymentTermDays, err = resolveSourceOrderPaymentTermDays(ctx, uc.repo, normalized.SupplierID, normalized.PaymentTermDays)
@@ -278,7 +278,7 @@ func (uc *PurchaseOrderUsecase) UpdatePurchaseOrder(ctx context.Context, id int,
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateSupplierActive(ctx, normalized.SupplierID); err != nil {
+	if err := requireActiveReference(ctx, normalized.SupplierID, uc.repo.SupplierIsActive, ErrSupplierInactive); err != nil {
 		return nil, err
 	}
 	return uc.repo.UpdatePurchaseOrder(ctx, id, &normalized)
@@ -468,7 +468,7 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateSupplierActive(ctx, normalizedOrder.SupplierID); err != nil {
+	if err := requireActiveReference(ctx, normalizedOrder.SupplierID, uc.repo.SupplierIsActive, ErrSupplierInactive); err != nil {
 		return nil, err
 	}
 	if id == 0 {
@@ -560,17 +560,6 @@ func (uc *PurchaseOrderUsecase) changePurchaseOrderLifecycle(ctx context.Context
 		return current, nil
 	}
 	return uc.repo.UpdatePurchaseOrderLifecycle(ctx, id, next)
-}
-
-func (uc *PurchaseOrderUsecase) validateSupplierActive(ctx context.Context, id int) error {
-	active, err := uc.repo.SupplierIsActive(ctx, id)
-	if err != nil {
-		return err
-	}
-	if !active {
-		return ErrSupplierInactive
-	}
-	return nil
 }
 
 func (uc *PurchaseOrderUsecase) validateOpenPurchaseOrder(ctx context.Context, id int) error {
@@ -805,12 +794,7 @@ func normalizePurchaseOrderItemFilter(in PurchaseOrderItemFilter) (PurchaseOrder
 	if in.LineStatus != "" && !IsValidPurchaseOrderItemStatus(in.LineStatus) {
 		return PurchaseOrderItemFilter{}, ErrBadParam
 	}
-	if in.Limit <= 0 || in.Limit > 200 {
-		in.Limit = 50
-	}
-	if in.Offset < 0 {
-		in.Offset = 0
-	}
+	in.Limit, in.Offset = normalizeOrderItemPagination(in.Limit, in.Offset)
 	return in, nil
 }
 

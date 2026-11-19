@@ -777,3 +777,26 @@ func createSalesOrderTestProductSKU(t *testing.T, ctx context.Context, client *e
 	}
 	return row
 }
+
+func TestSalesOrderCommercialUpdateBuildersPreserveZeroAndClear(t *testing.T) {
+	_, client := openSalesOrderRepoTest(t, "sales_commercial_field_mapping")
+	defer mustCloseEntClient(t, client)
+	zero := decimal.Zero
+	mode, terms := "NONE", "INCLUDED"
+	values := biz.SalesOrderMutation{TaxMode: &mode, TaxRate: &zero, FreightTerms: &terms, QuotedFreightAmount: &zero, GoodsAmount: &zero, TaxAmount: &zero, OrderTotal: &zero}
+	for _, mutation := range []*ent.SalesOrderMutation{client.SalesOrder.UpdateOneID(1).Mutation(), client.SalesOrder.Update().Mutation()} {
+		setSalesOrderCommercialFields(mutation, &values)
+		for _, field := range []string{"tax_rate", "quoted_freight_amount", "goods_amount", "tax_amount", "order_total"} {
+			got, set := mutation.Field(field)
+			if n, ok := got.(decimal.Decimal); !set || !ok || !n.IsZero() {
+				t.Fatalf("%s: zero was not set: %v", field, got)
+			}
+		}
+		setSalesOrderCommercialFields(mutation, &biz.SalesOrderMutation{})
+		for _, field := range []string{"tax_mode", "tax_rate", "freight_terms", "quoted_freight_amount", "goods_amount", "tax_amount", "order_total"} {
+			if !mutation.FieldCleared(field) {
+				t.Fatalf("%s: missing clear", field)
+			}
+		}
+	}
+}

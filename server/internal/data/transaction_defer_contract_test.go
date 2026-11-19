@@ -116,7 +116,7 @@ func defersEntTransactionRollback(body *ast.BlockStmt) bool {
 func isManagedEntTransactionRollback(callee ast.Expr) bool {
 	switch expression := callee.(type) {
 	case *ast.Ident:
-		return expression.Name == "rollbackEntTx" || expression.Name == "rollbackMasterDataEntTx"
+		return expression.Name == "rollbackEntTx"
 	case *ast.SelectorExpr:
 		return expression.Sel.Name == "rollbackAdminManageTx"
 	default:

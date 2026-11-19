@@ -834,22 +834,22 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	in.TaskGroup = strings.TrimSpace(in.TaskGroup)
 	in.TaskName = strings.TrimSpace(in.TaskName)
 	in.SourceType = strings.TrimSpace(in.SourceType)
-	in.SourceNo = normalizeWorkflowOptionalStringPtr(in.SourceNo)
+	in.SourceNo = normalizeOptionalString(in.SourceNo)
 	in.TaskStatusKey = strings.TrimSpace(in.TaskStatusKey)
 	in.OwnerRoleKey = NormalizeRoleKey(in.OwnerRoleKey)
-	in.OwnerPoolKey = normalizeWorkflowOptionalStringPtr(in.OwnerPoolKey)
+	in.OwnerPoolKey = normalizeOptionalString(in.OwnerPoolKey)
 	if in.OwnerPoolKey == nil && in.OwnerRoleKey != "" {
 		ownerPoolKey := in.OwnerRoleKey
 		in.OwnerPoolKey = &ownerPoolKey
 	}
-	in.RequiredCapabilityKey = normalizeWorkflowOptionalStringPtr(in.RequiredCapabilityKey)
+	in.RequiredCapabilityKey = normalizeOptionalString(in.RequiredCapabilityKey)
 	if in.RequiredCapabilityKey == nil {
 		requiredCapabilityKey := workflowTaskDefaultRequiredCapability(in)
 		if requiredCapabilityKey != "" {
 			in.RequiredCapabilityKey = &requiredCapabilityKey
 		}
 	}
-	in.ConfigRevision = normalizeWorkflowOptionalStringPtr(in.ConfigRevision)
+	in.ConfigRevision = normalizeOptionalString(in.ConfigRevision)
 	var err error
 	in.AssigneeID, err = normalizeWorkflowOptionalPositiveIntPtr(in.AssigneeID)
 	if err != nil {
@@ -926,17 +926,6 @@ func workflowTaskCreateTextLengthsValid(in WorkflowTaskCreate) bool {
 	return true
 }
 
-func normalizeWorkflowOptionalStringPtr(value *string) *string {
-	if value == nil {
-		return nil
-	}
-	normalized := strings.TrimSpace(*value)
-	if normalized == "" {
-		return nil
-	}
-	return &normalized
-}
-
 func normalizeWorkflowOptionalPositiveIntPtr(value *int) (*int, error) {
 	if value == nil {
 		return nil, nil
@@ -963,7 +952,7 @@ func normalizeWorkflowDerivedTaskRuntimeAnchors(current *WorkflowTask, in *Workf
 	}
 	derived := *in.SideEffects.DerivedTask
 	if derived.ConfigRevision == nil && current.ConfigRevision != nil {
-		derived.ConfigRevision = normalizeWorkflowOptionalStringPtr(current.ConfigRevision)
+		derived.ConfigRevision = normalizeOptionalString(current.ConfigRevision)
 	}
 	normalized, err := normalizeWorkflowTaskCreate(derived)
 	if err != nil {

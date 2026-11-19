@@ -105,13 +105,10 @@ type ProductionExceptionFilter struct {
 
 type ProductionExceptionDecisionRepo interface {
 	SubmitProductionException(context.Context, *ProductionExceptionSubmit, string) (*ProductionExceptionDecision, error)
-	ApproveProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
-	RejectProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
 	CancelProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
 	GetProductionException(context.Context, int) (*ProductionExceptionDecision, error)
 }
 type ProductionExceptionExecutionRepo interface {
-	ExecuteProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
 	ReverseProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
 }
 type ProductionExceptionSourceResolver interface {
@@ -214,20 +211,6 @@ func ProductionExceptionCreatesBatch(decisionType string) bool {
 	return decisionType == ProductionExceptionReworkOriginal || decisionType == ProductionExceptionReworkSwitch || decisionType == ProductionExceptionRemake
 }
 
-func (uc *OperationalFactUsecase) ApproveProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
-	_, ok := productionExceptionRepo(uc)
-	if !ok || !validProductionExceptionMutation(in, true) {
-		return nil, ErrBadParam
-	}
-	return nil, ErrProcessRuntimeRequired
-}
-func (uc *OperationalFactUsecase) RejectProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
-	_, ok := productionExceptionRepo(uc)
-	if !ok || !validProductionExceptionMutation(in, false) {
-		return nil, ErrBadParam
-	}
-	return nil, ErrProcessRuntimeRequired
-}
 func (uc *OperationalFactUsecase) CancelProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
 	repo, ok := productionExceptionRepo(uc)
 	if !ok || !validProductionExceptionMutation(in, false) {
@@ -237,16 +220,6 @@ func (uc *OperationalFactUsecase) CancelProductionException(ctx context.Context,
 	n.Reason = strings.TrimSpace(n.Reason)
 	n.ApprovedQuantity = nil
 	return repo.CancelProductionException(ctx, &n)
-}
-func (uc *OperationalFactUsecase) ExecuteProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
-	if uc == nil || uc.repo == nil || !validProductionExceptionMutation(in, false) {
-		return nil, ErrBadParam
-	}
-	_, ok := any(uc.repo).(ProductionExceptionExecutionRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
-	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) ReverseProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
 	if uc == nil || uc.repo == nil || !validProductionExceptionMutation(in, false) {

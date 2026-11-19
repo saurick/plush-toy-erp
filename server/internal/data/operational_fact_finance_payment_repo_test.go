@@ -302,9 +302,6 @@ func TestFinancePaymentMultiAllocationAndReversal(t *testing.T) {
 	}
 	client.Customer.UpdateOneID(customer.ID).SetIsActive(true).ExecX(ctx)
 	postInput := &biz.FinancePaymentPost{ID: created.ID, ExpectedVersion: created.Version, Allocations: []biz.FinancePaymentAllocationInput{{FinanceFactID: fact2, Amount: decimal.NewFromInt(40)}, {FinanceFactID: fact1, Amount: decimal.NewFromInt(60)}}}
-	if _, err := uc.PostFinancePayment(ctx, postInput, poster.ID); !errors.Is(err, biz.ErrProcessRuntimeRequired) {
-		t.Fatalf("direct payment post guard err=%v", err)
-	}
 	approved := approveFinancePaymentForRepoTest(t, ctx, client, created.ID, approver.ID)
 	postInput.ExpectedVersion = approved.Version
 	posted, err := repo.postFinancePayment(ctx, postInput, poster.ID, nil, nil)

@@ -25,9 +25,6 @@ func TestProductionOverIssueApprovalExtendsAndCapsMaterialIssue(t *testing.T) {
 	}
 	approver := f.client.AdminUser.Create().SetUsername("over-issue-approver").SetPasswordHash("test-password-hash").SaveX(ctx)
 	approved := decimal.NewFromInt(3)
-	if _, guardErr := factUC.ApproveProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, ApprovedQuantity: &approved, Reason: "批准三件"}); !errors.Is(guardErr, biz.ErrProcessRuntimeRequired) {
-		t.Fatalf("direct production exception approval guard err=%v", guardErr)
-	}
 	decision, err = factRepo.decideProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, ApprovedQuantity: &approved, Reason: "批准三件"}, biz.ProductionExceptionApproved, nil, nil)
 	if err != nil || decision.Status != biz.ProductionExceptionApproved || decision.ApprovedQuantity == nil || !decision.ApprovedQuantity.Equal(approved) {
 		t.Fatalf("decision=%#v err=%v", decision, err)

@@ -317,10 +317,6 @@ func (r *operationalFactRepo) decideFinancePaymentForProcessCommand(
 	return out, nil
 }
 
-func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.FinancePaymentPost, actorID int) (*biz.FinancePayment, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
 func (r *operationalFactRepo) PostFinancePaymentForProcessCommand(
 	ctx context.Context,
 	in *biz.FinancePaymentPost,

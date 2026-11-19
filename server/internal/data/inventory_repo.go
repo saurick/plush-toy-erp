@@ -18,16 +18,12 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/inventorytxn"
-	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
-	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/supplier"
-	"server/internal/data/model/ent/unit"
-	"server/internal/data/model/ent/warehouse"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -75,55 +71,19 @@ func (r *inventoryRepo) GetSupplier(ctx context.Context, id int) (*biz.Supplier,
 }
 
 func (r *inventoryRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Material.Query().
-		Where(material.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrMaterialNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.materialIsActive(ctx, id)
 }
 
 func (r *inventoryRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Product.Query().
-		Where(product.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrProductNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.productIsActive(ctx, id)
 }
 
 func (r *inventoryRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Unit.Query().
-		Where(unit.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrUnitNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.unitIsActive(ctx, id)
 }
 
 func (r *inventoryRepo) WarehouseIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Warehouse.Query().
-		Where(warehouse.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrWarehouseNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.warehouseIsActive(ctx, id)
 }
 
 func (r *inventoryRepo) CreateInventoryLot(ctx context.Context, in *biz.InventoryLotCreate) (*biz.InventoryLot, error) {

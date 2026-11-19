@@ -237,12 +237,12 @@ func updateInventoryOperationDraftItem(
 	result, err := tx.sqlTx.ExecContext(
 		ctx,
 		query,
-		optionalDecimalSQLValue(expectedQuantity),
-		optionalDecimalSQLValue(countedQuantity),
+		optionalSQLValue(expectedQuantity),
+		optionalSQLValue(countedQuantity),
 		adjustmentQuantity,
-		optionalIntSQLValue(toWarehouseID),
-		optionalIntSQLValue(toLotID),
-		optionalStringSQLValue(note),
+		optionalSQLValue(toWarehouseID),
+		optionalSQLValue(toLotID),
+		optionalSQLValue(note),
 		itemID,
 		operationID,
 	)
@@ -292,10 +292,6 @@ func (r *inventoryRepo) resolveInventoryOperationReplay(ctx context.Context, cli
 	}
 	out, err := inventoryOperationByID(ctx, client, row.ID)
 	return out, true, err
-}
-
-func (r *inventoryRepo) SubmitInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
-	return nil, biz.ErrProcessRuntimeRequired
 }
 
 func (r *inventoryRepo) SubmitInventoryOperationForProcessCommand(
@@ -358,10 +354,6 @@ func (r *inventoryRepo) submitInventoryOperation(
 	return commitInventoryOperation(ctx, tx, row.ID)
 }
 
-func (r *inventoryRepo) ApproveInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
 func (r *inventoryRepo) ApproveInventoryOperationForProcessCommand(
 	ctx context.Context,
 	id int,
@@ -421,10 +413,6 @@ func (r *inventoryRepo) approveInventoryOperation(
 		}
 	}
 	return commitInventoryOperation(ctx, tx, row.ID)
-}
-
-func (r *inventoryRepo) RejectInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
-	return nil, biz.ErrProcessRuntimeRequired
 }
 
 func (r *inventoryRepo) RejectInventoryOperationForProcessCommand(

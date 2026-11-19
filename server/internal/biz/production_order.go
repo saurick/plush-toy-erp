@@ -476,7 +476,7 @@ func (uc *ProductionOrderUsecase) applyAction(ctx context.Context, in *Productio
 	if key == "" || utf8.RuneCountInString(key) > 128 {
 		return nil, ErrBadParam
 	}
-	reason := normalizeOptionalProductionOrderText(in.Reason)
+	reason := normalizeOptionalString(in.Reason)
 	if reason != nil && utf8.RuneCountInString(*reason) > 255 {
 		return nil, ErrBadParam
 	}
@@ -499,7 +499,7 @@ func (uc *ProductionOrderUsecase) applyAction(ctx context.Context, in *Productio
 func normalizeProductionOrderCommand(draft ProductionOrderDraft, actorID int, rawKey string) (ProductionOrderDraft, string, error) {
 	key := strings.TrimSpace(rawKey)
 	draft.OrderNo = strings.TrimSpace(draft.OrderNo)
-	draft.Note = normalizeOptionalProductionOrderText(draft.Note)
+	draft.Note = normalizeOptionalString(draft.Note)
 	draft.PlannedStartAt = normalizeProductionOrderTime(draft.PlannedStartAt)
 	draft.PlannedEndAt = normalizeProductionOrderTime(draft.PlannedEndAt)
 	if actorID <= 0 || key == "" || utf8.RuneCountInString(key) > 128 || draft.OrderNo == "" || utf8.RuneCountInString(draft.OrderNo) > 64 || (draft.Note != nil && utf8.RuneCountInString(*draft.Note) > corevalue.BusinessNoteMaxCharacters) || len(draft.Items) == 0 {
@@ -512,8 +512,8 @@ func normalizeProductionOrderCommand(draft ProductionOrderDraft, actorID int, ra
 	items := append([]ProductionOrderDraftItem(nil), draft.Items...)
 	for i := range items {
 		item := &items[i]
-		item.Note = normalizeOptionalProductionOrderText(item.Note)
-		item.RouteCode = normalizeOptionalProductionOrderText(item.RouteCode)
+		item.Note = normalizeOptionalString(item.Note)
+		item.RouteCode = normalizeOptionalString(item.RouteCode)
 		if item.LineNo <= 0 || item.ProductID <= 0 || item.UnitID <= 0 || !item.PlannedQuantity.GreaterThan(decimal.Zero) || (item.Note != nil && utf8.RuneCountInString(*item.Note) > corevalue.BusinessNoteMaxCharacters) {
 			return ProductionOrderDraft{}, "", ErrBadParam
 		}
@@ -538,17 +538,6 @@ func normalizeProductionOrderTime(value *time.Time) *time.Time {
 		return nil
 	}
 	normalized := value.UTC()
-	return &normalized
-}
-
-func normalizeOptionalProductionOrderText(value *string) *string {
-	if value == nil {
-		return nil
-	}
-	normalized := strings.TrimSpace(*value)
-	if normalized == "" {
-		return nil
-	}
 	return &normalized
 }
 

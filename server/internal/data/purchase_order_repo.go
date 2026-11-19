@@ -7,14 +7,11 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
-	"server/internal/data/model/ent/supplier"
-	"server/internal/data/model/ent/unit"
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
@@ -1256,16 +1253,7 @@ func purchaseOrderLifecyclePredecessors(next string) []string {
 }
 
 func (r *purchaseOrderRepo) SupplierIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Supplier.Query().
-		Where(supplier.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrSupplierNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.supplierIsActive(ctx, id)
 }
 
 func (r *purchaseOrderRepo) SupplierDefaultPaymentTermDays(ctx context.Context, id int) (int, error) {
@@ -1295,29 +1283,11 @@ func (r *purchaseOrderRepo) SupplierPurchaseDefaults(ctx context.Context, id int
 }
 
 func (r *purchaseOrderRepo) MaterialIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Material.Query().
-		Where(material.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrMaterialNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.materialIsActive(ctx, id)
 }
 
 func (r *purchaseOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
-	row, err := r.data.postgres.Unit.Query().
-		Where(unit.ID(id)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return false, biz.ErrUnitNotFound
-		}
-		return false, err
-	}
-	return row.IsActive, nil
+	return r.data.unitIsActive(ctx, id)
 }
 
 func savePurchaseOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, displayOrder int, in *biz.PurchaseOrderItemMutation) (*ent.PurchaseOrderItem, error) {
