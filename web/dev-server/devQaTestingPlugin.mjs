@@ -4,6 +4,7 @@ import { statSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { processIsAlive } from './processIsAlive.mjs'
 import {
   DEV_TESTING_ACTIONS,
   DEV_TESTING_OPERATION_ACTIVE_STATUSES,
@@ -355,16 +356,6 @@ function publicOperation(operation) {
     updatedAt: operation.updatedAt,
     finishedAt: operation.finishedAt,
     message: operation.message,
-  }
-}
-
-function processIsAlive(pid) {
-  if (!Number.isSafeInteger(pid) || pid < 1) return false
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error?.code === 'EPERM'
   }
 }
 

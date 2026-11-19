@@ -4,6 +4,7 @@ import { constants, readFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import { processIsAlive } from './processIsAlive.mjs'
 import {
   COVERAGE_REPORT_SCHEMA as QA_COVERAGE_REPORT_SCHEMA,
   validateCoverageReport as validateQaCoverageReport,
@@ -213,16 +214,6 @@ function publicCoverageOperation(operation) {
       stage,
       message,
     })),
-  }
-}
-
-function processIsAlive(pid) {
-  if (!Number.isSafeInteger(pid) || pid < 1) return false
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error?.code === 'EPERM'
   }
 }
 

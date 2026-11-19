@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -38,7 +37,7 @@ func main() {
 	timeout := flag.Duration("timeout", 15*time.Second, "database operation timeout")
 	flag.Parse()
 
-	if err := guardProduction(*confPath, *allowProd); err != nil {
+	if err := commandconfig.GuardSeedProduction(*confPath, *allowProd, "seed core demo data"); err != nil {
 		fail("%v", err)
 	}
 
@@ -246,22 +245,6 @@ func printIDs(label string, ids map[string]int) {
 	for _, key := range keys {
 		fmt.Printf("%s_id[%s]=%d\n", label, key, ids[key])
 	}
-}
-
-func guardProduction(confPath string, allowProd bool) error {
-	if allowProd {
-		return nil
-	}
-	normalizedConf := filepath.ToSlash(strings.ToLower(confPath))
-	if strings.Contains(normalizedConf, "/prod/") || strings.Contains(normalizedConf, "configs/prod") {
-		return fmt.Errorf("refuse to seed core demo data with prod config; pass --allow-prod only for an intentional controlled operation")
-	}
-	for _, key := range []string{"APP_ENV", "ERP_ENV", "GO_ENV"} {
-		if strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "prod") || strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "production") {
-			return fmt.Errorf("refuse to seed core demo data when %s=%s; pass --allow-prod only for an intentional controlled operation", key, os.Getenv(key))
-		}
-	}
-	return nil
 }
 
 func fail(format string, args ...any) {

@@ -4,6 +4,7 @@ import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { processIsAlive } from './processIsAlive.mjs'
 import { readIntegrationRunEvidence } from './devIntegrationEvidence.mjs'
 import { INTEGRATION_EVIDENCE_API } from '../src/dev-workbench/config/devIntegration.mjs'
 import { readDevRPCContractReview } from './devRPCContractReview.mjs'
@@ -322,16 +323,6 @@ function publicOperation(operation) {
     updatedAt: operation.updatedAt,
     finishedAt: operation.finishedAt,
     message: operation.message,
-  }
-}
-
-function processIsAlive(pid) {
-  if (!Number.isSafeInteger(pid) || pid < 1) return false
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error?.code === 'EPERM'
   }
 }
 

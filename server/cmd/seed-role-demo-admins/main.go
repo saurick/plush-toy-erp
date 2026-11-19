@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,7 +38,7 @@ func main() {
 		fail("%v", err)
 	}
 
-	if err := guardProduction(*confPath, *allowProd); err != nil {
+	if err := commandconfig.GuardSeedProduction(*confPath, *allowProd, "seed role demo admins"); err != nil {
 		fail("%v", err)
 	}
 
@@ -180,22 +179,6 @@ func roleDemoAccountsForPassword(password string, includeDebug bool) []data.Role
 func rejectStableAdminReset(requested bool, confirmation string) error {
 	if requested || strings.TrimSpace(confirmation) != "" {
 		return fmt.Errorf("stable local admin password reset is disabled; use demo accounts or an isolated database")
-	}
-	return nil
-}
-
-func guardProduction(confPath string, allowProd bool) error {
-	if allowProd {
-		return nil
-	}
-	normalizedConf := filepath.ToSlash(strings.ToLower(confPath))
-	if strings.Contains(normalizedConf, "/prod/") || strings.Contains(normalizedConf, "configs/prod") {
-		return fmt.Errorf("refuse to seed role demo admins with prod config; pass --allow-prod only for an intentional controlled operation")
-	}
-	for _, key := range []string{"APP_ENV", "ERP_ENV", "GO_ENV"} {
-		if strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "prod") || strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "production") {
-			return fmt.Errorf("refuse to seed role demo admins when %s=%s; pass --allow-prod only for an intentional controlled operation", key, os.Getenv(key))
-		}
 	}
 	return nil
 }

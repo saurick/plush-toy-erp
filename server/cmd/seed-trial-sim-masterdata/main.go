@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func main() {
 	timeout := flag.Duration("timeout", 15*time.Second, "database operation timeout")
 	flag.Parse()
 
-	if err := guardProduction(*confPath, *allowProd); err != nil {
+	if err := commandconfig.GuardSeedProduction(*confPath, *allowProd, "seed trial simulated masterdata"); err != nil {
 		fail("%v", err)
 	}
 	if !strings.HasPrefix(*unitCode, simulationPrefix) || !strings.HasPrefix(*productCode, simulationPrefix) {
@@ -109,22 +108,6 @@ ON CONFLICT (code) DO UPDATE SET
 RETURNING id
 `, strings.TrimSpace(code), strings.TrimSpace(name), code+"-STYLE", unitID).Scan(&id)
 	return id, err
-}
-
-func guardProduction(confPath string, allowProd bool) error {
-	if allowProd {
-		return nil
-	}
-	normalizedConf := filepath.ToSlash(strings.ToLower(confPath))
-	if strings.Contains(normalizedConf, "/prod/") || strings.Contains(normalizedConf, "configs/prod") {
-		return fmt.Errorf("refuse to seed trial simulated masterdata with prod config; pass --allow-prod only for an intentional controlled operation")
-	}
-	for _, key := range []string{"APP_ENV", "ERP_ENV", "GO_ENV"} {
-		if strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "prod") || strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "production") {
-			return fmt.Errorf("refuse to seed trial simulated masterdata when %s=%s; pass --allow-prod only for an intentional controlled operation", key, os.Getenv(key))
-		}
-	}
-	return nil
 }
 
 func fail(format string, args ...any) {
