@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
-import { spawn, spawnSync } from "node:child_process";
-import {
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -25,6 +18,8 @@ import {
   formatCiQualityStageLaneAggregate,
   loadCiQualityStageLaneSet,
 } from "./ci-quality-stage-lane.mjs";
+import { stableSha256 } from "../lib/stable-json.mjs";
+import { writeCiReceiptJson, runCiReceiptGit } from "./lib/ci-receipt-support.mjs";
 
 export const CI_QUALITY_SHARD_SCHEMA = "plush.ci-quality-shard/v1";
 export const CI_QUALITY_SHARDS = Object.freeze({
@@ -130,24 +125,6 @@ export function hasCompleteSourceArchiveLightEvidence(
   );
 }
 
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableSha256(value) {
-  return createHash("sha256")
-    .update(JSON.stringify(stableValue(value)))
-    .digest("hex");
-}
-
 function safeFailure(error) {
   return String(error?.message || error || "quality shard failed")
     .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s]+/giu, "<redacted-url>")
@@ -182,20 +159,6 @@ export function sourceArchiveFailureMessage(error) {
   }
 }
 
-function runGit(root, args) {
-  const result = spawnSync("git", args, {
-    cwd: root,
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (result.error || result.status !== 0) {
-    throw new Error(`git ${args[0] || "command"} failed`);
-  }
-  return String(result.stdout || "").trim();
-}
-
 function assertGitLabIdentity(root, shard, env) {
   const definition = CI_QUALITY_SHARDS[shard];
   if (
@@ -217,9 +180,9 @@ function assertGitLabIdentity(root, shard, env) {
     throw new Error("quality shard GitLab identity is untrusted");
   }
   if (
-    runGit(root, ["rev-parse", "HEAD"]) !== env.CI_COMMIT_SHA ||
-    runGit(root, ["rev-parse", "origin/main"]) !== env.CI_COMMIT_SHA ||
-    runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
+    runCiReceiptGit(root, ["rev-parse", "HEAD"]) !== env.CI_COMMIT_SHA ||
+    runCiReceiptGit(root, ["rev-parse", "origin/main"]) !== env.CI_COMMIT_SHA ||
+    runCiReceiptGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
   ) {
     throw new Error("quality shard requires clean exact protected main");
   }
@@ -302,20 +265,6 @@ async function runProcess(command, args, { cwd, env, stream = true } = {}) {
     throw error;
   }
   return value;
-}
-
-function atomicJson(file, value) {
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.tmp`;
-  try {
-    writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
-      mode: 0o600,
-      flag: "wx",
-    });
-    renameSync(temporary, file);
-  } finally {
-    rmSync(temporary, { force: true });
-  }
 }
 
 function balancedCounts(value = {}) {
@@ -626,7 +575,7 @@ export async function runCiQualityShard({
       containsRawLogs: false,
     },
   };
-  atomicJson(path.resolve(root, out), receipt);
+  writeCiReceiptJson(path.resolve(root, out), receipt);
   process.stderr.write(
     `[ci-quality-shard] shard=${shard} status=${status} receipt=${out}\n`,
   );

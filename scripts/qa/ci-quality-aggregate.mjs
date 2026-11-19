@@ -1,15 +1,10 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import {
   copyFileSync,
-  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -54,6 +49,8 @@ import {
   readRunnerCapacityPolicy,
   validateRunnerCapacityObservation,
 } from "./ci-runner-capacity-evidence.mjs";
+import { stableSha256 } from "../lib/stable-json.mjs";
+import { writeCiReceiptJson, readCiReceiptJson } from "./lib/ci-receipt-support.mjs";
 
 export const CI_QUALITY_AGGREGATE_SCHEMA = "plush.gitlab-strict-aggregate/v2";
 export const CI_EVIDENCE_MANIFEST_SCHEMA = "plush.gitlab-ci-evidence/v1";
@@ -304,51 +301,6 @@ export function buildObservedQualityPaths(
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableSha256(value) {
-  return createHash("sha256")
-    .update(JSON.stringify(stableValue(value)))
-    .digest("hex");
-}
-
-function atomicJson(file, value) {
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.tmp`;
-  try {
-    writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
-      mode: 0o600,
-      flag: "wx",
-    });
-    renameSync(temporary, file);
-  } finally {
-    rmSync(temporary, { force: true });
-  }
-}
-
-function plainJson(file, label) {
-  const stat = lstatSync(file);
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.size < 2 ||
-    stat.size > 4 * 1024 * 1024
-  ) {
-    throw new Error(`${label} is not a bounded plain file`);
-  }
-  return JSON.parse(readFileSync(file, "utf8"));
-}
-
 function assertAggregateEnvironment(env) {
   if (
     env.GITLAB_CI !== "true" ||
@@ -540,7 +492,7 @@ export async function aggregateCiQuality({
   });
   const trust = validateTrust(
     root,
-    plainJson(path.resolve(root, trustFile), "CI trust receipt"),
+    readCiReceiptJson(path.resolve(root, trustFile), "CI trust receipt"),
     expected,
   );
   const directory = path.resolve(root, shardsDir);
@@ -552,7 +504,7 @@ export async function aggregateCiQuality({
     throw new Error("quality aggregate shard artifact directory is ambiguous");
   }
   const receipts = names.map((name) =>
-    plainJson(path.join(directory, name), `quality shard ${name}`),
+    readCiReceiptJson(path.join(directory, name), `quality shard ${name}`),
   );
   const byShard = validateCiQualityShardSet(receipts, expected);
   const runnerCapacityPolicy = readRunnerCapacityPolicy({
@@ -560,7 +512,7 @@ export async function aggregateCiQuality({
     helperFile: path.resolve(root, RUNNER_CAPACITY_HELPER_SOURCE_PATH),
   });
   const capacityObservation = validateRunnerCapacityObservation(
-    plainJson(path.resolve(root, capacityFile), "Runner capacity observation"),
+    readCiReceiptJson(path.resolve(root, capacityFile), "Runner capacity observation"),
     {
       repository: expected.repository,
       gitSha: expected.gitSha,
@@ -824,7 +776,7 @@ export async function aggregateCiQuality({
       containsRawLogs: false,
     },
   };
-  atomicJson(path.resolve(root, aggregateFile), aggregate);
+  writeCiReceiptJson(path.resolve(root, aggregateFile), aggregate);
   const gitContext = getDevWorkbenchGitContext(root);
   if (
     gitContext.gitCommit !== expected.gitSha ||
@@ -923,7 +875,7 @@ export async function aggregateCiQuality({
       containsRawLogs: false,
     },
   };
-  atomicJson(path.join(evidenceRoot, "evidence-manifest.json"), manifest);
+  writeCiReceiptJson(path.join(evidenceRoot, "evidence-manifest.json"), manifest);
   return { aggregate, manifest, terminal: terminalResult.terminal };
 }
 

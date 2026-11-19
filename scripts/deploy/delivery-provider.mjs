@@ -20,7 +20,7 @@ export const DELIVERY_RELEASE_ASSETS = Object.freeze([
 ]);
 const ALLOWED_DELIVERY_RELEASE_ASSETS = new Set(DELIVERY_RELEASE_ASSETS);
 
-function exactAssetSet(assets, expected) {
+export function exactAssetSet(assets, expected) {
   const sorted = [...expected].sort();
   return (
     assets.length === sorted.length &&

@@ -8,6 +8,7 @@ import {
   resolveSafeEvidenceOutputDirectory,
   writePrivateEvidenceFile,
 } from "./customerSourceManifestCheck.mjs";
+import { CliError, parseSnapshotCliArgs } from "./customerSnapshotCliArgs.mjs";
 
 const USAGE = `Customer source snapshot freeze checker
 
@@ -245,64 +246,6 @@ const WORKFLOW_FACT_PATTERNS = [
   /事实.*过账/u,
   /任务.*完成/u,
 ];
-
-class CliError extends Error {
-  constructor(message, exitCode = 1) {
-    super(message);
-    this.name = "CliError";
-    this.exitCode = exitCode;
-  }
-}
-
-export function parseCliArgs(argv) {
-  const options = { help: false };
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === "--help" || token === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (!token.startsWith("--")) {
-      throw new CliError(`Unexpected argument: ${token}`, 2);
-    }
-
-    const equalIndex = token.indexOf("=");
-    const key = token.slice(2, equalIndex === -1 ? undefined : equalIndex);
-    const inlineValue =
-      equalIndex === -1 ? undefined : token.slice(equalIndex + 1);
-    const value = inlineValue ?? argv[index + 1];
-    if (inlineValue === undefined) {
-      index += 1;
-    }
-    if (value === undefined || value.startsWith("--")) {
-      throw new CliError(`Missing value for --${key}`, 2);
-    }
-
-    if (key === "source") {
-      options.source = value;
-    } else if (key === "existing") {
-      options.existing = value;
-    } else if (key === "out") {
-      options.out = value;
-    } else {
-      throw new CliError(`Unknown option: --${key}`, 2);
-    }
-  }
-
-  if (options.help) {
-    return options;
-  }
-  if (!options.source) {
-    throw new CliError("Missing required --source", 2);
-  }
-  if (!options.existing) {
-    throw new CliError("Missing required --existing", 2);
-  }
-  if (!options.out) {
-    throw new CliError("Missing required --out", 2);
-  }
-  return options;
-}
 
 export async function runFreezeCheck(options) {
   const [sourceFile, existingFile] = await Promise.all([
@@ -1014,7 +957,7 @@ function sha256(buffer) {
 }
 
 export async function runCli(argv = process.argv.slice(2)) {
-  const options = parseCliArgs(argv);
+  const options = parseSnapshotCliArgs(argv);
   if (options.help) {
     console.log(USAGE);
     return 0;

@@ -14,6 +14,7 @@ import {
 import path from "node:path";
 import process from "node:process";
 import { DEV_TESTING_ACTIONS } from "./dev-testing-operation-store.mjs";
+import { assertExactKeys } from "./lib/dev-operation-record.mjs";
 
 export const DEV_QA_EXECUTION_LOCK_SCHEMA = "plush.dev-qa-execution-lock/v1";
 export const DEV_QA_EXECUTION_KINDS = Object.freeze([
@@ -31,26 +32,6 @@ export const DEV_QA_EXECUTION_PROFILES = Object.freeze([
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const MAX_LOCK_BYTES = 8 * 1024;
-
-function assertExactKeys(value, expected, field) {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.getPrototypeOf(value) !== Object.prototype
-  ) {
-    throw new Error(`${field} must be a plain object`);
-  }
-  const actual = Object.keys(value).sort();
-  const wanted = [...expected].sort();
-  if (
-    actual.length !== wanted.length ||
-    actual.some((key, index) => key !== wanted[index])
-  ) {
-    throw new Error(`${field} contains unsupported fields`);
-  }
-  return value;
-}
 
 function validateKindProfile(kind, profile) {
   const valid =

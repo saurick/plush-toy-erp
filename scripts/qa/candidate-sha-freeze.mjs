@@ -2,23 +2,17 @@
 
 import { spawnSync } from "node:child_process";
 import {
-  closeSync,
   existsSync,
-  fsyncSync,
   lstatSync,
-  mkdirSync,
-  openSync,
   readFileSync,
   realpathSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { validateStrictReceiptEvidence } from "./strict-receipt-identity.mjs";
+import { writeDurableJson } from "./lib/durable-json.mjs";
 
 export const CANDIDATE_SHA_FREEZE_CONTRACT = "plush.candidate-sha-freeze/v1";
 export const CANDIDATE_SHA_FREEZE_SCENARIOS = Object.freeze([
@@ -144,26 +138,6 @@ function assertCleanExactHead(root, gitSha, runCommand) {
   }
 }
 
-function writeJsonAtomic(file, value) {
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.tmp`;
-  let descriptor;
-  try {
-    descriptor = openSync(temporary, "wx", 0o600);
-    writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`);
-    fsyncSync(descriptor);
-    closeSync(descriptor);
-    descriptor = undefined;
-    renameSync(temporary, file);
-    const directory = openSync(path.dirname(file), "r");
-    fsyncSync(directory);
-    closeSync(directory);
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
-    if (existsSync(temporary)) unlinkSync(temporary);
-  }
-}
-
 export function runCandidateShaFreeze(
   root,
   { gitSha, terminalPath, outPath },
@@ -234,7 +208,7 @@ export function runCandidateShaFreeze(
       "candidate freeze output must remain in output/qa/candidate-freeze",
     );
   }
-  writeJsonAtomic(output, receipt);
+  writeDurableJson(output, receipt);
   return Object.freeze({ receipt, output });
 }
 

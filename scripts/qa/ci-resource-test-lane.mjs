@@ -1,16 +1,12 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
   lstatSync,
-  mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
   rmSync,
-  writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -25,6 +21,13 @@ import { NODE_TEST_GROUPS } from "./node-test-groups.mjs";
 import { verifyNodeTestSummary } from "./verify-node-test-summary.mjs";
 import { nativeNodeReportArgs } from "./ci-native-reports.mjs";
 import { nodeTestProcessArgs, NODE_TEST_SUITE_TIMEOUT_MS } from "./lib/node-test-process.mjs";
+import { stableSha256 } from "../lib/stable-json.mjs";
+import {
+  writeCiReceiptJson,
+  readCiReceiptJson,
+  runCiReceiptGit,
+  expectedCiLaneIdentity,
+} from "./lib/ci-receipt-support.mjs";
 
 export const CI_RESOURCE_TEST_LANE_SCHEMA = "plush.ci-resource-test-lane/v1";
 export const CI_RESOURCE_TEST_LANES = Object.freeze({
@@ -50,43 +53,11 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const RANGE_PATTERN = /^(?:[0-9a-f]{40}|HEAD\^)\.\.\.?HEAD$/u;
 const FIXTURE_PREFIX = "bootstrap-production-admin-";
 
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableSha256(value) {
-  return createHash("sha256")
-    .update(JSON.stringify(stableValue(value)))
-    .digest("hex");
-}
-
 function safeFailure(error) {
   return String(error?.message || error || "resource test lane failed")
     .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s]+/giu, "<redacted-url>")
     .replace(/\/(?:Users|home|builds|private|tmp)\/[^\s]+/gu, "<redacted-path>")
     .slice(0, 500);
-}
-
-function runGit(root, args) {
-  const result = spawnSync("git", args, {
-    cwd: root,
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (result.error || result.status !== 0) {
-    throw new Error(`git ${args[0] || "command"} failed`);
-  }
-  return String(result.stdout || "").trim();
 }
 
 function assertBaseGitLabIdentity(root, env) {
@@ -106,9 +77,9 @@ function assertBaseGitLabIdentity(root, env) {
     throw new Error("resource test lane GitLab identity is untrusted");
   }
   if (
-    runGit(root, ["rev-parse", "HEAD"]) !== env.CI_COMMIT_SHA ||
-    runGit(root, ["rev-parse", "origin/main"]) !== env.CI_COMMIT_SHA ||
-    runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
+    runCiReceiptGit(root, ["rev-parse", "HEAD"]) !== env.CI_COMMIT_SHA ||
+    runCiReceiptGit(root, ["rev-parse", "origin/main"]) !== env.CI_COMMIT_SHA ||
+    runCiReceiptGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
   ) {
     throw new Error("resource test lane requires clean exact protected main");
   }
@@ -131,33 +102,6 @@ function readPlan(root, planFile, rangeFile) {
     planSha256: sha256File(absolutePlan),
     rangeSha256: sha256File(absoluteRange),
   });
-}
-
-function atomicJson(file, value) {
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.tmp`;
-  try {
-    writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
-      mode: 0o600,
-      flag: "wx",
-    });
-    renameSync(temporary, file);
-  } finally {
-    rmSync(temporary, { force: true });
-  }
-}
-
-function plainJson(file, label) {
-  const stat = lstatSync(file);
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.size < 2 ||
-    stat.size > 4 * 1024 * 1024
-  ) {
-    throw new Error(`${label} is not a bounded plain file`);
-  }
-  return JSON.parse(readFileSync(file, "utf8"));
 }
 
 function fixtureInventory(root) {
@@ -267,19 +211,6 @@ export function validateCiResourceTestLaneCatalog() {
   });
 }
 
-function expectedFromEnvironment(env, plan) {
-  return Object.freeze({
-    repository: env.CI_PROJECT_PATH,
-    gitSha: env.CI_COMMIT_SHA,
-    pipelineId: String(env.CI_PIPELINE_ID),
-    pipelineIid: String(env.CI_PIPELINE_IID),
-    pipelineSource: env.CI_PIPELINE_SOURCE,
-    planSha256: plan.planSha256,
-    rangeSha256: plan.rangeSha256,
-    range: plan.range,
-  });
-}
-
 export function validateCiResourceTestLaneSet(
   receipts,
   expected,
@@ -360,7 +291,7 @@ export function loadCiResourceTestLaneSet({ root, directory, expected }) {
     throw new Error("resource test lane artifact directory is ambiguous");
   }
   const receipts = names.map((name) =>
-    plainJson(path.join(resolved, name), `resource test lane ${name}`),
+    readCiReceiptJson(path.join(resolved, name), `resource test lane ${name}`),
   );
   const byLane = validateCiResourceTestLaneSet(receipts, expected, { root });
   return Object.freeze({
@@ -420,7 +351,7 @@ export function aggregateCiResourceTestLanes({
   const aggregate = loadCiResourceTestLaneSet({
     root,
     directory,
-    expected: expectedFromEnvironment(env, plan),
+    expected: expectedCiLaneIdentity(env, plan),
   });
   process.stdout.write(
     `[qa:test-gate] label=ci-resource-lanes status=complete tests=${aggregate.summary.tests} pass=${aggregate.summary.pass} fail=0 skipped=0\n`,
@@ -506,7 +437,7 @@ export function runCiResourceTestLane({
   if (added.length > 0 || !inventoryPreserved) {
     failure ||= new Error("resource test lane fixture cleanup was incomplete");
   }
-  if (runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])) {
+  if (runCiReceiptGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])) {
     failure ||= new Error("resource test lane changed the exact-SHA checkout");
   }
 
@@ -555,7 +486,7 @@ export function runCiResourceTestLane({
       containsRawLogs: false,
     },
   };
-  atomicJson(path.resolve(root, out), receipt);
+  writeCiReceiptJson(path.resolve(root, out), receipt);
   process.stderr.write(
     `[ci-resource-test-lane] lane=${lane} status=${receipt.status} receipt=${out}\n`,
   );

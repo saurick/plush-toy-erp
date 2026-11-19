@@ -102,6 +102,7 @@ function installRealReceiptFiles(root) {
     "scripts/qa/lib/git-range.mjs",
     "scripts/qa/lib/repository-identity.mjs",
     "scripts/lib/gitlab-project.mjs",
+    "scripts/lib/stable-json.mjs",
     "scripts/git-hooks/pre-push.sh",
   ]) {
     const target = path.join(root, file);

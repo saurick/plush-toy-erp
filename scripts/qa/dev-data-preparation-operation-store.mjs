@@ -19,6 +19,8 @@ import path from "node:path";
 import process from "node:process";
 
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
+import { assertExactKeys } from "./lib/dev-operation-record.mjs";
+import { stableSha256 } from "../lib/stable-json.mjs";
 
 export const DATA_PREPARATION_OPERATION_SCHEMA =
   "plush.dev-data-preparation-operation/v1";
@@ -79,42 +81,8 @@ const STATUS_TRANSITIONS = Object.freeze({
 });
 const MAX_RECORD_BYTES = 256 * 1024;
 
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
 export function hashDataPreparationPlan(value) {
-  return createHash("sha256")
-    .update(JSON.stringify(stableValue(value)))
-    .digest("hex");
-}
-
-function assertExactKeys(value, expected, field) {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.getPrototypeOf(value) !== Object.prototype
-  ) {
-    throw new Error(`${field} must be a plain object`);
-  }
-  const actual = Object.keys(value).sort();
-  const wanted = [...expected].sort();
-  if (
-    actual.length !== wanted.length ||
-    actual.some((key, index) => key !== wanted[index])
-  ) {
-    throw new Error(`${field} contains unsupported fields`);
-  }
-  return value;
+  return stableSha256(value);
 }
 
 function assertSafeText(value, field, max = 500) {

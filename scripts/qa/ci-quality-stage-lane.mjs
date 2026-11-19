@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import net from "node:net";
 import {
@@ -9,7 +8,6 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -28,6 +26,13 @@ import {
   parseGateStageTimings,
   summarizeGateCategories,
 } from "./run-gate-with-receipt.mjs";
+import { stableSha256 } from "../lib/stable-json.mjs";
+import {
+  writeCiReceiptJson,
+  readCiReceiptJson,
+  runCiReceiptGit,
+  expectedCiLaneIdentity,
+} from "./lib/ci-receipt-support.mjs";
 
 export const CI_QUALITY_STAGE_LANE_SCHEMA = "plush.ci-quality-stage-lane/v2";
 export const CI_POSTGRES_IMAGE = "postgres:18.6";
@@ -258,43 +263,11 @@ function laneDefinition(shard, lane) {
   return definition;
 }
 
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableSha256(value) {
-  return createHash("sha256")
-    .update(JSON.stringify(stableValue(value)))
-    .digest("hex");
-}
-
 function safeFailure(error) {
   return String(error?.message || error || "quality lane failed")
     .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s]+/giu, "<redacted-url>")
     .replace(/\/(?:Users|home|builds|private|tmp)\/[^\s]+/gu, "<redacted-path>")
     .slice(0, 500);
-}
-
-function runGit(root, args) {
-  const result = spawnSync("git", args, {
-    cwd: root,
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (result.error || result.status !== 0) {
-    throw new Error(`git ${args[0] || "command"} failed`);
-  }
-  return String(result.stdout || "").trim();
 }
 
 function assertGitLabIdentity(root, expectedJob, env) {
@@ -316,9 +289,9 @@ function assertGitLabIdentity(root, expectedJob, env) {
     throw new Error("quality lane GitLab identity is untrusted");
   }
   if (
-    runGit(root, ["rev-parse", "HEAD"]) !== env.CI_COMMIT_SHA ||
-    runGit(root, ["rev-parse", "origin/main"]) !== env.CI_COMMIT_SHA ||
-    runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
+    runCiReceiptGit(root, ["rev-parse", "HEAD"]) !== env.CI_COMMIT_SHA ||
+    runCiReceiptGit(root, ["rev-parse", "origin/main"]) !== env.CI_COMMIT_SHA ||
+    runCiReceiptGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
   ) {
     throw new Error("quality lane requires clean exact protected main");
   }
@@ -340,19 +313,6 @@ function readPlan(root, planFile, rangeFile) {
     range,
     planSha256: sha256File(absolutePlan),
     rangeSha256: sha256File(absoluteRange),
-  });
-}
-
-function expectedFromEnvironment(env, plan) {
-  return Object.freeze({
-    repository: env.CI_PROJECT_PATH,
-    gitSha: env.CI_COMMIT_SHA,
-    pipelineId: String(env.CI_PIPELINE_ID),
-    pipelineIid: String(env.CI_PIPELINE_IID),
-    pipelineSource: env.CI_PIPELINE_SOURCE,
-    planSha256: plan.planSha256,
-    rangeSha256: plan.rangeSha256,
-    range: plan.range,
   });
 }
 
@@ -486,33 +446,6 @@ async function runProcess(
     throw error;
   }
   return value;
-}
-
-function atomicJson(file, value) {
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.tmp`;
-  try {
-    writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
-      mode: 0o600,
-      flag: "wx",
-    });
-    renameSync(temporary, file);
-  } finally {
-    rmSync(temporary, { force: true });
-  }
-}
-
-function plainJson(file, label) {
-  const stat = lstatSync(file);
-  if (
-    !stat.isFile() ||
-    stat.isSymbolicLink() ||
-    stat.size < 2 ||
-    stat.size > 4 * 1024 * 1024
-  ) {
-    throw new Error(`${label} is not a bounded plain file`);
-  }
-  return JSON.parse(readFileSync(file, "utf8"));
 }
 
 function hashDirectory(root) {
@@ -669,7 +602,7 @@ function verifyConsumedWebBuild(root, env, plan) {
     file: "output/ci/web-lanes/build.json",
     shard: "web",
     lane: "build",
-    expected: expectedFromEnvironment(env, plan),
+    expected: expectedCiLaneIdentity(env, plan),
   });
   const digest = hashDirectory(path.join(root, "web", "build"));
   if (receipt.webBuildSha256 !== digest) {
@@ -990,7 +923,7 @@ export function readCiQualityStageLaneReceipt({
   expected,
 }) {
   return validateCiQualityStageLaneReceipt(
-    plainJson(path.resolve(root, file), `${shard} quality lane ${lane}`),
+    readCiReceiptJson(path.resolve(root, file), `${shard} quality lane ${lane}`),
     { shard, lane, expected },
   );
 }
@@ -1209,7 +1142,7 @@ export function aggregateCiQualityStageLanes({
     root,
     shard,
     directory,
-    expected: expectedFromEnvironment(env, plan),
+    expected: expectedCiLaneIdentity(env, plan),
   });
   process.stdout.write(formatCiQualityStageLaneAggregate(shard, aggregate));
   return aggregate;
@@ -1394,7 +1327,7 @@ export async function runCiQualityStageLane({
       gateOutput = result.output;
     }
     if (definition.makeData) {
-      if (runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])) {
+      if (runCiReceiptGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])) {
         throw new Error("make data changed the exact-SHA checkout");
       }
       invariants.makeData = "passed";
@@ -1508,7 +1441,7 @@ export async function runCiQualityStageLane({
   }
   if (
     !failure &&
-    runGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
+    runCiReceiptGit(root, ["status", "--porcelain=v1", "--untracked-files=all"])
   ) {
     failure = new Error("quality lane changed the exact-SHA checkout");
   }
@@ -1562,7 +1495,7 @@ export async function runCiQualityStageLane({
       containsRawLogs: false,
     },
   };
-  atomicJson(path.resolve(root, out), receipt);
+  writeCiReceiptJson(path.resolve(root, out), receipt);
   process.stderr.write(
     `[ci-quality-stage-lane] shard=${shard} lane=${lane} status=${receipt.status} receipt=${out}\n`,
   );

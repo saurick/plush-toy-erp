@@ -17,6 +17,7 @@ import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
 import { validateStrictReceiptEvidence } from "../qa/strict-receipt-identity.mjs";
+import { stableStringify } from "../lib/stable-json.mjs";
 
 export const RELEASE_MANIFEST_CONTRACT_V1 = "plush.release-manifest/v1";
 export const RELEASE_MANIFEST_CONTRACT_V2 = "plush.release-manifest/v2";
@@ -27,22 +28,6 @@ const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const REGISTRY_REPOSITORY_PATTERN =
   /^ghcr\.io\/[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?\/[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/u;
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(stableValue(value));
-}
 
 export { sha256File };
 

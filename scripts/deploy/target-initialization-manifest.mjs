@@ -16,6 +16,7 @@ import process from "node:process";
 
 import { getDeploymentTarget } from "./deployment-targets.mjs";
 import { validateReleaseManifest } from "./release-catalog.mjs";
+import { stableStringify } from "../lib/stable-json.mjs";
 
 export const TARGET_INITIALIZATION_MANIFEST_CONTRACT =
   "plush.target-initialization-manifest/v1";
@@ -26,23 +27,11 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const BLOCKER_PATTERN = /^[a-z][a-z0-9_]{2,63}$/u;
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
 function fingerprint(value) {
   const copy = structuredClone(value);
   delete copy.fingerprint;
   return createHash("sha256")
-    .update(JSON.stringify(stableValue(copy)))
+    .update(stableStringify(copy))
     .digest("hex");
 }
 
@@ -256,8 +245,8 @@ export function writeTargetInitializationManifest(file, manifest) {
       JSON.parse(readFileSync(file, "utf8")),
     );
     if (
-      JSON.stringify(stableValue(existing)) !==
-      JSON.stringify(stableValue(manifest))
+      stableStringify(existing) !==
+      stableStringify(manifest)
     ) {
       throw new Error(
         "target initialization manifest already exists with different content",

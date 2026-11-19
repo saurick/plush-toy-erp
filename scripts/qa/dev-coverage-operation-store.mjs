@@ -16,6 +16,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { assertExactKeys } from "./lib/dev-operation-record.mjs";
 
 export const COVERAGE_OPERATION_SCHEMA =
   "plush.dev-qa-coverage-operation/v1";
@@ -61,26 +62,6 @@ const STAGE_INDEX = new Map(
   COVERAGE_OPERATION_STAGES.map((stage, index) => [stage, index]),
 );
 const MAX_RECORD_BYTES = 128 * 1024;
-
-function assertExactKeys(value, expected, field) {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.getPrototypeOf(value) !== Object.prototype
-  ) {
-    throw new Error(`${field} must be a plain object`);
-  }
-  const actual = Object.keys(value).sort();
-  const wanted = [...expected].sort();
-  if (
-    actual.length !== wanted.length ||
-    actual.some((key, index) => key !== wanted[index])
-  ) {
-    throw new Error(`${field} contains unsupported fields`);
-  }
-  return value;
-}
 
 function assertSafeText(value, field, max = 500) {
   if (

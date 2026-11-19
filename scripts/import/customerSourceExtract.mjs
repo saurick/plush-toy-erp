@@ -2132,12 +2132,6 @@ function resolveBaseDir(baseDir) {
   return path.resolve(process.cwd(), baseDir);
 }
 
-function resolveInputPath(filePath, baseDir) {
-  return path.isAbsolute(filePath)
-    ? path.resolve(filePath)
-    : path.resolve(baseDir, filePath);
-}
-
 async function main() {
   try {
     const options = parseCliArgs(process.argv.slice(2));

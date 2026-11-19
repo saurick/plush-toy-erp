@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { assertExactKeys } from "./lib/dev-operation-record.mjs";
 
 export const DEV_QUALITY_GATE_OPERATION_SCHEMA =
   "plush.dev-quality-gate-operation/v1";
@@ -87,26 +88,6 @@ const STATUS_TRANSITIONS = Object.freeze({
   blocked: new Set(),
   not_proven: new Set(),
 });
-
-function assertExactKeys(value, expected, field) {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.getPrototypeOf(value) !== Object.prototype
-  ) {
-    throw new Error(`${field} must be a plain object`);
-  }
-  const actual = Object.keys(value).sort();
-  const wanted = [...expected].sort();
-  if (
-    actual.length !== wanted.length ||
-    actual.some((key, index) => key !== wanted[index])
-  ) {
-    throw new Error(`${field} contains unsupported fields`);
-  }
-  return value;
-}
 
 function assertSafeText(value, field, { allowEmpty = false, max = 1000 } = {}) {
   if (

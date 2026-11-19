@@ -39,6 +39,7 @@ import {
 } from "./affected.mjs";
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
 import { isGitlabDeliveryPushLocation } from "../lib/gitlab-project.mjs";
+import { stableStringify } from "../lib/stable-json.mjs";
 
 export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v7";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
@@ -121,22 +122,6 @@ class ReceiptError extends Error {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(stableValue(value));
 }
 
 function commandResult(

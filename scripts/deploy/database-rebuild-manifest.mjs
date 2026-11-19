@@ -16,6 +16,7 @@ import path from "node:path";
 import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { getDeploymentTarget, assertDatabaseRebuildAllowed } from "./deployment-targets.mjs";
+import { stableStringify } from "../lib/stable-json.mjs";
 
 export const DATABASE_REBUILD_MANIFEST_CONTRACT =
   "plush.database-rebuild-manifest/v1";
@@ -25,22 +26,6 @@ const UUID_V4_PATTERN =
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const BLOCKER_PATTERN = /^[a-z][a-z0-9_]{2,63}$/u;
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(stableValue(value));
-}
 
 function manifestFingerprint(manifest) {
   const copy = structuredClone(manifest);

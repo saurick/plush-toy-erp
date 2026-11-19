@@ -18,6 +18,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { stableStringify } from "../lib/stable-json.mjs";
 
 export const DELIVERY_OPERATION_CONTRACT = "plush.delivery-operation/v1";
 export const DELIVERY_OPERATION_STORE_REPO_ROOT_ENV =
@@ -82,22 +83,6 @@ const LEGACY_IDEMPOTENCY_INDEX_CONTRACT =
   "plush.delivery-operation-idempotency/v1";
 const INTENT_INDEX_CONTRACT = "plush.delivery-operation-intent/v1";
 const RETRY_INDEX_CONTRACT = "plush.delivery-operation-retry-intent/v1";
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-function stableStringify(value) {
-  return JSON.stringify(stableValue(value));
-}
 
 function fingerprint(value) {
   return createHash("sha256").update(stableStringify(value)).digest("hex");

@@ -1,7 +1,7 @@
 import standardUnits from "../../server/internal/unitpolicy/units.json" with { type: "json" };
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { stableSha256 } from "../lib/stable-json.mjs";
 
 const CONTRACT_PATH = fileURLToPath(
   new URL(
@@ -9,18 +9,6 @@ const CONTRACT_PATH = fileURLToPath(
     import.meta.url,
   ),
 );
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
 
 function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) {
@@ -136,13 +124,9 @@ export const MANUAL_ACCEPTANCE_CORE_CONTRACT = deepFreeze(
   ),
 );
 
-export const MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST = createHash("sha256")
-  .update(
-    JSON.stringify(
-      stableValue(dataSemanticValue(MANUAL_ACCEPTANCE_CORE_CONTRACT)),
-    ),
-  )
-  .digest("hex");
+export const MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST = stableSha256(
+  dataSemanticValue(MANUAL_ACCEPTANCE_CORE_CONTRACT),
+);
 
 export const MANUAL_ACCEPTANCE_CORE_UNITS =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.units;

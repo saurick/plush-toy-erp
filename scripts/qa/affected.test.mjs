@@ -192,6 +192,12 @@ test("business data consistency changes select the registered specialist and foc
     "server/internal/data/operational_fact_shipment_repo.go",
     "server/internal/data/engineering_material_request_repo.go",
     "server/internal/biz/operational_fact.go",
+    "server/internal/biz/operational_fact_finance.go",
+    "server/internal/biz/operational_fact_normalize.go",
+    "server/internal/biz/operational_fact_outsourcing.go",
+    "server/internal/biz/operational_fact_production.go",
+    "server/internal/biz/operational_fact_reservation.go",
+    "server/internal/biz/operational_fact_shipment.go",
     "server/internal/service/jsonrpc_date_filter.go",
     "scripts/qa/business-data-consistency.mjs",
   ]) {

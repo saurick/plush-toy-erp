@@ -34,6 +34,7 @@ import {
   normalizeFields,
   normalizeSourceType,
 } from "./customerImportDryRunNormalize.mjs";
+import { CliError, parseSnapshotCliArgs } from "./customerSnapshotCliArgs.mjs";
 
 const USAGE = `Customer import dry-run tooling
 
@@ -68,83 +69,13 @@ const OUTPUT_FILES = [
   "dry-run-report.md",
 ];
 
-class CliError extends Error {
-  constructor(message, exitCode = 1) {
-    super(message);
-    this.name = "CliError";
-    this.exitCode = exitCode;
-  }
-}
-
-export function parseCliArgs(argv) {
-  const options = {
-    format: "json,md",
-    failOnBlockers: false,
-    strictSource: false,
-    help: false,
-  };
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === "--help" || token === "-h") {
-      options.help = true;
-      continue;
-    }
-    if (token === "--fail-on-blockers") {
-      options.failOnBlockers = true;
-      continue;
-    }
-    if (token === "--strict-source") {
-      options.strictSource = true;
-      continue;
-    }
-    if (!token.startsWith("--")) {
-      throw new CliError(`Unexpected argument: ${token}`, 2);
-    }
-
-    const equalIndex = token.indexOf("=");
-    const key = token.slice(2, equalIndex === -1 ? undefined : equalIndex);
-    const inlineValue =
-      equalIndex === -1 ? undefined : token.slice(equalIndex + 1);
-    const value = inlineValue ?? argv[index + 1];
-    if (inlineValue === undefined) {
-      index += 1;
-    }
-    if (value === undefined || value.startsWith("--")) {
-      throw new CliError(`Missing value for --${key}`, 2);
-    }
-
-    if (key === "source") {
-      options.source = value;
-    } else if (key === "existing") {
-      options.existing = value;
-    } else if (key === "out") {
-      options.out = value;
-    } else if (key === "format") {
-      options.format = value;
-    } else {
-      throw new CliError(`Unknown option: --${key}`, 2);
-    }
-  }
-
-  if (options.help) {
-    return options;
-  }
-  if (!options.source) {
-    throw new CliError("Missing required --source", 2);
-  }
-  if (!options.existing) {
-    throw new CliError("Missing required --existing", 2);
-  }
-  if (!options.out) {
-    throw new CliError("Missing required --out", 2);
-  }
-
-  const formats = parseFormats(options.format);
-  return {
-    ...options,
-    formats,
-  };
+function parseCliArgs(argv) {
+  const options = parseSnapshotCliArgs(argv, {
+    defaults: { format: "json,md", failOnBlockers: false, strictSource: false },
+    flags: { "--fail-on-blockers": "failOnBlockers", "--strict-source": "strictSource" },
+    extraValueKeys: ["format"],
+  });
+  return options.help ? options : { ...options, formats: parseFormats(options.format) };
 }
 
 function parseFormats(formatText) {

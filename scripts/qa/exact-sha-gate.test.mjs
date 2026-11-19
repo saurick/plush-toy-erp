@@ -12,6 +12,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { stableSha256, stableStringify } from "../lib/stable-json.mjs";
+
 import {
   PROFILE_REQUIRED_EXECUTABLES,
   PROFILE_REQUIRED_FILES,
@@ -126,6 +128,21 @@ function createFixture() {
     },
   };
 }
+
+test("receipt digests preserve canonical JSON bytes and array order", () => {
+  const value = {
+    z: { b: true, a: false, omitted: undefined },
+    a: [{ z: 2, a: 1 }, null, 10, 2],
+  };
+  assert.equal(
+    stableStringify(value),
+    '{"a":[{"a":1,"z":2},null,10,2],"z":{"a":false,"b":true}}',
+  );
+  assert.equal(
+    stableSha256(value),
+    "d94a38e77ec6e887fd4981d59577111a1cb38217253eb1cc56000e7772ca30fa",
+  );
+});
 
 test("exact-SHA plan binds a clean main-reachable commit and fixed terminal path", () => {
   const fixture = createFixture();

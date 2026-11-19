@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 export const STRICT_RECEIPT_SCHEMA = "plush.exact-sha-strict/v3";
 export const STRICT_RECEIPT_CATEGORY_KEYS = Object.freeze([
   "web",
@@ -15,24 +13,6 @@ export const TIME_SENSITIVE_CHECK_KEYS = Object.freeze([
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
-export function stableSha256(value) {
-  return createHash("sha256")
-    .update(JSON.stringify(stableValue(value)))
-    .digest("hex");
-}
 
 function assertFingerprint(value, label) {
   if (!SHA256_PATTERN.test(String(value || ""))) {

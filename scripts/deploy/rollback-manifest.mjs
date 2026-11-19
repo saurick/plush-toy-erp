@@ -16,6 +16,7 @@ import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
 import { readBoundedPlainFile } from "../lib/file-digest.mjs";
+import { stableStringify } from "../lib/stable-json.mjs";
 
 export const ROLLBACK_MANIFEST_CONTRACT = "plush.rollback-manifest/v1";
 
@@ -25,23 +26,11 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const BLOCKER_PATTERN = /^[a-z][a-z0-9_]{2,63}$/u;
 
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nested]) => [key, stableValue(nested)]),
-    );
-  }
-  return value;
-}
-
 function fingerprint(manifest) {
   const copy = structuredClone(manifest);
   delete copy.fingerprint;
   return createHash("sha256")
-    .update(JSON.stringify(stableValue(copy)))
+    .update(stableStringify(copy))
     .digest("hex");
 }
 
@@ -306,8 +295,8 @@ export function writeRollbackManifest(file, manifest) {
       JSON.parse(snapshot.content.toString("utf8")),
     );
     if (
-      JSON.stringify(stableValue(existing)) !==
-      JSON.stringify(stableValue(manifest))
+      stableStringify(existing) !==
+      stableStringify(manifest)
     ) {
       throw new Error("rollback manifest already exists with different content");
     }

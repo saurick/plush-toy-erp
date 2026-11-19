@@ -1069,16 +1069,6 @@ function assertNoForbiddenKeys(value, currentPath = "runtimeManifest") {
   }
 }
 
-function roleHasCapability(manifest, roleKey, capabilityKey) {
-  return manifest.access_entitlements.some(
-    (item) =>
-      item.role_key === roleKey &&
-      item.capability_key === capabilityKey &&
-      item.scope_value === manifest.customer_key &&
-      item.enabled === true,
-  );
-}
-
 function validateFlowAndPolicyCatalogs(manifest) {
   const flowCatalog = manifest.compiled_snapshot.flowCatalog;
   assert(flowCatalog && typeof flowCatalog === "object", "compiled_snapshot.flowCatalog must exist");

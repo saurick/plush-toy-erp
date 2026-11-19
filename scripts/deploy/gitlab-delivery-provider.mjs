@@ -16,6 +16,7 @@ import {
   DELIVERY_PROVIDER_CONTRACT,
   DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
   LEGACY_DELIVERY_RELEASE_ASSETS,
+  exactAssetSet,
   validateDeliveryReleaseVersion,
   validateReleaseDispatchRequest,
 } from "./delivery-provider.mjs";
@@ -67,14 +68,6 @@ const ALLOWED_CONTROL_RELEASE_ASSETS = new Set([
   ...LEGACY_CONTROL_RELEASE_ASSETS,
 ]);
 const TERMINAL_STATUSES = new Set(["success", "failed", "canceled", "skipped"]);
-
-function exactAssetSet(assets, expected) {
-  const sorted = [...expected].sort();
-  return (
-    assets.length === sorted.length &&
-    assets.every((asset, index) => asset === sorted[index])
-  );
-}
 
 function releaseTransportForFiles(formalFiles) {
   const names = formalFiles.map((file) => file.name);
