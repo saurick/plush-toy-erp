@@ -335,7 +335,7 @@ test("desktop workbench uses a bounded snapshot while mobile tasks keep role-tas
 
   assert.match(
     workflowApiSource,
-    /export async function getWorkflowWorkbench\(params = \{\}, options = \{\}\) \{\s*const query = requireWorkflowWorkbenchQuery\(params\)\s*const result = await workflowRpc\.call\('get_workbench', query, options\)\s*return requireWorkflowWorkbenchResponse\(result, query\)\s*\}/u,
+    /export async function getWorkflowWorkbench\(params = \{\}, options = \{\}\) \{\s*const query = requireWorkflowWorkbenchQuery\(params\)\s*const result = await workflowRpc\.call\(\s*'get_workbench',\s*query,\s*options\s*\)\s*return requireWorkflowWorkbenchResponse\(result, query\)\s*\}/u,
   );
   assert.doesNotMatch(
     workflowApiSource,

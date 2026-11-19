@@ -157,6 +157,9 @@ test("sales order form fields are saved through the shared mapper", () => {
   const salesOrderForm = read(
     "web/src/erp/components/sales-orders/SalesOrderForm.jsx",
   );
+  const salesOrderEditor = read(
+    "web/src/erp/components/sales-orders/useSalesOrderEditor.mjs",
+  );
   const orderView = read("web/src/erp/utils/sourceOrderParams.mjs");
   const partySource = read("web/src/erp/utils/sourcePartySnapshots.mjs");
   const salesOrderService = read(
@@ -183,28 +186,33 @@ test("sales order form fields are saved through the shared mapper", () => {
   }
   assertIncludes(
     salesOrderPage,
+    "} = useSalesOrderEditor({",
+    "sales order page editor binding",
+  );
+  assertIncludes(
+    salesOrderEditor,
     "buildSalesOrderCustomerSourceValues(customer)",
-    "SalesOrdersPage save mapper",
+    "sales order editor save mapper",
   );
   assertIncludes(
-    salesOrderPage,
+    salesOrderEditor,
     "contact_snapshot: buildOrderContactSnapshot(values)",
-    "SalesOrdersPage save mapper",
+    "sales order editor save mapper",
   );
   assertIncludes(
-    salesOrderPage,
+    salesOrderEditor,
     "buildSalesOrderParams(",
-    "SalesOrdersPage save mapper",
+    "sales order editor save mapper",
   );
   assertIncludes(
-    salesOrderPage,
+    salesOrderEditor,
     "order_no: undefined",
-    "SalesOrdersPage order no draft",
+    "sales order editor order no draft",
   );
   assertIncludes(
-    salesOrderPage,
+    salesOrderEditor,
     "orderForm.setFieldsValue({ order_no: savedOrder.order_no })",
-    "SalesOrdersPage order no draft",
+    "sales order editor order no readback",
   );
   assertIncludes(
     partySource,

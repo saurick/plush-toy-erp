@@ -324,7 +324,9 @@ export default function ApprovalResponsibilityPanel({
     try {
       nextDraft = draftItemFromEditor(editingKey, values)
     } catch (error) {
-      message.warning(error.message)
+      message.warning(
+        getActionErrorMessage(error, '审批责任校验失败，请核对填写内容')
+      )
       return
     }
     setDraftItems((current) =>
