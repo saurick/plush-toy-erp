@@ -377,7 +377,7 @@ export function createBusinessProgressScenarios({
           await page.locator('.ant-select-dropdown:visible .ant-select-item-option').getByText('已结束订单的业务员', { exact: true }).click()
           await board.getByText('没有符合条件的记录').waitFor()
           assert.equal(new URL(page.url()).searchParams.get('owner_name'), '已结束订单的业务员')
-          await page.getByRole('button', { name: '重置筛选', exact: true }).click()
+          await page.getByRole('button', { name: '清空筛选', exact: true }).click()
           await page.keyboard.press('Escape')
           await progressCard('SO-0001').waitFor()
         }

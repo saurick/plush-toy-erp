@@ -23,6 +23,31 @@ async function waitForFilters(page, filters) {
   }, await filters.getAttribute('aria-label'))
 }
 
+async function assertFilterFits(assert, dialog) {
+  const geometry = await dialog.evaluate((node) => {
+    const { left, right, top, bottom } = (node.closest('.erp-business-filter-popover, .ant-modal') ?? node).getBoundingClientRect()
+    return { left, right, top, bottom, width: innerWidth, height: innerHeight }
+  })
+  assert(geometry.left >= 0 && geometry.right <= geometry.width + 1 && geometry.top >= 0 && geometry.bottom <= geometry.height + 1,
+    `筛选面板超出视口 ${JSON.stringify(geometry)}`)
+}
+
+async function assertDesktopFilterLayout(assert, dialog) {
+  await assertFilterFits(assert, dialog)
+  const geometry = await dialog.evaluate((node) => {
+    const fields = node.querySelector('.erp-business-operation-panel__filters').getBoundingClientRect()
+    const title = node.querySelector('header strong').getBoundingClientRect()
+    const clear = node.querySelector('header button').getBoundingClientRect()
+    const close = node.querySelector('footer button').getBoundingClientRect()
+    return { titleLeft: title.left, clearRight: clear.right, closeRight: close.right, closeWidth: close.width, closeTop: close.top,
+      fieldsLeft: fields.left, fieldsRight: fields.right, fieldsBottom: fields.bottom, fieldsWidth: fields.width }
+  })
+  assert(Math.abs(geometry.titleLeft - geometry.fieldsLeft) <= 1 && Math.abs(geometry.clearRight - geometry.fieldsRight) <= 1,
+    '标题左对齐，清空在右上')
+  assert(Math.abs(geometry.closeRight - geometry.fieldsRight) <= 1 && geometry.closeTop >= geometry.fieldsBottom && geometry.closeWidth < geometry.fieldsWidth / 2,
+    '收起在条件区右下，宽度随文字')
+}
+
 async function choose(page, root, label, value) {
   const choices = root.getByRole('group', { name: label, exact: true })
   if (await choices.count()) {
@@ -48,6 +73,7 @@ export function createFilterConflictScenarios(deps) {
     const panel = page.getByRole('region', { name: phone ? '手机进度看板' : '进度看板', exact: true })
     const quick = panel.getByRole('group', { name: '进度快捷筛选', exact: true })
     const filters = page.getByRole('dialog', { name: '筛选进度', exact: true })
+    const clear = filters.getByRole('button', { name: phone ? '重置筛选' : '清空筛选', exact: true })
     const trigger = panel.getByRole('button', { name: /^筛选进度/ })
     const search = panel.getByLabel(phone ? '搜索进度' : '搜索订单、客户或产品', { exact: true })
     const waitQuery = async (expected) => {
@@ -82,6 +108,13 @@ export function createFilterConflictScenarios(deps) {
     if (phone) await assertMobileFilterDensity({ assert, dialog: filters })
     if (phone) assert.equal(await filters.getByRole('textbox').count(), 0, '手机进度不要求输入姓名')
     else {
+      await assertDesktopFilterLayout(assert, filters)
+      for (const label of ['记录范围', '交期情况']) {
+        const buttons = filters.getByRole('group', { name: label, exact: true }).getByRole('button')
+        const [first, second] = await Promise.all([buttons.nth(0).boundingBox(), buttons.nth(1).boundingBox()])
+        assert(first && second && Math.abs(first.y - second.y) <= 1 && first.x + first.width < second.x,
+          `${label}选项按文字宽度横排`)
+      }
       await filters.getByRole('combobox', { name: '客户', exact: true }).waitFor()
       const owner = filters.getByRole('combobox', { name: '处理人或业务负责人', exact: true })
       assert.equal(await filters.getByRole('button', { name: '搜索', exact: true }).count(), 0)
@@ -93,7 +126,7 @@ export function createFilterConflictScenarios(deps) {
       await filters.getByRole('button', { name: '收起', exact: true }).click()
       await trigger.click()
       await waitForFilters(page, filters)
-      await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+      await clear.click()
       await waitQuery({ owner_name: '' })
     }
     await due(filters, '已逾期').click()
@@ -106,7 +139,7 @@ export function createFilterConflictScenarios(deps) {
     await waitQuery({ scope: 'all', due_status: 'overdue', blocked_only: true })
     await panel.getByRole('button', { name: '筛选进度，已应用 1 项', exact: true }).waitFor()
     assert.equal(await trigger.getAttribute('aria-label'), '筛选进度，已应用 1 项')
-    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    await clear.click()
     await waitQuery({ scope: 'active', due_status: 'overdue', blocked_only: true })
     assert.match(await due(filters, '已逾期').innerText(), /1/u)
     assert.match(await due(filters, '7天内到期').innerText(), /0/u)
@@ -125,7 +158,7 @@ export function createFilterConflictScenarios(deps) {
     await filters.getByLabel('记录范围', { exact: true }).getByText('全部记录', { exact: true }).click()
     await waitQuery({ scope: 'all' })
     assert.equal(await due(quick, '不限交期').getAttribute('aria-pressed'), 'true')
-    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    await clear.click()
     await waitQuery({ scope: 'active' })
     await page.keyboard.press('Escape')
     await filters.waitFor({ state: 'hidden' })
@@ -133,8 +166,7 @@ export function createFilterConflictScenarios(deps) {
     await search.press('Enter')
     await trigger.click()
     await waitForFilters(page, filters)
-    if (phone) assert.equal(await filters.getByRole('button', { name: '重置筛选', exact: true }).isDisabled(), true)
-    else await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    assert.equal(await clear.isDisabled(), true)
     assert.equal(await search.inputValue(), '云朵')
     assert.equal(await trigger.getAttribute('aria-label'), '筛选进度')
     if (phone) {
@@ -144,6 +176,9 @@ export function createFilterConflictScenarios(deps) {
     } else {
       await filters.getByRole('button', { name: '自定义交期日期', exact: true }).click()
       const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
+      await dates.waitFor()
+      await waitForFiniteAnimations(page)
+      await assertFilterFits(assert, dates)
       const day = dates.getByRole('group', { name: '选择日期范围' }).getByRole('button').nth(15)
       await day.click(); await day.click()
       await dates.getByRole('button', { name: '应用日期', exact: true }).click()
@@ -161,7 +196,7 @@ export function createFilterConflictScenarios(deps) {
     assert.equal(await due(quick, '未定交期').count(), 0, '少用条件留在更多筛选，当前条件持续可见')
     await trigger.click()
     await waitForFilters(page, filters)
-    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    await clear.click()
     if (!phone) assert.equal(new URL(page.url()).searchParams.get('due_status'), 'all', '重置后立即清除交期条件')
     await page.keyboard.press('Escape')
     await search.fill(''); await search.press('Enter')
@@ -181,16 +216,32 @@ export function createFilterConflictScenarios(deps) {
     await trigger.click()
     await waitForFilters(page, filters)
     await page.screenshot({ path: path.join(outputDir, `${name}-filter.png`) })
-    if (phone) {
-      await page.setViewportSize({ width: 320, height: 568 })
-      await waitForFiniteAnimations(page)
-    }
+    await page.setViewportSize(phone ? { width: 320, height: 568 } : { width: 1280, height: 550 })
+    await waitForFilters(page, filters)
     await assertNoHorizontalOverflow(page, `${name} 筛选`)
-    const geometry = await filters.evaluate((node) => {
-      const box = node.getBoundingClientRect()
-      return { left: box.left, right: box.right, bottom: box.bottom, width: innerWidth, height: innerHeight }
-    })
-    assert(geometry.left >= 0 && geometry.right <= geometry.width + 1 && geometry.bottom <= geometry.height + 1, JSON.stringify(geometry))
+    if (phone) {
+      await assertFilterFits(assert, filters)
+    } else {
+      await assertDesktopFilterLayout(assert, filters)
+      const conditions = filters.locator('.erp-business-operation-panel__filters')
+      const dateTrigger = filters.getByRole('button', { name: '自定义交期日期', exact: true })
+      await dateTrigger.scrollIntoViewIfNeeded()
+      const scrollTop = await conditions.evaluate((node) => node.scrollTop)
+      assert(scrollTop > 0, '矮窗口只滚动条件区')
+      await dateTrigger.click()
+      const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
+      await dates.waitFor()
+      await waitForFiniteAnimations(page)
+      await assertFilterFits(assert, dates)
+      await dates.getByRole('button', { name: '取消', exact: true }).click()
+      await dates.waitFor({ state: 'hidden' })
+      await waitForFilters(page, filters)
+      await assertDesktopFilterLayout(assert, filters)
+      assert.equal(await conditions.evaluate((node) => node.scrollTop), scrollTop)
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
+      await filters.waitFor({ state: 'hidden' })
+      assert.equal(await trigger.evaluate((node) => node === document.activeElement), true)
+    }
   }
   const mobile = createMobileProgressScenarios(deps).slice(0, 2).map((base) => ({
     ...base,
@@ -566,6 +617,7 @@ export function createFilterConflictScenarios(deps) {
     ...createDashboardTaskScenarios(deps).find((scenario) => scenario.name === 'erp-task-board-desktop'),
     name: 'erp-task-filter-date-parity',
     path: '/erp/task-board?lane=finished',
+    viewport: { width: 1280, height: 640 },
     verify: async (page) => {
       const panel = page.getByRole('region', { name: '任务管理', exact: true })
       const trigger = panel.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ })
@@ -573,6 +625,7 @@ export function createFilterConflictScenarios(deps) {
       const dates = page.getByRole('dialog', { name: '选择处理日期范围', exact: true })
       await trigger.click()
       await waitForFilters(page, filters)
+      await assertDesktopFilterLayout(assert, filters)
       const sortChoices = filters.getByRole('group', { name: '任务排序', exact: true })
       assert.deepEqual(await sortChoices.getByRole('button').allTextContents(), ['智能优先', '最早到期', '最近创建', '任务时间从早到晚', '任务时间从晚到早'])
       assert.equal(await sortChoices.getByRole('button', { name: '智能优先', exact: true }).getAttribute('aria-pressed'), 'true')

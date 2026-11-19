@@ -52,12 +52,12 @@ export function ProgressDueFilters({
   query,
   counts,
   onChange,
-  className = '',
+  className = 'erp-progress-due-options',
   compact = false,
 }) {
   return (
     <div
-      className={`erp-progress-due-options ${className}`.trim()}
+      className={className}
       role="group"
       aria-label="交期情况"
     >
@@ -118,10 +118,10 @@ function ProgressOwnerFilter({ query, onChange }) {
 
   const label = '处理人或业务负责人'
   return (
-    <>
+    <FilterField label={label}>
       <FilterSelect
-        label={label}
-        labelPlacement="stacked"
+        label={false}
+        aria-label={label}
         placeholder="请选择人员"
         showSearch
         optionFilterProp="label"
@@ -131,7 +131,7 @@ function ProgressOwnerFilter({ query, onChange }) {
         onChange={(name) => onChange({ owner_name: name, owner: '' })}
       />
       {state.error && <Alert type="error" showIcon message={state.error} action={<Button onClick={() => setRetry((value) => value + 1)}>重试</Button>} />}
-    </>
+    </FilterField>
   )
 }
 
@@ -145,21 +145,22 @@ export default function BusinessProgressFilterFields({
   open,
   adminProfile,
 }) {
-  return (
-    <div className={`erp-progress-filter-fields${compact ? ' erp-progress-filter-fields--compact' : ''}`}>
+  const fields = (
+    <>
       {compact ? <MobileFilterChoices label="记录范围" options={PROGRESS_SCOPE_OPTIONS} value={query.scope} onChange={(scope) => onChange({ scope })} /> : <FilterChipGroup
         label="记录范围"
+        className="erp-business-filter-field--choices"
         options={PROGRESS_SCOPE_OPTIONS}
         value={query.scope}
         onChange={(scope) => onChange({ scope })}
       />}
       {query.display !== 'lines' && (
-        <FilterField label="交期情况（单选）">
-          <ProgressDueFilters query={query} counts={counts} onChange={onChange} />
+        <FilterField label="交期情况（单选）" className="erp-business-filter-field--choices">
+          <ProgressDueFilters className={compact ? undefined : 'erp-filter-chip-group'} query={query} counts={counts} onChange={onChange} />
         </FilterField>
       )}
       {query.scope !== 'ended' && query.display !== 'lines' && (
-        <FilterField label="任务异常">
+        <FilterField label="任务异常" className="erp-business-filter-field--choices">
           <ProgressBlockedFilter
             query={query}
             counts={counts}
@@ -183,7 +184,7 @@ export default function BusinessProgressFilterFields({
         </ReferenceRecordsProvider>
       )}
       {query.view === 'production' && (
-        <FilterField label="销售关联">
+        <FilterField label="销售关联" className="erp-business-filter-field--choices">
           <FilterChip
             selected={query.unlinked_only}
             removable
@@ -208,6 +209,7 @@ export default function BusinessProgressFilterFields({
           </Button>
         </FilterField>
       )}
-    </div>
+    </>
   )
+  return compact ? <div className="erp-progress-filter-fields">{fields}</div> : fields
 }

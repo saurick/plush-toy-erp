@@ -9,7 +9,6 @@ import {
   DownOutlined,
   EllipsisOutlined,
   FilterOutlined,
-  RollbackOutlined,
   SendOutlined,
   StopOutlined,
 } from '@ant-design/icons'
@@ -28,7 +27,6 @@ import {
   theme,
 } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import { hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import useBusinessPageContext, { BusinessPageContext } from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
@@ -39,6 +37,7 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import FilterField from '@/common/components/navigation/FilterField.jsx'
 import BusinessSwitchContent from '../BusinessSwitchContent.jsx'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
+import BusinessFilterPopoverContent, { businessFilterPopoverOverflow } from './BusinessFilterPopoverContent.jsx'
 import './businessFilterChoices.css'
 import BusinessRecordDetails from './BusinessRecordDetails.jsx'
 import { taskBusinessActionNode } from './taskBusinessActions.mjs'
@@ -1106,7 +1105,6 @@ export function BusinessOperationPanel({
   }
   const filterTriggerRef = React.useRef(null)
   const filterPanelRef = React.useRef(null)
-  const overlay = useOverlayScope()
   const filterPanelId = React.useId()
   const closeFilters = () => {
     setFiltersOpen(false)
@@ -1152,7 +1150,7 @@ export function BusinessOperationPanel({
           <Popover
             trigger="click"
             placement="bottomLeft"
-            align={{ overflow: { adjustX: true, adjustY: true, shiftY: true } }}
+            autoAdjustOverflow={businessFilterPopoverOverflow}
             open={filtersOpen}
             onOpenChange={setFiltersOpen}
             classNames={{ root: 'erp-business-filter-popover' }}
@@ -1167,79 +1165,19 @@ export function BusinessOperationPanel({
               }
             }}
             content={
-              <section
-                className="erp-business-filter-popover__content"
-                aria-label="筛选条件"
-                role="dialog"
+              <BusinessFilterPopoverContent
                 id={filterPanelId}
-                ref={filterPanelRef}
-                tabIndex={-1}
-                onKeyDownCapture={(event) => {
-                  if (
-                    event.defaultPrevented ||
-                    hasVisibleOverlayPopup(overlay)
-                  ) {
-                    return
-                  }
-                  if (event.key === 'Escape') {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    closeFilters()
-                  }
-                  if (event.key === 'Tab') {
-                    const controls = [
-                      ...event.currentTarget.querySelectorAll(
-                        'button:not(:disabled), input:not(:disabled), [tabindex="0"]'
-                      ),
-                    ].filter((node) => node.getClientRects().length)
-                    const first = controls[0]
-                    const last = controls.at(-1)
-                    if (
-                      event.shiftKey &&
-                      (document.activeElement === first ||
-                        document.activeElement === event.currentTarget)
-                    ) {
-                      event.preventDefault()
-                      last?.focus()
-                    } else if (
-                      !event.shiftKey &&
-                      document.activeElement === last
-                    ) {
-                      event.preventDefault()
-                      first?.focus()
-                    }
-                  }
-                }}
+                panelRef={filterPanelRef}
+                triggerRef={filterTriggerRef}
+                open={filtersOpen}
+                onDismiss={closeFilters}
+                onClear={hasClearFilters ? onClearFilters : undefined}
+                clearDisabled={!hasActiveFilters}
               >
-                <header>
-                  <strong>筛选条件</strong>
-                  {hasClearFilters ? (
-                    <Button
-                      aria-label="清空筛选"
-                      size="small"
-                      type="text"
-                      disabled={!hasActiveFilters}
-                      icon={<RollbackOutlined />}
-                      onClick={() => {
-                        onClearFilters()
-                        filterPanelRef.current?.focus({ preventScroll: true })
-                      }}
-                    >
-                      清空筛选
-                    </Button>
-                  ) : null}
-                </header>
-                <div className="erp-business-operation-panel__filters">
-                  <BusinessFilterPanelContext.Provider value>
-                    {additionalFilters}
-                  </BusinessFilterPanelContext.Provider>
-                </div>
-                <footer>
-                  <Button type="primary" onClick={closeFilters}>
-                    收起
-                  </Button>
-                </footer>
-              </section>
+                <BusinessFilterPanelContext.Provider value>
+                  {additionalFilters}
+                </BusinessFilterPanelContext.Provider>
+              </BusinessFilterPopoverContent>
             }
           >
             <Button

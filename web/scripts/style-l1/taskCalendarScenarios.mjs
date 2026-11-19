@@ -629,6 +629,12 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
       await frame.locator('.nav-item[data-page="dashboard"]').click()
       await frame.locator('.nav-item[data-page="tasks"]').click()
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
+      await frame.getByRole('button', { name: '筛选', exact: true }).click()
+      const filters = frame.getByRole('dialog', { name: '筛选条件', exact: true })
+      const conditions = filters.locator('.task-filter-body')
+      assert(await conditions.evaluate((node) => getComputedStyle(node).overflowY === 'auto'
+        && node.nextElementSibling?.classList.contains('popover-foot')), '设计示例的收起位于条件滚动区外')
+      await filters.getByRole('button', { name: '收起', exact: true }).click()
       await page.screenshot({ path: path.join(outputDir, 'task-calendar-design-desktop-4k.png') })
       await page.goto(new URL('/__dev/ui-design?page=mobile-tasks', page.url()).href)
       const switchMobileLayout = async (layout) => {

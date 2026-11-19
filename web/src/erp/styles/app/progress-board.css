@@ -98,23 +98,6 @@
   gap: 12px;
   min-width: 0;
 }
-.erp-progress-filter-fields:not(.erp-progress-filter-fields--compact) {
-  --erp-filter-label-size: var(--erp-font-small);
-  --erp-filter-label-gap: 6px;
-  --erp-filter-label-align: center;
-}
-.erp-progress-filter-fields:not(.erp-progress-filter-fields--compact)
-  .erp-progress-due-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.erp-progress-filter-fields:not(.erp-progress-filter-fields--compact)
-  .erp-filter-chip {
-  min-width: 0;
-  width: 100%;
-  justify-content: center;
-}
 .erp-progress-active-filters {
   display: flex;
   align-items: center;
@@ -501,45 +484,6 @@
   padding: 16px;
   color: var(--erp-text-muted);
   text-align: center;
-}
-.erp-progress-filters {
-  --erp-business-control-height: max(32px, var(--erp-touch-field-height, 0px));
-
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: min(360px, 82vw);
-  max-height: min(640px, 80vh);
-  overflow: hidden;
-  padding: 4px;
-}
-.erp-progress-filters > .erp-progress-filter-fields {
-  min-height: 0;
-  overflow-y: auto;
-}
-.erp-progress-filter-actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 8px;
-}
-.erp-progress-filter-actions > .ant-btn {
-  flex: 1;
-}
-.erp-progress-filters .erp-business-date-range-filter {
-  flex: none;
-  flex-direction: row;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-}
-.erp-progress-filters .erp-business-date-range-filter__range {
-  flex: 1 1 auto;
-  flex-direction: row;
-  min-width: 0;
-}
-.erp-progress-filters .erp-business-date-input.ant-picker {
-  flex: 1 1 0;
-  min-width: 0;
 }
 .erp-progress-help {
   width: min(320px, 80vw);

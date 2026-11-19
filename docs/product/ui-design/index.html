@@ -1042,6 +1042,14 @@
     .task-discovery-controls label { flex: 1; min-width: 165px; }
     .filter-choice-field {display:grid;gap:6px;grid-column:1/-1}.filter-choice-field>span{color:var(--text-2);font-size:12px}.filter-choice-options{display:flex;flex-wrap:wrap;gap:6px}
     .task-discovery-controls ui-select { min-width: 0; max-width: 100%; width: 100%; }
+    #task-filter-popover {
+      --task-filter-top: var(--task-filter-anchor-top);
+      top: var(--task-filter-top);
+      max-height: min(624px, calc(100dvh - var(--task-filter-top) - 12px));
+    }
+    #task-filter-popover > :is(.popover-head, .popover-foot) { flex-shrink: 0; }
+    .task-filter-body { min-height: 0; overflow-y: auto; }
+    @media (max-width: 640px) { #task-filter-popover { --task-filter-top: 145px; } }
     #task-filter-popover .task-discovery-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
     #task-filter-popover .task-discovery-controls label { min-width:0; height:auto; align-items:stretch; flex-direction:column; padding:6px 10px; }
     @media(max-width:480px) { #task-filter-popover .task-discovery-controls { grid-template-columns:minmax(0,1fr); } }
@@ -17110,7 +17118,15 @@ return {orders,financeCustomers};})();
       const top = Math.min((trigger?.bottom || 130) + 8, Math.max(12, innerHeight - 360));
       const right = Math.max(12, innerWidth - (trigger?.right || innerWidth - 12));
       const active = tracking ? [f.role,f.source,f.attention,f.from||f.to].some(Boolean) : Boolean(state.boardRole !== 'all' || Object.values(taskDiscoveryDemo).some(Boolean));
-      return `<section class="popover" id="task-filter-popover" role="dialog" aria-label="筛选条件" style="top:${top}px;right:${right}px;width:min(560px,calc(100vw - 24px))"><div class="popover-head"><strong>筛选条件</strong><button class="btn" data-action="task-filter-clear" ${active?'':'disabled'}>清空筛选</button></div>${tracking?'':renderTaskDiscoveryControls()}<div class="filter-grid">${fields}</div><div class="popover-foot"><button class="btn primary" data-action="close-overlay">收起</button></div></section>`;
+      return `<section class="popover" id="task-filter-popover" role="dialog" aria-label="筛选条件"
+        style="--task-filter-anchor-top:${top}px;right:${right}px;width:min(560px,calc(100vw - 24px))">
+        <div class="popover-head"><strong>筛选条件</strong><button class="btn ghost" data-action="task-filter-clear" ${active?'':'disabled'}>清空筛选</button></div>
+        <div class="task-filter-body">
+          ${tracking?'':renderTaskDiscoveryControls()}
+          <div class="filter-grid">${fields}</div>
+        </div>
+        <div class="popover-foot"><button class="btn primary" data-action="close-overlay">收起</button></div>
+      </section>`;
     }
 
     function handlingTask() {

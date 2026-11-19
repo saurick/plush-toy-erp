@@ -51,6 +51,7 @@ import {
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
 import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
+import BusinessFilterPopoverContent, { businessFilterPopoverOverflow } from '../components/business-list/BusinessFilterPopoverContent.jsx'
 import '../styles/app/progress-board.css'
 
 export default function BusinessDashboardPage() {
@@ -104,6 +105,12 @@ export default function BusinessDashboardPage() {
   const lines = view === 'orders' && query.display === 'lines'
   const [moreOpen, setMoreOpen] = useState(false)
   const filterTriggerRef = useRef(null)
+  const filterPanelRef = useRef(null)
+  const filterPanelId = React.useId()
+  const closeFilters = () => {
+    setMoreOpen(false)
+    filterTriggerRef.current?.focus({ preventScroll: true })
+  }
   useEffect(() => {
     if (!moreOpen) return undefined
     const closeOnEscape = (event) => {
@@ -403,12 +410,24 @@ export default function BusinessDashboardPage() {
                   trigger="click"
                   open={moreOpen}
                   onOpenChange={setMoreOpen}
-                  placement="bottom"
+                  placement="bottomRight"
+                  autoAdjustOverflow={businessFilterPopoverOverflow}
+                  classNames={{ root: 'erp-business-filter-popover' }}
+                  afterOpenChange={(visible) => {
+                    if (visible && [filterTriggerRef.current, document.body].includes(document.activeElement)) {
+                      filterPanelRef.current?.focus({ preventScroll: true })
+                    }
+                  }}
                   content={
-                    <section
-                      className="erp-progress-filters"
-                      role="dialog"
-                      aria-label="筛选进度"
+                    <BusinessFilterPopoverContent
+                      id={filterPanelId}
+                      panelRef={filterPanelRef}
+                      triggerRef={filterTriggerRef}
+                      open={moreOpen}
+                      label="筛选进度"
+                      onDismiss={closeFilters}
+                      onClear={() => update(progressFilterReset(query))}
+                      clearDisabled={!filterCount}
                     >
                       <BusinessProgressFilterFields
                         adminProfile={adminProfile}
@@ -422,31 +441,14 @@ export default function BusinessDashboardPage() {
                           setDateOpen(true)
                         }}
                       />
-                      <div className="erp-progress-filter-actions">
-                        <Button
-                          onClick={() => {
-                            update(progressFilterReset(query))
-                          }}
-                        >
-                          重置筛选
-                        </Button>
-                        <Button
-                          type="primary"
-                          onClick={() => {
-                            setMoreOpen(false)
-                            filterTriggerRef.current?.focus()
-                          }}
-                        >
-                          收起
-                        </Button>
-                      </div>
-                    </section>
+                    </BusinessFilterPopoverContent>
                   }
                 >
                   <Button
                     ref={filterTriggerRef}
                     icon={<FilterOutlined />}
                     aria-haspopup="dialog"
+                    aria-controls={moreOpen ? filterPanelId : undefined}
                     aria-expanded={moreOpen}
                     aria-label={
                       filterCount
@@ -470,7 +472,7 @@ export default function BusinessDashboardPage() {
                         领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
                       </p>
                       <p>
-                        选项数量表示保留其他条件时，选择该项可查到的记录数；交期与任务受阻可以组合。筛选数量只统计额外条件；搜索词、已逾期、7天内和受阻快捷项不重复计数，重置时保留。关联任务仅包含当前账号可见内容。
+                        选项数量表示保留其他条件时，选择该项可查到的记录数；交期与任务受阻可以组合。筛选数量只统计额外条件；搜索词、已逾期、7天内和受阻快捷项不重复计数，清空筛选时保留。关联任务仅包含当前账号可见内容。
                       </p>
                     </div>
                   }
