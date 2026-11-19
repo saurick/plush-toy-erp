@@ -59,6 +59,11 @@ test('first incoming rejection: keeps draft, post and cancellation distinct from
   assert.match(rejectionModal, /不生成库存退货流水/u)
   assert.match(rejectionModal, /createSourceBusinessActionAttemptStore/u)
   assert.match(rejectionModal, /expected_version: record\.version/u)
+  assert.match(rejectionModal, /afterOpenChange=\{initializeOpenForm\}/u)
+  assert.doesNotMatch(
+    rejectionModal,
+    /if \(!open \|\| !inspection\?\.id[\s\S]{0,180}form\.resetFields/u
+  )
 })
 
 test('finance payments: lists real payments, allocates multiple facts and preserves reversal audit', () => {

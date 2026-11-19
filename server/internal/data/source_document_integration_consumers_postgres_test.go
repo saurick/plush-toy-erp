@@ -97,7 +97,7 @@ type integrationHTTPFixture struct {
 	password string
 }
 
-func newIntegrationHTTP(t *testing.T) *integrationHTTPFixture {
+func newIntegrationHTTP(t *testing.T, additionalModules ...string) *integrationHTTPFixture {
 	t.Helper()
 	db, client := data.OpenIntegrationPostgresData(t)
 	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")
@@ -129,7 +129,7 @@ func newIntegrationHTTP(t *testing.T) *integrationHTTPFixture {
 			map[string]any{"approval_key": biz.ApprovalSettingShipmentFinance, "enabled": true},
 		}},
 	}}
-	for _, key := range []string{"customers", "suppliers", "products", "materials", "sales_orders", "purchase_orders", "purchase_receipts", "quality_inspections", "inventory", "finance", "finance_payments", "workflow_tasks", "shipments"} {
+	for _, key := range append([]string{"customers", "suppliers", "products", "materials", "sales_orders", "purchase_orders", "purchase_receipts", "quality_inspections", "inventory", "finance", "finance_payments", "workflow_tasks", "shipments"}, additionalModules...) {
 		input.ModuleStates = append(input.ModuleStates, biz.DeploymentModuleStateInput{ModuleKey: key, ContractVersion: "v1", State: "enabled"})
 	}
 	for _, registered := range biz.BuiltinRoles() {

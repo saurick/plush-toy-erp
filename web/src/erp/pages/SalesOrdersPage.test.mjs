@@ -33,6 +33,20 @@ const businessModal = readFileSync(
   new URL('../components/sales-orders/SalesOrderEditor.jsx', import.meta.url),
   'utf8'
 )
+const reservationFlow = readFileSync(
+  new URL(
+    '../components/sales-orders/useSalesOrderReservation.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+const editorFlow = readFileSync(
+  new URL(
+    '../components/sales-orders/useSalesOrderEditor.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
 
 test('sales order commercial fields preserve their contracts with demand before attachments', () => {
   for (const copy of [
@@ -65,7 +79,10 @@ test('sales order commercial fields preserve their contracts with demand before 
   assert.match(form, /unitText="%"/u)
   assert.match(form, /name="quoted_freight_amount"/u)
   assert.match(form, /value !== 'EXCLUDED'/u)
-  assert.match(form, /setFieldsValue\(\{ quoted_freight_amount: undefined \}\)/u)
+  assert.match(
+    form,
+    /setFieldsValue\(\{ quoted_freight_amount: undefined \}\)/u
+  )
   assert.match(form, /unitText=\{currency \|\| '币种'\}/u)
   assert.match(columns, /title: '报价运费'/u)
   assert.match(columns, /dataIndex: 'quoted_freight_amount'/u)
@@ -89,34 +106,43 @@ test('planned delivery date header keeps enough width for one line', () => {
 
 test('active sales orders expose a permission-bound reservation action', () => {
   assert.match(page, /'stock\.reservation\.create'/u)
-  assert.match(page, /selectedOrder\?\.lifecycle_status/u)
-  assert.match(page, /\.toLowerCase\(\) !== 'active'/u)
-  assert.match(page, /getSalesOrder\(\{ id: orderID \}\)/u)
-  assert.match(page, /selectedOrderIDRef\.current = orderID/u)
-  assert.match(page, /listAllSalesOrderItems/u)
-  assert.match(page, /buildSalesOrderReservationItemChoices/u)
+  assert.match(page, /useSalesOrderReservation/u)
+  assert.match(reservationFlow, /selectedOrder\?\.lifecycle_status/u)
+  assert.match(reservationFlow, /\.toLowerCase\(\) !== 'active'/u)
+  assert.match(reservationFlow, /getSalesOrder\(/u)
+  assert.match(reservationFlow, /selectedOrderIDRef\.current = orderID/u)
+  assert.match(reservationFlow, /listAllSalesOrderItems/u)
+  assert.match(reservationFlow, /buildSalesOrderReservationItemChoices/u)
 })
 
 test('reservation context uses existing facts and matching available stock', () => {
   assert.match(
-    page,
-    /listAllStockReservations\(\{[\s\S]*source_id: orderID,[\s\S]*status: 'ACTIVE',[\s\S]*\}\)/u
+    reservationFlow,
+    /listAllStockReservations\([\s\S]*source_id: orderID,[\s\S]*status: 'ACTIVE'/u
   )
   assert.match(
-    page,
-    /listAllShipments\(\{ source_id: orderID, status: 'SHIPPED' \}\)/u
+    reservationFlow,
+    /listAllShipments\([\s\S]*source_id: orderID,[\s\S]*status: 'SHIPPED'/u
   )
-  assert.match(page, /firstReservableItem/u)
-  assert.match(page, /相关预留或出货记录未完整加载，暂不能新增预留/u)
+  assert.match(reservationFlow, /firstReservableItem/u)
+  assert.match(reservationFlow, /相关预留或出货记录未完整加载，暂不能新增预留/u)
   assert.match(page, /shipments=\{reservationContext\.shipments\}/u)
-  assert.match(page, /subject_type: 'PRODUCT'/u)
-  assert.match(page, /subject_id: Number\(item\.product_id/u)
-  assert.match(page, /listAllInventoryBalances\(params\)/u)
+  assert.match(reservationFlow, /subject_type: 'PRODUCT'/u)
+  assert.match(reservationFlow, /subject_id: Number\(item\.product_id/u)
+  assert.match(reservationFlow, /listAllInventoryBalances\(params/u)
   assert.match(
-    page,
-    /listAllInventoryLots\(\{ \.\.\.params, status: 'ACTIVE' \}\)/u
+    reservationFlow,
+    /listAllInventoryLots\([\s\S]*\.\.\.params,[\s\S]*status: 'ACTIVE'/u
   )
-  assert.match(page, /enrichReservationBalances/u)
+  assert.match(reservationFlow, /enrichBalances/u)
+  const loadBalances = reservationFlow.slice(
+    reservationFlow.indexOf('const loadBalances'),
+    reservationFlow.indexOf('const openForSelectedOrder')
+  )
+  assert.match(
+    loadBalances,
+    /const request = beginLatestRequest\('sales-order-reservation-balances'\)[\s\S]*if \(!item \|\| orderID <= 0\)[\s\S]*request\.finish\(\)[\s\S]*setLoading\(false\)[\s\S]*balances: \[\]/u
+  )
   assert.match(modal, /当前生效预留/u)
   assert.match(modal, /已出货/u)
   assert.match(modal, /可预留/u)
@@ -128,19 +154,44 @@ test('reservation context uses existing facts and matching available stock', () 
 })
 
 test('reservation submit owns its number and safe retry identity', () => {
-  assert.match(page, /buildSalesOrderReservationPayload/u)
-  assert.match(page, /createSourceBusinessActionAttemptStore/u)
-  assert.match(page, /sourceBusinessActionNo/u)
-  assert.match(page, /createStockReservationFromSalesOrder\(params\)/u)
-  assert.doesNotMatch(page, /createStockReservation\(params\)/u)
-  assert.match(page, /result\.status !== 'ACTIVE'/u)
-  assert.match(page, /customer_key: activeCustomerKey \|\| undefined/u)
+  assert.match(reservationFlow, /buildSalesOrderReservationPayload/u)
+  assert.match(reservationFlow, /createSourceBusinessActionAttemptStore/u)
+  assert.match(reservationFlow, /sourceBusinessActionNo/u)
   assert.match(
-    page,
+    reservationFlow,
+    /createStockReservationFromSalesOrder\(params\)/u
+  )
+  assert.doesNotMatch(reservationFlow, /createStockReservation\(params\)/u)
+  assert.match(reservationFlow, /validateSalesOrderReservationResult/u)
+  assert.doesNotMatch(reservationFlow, /result\.status !==/u)
+  assert.match(
+    reservationFlow,
+    /try \{[\s\S]*attemptsRef\.current\.prepare\(scope, payload\)[\s\S]*sourceBusinessActionNo\([\s\S]*\} catch \(error\) \{[\s\S]*准备库存预留/u
+  )
+  assert.match(
+    reservationFlow,
+    /customer_key: activeCustomerKey \|\| undefined/u
+  )
+  assert.match(
+    reservationFlow,
     /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
   )
   assert.match(page, /BUSINESS_ROUTE_PATHS\.outbound/u)
   assert.doesNotMatch(page, /consumeStockReservation|shipShipment/u)
+})
+
+test('sales order editor keeps create retry identity and isolates post-save effects', () => {
+  assert.match(page, /useSalesOrderEditor/u)
+  assert.match(editorFlow, /createSourceBusinessActionAttemptStore/u)
+  assert.match(editorFlow, /createAttemptsRef\.current\.peek\(CREATE_SCOPE\)/u)
+  assert.match(editorFlow, /isMutationResultUnknown\(saveError\)/u)
+  assert.match(editorFlow, /isResourceVersionConflict\(saveError\)/u)
+  assert.match(editorFlow, /commitSourceDocumentSaveResult/u)
+  assert.match(editorFlow, /flushPendingAttachments\(saved\.id\)/u)
+  assert.match(editorFlow, /settleSourceDocumentPostSaveEffect/u)
+  assert.match(editorFlow, /expected_version: editingOrder\.version/u)
+  assert.doesNotMatch(page, /const saveOrder = async/u)
+  assert.doesNotMatch(page, /const openEditOrder = async/u)
 })
 
 test('reservation form keeps source and stock identities out of visible copy', () => {

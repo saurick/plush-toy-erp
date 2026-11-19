@@ -1,12 +1,5 @@
 import React, { useMemo } from 'react'
-import {
-  Alert,
-  Descriptions,
-  Form,
-  Input,
-  Radio,
-  Typography,
-} from 'antd'
+import { Alert, Descriptions, Form, Input, Radio, Typography } from 'antd'
 import { submitValidatedForm } from '../../utils/submitValidatedForm.mjs'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
 import Select from '@/common/components/select/AppSelect'
@@ -19,6 +12,7 @@ import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
@@ -37,12 +31,6 @@ const { Text } = Typography
 function choiceByID(choices, value) {
   const id = Number(value || 0)
   return choices.find((item) => item.value === id) || null
-}
-
-function localDateTimeValue() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
 }
 
 export default function ProductionCompletionModal({
@@ -115,7 +103,10 @@ export default function ProductionCompletionModal({
       ? choiceByID(choices, initialValues.production_order_item_id)
       : choices.find((item) => !item.disabled)
     const firstBatch = initialValues?.production_wip_batch_id
-      ? choiceByID(firstAvailable?.batchChoices || [], initialValues.production_wip_batch_id)
+      ? choiceByID(
+          firstAvailable?.batchChoices || [],
+          initialValues.production_wip_batch_id
+        )
       : firstAvailable?.batchChoices?.find((batch) => !batch.disabled)
     const firstLotOptions = buildProductionCompletionLotOptions(
       firstAvailable?.item,
@@ -135,7 +126,8 @@ export default function ProductionCompletionModal({
         firstAvailable?.remaining ||
         '',
       warehouse_id: initialValues?.warehouse_id
-        ? choiceByID(finishedWarehouseOptions, initialValues.warehouse_id)?.value
+        ? choiceByID(finishedWarehouseOptions, initialValues.warehouse_id)
+            ?.value
         : finishedWarehouseOptions[0]?.value,
       lot_selection: initialValues?.lot_selection || firstLotSelection,
       lot_id:
@@ -144,7 +136,8 @@ export default function ProductionCompletionModal({
           ? firstLotOptions[0]?.value
           : undefined),
       new_lot_no: initialValues?.new_lot_no,
-      occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+      occurred_at:
+        initialValues?.occurred_at || formatLocalDateTimeInputValue(),
       note: initialValues?.note || '',
     })
   }
@@ -155,7 +148,13 @@ export default function ProductionCompletionModal({
     <Editor
       {...(editing
         ? { form }
-        : { taskInline: true, form, size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
+        : {
+            taskInline: true,
+            form,
+            size: 'localAction',
+            cancelText: '取消',
+            destroyOnHidden: true,
+          })}
       title={
         editing
           ? '核对成品收仓草稿'
@@ -437,7 +436,11 @@ export default function ProductionCompletionModal({
             name="note"
             label="备注"
           >
-            <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
+            <BusinessTextArea
+              minRows={2}
+              maxLength={BusinessTextPolicy.noteMaxCharacters}
+              showCount
+            />
           </Form.Item>
         </BusinessFormSection>
       </BusinessForm>

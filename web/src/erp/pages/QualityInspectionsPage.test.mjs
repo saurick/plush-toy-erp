@@ -11,51 +11,65 @@ const source = readFileSync(
 const querySource = readFileSync(new URL('../components/quality-inspections/qualityInspectionQueries.mjs', import.meta.url), 'utf8')
 const editorSource = readFileSync(new URL('../components/quality-inspections/useQualityInspectionEditor.js', import.meta.url), 'utf8')
 const actionsSource = readFileSync(new URL('../components/quality-inspections/useQualityInspectionActions.js', import.meta.url), 'utf8')
+const purchaseReturnSource = readFileSync(
+  new URL(
+    '../components/quality-inspections/useQualityInspectionPurchaseReturn.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
+const pageModelSource = readFileSync(
+  new URL(
+    '../components/quality-inspections/qualityInspectionPageModel.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
 
 test('quality page uses exact purchase return permission and dedicated source command', () => {
   assert.equal(PurchaseSourceActions.qualityReturn.permission, 'purchase.return.create')
   assert.match(source, /sourceActionAccess\(adminProfile, PurchaseSourceActions.qualityReturn\)/u)
   assert.match(source, /'purchase\.return\.read'/u)
-  assert.match(source, /createPurchaseReturnFromQualityInspection/u)
-  assert.match(source, /isRejectedIncomingInspection/u)
+  assert.match(purchaseReturnSource, /createPurchaseReturnFromQualityInspection/u)
+  assert.match(purchaseReturnSource, /isRejectedIncomingInspection/u)
   assert.doesNotMatch(
-    source,
+    `${source}\n${purchaseReturnSource}`,
     /warehouse\.adjustment\.create|purchase\.order\.update/u
   )
 })
 
 test('quality rejection return retries safely and validates the returned source trace', () => {
   assert.match(
-    source,
+    purchaseReturnSource,
     /listAllPurchaseReturns\(\s*compactParams\(\{[\s\S]*?quality_inspection_id: inspection\.id/u
   )
-  assert.doesNotMatch(source, /listPurchaseReturns\([\s\S]{0,180}limit:\s*20/u)
-  assert.match(source, /getPurchaseReceipt\(\{ id: receiptID \}, \{ signal: request\.signal \}\)/u)
-  assert.match(source, /selectedRowPurchaseReceiptRequestRef/u)
+  assert.doesNotMatch(purchaseReturnSource, /listPurchaseReturns\([\s\S]{0,180}limit:\s*20/u)
+  assert.match(purchaseReturnSource, /getPurchaseReceipt\(\{ id: receiptID \}, \{ signal: request\.signal \}\)/u)
+  assert.match(purchaseReturnSource, /selectedRowPurchaseReceiptRequestRef/u)
   assert.match(source, /未能确认来源收货已入库，暂不能生成采购退货/u)
-  const openAction = source.slice(
-    source.indexOf('const openPurchaseReturn'),
-    source.indexOf('const closePurchaseReturn =')
+  const openAction = purchaseReturnSource.slice(
+    purchaseReturnSource.indexOf('const openPurchaseReturn'),
+    purchaseReturnSource.indexOf('const closePurchaseReturn =')
   )
   assert.match(
     openAction,
-    /canCreatePurchaseReturnFromRejectedInspection\(\s*inspection,\s*sourceReceipt\s*\)/u
+    /canCreatePurchaseReturnFromRejectedInspection\(\s*inspection,\s*selectedRowPurchaseReceipt\s*\)/u
   )
   assert.match(
     openAction,
     /首次到货检验不合格只会阻止入库；只有已入库后追加检验不合格才可退供应商/u
   )
   assert.doesNotMatch(openAction, /findByPositiveID\([\s\S]*purchaseReceipts/u)
-  const action = source.slice(
-    source.indexOf('const submitPurchaseReturn'),
-    source.indexOf('const selectedRowLabel')
+  const action = purchaseReturnSource.slice(
+    purchaseReturnSource.indexOf('const submitPurchaseReturn'),
+    purchaseReturnSource.indexOf('const purchaseReturnSourceSummary')
   )
   assert.match(action, /purchaseReturnInFlightRef\.current/u)
   assert.match(action, /purchaseReturnAttemptsRef\.current\.prepare/u)
   assert.match(action, /purchaseReturnAttemptsRef\.current\.settle/u)
   assert.match(action, /quality_inspection_id/u)
   assert.match(action, /created\?\.status/u)
-  assert.match(action, /await loadRows\(\)/u)
+  assert.match(source, /if \(await submitPurchaseReturnSource\(values\)\) await loadRows\(\)/u)
   assert.match(
     action,
     /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
@@ -69,7 +83,7 @@ test('quality source actions require ready references and refresh both source sc
     /Promise\.all\(\[\s*loadRows\(\),\s*loadReferenceOptions\(\)/u
   )
   assert.match(source, /referenceDataState !== 'ready'/u)
-  assert.match(source, /质检来源资料加载失败，请先刷新当前页后重试/u)
+  assert.match(purchaseReturnSource, /质检来源资料加载失败，请先刷新当前页后重试/u)
   assert.match(source, /referenceDataReady=\{referenceDataState === 'ready'\}/u)
 })
 
@@ -94,7 +108,7 @@ test('incoming quality create submits only source selectors and customer context
 
 test('quality page mounts the return modal and marks a successful source once', () => {
   assert.match(source, /<QualityInspectionPurchaseReturnModal/u)
-  assert.match(source, /markInspectionReturned\(inspection\.id\)/u)
+  assert.match(purchaseReturnSource, /markInspectionReturned\(inspection\.id\)/u)
   assert.match(source, /returnedInspectionIDs\.has\(selectedRow\.id\)/u)
   assert.match(
     source,
@@ -249,9 +263,9 @@ test('production-stage filter uses the WIP read model without inventory lot or w
 })
 
 test('production-stage decision summary displays backend business snapshots and never guesses from IDs', () => {
-  const summary = source.slice(
-    source.indexOf('if (isProductionStageQualityInspection(inspection))'),
-    source.indexOf('const recordedSourceNo')
+  const summary = pageModelSource.slice(
+    pageModelSource.indexOf('if (isProductionStageQualityInspection(inspection))'),
+    pageModelSource.indexOf('const recordedSourceNo')
   )
   for (const businessField of [
     'production_order_no',
@@ -287,7 +301,7 @@ test('quality decision requires an estimated source-document defect rate without
   assert.match(editorSource, /defect_rate_custom_percent: undefined/u)
   assert.match(actionsSource, /buildDecisionParams\(inspection\.id, values/u)
   assert.match(source, /来源单据：\$\{decisionSourceSummary\.sourceNo\}/u)
-  assert.match(source, /inspection\?\.source_no/u)
+  assert.match(pageModelSource, /inspection\?\.source_no/u)
   assert.match(source, /按来源记录估算不良比例/u)
   assert.match(source, /后续返工、退货或阻断仍由对应来源业务办理/u)
   assert.doesNotMatch(source, /defect_rate_percent\s*\*\s*quantity/u)

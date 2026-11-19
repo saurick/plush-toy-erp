@@ -15,6 +15,7 @@ import {
   trimOptional,
   normalizeOptionalDecimalString,
   normalizeOptionalNonNegativeInteger,
+  optionalFormReferenceID,
   compactParams,
 } from './sourceDocumentValues.mjs'
 import { isBusinessCurrency } from './businessCurrency.mjs'
@@ -46,16 +47,21 @@ function normalizeLineNo(primaryValue, fallbackValue) {
   return fallback && fallback > 0 ? fallback : 1
 }
 
+function orderSnapshot(value) {
+  if (value == null) return {}
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('单据信息格式有误，请核对来源后保存')
+  }
+  return value
+}
+
 function buildOptionalContractPartySnapshotParam(values = {}) {
   if (
     !Object.prototype.hasOwnProperty.call(values, 'contract_party_snapshot')
   ) {
     return undefined
   }
-  return values.contract_party_snapshot &&
-    typeof values.contract_party_snapshot === 'object'
-    ? buildContractPartySnapshot(values.contract_party_snapshot)
-    : {}
+  return buildContractPartySnapshot(orderSnapshot(values.contract_party_snapshot))
 }
 
 function buildSalesOrderParams(values = {}, extra = {}) {
@@ -77,15 +83,11 @@ function buildSalesOrderParams(values = {}, extra = {}) {
         ? undefined
         : Number(values.customer_id || 0),
     customer_order_no: trimOptional(values.customer_order_no),
-    customer_snapshot:
-      values.customer_snapshot && typeof values.customer_snapshot === 'object'
-        ? values.customer_snapshot
-        : {},
+    customer_snapshot: orderSnapshot(values.customer_snapshot),
     sales_owner: trimOptional(values.sales_owner),
-    contact_snapshot:
-      values.contact_snapshot && typeof values.contact_snapshot === 'object'
-        ? values.contact_snapshot
-        : buildOrderContactSnapshot(values),
+    contact_snapshot: values.contact_snapshot === undefined
+      ? buildOrderContactSnapshot(values)
+      : orderSnapshot(values.contact_snapshot),
     delivery_snapshot:
       Object.keys(deliverySnapshot).length > 0 ? deliverySnapshot : undefined,
     payment_method: trimOptional(values.payment_method),
@@ -136,14 +138,9 @@ function buildSalesOrderItemParams(values = {}, extra = {}) {
 }
 
 function buildPurchaseOrderParams(values = {}, extra = {}) {
-  const supplierSnapshot =
-    Object.prototype.hasOwnProperty.call(extra, 'supplier_snapshot') &&
-    extra.supplier_snapshot &&
-    typeof extra.supplier_snapshot === 'object'
-      ? extra.supplier_snapshot
-      : values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
-        ? values.supplier_snapshot
-        : {}
+  const supplierSnapshot = orderSnapshot(
+    extra.supplier_snapshot === undefined ? values.supplier_snapshot : extra.supplier_snapshot
+  )
   return compactParams({
     ...extra,
     purchase_order_no: trimOptional(values.purchase_order_no),
@@ -200,10 +197,7 @@ function buildOutsourcingOrderParams(values = {}, extra = {}) {
     outsourcing_order_no: trimOptional(values.outsourcing_order_no),
     currency: normalizeSourceOrderCurrency(values.currency, extra),
     supplier_id: Number(values.supplier_id || 0),
-    supplier_snapshot:
-      values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
-        ? values.supplier_snapshot
-        : {},
+    supplier_snapshot: orderSnapshot(values.supplier_snapshot),
     contract_party_snapshot: buildOptionalContractPartySnapshotParam(values),
     source_order_no: trimOptional(values.source_order_no),
     order_date: trimOptional(values.order_date),
@@ -225,13 +219,13 @@ function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
     line_no: normalizeLineNo(extra.line_no, values.line_no),
     subject_type: subjectType,
     product_id: productSubject
-      ? normalizeOptionalPositiveInteger(values.product_id)
+      ? optionalFormReferenceID(values.product_id)
       : undefined,
     product_sku_id: productSubject
-      ? normalizeOptionalPositiveInteger(values.product_sku_id)
+      ? optionalFormReferenceID(values.product_sku_id)
       : undefined,
     material_id: materialSubject
-      ? normalizeOptionalPositiveInteger(values.material_id)
+      ? optionalFormReferenceID(values.material_id)
       : undefined,
     process_id: Number(values.process_id || 0),
     unit_id: Number(values.unit_id || 0),

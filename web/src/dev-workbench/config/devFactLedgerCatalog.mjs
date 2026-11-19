@@ -101,7 +101,7 @@ const FACT_DEFINITIONS = [
     idempotencyRule: '出货单版本、来源销售行和幂等键阻止重复出库。',
     correction: '按出货取消合同生成可审计纠正记录。',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_shipment.go',
       'server/internal/service/jsonrpc_operational_fact_shipment.go',
     ],
   }),
@@ -115,7 +115,7 @@ const FACT_DEFINITIONS = [
     idempotencyRule: '生产订单、批次、动作类型和幂等键必须唯一。',
     correction: '通过命名的生产纠正或返工动作保留原记录并生成反向影响。',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_production.go',
       'server/internal/service/jsonrpc_operational_fact.go',
     ],
   }),
@@ -129,7 +129,7 @@ const FACT_DEFINITIONS = [
     idempotencyRule: '委外订单行、动作类型和幂等键不得重复生效。',
     correction: '正式来源草稿可作废并释放占用，不生成库存冲正；已过账事实使用委外处置或反向库存事务纠正，保留原事实。',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_outsourcing.go',
       'server/internal/service/jsonrpc_operational_fact.go',
     ],
   }),
@@ -143,7 +143,7 @@ const FACT_DEFINITIONS = [
     idempotencyRule: '同一来源销售行与预留意图只能生成一个有效影响。',
     correction: '释放或取消预留，不能用 Workflow 状态代替库存释放。',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_reservation.go',
       'server/internal/data/operational_fact_repo.go',
     ],
   }),
@@ -157,7 +157,7 @@ const FACT_DEFINITIONS = [
     idempotencyRule: '来源类型、来源 ID、事实类型和业务唯一键不得重复。',
     correction: '正式来源草稿可作废且不生成财务影响；已生效事实通过红冲或反向事实纠正，保留原记录。',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_finance.go',
       'server/internal/data/model/schema/finance_fact.go',
     ],
   }),

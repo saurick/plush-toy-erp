@@ -11,20 +11,6 @@ const customerConfigApiSource = readFileSync(
   fileURLToPath(new URL('./customerConfigApi.mjs', import.meta.url)),
   'utf8'
 )
-const salesOrderPageConfigSource = readFileSync(
-  fileURLToPath(
-    new URL(
-      '../components/sales-orders/salesOrderPageConfig.mjs',
-      import.meta.url
-    )
-  ),
-  'utf8'
-)
-const salesOrderPageSource = readFileSync(
-  fileURLToPath(new URL('../pages/SalesOrdersPage.jsx', import.meta.url)),
-  'utf8'
-)
-
 const setCustomerConfigApiCall = installRpcCallHarness(after)
 
 async function loadCustomerConfigApiForTest(call) {
@@ -786,31 +772,6 @@ test('customerConfigApi: customer config transitions use strict shared payload b
     customerConfigApiSource,
     /buildCustomerConfigMutationPayload\('rollback', params\)/
   )
-})
-
-test('SalesOrdersPage: sales order submit action enters acceptance workflow', () => {
-  assert.match(salesOrderPageConfigSource, /submitSalesOrderAcceptanceProcess/)
-  assert.match(
-    salesOrderPageConfigSource,
-    /successMessage:\s*'销售订单已提交，已进入审批流程'/
-  )
-  assert.match(salesOrderPageConfigSource, /returnsRecord:\s*false/)
-  assert.doesNotMatch(salesOrderPageConfigSource, /submitSalesOrder,/)
-  assert.match(salesOrderPageSource, /activeCustomerKey/)
-  assert.match(salesOrderPageSource, /customer_key:\s*activeCustomerKey/)
-  assert.match(salesOrderPageSource, /business_ref_no:\s*order\.order_no/)
-})
-
-test('SalesOrdersPage: process submit payload does not replace selected sales order', () => {
-  assert.match(
-    salesOrderPageSource,
-    /action\.returnsRecord === false \? order : updated/
-  )
-  assert.match(
-    salesOrderPageSource,
-    /if \(action\.returnsRecord !== false\) requireSourceActionRecord\(updated, order\.id\)/
-  )
-  assert.match(salesOrderPageSource, /setSelectedOrder\(nextSelectedOrder\)/)
 })
 
 test('customerConfigApi: exempt orders require completed source activation, including retries', async (t) => {

@@ -45,13 +45,6 @@ export function shipmentFinanceSourceActionConfig(action) {
   return config
 }
 
-export function localDateTimeInputValue(now = new Date()) {
-  const timestamp = now instanceof Date ? now.getTime() : Number.NaN
-  if (!Number.isFinite(timestamp)) return ''
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(timestamp - offset).toISOString().slice(0, 16)
-}
-
 export function buildShipmentFinanceSourcePayload(
   values = {},
   shipment = {},

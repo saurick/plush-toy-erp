@@ -50,6 +50,14 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 	if !ok {
 		return nil, false
 	}
+	supplierSnapshot, ok := getOptionalJSONRPCMap(pm, "supplier_snapshot")
+	if !ok {
+		return nil, false
+	}
+	contractPartySnapshot, ok := getOptionalJSONRPCMap(pm, "contract_party_snapshot")
+	if !ok {
+		return nil, false
+	}
 	return &biz.PurchaseOrderMutation{
 		PurchaseOrderNo:              getString(pm, "purchase_order_no"),
 		SupplierID:                   supplierID,
@@ -59,8 +67,8 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 		InvoiceRequired:              invoiceRequired,
 		InvoiceCategory:              getWorkflowStringPtr(pm, "invoice_category"),
 		SupplierPurchaseOrderNo:      getWorkflowStringPtr(pm, "supplier_purchase_order_no"),
-		SupplierSnapshot:             getMap(pm, "supplier_snapshot"),
-		ContractPartySnapshot:        getMap(pm, "contract_party_snapshot"),
+		SupplierSnapshot:             supplierSnapshot,
+		ContractPartySnapshot:        contractPartySnapshot,
 		PurchaseDate:                 purchaseDate,
 		ExpectedArrivalDate:          expectedArrivalDate,
 		SupplierConfirmedArrivalDate: supplierConfirmedArrivalDate,

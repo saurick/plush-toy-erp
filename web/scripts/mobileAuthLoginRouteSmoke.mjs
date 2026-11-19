@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
@@ -15,6 +14,11 @@ import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../src/erp/utils/mobileTaskQueries.
 import { createMockAdminSessionToken } from './mockAdminSessionToken.mjs'
 import { expectAdminLoginHeading } from './style-l1/loginAssertions.mjs'
 import { installAdminRpcMocks } from './style-l1/adminRpcMocks.mjs'
+import {
+  startBrowserSmokeDevServer,
+  stopBrowserSmokeDevServer,
+  writeBrowserSmokeJsonReport,
+} from './browserSmokeRuntime.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
@@ -178,7 +182,8 @@ async function main() {
   } finally {
     await browser.close()
     if (useSharedDevServer) {
-      await stopDevServer()
+      await stopBrowserSmokeDevServer(devServerProcess)
+      devServerProcess = null
     }
   }
 
@@ -232,62 +237,13 @@ async function runMobileRoleScenario(browser, { role }) {
 }
 
 function startDevServer() {
-  const child = spawn(
-    'pnpm',
-    [
-      'exec',
-      'vite',
-      '--config',
-      'vite.config.mjs',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(devServerPort),
-      '--strictPort',
-    ],
-    {
-      cwd: webDir,
-      env: {
-        ...process.env,
-        BROWSER: 'none',
-        ERP_VITE_PORT: String(devServerPort),
-        ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  )
-
-  child.stdout.on('data', (chunk) => {
-    devServerLogs += chunk.toString()
+  return startBrowserSmokeDevServer({
+    webDir,
+    port: devServerPort,
+    onLog: (chunk) => {
+      devServerLogs += chunk
+    },
   })
-  child.stderr.on('data', (chunk) => {
-    devServerLogs += chunk.toString()
-  })
-  child.on('exit', (code) => {
-    if (code !== null && code !== 0) {
-      devServerLogs += `\n[vite exited with code ${code}]`
-    }
-  })
-
-  return child
-}
-
-async function stopDevServer() {
-  if (!devServerProcess) return
-
-  if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGTERM')
-    await Promise.race([
-      new Promise((resolve) => devServerProcess.once('exit', resolve)),
-      delay(3000),
-    ])
-  }
-
-  if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGKILL')
-  }
-
-  devServerProcess = null
 }
 
 async function waitForServer(url, role) {
@@ -1470,12 +1426,6 @@ function resolveOptionalPreflightReportPath(tokens) {
   return resolved
 }
 
-async function writeJSONReport(filePath, payload) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.writeFile(`${filePath}.tmp`, `${JSON.stringify(payload, null, 2)}\n`)
-  await fs.rename(`${filePath}.tmp`, filePath)
-}
-
 async function runCli() {
   if (printInputTemplate) {
     console.log(JSON.stringify(buildInputTemplate(), null, 2))
@@ -1483,7 +1433,7 @@ async function runCli() {
   }
   if (preflightReportPath) {
     const report = await buildPreflightReport()
-    await writeJSONReport(preflightReportPath, report)
+    await writeBrowserSmokeJsonReport(preflightReportPath, report)
     console.log(
       `[mobile-auth-login-route-smoke] preflight written: ${path.relative(repoRoot, preflightReportPath)}`
     )

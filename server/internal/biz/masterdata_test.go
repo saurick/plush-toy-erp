@@ -393,6 +393,13 @@ func TestMasterDataUsecaseProductSKUGuardsProductAndUnit(t *testing.T) {
 	}
 	uc := NewMasterDataUsecase(repo)
 
+	for _, invalidUnit := range []int{0, -1} {
+		_, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7, SKUCode: "SKU-UNIT", DefaultUnitID: &invalidUnit})
+		if !errors.Is(err, ErrBadParam) || repo.createdSKU != nil {
+			t.Fatalf("explicit unit %d must be rejected before creating a SKU: %v", invalidUnit, err)
+		}
+	}
+
 	sku, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{
 		ProductID:      7,
 		SKUCode:        " SKU-RED-S ",

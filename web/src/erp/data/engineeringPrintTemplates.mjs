@@ -446,7 +446,7 @@ function normalizeWorkInstructionBodyRow(row = {}, index = 0) {
   }
 }
 
-function renumberWorkInstructionBodyRows(rows = []) {
+export function renumberWorkInstructionBodyRows(rows = []) {
   let stepNo = 1
   return rows.map((row) => {
     const type = normalizeWorkInstructionRowType(row?.type)

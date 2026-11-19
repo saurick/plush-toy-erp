@@ -62,14 +62,42 @@ async function loadWorkflowApi(call) {
       'const isWorkflowApprovalTask = globalThis.__workflowApiTestIsApprovalTask'
     )
   const resolved = transformed
-    .replace('../utils/workflowTaskListFilters.mjs', new URL('../utils/workflowTaskListFilters.mjs', import.meta.url).href)
-    .replace('../utils/workflowTaskCalendar.mjs', new URL('../utils/workflowTaskCalendar.mjs', import.meta.url).href)
-    .replace('../utils/businessStatusCounts.mjs', new URL('../utils/businessStatusCounts.mjs', import.meta.url).href)
-    .replace('../utils/workflowTaskDiscovery.mjs', new URL('../utils/workflowTaskDiscovery.mjs', import.meta.url).href)
-    .replace('../utils/workflowRoleTaskHistory.mjs', new URL('../utils/workflowRoleTaskHistory.mjs', import.meta.url).href)
-    .replace('../utils/workflowTracking.mjs', new URL('../utils/workflowTracking.mjs', import.meta.url).href)
-    .replace('../utils/workflowFollowup.mjs', new URL('../utils/workflowFollowup.mjs', import.meta.url).href)
-    .replace('../utils/workflowTaskChanges.mjs', new URL('../utils/workflowTaskChanges.mjs', import.meta.url).href)
+    .replace(
+      '../utils/workflowTaskListFilters.mjs',
+      new URL('../utils/workflowTaskListFilters.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/workflowTaskCalendar.mjs',
+      new URL('../utils/workflowTaskCalendar.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/businessStatusCounts.mjs',
+      new URL('../utils/businessStatusCounts.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/workflowTaskDiscovery.mjs',
+      new URL('../utils/workflowTaskDiscovery.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/workflowRoleTaskHistory.mjs',
+      new URL('../utils/workflowRoleTaskHistory.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/workflowTracking.mjs',
+      new URL('../utils/workflowTracking.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/workflowFollowup.mjs',
+      new URL('../utils/workflowFollowup.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/workflowTaskChanges.mjs',
+      new URL('../utils/workflowTaskChanges.mjs', import.meta.url).href
+    )
+    .replace(
+      '../utils/workflowApiContract.mjs',
+      new URL('../utils/workflowApiContract.mjs', import.meta.url).href
+    )
   const encoded = Buffer.from(resolved).toString('base64')
   return import(`data:text/javascript;base64,${encoded}#${Date.now()}`)
 }
@@ -93,7 +121,18 @@ function validTask(overrides = {}) {
 test('workflowApi: shared links preserve task identity, paging and cancellation without claiming an action', async () => {
   const calls = []
   const { signal } = new AbortController()
-  const data = { items: [{ id: 42, task_name: '工程资料', owner_role_key: 'engineering', task_status_key: 'ready', can_handle: true }], truncated: false }
+  const data = {
+    items: [
+      {
+        id: 42,
+        task_name: '工程资料',
+        owner_role_key: 'engineering',
+        task_status_key: 'ready',
+        can_handle: true,
+      },
+    ],
+    truncated: false,
+  }
   const api = await loadWorkflowApi(async (method, params, options) => {
     calls.push({ method, params, options })
     return { data }
@@ -102,20 +141,41 @@ test('workflowApi: shared links preserve task identity, paging and cancellation 
   assert.equal(await api.getWorkflowTaskLink(41, { offset: 100, signal }), data)
   assert.deepEqual(calls, [
     { method: 'get_task_link', params: { task_id: 41 }, options: { signal } },
-    { method: 'get_task_link', params: { task_id: 41, offset: 100 }, options: { signal } },
+    {
+      method: 'get_task_link',
+      params: { task_id: 41, offset: 100 },
+      options: { signal },
+    },
   ])
-  for (const id of [0, -1, 1.5, '41', Number.MAX_SAFE_INTEGER + 1]) await assert.rejects(api.getWorkflowTaskLink(id), /任务链接无效/u)
-  await assert.rejects(api.getWorkflowTaskLink(41, { offset: -1 }), /任务链接无效/u)
+  for (const id of [0, -1, 1.5, '41', Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(api.getWorkflowTaskLink(id), /任务链接无效/u)
+  }
+  await assert.rejects(
+    api.getWorkflowTaskLink(41, { offset: -1 }),
+    /任务链接无效/u
+  )
   assert.equal(calls.length, 2)
 })
 
 test('workflowApi: incomplete or contradictory shared task access fails closed', async () => {
-  const task = { id: 42, task_name: '工程资料', owner_role_key: 'engineering', task_status_key: 'ready', can_handle: true }
+  const task = {
+    id: 42,
+    task_name: '工程资料',
+    owner_role_key: 'engineering',
+    task_status_key: 'ready',
+    can_handle: true,
+  }
   let data
   const api = await loadWorkflowApi(async () => ({ data }))
-  for (const invalid of [null, { items: [task] }, { items: [], truncated: false }, { items: [task], truncated: true },
-    { items: [task, task], truncated: false }, { items: [{ ...task, can_handle: undefined }], truncated: false },
-    { items: [{ ...task, task_status_key: 'done' }], truncated: false }]) {
+  for (const invalid of [
+    null,
+    { items: [task] },
+    { items: [], truncated: false },
+    { items: [task], truncated: true },
+    { items: [task, task], truncated: false },
+    { items: [{ ...task, can_handle: undefined }], truncated: false },
+    { items: [{ ...task, task_status_key: 'done' }], truncated: false },
+  ]) {
     data = invalid
     await assert.rejects(api.getWorkflowTaskLink(41))
   }
@@ -130,26 +190,47 @@ test('workflowApi: calendar reads preserve scope, cancellation and complete date
     assert.equal(method, params.role_key ? 'list_role_tasks' : 'get_task_board')
     assert.equal(options.signal, signal)
     assert.equal(params.keyword, '待跟进')
-    return { data: { calendar: {
-      month: params.calendar_month,
-      selection: params.calendar_selection,
-      days: {},
-      overdue: 0,
-      undated: 1,
-      total: 1,
-      limit: 30,
-      offset: 0,
-      snapshot_at: 1791900000,
-      revision: 'a'.repeat(64),
-      items: incomplete ? [] : [validTask({ task_status_key: 'ready', due_at: null })],
-    } } }
+    return {
+      data: {
+        calendar: {
+          month: params.calendar_month,
+          selection: params.calendar_selection,
+          days: {},
+          overdue: 0,
+          undated: 1,
+          total: 1,
+          limit: 30,
+          offset: 0,
+          snapshot_at: 1791900000,
+          revision: 'a'.repeat(64),
+          items: incomplete
+            ? []
+            : [validTask({ task_status_key: 'ready', due_at: null })],
+        },
+      },
+    }
   })
-  const params = { calendar_month: '2026-10', calendar_selection: 'undated', limit: 30, keyword: '待跟进' }
-  for (const scope of [{ todo_only: true }, { view_key: 'todo', role_key: 'sales' }]) {
-    assert.equal((await api.getWorkflowTaskCalendar({ ...params, ...scope }, { signal })).items[0].id, 42)
+  const params = {
+    calendar_month: '2026-10',
+    calendar_selection: 'undated',
+    limit: 30,
+    keyword: '待跟进',
+  }
+  for (const scope of [
+    { todo_only: true },
+    { view_key: 'todo', role_key: 'sales' },
+  ]) {
+    assert.equal(
+      (await api.getWorkflowTaskCalendar({ ...params, ...scope }, { signal }))
+        .items[0].id,
+      42
+    )
   }
   incomplete = true
-  await assert.rejects(api.getWorkflowTaskCalendar({ ...params, todo_only: true }, { signal }), { isInvalidResponse: true })
+  await assert.rejects(
+    api.getWorkflowTaskCalendar({ ...params, todo_only: true }, { signal }),
+    { isInvalidResponse: true }
+  )
 })
 
 test('workflowApi: tracking reads preserve cancellation and reject mismatched receipts', async () => {
@@ -159,39 +240,118 @@ test('workflowApi: tracking reads preserve cancellation and reject mismatched re
     assert.equal(options.signal, signal)
     if (method === 'list_tracking') {
       assert.equal(params.scope, 'started')
-      return { data: { items: [], total: 0, status_counts: {}, limit: 20, offset: 0 } }
+      return {
+        data: { items: [], total: 0, status_counts: {}, limit: 20, offset: 0 },
+      }
     }
     assert.equal(method, 'get_tracking')
     const now = 1791367200
-    return { data: { tracking: {
-      summary: { kind: 'process', id: wrongID ? 11 : 10, process_key: 'sales_order_acceptance', title: '', source_type: 'sales_order', source_id: 1, source_no: 'SO-TRACK', display_context: null, status: 'completed', resolution_kind: 'succeeded', started_at: now, updated_at: now, completed_at: now, initiator_name: '业务', initiator_role_key: 'sales', current_tasks: [] },
-      tasks: [],
-      current_task_access: [],
-      nodes: [],
-      events: [],
-      events_truncated: false,
-      next_event_id: 0,
-    } } }
+    return {
+      data: {
+        tracking: {
+          summary: {
+            kind: 'process',
+            id: wrongID ? 11 : 10,
+            process_key: 'sales_order_acceptance',
+            title: '',
+            source_type: 'sales_order',
+            source_id: 1,
+            source_no: 'SO-TRACK',
+            display_context: null,
+            status: 'completed',
+            resolution_kind: 'succeeded',
+            started_at: now,
+            updated_at: now,
+            completed_at: now,
+            initiator_name: '业务',
+            initiator_role_key: 'sales',
+            current_tasks: [],
+          },
+          tasks: [],
+          current_task_access: [],
+          nodes: [],
+          events: [],
+          events_truncated: false,
+          next_event_id: 0,
+        },
+      },
+    }
   })
-  assert.deepEqual(await api.listWorkflowTracking({ scope: 'started' }, { signal }), { items: [], total: 0, status_counts: {}, limit: 20, offset: 0 })
-  assert.equal((await api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal })).summary.id, 10)
+  assert.deepEqual(
+    await api.listWorkflowTracking({ scope: 'started' }, { signal }),
+    { items: [], total: 0, status_counts: {}, limit: 20, offset: 0 }
+  )
+  assert.equal(
+    (await api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal }))
+      .summary.id,
+    10
+  )
   wrongID = true
-  await assert.rejects(api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal }), { isInvalidResponse: true })
+  await assert.rejects(
+    api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal }),
+    { isInvalidResponse: true }
+  )
 })
 
 test('workflowApi: 单据发起使用受控接口并校验来源和完整回执', async () => {
-  const params = { source_type: 'sales_order', source_id: 42, task_name: '核实交期', description: '请反馈交期', owner_role_key: 'sales', assignee_id: null, due_at: 1_900_000_000, priority: 0, idempotency_key: 'followup:api' }
+  const params = {
+    source_type: 'sales_order',
+    source_id: 42,
+    task_name: '核实交期',
+    description: '请反馈交期',
+    owner_role_key: 'sales',
+    assignee_id: null,
+    due_at: 1_900_000_000,
+    priority: 0,
+    idempotency_key: 'followup:api',
+  }
   const calls = []
   const api = await loadWorkflowApi(async (method, sent) => {
     calls.push(method)
-    if (method === 'get_task_create_options') return { data: { ...sent, source_no: 'SO-42', can_create: true, roles: [{ role_key: 'sales', label: '销售', assignees: [{ admin_id: 7, display_name: '销售员' }] }] } }
+    if (method === 'get_task_create_options') {
+      return {
+        data: {
+          ...sent,
+          source_no: 'SO-42',
+          can_create: true,
+          roles: [
+            {
+              role_key: 'sales',
+              label: '销售',
+              assignees: [{ admin_id: 7, display_name: '销售员' }],
+            },
+          ],
+        },
+      }
+    }
     assert.equal(method, 'create_followup_task')
     assert.deepEqual(sent, params)
-    return { data: { task: { ...params, id: 99, version: 1, task_group: 'business_followup', task_status_key: 'ready', payload: { description: params.description } } } }
+    return {
+      data: {
+        task: {
+          ...params,
+          id: 99,
+          version: 1,
+          task_group: 'business_followup',
+          task_status_key: 'ready',
+          payload: { description: params.description },
+        },
+      },
+    }
   })
-  assert.equal((await api.getWorkflowTaskCreateOptions({ source_type: 'sales_order', source_id: 42 })).source_no, 'SO-42')
+  assert.equal(
+    (
+      await api.getWorkflowTaskCreateOptions({
+        source_type: 'sales_order',
+        source_id: 42,
+      })
+    ).source_no,
+    'SO-42'
+  )
   assert.equal((await api.createWorkflowFollowupTask(params)).id, 99)
-  await assert.rejects(api.createWorkflowFollowupTask({ ...params, source_no: 'FORGED' }))
+  await assert.rejects(
+    api.createWorkflowFollowupTask({ ...params, source_no: 'FORGED' })
+  )
   assert.deepEqual(calls, ['get_task_create_options', 'create_followup_task'])
 })
 
@@ -245,16 +405,41 @@ test('workflowApi: 已办处理结果与日期完整传递，非法或跨视图�
   const calls = []
   const api = await loadWorkflowApi(async (method, params) => {
     calls.push(params)
-    return { data: { items: [validTask()], has_more: false, next_cursor: '', server_time: 1_800_000_000, counts: roleTaskCounts({ done: 1 }), status_counts: { done: 1 }, risk_scope: 'role' } }
+    return {
+      data: {
+        items: [validTask()],
+        has_more: false,
+        next_cursor: '',
+        server_time: 1_800_000_000,
+        counts: roleTaskCounts({ done: 1 }),
+        status_counts: { done: 1 },
+        risk_scope: 'role',
+      },
+    }
   })
-  const query = { view_key: 'history', role_key: 'sales', limit: 50, sort_key: 'completed', status_key: 'done', period: 'custom', date_from: '2026-10-01', date_to: '2026-10-12' }
+  const query = {
+    view_key: 'history',
+    role_key: 'sales',
+    limit: 50,
+    sort_key: 'completed',
+    status_key: 'done',
+    period: 'custom',
+    date_from: '2026-10-01',
+    date_to: '2026-10-12',
+  }
   await api.listWorkflowRoleTasks(query)
   assert.deepEqual(calls, [query])
   for (const invalid of [
-    { ...query, status_key: 'ready' }, { ...query, sort_key: 'newest' }, { ...query, period: '7d' },
-    { ...query, date_to: '2026-09-30' }, { ...query, date_from: '2026-02-30' }, { ...query, period: null },
+    { ...query, status_key: 'ready' },
+    { ...query, sort_key: 'newest' },
+    { ...query, period: '7d' },
+    { ...query, date_to: '2026-09-30' },
+    { ...query, date_from: '2026-02-30' },
+    { ...query, period: null },
     { view_key: 'todo', role_key: 'sales', limit: 50, period: 'today' },
-  ]) await assert.rejects(api.listWorkflowRoleTasks(invalid), /任务查询条件有误/)
+  ]) {
+    await assert.rejects(api.listWorkflowRoleTasks(invalid), /任务查询条件有误/)
+  }
   assert.equal(calls.length, 1)
 })
 
@@ -262,16 +447,49 @@ test('workflowApi: 截止和来源筛选通过真实 API 包装传递，非法�
   const calls = []
   const api = await loadWorkflowApi(async (method, params) => {
     calls.push({ method, params })
-    return { data: { items: [validTask({ task_status_key: 'ready' })], has_more: false, next_cursor: '', server_time: 1_800_000_000, ...(method === 'list_role_tasks' ? { counts: roleTaskCounts({ ready: 1 }), status_counts: { ready: 1 }, risk_scope: 'role' } : {}) } }
+    return {
+      data: {
+        items: [validTask({ task_status_key: 'ready' })],
+        has_more: false,
+        next_cursor: '',
+        server_time: 1_800_000_000,
+        ...(method === 'list_role_tasks'
+          ? {
+              counts: roleTaskCounts({ ready: 1 }),
+              status_counts: { ready: 1 },
+              risk_scope: 'role',
+            }
+          : {}),
+      },
+    }
   })
-  const query = { view_key: 'todo', role_key: 'sales', limit: 50, due: 'noDue', source_type: 'sales_order' }
-  for (const read of [api.listWorkflowRoleTasks, api.listWorkflowWorkbenchRoleTasks]) {
+  const query = {
+    view_key: 'todo',
+    role_key: 'sales',
+    limit: 50,
+    due: 'noDue',
+    source_type: 'sales_order',
+  }
+  for (const read of [
+    api.listWorkflowRoleTasks,
+    api.listWorkflowWorkbenchRoleTasks,
+  ]) {
     await read(query)
-    for (const patch of [{ due: 'unknown' }, { due: null }, { source_type: '' }, { source_type: ' padded ' }, { source_type: '源'.repeat(65) }, { source_type: 1 }]) {
+    for (const patch of [
+      { due: 'unknown' },
+      { due: null },
+      { source_type: '' },
+      { source_type: ' padded ' },
+      { source_type: '源'.repeat(65) },
+      { source_type: 1 },
+    ]) {
       await assert.rejects(read({ ...query, ...patch }), /任务查询条件有误/)
     }
   }
-  assert.deepEqual(calls.map(({ params }) => params), [query, query])
+  assert.deepEqual(
+    calls.map(({ params }) => params),
+    [query, query]
+  )
 })
 
 function validProcessContext(overrides = {}) {
@@ -393,20 +611,49 @@ test('workflowApi: task events require an explicit bounded projection', async ()
 
 test('workflowApi: flow scope validates the originating task and bounded cursor', async () => {
   const calls = []
-  const task = { id: 43, task_name: '老板用料审核', task_group: 'engineering_material_boss_review', owner_role_key: 'boss' }
+  const task = {
+    id: 43,
+    task_name: '老板用料审核',
+    task_group: 'engineering_material_boss_review',
+    owner_role_key: 'boss',
+  }
   const items = [{ id: 7, task_id: 43, event_type: 'status_changed', task }]
   const api = await loadWorkflowApi(async (method, params, options) => {
     calls.push({ method, params, signal: options?.signal })
     return { data: { items, truncated: false } }
   })
   const controller = new AbortController()
-  assert.deepEqual(await api.listWorkflowTaskEvents(42, { scope: 'flow', beforeEventId: 8, signal: controller.signal }), { items, truncated: false })
-  assert.deepEqual(calls[0].params, { task_id: 42, limit: 100, scope: 'flow', before_event_id: 8 })
+  assert.deepEqual(
+    await api.listWorkflowTaskEvents(42, {
+      scope: 'flow',
+      beforeEventId: 8,
+      signal: controller.signal,
+    }),
+    { items, truncated: false }
+  )
+  assert.deepEqual(calls[0].params, {
+    task_id: 42,
+    limit: 100,
+    scope: 'flow',
+    before_event_id: 8,
+  })
   assert.equal(calls[0].signal === controller.signal, true)
-  await assert.rejects(api.listWorkflowTaskEvents(42, { scope: 'order' }), /任务轨迹参数无效/u)
-  for (const taskContext of [undefined, { ...task, id: 44 }, { ...task, task_name: '' }]) {
-    const invalid = await loadWorkflowApi(async () => ({ data: { items: [{ ...items[0], task: taskContext }], truncated: false } }))
-    await assert.rejects(invalid.listWorkflowTaskEvents(42, { scope: 'flow' }), /流程处理记录返回格式无效/u)
+  await assert.rejects(
+    api.listWorkflowTaskEvents(42, { scope: 'order' }),
+    /任务轨迹参数无效/u
+  )
+  for (const taskContext of [
+    undefined,
+    { ...task, id: 44 },
+    { ...task, task_name: '' },
+  ]) {
+    const invalid = await loadWorkflowApi(async () => ({
+      data: { items: [{ ...items[0], task: taskContext }], truncated: false },
+    }))
+    await assert.rejects(
+      invalid.listWorkflowTaskEvents(42, { scope: 'flow' }),
+      /流程处理记录返回格式无效/u
+    )
   }
 })
 
@@ -561,7 +808,12 @@ test('workflowApi: workbench uses one bounded queue projection and forwards canc
     calls.push({ method, params, options })
     return { data: response }
   })
-  const params = { queue_key: 'actionable', sort: 'time_desc', limit: 100, offset: 0 }
+  const params = {
+    queue_key: 'actionable',
+    sort: 'time_desc',
+    limit: 100,
+    offset: 0,
+  }
   const controller = new AbortController()
 
   assert.equal(
@@ -1454,10 +1706,12 @@ test('workflow task callers own a frozen user-intent attempt store', () => {
 })
 
 test('workflow task request IDs stay cryptographically strong on non-secure HTTP targets', () => {
-  const source = read('../utils/workflowTaskMutation.mjs')
-  assert.match(source, /cryptoProvider\?\.randomUUID/u)
-  assert.match(source, /cryptoProvider\?\.getRandomValues/u)
-  assert.doesNotMatch(source, /Math\.random/u)
+  const mutationSource = read('../utils/workflowTaskMutation.mjs')
+  const secureSource = read('../utils/mutationAttempt.mjs')
+  assert.match(mutationSource, /secureMutationUUID/u)
+  assert.match(secureSource, /cryptoProvider\?\.randomUUID/u)
+  assert.match(secureSource, /cryptoProvider\?\.getRandomValues/u)
+  assert.doesNotMatch(secureSource, /Math\.random/u)
 })
 
 test('workflow browser and simulated closure fixtures submit idempotency keys', () => {
@@ -1505,16 +1759,30 @@ test('workflowApi: only validated mutation receipts invalidate menu counts', asy
   const target = new EventTarget()
   globalThis.window = target
   let changed = 0
-  target.addEventListener('erp-workflow-tasks-changed', () => { changed += 1 })
+  target.addEventListener('erp-workflow-tasks-changed', () => {
+    changed += 1
+  })
   try {
     let task = { id: 42, version: 8, task_status_key: 'done' }
     const api = await loadWorkflowApi(async () => ({ data: { task } }))
-    const params = { task_id: 42, expected_version: 7, idempotency_key: 'navigation-count-confirmed', action_key: 'complete' }
+    const params = {
+      task_id: 42,
+      expected_version: 7,
+      idempotency_key: 'navigation-count-confirmed',
+      action_key: 'complete',
+    }
     await api.completeWorkflowTaskAction(params)
     assert.equal(changed, 1)
     task = { ...task, version: 7 }
-    await assert.rejects(() => api.completeWorkflowTaskAction(params), /暂时无法确认/)
-    assert.equal(changed, 1, 'an unconfirmed receipt cannot change the displayed workload')
+    await assert.rejects(
+      () => api.completeWorkflowTaskAction(params),
+      /暂时无法确认/
+    )
+    assert.equal(
+      changed,
+      1,
+      'an unconfirmed receipt cannot change the displayed workload'
+    )
   } finally {
     if (previousWindow === undefined) delete globalThis.window
     else globalThis.window = previousWindow
@@ -1525,7 +1793,19 @@ test('task handling chain defaults to task scope and keeps order scope explicit'
   const calls = []
   const api = await loadWorkflowApi(async (method, params, options) => {
     calls.push({ method, params, options })
-    return { data: { truncated: false, items: [{ id: 41, task_name: '返工复检', task_status_key: 'blocked', owner_role_key: 'quality' }] } }
+    return {
+      data: {
+        truncated: false,
+        items: [
+          {
+            id: 41,
+            task_name: '返工复检',
+            task_status_key: 'blocked',
+            owner_role_key: 'quality',
+          },
+        ],
+      },
+    }
   })
   const controller = new AbortController()
   await api.getWorkflowTaskHandlingChain(41, { signal: controller.signal })
@@ -1533,7 +1813,12 @@ test('task handling chain defaults to task scope and keeps order scope explicit'
   assert.equal(calls[0].options.signal, controller.signal)
   await api.getWorkflowTaskHandlingChain(41, { view: 'order' })
   assert.deepEqual(calls[1].params, { task_id: 41, view: 'order' })
-  for (const view of ['', 'all', null, true]) await assert.rejects(api.getWorkflowTaskHandlingChain(41, { view }), /范围无效/u)
+  for (const view of ['', 'all', null, true]) {
+    await assert.rejects(
+      api.getWorkflowTaskHandlingChain(41, { view }),
+      /范围无效/u
+    )
+  }
   assert.equal(calls.length, 2)
 })
 
@@ -1544,14 +1829,35 @@ test('workflowApi: older event cursors are bounded, ordered and never sent as re
     calls.push({ method, params, options })
     return { data: { items: [{ id: 9 }, { id: 8 }], truncated: false } }
   })
-  await api.listWorkflowTaskEvents(42, { limit: 2, beforeEventId: 10, signal: controller.signal })
-  assert.deepEqual(calls[0].params, { task_id: 42, limit: 2, before_event_id: 10 })
+  await api.listWorkflowTaskEvents(42, {
+    limit: 2,
+    beforeEventId: 10,
+    signal: controller.signal,
+  })
+  assert.deepEqual(calls[0].params, {
+    task_id: 42,
+    limit: 2,
+    before_event_id: 10,
+  })
   assert.equal(calls[0].options.signal, controller.signal)
   for (const beforeEventId of [-1, 1.5, 'invalid']) {
-    await assert.rejects(api.listWorkflowTaskEvents(42, { beforeEventId }), /任务轨迹参数无效/u)
+    await assert.rejects(
+      api.listWorkflowTaskEvents(42, { beforeEventId }),
+      /任务轨迹参数无效/u
+    )
   }
-  for (const items of [[{ id: 10 }], [{ id: 9 }, { id: 9 }], [{ id: 8 }, { id: 9 }], [{ id: 0 }]]) {
-    const malformed = await loadWorkflowApi(async () => ({ data: { items, truncated: false } }))
-    await assert.rejects(malformed.listWorkflowTaskEvents(42, { beforeEventId: 10 }), /返回格式无效/u)
+  for (const items of [
+    [{ id: 10 }],
+    [{ id: 9 }, { id: 9 }],
+    [{ id: 8 }, { id: 9 }],
+    [{ id: 0 }],
+  ]) {
+    const malformed = await loadWorkflowApi(async () => ({
+      data: { items, truncated: false },
+    }))
+    await assert.rejects(
+      malformed.listWorkflowTaskEvents(42, { beforeEventId: 10 }),
+      /返回格式无效/u
+    )
   }
 })

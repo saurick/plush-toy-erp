@@ -9,6 +9,7 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import {
@@ -30,12 +31,6 @@ import {
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
-
-function localDateTimeValue() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
-}
 
 function readableText(values = [], fallback = '-') {
   const text = values
@@ -145,7 +140,7 @@ export default function OutsourcingOrderSourceFactModal({
       )
         ? quantitySummary.remaining
         : ''),
-    occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+    occurred_at: initialValues?.occurred_at || formatLocalDateTimeInputValue(),
     note: initialValues?.note || '',
   }
   useEffect(() => {

@@ -15,8 +15,7 @@ async function assertDocumentFilterLayout(page, filters, assert, change) {
   await waitForFiniteAnimations(page)
   const monitor = await filters.evaluateHandle((panel) => {
     const nodes = [
-      panel,
-      ...panel.querySelectorAll('[role="tab"], [role="tabpanel"], [aria-label="任务排序"], [aria-label="负责岗位"], footer button'),
+      ...panel.querySelectorAll('[role="tab"]'),
       document.querySelector('.erp-task-board-filters [aria-haspopup="dialog"]'),
       document.querySelector('.erp-task-board-filters .erp-business-operation-panel__search'),
     ]
@@ -45,7 +44,7 @@ async function assertDocumentFilterLayout(page, filters, assert, change) {
     movement = await monitor.evaluate((stop) => stop())
     await monitor.dispose()
   }
-  assert.equal(movement, undefined, `单据筛选切换期间控件应留在原位：${JSON.stringify(movement)}`)
+  assert.equal(movement, undefined, `单据筛选切换期间模块页签和工具栏应留在原位：${JSON.stringify(movement)}`)
 }
 
 async function assertNarrowScreenAccountAccess(page) {
@@ -2393,6 +2392,16 @@ export function createDashboardTaskScenarios({
         const types = documents.getByRole('group', { name: '单据类型', exact: true })
         assert.equal(await modules.getByRole('tab').count(), 10)
         assert.equal(await types.getByRole('button').count(), 17)
+        const assertTypesFit = async () => {
+          const layout = await documents.getByRole('tabpanel').evaluate((panel) => ({
+            visibleHeight: panel.clientHeight,
+            contentHeight: panel.scrollHeight,
+            groupHeight: panel.querySelector('[role="group"]').offsetHeight,
+          }))
+          assert(Math.abs(layout.visibleHeight - layout.groupHeight) <= 1 && layout.contentHeight <= layout.visibleHeight + 1,
+            `单据类型应按实际行数展开：${JSON.stringify(layout)}`)
+        }
+        await assertTypesFit()
         const originalModules = await modules.elementHandle()
         const quality = modules.getByRole('tab', { name: '质检管理', exact: true })
         const production = modules.getByRole('tab', { name: '生产管理', exact: true })
@@ -2412,6 +2421,7 @@ export function createDashboardTaskScenarios({
             assert.equal(await modules.getByRole('tab').count(), 10)
             assert.equal(await quality.getAttribute('aria-selected'), 'true')
             assert.deepEqual(await types.getByRole('button').allTextContents(), ['不限', '质量检验记录'])
+            await assertTypesFit()
             assert.equal(await filters.getByRole('group', { name: '负责岗位', exact: true }).isVisible(), true)
           } finally {
             release()
@@ -2424,7 +2434,6 @@ export function createDashboardTaskScenarios({
           await page.getByText('当前范围暂无匹配任务', { exact: true }).waitFor()
           await reset.click()
           await result(16)
-          // The final choice in the full catalogue must remain reachable in the scrollable list.
           const lastType = types.getByRole('button').last()
           const name = await lastType.textContent()
           await lastType.click()
@@ -2458,6 +2467,7 @@ export function createDashboardTaskScenarios({
           await assertDocumentFilterLayout(page, filters, assert, async () => {
             await reset.click()
             await result(16)
+            await assertTypesFit()
             await production.click()
             await result(5)
           })
@@ -2465,16 +2475,22 @@ export function createDashboardTaskScenarios({
         }
         await page.setViewportSize({ width: 1920, height: 1080 })
         await waitForFiniteAnimations(page)
-        await page.screenshot({ path: path.resolve(outputDir, 'erp-task-board-compact-document-types-dark.png') })
         await reset.click()
         await page.getByText('第 1-16 条 / 共 16 条', { exact: true }).waitFor()
         assert.equal(await types.getByRole('button').count(), 17)
+        await page.screenshot({ path: path.resolve(outputDir, 'erp-task-board-compact-document-types-dark.png') })
         const all = modules.getByRole('tab', { name: '全部模块', exact: true })
         await all.press('End')
         await modules.getByRole('tab', { name: '财务管理', selected: true }).waitFor()
         await page.keyboard.press('Home')
         await modules.getByRole('tab', { name: '全部模块', selected: true }).waitFor()
-        await filters.getByRole('button', { name: '收起', exact: true }).click()
+        await page.setViewportSize({ width: 1024, height: 600 })
+        await waitForFiniteAnimations(page)
+        await assertTypesFit()
+        const close = filters.getByRole('button', { name: '收起', exact: true })
+        await close.scrollIntoViewIfNeeded()
+        assert(await filters.evaluate((panel) => panel.scrollTop > 0), '矮窗口应能滚动筛选面板到达底部操作')
+        await close.click()
         assert.equal(await page.locator('.erp-task-board-filters [aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
         await originalModules.dispose()
       },

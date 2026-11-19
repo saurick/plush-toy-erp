@@ -109,6 +109,9 @@ export function createShipmentSourceCandidateAssertions(deps) {
       .getByText('PROD-STYLE-L1-01', { exact: false })
       .first()
       .waitFor({ state: 'visible' })
+    await failedPicker
+      .locator('.ant-alert-error')
+      .waitFor({ state: 'hidden', timeout: 10_000 })
     const searchInput = failedPicker.locator('.ant-input').first()
     await assertImportPickerGeometry(page, failedPicker, 'shipment-source-picker')
     const layout = await readImportPickerLayout(failedPicker)
@@ -943,6 +946,20 @@ id: body.id,
             assert.equal(summaryFits, true, '窄屏导入行数留在标题区内，不覆盖相邻区域')
             await assertImportUndoPlacement(editor, { narrow: true })
             await page.setViewportSize({ width: 1920, height: 1080 })
+
+            await weight.fill('1.7')
+            await importButton.click()
+            const existingSource = page.locator('.erp-source-import-picker-modal.ant-modal:visible').last()
+            await existingSource
+              .locator('.ant-table-row').first()
+              .locator('.ant-checkbox-wrapper').first()
+              .click()
+            await existingSource.locator('.erp-source-import-picker__footer-actions .ant-btn-primary').click()
+            await expectText(page, '所选销售订单来源行已在当前出货明细中')
+            await existingSource.getByRole('button', { name: '取消', exact: true }).click()
+            await existingSource.waitFor({ state: 'hidden' })
+            assert.equal(await weight.inputValue(), '1.7', '重复来源没有改变明细，保留刚填写的净重')
+            assert.equal(await shipmentLines.count(), 3)
           },
         })
         await verifyBusinessActionFormModal(page, {

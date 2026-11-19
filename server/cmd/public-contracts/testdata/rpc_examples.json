@@ -15445,6 +15445,7 @@
     },
     "message": "OK",
     "params": {
+      "color": null,
       "default_unit_id": null,
       "id": 1,
       "product_id": 1,
@@ -22711,7 +22712,9 @@
       "offset": 20,
       "sort": "time_asc",
       "todo_only": true,
-      "source_section": "production"
+      "source_section": "production",
+      "due_date_from": "2026-10-16",
+      "due_date_to": "2026-10-18"
     },
     "test": "TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage"
   },

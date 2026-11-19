@@ -10,7 +10,6 @@ const source = readFileSync(
 test('rework progress is derived from authoritative lineage and exact completion batches', () => {
   assert.match(source, /buildProductionReworkProgressItems/u)
   assert.match(source, /origin_rework_fact_id/u)
-  assert.match(source, /source_batch_id/u)
   assert.match(source, /production_wip_batch_id/u)
   assert.match(source, /FINISHED_GOODS_RECEIPT/u)
   assert.match(source, /acceptedPackagingQuantity/u)

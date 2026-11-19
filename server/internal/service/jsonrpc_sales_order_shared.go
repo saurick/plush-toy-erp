@@ -65,16 +65,28 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 	if !ok {
 		return nil, false
 	}
+	customerSnapshot, ok := getOptionalJSONRPCMap(pm, "customer_snapshot")
+	if !ok {
+		return nil, false
+	}
+	contactSnapshot, ok := getOptionalJSONRPCMap(pm, "contact_snapshot")
+	if !ok {
+		return nil, false
+	}
+	deliverySnapshot, ok := getOptionalJSONRPCMap(pm, "delivery_snapshot")
+	if !ok {
+		return nil, false
+	}
 	return &biz.SalesOrderMutation{
 		IdempotencyKey:      idempotencyKey,
 		OrderNo:             getString(pm, "order_no"),
 		CustomerID:          customerID,
 		Currency:            getString(pm, "currency"),
 		CustomerOrderNo:     getWorkflowStringPtr(pm, "customer_order_no"),
-		CustomerSnapshot:    getMap(pm, "customer_snapshot"),
+		CustomerSnapshot:    customerSnapshot,
 		SalesOwner:          getWorkflowStringPtr(pm, "sales_owner"),
-		ContactSnapshot:     getMap(pm, "contact_snapshot"),
-		DeliverySnapshot:    getMap(pm, "delivery_snapshot"),
+		ContactSnapshot:     contactSnapshot,
+		DeliverySnapshot:    deliverySnapshot,
 		PaymentMethod:       getWorkflowStringPtr(pm, "payment_method"),
 		PaymentTermDays:     paymentTermDays,
 		PriceConditionNote:  getWorkflowStringPtr(pm, "price_condition_note"),

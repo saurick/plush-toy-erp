@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertLineItemGroupHeaderInteraction } from './businessLineItemDisclosureAssertions.mjs'
 import { parseRgb } from './colorAssertions.mjs'
 import { assertVisibleRoundedInputWrapperClipping } from './inputControlAssertions.mjs'
@@ -261,7 +262,15 @@ export async function closeBusinessFormPage(page, editor) {
       button.textContent.trim() === '放弃修改' && button.getClientRects().length > 0
     ), root)
   if (await editor.isVisible()) {
-    await page.getByRole('button', { name: '放弃修改', exact: true }).click()
+    const confirmation = page
+      .locator('.ant-modal-confirm:visible')
+      .filter({ has: page.getByRole('button', { name: '放弃修改', exact: true }) })
+    await confirmation.waitFor({ state: 'visible' })
+    await waitForFiniteAnimations(page, { selector: '.ant-modal-confirm' })
+    await confirmation
+      .getByRole('button', { name: '放弃修改', exact: true })
+      .click()
+    await confirmation.waitFor({ state: 'hidden' })
   }
   await root.dispose()
   await editor.waitFor({ state: 'hidden' })

@@ -20,7 +20,6 @@ import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
-import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message, useModal } from '@/common/utils/antdApp'
@@ -31,52 +30,40 @@ import {
   previewApprovalSettings,
 } from '../api/approvalSettingsApi.mjs'
 import {
-  approvalSettingsMutationMayHaveSucceeded,
+  activateApprovalSettings,
   getApprovalSettingsBlockerLabel,
-  getApprovalSettingsBlockingItems,
-  verifyAppliedApprovalSettings,
 } from '../utils/approvalSettingsActivation.mjs'
 import {
   freezeApprovalSettingsPayload,
   nextApprovalSettingsRevision,
 } from '../utils/approvalSettingsDraft.mjs'
-import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
-import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
-
 import {
-  AMOUNT_APPROVAL_KEYS,
+  EDITOR_MEMBER_FIELDS,
+  STRATEGIES,
+  adminHasRole,
+  adminIsActive,
   approvalConditionSummary,
+  approvalEditorEligibilityNotice,
+  approvalSettingsNeedInitialization,
+  buildApprovalDisplayItems,
+  buildApprovalRoleOptions,
+  conflictingStrategy,
+  draftItemFromEditor,
+  draftSignature,
+  editorValuesForApproval,
+  memberLabel,
   normalizeApprovalCondition,
-} from '../utils/approvalCondition.mjs'
+  normalizeDraftItems,
+  roleOptionsForStrategy as calculateRoleOptionsForStrategy,
+  selectedUnavailableApprovalRoles,
+  strategyShortLabel,
+  usersForApprovalRole,
+} from '../utils/approvalResponsibilityModel.mjs'
+import { AMOUNT_APPROVAL_KEYS } from '../utils/approvalCondition.mjs'
 import { BUSINESS_CURRENCY_OPTIONS } from '../utils/businessCurrency.mjs'
 import BusinessForm from '../components/business-list/BusinessForm.jsx'
 
 const { Text, Title } = Typography
-
-const APPROVAL_KEYS = ['sales_order', 'purchase_order', 'shipment_finance']
-const STRATEGIES = [
-  {
-    key: 'primary',
-    shortLabel: '主办',
-    fieldLabel: '主要由谁审批',
-  },
-  {
-    key: 'backup',
-    shortLabel: '备用',
-    fieldLabel: '主办无人可处理时',
-  },
-  {
-    key: 'escalation',
-    shortLabel: '升级',
-    fieldLabel: '超时或需要升级时',
-  },
-]
-const APPROVAL_ROLE_KEYS = new Set(Object.keys(ROLE_DISPLAY_NAMES))
-const EDITOR_MEMBER_FIELDS = STRATEGIES.flatMap(({ key }) => [
-  `${key}_role`,
-  `${key}_mode`,
-  `${key}_user`,
-])
 
 const APPROVAL_SETTINGS_RESULT_MESSAGE_KEY = 'approval-settings-result'
 
@@ -109,142 +96,6 @@ function notifyApprovalSettingsConfirmation(content) {
   })
 }
 
-function roleKeyOf(role = {}) {
-  return String(role.role_key || role.key || '').trim()
-}
-
-function adminRoleKeys(admin = {}) {
-  return Array.from(
-    new Set(
-      (Array.isArray(admin.roles) ? admin.roles : [])
-        .map(roleKeyOf)
-        .filter(Boolean)
-    )
-  )
-}
-
-function adminIsActive(admin = {}) {
-  const status = String(admin.account_status || '').trim()
-  return (
-    admin.disabled !== true &&
-    admin.revoked !== true &&
-    !admin.revoked_at &&
-    (!status || status === 'active')
-  )
-}
-
-function adminHasRole(admin = {}, roleKey = '') {
-  return adminRoleKeys(admin).includes(String(roleKey || '').trim())
-}
-
-function strategyShortLabel(strategyKey) {
-  return (
-    STRATEGIES.find((strategy) => strategy.key === strategyKey)?.shortLabel ||
-    '其他'
-  )
-}
-
-function responsibilityIdentity(values = {}, strategyKey = '') {
-  const roleKey = String(values[`${strategyKey}_role`] || '').trim()
-  if (!roleKey) return ''
-  if (values[`${strategyKey}_mode`] === 'user') {
-    const userID = Number(values[`${strategyKey}_user`] || 0)
-    return userID > 0 ? `${roleKey}:${userID}` : ''
-  }
-  return `${roleKey}:0`
-}
-
-function conflictingStrategy(values = {}, strategyKey = '', identity = '') {
-  if (!identity) return ''
-  return (
-    STRATEGIES.find(
-      ({ key }) =>
-        key !== strategyKey && responsibilityIdentity(values, key) === identity
-    )?.key || ''
-  )
-}
-
-function defaultMembers(approvalKey) {
-  const primaryRole = {
-    sales_order: 'sales',
-    purchase_order: 'purchase',
-    shipment_finance: 'finance',
-  }[approvalKey]
-  return [
-    {
-      role_key: primaryRole,
-      user_id: 0,
-      strategy: 'primary',
-      enabled: true,
-    },
-    {
-      role_key: 'boss',
-      user_id: 0,
-      strategy: 'escalation',
-      enabled: true,
-    },
-  ].filter((member) => member.role_key)
-}
-
-function normalizeDraftItems(
-  items = [],
-  { initializeUnconfigured = true } = {}
-) {
-  return APPROVAL_KEYS.map((approvalKey) => {
-    const item = (Array.isArray(items) ? items : []).find(
-      (candidate) =>
-        candidate?.configurable === true &&
-        candidate.approval_key === approvalKey
-    )
-    const configured = item?.configured === true
-    const shouldInitialize = !configured && initializeUnconfigured
-    return {
-      approval_key: approvalKey,
-      condition: normalizeApprovalCondition(approvalKey, item?.condition),
-      configured,
-      enabled: shouldInitialize ? true : item?.enabled === true,
-      members:
-        Array.isArray(item?.members) && item.members.length > 0
-          ? item.members.map((member) => ({
-              role_key: String(member.role_key || '').trim(),
-              user_id: Number(member.user_id || 0),
-              strategy: String(member.strategy || '').trim(),
-              enabled: member.enabled !== false,
-            }))
-          : shouldInitialize
-            ? defaultMembers(approvalKey)
-            : [],
-    }
-  })
-}
-
-function draftSignature(items = []) {
-  return JSON.stringify(
-    items.map((item) => ({
-      ...item,
-      configured: undefined,
-      members: [...item.members].sort((left, right) =>
-        `${left.strategy}:${left.role_key}:${left.user_id}`.localeCompare(
-          `${right.strategy}:${right.role_key}:${right.user_id}`
-        )
-      ),
-    }))
-  )
-}
-
-function memberLabel(member, adminByID) {
-  const strategy =
-    STRATEGIES.find((item) => item.key === member.strategy)?.shortLabel ||
-    '责任'
-  const role = getRoleDisplayName(member.role_key)
-  const admin = adminByID.get(Number(member.user_id || 0))
-  return `${strategy} · ${role}${
-    admin
-      ? ` · ${formatAdminIdentity(admin, { fallback: `员工 ${admin.id}` })}`
-      : ''
-  }`
-}
-
 export default function ApprovalResponsibilityPanel({
   active = false,
   admins = [],
@@ -263,7 +114,10 @@ export default function ApprovalResponsibilityPanel({
   const [loadError, setLoadError] = useState('')
   const [settings, setSettings] = useState(null)
   const tableCardRef = useRef(null)
-  const sticky = useBusinessListStickyHeader(tableCardRef, active && Boolean(settings))
+  const sticky = useBusinessListStickyHeader(
+    tableCardRef,
+    active && Boolean(settings)
+  )
   const [draftItems, setDraftItems] = useState([])
   const [revision, setRevision] = useState('')
   const [preview, setPreview] = useState(null)
@@ -339,10 +193,7 @@ export default function ApprovalResponsibilityPanel({
   )
   const draftDirty = Boolean(settings) && savedSignature !== currentSignature
   const settingsNeedInitialization = useMemo(
-    () =>
-      (settings?.items || []).some(
-        (item) => item?.configurable === true && item.configured !== true
-      ),
+    () => approvalSettingsNeedInitialization(settings),
     [settings]
   )
   const pageDirty =
@@ -364,72 +215,16 @@ export default function ApprovalResponsibilityPanel({
     [admins]
   )
 
-  const currentAdminRoleSet = useMemo(
-    () => new Set(adminRoleKeys(currentAdmin || {})),
-    [currentAdmin]
+  const roleOptions = useMemo(
+    () =>
+      buildApprovalRoleOptions({
+        admins,
+        currentAdmin,
+        draftItems,
+        roles,
+      }),
+    [admins, currentAdmin, draftItems, roles]
   )
-
-  const roleOptions = useMemo(() => {
-    const roleByKey = new Map(
-      roles
-        .map((role) => [roleKeyOf(role), role])
-        .filter(([key]) => key && !['admin', 'debug_operator'].includes(key))
-    )
-    const savedRoleKeys = new Set(
-      draftItems.flatMap((item) =>
-        (item.members || []).map((member) =>
-          String(member.role_key || '').trim()
-        )
-      )
-    )
-    savedRoleKeys.forEach((key) => {
-      if (key && !roleByKey.has(key)) {
-        roleByKey.set(key, { role_key: key, missing: true })
-      }
-    })
-
-    return Array.from(roleByKey.entries()).map(([key, role]) => {
-      const displayLabel = getRoleDisplayName(key)
-      const protectedOwnRole =
-        currentAdmin?.is_super_admin !== true && currentAdminRoleSet.has(key)
-      const activeEmployeeCount = admins.filter(
-        (admin) => adminIsActive(admin) && adminHasRole(admin, key)
-      ).length
-      let reason = ''
-      let validationMessage = ''
-      if (role.missing === true) {
-        reason = '岗位已不存在，请重新选择'
-        validationMessage = '当前岗位已不存在，请重新选择'
-      } else if (!APPROVAL_ROLE_KEYS.has(key)) {
-        reason = '不支持审批责任'
-        validationMessage = '当前岗位不支持审批责任，请重新选择'
-      } else if (role.disabled === true) {
-        reason = '岗位已停用'
-        validationMessage = '当前岗位已停用，请重新选择'
-      } else if (
-        !Array.isArray(role.permissions) ||
-        !role.permissions.includes(PermissionCode.WORKFLOW_TASK_APPROVE)
-      ) {
-        reason = '未开启审批功能'
-        validationMessage = '当前岗位未开启审批功能，请先在岗位设置中开启'
-      } else if (activeEmployeeCount === 0) {
-        reason = '暂无启用员工'
-        validationMessage = '当前岗位暂无启用员工，请先启用员工'
-      } else if (protectedOwnRole) {
-        reason = '不能配置本人岗位'
-        validationMessage = '不能通过审批责任配置本人岗位'
-      }
-      return {
-        value: key,
-        displayLabel,
-        label: reason ? `${displayLabel}（${reason}）` : displayLabel,
-        disabled: Boolean(reason),
-        eligible: !reason,
-        reason,
-        validationMessage,
-      }
-    })
-  }, [admins, currentAdmin, currentAdminRoleSet, draftItems, roles])
 
   const roleOptionByKey = useMemo(
     () => new Map(roleOptions.map((option) => [option.value, option])),
@@ -443,150 +238,48 @@ export default function ApprovalResponsibilityPanel({
 
   const roleOptionsForStrategy = useCallback(
     (strategyKey) =>
-      roleOptions.map((option) => {
-        if (option.disabled || editorValues[`${strategyKey}_mode`] === 'user') {
-          return option
-        }
-        const occupiedBy = conflictingStrategy(
-          editorValues,
-          strategyKey,
-          `${option.value}:0`
-        )
-        if (!occupiedBy) return option
-        return {
-          ...option,
-          label: `${option.displayLabel}（已用于${strategyShortLabel(
-            occupiedBy
-          )}责任）`,
-          disabled: true,
-        }
+      calculateRoleOptionsForStrategy({
+        roleOptions,
+        editorValues,
+        strategyKey,
       }),
     [editorValues, roleOptions]
   )
 
   const usersForRole = useCallback(
-    (roleKey, selectedUserID = 0, strategyKey = '') => {
-      const candidates = admins
-        .filter(
-          (admin) =>
-            adminHasRole(admin, roleKey) ||
-            Number(admin.id) === Number(selectedUserID)
-        )
-        .map((admin) => ({ ...admin, missing: false }))
-      if (
-        selectedUserID > 0 &&
-        !candidates.some((admin) => Number(admin.id) === Number(selectedUserID))
-      ) {
-        candidates.push({ id: selectedUserID, missing: true })
-      }
-      return candidates.map((admin) => {
-        const adminID = Number(admin.id)
-        const protectedSelf =
-          currentAdmin?.is_super_admin !== true &&
-          adminID === Number(currentAdmin?.id)
-        const occupiedBy = conflictingStrategy(
-          editorValues,
-          strategyKey,
-          `${roleKey}:${adminID}`
-        )
-        let reason = ''
-        if (admin.missing === true || admin.account_status === 'revoked') {
-          reason = '账号不存在或已离职'
-        } else if (!adminHasRole(admin, roleKey)) {
-          reason = '已不属于该岗位'
-        } else if (!adminIsActive(admin)) {
-          reason = '账号已停用'
-        } else if (protectedSelf) {
-          reason = '不能指定本人'
-        } else if (occupiedBy) {
-          reason = `已用于${strategyShortLabel(occupiedBy)}责任`
-        }
-        const displayLabel = formatAdminIdentity(admin, {
-          fallback: admin.phone || `员工 ${adminID}`,
-        })
-        return {
-          value: adminID,
-          label: reason ? `${displayLabel}（${reason}）` : displayLabel,
-          disabled: Boolean(reason),
-          reason,
-        }
-      })
-    },
+    (roleKey, selectedUserID = 0, strategyKey = '') =>
+      usersForApprovalRole({
+        admins,
+        currentAdmin,
+        editorValues,
+        roleKey,
+        selectedUserID,
+        strategyKey,
+      }),
     [admins, currentAdmin, editorValues]
   )
 
-  const displayItems = useMemo(() => {
-    const baseByKey = new Map(
-      (settings?.items || [])
-        .filter((item) => item?.configurable)
-        .map((item) => [item.approval_key, item])
-    )
-    const draftByKey = new Map(
-      draftItems.map((item) => [item.approval_key, item])
-    )
-    const previewByKey = new Map(
-      (preview?.items || []).map((item) => [item.approval_key, item])
-    )
-    return APPROVAL_KEYS.map((key) => ({
-      ...(baseByKey.get(key) || { approval_key: key, label: key }),
-      ...(draftByKey.get(key) || {}),
-      ...(previewByKey.get(key) || {}),
-      members:
-        previewByKey.get(key)?.members ||
-        draftByKey.get(key)?.members ||
-        baseByKey.get(key)?.members ||
-        [],
-    }))
-  }, [draftItems, preview, settings])
+  const displayItems = useMemo(
+    () => buildApprovalDisplayItems({ settings, draftItems, preview }),
+    [draftItems, preview, settings]
+  )
 
   const activeEditable = draftItems.find(
     (item) => item.approval_key === editingKey
   )
-  const selectedUnavailableRoles = useMemo(() => {
-    const seen = new Set()
-    return STRATEGIES.flatMap(({ key }) => {
-      const roleKey = String(editorValues[`${key}_role`] || '').trim()
-      const option = roleOptionByKey.get(roleKey)
-      if (!roleKey || !option?.disabled || seen.has(roleKey)) return []
-      seen.add(roleKey)
-      return [option]
-    })
-  }, [editorValues, roleOptionByKey])
+  const selectedUnavailableRoles = useMemo(
+    () => selectedUnavailableApprovalRoles({ editorValues, roleOptionByKey }),
+    [editorValues, roleOptionByKey]
+  )
 
-  const editorEligibilityNotice = useMemo(() => {
-    const onlyOption = selectableRoleOptions[0]
-    const availabilityCopy =
-      selectableRoleOptions.length === 0
-        ? '当前没有具备审批资格的岗位。请先在“岗位设置”中启用岗位、开启审批功能，并至少保留一名启用员工。'
-        : selectableRoleOptions.length === 1
-          ? `当前只有“${onlyOption.displayLabel}”具备审批资格。备用和升级可以留空；同一岗位的“岗位内任一员工”选项或同一指定员工不能重复设置，如需调整主办，请先清空与其重复的备用或升级责任。`
-          : ''
-    if (selectedUnavailableRoles.length > 0) {
-      return {
-        type: 'warning',
-        message: '当前设置包含不可用岗位',
-        description: `${selectedUnavailableRoles
-          .map(
-            (option) =>
-              `${option.displayLabel}：${option.reason || '当前不可用'}`
-          )
-          .join(
-            '；'
-          )}。${availabilityCopy || '请重新选择具备审批资格的岗位。'}`,
-      }
-    }
-    if (availabilityCopy) {
-      return {
-        type: selectableRoleOptions.length === 0 ? 'warning' : 'info',
-        message:
-          selectableRoleOptions.length === 0
-            ? '当前没有可承接岗位'
-            : '当前只有一个可承接岗位',
-        description: availabilityCopy,
-      }
-    }
-    return null
-  }, [selectableRoleOptions, selectedUnavailableRoles])
+  const editorEligibilityNotice = useMemo(
+    () =>
+      approvalEditorEligibilityNotice({
+        selectableRoleOptions,
+        selectedUnavailableRoles,
+      }),
+    [selectableRoleOptions, selectedUnavailableRoles]
+  )
 
   const openEditor = (item) => {
     if (!canManage) return
@@ -594,28 +287,7 @@ export default function ApprovalResponsibilityPanel({
       message.info('请先完成当前设置生效，或刷新后重新调整')
       return
     }
-    const draft = draftItems.find(
-      (candidate) => candidate.approval_key === item.approval_key
-    ) || { enabled: false, members: [] }
-    const condition = normalizeApprovalCondition(
-      item.approval_key,
-      draft.condition
-    )
-    const values = {
-      enabled: draft.enabled,
-      approval_mode: condition.mode,
-      approval_amount: condition.amount || undefined,
-      approval_currency: condition.currency || 'CNY',
-    }
-    STRATEGIES.forEach(({ key }) => {
-      const member = draft.members.find(
-        (candidate) => candidate.strategy === key
-      )
-      values[`${key}_role`] = member?.role_key
-      values[`${key}_mode`] = member?.user_id > 0 ? 'user' : 'role'
-      values[`${key}_user`] = member?.user_id || undefined
-    })
-    form.setFieldsValue(values)
+    const values = editorValuesForApproval(item.approval_key, draftItems)
     setEditorValues(values)
     setEditingKey(item.approval_key)
     setEditorDirty(false)
@@ -648,44 +320,16 @@ export default function ApprovalResponsibilityPanel({
     } catch {
       return
     }
-    let condition
+    let nextDraft
     try {
-      condition = normalizeApprovalCondition(editingKey, {
-        mode: values.approval_mode,
-        amount: values.approval_amount,
-        currency: values.approval_currency,
-      })
-    } catch {
-      message.warning('审批条件不完整，请核对金额与币种')
+      nextDraft = draftItemFromEditor(editingKey, values)
+    } catch (error) {
+      message.warning(error.message)
       return
-    }
-    const members = STRATEGIES.filter(({ key }) => values[`${key}_role`]).map(
-      ({ key }) => ({
-        role_key: values[`${key}_role`],
-        user_id:
-          values[`${key}_mode`] === 'user'
-            ? Number(values[`${key}_user`] || 0)
-            : 0,
-        strategy: key,
-        enabled: true,
-      })
-    )
-    const memberIdentities = new Set()
-    for (const member of values.enabled ? members : []) {
-      const identity = `${member.role_key}:${member.user_id}`
-      if (memberIdentities.has(identity)) {
-        message.warning(
-          '同一岗位的“岗位内任一员工”选项或同一指定员工不能重复承担多个责任层级'
-        )
-        return
-      }
-      memberIdentities.add(identity)
     }
     setDraftItems((current) =>
       current.map((item) =>
-        item.approval_key === editingKey
-          ? { ...item, enabled: values.enabled === true, members, condition }
-          : item
+        item.approval_key === editingKey ? { ...item, ...nextDraft } : item
       )
     )
     setPreview(null)
@@ -699,96 +343,50 @@ export default function ApprovalResponsibilityPanel({
     mutationRef.current = true
     requestIDRef.current += 1
     setSaving(true)
-    const nextPayload =
-      pendingPayload ||
-      freezeApprovalSettingsPayload({
-        settings,
-        revision,
-        draftItems,
-      })
     try {
-      if (appliedReceipt || pendingPayload) {
-        try {
-          const current = await getApprovalSettings({})
-          verifyAppliedApprovalSettings({
-            readback: current,
-            payload: nextPayload,
-            receipt: appliedReceipt,
-          })
-          applySettings(current)
-          notifyApprovalSettingsApplied()
-          return
-        } catch (readbackError) {
-          if (appliedReceipt) {
-            notifyApprovalSettingsConfirmation(
-              getActionErrorMessage(readbackError, '', {
-                fallback: '生效结果暂时无法确认，请稍后重新确认',
-              })
-            )
-            return
-          }
-        }
-      }
-      if (!pendingPayload) {
-        const checked = await previewApprovalSettings(nextPayload)
-        const blocking = getApprovalSettingsBlockingItems(checked)
-        setPreview(checked)
-        if (blocking.length > 0) {
-          throw new Error(
-            blocking
-              .map(
-                (item) =>
-                  `${item.label}：${item.blocked_reasons
-                    .map(getApprovalSettingsBlockerLabel)
-                    .join('、')}`
-              )
-              .join('；')
-          )
-        }
-      }
-      let receipt
-      try {
-        receipt = await applyApprovalSettings(nextPayload)
-      } catch (error) {
-        if (!approvalSettingsMutationMayHaveSucceeded(error)) throw error
-        try {
-          const current = await getApprovalSettings({})
-          verifyAppliedApprovalSettings({
-            readback: current,
-            payload: nextPayload,
-          })
-          applySettings(current)
-          notifyApprovalSettingsApplied()
-          return
-        } catch {
-          setPendingPayload(nextPayload)
-          setAppliedReceipt(null)
-          notifyApprovalSettingsConfirmation(
-            '保存结果暂时无法确认，请点击“确认并生效”继续处理'
-          )
-          return
-        }
-      }
-      setAppliedReceipt(receipt)
-      setPendingPayload(nextPayload)
-      let readback
-      try {
-        readback = await getApprovalSettings({})
-        verifyAppliedApprovalSettings({
-          readback,
-          payload: nextPayload,
-          receipt,
+      const nextPayload =
+        pendingPayload ||
+        freezeApprovalSettingsPayload({
+          settings,
+          revision,
+          draftItems,
         })
-      } catch (error) {
+      const result = await activateApprovalSettings({
+        payload: nextPayload,
+        receipt: appliedReceipt,
+        retrying: Boolean(pendingPayload),
+        preview: previewApprovalSettings,
+        apply: applyApprovalSettings,
+        readback: () => getApprovalSettings({}),
+      })
+      if (result.preview) setPreview(result.preview)
+      if (result.status === 'confirmed') {
+        applySettings(result.readback)
+        notifyApprovalSettingsApplied()
+        return
+      }
+      if (result.status === 'blocked') {
+        message.error(result.blockingMessage)
+        return
+      }
+      setPendingPayload(nextPayload)
+      setAppliedReceipt(result.receipt || null)
+      if (result.status === 'submission_unknown') {
         notifyApprovalSettingsConfirmation(
-          getActionErrorMessage(error, '', {
-            fallback: '设置已提交，正在等待确认生效结果',
-          })
+          '保存结果暂时无法确认，请点击“确认并生效”继续处理'
         )
         return
       }
-      applySettings(readback)
-      notifyApprovalSettingsApplied()
+      if (result.status === 'confirmation_pending') {
+        notifyApprovalSettingsConfirmation(
+          getActionErrorMessage(result.error, '', {
+            fallback:
+              result.confirmationStage === 'existing_receipt'
+                ? '生效结果暂时无法确认，请稍后重新确认'
+                : '设置已提交，正在等待确认生效结果',
+          })
+        )
+      }
     } catch (error) {
       message.error(
         getActionErrorMessage(error, '', {
@@ -925,7 +523,11 @@ export default function ApprovalResponsibilityPanel({
         className="erp-permission-section erp-permission-section--approvals"
         variant="borderless"
       >
-        <Empty state="denied" description="无权查看审批责任" detail="请联系管理员核对权限。" />
+        <Empty
+          state="denied"
+          description="无权查看审批责任"
+          detail="请联系管理员核对权限。"
+        />
       </Card>
     )
   }
@@ -964,7 +566,10 @@ export default function ApprovalResponsibilityPanel({
 
       {settings ? (
         <>
-          <div className="erp-approval-responsibility__header" data-page-table-toolbar>
+          <div
+            className="erp-approval-responsibility__header"
+            data-page-table-toolbar
+          >
             <div>
               <Title level={5}>审批责任</Title>
               <Text type="secondary">
@@ -1097,6 +702,8 @@ export default function ApprovalResponsibilityPanel({
       >
         <BusinessForm
           form={form}
+          initialValues={editorValues}
+          clearOnDestroy
           layout="vertical"
           className="erp-approval-responsibility-form"
           onValuesChange={(_, values) => {
@@ -1124,7 +731,10 @@ export default function ApprovalResponsibilityPanel({
                     label="门槛币种"
                     rules={[{ required: true, message: '请选择币种' }]}
                   >
-                    <Select placeholder="请选择门槛币种" options={BUSINESS_CURRENCY_OPTIONS} />
+                    <Select
+                      placeholder="请选择门槛币种"
+                      options={BUSINESS_CURRENCY_OPTIONS}
+                    />
                   </Form.Item>
                   <Form.Item
                     name="approval_amount"
@@ -1259,13 +869,11 @@ export default function ApprovalResponsibilityPanel({
                   }}
                 />
               </Form.Item>
-              <Form.Item
-                name={`${key}_mode`}
-                label="由谁承接"
-                initialValue="role"
-              >
+              <Form.Item name={`${key}_mode`} label="由谁承接">
                 <Select
-                  allowClear={false /* 不可清空：承接规则必须明确按岗位或指定员工，空模式不能生成有效责任规则。 */}
+                  allowClear={
+                    false /* 不可清空：承接规则必须明确按岗位或指定员工，空模式不能生成有效责任规则。 */
+                  }
                   placeholder="请选择由谁承接"
                   options={[
                     { value: 'role', label: '岗位内任一员工' },
@@ -1365,9 +973,11 @@ export default function ApprovalResponsibilityPanel({
                           Number(getFieldValue(`${key}_user`) || 0),
                           key
                         )}
-                        placeholder={getFieldValue(`${key}_role`)
-                          ? '选择审批员工'
-                          : '请先选择审批岗位'}
+                        placeholder={
+                          getFieldValue(`${key}_role`)
+                            ? '选择审批员工'
+                            : '请先选择审批岗位'
+                        }
                       />
                     </Form.Item>
                   ) : (

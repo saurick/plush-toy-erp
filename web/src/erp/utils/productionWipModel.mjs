@@ -1506,6 +1506,10 @@ export function productionWipBatchLineageMeta(batch = {}) {
   return null
 }
 
+export function isFinishedGoodsReworkRoot(batch) {
+  return positiveSafeInteger(batch.origin_rework_fact_id) && !positiveSafeInteger(batch.source_batch_id)
+}
+
 export function productionWipActionAllowedForOrder(
   order = {},
   batch = {},

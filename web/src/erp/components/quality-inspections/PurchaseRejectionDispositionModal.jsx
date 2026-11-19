@@ -46,6 +46,31 @@ const STATUS_META = Object.freeze({
   [PurchaseRejectionStatus.CANCELLED]: { label: '已取消', color: 'default' },
 })
 
+function draftDispositionFormValues(inspectionNo) {
+  return {
+    disposition_no: sourceBusinessActionNo(
+      'IQC-DISP',
+      inspectionNo || 'QUALITY',
+      sourceBusinessActionUUID()
+    ),
+    disposition_type: 'RETURN_TO_VENDOR',
+    quantity: '',
+    reason: '首次来料检验不合格',
+    cancel_reason: '',
+  }
+}
+
+function recordDispositionFormValues(record) {
+  return {
+    disposition_no: record.disposition_no,
+    disposition_type: record.disposition_type,
+    quantity: record.quantity,
+    reason: record.reason,
+    cancel_reason: '',
+    counted_quantity: '',
+  }
+}
+
 export default function PurchaseRejectionDispositionModal({
   open,
   inspection,
@@ -73,6 +98,7 @@ export default function PurchaseRejectionDispositionModal({
   const attemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const beginSourceRequest = useLatestRequestCoordinator()
   const submittingRef = useRef(false)
+  const formConnectedRef = useRef(false)
   const accessRef = useRef(sourceAccess)
   accessRef.current = sourceAccess
   const onCloseRef = useRef(onClose)
@@ -92,10 +118,9 @@ export default function PurchaseRejectionDispositionModal({
     setHistory([])
     setLoading(false)
     setPostConfirmOpen(false)
-    form.resetFields()
     onCloseRef.current?.()
     message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
-  }, [beginSourceRequest, form])
+  }, [beginSourceRequest])
   useEffect(() => {
     if (open && !sourceAccess.allowed) revokeSource()
   }, [open, sourceAccess.allowed, revokeSource])
@@ -107,16 +132,23 @@ export default function PurchaseRejectionDispositionModal({
     setPostConfirmOpen(false)
   }, [open, record?.id, record?.status])
   useEffect(() => {
-    if (!record) return
-    form.setFieldsValue({
-      disposition_no: record.disposition_no,
-      disposition_type: record.disposition_type,
-      quantity: record.quantity,
-      reason: record.reason,
-      cancel_reason: '',
-      counted_quantity: '',
-    })
+    if (!record || !formConnectedRef.current) return
+    form.setFieldsValue(recordDispositionFormValues(record))
   }, [form, record])
+
+  const initializeOpenForm = useCallback(
+    (visible) => {
+      formConnectedRef.current = visible
+      if (!visible || !inspection?.id || !sourceAccess.allowed) return
+      form.resetFields()
+      form.setFieldsValue(
+        record
+          ? recordDispositionFormValues(record)
+          : draftDispositionFormValues(inspection?.inspection_no)
+      )
+    },
+    [form, inspection?.id, inspection?.inspection_no, record, sourceAccess.allowed]
+  )
 
   const remember = useCallback((next) => {
     if (
@@ -171,18 +203,6 @@ export default function PurchaseRejectionDispositionModal({
     if (!open || !inspection?.id || !sourceAccess.allowed) return
     let active = true
     const request = beginSourceRequest('history')
-    form.resetFields()
-    form.setFieldsValue({
-      disposition_no: sourceBusinessActionNo(
-        'IQC-DISP',
-        inspection?.inspection_no || 'QUALITY',
-        sourceBusinessActionUUID()
-      ),
-      disposition_type: 'RETURN_TO_VENDOR',
-      quantity: '',
-      reason: '首次来料检验不合格',
-      cancel_reason: '',
-    })
     setLoading(true)
     const read = taskDispositionID
       ? (initialRecord?.id === taskDispositionID && loadRevision === 0
@@ -220,7 +240,7 @@ export default function PurchaseRejectionDispositionModal({
       active = false
       beginSourceRequest('history').finish()
     }
-  }, [form, inspection?.id, inspection?.inspection_no, open, sourceAccess.allowed, revokeSource, beginSourceRequest, taskDispositionID, loadRevision, initialRecord])
+  }, [inspection?.id, open, sourceAccess.allowed, revokeSource, beginSourceRequest, taskDispositionID, loadRevision, initialRecord])
 
   const create = async () => {
     if (readOnly || taskDispositionID || loadError || !sourceRef.current || submittingRef.current || !accessRef.current.allowed) return
@@ -285,17 +305,7 @@ export default function PurchaseRejectionDispositionModal({
   const prepareNew = () => {
     if (readOnly || taskDispositionID) return
     setRecord(null)
-    form.setFieldsValue({
-      disposition_no: sourceBusinessActionNo(
-        'IQC-DISP',
-        inspection?.inspection_no || 'QUALITY',
-        sourceBusinessActionUUID()
-      ),
-      disposition_type: 'RETURN_TO_VENDOR',
-      quantity: '',
-      reason: '首次来料检验不合格',
-      cancel_reason: '',
-    })
+    form.setFieldsValue(draftDispositionFormValues(inspection?.inspection_no))
   }
 
   const transition = async (action) => {
@@ -400,6 +410,7 @@ export default function PurchaseRejectionDispositionModal({
       maskClosable={!loading}
       keyboard={!loading}
       closable={!loading}
+      afterOpenChange={initializeOpenForm}
       onCancel={() => !loading && onClose?.()}
       footer={
         <Space wrap>

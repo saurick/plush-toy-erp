@@ -24,7 +24,7 @@ import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/R
 import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
 import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
 
-import { loadReferenceIDs, mergeReferenceRecords, canReadReference } from '../utils/remoteReferences.mjs'
+import { loadReferenceIDs, canReadReference } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import {
@@ -63,7 +63,6 @@ import {
   createShipmentWithItems,
   getShipment,
   listAllShipments,
-  listShipmentSourceCandidates,
   listShipments,
   saveShipmentDraft,
   shipShipment,
@@ -100,11 +99,7 @@ import ShipmentEditor, {
 } from '../components/shipments/ShipmentEditor.jsx'
 import ShipmentTaskItems from '../components/shipments/ShipmentTaskItems.jsx'
 import { submitShipmentDraft } from '../components/shipments/submitShipmentDraft.mjs'
-import {
-  canUndoShipmentSourceImport,
-  createShipmentSourceImportUndo,
-  shipmentSourceImportSnapshot,
-} from '../utils/shipmentSourceImportUndo.mjs'
+import useShipmentSourceImport from '../components/shipments/useShipmentSourceImport.mjs'
 import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
 import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
 import ProductIdentity, { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
@@ -129,9 +124,7 @@ import { DEFAULT_DELIVERY_COUNTRY } from '../utils/deliveryAddress.mjs'
 import {
   buildShipmentItemParams,
   createBlankShipmentItem,
-  createShipmentItemFromSalesOrderItem,
   formatQuantity,
-  isBlankShipmentItem,
   positiveInt,
 } from '../utils/businessLineItems.mjs'
 import {
@@ -197,11 +190,7 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import {
   SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
-  normalizeShipmentSourceCandidate,
-  loadShipmentSourceSelection,
-  shipmentSourceCandidateListParams,
   shipmentSourceFilterOptions,
-  shipmentSourceOrderFromCandidate,
 } from '../utils/shipmentSourceCandidate.mjs'
 
 const { Text } = Typography
@@ -355,13 +344,10 @@ export default function ShipmentsPage() {
   const [qualitySourceContext, setQualitySourceContext] = useState(null)
   const [qualitySourceLoading, setQualitySourceLoading] = useState(false)
   const [shipmentModal, setShipmentModal] = useState(null)
-  const [salesOrderSources, setSalesOrderSources] = useState([])
-  const [salesOrderSourceItems, setSalesOrderSourceItems] = useState([])
-  const [shipmentSourceRows, setShipmentSourceRows] = useState([])
-  const [salesOrderSourceTotal, setSalesOrderSourceTotal] = useState(0)
-  const [salesOrderSourceCurrent, setSalesOrderSourceCurrent] = useState(1)
-  const [salesOrderSourceLoadFailed, setSalesOrderSourceLoadFailed] =
-    useState(false)
+  const shipmentModalMode = shipmentModal?.mode || ''
+  const isCreateModal = shipmentModalMode === 'create'
+  const isEditModal = shipmentModalMode === 'edit'
+  const isViewModal = shipmentModalMode === 'view'
   const [customers, , mergeCustomers] = useReferenceRecords(adminProfile)
   const [inventoryLots, , mergeInventoryLots] = useReferenceRecords(adminProfile)
   const [warehouses, setWarehouses] = useState([])
@@ -370,31 +356,14 @@ export default function ShipmentsPage() {
   const [salesOrderItems, setSalesOrderItems] = useState([])
   const [salesOrders, setSalesOrders, mergeSalesOrders] = useReferenceRecords(adminProfile)
   const [units, setUnits] = useState([])
-  const [sourceLoading, setSourceLoading] = useState(false)
-  const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
-  const [sourceImportUndo, setSourceImportUndo] = useState(null)
   const referenceDraftItems = Form.useWatch('items', { form: shipmentForm, preserve: true }) || []
-  const sourceImportSnapshot = Form.useWatch(shipmentSourceImportSnapshot, {
-    form: shipmentForm,
-    preserve: true,
-  })
-  useEffect(() => {
-    setSourceImportUndo((current) => {
-      if (!current || current.invalidated ||
-        canUndoShipmentSourceImport(current, shipmentForm.getFieldsValue(true))) return current
-      return { ...current, invalidated: true }
-    })
-  }, [shipmentForm, sourceImportSnapshot])
   const shipmentAttachmentRef = useRef(null)
   const financeSourceAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
   )
   const financeSourceInFlightRef = useRef(false)
   const qualitySourceInFlightRef = useRef(false)
-  const salesOrderSourceQueryRef = useRef({ keyword: '', page: 1 })
-  const [salesOrderSourceFilters, setSalesOrderSourceFilters] = useState({ selectable: true })
-  const [salesOrderSourceOrders, setSalesOrderSourceOrders] = useState([])
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
   const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
@@ -628,12 +597,6 @@ export default function ShipmentsPage() {
     () => uniqueReferenceOptions(salesOrders, salesOrderOption),
     [salesOrders]
   )
-  const salesOrderSourceFilterOptions = useMemo(() => shipmentSourceFilterOptions(salesOrderSourceOrders, {
-    customerID: salesOrderSourceFilters.customerID,
-    salesOrderID: salesOrderSourceFilters.salesOrderID,
-    customerOptions,
-    salesOrderOptions,
-  }), [salesOrderSourceOrders, salesOrderSourceFilters, customerOptions, salesOrderOptions])
   const salesOrdersByID = useMemo(
     () =>
       new Map(
@@ -643,6 +606,50 @@ export default function ShipmentsPage() {
       ),
     [salesOrders]
   )
+  const {
+    handleSalesOrderSourceFiltersChange,
+    handleSalesOrderSourcePageChange,
+    handleSalesOrderSourceReload,
+    handleSalesOrderSourceSearch,
+    handleSalesOrderSourceSelectAll,
+    importSalesOrderToShipment,
+    invalidateSourceImportUndo,
+    loadSalesOrderSources,
+    openSalesOrderImport,
+    resetShipmentSourceSelectionState,
+    salesOrderImportOpen,
+    salesOrderSourceCurrent,
+    salesOrderSourceFilters,
+    salesOrderSourceLoadFailed,
+    salesOrderSourceOrders,
+    salesOrderSources,
+    salesOrderSourceTotal,
+    setSalesOrderImportOpen,
+    shipmentSourceRows,
+    sourceImportUndo,
+    sourceLoading,
+    undoSourceImport,
+  } = useShipmentSourceImport({
+    beginLatestRequest,
+    canCreate,
+    canImportSalesOrderSource,
+    canUpdate,
+    isCreateModal,
+    isEditModal,
+    salesOrderItems,
+    salesOrdersByID,
+    saving,
+    setSalesOrderItems,
+    setSalesOrders,
+    shipmentForm,
+    taskDraftSavingRef,
+  })
+  const salesOrderSourceFilterOptions = useMemo(() => shipmentSourceFilterOptions(salesOrderSourceOrders, {
+    customerID: salesOrderSourceFilters.customerID,
+    salesOrderID: salesOrderSourceFilters.salesOrderID,
+    customerOptions,
+    salesOrderOptions,
+  }), [salesOrderSourceOrders, salesOrderSourceFilters, customerOptions, salesOrderOptions])
   const salesOrderItemOptions = useMemo(
     () => uniqueReferenceOptions(salesOrderItems, salesOrderItemOption),
     [salesOrderItems]
@@ -806,10 +813,6 @@ export default function ShipmentsPage() {
     return rows.find((item) => item.id === shipment.id) || shipment
   }, [rows, shipmentModal?.shipment])
 
-  const shipmentModalMode = shipmentModal?.mode || ''
-  const isCreateModal = shipmentModalMode === 'create'
-  const isEditModal = shipmentModalMode === 'edit'
-  const isViewModal = shipmentModalMode === 'view'
   const selectedSalesOrder = useMemo(
     () => salesOrdersByID.get(Number(selectedSalesOrderID || 0)) || null,
     [salesOrdersByID, selectedSalesOrderID]
@@ -888,251 +891,6 @@ export default function ShipmentsPage() {
     ],
     [productOptions, productSKUOptions]
   )
-
-  const acceptSalesOrderSourceRows = useCallback((rows) => {
-    setSalesOrderSourceItems((current) => mergeReferenceRecords(current, rows))
-    setSalesOrderItems((currentItems) => mergeReferenceRecords(currentItems, rows))
-    setShipmentSourceRows((current) => mergeReferenceRecords(current, rows))
-    setSalesOrders((current) => mergeReferenceRecords(
-      current.filter((order) => Number.isSafeInteger(Number(order?.id)) && Number(order.id) > 0),
-      rows.map(shipmentSourceOrderFromCandidate)
-    ))
-  }, [setSalesOrders])
-
-  const loadSalesOrderSources = useCallback(
-    async ({ keyword = '', page = 1, filters = salesOrderSourceQueryRef.current.filters || {} } = {}) => {
-      const normalizedKeyword = String(keyword || '').trim()
-      const normalizedPage = Number(page) || 1
-      const request = beginLatestRequest('shipment-source-candidates')
-      salesOrderSourceQueryRef.current = {
-        keyword: normalizedKeyword,
-        page: normalizedPage,
-        filters,
-      }
-      setSalesOrderSourceCurrent(normalizedPage)
-      setSalesOrderSourceLoadFailed(false)
-      setSourceLoading(true)
-      try {
-        const params = shipmentSourceCandidateListParams({
-          keyword: normalizedKeyword,
-          page: normalizedPage,
-          pageSize: SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
-          salesOrderID: shipmentForm.getFieldValue('sales_order_id') || filters.salesOrderID,
-          customerID: filters.customerID,
-          selectable: filters.selectable !== false,
-        })
-        const data = await listShipmentSourceCandidates(params, {
-          signal: request.signal,
-        })
-        if (!request.isCurrent()) return false
-        const nextSourceRows = data.shipment_source_candidates.map(
-          normalizeShipmentSourceCandidate
-        )
-        setSalesOrderSourceOrders(data.source_orders)
-        setSalesOrderSources(nextSourceRows)
-        setSalesOrderSourceTotal(data.total)
-        acceptSalesOrderSourceRows(nextSourceRows)
-        return true
-      } catch (error) {
-        if (isRpcAbortError(error) || !request.isCurrent()) return false
-        setSalesOrderSources([])
-        setSalesOrderSourceTotal(0)
-        setSalesOrderSourceLoadFailed(true)
-        showPageLoadError(error, '加载销售订单来源')
-        return false
-      } finally {
-        if (request.isCurrent()) {
-          setSourceLoading(false)
-          request.finish()
-        }
-      }
-    },
-    [beginLatestRequest, shipmentForm, acceptSalesOrderSourceRows]
-  )
-
-  const handleSalesOrderSourceSelectAll = useCallback(async ({ signal, expectedTotal }) => {
-    try {
-      if (!canImportSalesOrderSource) throw new Error('当前账号不能读取销售订单来源行')
-      const { keyword, filters = {} } = salesOrderSourceQueryRef.current
-      const params = shipmentSourceCandidateListParams({
-        keyword,
-        salesOrderID: shipmentForm.getFieldValue('sales_order_id') || filters.salesOrderID,
-        customerID: filters.customerID,
-        selectable: filters.selectable !== false,
-      })
-      const rows = await loadShipmentSourceSelection(listShipmentSourceCandidates, params, { signal, expectedTotal })
-      if (!signal.aborted) acceptSalesOrderSourceRows(rows)
-      return rows
-    } catch (error) {
-      if (!signal.aborted && !isRpcAbortError(error)) showPageLoadError(error, '全选销售订单来源')
-      throw error
-    }
-  }, [canImportSalesOrderSource, shipmentForm, acceptSalesOrderSourceRows])
-
-  const handleSalesOrderSourceSearch = useCallback(
-    (keyword) => {
-      const normalizedKeyword = String(keyword || '').trim()
-      const currentQuery = salesOrderSourceQueryRef.current
-      if (
-        currentQuery.keyword === normalizedKeyword &&
-        currentQuery.page === 1
-      ) {
-        return
-      }
-      loadSalesOrderSources({ keyword: normalizedKeyword, page: 1 })
-    },
-    [loadSalesOrderSources]
-  )
-
-  const handleSalesOrderSourcePageChange = useCallback(
-    (page, _pageSize, keyword) => {
-      loadSalesOrderSources({ keyword, page })
-    },
-    [loadSalesOrderSources]
-  )
-
-  const handleSalesOrderSourceReload = useCallback(
-    (keyword, page) => {
-      loadSalesOrderSources({ keyword, page })
-    },
-    [loadSalesOrderSources]
-  )
-
-  const openSalesOrderImport = () => {
-    if (!canImportSalesOrderSource) {
-      message.warning('当前账号不能读取销售订单来源行')
-      return
-    }
-    setSalesOrderSources([])
-    setSalesOrderSourceItems([])
-    setSalesOrderSourceOrders([])
-    setShipmentSourceRows([])
-    setSalesOrderSourceTotal(0)
-    setSalesOrderSourceCurrent(1)
-    setSalesOrderSourceLoadFailed(false)
-    const filters = { selectable: true }
-    setSalesOrderSourceFilters(filters)
-    salesOrderSourceQueryRef.current = { keyword: '', page: 1, filters }
-    setSalesOrderImportOpen(true)
-    loadSalesOrderSources({ keyword: '', page: 1, filters })
-  }
-
-  const importSalesOrderToShipment = async (sourceItems = []) => {
-    if (!canImportSalesOrderSource || saving || taskDraftSavingRef.current ||
-      !(isCreateModal ? canCreate : isEditModal && canUpdate)) return
-    const importableItems = sourceItems.filter(
-      (item) =>
-        item.selectable === true &&
-        !item.disabledReason &&
-        isPositiveNumeric20Scale6Units(
-          numeric20Scale6Units(item.remainingQuantity)
-        )
-    )
-    if (importableItems.length === 0) {
-      message.warning('请选择仍有剩余可出货数量的销售订单行')
-      return
-    }
-    const sourceOrderIDs = new Set(
-      importableItems.map((item) => Number(item.sales_order_id || 0))
-    )
-    if (sourceOrderIDs.size !== 1) {
-      message.warning('一次出货草稿只能导入同一张销售订单的来源行')
-      return
-    }
-    const sourceOrderID = [...sourceOrderIDs][0]
-    const currentSourceOrderID = positiveInt(
-      shipmentForm.getFieldValue('sales_order_id')
-    )
-    if (currentSourceOrderID && currentSourceOrderID !== sourceOrderID) {
-      message.warning('当前出货草稿只能继续导入同一张销售订单的来源行')
-      return
-    }
-    const sourceOrder = salesOrdersByID.get(sourceOrderID)
-    if (!sourceOrder?.id) return
-    const before = shipmentForm.getFieldsValue(true)
-    const currentItems = (before.items || []).filter((item) => !isBlankShipmentItem(item))
-    const currentSourceItemIDs = new Set(
-      currentItems.map((item) => positiveInt(item?.sales_order_item_id)).filter(Boolean)
-    )
-    const newSourceItems = importableItems.filter(
-      (item) => !currentSourceItemIDs.has(positiveInt(item.id))
-    )
-    if (newSourceItems.length === 0) {
-      message.warning('所选销售订单来源行已在当前出货明细中')
-      return
-    }
-    try {
-      setSourceLoading(true)
-      const sameOrderItems = salesOrderSourceItems.filter(
-        (item) => Number(item.sales_order_id || 0) === sourceOrderID
-      )
-      setSalesOrderItems(sameOrderItems)
-      shipmentForm.setFieldsValue({
-        sales_order_id: sourceOrder.id,
-        customer_id: sourceOrder.customer_id,
-        customer_snapshot: salesOrderCustomerText(sourceOrder),
-        ...(currentSourceOrderID
-          ? {}
-          : deliverySnapshotFormValues(sourceOrder.delivery_snapshot)),
-        total_net_weight_g: undefined,
-        total_net_weight_items_signature: undefined,
-        items: [
-          ...currentItems,
-          ...newSourceItems.map((item) =>
-            createShipmentItemFromSalesOrderItem(item, {
-              quantity: item.remainingQuantity,
-            })
-          ),
-        ],
-      })
-      setSourceImportUndo({
-        ...createShipmentSourceImportUndo(before, shipmentForm.getFieldsValue(true)),
-        salesOrderItems: structuredClone(salesOrderItems),
-      })
-      if (String(before.total_net_weight_g ?? '').trim()) {
-        message.warning('出货明细已变更，旧人工总净重已清空；撤销本次导入可恢复')
-      }
-      message.success('已导入销售订单来源行和剩余可出货数量')
-      setSalesOrderImportOpen(false)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '导入销售订单来源'))
-    } finally {
-      setSourceLoading(false)
-    }
-  }
-
-  const undoSourceImport = () => {
-    if (saving || sourceLoading || taskDraftSavingRef.current || !canImportSalesOrderSource ||
-      !(isCreateModal ? canCreate : isEditModal && canUpdate)) return false
-    if (!canUndoShipmentSourceImport(sourceImportUndo, shipmentForm.getFieldsValue(true))) {
-      setSourceImportUndo((current) => current ? { ...current, invalidated: true } : null)
-      return false
-    }
-    shipmentForm.setFieldsValue(structuredClone(sourceImportUndo.values))
-    setSalesOrderItems(sourceImportUndo.salesOrderItems)
-    setSourceImportUndo(null)
-    message.success('已撤销本次导入，原有明细和无关填写已保留')
-    return true
-  }
-
-  useEffect(() => {
-    if (!canImportSalesOrderSource || !(isCreateModal ? canCreate : isEditModal && canUpdate)) {
-      setSourceImportUndo(null)
-    }
-  }, [canImportSalesOrderSource, canCreate, canUpdate, isCreateModal, isEditModal])
-
-  const resetShipmentSourceSelectionState = useCallback(() => {
-    setSourceImportUndo(null)
-    setSalesOrderItems([])
-    setSalesOrderSources([])
-    setSalesOrderSourceItems([])
-    setShipmentSourceRows([])
-    setSalesOrderSourceTotal(0)
-    setSalesOrderSourceCurrent(1)
-    setSalesOrderSourceLoadFailed(false)
-    setSalesOrderImportOpen(false)
-    salesOrderSourceQueryRef.current = { keyword: '', page: 1 }
-  }, [])
 
   const openCreate = () => {
     shipmentAttachmentRef.current?.clearPendingAttachments()
@@ -1259,7 +1017,7 @@ export default function ShipmentsPage() {
     setSaving,
     saveShipmentDraft,
     createShipmentWithItems,
-    invalidateSourceImportUndo: () => setSourceImportUndo(null),
+    invalidateSourceImportUndo,
     shipmentAttachmentRef,
     getShipment,
     shipmentFormValues,
@@ -2151,10 +1909,7 @@ export default function ShipmentsPage() {
         salesOrderSourceFilters={salesOrderSourceFilters}
         salesOrderSourceOrderOptions={salesOrderSourceFilterOptions.orders}
         salesOrderSourceCustomerOptions={salesOrderSourceFilterOptions.customers}
-        onSalesOrderSourceFiltersChange={(filters, { keyword = salesOrderSourceQueryRef.current.keyword } = {}) => {
-          setSalesOrderSourceFilters(filters)
-          loadSalesOrderSources({ keyword, page: 1, filters })
-        }}
+        onSalesOrderSourceFiltersChange={handleSalesOrderSourceFiltersChange}
         salesOrderSourceCurrent={salesOrderSourceCurrent}
         salesOrderSourceEmptyDescription={
           salesOrderSourceFilters.selectable === false ? '当前范围没有不可导入明细' : '暂无可导入销售订单行'

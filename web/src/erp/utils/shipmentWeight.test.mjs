@@ -322,7 +322,7 @@ test('shipmentWeight: frozen line snapshot can produce the displayed line net we
   assert.equal(hasFinalShipmentWeight('DRAFT'), false)
 })
 
-test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear UI contracts are wired', () => {
+test('shipmentWeight: SKU, shipment modal, list column, and export UI contracts are wired', () => {
   const shipmentWeightSource = readERPSource('./shipmentWeight.mjs')
   const masterFormSource = readERPSource(
     '../components/master-data/MasterDataForm.jsx'
@@ -362,11 +362,6 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
   assert.match(shipmentModalSource, /确认出货单重（克）/u)
   assert.match(shipmentModalSource, /行净重（克）/u)
   assert.match(shipmentModalSource, /hasFinalShipmentWeight\(status\)/u)
-  assert.match(shipmentModalSource, /onImport=\{importSalesOrderToShipment\}/u)
-  const importSource = readERPSource('../pages/ShipmentsPage.jsx')
-  assert.match(importSource, /if \(newSourceItems\.length === 0\) \{[\s\S]*?return\s*\}[\s\S]*?total_net_weight_g: undefined/u)
-  assert.match(importSource, /createShipmentSourceImportUndo\(before, shipmentForm\.getFieldsValue\(true\)\)/u)
-
   assert.match(shipmentColumnsSource, /dataIndex: 'total_net_weight_g'/u)
   assert.match(shipmentColumnsSource, /exportTitle: '总净重（克）'/u)
   assert.match(shipmentColumnsSource, /return '待确认'/u)

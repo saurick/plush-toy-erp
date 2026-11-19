@@ -2,6 +2,7 @@ import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { WorkbenchSummarySort } from '../../common/consts/statuses.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { canListEngineeringMaterial } from './engineeringMaterialTask.mjs'
+import { currentBusinessDate } from './businessDate.mjs'
 
 export function getWorkbenchSummaryOptions(profile) {
   if (
@@ -81,6 +82,47 @@ export function summaryDate(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().startsWith(value)
     ? value
     : ''
+}
+
+export const PAYMENT_SUMMARY_PERIOD_PRESETS = [
+  { value: 'month', label: '本月' },
+  { value: 'today', label: '今天' },
+  { value: 'last-month', label: '上月' },
+  { value: 'all', label: '全部历史' },
+]
+
+export function readPaymentSummaryPeriod(params, today = currentBusinessDate()) {
+  const period = params.get('payments.period')
+  const monthStart = `${today.slice(0, 7)}-01`
+  switch (period) {
+    case 'today':
+      return { period, dateFrom: today, dateTo: today }
+    case 'last-month': {
+      const lastMonthEnd = new Date(`${monthStart}T00:00:00Z`)
+      lastMonthEnd.setUTCDate(0)
+      const dateTo = lastMonthEnd.toISOString().slice(0, 10)
+      return { period, dateFrom: `${dateTo.slice(0, 7)}-01`, dateTo }
+    }
+    case 'all':
+      return { period, dateFrom: '', dateTo: '' }
+    case 'custom': {
+      const dateFrom = summaryDate(params.get('payments.from'))
+      const dateTo = summaryDate(params.get('payments.to'))
+      if (dateFrom && dateTo && dateFrom <= dateTo) {
+        return { period, dateFrom, dateTo }
+      }
+      break
+    }
+    case null: {
+      // Preserve saved workbench links from the single-day view.
+      const date = summaryDate(params.get('payments.date'))
+      if (date) return { period: 'custom', dateFrom: date, dateTo: date }
+      break
+    }
+    default:
+      break
+  }
+  return { period: 'month', dateFrom: monthStart, dateTo: today }
 }
 
 export function readSalesSummaryFilters(params) {

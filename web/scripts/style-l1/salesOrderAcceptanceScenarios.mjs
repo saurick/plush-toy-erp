@@ -26,6 +26,7 @@ export function createSalesOrderAcceptanceScenarios(deps) {
           if (method === 'get_effective_session') {
             data = { session: customerRuntimeEffectiveSession }
           } else if (method === 'start_sales_order_acceptance_process') {
+            assert.equal(params.customer_key, customerRuntimeEffectiveSession.customer.key)
             assert.equal(
               Number(params.sales_order_id),
               1,
@@ -171,11 +172,14 @@ export function createSalesOrderAcceptanceScenarios(deps) {
           menuActionLabels: ['取消'],
           absentButtonLabels: ['生效', '关闭', '取消'],
         })
-        await page
-          .locator('.erp-business-module-current-action')
-          .first()
-          .getByRole('button', { name: '提交订单', exact: true })
-          .click()
+        await Promise.all([
+          page.waitForResponse((response) =>
+            response.url().endsWith('/rpc/sales_order') &&
+            response.request().postDataJSON()?.method === 'list_sales_orders'
+          ),
+          page.locator('.erp-business-module-current-action').first()
+            .getByRole('button', { name: '提交订单', exact: true }).click(),
+        ])
         await waitForCapturedMethods(
           customerConfigMethods,
           [
@@ -193,7 +197,8 @@ export function createSalesOrderAcceptanceScenarios(deps) {
             salesOrderMethods,
           })}`
         )
-        await expectText(page, 'SO-STYLE-L1')
+        await page.locator('.ant-table-row-selected').getByText('SO-STYLE-L1', { exact: true }).waitFor()
+        await page.locator('.erp-business-module-selection-tag').filter({ hasText: 'SO-STYLE-L1' }).waitFor()
         await assertNoHorizontalOverflow(
           page,
           'sales-order-acceptance-submit-action-desktop'

@@ -1,6 +1,7 @@
 import { positiveID } from './sourceDocumentValues.mjs'
 import { optionalOccurredAtFromForm } from './factOccurredAt.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
+import { formatLocalDateTimeInputValue } from './dateRange.mjs'
 import {
   positiveUnitsText,
   addNumeric20Scale6Units,
@@ -100,13 +101,6 @@ export function isProductionReworkEligible(source = {}, facts = []) {
 export function suggestedProductionReworkNo(source = {}) {
   const sourceNo = normalizedText(source?.fact_no)
   return sourceNo ? `RW-${sourceNo}`.slice(0, MAX_FACT_NO_LENGTH) : ''
-}
-
-export function localProductionReworkDateTimeInputValue(now = new Date()) {
-  const timestamp = now instanceof Date ? now.getTime() : Number.NaN
-  if (!Number.isFinite(timestamp)) return ''
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(timestamp - offset).toISOString().slice(0, 16)
 }
 
 export function buildProductionReworkPayload(
@@ -225,7 +219,7 @@ export function productionReworkFormValuesFromRequest(request = {}) {
     quantity: normalizePositiveNumeric20Scale6(request?.quantity),
     occurred_at:
       date && Number.isFinite(date.getTime())
-        ? localProductionReworkDateTimeInputValue(date)
+        ? formatLocalDateTimeInputValue(date)
         : '',
     reason: normalizedText(request?.reason),
   }

@@ -1,4 +1,10 @@
 import { normalizePositiveNumeric20Scale6 } from './numeric20Scale6.mjs'
+import {
+  deepFreezeMutationValue,
+  isMutationResultUnknown,
+  secureMutationUUID,
+  stableMutationSignature,
+} from './mutationAttempt.mjs'
 
 const WORKFLOW_TASK_ACTION_PAYLOAD_KEYS = new Set([
   'entry_path',
@@ -273,30 +279,9 @@ export function requireWorkflowTaskMutationParams(
 }
 
 export function workflowTaskMutationUUID(cryptoProvider = globalThis.crypto) {
-  if (typeof cryptoProvider?.randomUUID === 'function') {
-    return cryptoProvider.randomUUID()
-  }
-  if (typeof cryptoProvider?.getRandomValues === 'function') {
-    const bytes = cryptoProvider.getRandomValues(new Uint8Array(16))
-    bytes[6] = (bytes[6] % 16) + 64
-    bytes[8] = (bytes[8] % 64) + 128
-    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0'))
-    return `${hex.slice(0, 4).join('')}-${hex
-      .slice(4, 6)
-      .join('')}-${hex.slice(6, 8).join('')}-${hex
-      .slice(8, 10)
-      .join('')}-${hex.slice(10).join('')}`
-  }
-  throw new Error('当前浏览器暂时无法提交任务，请刷新或升级浏览器后重试')
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue)
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map((key) => [key, stableValue(value[key])])
+  return secureMutationUUID(
+    cryptoProvider,
+    '当前浏览器暂时无法提交任务，请刷新或升级浏览器后重试'
   )
 }
 
@@ -310,54 +295,34 @@ function semanticPayload(value) {
 
 export function workflowTaskMutationSignature(operation, params) {
   const normalizedParams = requireWorkflowTaskMutationParams(operation, params)
-  return JSON.stringify(
-    stableValue({
-      operation: String(operation || '').trim(),
-      task_id: normalizedParams.task_id,
-      action:
-        String(operation || '').trim() === 'urge'
-          ? normalizedParams.action
-          : String(operation || '').trim(),
-      reason: String(normalizedParams.reason || '').trim(),
-      payload: semanticPayload(normalizedParams.payload || {}),
-      assignee_id:
-        String(operation || '').trim() === 'assign'
-          ? normalizedParams.assignee_id
-          : undefined,
-      break_glass: Boolean(normalizedParams.break_glass),
-      break_glass_reason: String(
-        normalizedParams.break_glass_reason || ''
-      ).trim(),
-      break_glass_expires_at: normalizedParams.break_glass_expires_at || null,
-    })
-  )
+  return stableMutationSignature({
+    operation: String(operation || '').trim(),
+    task_id: normalizedParams.task_id,
+    action:
+      String(operation || '').trim() === 'urge'
+        ? normalizedParams.action
+        : String(operation || '').trim(),
+    reason: String(normalizedParams.reason || '').trim(),
+    payload: semanticPayload(normalizedParams.payload || {}),
+    assignee_id:
+      String(operation || '').trim() === 'assign'
+        ? normalizedParams.assignee_id
+        : undefined,
+    break_glass: Boolean(normalizedParams.break_glass),
+    break_glass_reason: String(
+      normalizedParams.break_glass_reason || ''
+    ).trim(),
+    break_glass_expires_at: normalizedParams.break_glass_expires_at || null,
+  })
 }
 
 function frozenWorkflowTaskMutationParams(params, idempotencyKey) {
-  return deepFreeze(
+  return deepFreezeMutationValue(
     JSON.parse(JSON.stringify({ ...params, idempotency_key: idempotencyKey }))
   )
 }
 
-function deepFreeze(value) {
-  if (!value || typeof value !== 'object' || Object.isFrozen(value)) {
-    return value
-  }
-  for (const item of Object.values(value)) deepFreeze(item)
-  return Object.freeze(value)
-}
-
-export function isWorkflowTaskMutationResultUnknown(error) {
-  const httpStatus = Number(error?.httpStatus || 0)
-  return Boolean(
-    error?.isNetworkError ||
-      error?.isAbortError ||
-      error?.isInvalidResponse ||
-      httpStatus === 408 ||
-      httpStatus >= 500 ||
-      Number(error?.code || 0) >= 50000
-  )
-}
+export { isMutationResultUnknown as isWorkflowTaskMutationResultUnknown }
 
 export function createTaskMutationInFlightGuard() {
   const leases = new Map()
@@ -430,7 +395,7 @@ export function createTaskMutationAttemptStore({
           if (attempts.get(scope) === attempt) attempts.delete(scope)
           return result
         } catch (error) {
-          if (!isWorkflowTaskMutationResultUnknown(error)) {
+          if (!isMutationResultUnknown(error)) {
             if (attempts.get(scope) === attempt) attempts.delete(scope)
             throw error
           }
@@ -467,7 +432,7 @@ export async function runWorkflowTaskMutationWithFailureRefresh(
   try {
     return await mutate()
   } catch (error) {
-    if (isWorkflowTaskMutationResultUnknown(error)) {
+    if (isMutationResultUnknown(error)) {
       throw error
     }
     try {

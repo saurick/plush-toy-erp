@@ -81,7 +81,9 @@ test('mobile auth login route smoke managed server uses one IPv4 host', () => {
   const source = fs.readFileSync(scriptPath, 'utf8')
 
   assert.match(source, /http:\/\/127\.0\.0\.1:\$\{devServerPort\}/u)
-  assert.match(source, /'--host',\s*'127\.0\.0\.1'/u)
+  assert.match(source, /startBrowserSmokeDevServer\(/u)
+  const runtime = fs.readFileSync(new URL('./browserSmokeRuntime.mjs', import.meta.url), 'utf8')
+  assert.match(runtime, /'--host',\s*'127\.0\.0\.1'/u)
   assert.doesNotMatch(source, /http:\/\/localhost:\$\{devServerPort\}/u)
 })
 

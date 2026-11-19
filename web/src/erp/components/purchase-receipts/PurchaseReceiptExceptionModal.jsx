@@ -10,6 +10,7 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -38,12 +39,6 @@ function receiptItemLabel(item, materialOptions = []) {
   ]
     .filter(Boolean)
     .join(' ')
-}
-
-function localDateTimeValue() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
 }
 
 export default function PurchaseReceiptExceptionModal({
@@ -81,7 +76,7 @@ export default function PurchaseReceiptExceptionModal({
     if (!open) return
     form.resetFields()
     form.setFieldsValue({
-      [isReturn ? 'returned_at' : 'adjusted_at']: localDateTimeValue(),
+      [isReturn ? 'returned_at' : 'adjusted_at']: formatLocalDateTimeInputValue(),
       items: [
         {
           purchase_receipt_item_id: firstSourceItemID,

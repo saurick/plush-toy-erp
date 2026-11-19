@@ -1,4 +1,5 @@
 import { positiveID } from './sourceDocumentValues.mjs'
+import { formatLocalDateTimeInputValue } from './dateRange.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
@@ -153,12 +154,7 @@ export function normalizeOutsourcingFactDraftSaveRequest(action, params = {}) {
 export function operationalFactDraftFormValues(record = {}) {
   const occurredAt = Number(record?.occurred_at || 0)
   const date = occurredAt > 0 ? new Date(occurredAt * 1000) : null
-  const localOccurredAt =
-    date && Number.isFinite(date.getTime())
-      ? new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-          .toISOString()
-          .slice(0, 16)
-      : ''
+  const localOccurredAt = date ? formatLocalDateTimeInputValue(date) : ''
   return {
     fact_no: String(record?.fact_no || ''),
     warehouse_id: positiveID(record?.warehouse_id) || undefined,

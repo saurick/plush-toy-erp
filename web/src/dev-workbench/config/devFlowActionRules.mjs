@@ -144,7 +144,7 @@ export const DEV_FLOW_ACTION_RULES = {
         '先补齐对应条件，再从原办理入口继续；重复执行核对已有出库证据，不重复扣库。已出货错误走取消与库存冲正。',
       sourceRefs: [
         `${DATA}operational_fact_shipment_repo.go`,
-        `${BIZ}operational_fact.go`,
+        `${BIZ}operational_fact_shipment.go`,
       ],
     },
     {
@@ -360,7 +360,7 @@ export const DEV_FLOW_ACTION_RULES = {
       sourceRefs: [
         `${DATA}operational_fact_production_repo.go`,
         `${DATA}production_material_usage.go`,
-        `${BIZ}operational_fact.go`,
+        `${BIZ}operational_fact_production.go`,
       ],
     },
     {

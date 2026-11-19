@@ -1,19 +1,9 @@
 import { RpcErrorCode } from '../../common/consts/errorCodes.js'
 
+export { isMutationResultUnknown } from './mutationAttempt.mjs'
+
 export function isResourceVersionConflict(error) {
   return Number(error?.code || 0) === RpcErrorCode.RESOURCE_VERSION_CONFLICT
-}
-
-export function isMutationResultUnknown(error) {
-  const httpStatus = Number(error?.httpStatus || 0)
-  return Boolean(
-    error?.isNetworkError ||
-      error?.isAbortError ||
-      error?.isInvalidResponse ||
-      httpStatus === 408 ||
-      httpStatus >= 500 ||
-      Number(error?.code || 0) >= 50000
-  )
 }
 
 function invalidSourceDocumentItemsResponse() {

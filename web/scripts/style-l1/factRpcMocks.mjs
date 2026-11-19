@@ -325,6 +325,18 @@ function workflowMockRoleTaskReadAllowed(
   )
 }
 
+function isWorkbenchMockRiskTask(task, snapshotAt) {
+  return (
+    task.task_status_key === 'blocked' ||
+    (Number(task.due_at || 0) > 0 && Number(task.due_at) < snapshotAt) ||
+    Number(task.priority || 0) >= 3 ||
+    task.critical_path === true ||
+    Number(task.urge_count || 0) > 0 ||
+    Boolean(task.escalated_at) ||
+    task.payload?.critical_path === true
+  )
+}
+
 export async function installFactRpcMocks(page, context) {
   const { adminProfile, effectiveSession, nowUnix, resolveDelayFromReferer } =
     context
@@ -2510,21 +2522,13 @@ export async function installFactRpcMocks(page, context) {
         const visibleTasks = workflowTasks.filter((task) =>
           workflowMockCanViewTask(adminProfile, effectiveSession, task)
         )
-        const isRiskTask = (task) =>
-          task.task_status_key === 'blocked' ||
-          (Number(task.due_at || 0) > 0 && Number(task.due_at) < snapshotAt) ||
-          Number(task.priority || 0) >= 3 ||
-          task.critical_path === true ||
-          Number(task.urge_count || 0) > 0 ||
-          Boolean(task.escalated_at) ||
-          task.payload?.critical_path === true
         const actionableTasks = visibleTasks.filter(
-          (task) => task.task_status_key === 'ready' && !isRiskTask(task)
+          (task) => task.task_status_key === 'ready' && !isWorkbenchMockRiskTask(task, snapshotAt)
         )
         const riskTasks = visibleTasks.filter(
           (task) =>
             ['ready', 'blocked'].includes(task.task_status_key) &&
-            isRiskTask(task)
+            isWorkbenchMockRiskTask(task, snapshotAt)
         )
         const approvalTasks = visibleTasks.filter(
           (task) =>
@@ -2628,14 +2632,6 @@ export async function installFactRpcMocks(page, context) {
             ? Date.parse(`${params.date_to}T00:00:00+08:00`) / 1000 + 86400
             : null
         const terminalStatuses = new Set(['done', 'rejected', 'withdrawn'])
-        const isRiskTask = (task) =>
-          task.task_status_key === 'blocked' ||
-          (Number(task.due_at || 0) > 0 && Number(task.due_at) < snapshotAt) ||
-          Number(task.priority || 0) >= 3 ||
-          task.critical_path === true ||
-          Number(task.urge_count || 0) > 0 ||
-          Boolean(task.escalated_at) ||
-          task.payload?.critical_path === true
         const supervisorRiskAllowed = mobileReview
           ? roleKey === 'all'
           : adminProfile?.is_super_admin === true ||
@@ -2707,7 +2703,7 @@ export async function installFactRpcMocks(page, context) {
             targetViewKey === 'history'
               ? terminal
               : targetViewKey === 'risk'
-                ? !terminal && isRiskTask(task)
+                ? !terminal && isWorkbenchMockRiskTask(task, snapshotAt)
                 : targetViewKey === 'approval'
                   ? !terminal &&
                     isWorkflowApprovalTask(task) &&

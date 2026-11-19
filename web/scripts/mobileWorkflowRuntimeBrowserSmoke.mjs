@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
@@ -19,6 +18,12 @@ import {
 } from './yoyoosunLocalEntryAudit.mjs'
 import { getRoleDisplayName } from '../src/erp/utils/roleKeys.mjs'
 import { getWorkflowTaskGroupLabel } from '../src/erp/utils/workflowTaskLabels.mjs'
+import {
+  startBrowserSmokeDevServer,
+  stopBrowserSmokeDevServer,
+  probeBrowserSmokeURL,
+  writeBrowserSmokeJsonReport,
+} from './browserSmokeRuntime.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
@@ -626,36 +631,6 @@ function buildYoyoosunEntryAuditPlan(options) {
   }
 }
 
-async function probeURL(url, { timeoutMs = 3000 } = {}) {
-  const startedAt = Date.now()
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal: controller.signal,
-    })
-    return {
-      ok: response.ok || response.status === 302 || response.status === 304,
-      status: response.status,
-      elapsedMs: Date.now() - startedAt,
-      error: '',
-    }
-  } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      elapsedMs: Date.now() - startedAt,
-      error:
-        error?.name === 'AbortError'
-          ? 'timeout'
-          : String(error?.message || error),
-    }
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 async function buildPreflightReport(options, runtime = {}) {
   const backendHealthURL = new URL(
     process.env.MOBILE_WORKFLOW_BROWSER_SMOKE_BACKEND_HEALTH_URL ||
@@ -670,7 +645,7 @@ async function buildPreflightReport(options, runtime = {}) {
   const presentPasswordEnvNames = passwordEnvNames.filter((name) =>
     Boolean(optionalText(process.env[name]))
   )
-  const backendHealth = await probeURL(backendHealthURL.toString())
+  const backendHealth = await probeBrowserSmokeURL(backendHealthURL.toString())
   const yoyoosunEntryAudit = await buildMobileYoyoosunEntryAudit(
     options,
     backendHealthURL.toString(),
@@ -831,12 +806,6 @@ function getPortFromURL(rawURL) {
   const url = new URL(rawURL)
   if (url.port) return url.port
   return url.protocol === 'https:' ? '443' : '80'
-}
-
-async function writeJSONReport(filePath, payload) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.writeFile(`${filePath}.tmp`, `${JSON.stringify(payload, null, 2)}\n`)
-  await fs.rename(`${filePath}.tmp`, filePath)
 }
 
 function buildSmokeReport({
@@ -1353,61 +1322,6 @@ function workflowTaskEventRecorded(
 
 let devServerProcess = null
 let devServerLogs = ''
-
-function startDevServer(options) {
-  const child = spawn(
-    'pnpm',
-    [
-      'exec',
-      'vite',
-      '--config',
-      'vite.config.mjs',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(options.port),
-      '--strictPort',
-    ],
-    {
-      cwd: webDir,
-      env: {
-        ...process.env,
-        BROWSER: 'none',
-        API_ORIGIN: options.backendURL,
-        ERP_VITE_PORT: String(options.port),
-        ERP_VITE_HMR_CLIENT_PORT: String(options.port),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  )
-  child.stdout.on('data', (chunk) => {
-    devServerLogs += chunk.toString()
-  })
-  child.stderr.on('data', (chunk) => {
-    devServerLogs += chunk.toString()
-  })
-  child.on('exit', (code) => {
-    if (code !== null && code !== 0) {
-      devServerLogs += `\n[vite exited with code ${code}]`
-    }
-  })
-  return child
-}
-
-async function stopDevServer() {
-  if (!devServerProcess) return
-  if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGTERM')
-    await Promise.race([
-      new Promise((resolve) => devServerProcess.once('exit', resolve)),
-      delay(3000),
-    ])
-  }
-  if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGKILL')
-  }
-  devServerProcess = null
-}
 
 async function ensureURLReady(url, label) {
   const deadline = Date.now() + 30_000
@@ -2276,7 +2190,7 @@ async function main() {
   }
   if (options.preflightReport) {
     const report = await buildPreflightReport(options)
-    await writeJSONReport(options.preflightReport, report)
+    await writeBrowserSmokeJsonReport(options.preflightReport, report)
     process.stdout.write(
       `[mobile-workflow-runtime-browser-smoke] preflight report written: ${path.relative(repoRoot, options.preflightReport)} ready=${report.readyForRealSmoke}\n`
     )
@@ -2312,7 +2226,14 @@ async function main() {
     assertNoURLCredentials(backendHealthURL)
     await ensureURLReady(backendHealthURL.toString(), 'backend health')
     if (!options.externalBaseURLProvided) {
-      devServerProcess = startDevServer(options)
+      devServerProcess = startBrowserSmokeDevServer({
+        webDir,
+        port: options.port,
+        backendURL: options.backendURL,
+        onLog: (chunk) => {
+          devServerLogs += chunk
+        },
+      })
       await ensureURLReady(options.baseURL, 'vite preview')
     }
 
@@ -2595,7 +2516,7 @@ async function main() {
         updatedWarehouseTask,
         workflowEventChecks,
       })
-      await writeJSONReport(options.report, report)
+      await writeBrowserSmokeJsonReport(options.report, report)
     }
     process.stdout.write(
       `[mobile-workflow-runtime-browser-smoke] 通过，blocked=${createdBossTask.task_code} rejected=${createdBossRejectTask.task_code} done=${createdBossDoneTask.task_code} qualityDone=${createdQualityTask.task_code} warehouseInboundDone=${createdWarehouseInboundTask.task_code} urged=${createdWarehouseTask.task_code} base=${options.baseURL}${options.report ? ` report=${path.relative(repoRoot, options.report)}` : ''}\n`
@@ -2604,7 +2525,8 @@ async function main() {
     try {
       await browser?.close()
     } finally {
-      await stopDevServer()
+      await stopBrowserSmokeDevServer(devServerProcess)
+      devServerProcess = null
     }
   }
 }

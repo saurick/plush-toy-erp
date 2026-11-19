@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -22,6 +21,11 @@ import {
   buildYoyoosunLocalEntryAudit,
   defaultYoyoosunEntryAuditPorts,
 } from './yoyoosunLocalEntryAudit.mjs'
+import {
+  startBrowserSmokeDevServer,
+  stopBrowserSmokeDevServer,
+  probeBrowserSmokeURL,
+} from './browserSmokeRuntime.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
@@ -642,36 +646,6 @@ function resolveRepoOutputPath(raw, optionName) {
   return resolved
 }
 
-async function probeURL(url, { timeoutMs = 3000 } = {}) {
-  const startedAt = Date.now()
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal: controller.signal,
-    })
-    return {
-      ok: response.ok || response.status === 302 || response.status === 304,
-      status: response.status,
-      elapsedMs: Date.now() - startedAt,
-      error: '',
-    }
-  } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      elapsedMs: Date.now() - startedAt,
-      error:
-        error?.name === 'AbortError'
-          ? 'timeout'
-          : String(error?.message || error),
-    }
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 async function buildPreflightReport(runtime = {}) {
   const menuProjectionPlan = buildMenuProjectionPlan()
   const menuProjectionCoverage = buildMenuProjectionCoverage(menuProjectionPlan)
@@ -681,7 +655,7 @@ async function buildPreflightReport(runtime = {}) {
   const presentPasswordEnvNames = passwordEnvNames.filter((name) =>
     Boolean(String(process.env[name] || '').trim())
   )
-  const backendHealth = await probeURL(backendHealthURL)
+  const backendHealth = await probeBrowserSmokeURL(backendHealthURL)
   const yoyoosunEntryAudit = await buildTrialYoyoosunEntryAudit(runtime)
   const suggestedRealSmokeCommand = [
     "TRIAL_ACCOUNT_PASSWORD='<local-demo-password>'",
@@ -1176,7 +1150,13 @@ async function main() {
   await fs.mkdir(outputDir, { recursive: true })
   await ensureBackendReady()
   if (!externalBaseURL) {
-    devServerProcess = startDevServer()
+    devServerProcess = startBrowserSmokeDevServer({
+      webDir,
+      port: devServerPort,
+      onLog: (chunk) => {
+        devServerLogs += chunk
+      },
+    })
     await waitForServer(baseURL)
   }
 
@@ -1226,7 +1206,8 @@ async function main() {
     })
   } finally {
     await browser.close()
-    await stopDevServer()
+    await stopBrowserSmokeDevServer(devServerProcess)
+    devServerProcess = null
   }
 
   const report = buildRealSmokeReport({
@@ -1254,60 +1235,6 @@ async function main() {
   process.stdout.write(
     `[trial-demo-account-browser-smoke] 通过，桌面账号 ${verifiedDesktop.length} 个，岗位任务端 ${verifiedMobile.length} 个，拒绝态 1 个。base=${baseURL}\n`
   )
-}
-
-function startDevServer() {
-  const child = spawn(
-    'pnpm',
-    [
-      'exec',
-      'vite',
-      '--config',
-      'vite.config.mjs',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(devServerPort),
-      '--strictPort',
-    ],
-    {
-      cwd: webDir,
-      env: {
-        ...process.env,
-        BROWSER: 'none',
-        ERP_VITE_PORT: String(devServerPort),
-        ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  )
-  child.stdout.on('data', (chunk) => {
-    devServerLogs += chunk.toString()
-  })
-  child.stderr.on('data', (chunk) => {
-    devServerLogs += chunk.toString()
-  })
-  child.on('exit', (code) => {
-    if (code !== null && code !== 0) {
-      devServerLogs += `\n[vite exited with code ${code}]`
-    }
-  })
-  return child
-}
-
-async function stopDevServer() {
-  if (!devServerProcess) return
-  if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGTERM')
-    await Promise.race([
-      new Promise((resolve) => devServerProcess.once('exit', resolve)),
-      delay(3000),
-    ])
-  }
-  if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGKILL')
-  }
-  devServerProcess = null
 }
 
 async function ensureBackendReady() {

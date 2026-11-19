@@ -2,6 +2,7 @@ import { positiveID } from './sourceDocumentValues.mjs'
 import { optionalOccurredAtFromForm } from './factOccurredAt.mjs'
 import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
+import { formatLocalDateTimeInputValue } from './dateRange.mjs'
 
 const MAX_FACT_NO_LENGTH = 64
 const MAX_NOTE_LENGTH = BusinessTextPolicy.noteMaxCharacters
@@ -121,13 +122,6 @@ export function financeBusinessSourceActionConfig(action) {
   const config = ACTION_CONFIGS[normalizedText(action)]
   if (!config) throw new Error('请选择财务来源操作')
   return config
-}
-
-export function localFinanceDateTimeInputValue(now = new Date()) {
-  const timestamp = now instanceof Date ? now.getTime() : Number.NaN
-  if (!Number.isFinite(timestamp)) return ''
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(timestamp - offset).toISOString().slice(0, 16)
 }
 
 function sourceBusinessNo(action, source = {}) {
@@ -308,7 +302,7 @@ export function financeBusinessSourceFormValuesFromRequest(request = {}) {
     fact_no: normalizedText(request.fact_no),
     occurred_at:
       occurredAt && Number.isFinite(occurredAt.getTime())
-        ? localFinanceDateTimeInputValue(occurredAt)
+        ? formatLocalDateTimeInputValue(occurredAt)
         : '',
     note: normalizedText(request.note),
   }

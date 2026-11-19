@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Space } from 'antd'
+import { Alert, Button, Space, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -9,24 +9,40 @@ import {
   FinancePaymentStatus,
 } from '../../../common/consts/statuses.generated.mjs'
 import { listFinancePayments } from '../../api/operationalFactApi.mjs'
-import { currentBusinessDate } from '../../utils/businessDate.mjs'
-import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
+import { unixSecondsToBusinessDate } from '../../utils/businessDate.mjs'
+import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import {
-  summaryDate,
+  compareNumeric20Scale6Units,
+  formatNumeric20Scale6Summary,
+  numeric20Scale6AggregateUnits,
+} from '../../utils/numeric20Scale6.mjs'
+import {
+  readPaymentSummaryPeriod,
   updateSummarySearch,
 } from '../../utils/workbenchSummary.mjs'
-import { DateInput } from '../business-list/BusinessDateInputs.jsx'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
 } from '../business-list/BusinessListLayout.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import { paymentSourceReference } from '../finance/financePaymentPresentation.jsx'
+import PaymentSummaryPeriodPicker from './PaymentSummaryPeriodPicker.jsx'
 
 const { RECEIPT, DISBURSEMENT } = FinancePaymentDirection
 const detailPageSize = 20
+const sortTooltip = {
+  target: 'sorter-icon',
+  placement: 'bottom',
+  styles: { root: { pointerEvents: 'none' } },
+}
 const money = (value) => formatNumeric20Scale6Summary(value, 2)
+const amountUnits = (row, direction) => numeric20Scale6AggregateUnits(row[direction]?.amount ?? '0')
 const detailColumns = [
+  {
+    title: '收付日期',
+    dataIndex: 'occurred_at',
+    render: (value) => unixSecondsToBusinessDate(value) || '—',
+  },
   { title: '收付款单号', dataIndex: 'payment_no' },
   { title: '金额', dataIndex: 'amount', align: 'right', render: money },
   { title: '收付款账户摘要', dataIndex: 'account_ref' },
@@ -38,7 +54,7 @@ const detailColumns = [
   },
 ]
 
-function usePostedPayments(date, refreshRevision, group, page = 1) {
+function usePostedPayments({ dateFrom, dateTo }, refreshRevision, group, page = 1) {
   const [attempt, setAttempt] = useState(0)
   const [response, setResponse] = useState(null)
   const currency = group?.currency
@@ -46,8 +62,7 @@ function usePostedPayments(date, refreshRevision, group, page = 1) {
   const request = useMemo(
     () => ({
       params: {
-        date_from: date,
-        date_to: date,
+        ...(dateFrom ? { date_from: dateFrom, date_to: dateTo } : {}),
         status: FinancePaymentStatus.POSTED,
         ...(direction
           ? {
@@ -61,7 +76,7 @@ function usePostedPayments(date, refreshRevision, group, page = 1) {
       refreshRevision,
       attempt,
     }),
-    [date, direction, currency, page, refreshRevision, attempt]
+    [dateFrom, dateTo, direction, currency, page, refreshRevision, attempt]
   )
   useEffect(() => {
     const controller = new AbortController()
@@ -101,10 +116,10 @@ function queryError(error, retry) {
   )
 }
 
-function PaymentDetailRows({ date, group, refreshRevision }) {
+function PaymentDetailRows({ range, group, refreshRevision }) {
   const [page, setPage] = useState(1)
   const { data, loading, error, retry } = usePostedPayments(
-    date,
+    range,
     refreshRevision,
     group,
     page
@@ -134,13 +149,13 @@ function PaymentDetailRows({ date, group, refreshRevision }) {
   )
 }
 
-function DailyPaymentTotals({ date, refreshRevision }) {
+function PaymentPeriodTotals({ range, scope, refreshRevision, onShowAll }) {
   const [group, setGroup] = useState(null)
   const amountId = useId()
   const openerId = useRef(null)
   const overlay = useOverlayScope()
   const { data, loading, error, retry } = usePostedPayments(
-    date,
+    range,
     refreshRevision
   )
   const rows = useMemo(() => {
@@ -155,8 +170,8 @@ function DailyPaymentTotals({ date, refreshRevision }) {
       a.currency.localeCompare(b.currency)
     )
   }, [data])
-  const columns = [
-    { title: '币种', dataIndex: 'currency' },
+  const columns = applyBusinessColumnSorters([
+    { title: '币种', dataIndex: 'currency', showSorterTooltip: sortTooltip },
     ...[
       [RECEIPT, '收款'],
       [DISBURSEMENT, '付款'],
@@ -165,6 +180,11 @@ function DailyPaymentTotals({ date, refreshRevision }) {
         title: `已入账${label}`,
         dataIndex: direction,
         align: 'right',
+        showSorterTooltip: sortTooltip,
+        sorter: (left, right) => compareNumeric20Scale6Units(
+          amountUnits(left, direction),
+          amountUnits(right, direction)
+        ),
         render: (item) =>
           item ? (
             <Button
@@ -186,10 +206,13 @@ function DailyPaymentTotals({ date, refreshRevision }) {
         title: `${label}笔数`,
         key: `${direction}-count`,
         align: 'right',
-        render: (_, row) => row[direction]?.count ?? 0,
+        dataIndex: [direction, 'count'],
+        showSorterTooltip: sortTooltip,
+        sortValue: (row) => row[direction]?.count ?? 0,
+        render: (count) => count ?? 0,
       },
     ]),
-  ]
+  ])
   return (
     <>
       {error ? (
@@ -201,7 +224,12 @@ function DailyPaymentTotals({ date, refreshRevision }) {
           dataSource={rows}
           loading={loading}
           pagination={false}
-          emptyDescription="该收付日期没有已入账的收付款"
+          emptyDescription={loading ? '正在读取收付款汇总…' : range.dateFrom ? (
+            <Space direction="vertical" size={0}>
+              <span>所选期间没有已入账的收付款</span>
+              <Button type="link" onClick={onShowAll}>查看全部历史</Button>
+            </Space>
+          ) : '没有已入账的收付款'}
         />
       )}
       <BusinessModal
@@ -223,9 +251,9 @@ function DailyPaymentTotals({ date, refreshRevision }) {
       >
         {group && (
           <>
-            <p className="erp-business-inline-note">{date} · 已入账</p>
+            <p className="erp-business-inline-note">{scope}</p>
             <PaymentDetailRows
-              date={date}
+              range={range}
               group={group}
               refreshRevision={refreshRevision}
             />
@@ -236,18 +264,15 @@ function DailyPaymentTotals({ date, refreshRevision }) {
   )
 }
 
-function PaymentSummaryControls({ typeControl, date, onChange }) {
+function PaymentSummaryControls({ typeControl, periodRef, range, onChange, scope }) {
   return (
-    <Space wrap>
+    <div className="erp-payment-summary-filters">
       {typeControl}
-      <DateInput
-        prefix="收付日期"
-        aria-label="收付日期"
-        value={date}
-        onChange={onChange}
-        allowClear={false}
-      />
-    </Space>
+      <PaymentSummaryPeriodPicker periodRef={periodRef} range={range} onChange={onChange} />
+      <Typography.Text type="secondary" role="status">
+        {range.period === 'custom' || range.period === 'all' ? '仅已入账' : scope}
+      </Typography.Text>
+    </div>
   )
 }
 
@@ -256,10 +281,18 @@ export default function FinancePaymentSummaryPanel({
   refreshRevision,
 }) {
   const [params, setParams] = useSearchParams()
-  const today = currentBusinessDate()
-  const date = summaryDate(params.get('payments.date')) || today
-  const changeDate = (value) => {
-    const next = updateSummarySearch(params, 'payments', { date: value === today ? '' : value })
+  const periodRef = useRef(null)
+  const range = readPaymentSummaryPeriod(params)
+  const { dateFrom, dateTo } = range
+  const dateLabel = dateFrom === dateTo ? dateFrom : `${dateFrom} 至 ${dateTo}`
+  const scope = `${dateLabel ? `收付日期：${dateLabel}` : '不限收付日期'} · 仅已入账`
+  const changePeriod = (period, from, to) => {
+    const next = updateSummarySearch(params, 'payments', {
+      period: period === 'month' ? '' : period,
+      from,
+      to,
+      date: '',
+    })
     setParams(next, { replace: true })
   }
   return (
@@ -270,15 +303,22 @@ export default function FinancePaymentSummaryPanel({
           <PaymentSummaryControls
             inline
             typeControl={summaryTypeControl}
-            date={date}
-            onChange={changeDate}
+            periodRef={periodRef}
+            range={range}
+            onChange={changePeriod}
+            scope={scope}
           />
         }
       />
-      <DailyPaymentTotals
-        key={date}
-        date={date}
+      <PaymentPeriodTotals
+        key={`${range.dateFrom}:${range.dateTo}`}
+        range={range}
+        scope={scope}
         refreshRevision={refreshRevision}
+        onShowAll={() => {
+          changePeriod('all')
+          periodRef.current?.focus({ preventScroll: true })
+        }}
       />
     </>
   )

@@ -27,16 +27,44 @@ func getMap(pm map[string]any, key string) map[string]any {
 	return map[string]any{}
 }
 
-func getOptionalPositiveIntPtr(pm map[string]any, key string) *int {
-	raw, ok := pm[key]
-	if !ok || raw == nil {
-		return nil
+func getOptionalJSONRPCPositiveInt(pm map[string]any, key string) (*int, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
 	}
-	value := getInt(pm, key, 0)
-	if value <= 0 {
-		return nil
+	value, ok := getRequiredJSONRPCPositiveInt(pm, key)
+	if !ok {
+		return nil, false
 	}
-	return &value
+	return &value, true
+}
+
+func getOptionalJSONRPCString(pm map[string]any, key string) (*string, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return nil, false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, true
+	}
+	return &value, true
+}
+
+func getOptionalJSONRPCMap(pm map[string]any, key string) (map[string]any, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return map[string]any{}, true
+	}
+	value, ok := raw.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	return value, true
 }
 
 func getOptionalJSONRPCNonNegativeInt(pm map[string]any, key string) (*int, bool) {

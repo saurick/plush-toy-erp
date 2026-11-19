@@ -1038,7 +1038,7 @@ func normalizeProductSKUMutation(in ProductSKUMutation) (ProductSKUMutation, err
 	in.Size = normalizeOptionalString(in.Size)
 	in.PackagingVersion = normalizeOptionalString(in.PackagingVersion)
 	if in.DefaultUnitID != nil && *in.DefaultUnitID <= 0 {
-		in.DefaultUnitID = nil
+		return ProductSKUMutation{}, ErrBadParam
 	}
 	if in.ProductID <= 0 || in.SKUCode == "" ||
 		!validNetWeightG(in.UnitNetWeightG) ||

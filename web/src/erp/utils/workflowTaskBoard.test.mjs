@@ -182,6 +182,36 @@ test('workflowTaskBoard: 分类只提供可以匹配的状态和日期条件', (
   }
 })
 
+test('截止日期范围随网址恢复，日历、快捷条件和已结束任务各自使用自己的时间', () => {
+  const dates = { dueDateFrom: '2026-11-18', dueDateTo: '2026-11-19' }
+  const url = writeWorkflowTaskBoardFiltersToSearch('q=包装', { ...dates, keyword: '包装', page: 2 })
+  const filters = readWorkflowTaskBoardFiltersFromSearch(url)
+  const request = buildWorkflowTaskBoardRequest(filters)
+  assert.equal(request.due_date_from, dates.dueDateFrom)
+  assert.equal(request.due_date_to, dates.dueDateTo)
+  assert.equal(request.offset, 20)
+  assert.equal(request.date_from, undefined)
+  assert.equal(workflowTaskBoardExtraFilterCount(filters), 1)
+  assert.equal(workflowTaskBoardExtraFilterCount(filters, { calendar: true }), 0)
+  for (const field of ['dueDateFrom', 'dueDateTo']) {
+    const singleDay = readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', { [field]: dates.dueDateFrom }))
+    const query = buildWorkflowTaskBoardRequest(singleDay)
+    assert.equal(singleDay[field], dates.dueDateFrom)
+    assert.equal(query.due_date_from, dates.dueDateFrom)
+    assert.equal(query.due_date_to, dates.dueDateFrom)
+    assert.equal(workflowTaskBoardExtraFilterCount(singleDay), 1)
+  }
+  for (const query of [
+    buildWorkflowTaskBoardRequest(filters, { calendar: true }),
+    buildWorkflowTaskBoardRequest({ ...filters, due: 'noDue' }),
+    buildWorkflowTaskBoardRequest({ ...filters, lane: 'finished' }),
+    buildWorkflowTaskBoardRequest({ ...filters, dueDateFrom: '2026-11-20' }),
+  ]) {
+    assert.equal(query.due_date_from, undefined)
+    assert.equal(query.due_date_to, undefined)
+  }
+})
+
 const tasks = Object.freeze([
   {
     id: 1,

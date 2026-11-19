@@ -7,6 +7,10 @@ import {
   numeric20Scale6Units,
 } from './numeric20Scale6.mjs'
 import { unixSecondsToBusinessDate } from './businessDate.mjs'
+import {
+  isMutationResultUnknown,
+  stableMutationSignature,
+} from './mutationAttempt.mjs'
 
 export const PRODUCTION_ORDER_STATUS = ProductionOrderStatus
 
@@ -263,33 +267,13 @@ export function validateProductionOrderOptions(
   return data
 }
 
-export function isProductionOrderResultUnknown(error) {
-  const httpStatus = Number(error?.httpStatus || 0)
-  return Boolean(
-    error?.isNetworkError ||
-      error?.isAbortError ||
-      error?.isInvalidResponse ||
-      httpStatus === 408 ||
-      httpStatus >= 500 ||
-      Number(error?.code || 0) >= 50000
-  )
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) return value.map(stableValue)
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map((key) => [key, stableValue(value[key])])
-  )
-}
+export { isMutationResultUnknown as isProductionOrderResultUnknown }
 
 export function createProductionOrderAttemptStore() {
   const attempts = new Map()
   return {
     prepare(scope, payload) {
-      const signature = JSON.stringify(stableValue(payload))
+      const signature = stableMutationSignature(payload)
       const current = attempts.get(scope)
       if (current?.signature === signature) return current
       const attempt = Object.freeze({

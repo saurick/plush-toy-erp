@@ -20,6 +20,10 @@ import {
   createRealLoginSmokeRuntime,
   safeScreenshot,
 } from './realLoginSmokeShared.mjs'
+import {
+  probeBrowserSmokeURL,
+  writeBrowserSmokeJsonReport,
+} from './browserSmokeRuntime.mjs'
 
 const DEFAULT_PORT = resolveDevAuxPort(
   loadDevPorts(path.resolve(import.meta.dirname, '..', '..')),
@@ -98,7 +102,7 @@ export function buildInputTemplate() {
 export async function buildPreflightReport() {
   const baseURL = resolveSmokeBaseURL()
   const backendHealthURL = resolveBackendHealthURL()
-  const backendHealth = await probeURL(backendHealthURL)
+  const backendHealth = await probeBrowserSmokeURL(backendHealthURL)
   const credentialEnvNames = [
     'REAL_LOGIN_ADMIN_USERNAME',
     'REAL_LOGIN_ADMIN_PASSWORD',
@@ -313,7 +317,7 @@ async function runCli() {
 
   if (preflightReportPath) {
     const report = await buildPreflightReport()
-    await writeJSONReport(preflightReportPath, report)
+    await writeBrowserSmokeJsonReport(preflightReportPath, report)
     console.log(
       `[purchase-receipt-real-write-browser-e2e] preflight report written: ${path.relative(
         repoRoot,
@@ -405,42 +409,6 @@ function analyzeSafeWriteTarget(baseURL) {
     externalTargetAllowed,
     allowed: isLocalHost && ['http:', 'https:'].includes(targetURL.protocol),
   }
-}
-
-async function probeURL(url, { timeoutMs = 3000 } = {}) {
-  const startedAt = Date.now()
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal: controller.signal,
-    })
-    return {
-      ok: response.ok || response.status === 302 || response.status === 304,
-      status: response.status,
-      elapsedMs: Date.now() - startedAt,
-      error: '',
-    }
-  } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      elapsedMs: Date.now() - startedAt,
-      error:
-        error?.name === 'AbortError'
-          ? 'timeout'
-          : String(error?.message || error),
-    }
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-async function writeJSONReport(filePath, payload) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.writeFile(`${filePath}.tmp`, `${JSON.stringify(payload, null, 2)}\n`)
-  await fs.rename(`${filePath}.tmp`, filePath)
 }
 
 function assertSafePersistentWriteTarget(baseURL) {

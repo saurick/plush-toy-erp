@@ -21,7 +21,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProcesses); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.CreateProcess(ctx, processMutationFromParams(pm))
+		mutation, valid := processMutationFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.CreateProcess(ctx, mutation)
 		return id, processMutationResult(ctx, d, item, err), nil
 	case "update_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessUpdate); res != nil {
@@ -34,7 +38,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.masterDataUC.UpdateProcess(ctx, targetID, processMutationFromParams(pm))
+		mutation, valid := processMutationFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.masterDataUC.UpdateProcess(ctx, targetID, mutation)
 		return id, processMutationResult(ctx, d, item, err), nil
 	case "get_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRead); res != nil {
@@ -78,16 +86,21 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 	}
 }
 
-func processMutationFromParams(pm map[string]any) *biz.ProcessMutation {
+func processMutationFromParams(pm map[string]any) (*biz.ProcessMutation, bool) {
+	outsourcing, validOutsourcing := getOptionalJSONRPCBool(pm, "outsourcing_enabled")
+	inhouse, validInhouse := getOptionalJSONRPCBool(pm, "inhouse_enabled")
+	if !validOutsourcing || !validInhouse {
+		return nil, false
+	}
 	return &biz.ProcessMutation{
 		Code:                         getString(pm, "code"),
 		Name:                         getString(pm, "name"),
 		Category:                     getWorkflowStringPtr(pm, "category"),
 		ProductionRouteOperationCode: getWorkflowStringPtr(pm, "production_route_operation_code"),
-		OutsourcingEnabled:           getBool(pm, "outsourcing_enabled", false),
-		InhouseEnabled:               getBool(pm, "inhouse_enabled", true),
+		OutsourcingEnabled:           outsourcing != nil && *outsourcing,
+		InhouseEnabled:               inhouse == nil || *inhouse,
 		Note:                         getWorkflowStringPtr(pm, "note"),
-	}
+	}, true
 }
 
 func processMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.Process, err error) *v1.JsonrpcResult {

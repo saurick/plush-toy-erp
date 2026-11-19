@@ -171,22 +171,36 @@ func productMutationFromParams(pm map[string]any) (*biz.ProductMutation, bool) {
 }
 
 func productSKUMutationFromParams(pm map[string]any) (*biz.ProductSKUMutation, bool) {
-	unitNetWeightG, ok := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_g")
-	if !ok {
+	productID, validProduct := getRequiredJSONRPCPositiveInt(pm, "product_id")
+	skuCode, validCode := pm["sku_code"].(string)
+	defaultUnitID, validUnit := getOptionalJSONRPCPositiveInt(pm, "default_unit_id")
+	unitNetWeightG, validWeight := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_g")
+	if !validProduct || !validCode || !validUnit || !validWeight {
+		return nil, false
+	}
+
+	name, validName := getOptionalJSONRPCString(pm, "sku_name")
+	barcode, validBarcode := getOptionalJSONRPCString(pm, "barcode")
+	customerSKU, validCustomerSKU := getOptionalJSONRPCString(pm, "customer_sku")
+	color, validColor := getOptionalJSONRPCString(pm, "color")
+	colorNo, validColorNo := getOptionalJSONRPCString(pm, "color_no")
+	size, validSize := getOptionalJSONRPCString(pm, "size")
+	packagingVersion, validPackaging := getOptionalJSONRPCString(pm, "packaging_version")
+	if !validName || !validBarcode || !validCustomerSKU || !validColor || !validColorNo || !validSize || !validPackaging {
 		return nil, false
 	}
 	return &biz.ProductSKUMutation{
-		ProductID:        getInt(pm, "product_id", 0),
-		SKUCode:          getString(pm, "sku_code"),
-		SKUName:          getWorkflowStringPtr(pm, "sku_name"),
-		Barcode:          getWorkflowStringPtr(pm, "barcode"),
-		CustomerSKU:      getWorkflowStringPtr(pm, "customer_sku"),
-		Color:            getWorkflowStringPtr(pm, "color"),
-		ColorNo:          getWorkflowStringPtr(pm, "color_no"),
-		Size:             getWorkflowStringPtr(pm, "size"),
-		PackagingVersion: getWorkflowStringPtr(pm, "packaging_version"),
-		DefaultUnitID:    getOptionalPositiveIntPtr(pm, "default_unit_id"),
+		ProductID:        productID,
+		SKUCode:          skuCode,
+		DefaultUnitID:    defaultUnitID,
 		UnitNetWeightG:   unitNetWeightG,
+		SKUName:          name,
+		Barcode:          barcode,
+		CustomerSKU:      customerSKU,
+		Color:            color,
+		ColorNo:          colorNo,
+		Size:             size,
+		PackagingVersion: packagingVersion,
 	}, true
 }
 

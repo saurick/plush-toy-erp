@@ -271,6 +271,9 @@ func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.W
 }
 
 func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) (*ent.WorkflowTaskQuery, error) {
+	if filter.DueFrom != nil && filter.DueBefore != nil {
+		query = query.Where(workflowtask.DueAtGTE(*filter.DueFrom), workflowtask.DueAtLT(*filter.DueBefore))
+	}
 	if filter.CompletedFrom != nil {
 		query = query.Where(workflowtask.CompletedAtGTE(*filter.CompletedFrom))
 	}

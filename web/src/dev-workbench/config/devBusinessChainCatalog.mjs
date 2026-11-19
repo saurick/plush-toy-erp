@@ -180,7 +180,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainNode('stock_reservation', '销售库存预留', 'fact_ledger', {
         machineKeys: ['fact.stock_reservation'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_reservation.go'],
       }),
       chainNode('production_order', '生产订单', 'source_document', {
         machineKeys: ['source.production_order'],
@@ -249,7 +249,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           condition:
             '订单已生效且有可预留成品；不作为生产前置，不由审批自动创建。',
           factBoundary: 'stock_reservation_fact',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_reservation.go'],
         }
       ),
       chainEdge(
@@ -366,7 +366,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
       chainNode('purchase_payable', '已过账采购应付', 'fact_ledger', {
         machineKeys: ['fact.finance'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
       }),
     ],
     [
@@ -484,7 +484,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         {
           action: 'OperationalFactUsecase.PostFinanceFact',
           factBoundary: 'finance_fact_posted',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
         }
       ),
       chainEdge(
@@ -522,7 +522,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
       chainNode('production_completion', '仓库登记成品入库', 'fact_ledger', {
         machineKeys: ['fact.production'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_production.go'],
       }),
       chainNode('finished_goods_lot', '正式成品库存', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
@@ -595,11 +595,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
       chainNode('outsourcing_issue', '委外发料事实', 'fact_ledger', {
         machineKeys: ['fact.outsourcing'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_outsourcing.go'],
       }),
       chainNode('outsourcing_return', '委外回货事实', 'fact_ledger', {
         machineKeys: ['fact.outsourcing'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_outsourcing.go'],
       }),
       chainNode('outsourcing_quality', '委外回货质检', 'fact_ledger', {
         machineKeys: ['fact.quality_inspection'],
@@ -619,7 +619,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
       chainNode('outsourcing_payable', '已过账委外应付', 'fact_ledger', {
         machineKeys: ['fact.finance'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
       }),
     ],
     [
@@ -634,7 +634,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           factBoundary: 'outsourcing_issue_and_inventory',
           sourceRefs: [
             'server/internal/biz/outsourcing_order.go',
-            'server/internal/biz/operational_fact.go',
+            'server/internal/biz/operational_fact_outsourcing.go',
           ],
         }
       ),
@@ -648,7 +648,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
             'OperationalFactUsecase.CreateOutsourcingReturnReceiptFromOrder / PostOutsourcingFact',
           condition: '按已确认合同登记回货，仓库显式过账形成回货与库存流水；草稿不能创建回货质检。',
           factBoundary: 'outsourcing_return_receipt',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_outsourcing.go'],
         }
       ),
       chainEdge(
@@ -710,7 +710,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         {
           action: 'OperationalFactUsecase.PostFinanceFact',
           factBoundary: 'finance_fact_posted',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
         }
       ),
     ]
@@ -723,7 +723,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     [
       chainNode('shipment_draft', '出货单', 'fact_ledger', {
         machineKeys: ['fact.shipment'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_shipment.go'],
       }),
       chainNode(
         'shipment_release_process',
@@ -747,19 +747,19 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('shipment_rejected', '财务审批拒绝 · 本次结束', 'derived_result', { terminal: true, risk: true, machineKeys: ['fact.shipment_finance_release'], summary: '拒绝保持禁止实际出货；重新提交仍按正式放行合同办理。', sourceRefs: ['server/internal/biz/shipment_process_command.go'] }),
       chainNode('shipped', '真实出货事实', 'fact_ledger', {
         machineKeys: ['fact.shipment'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_shipment.go'],
       }),
       chainNode('receivable_draft', '应收或发票草稿', 'fact_ledger', {
         machineKeys: ['fact.finance'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
       }),
       chainNode('receivable', '已过账应收或发票', 'fact_ledger', {
         machineKeys: ['fact.finance'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
       }),
       chainNode('shipment_cancelled', '已取消出货事实', 'fact_ledger', {
         machineKeys: ['fact.shipment'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_shipment.go'],
       }),
     ],
     [
@@ -771,7 +771,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         {
           action: 'OperationalFactUsecase.SubmitShipmentRelease',
           factBoundary: 'shipment_release_not_shipped',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_shipment.go'],
         }
       ),
       chainEdge(
@@ -803,7 +803,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge('shipment_release', 'shipped', '有效放行且发货条件满足，显式确认实际出货', 'posts_fact', {
         action: 'OperationalFactUsecase.ShipShipmentWithActor',
         factBoundary: 'shipment_and_inventory',
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_shipment.go'],
       }),
       chainEdge(
         'shipped',
@@ -814,7 +814,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           action:
             'OperationalFactUsecase.CreateReceivableFromShipment / CreateInvoiceFromShipment',
           factBoundary: 'finance_draft_after_shipped',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
         }
       ),
       chainEdge(
@@ -825,7 +825,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         {
           action: 'OperationalFactUsecase.PostFinanceFact',
           factBoundary: 'finance_fact_after_shipped',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
         }
       ),
       chainEdge(
@@ -836,7 +836,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         {
           action: 'OperationalFactUsecase.CancelShippedShipmentWithActor',
           factBoundary: 'shipment_and_inventory_correction',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
+          sourceRefs: ['server/internal/biz/operational_fact_shipment.go'],
         }
       ),
       chainEdge(
@@ -869,7 +869,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
       chainNode('open_finance_fact', '未结应收 / 应付', 'fact_ledger', {
         machineKeys: ['fact.finance'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_finance.go'],
       }),
       chainNode(
         'finance_payment_process',
@@ -1266,7 +1266,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
       chainNode('affected_production_fact', '后续正常生产事实', 'fact_ledger', {
         machineKeys: ['fact.production'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_production.go'],
       }),
     ],
     [
@@ -1383,7 +1383,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           factBoundary: 'later_normal_production_fact_only',
           sourceRefs: [
             'server/internal/biz/production_wip.go',
-            'server/internal/biz/operational_fact.go',
+            'server/internal/biz/operational_fact_production.go',
           ],
         }
       ),
@@ -1396,7 +1396,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           action: 'OperationalFactUsecase.PostProductionFact',
           factBoundary: 'later_material_issue_fact_only',
           sourceRefs: [
-            'server/internal/biz/operational_fact.go',
+            'server/internal/biz/operational_fact_production.go',
             'server/internal/data/operational_fact_production_repo.go',
             'server/internal/data/production_exception_decision_repo.go',
           ],
@@ -1519,7 +1519,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
       chainNode('outsourcing_correction', '委外事实修正', 'fact_ledger', {
         machineKeys: ['fact.outsourcing'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
+        sourceRefs: ['server/internal/biz/operational_fact_outsourcing.go'],
       }),
       chainNode('outsourcing_quarantine_lot', '隔离或扣减库存', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
@@ -1548,7 +1548,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           factBoundary: 'outsourcing_return_correction',
           sourceRefs: [
             'server/internal/biz/outsourcing_return_disposition.go',
-            'server/internal/biz/operational_fact.go',
+            'server/internal/biz/operational_fact_outsourcing.go',
           ],
         }
       ),

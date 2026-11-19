@@ -1,0 +1,83 @@
+.erp-payment-summary-filters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.erp-payment-period__trigger.ant-btn {
+  max-width: 100%;
+  height: auto;
+  min-height: var(--erp-form-control-height);
+  padding-block: 4px;
+  white-space: normal;
+}
+.erp-payment-period__label,
+.erp-payment-period__trigger > .anticon:last-child {
+  flex-shrink: 0;
+  color: var(--erp-text-muted);
+}
+.erp-payment-period__value {
+  min-width: 0;
+  text-align: start;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.erp-payment-period__value > span {
+  white-space: nowrap;
+}
+.erp-payment-period-popover {
+  width: min(688px, calc(var(--erp-overlay-width, 100vw) - 32px));
+  container: erp-date-range / inline-size;
+}
+.erp-payment-period__panel {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  overflow-y: auto;
+}
+.erp-payment-period__presets.erp-filter-chip-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+.erp-payment-period__calendar {
+  min-width: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid var(--erp-border);
+}
+.erp-payment-period__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--erp-border);
+}
+.erp-payment-period__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+@container erp-date-range (max-width: 640px) {
+  .erp-payment-period__panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .erp-payment-period__presets.erp-filter-chip-group {
+    flex-direction: row;
+  }
+  .erp-payment-period__calendar {
+    padding-inline-start: 0;
+    padding-block-start: 8px;
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--erp-border);
+  }
+}
+@media (pointer: coarse) {
+  .erp-payment-period__actions > .ant-btn {
+    min-height: 44px;
+  }
+}

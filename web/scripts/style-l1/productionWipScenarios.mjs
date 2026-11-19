@@ -1,4 +1,6 @@
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
 import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
 import { createProductionTaskHandlingScenarios } from './productionTaskHandlingScenarios.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
@@ -44,7 +46,14 @@ async function clickVisibleAction(page, text) {
 async function releaseProductionOrder(page, expectText) {
   await page.getByText('MO-STYLE-L1-20260713', { exact: true }).first().click()
   await clickVisibleAction(page, '发布')
-  await page.getByRole('button', { name: '确认发布' }).click()
+  const confirmation = page
+    .locator('.ant-modal-confirm:visible')
+    .filter({ hasText: '确认发布生产订单？' })
+  await confirmation.waitFor({ state: 'visible' })
+  await waitForFiniteAnimations(page, { selector: '.ant-modal-confirm' })
+  await confirmation
+    .getByRole('button', { name: '确认发布', exact: true })
+    .click()
   await expectText(page, '生产订单已发布，排产确认已进入 PMC 待办')
 }
 
@@ -412,9 +421,42 @@ result: styleRpcResult(stylePaginatedRpcData([
         await routeModal.getByRole('button', { name: '返回工序' }).click()
 
         await splitButton.click()
-        await routeModal.getByLabel('拆出数量').fill('1')
-        await routeModal.getByRole('button', { name: '确认办理' }).click()
-        await expectText(page, '在制批次已拆分')
+        const splitQuantity = routeModal.getByLabel('拆出数量')
+        const submit = routeModal.getByRole('button', { name: '确认办理' })
+        await splitQuantity.fill('1')
+        const attempts = []
+        const failFirstWrite = async (route) => {
+          const body = route.request().postDataJSON()
+          if (body.method !== 'execute_production_wip_action') return route.fallback()
+          attempts.push(body.params)
+          if (attempts.length > 1) return route.fallback()
+          await route.fulfill({
+            json: { jsonrpc: '2.0', id: body.id, result: { code: RpcErrorCode.INTERNAL, message: '请求失败，请稍后重试' } },
+          })
+        }
+        await page.route('**/rpc/production_wip', failFirstWrite)
+        try {
+          // An own property shadows the browser's native prototype method for this submission.
+          await page.evaluate(() => { Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true }) })
+          try {
+            await submit.click()
+            await expectText(page, '当前浏览器暂时无法安全提交，请刷新或升级浏览器后重试')
+            assert.equal(await splitQuantity.inputValue(), '1')
+            assert.equal(attempts.length, 0)
+          } finally {
+            await page.evaluate(() => { delete crypto.randomUUID })
+          }
+          await submit.click()
+          await expectText(page, '暂时无法确认工序是否已办理，请核对进度；填写内容未变时可再次确认办理')
+          assert.equal(await splitQuantity.inputValue(), '1')
+          await submit.click()
+          await expectText(page, '在制批次已拆分')
+          assert.equal(attempts.length, 2)
+          assert.ok(attempts[0].idempotency_key)
+          assert.deepEqual(attempts[1], attempts[0])
+        } finally {
+          await page.unroute('**/rpc/production_wip', failFirstWrite)
+        }
         await expectText(page, '19')
 
         const desktopMetrics = await routeModal.evaluate((element) => {

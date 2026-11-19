@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
@@ -7,6 +6,10 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 
 import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
+import {
+  startBrowserSmokeDevServer,
+  writeBrowserSmokeJsonReport,
+} from './browserSmokeRuntime.mjs'
 
 const INPUT_TEMPLATE_SCOPE = 'real-login-smoke-shared-input-template'
 const PREFLIGHT_SCOPE = 'real-login-smoke-shared-preflight-report'
@@ -107,9 +110,9 @@ export function createRealLoginSmokeRuntime({
     })
 
     if (!externalBaseURL) {
-      devServerProcess = startDevServer({
+      devServerProcess = startBrowserSmokeDevServer({
         webDir,
-        devServerPort,
+        port: devServerPort,
         backendURL: new URL(backendHealthURL).origin,
         onLog: (chunk) => {
           devServerLogs += chunk
@@ -274,6 +277,49 @@ export function attachErrorCollectors(page) {
   })
 
   return errors
+}
+
+export async function assertPdfPreviewPopupReady(popup) {
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    if (popup.url().startsWith('blob:')) {
+      return
+    }
+    const iframeCount = await popup
+      .locator('iframe.pdf-preview-frame')
+      .count()
+      .catch(() => 0)
+    if (iframeCount > 0) {
+      await popup
+        .locator('iframe.pdf-preview-frame')
+        .waitFor({ state: 'visible', timeout: 1_000 })
+      break
+    }
+    await popup.waitForTimeout(100)
+  }
+  assert.ok(
+    popup.url().startsWith('blob:') ||
+      (await popup
+        .locator('iframe.pdf-preview-frame')
+        .count()
+        .catch(() => 0)) > 0,
+    `PDF 预览页未进入 blob 或 iframe 预览状态，当前 URL: ${popup.url()}`
+  )
+
+  await popup.waitForTimeout(300)
+  const state = await popup.evaluate(() => {
+    const iframe = document.querySelector('iframe.pdf-preview-frame')
+    return {
+      bodyText: document.body?.textContent?.trim() || '',
+      iframeSrc: iframe?.getAttribute('src') || '',
+      iframeCount: document.querySelectorAll('iframe.pdf-preview-frame').length,
+    }
+  })
+
+  assert.equal(state.iframeCount, 1)
+  assert.match(state.iframeSrc, /^blob:/)
+  assert.doesNotMatch(state.bodyText, /正在等待 PDF 预览结果/)
+  assert.doesNotMatch(state.bodyText, /PDF 预览不存在或已过期/)
 }
 
 export async function verifyPdfDownloadButton(page, { timeout = 15_000 } = {}) {
@@ -531,43 +577,6 @@ async function ensureBackendReady(backendHealthURL) {
   }
 }
 
-function startDevServer({ webDir, devServerPort, backendURL, onLog }) {
-  const child = spawn(
-    'pnpm',
-    [
-      'exec',
-      'vite',
-      '--config',
-      'vite.config.mjs',
-      '--host',
-      '127.0.0.1',
-      '--port',
-      String(devServerPort),
-      '--strictPort',
-    ],
-    {
-      cwd: webDir,
-      env: {
-        ...process.env,
-        BROWSER: 'none',
-        API_ORIGIN: backendURL,
-        ERP_VITE_PORT: String(devServerPort),
-        ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  )
-
-  child.stdout.on('data', (chunk) => {
-    onLog(chunk.toString())
-  })
-  child.stderr.on('data', (chunk) => {
-    onLog(chunk.toString())
-  })
-
-  return child
-}
-
 async function runCli() {
   const args = process.argv.slice(2)
   if (args.includes('--print-input-template')) {
@@ -577,7 +586,7 @@ async function runCli() {
   const preflightReportPath = resolveOptionalReportPath(args)
   if (preflightReportPath) {
     const report = await buildRealLoginSmokePreflightReport()
-    await writeJSONReport(preflightReportPath, report)
+    await writeBrowserSmokeJsonReport(preflightReportPath, report)
     console.log(
       `[real-login-smoke-shared] preflight written: ${path.relative(repoDir, preflightReportPath)}`
     )
@@ -643,12 +652,6 @@ function resolveOptionalReportPath(args) {
     throw new Error('--preflight-report must stay inside the repository')
   }
   return resolved
-}
-
-async function writeJSONReport(filePath, data) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.writeFile(`${filePath}.tmp`, `${JSON.stringify(data, null, 2)}\n`)
-  await fs.rename(`${filePath}.tmp`, filePath)
 }
 
 if (

@@ -143,9 +143,25 @@ export function createProductionMaterialIssueScenarios(deps) {
               ).replace(/\s+/gu, ' ')}`
             )
           }
-          await detailModal
-            .getByRole('button', { name: '领料', exact: true })
-            .click()
+          const issueButton = detailModal.getByRole('button', {
+            name: '领料',
+            exact: true,
+          })
+          if (!(await issueButton.isEnabled())) {
+            throw new Error(
+              `生产领料入口持续处于加载态: ${JSON.stringify({
+                operationalFactMethods,
+                requirementListParams,
+                inventoryLotParams,
+                button: await issueButton.evaluate((node) => ({
+                  disabled: node.disabled,
+                  className: node.className,
+                  text: node.textContent,
+                })),
+              })}`
+            )
+          }
+          await issueButton.click()
 
           const issueModal = page
             .locator('.ant-modal:visible')
@@ -213,7 +229,10 @@ export function createProductionMaterialIssueScenarios(deps) {
           await issueModal
             .getByRole('button', { name: /生\s*成\s*领\s*料\s*记\s*录/u })
             .click()
-          await expectText(page, '领料记录草稿已生成，请到生产记录核对并过账')
+          await expectText(
+            page,
+            '领料记录草稿已生成，请到生产记录核对并确认领料出库'
+          )
 
           assert.equal(
             requirementListParams.length,

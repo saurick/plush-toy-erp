@@ -275,6 +275,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			"source_type",
 			"source_section",
 			"period", "date_from", "date_to",
+			"due_date_from", "due_date_to",
 			"module_key", "stage_key", "chain_key", "assignee",
 			"lane_key",
 			"sort",

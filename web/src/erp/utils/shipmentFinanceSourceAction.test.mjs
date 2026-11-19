@@ -3,7 +3,6 @@ import test from 'node:test'
 
 import {
   buildShipmentFinanceSourcePayload,
-  localDateTimeInputValue,
   shipmentFinanceSourceActionConfig,
 } from './shipmentFinanceSourceAction.mjs'
 
@@ -86,10 +85,4 @@ test('shipment finance payload rejects stale source state and invalid time', () 
       ),
     /发生时间无效/u
   )
-})
-
-test('local datetime input omits the timezone suffix expected by the control', () => {
-  const value = localDateTimeInputValue(new Date('2026-07-14T15:30:00+08:00'))
-  assert.match(value, /^2026-07-14T\d{2}:30$/u)
-  assert.equal(value.length, 16)
 })

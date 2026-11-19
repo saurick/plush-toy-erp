@@ -47,21 +47,17 @@ export function createQualitySourceActionScenarios(deps) {
     await more.click()
     const actionMenu = page.locator('.erp-business-selection-action-menu:visible')
     await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
-    const overflowButtons = actionMenu
+    const overflowButton = actionMenu
       .locator('button')
       .filter({ hasText: actionName })
-    await overflowButtons.first().waitFor({ state: 'visible' })
-    for (let index = 0; index < (await overflowButtons.count()); index += 1) {
-      const candidate = overflowButtons.nth(index)
-      if (compact(await candidate.innerText()) === compact(actionName)) {
-        return candidate
-      }
-    }
-    throw new Error(
-      `更多操作中缺少“${actionName}”: ${String(
-        (await actionMenu.innerText()) || ''
-      ).replace(/\s+/gu, ' ')}`
+      .first()
+    await overflowButton.waitFor({ state: 'visible' })
+    assert.equal(
+      compact(await overflowButton.innerText()),
+      compact(actionName),
+      `更多操作中的动作名称不精确: ${actionName}`
     )
+    return overflowButton
   }
 
   const clickSelectionAction = async (page, actionName) => {

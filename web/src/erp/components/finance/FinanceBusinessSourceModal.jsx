@@ -5,11 +5,11 @@ import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mj
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
   financeBusinessSourceActionConfig,
-  localFinanceDateTimeInputValue,
   suggestedFinanceBusinessNo,
 } from '../../utils/financeBusinessSourceAction.mjs'
 import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
@@ -122,7 +122,7 @@ export default function FinanceBusinessSourceModal({
     note: '',
     ...(initialValues || {}),
     occurred_at: isReconciliation
-      ? initialValues?.occurred_at ?? localFinanceDateTimeInputValue()
+      ? initialValues?.occurred_at ?? formatLocalDateTimeInputValue()
       : undefined,
   }
 

@@ -11,14 +11,21 @@ import {
 import { Button, Dropdown, Form, Space } from 'antd'
 import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
-import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
-import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
-import { canReadReference, loadReferenceIDs } from '../utils/remoteReferences.mjs'
+import {
+  useReferenceRecords,
+  useReferenceHydration,
+} from '../hooks/useReferenceRecords.js'
+import RemoteReferenceSelect, {
+  ReferenceRecordsProvider,
+} from '../components/RemoteReferenceSelect.jsx'
+import { canReadReference } from '../utils/remoteReferences.mjs'
 import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
-import { InventoryLotStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
-import { effectiveSessionAllowsPage, filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
+import {
+  effectiveSessionAllowsPage,
+  filterColumnsByEffectiveFieldPolicy,
+} from '../utils/adminProfileSync.mjs'
 import { useProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -32,7 +39,6 @@ import { message, useModal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
-import { DEFAULT_DELIVERY_COUNTRY } from '../utils/deliveryAddress.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessActionTooltip,
@@ -49,12 +55,17 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
-import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import { salesOrderLineGroupKey } from '../utils/sourceDocumentLineGroupKeys.mjs'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
+import { useSalesOrderEditor } from '../components/sales-orders/useSalesOrderEditor.mjs'
+import { useSalesOrderReservation } from '../components/sales-orders/useSalesOrderReservation.mjs'
 import {
   getSalesOrder,
   listAllContactsByOwner,
@@ -63,21 +74,7 @@ import {
   exportSalesOrders,
   listSalesOrders,
   listAllUnits,
-  listAllWarehouses,
-  saveSalesOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
-import {
-  createStockReservationFromSalesOrder,
-  listAllShipments,
-  listAllStockReservations,
-} from '../api/operationalFactApi.mjs'
-import {
-  listAllInventoryBalances,
-  listAllInventoryLots,
-} from '../api/inventoryApi.mjs'
-import {
-  normalizeSalesOrderItemFormValue,
-} from '../components/sales-orders/SalesOrderForm.jsx'
 import { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
 import { documentProductGalleryColumn } from '../components/business-list/BusinessDocumentProductGallery.jsx'
 import { DOCUMENT_PRODUCT_SOURCES } from '../utils/businessProductGallery.mjs'
@@ -112,29 +109,13 @@ import {
   SALES_ORDER_ITEM_STATUS_LABELS,
   SOURCE_DOCUMENT_ITEM_STATUS_TONES,
   statusText,
-  unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import {
-  buildSalesOrderItemParams,
-  buildSalesOrderParams,
-} from '../utils/sourceOrderParams.mjs'
-import {
-  buildOrderContactSnapshot,
   buildSalesOrderContactFormValues,
   buildSalesOrderCustomerSourceValues,
-  deliverySnapshotFormValues,
 } from '../utils/sourcePartySnapshots.mjs'
 import { parseBusinessSortValue } from '../utils/businessTableActions.mjs'
 import { isDraftSourceDocument } from '../utils/sourceDocumentEditing.mjs'
-import {
-  commitSourceDocumentSaveResult,
-  createSourceDocumentOpenEditController,
-  isMutationResultUnknown,
-  isResourceVersionConflict,
-  openSourceDocumentEditWithAccessGate,
-  selectOpenSourceDocumentItems,
-  settleSourceDocumentPostSaveEffect,
-} from '../utils/sourceDocumentMutation.mjs'
 import {
   DEFAULT_BUSINESS_PAGE_SIZE,
   createBusinessTablePagination,
@@ -164,16 +145,11 @@ import {
   uniqueReferenceOptions,
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
-import {
-  buildSalesOrderReservationItemChoices,
-  buildSalesOrderReservationPayload,
-} from '../utils/salesOrderReservationAction.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   requireSourceActionRecord,
   createSourceBusinessActionAttemptStore,
-  sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
 import {
   normalizeSourceOrderLifecycleReason,
@@ -186,55 +162,6 @@ const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
 function salesOwnerOptionFromText(text) {
   const value = String(text || '').trim()
   return value ? { value, label: value } : null
-}
-
-function reservationInventoryParams(item = {}) {
-  return {
-    subject_type: 'PRODUCT',
-    subject_id: Number(item.product_id || 0),
-    ...(Number(item.product_sku_id || 0) > 0
-      ? { product_sku_id: Number(item.product_sku_id) }
-      : {}),
-  }
-}
-
-function enrichReservationBalances(balances = [], warehouses = [], lots = []) {
-  const warehousesByID = new Map(
-    (Array.isArray(warehouses) ? warehouses : []).map((warehouse) => [
-      Number(warehouse?.id || 0),
-      warehouse,
-    ])
-  )
-  const lotsByID = new Map(
-    (Array.isArray(lots) ? lots : []).map((lot) => [Number(lot?.id || 0), lot])
-  )
-  return (Array.isArray(balances) ? balances : [])
-    .filter(
-      (balance) => !balance?.lot_id || lotsByID.has(Number(balance.lot_id))
-    )
-    .map((balance) => {
-      const warehouse = warehousesByID.get(Number(balance?.warehouse_id || 0))
-      const lot = lotsByID.get(Number(balance?.lot_id || 0))
-      return {
-        ...balance,
-        warehouse_name: warehouse?.name || warehouse?.code || '',
-        lot_no: lot?.lot_no || lot?.production_lot_no || '',
-      }
-    })
-}
-
-async function loadReservationStockForItem(item = {}) {
-  const params = reservationInventoryParams(item)
-  const [balanceData, lotData] = await Promise.all([
-    listAllInventoryBalances(params),
-    listAllInventoryLots({ ...params, status: InventoryLotStatus.ACTIVE }),
-  ])
-  return {
-    balances: Array.isArray(balanceData?.inventory_balances)
-      ? balanceData.inventory_balances
-      : [],
-    lots: Array.isArray(lotData?.inventory_lots) ? lotData.inventory_lots : [],
-  }
 }
 
 export default function SalesOrdersPage() {
@@ -254,7 +181,6 @@ export default function SalesOrdersPage() {
     [adminProfile]
   )
   const [loading, setLoading] = useState(false)
-  const [itemLoading, setItemLoading] = useState(false)
   const [referencesLoading, setReferencesLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
@@ -304,32 +230,33 @@ export default function SalesOrdersPage() {
     pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
   })
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [savedProgressReturn, setSavedProgressReturn] = useBusinessPageState('progressReturn', null)
-  const initialProgressReturn = useRef(location.state?.restoredSalesDeliverySelection || savedProgressReturn)
-  const restoreProgressSelection = useRef(initialProgressReturn.current?.orderID || 0)
+  const [savedProgressReturn, setSavedProgressReturn] = useBusinessPageState(
+    'progressReturn',
+    null
+  )
+  const initialProgressReturn = useRef(
+    location.state?.restoredSalesDeliverySelection || savedProgressReturn
+  )
+  const restoreProgressSelection = useRef(
+    initialProgressReturn.current?.orderID || 0
+  )
   const progressTriggerRef = useRef(null)
   const searchInputRef = useRef(null)
-  const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [engineeringOrderID, setEngineeringOrderID] = useState(null)
   const [materialRequestOrderID, setMaterialRequestOrderID] = useState(null)
   const canReviewMaterialRequest =
-    hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE) ||
-    hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE)
-  const [editingOrder, setEditingOrder] = useState(null)
+    hasActionPermission(
+      adminProfile,
+      PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE
+    ) ||
+    hasActionPermission(
+      adminProfile,
+      PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE
+    )
   const [detailOrder, setDetailOrder] = useState(null)
   const [orderForm] = Form.useForm()
   const [productSKUs, , mergeProductSKUs] = useReferenceRecords(adminProfile)
   const [customerContacts, setCustomerContacts] = useState([])
-  const [reservationOpen, setReservationOpen] = useState(false)
-  const [reservationLoading, setReservationLoading] = useState(false)
-  const [reservationContext, setReservationContext] = useState({
-    order: null,
-    items: [],
-    reservations: [],
-    shipments: [],
-    balances: [],
-    warehouses: [],
-  })
   const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
     'sales_order_id'
@@ -338,9 +265,12 @@ export default function SalesOrdersPage() {
     searchParams,
     'material_request_id'
   )
-  const engineeringEntry = outletContext?.taskBusiness?.task?.task_group === 'engineering_data'
+  const engineeringEntry =
+    outletContext?.taskBusiness?.task?.task_group === 'engineering_data'
   useEffect(() => {
-    if (engineeringEntry && routeSalesOrderID) setEngineeringOrderID(routeSalesOrderID)
+    if (engineeringEntry && routeSalesOrderID) {
+      setEngineeringOrderID(routeSalesOrderID)
+    }
   }, [engineeringEntry, routeSalesOrderID])
   const linkedKeyword = linkedDocumentContext(searchParams).keyword
   const resolvedRouteKeyword =
@@ -361,33 +291,10 @@ export default function SalesOrdersPage() {
       }),
     [adminProfile, allowedMenuPaths]
   )
-  const orderAttachmentRef = useRef(null)
   const contactLoadSeqRef = useRef(0)
-  const reservationContextRequestRef = useRef(0)
-  const reservationBalanceRequestRef = useRef(0)
-  const reservationInFlightRef = useRef(false)
-  const orderSaveInFlightRef = useRef(false)
-  const [orderCreateResultUnknown, setOrderCreateResultUnknown] =
-    useState(false)
-  const orderCreateAttemptsRef = useRef(
-    createSourceBusinessActionAttemptStore()
-  )
-  const orderCreateDraftValuesRef = useRef(null)
   const lifecycleInFlightRef = useRef(false)
   const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const reservationAttemptsRef = useRef(
-    createSourceBusinessActionAttemptStore()
-  )
-  const selectedOrderIDRef = useRef(0)
   const beginLatestRequest = useLatestRequestCoordinator()
-  const sourceDocumentOpenEditController = useMemo(
-    () =>
-      createSourceDocumentOpenEditController({
-        beginLatestRequest,
-        setLoading: setItemLoading,
-      }),
-    [beginLatestRequest]
-  )
 
   const canCreateOrder = hasActionPermission(
     adminProfile,
@@ -401,26 +308,40 @@ export default function SalesOrdersPage() {
     adminProfile,
     PermissionCode.SALES_ORDER_ITEM_READ
   )
-  const canOpenOrderProgress = location.pathname === BUSINESS_ROUTE_PATHS.salesOrders &&
+  const canOpenOrderProgress =
+    location.pathname === BUSINESS_ROUTE_PATHS.salesOrders &&
     canReadOrderItems &&
     hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_READ) &&
-    hasActionPermission(adminProfile, PermissionCode.ERP_BUSINESS_DASHBOARD_READ) &&
-    (adminProfile.is_super_admin || allowedMenuPaths.includes(BUSINESS_ROUTE_PATHS.businessDashboard)) &&
+    hasActionPermission(
+      adminProfile,
+      PermissionCode.ERP_BUSINESS_DASHBOARD_READ
+    ) &&
+    (adminProfile.is_super_admin ||
+      allowedMenuPaths.includes(BUSINESS_ROUTE_PATHS.businessDashboard)) &&
     effectiveSessionAllowsPage(adminProfile, 'business-dashboard', {
       isLocalDev: false,
       isSuperAdmin: adminProfile.is_super_admin === true,
     })
   const goToOrderProgress = (order) => {
     if (!canOpenOrderProgress || !order?.id || saving) return
-    const selection = { orderID: order.id, draft: searchInputRef.current?.input?.value }
+    const selection = {
+      orderID: order.id,
+      draft: searchInputRef.current?.input?.value,
+    }
     setSavedProgressReturn(selection)
     const params = new URLSearchParams({
-      view: 'orders', display: 'lines', scope: 'all', sales_order_id: String(order.id),
+      view: 'orders',
+      display: 'lines',
+      scope: 'all',
+      sales_order_id: String(order.id),
     })
     navigate(`${BUSINESS_ROUTE_PATHS.businessDashboard}?${params}`, {
       state: {
         salesDeliveryReturn: {
-          adminID: adminProfile.id, pathname: location.pathname, search: location.search, selection,
+          adminID: adminProfile.id,
+          pathname: location.pathname,
+          search: location.search,
+          selection,
         },
       },
     })
@@ -430,9 +351,6 @@ export default function SalesOrdersPage() {
     PermissionCode.STOCK_RESERVATION_CREATE
   )
 
-  useEffect(() => {
-    selectedOrderIDRef.current = Number(selectedOrder?.id || 0)
-  }, [selectedOrder?.id])
   const selectedOrderCanEdit = Boolean(
     canUpdateOrder && isDraftSourceDocument(selectedOrder)
   )
@@ -466,7 +384,11 @@ export default function SalesOrdersPage() {
         label: '产品图',
         media: true,
         value: (
-          <ProductThumbnail productId={item?.product_id} name={salesOrderRequirementName(item)} code={item?.product_code_snapshot} />
+          <ProductThumbnail
+            productId={item?.product_id}
+            name={salesOrderRequirementName(item)}
+            code={item?.product_code_snapshot}
+          />
         ),
       },
       {
@@ -638,10 +560,13 @@ export default function SalesOrdersPage() {
     ]
   )
 
-  const loadImportReferenceData = useCallback(async (options) => {
-    const data = await listAllCustomers({ active_only: true }, options)
-    mergeCustomers(data.customers)
-  }, [mergeCustomers])
+  const loadImportReferenceData = useCallback(
+    async (options) => {
+      const data = await listAllCustomers({ active_only: true }, options)
+      mergeCustomers(data.customers)
+    },
+    [mergeCustomers]
+  )
 
   const loadCustomers = useCallback(async () => {
     setReferencesLoading(true)
@@ -751,10 +676,22 @@ export default function SalesOrdersPage() {
         request.finish()
       }
     }
-  }, [beginLatestRequest, orderListParams, pagination, routeSalesOrderID, setSavedProgressReturn])
+  }, [
+    beginLatestRequest,
+    orderListParams,
+    pagination,
+    routeSalesOrderID,
+    setSavedProgressReturn,
+  ])
 
   useEffect(() => {
-    if (loading || !selectedOrder || selectedOrder.id !== initialProgressReturn.current?.orderID) return
+    if (
+      loading ||
+      !selectedOrder ||
+      selectedOrder.id !== initialProgressReturn.current?.orderID
+    ) {
+      return
+    }
     initialProgressReturn.current = null
     progressTriggerRef.current?.focus({ preventScroll: true })
   }, [loading, selectedOrder])
@@ -774,321 +711,51 @@ export default function SalesOrdersPage() {
     })
   }, [loadOrders, outletContext])
 
-  const loadReservationBalances = useCallback(
-    async (item) => {
-      const orderID = Number(reservationContext.order?.id || 0)
-      const requestID = reservationBalanceRequestRef.current + 1
-      reservationBalanceRequestRef.current = requestID
-      if (!item || orderID <= 0) {
-        setReservationContext((current) => ({ ...current, balances: [] }))
-        return
-      }
-      setReservationLoading(true)
-      try {
-        const stock = await loadReservationStockForItem(item)
-        if (
-          reservationBalanceRequestRef.current !== requestID ||
-          Number(reservationContext.order?.id || 0) !== orderID
-        ) {
-          return
-        }
-        setReservationContext((current) =>
-          Number(current.order?.id || 0) === orderID
-            ? {
-                ...current,
-                balances: enrichReservationBalances(
-                  stock.balances,
-                  current.warehouses,
-                  stock.lots
-                ),
-              }
-            : current
-        )
-      } catch (error) {
-        if (reservationBalanceRequestRef.current === requestID) {
-          setReservationContext((current) => ({ ...current, balances: [] }))
-          showPageLoadError(error, '加载可用库存')
-        }
-      } finally {
-        if (reservationBalanceRequestRef.current === requestID) {
-          setReservationLoading(false)
-        }
-      }
-    },
-    [reservationContext.order?.id]
-  )
-
-  const openSalesOrderReservation = async () => {
-    const orderID = Number(selectedOrder?.id || 0)
-    if (
-      orderID <= 0 ||
-      String(selectedOrder?.lifecycle_status || '').toLowerCase() !== 'active'
-    ) {
-      message.warning('请先选择已生效的销售订单')
-      return
-    }
-    selectedOrderIDRef.current = orderID
-    const requestID = reservationContextRequestRef.current + 1
-    reservationContextRequestRef.current = requestID
-    setReservationLoading(true)
-    try {
-      const freshOrder = await getSalesOrder({ id: orderID })
-      if (
-        reservationContextRequestRef.current !== requestID ||
-        selectedOrderIDRef.current !== orderID
-      ) {
-        return
-      }
-      if (
-        String(freshOrder?.lifecycle_status || '').toLowerCase() !== 'active'
-      ) {
-        message.warning('销售订单状态已变化，请刷新后重试')
-        await loadOrders()
-        return
-      }
-      const itemData = await listAllSalesOrderItems({
-        sales_order_id: orderID,
-        expected_version: freshOrder.version,
-      })
-      const items = Array.isArray(itemData?.sales_order_items)
-        ? itemData.sales_order_items
-        : []
-      const [reservationData, shipmentData, warehouseData] = await Promise.all([
-        listAllStockReservations({
-          source_id: orderID,
-          status: StockReservationStatus.ACTIVE,
-        }),
-        listAllShipments({ source_id: orderID, status: ShipmentStatus.SHIPPED }),
-        listAllWarehouses({ active_only: true }),
-      ])
-      if (
-        reservationContextRequestRef.current !== requestID ||
-        selectedOrderIDRef.current !== orderID
-      ) {
-        return
-      }
-      const warehouses = Array.isArray(warehouseData?.warehouses)
-        ? warehouseData.warehouses
-        : []
-      const reservations = Array.isArray(reservationData?.stock_reservations)
-        ? reservationData.stock_reservations
-        : []
-      const shipments = Array.isArray(shipmentData?.shipments)
-        ? shipmentData.shipments
-        : []
-      if (
-        Number(reservationData?.total || reservations.length) >
-          reservations.length ||
-        Number(shipmentData?.total || shipments.length) > shipments.length
-      ) {
-        message.warning('相关预留或出货记录未完整加载，暂不能新增预留')
-        return
-      }
-      const firstReservableItem = buildSalesOrderReservationItemChoices(
-        items,
-        reservations,
-        shipments
-      ).find((choice) => !choice.disabled)?.item
-      if (!firstReservableItem) {
-        message.warning('当前销售订单已没有可预留数量')
-        return
-      }
-      const stock = await loadReservationStockForItem(firstReservableItem)
-      if (
-        reservationContextRequestRef.current !== requestID ||
-        selectedOrderIDRef.current !== orderID
-      ) {
-        return
-      }
-      setReservationContext({
-        order: freshOrder,
-        items,
-        reservations,
-        shipments,
-        balances: enrichReservationBalances(
-          stock.balances,
-          warehouses,
-          stock.lots
-        ),
-        warehouses,
-      })
-      setReservationOpen(true)
-    } catch (error) {
-      if (reservationContextRequestRef.current === requestID) {
-        showPageLoadError(error, '加载库存预留详情')
-      }
-    } finally {
-      if (reservationContextRequestRef.current === requestID) {
-        setReservationLoading(false)
-      }
-    }
-  }
-
-  const submitSalesOrderReservation = async (values) => {
-    if (reservationInFlightRef.current || !reservationContext.order) return
-    let payload
-    try {
-      payload = {
-        ...buildSalesOrderReservationPayload(
-          values,
-          reservationContext.order,
-          reservationContext.items,
-          reservationContext.balances,
-          reservationContext.reservations,
-          reservationContext.shipments
-        ),
-        customer_key: activeCustomerKey || undefined,
-      }
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '创建库存预留'))
-      return
-    }
-    const scope = `sales-order-reservation:${reservationContext.order.id}:${payload.sales_order_item_id}`
-    const attempt = reservationAttemptsRef.current.prepare(scope, payload)
-    const params = {
-      ...attempt.params,
-      reservation_no: sourceBusinessActionNo(
-        'RSV',
-        reservationContext.order.order_no,
-        attempt.params.idempotency_key
-      ),
-    }
-    reservationInFlightRef.current = true
-    setReservationLoading(true)
-    try {
-      const result = await createStockReservationFromSalesOrder(params)
-      if (!result || result.status !== StockReservationStatus.ACTIVE) {
-        const error = new Error('库存预留返回结果无法确认')
-        error.isInvalidResponse = true
-        throw error
-      }
-      reservationAttemptsRef.current.settle(scope, attempt, null)
-      setReservationContext((current) => ({
-        ...current,
-        reservations: [...current.reservations, result],
-      }))
-      setReservationOpen(false)
-      message.success('库存预留已创建，可在“相关单据 → 出库 / 预留”查看')
-    } catch (error) {
-      const retained = reservationAttemptsRef.current.settle(
-        scope,
-        attempt,
-        error
-      )
-      if (retained) {
-        message.warning(
-          '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
-        )
-      } else {
-        message.error(getActionErrorMessage(error, '创建库存预留'))
-      }
-    } finally {
-      reservationInFlightRef.current = false
-      setReservationLoading(false)
-    }
-  }
-
-  const openCreateOrder = () => {
-    if (orderCreateAttemptsRef.current.peek('sales-order-create')) {
-      orderForm.setFieldsValue(orderCreateDraftValuesRef.current)
-      setOrderModalOpen(true)
-      return
-    }
-    sourceDocumentOpenEditController.invalidate()
-    orderAttachmentRef.current?.clearPendingAttachments()
-    setEditingOrder(null)
-    setOrderCreateResultUnknown(false)
-    setCustomerContacts([])
-    orderForm.resetFields()
-    orderForm.setFieldsValue({
-      order_no: undefined,
-      currency: 'CNY',
-      tax_mode: undefined,
-      tax_rate: undefined,
-      freight_terms: undefined,
-      quoted_freight_amount: undefined,
-      order_date: currentBusinessDate(),
-      delivery_country_region: DEFAULT_DELIVERY_COUNTRY,
-      items: [],
-    })
-    rememberPaymentCondition({})
-    setOrderModalOpen(true)
-  }
-
-  const openEditOrder = async (order) => {
-    if (orderCreateAttemptsRef.current.peek('sales-order-create')) {
-      message.warning('请先打开新建订单，核对上次保存结果后再编辑其他订单')
-      return
-    }
-    const editResult = await openSourceDocumentEditWithAccessGate({
-      canUpdate: canUpdateOrder,
-      document: order,
-      invalidatePending: () => sourceDocumentOpenEditController.invalidate(),
-      isEditable: isDraftSourceDocument,
-      open: () =>
-        sourceDocumentOpenEditController.open({
-          loadItems: async ({ signal }) => {
-            const result = await listAllSalesOrderItems(
-              {
-                sales_order_id: order.id,
-                expected_version: order.version,
-              },
-              { signal }
-            )
-            const [customerData, skuData] = await Promise.all([
-              canReadReference(adminProfile, 'customers')
-                ? loadReferenceIDs('customers', [order.customer_id], { signal }) : { customers: [] },
-              canReadReference(adminProfile, 'product_skus')
-                ? loadReferenceIDs('product_skus', (result?.sales_order_items || []).map((row) => row.product_sku_id), { signal }) : { product_skus: [] },
-            ])
-            if (!signal.aborted) {
-              mergeCustomers(customerData.customers)
-              mergeProductSKUs(skuData.product_skus)
-            }
-            return result?.sales_order_items
-          },
-          enterEditing: (nextItems) => {
-            const openItems = selectOpenSourceDocumentItems(nextItems)
-            orderAttachmentRef.current?.clearPendingAttachments()
-            setSelectedOrder(order)
-            setEditingOrder(order)
-            orderForm.setFieldsValue({
-              ...order,
-              order_date: unixToDateInputValue(order.order_date),
-              planned_delivery_date: unixToDateInputValue(
-                order.planned_delivery_date
-              ),
-              ...deliverySnapshotFormValues(order.delivery_snapshot),
-              ...buildSalesOrderContactFormValues(order),
-              items: openItems.map(normalizeSalesOrderItemFormValue),
-            })
-            rememberPaymentCondition(order)
-            loadCustomerContacts(order.customer_id)
-            setOrderModalOpen(true)
-          },
-        }),
-    })
-    if (editResult.status === 'blocked') {
-      if (editResult.reason === 'forbidden') {
-        message.warning('当前账号没有编辑销售订单的权限。')
-      } else if (editResult.reason === 'not_editable') {
-        message.warning('订单提交后已冻结；如需调整，请取消后重新建立订单。')
-      }
-      return
-    }
-    if (editResult.status === 'load_failed') {
-      message.error(
-        `${getActionErrorMessage(
-          editResult.error,
-          '加载销售订单明细失败'
-        )}，未进入编辑`
-      )
-    }
-  }
+  const {
+    cancelOrderEdit,
+    editingOrder,
+    invalidatePendingEdit,
+    itemLoading,
+    openCreateOrder,
+    openEditOrder,
+    orderAttachmentRef,
+    orderCreateResultUnknown,
+    orderModalOpen,
+    saveOrder,
+  } = useSalesOrderEditor({
+    adminProfile,
+    beginLatestRequest,
+    canUpdateOrder,
+    customers,
+    loadCustomerContacts,
+    loadOrders,
+    mergeCustomers,
+    mergeProductSKUs,
+    orderForm,
+    rememberPaymentCondition,
+    setCustomerContacts,
+    setPagination,
+    setSaving,
+    setSelectedOrder,
+  })
+  const {
+    closeSalesOrderReservation,
+    loadReservationBalances,
+    openSalesOrderReservation,
+    reservationContext,
+    reservationLoading,
+    reservationOpen,
+    submitSalesOrderReservation,
+  } = useSalesOrderReservation({
+    activeCustomerKey,
+    beginLatestRequest,
+    loadOrders,
+    selectedOrder,
+  })
 
   const openSalesOrderDetails = (order) => {
     if (!order?.id) return
-    sourceDocumentOpenEditController.invalidate()
+    invalidatePendingEdit()
     setSelectedOrder(order)
     setDetailOrder(order)
   }
@@ -1102,152 +769,6 @@ export default function SalesOrdersPage() {
       return
     }
     openSalesOrderDetails(order)
-  }
-
-  const saveOrder = async () => {
-    if (orderSaveInFlightRef.current) return
-    orderSaveInFlightRef.current = true
-    setSaving(true)
-    const isCreatingOrder = !editingOrder?.id
-    const scope = 'sales-order-create'
-    const retainedAttempt = isCreatingOrder
-      ? orderCreateAttemptsRef.current.peek(scope)
-      : null
-    let createAttempt = retainedAttempt
-    try {
-      let params = retainedAttempt?.params
-      if (!params) {
-        let values
-        try {
-          values = await orderForm.validateFields()
-        } catch (error) {
-          if (!error?.errorFields) {
-            message.error(getActionErrorMessage(error, '校验销售订单内容'))
-          }
-          return
-        }
-        const customer = customers.find(
-          (item) => item.id === values.customer_id
-        )
-        const customerSourceValues =
-          buildSalesOrderCustomerSourceValues(customer)
-        try {
-          params = {
-            ...buildSalesOrderParams(
-              {
-                ...values,
-                customer_snapshot: customerSourceValues.customer_snapshot,
-                contact_snapshot: buildOrderContactSnapshot(values),
-              },
-              editingOrder?.id
-                ? {
-                    id: editingOrder.id,
-                    expected_version: editingOrder.version,
-                  }
-                : {}
-            ),
-            items: (Array.isArray(values.items) ? values.items : []).map(
-              (item, index) =>
-                buildSalesOrderItemParams(item, {
-                  ...(item?.id ? { id: item.id } : {}),
-                  line_no: index + 1,
-                })
-            ),
-          }
-          if (isCreatingOrder) {
-            const draftValues = structuredClone(values)
-            createAttempt = orderCreateAttemptsRef.current.prepare(
-              scope,
-              params
-            )
-            params = createAttempt.params
-            orderCreateDraftValuesRef.current = draftValues
-          }
-        } catch (error) {
-          message.error(getActionErrorMessage(error, '准备销售订单保存'))
-          return
-        }
-      }
-      const saveResult = await commitSourceDocumentSaveResult({
-        save: async () => {
-          const result = await saveSalesOrderWithItems(params)
-          return result.sales_order
-        },
-        bindSaved: (savedOrder) => {
-          orderForm.setFieldsValue({ order_no: savedOrder.order_no })
-          setEditingOrder(savedOrder)
-          setSelectedOrder(savedOrder)
-          if (createAttempt) {
-            orderCreateAttemptsRef.current.clear(scope)
-            orderCreateDraftValuesRef.current = null
-            setOrderCreateResultUnknown(false)
-          }
-        },
-      })
-      if (saveResult.status === 'save_failed') {
-        const saveError = saveResult.error
-        if (createAttempt) {
-          // A later rejection cannot disprove the first request's unknown result.
-          const unresolved =
-            Boolean(retainedAttempt) || isMutationResultUnknown(saveError)
-          setOrderCreateResultUnknown(unresolved)
-          if (!unresolved) {
-            orderCreateAttemptsRef.current.clear(scope)
-            orderCreateDraftValuesRef.current = null
-          }
-        }
-        if (isResourceVersionConflict(saveError)) {
-          message.warning(
-            '该单据已被其他人更新，本次内容没有覆盖最新数据。请核对最新单据后再保存。'
-          )
-        } else if (isMutationResultUnknown(saveError)) {
-          message.warning(
-            isCreatingOrder
-              ? '保存结果尚未确认，请点击“核对保存结果”；将按原内容重试，不会重复创建订单。'
-              : '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。'
-          )
-        } else {
-          message.error(getActionErrorMessage(saveError, '保存销售订单'))
-        }
-        return
-      }
-
-      const { saved } = saveResult
-      const attachmentEffect = await settleSourceDocumentPostSaveEffect(() =>
-        orderAttachmentRef.current?.flushPendingAttachments(saved.id)
-      )
-      const attachmentSaved =
-        attachmentEffect.status === 'fulfilled' &&
-        attachmentEffect.value !== false
-      if (attachmentEffect.status === 'rejected') {
-        message.warning(
-          getActionErrorMessage(attachmentEffect.error, '上传销售订单附件')
-        )
-      }
-      message.success(
-        attachmentSaved
-          ? editingOrder?.id
-            ? '销售订单已更新'
-            : '销售订单已创建'
-          : '销售订单已保存，未上传的附件请重新选择'
-      )
-      orderAttachmentRef.current?.clearPendingAttachments()
-      setOrderModalOpen(false)
-      if (isCreatingOrder) {
-        resetBusinessPaginationCurrent(setPagination)
-      } else {
-        const refreshEffect =
-          await settleSourceDocumentPostSaveEffect(loadOrders)
-        if (refreshEffect.status === 'rejected') {
-          message.warning(
-            getActionErrorMessage(refreshEffect.error, '刷新销售订单列表')
-          )
-        }
-      }
-    } finally {
-      orderSaveInFlightRef.current = false
-      setSaving(false)
-    }
   }
 
   const runLifecycleAction = async (action, order, reason = '') => {
@@ -1276,7 +797,9 @@ export default function SalesOrdersPage() {
         params = lifecycleAttempt.attempt.params
       }
       const updated = await action.run(params)
-      if (action.returnsRecord !== false) requireSourceActionRecord(updated, order.id)
+      if (action.returnsRecord !== false) {
+        requireSourceActionRecord(updated, order.id)
+      }
       if (lifecycleAttempt) {
         lifecycleAttemptsRef.current.settle(
           lifecycleAttempt.scope,
@@ -1286,15 +809,18 @@ export default function SalesOrdersPage() {
       }
       if (action.key === 'submit') {
         const title = orderSubmissionSuccessMessage('sales_order', updated)
-        await reportBusinessResult(title, { id: order.id, order_no: order.order_no }, getSalesOrder)
+        await reportBusinessResult(
+          title,
+          { id: order.id, order_no: order.order_no },
+          getSalesOrder
+        )
         showProcessSubmissionReceipt({ result: updated, title })
       } else {
         const title = action.successMessage || `销售订单已${action.label}`
         reportBusinessResult(title, updated)
         message.success(title)
       }
-      const nextSelectedOrder =
-        action.returnsRecord === false ? order : updated
+      const nextSelectedOrder = action.returnsRecord === false ? order : updated
       setSelectedOrder(nextSelectedOrder)
       await loadOrders()
     } catch (error) {
@@ -1370,8 +896,18 @@ export default function SalesOrdersPage() {
       ),
     [adminProfile]
   )
-  const galleryColumns = useMemo(() => documentProductGalleryColumn(DOCUMENT_PRODUCT_SOURCES.SALES_ORDER, adminProfile), [adminProfile])
-  const taskDetailColumns = useMemo(() => [...galleryColumns, ...orderDataColumns], [galleryColumns, orderDataColumns])
+  const galleryColumns = useMemo(
+    () =>
+      documentProductGalleryColumn(
+        DOCUMENT_PRODUCT_SOURCES.SALES_ORDER,
+        adminProfile
+      ),
+    [adminProfile]
+  )
+  const taskDetailColumns = useMemo(
+    () => [...galleryColumns, ...orderDataColumns],
+    [galleryColumns, orderDataColumns]
+  )
   const orderListColumns = useMemo(
     () => [...galleryColumns, ...buildSalesOrderListColumns(orderDataColumns)],
     [orderDataColumns, galleryColumns]
@@ -1437,15 +973,36 @@ export default function SalesOrdersPage() {
   )
   const clearFilters = useCallback(() => {
     setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
-    setStatusFilter((current) => lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, current, ['closed', 'canceled']) ? current : '')
+    setStatusFilter((current) =>
+      lifecycleScopeIncludesStatus(LIFECYCLE_SCOPE.CURRENT, current, [
+        'closed',
+        'canceled',
+      ])
+        ? current
+        : ''
+    )
     setCustomerFilter('')
     setDateFilterField('order_date')
     setDateFilterStart('')
     setDateFilterEnd('')
     setSortFilter('updated_at:desc')
-    setSearchParams((current) => withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT), { replace: true })
+    setSearchParams(
+      (current) =>
+        withLifecycleScopeSearchParam(current, LIFECYCLE_SCOPE.CURRENT),
+      { replace: true }
+    )
     resetBusinessPaginationCurrent(setPagination)
-  }, [setLifecycleScope, setStatusFilter, setCustomerFilter, setDateFilterField, setDateFilterStart, setDateFilterEnd, setSortFilter, setSearchParams, setPagination])
+  }, [
+    setLifecycleScope,
+    setStatusFilter,
+    setCustomerFilter,
+    setDateFilterField,
+    setDateFilterStart,
+    setDateFilterEnd,
+    setSortFilter,
+    setSearchParams,
+    setPagination,
+  ])
 
   const selectedOrderDisplayText = useMemo(() => {
     if (!selectedOrder) return '请先选择销售订单'
@@ -1530,12 +1087,30 @@ export default function SalesOrdersPage() {
       navigate(targetPath)
     }
   }
-  useReferenceHydration({
-    customers: { ids: [...orders.map((row) => row.customer_id), editingOrder?.customer_id, customerFilter], records: customers, onRecords: mergeCustomers, enabled: canReadReference(adminProfile, 'customers') },
-  }, adminProfile, referenceRefreshKey)
+  useReferenceHydration(
+    {
+      customers: {
+        ids: [
+          ...orders.map((row) => row.customer_id),
+          editingOrder?.customer_id,
+          customerFilter,
+        ],
+        records: customers,
+        onRecords: mergeCustomers,
+        enabled: canReadReference(adminProfile, 'customers'),
+      },
+    },
+    adminProfile,
+    referenceRefreshKey
+  )
 
   return (
-    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ customers: mergeCustomers, product_skus: mergeProductSKUs }} className="erp-sales-orders-page">
+    <ReferenceRecordsProvider
+      component={BusinessPageLayout}
+      adminProfile={adminProfile}
+      handlers={{ customers: mergeCustomers, product_skus: mergeProductSKUs }}
+      className="erp-sales-orders-page"
+    >
       <PageHeaderCard
         compact
         helpKey="sales-orders"
@@ -1648,15 +1223,19 @@ export default function SalesOrdersPage() {
                 units={units}
                 unitOptions={unitOptions}
                 disabled={referencesLoading || saving || orderModalOpen}
-                disabledReason={referencesLoading
+                disabledReason={
+                  referencesLoading
                     ? '基础资料加载中，请稍候'
-                    : saving ? '正在保存，请稍候' : '请先完成当前订单编辑'}
+                    : saving
+                      ? '正在保存，请稍候'
+                      : '请先完成当前订单编辑'
+                }
                 productSKUs={productSKUs}
                 salesOwnerOptions={salesOwnerOptions}
                 customerKey={activeCustomerKey}
                 onSaved={loadOrders}
               />
-              ) : null}
+            ) : null}
             <BusinessListToolbarActions
               onExport={exportOrders}
               exportDisabled={loading || exporting || total === 0}
@@ -1744,9 +1323,7 @@ export default function SalesOrdersPage() {
               disabled={!selectedOrder || saving}
               onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
             >
-              {canReviewMaterialRequest
-                  ? '审核用料汇总'
-                  : '查看用料汇总'}
+              {canReviewMaterialRequest ? '审核用料汇总' : '查看用料汇总'}
             </Button>
           ) : null}
           {relatedActionAvailability.visible ? (
@@ -1915,8 +1492,7 @@ export default function SalesOrdersPage() {
         pagination={createBusinessTablePagination({
           pagination,
           total,
-          onChange: (current, pageSize) =>
-            setPagination({ current, pageSize }),
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
         })}
         emptyDescription="暂无销售订单"
         rowSelection={{
@@ -1931,7 +1507,11 @@ export default function SalesOrdersPage() {
         rowClassName={(record) =>
           record.id === selectedOrder?.id ? 'ant-table-row-selected' : ''
         }
-        onRow={saving ? undefined : (record) => ({ onClick: () => setSelectedOrder(record) })}
+        onRow={
+          saving
+            ? undefined
+            : (record) => ({ onClick: () => setSelectedOrder(record) })
+        }
         onOpenRecord={saving ? undefined : openSalesOrderRecord}
       />
 
@@ -1946,7 +1526,12 @@ export default function SalesOrdersPage() {
                 getItemFields: getSalesOrderItemFields,
                 getItemGroup: (item) => ({
                   key: salesOrderLineGroupKey(item),
-                  label: [salesOrderRequirementName(item), item?.product_code_snapshot].filter(Boolean).join(' · '),
+                  label: [
+                    salesOrderRequirementName(item),
+                    item?.product_code_snapshot,
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
                 }),
                 getItemLabel: (item, { index }) =>
                   `明细 ${item?.line_no || index + 1}`,
@@ -1959,11 +1544,17 @@ export default function SalesOrdersPage() {
         record={detailOrder}
         title={`${getBusinessDocumentTitle('sales_order')}详情`}
         onClose={() => setDetailOrder(null)}
-        extraActions={canOpenOrderProgress && detailOrder && (
-          <Button onClick={() => goToOrderProgress(detailOrder)} icon={<BarChartOutlined aria-hidden="true" />}>
-            查看交付进度
-          </Button>
-        )}
+        extraActions={
+          canOpenOrderProgress &&
+          detailOrder && (
+            <Button
+              onClick={() => goToOrderProgress(detailOrder)}
+              icon={<BarChartOutlined aria-hidden="true" />}
+            >
+              查看交付进度
+            </Button>
+          )
+        }
       />
 
       {columnOrderModal}
@@ -2017,13 +1608,7 @@ export default function SalesOrdersPage() {
         canUpdateItem={canUpdateItem}
         canCancelItem={canCancelItem}
         onOk={saveOrder}
-        onCancel={() => {
-          sourceDocumentOpenEditController.invalidate()
-          if (!orderCreateResultUnknown) {
-            orderAttachmentRef.current?.clearPendingAttachments()
-          }
-          setOrderModalOpen(false)
-        }}
+        onCancel={cancelOrderEdit}
         onCustomerChange={applyCustomerOrderDefaults}
         onContactSelect={applyContactToOrderForm}
         onPaymentConditionBlur={requestPaymentConditionPriceReview}
@@ -2038,11 +1623,7 @@ export default function SalesOrdersPage() {
         balances={reservationContext.balances}
         loading={reservationLoading}
         onItemChange={loadReservationBalances}
-        onCancel={() => {
-          if (reservationInFlightRef.current) return
-          reservationBalanceRequestRef.current += 1
-          setReservationOpen(false)
-        }}
+        onCancel={closeSalesOrderReservation}
         onSubmit={submitSalesOrderReservation}
       />
     </ReferenceRecordsProvider>

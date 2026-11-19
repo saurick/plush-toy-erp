@@ -8,6 +8,7 @@ import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import { inventoryLotOption } from '../../utils/referenceSelectOptions.mjs'
 import {
@@ -16,12 +17,6 @@ import {
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
-
-function localDateTimeValue() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
-}
 
 function readableText(values = [], fallback = '-') {
   const text = values
@@ -66,7 +61,8 @@ export default function ProductionMaterialIssueModal({
       lot_id: initialValues?.lot_id || lotOptions[0]?.value,
       quantity:
         initialValues?.quantity || requirement?.remaining_quantity || '',
-      occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+      occurred_at:
+        initialValues?.occurred_at || formatLocalDateTimeInputValue(),
       note: initialValues?.note || '',
     })
   }
@@ -92,7 +88,13 @@ export default function ProductionMaterialIssueModal({
     <Editor
       {...(editing
         ? { form }
-        : { taskInline: true, form, size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
+        : {
+            taskInline: true,
+            form,
+            size: 'localAction',
+            cancelText: '取消',
+            destroyOnHidden: true,
+          })}
       className="erp-production-material-issue-modal"
       title={editing ? '编辑生产领料草稿' : '生产领料'}
       open={open}
@@ -288,7 +290,11 @@ export default function ProductionMaterialIssueModal({
           label="备注"
           className="erp-business-action-form__field--full"
         >
-          <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
+          <BusinessTextArea
+            minRows={2}
+            maxLength={BusinessTextPolicy.noteMaxCharacters}
+            showCount
+          />
         </Form.Item>
       </BusinessForm>
     </Editor>

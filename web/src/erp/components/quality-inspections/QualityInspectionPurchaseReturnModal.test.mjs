@@ -39,11 +39,9 @@ test('quality purchase return modal only asks for return business intent', () =>
 })
 
 test('quality purchase return modal prevents duplicate submission and stale fields', () => {
-  assert.match(source, /useEffect\(\(\) =>/u)
-  assert.match(
-    source,
-    /\[form, inspection\?\.id, inspection\?\.inspection_no, open\]/u
-  )
+  assert.match(source, /const initializeOpenForm = \(visible\) =>/u)
+  assert.match(source, /afterOpenChange=\{initializeOpenForm\}/u)
+  assert.doesNotMatch(source, /useEffect/u)
   assert.match(source, /form\.resetFields\(\)/u)
   assert.match(source, /confirmLoading=\{loading\}/u)
   assert.match(source, /okButtonProps=\{\{ disabled: !referenceDataReady \}\}/u)

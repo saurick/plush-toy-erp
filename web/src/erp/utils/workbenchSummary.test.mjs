@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   getWorkbenchSummaryOptions,
+  readPaymentSummaryPeriod,
   readSalesSummaryFilters,
   summaryPage,
   updateSummarySearch,
@@ -74,6 +75,39 @@ test('收付款汇总需要工作台和收付款的有效读取权限，单一�
   assert.deepEqual(options(finance, ['erp.workbench.read']), [])
   assert.deepEqual(options(['erp.workbench.read'], finance), [])
   assert.deepEqual(options(finance, finance, []), [])
+})
+
+test('收付款期间使用中国业务日，本月截至当天，上月包含自然月首尾', () => {
+  const read = (period = '', today = '2026-11-18') =>
+    readPaymentSummaryPeriod(new URLSearchParams({ 'payments.period': period }), today)
+  assert.deepEqual(read(), { period: 'month', dateFrom: '2026-11-01', dateTo: '2026-11-18' })
+  assert.deepEqual(read('today'), { period: 'today', dateFrom: '2026-11-18', dateTo: '2026-11-18' })
+  assert.deepEqual(read('last-month', '2026-01-01'), { period: 'last-month', dateFrom: '2025-12-01', dateTo: '2025-12-31' })
+  assert.deepEqual(read('last-month', '2024-03-01'), { period: 'last-month', dateFrom: '2024-02-01', dateTo: '2024-02-29' })
+  assert.deepEqual(read('all'), { period: 'all', dateFrom: '', dateTo: '' })
+})
+
+test('收付款仅恢复完整有效的自定义范围，历史单日链接映射为同日起止', () => {
+  const read = (query) => readPaymentSummaryPeriod(new URLSearchParams(query), '2026-11-18')
+  const month = read('')
+  for (const query of [
+    'payments.period=unknown',
+    'payments.period=custom&payments.from=2026-10-31',
+    'payments.period=custom&payments.from=2026-10-31&payments.to=2026-02-31',
+    'payments.period=custom&payments.from=2026-11-01&payments.to=2026-10-31',
+    'payments.date=2026-02-31',
+  ]) {
+    assert.deepEqual(read(query), month)
+  }
+  assert.deepEqual(read('payments.period=custom&payments.from=2026-10-31&payments.to=2026-11-01'), {
+    period: 'custom', dateFrom: '2026-10-31', dateTo: '2026-11-01',
+  })
+  const singleDay = { period: 'custom', dateFrom: '2026-10-31', dateTo: '2026-10-31' }
+  assert.deepEqual(read('payments.date=2026-10-31'), singleDay)
+  assert.deepEqual(read('payments.period=custom&payments.from=2026-10-31&payments.to=2026-10-31'), singleDay)
+  assert.deepEqual(read('payments.period=all&payments.date=2026-10-31&payments.from=2026-10-31&payments.to=2026-11-01'), {
+    period: 'all', dateFrom: '', dateTo: '',
+  })
 })
 
 test('switching summary filters preserves workbench and other summary state', () => {

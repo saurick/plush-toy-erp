@@ -16,13 +16,12 @@ const pickerLayoutSelectors = [
 
 export async function readImportPickerLayout(picker) {
   return picker.evaluate((root, selectors) => Object.fromEntries(selectors.map(([name, selector]) => {
-    const box = root.querySelector(selector).getBoundingClientRect()
+    const node = root.querySelector(selector)
+    const box = node.getBoundingClientRect()
     let width = box.width
     if (name === 'header') {
-      // Compare the complete column lane, including native scrollbar space.
-      const body = root.querySelector('.ant-table-body')
-      const reserved = root.querySelector('.ant-table-header .ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
-      width += body.offsetWidth - body.clientWidth - reserved
+      // TableScrollControls applies the current native scrollbar gap as margin.
+      width += Number.parseFloat(getComputedStyle(node).marginInlineEnd) || 0
     }
     return [name, { x: box.x, y: box.y, width, height: box.height }]
   })), pickerLayoutSelectors)
@@ -47,12 +46,11 @@ export async function assertImportPickerStableDuring(picker, label, action) {
       if (!probe.active) return
       probe.frames += 1
       for (const [name, selector] of selectors) {
-        const box = root.querySelector(selector).getBoundingClientRect()
+        const node = root.querySelector(selector)
+        const box = node.getBoundingClientRect()
         let width = box.width
         if (name === 'header') {
-          const body = root.querySelector('.ant-table-body')
-          const reserved = root.querySelector('.ant-table-header .ant-table-cell-scrollbar')?.getBoundingClientRect().width || 0
-          width += body.offsetWidth - body.clientWidth - reserved
+          width += Number.parseFloat(getComputedStyle(node).marginInlineEnd) || 0
         }
         for (const property of ['x', 'y', 'width', 'height']) {
           const after = property === 'width' ? width : box[property]

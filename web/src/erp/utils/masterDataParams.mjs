@@ -2,6 +2,7 @@ import {
   trimOptional,
   normalizeOptionalDecimalString,
   normalizeOptionalNonNegativeInteger,
+  optionalFormReferenceID,
   compactParams,
 } from './sourceDocumentValues.mjs'
 
@@ -76,28 +77,32 @@ function buildProcessParams(values = {}, extra = {}) {
     production_route_operation_code: trimOptional(
       values.production_route_operation_code
     ),
-    outsourcing_enabled: values.outsourcing_enabled === true,
-    inhouse_enabled: values.inhouse_enabled !== false,
+    outsourcing_enabled: values.outsourcing_enabled ?? false,
+    inhouse_enabled: values.inhouse_enabled ?? true,
     note: trimOptional(values.note),
   })
+}
+
+function skuText(value) {
+  if (value != null && typeof value !== 'string') {
+    throw new Error('产品规格资料须填写文本，请核对后保存')
+  }
+  return trimOptional(value)
 }
 
 function buildProductSKUParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
-    product_id: Number(values.product_id || 0),
-    sku_code: trimOptional(values.sku_code),
-    sku_name: trimOptional(values.sku_name),
-    barcode: trimOptional(values.barcode),
-    customer_sku: trimOptional(values.customer_sku),
-    color: trimOptional(values.color),
-    color_no: trimOptional(values.color_no),
-    size: trimOptional(values.size),
-    packaging_version: trimOptional(values.packaging_version),
-    default_unit_id:
-      values.default_unit_id === undefined || values.default_unit_id === null
-        ? undefined
-        : Number(values.default_unit_id || 0),
+    product_id: optionalFormReferenceID(values.product_id),
+    sku_code: skuText(values.sku_code),
+    sku_name: skuText(values.sku_name),
+    barcode: skuText(values.barcode),
+    customer_sku: skuText(values.customer_sku),
+    color: skuText(values.color),
+    color_no: skuText(values.color_no),
+    size: skuText(values.size),
+    packaging_version: skuText(values.packaging_version),
+    default_unit_id: optionalFormReferenceID(values.default_unit_id),
     unit_net_weight_g: normalizeOptionalDecimalString(values.unit_net_weight_g),
   })
 }

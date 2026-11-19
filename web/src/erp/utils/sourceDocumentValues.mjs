@@ -19,6 +19,15 @@ function normalizeOptionalNonNegativeInteger(value) {
   return Math.trunc(numeric)
 }
 
+function optionalFormReferenceID(value) {
+  if (value == null || (typeof value === 'string' && !value.trim())) return undefined
+  const id = typeof value === 'string' && /^\d+$/u.test(value.trim()) ? Number(value) : value
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new Error('所选档案编号无效，请重新选择')
+  }
+  return id
+}
+
 function compactParams(values = {}) {
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined)
@@ -29,6 +38,7 @@ export {
   trimOptional,
   normalizeOptionalDecimalString,
   normalizeOptionalNonNegativeInteger,
+  optionalFormReferenceID,
   compactParams,
 }
 

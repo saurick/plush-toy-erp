@@ -1018,6 +1018,51 @@ test('masterDataOrderView: blank product unit net weight is an explicit null', (
   )
 })
 
+test('order form snapshots keep explicit clears and reject malformed supplied snapshots', () => {
+  for (const [build, field] of [
+    [buildSalesOrderParams, 'customer_snapshot'],
+    [buildSalesOrderParams, 'contact_snapshot'],
+    [buildPurchaseOrderParams, 'supplier_snapshot'],
+    [buildPurchaseOrderParams, 'contract_party_snapshot'],
+    [buildOutsourcingOrderParams, 'supplier_snapshot'],
+    [buildOutsourcingOrderParams, 'contract_party_snapshot'],
+  ]) {
+    for (const value of [[], false, 'bad', 0]) {
+      assert.throws(() => build({ [field]: value }), /单据信息格式有误/u)
+    }
+    assert.deepEqual(build({ [field]: null })[field], {})
+  }
+  assert.deepEqual(buildSalesOrderParams({ contact_snapshot: null, contact_name: '旧联系人' }).contact_snapshot, {})
+  assert.deepEqual(buildSalesOrderParams({ contact_name: '当前联系人' }).contact_snapshot, { name: '当前联系人' })
+  assert.throws(() => buildPurchaseOrderParams({ supplier_snapshot: {} }, { supplier_snapshot: 'bad' }), /单据信息格式有误/u)
+})
+
+test('SKU and outsourcing reference pickers distinguish an empty selection from a malformed reference', () => {
+  for (const value of [undefined, null, '']) {
+    assert.equal(Object.hasOwn(buildProductSKUParams({ default_unit_id: value }), 'default_unit_id'), false)
+  }
+  for (const value of [0, -1, 1.5, true, 'text', Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => buildProductSKUParams({ default_unit_id: value }), /所选档案编号无效/u)
+    assert.throws(() => buildOutsourcingOrderItemParams({
+      subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT, product_id: 1, product_sku_id: value,
+    }), /所选档案编号无效/u)
+  }
+  for (const value of [23, true, {}, []]) {
+    assert.throws(() => buildProductSKUParams({ color: value }), /规格资料须填写文本/u)
+  }
+  assert.equal(buildProductSKUParams({ color: ' 红 ' }).color, '红')
+  assert.equal(Object.hasOwn(buildProductSKUParams({ color: '  ' }), 'color'), false)
+})
+
+test('process form defaults apply only to empty values and preserve supplied types for RPC validation', () => {
+  assert.equal(buildProcessParams({}).inhouse_enabled, true)
+  assert.equal(buildProcessParams({}).outsourcing_enabled, false)
+  assert.equal(buildProcessParams({ inhouse_enabled: false }).inhouse_enabled, false)
+  assert.equal(buildProcessParams({ outsourcing_enabled: true }).outsourcing_enabled, true)
+  assert.equal(buildProcessParams({ inhouse_enabled: 'false' }).inhouse_enabled, 'false')
+  assert.equal(buildProcessParams({ outsourcing_enabled: 1 }).outsourcing_enabled, 1)
+})
+
 test('masterDataOrderView: SKU unit net weight remains a decimal string and blank clears it explicitly', () => {
   assert.deepEqual(
     buildProductSKUParams({

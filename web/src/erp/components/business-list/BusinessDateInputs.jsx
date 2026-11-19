@@ -318,6 +318,7 @@ export function DateRangeFilter({
   startValue = '',
   endValue = '',
   onRangeChange,
+  shortcutFilter,
   customOnly = false,
   required = false,
   inputReadOnly,
@@ -328,16 +329,22 @@ export function DateRangeFilter({
   const [editingRange, setEditingRange] = React.useState(null)
   const presets = dateFilterPresets(dateType?.upcoming).filter((option) => !required || option.value)
   const editing = editingRange?.from === startValue && editingRange?.to === endValue
-  const period = editing ? 'custom' : presets.find(
+  const datePeriod = editing ? 'custom' : presets.find(
     (option) => option.from === startValue && option.to === endValue
   )?.value ?? 'custom'
+  const period = shortcutFilter?.value || datePeriod
   const showInputs = customOnly || period === 'custom'
   const selectPeriod = (next) => {
     if (next === 'custom') {
       setEditingRange({ from: startValue, to: endValue })
+      if (shortcutFilter?.value) onRangeChange(startValue, endValue)
       return
     }
     setEditingRange(null)
+    if (shortcutFilter?.options.some((option) => option.value === next)) {
+      shortcutFilter.onChange(next)
+      return
+    }
     const { from, to } = dateFilterPresets(dateType?.upcoming).find((option) => option.value === next)
     onRangeChange(from, to)
   }
@@ -376,7 +383,7 @@ export function DateRangeFilter({
           label={hasMultipleDateTypes ? '时间范围' : label}
           aria-label="时间范围"
           allowClear={!required}
-          options={presets}
+          options={shortcutFilter ? [...shortcutFilter.options, ...presets] : presets}
           value={period}
           onChange={selectPeriod}
         />

@@ -17,6 +17,15 @@ const salesOrderPageSource = readFileSync(
   fileURLToPath(new URL('../pages/SalesOrdersPage.jsx', import.meta.url)),
   'utf8'
 )
+const salesOrderEditorSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/sales-orders/useSalesOrderEditor.mjs',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
 const masterDataPageSource = readFileSync(
   fileURLToPath(new URL('../pages/MasterDataPage.jsx', import.meta.url)),
   'utf8'
@@ -221,15 +230,16 @@ test('masterDataOrderApi: sales orders expose aggregate save and lifecycle actio
 })
 
 test('SalesOrdersPage: order form save uses single transaction API', () => {
+  assert.match(salesOrderPageSource, /useSalesOrderEditor\(\{/u)
   assert.match(
-    salesOrderPageSource,
+    salesOrderEditorSource,
     /save:\s*async\s*\(\)\s*=>\s*\{\s*const result = await saveSalesOrderWithItems\(params\)\s*return result\.sales_order/u
   )
   assert.match(
-    salesOrderPageSource,
+    salesOrderEditorSource,
     /expected_version:\s*editingOrder\.version/
   )
-  assert.match(salesOrderPageSource, /listAllSalesOrderItems/)
+  assert.match(salesOrderEditorSource, /listAllSalesOrderItems/)
 
   for (const functionName of [
     'createSalesOrder',
@@ -239,7 +249,7 @@ test('SalesOrdersPage: order form save uses single transaction API', () => {
     'removeSalesOrderItem',
   ]) {
     assert.doesNotMatch(
-      salesOrderPageSource,
+      salesOrderEditorSource,
       new RegExp(`${functionName}\\s*\\(`)
     )
   }
@@ -642,10 +652,7 @@ test('masterDataOrderApi: purchase order methods do not expose receipt inventory
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
-  assert.doesNotMatch(
-    source,
-    /call\(\s*'(?:submit|approve)_purchase_order'/u
-  )
+  assert.doesNotMatch(source, /call\(\s*'(?:submit|approve)_purchase_order'/u)
 
   const forbiddenActionNames = [
     ['post', 'Purchase', 'Receipt'],

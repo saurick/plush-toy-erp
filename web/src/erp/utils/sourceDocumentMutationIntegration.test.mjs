@@ -5,12 +5,19 @@ import test from 'node:test'
 const pageSources = [
   {
     name: 'sales order',
+    editorSource: readFileSync(
+      new URL(
+        '../components/sales-orders/useSalesOrderEditor.mjs',
+        import.meta.url
+      ),
+      'utf8'
+    ),
     source: readFileSync(
       new URL('../pages/SalesOrdersPage.jsx', import.meta.url),
       'utf8'
     ),
     start: 'const saveOrder = async () => {',
-    end: 'const runLifecycleAction',
+    end: '\n  return {',
     saveCall: 'saveSalesOrderWithItems',
     allItemsCall: 'listAllSalesOrderItems',
     detailsItemsLoader: 'loadSalesOrderDetailsItems',
@@ -26,7 +33,15 @@ const pageSources = [
     detailsModalEnd: '{columnOrderModal}',
     detailsOpenCall: /openSalesOrderDetails\(order\)/u,
     recordOpenStart: 'const openSalesOrderRecord = (order) => {',
+    recordOpenEnd: 'const runLifecycleAction',
     recordOpenEditCall: /openEditOrder\(order\)/u,
+    recordSource: 'page',
+    detailsSource: 'page',
+    detailsInvalidationCall: /invalidatePendingEdit\(\)/u,
+    invalidationPattern: /openEditController\.invalidate\(\)/gu,
+    invalidatePendingCall:
+      /invalidatePending:\s*openEditController\.invalidate/u,
+    openControllerCall: /openEditController\.open\(/u,
   },
   {
     name: 'purchase order',
@@ -110,25 +125,33 @@ function functionSlice(source, start, end) {
 
 for (const page of pageSources) {
   test(`${page.name} opens editing only after the full item read succeeds`, () => {
+    const editorSource = page.editorSource || page.source
+    const recordSource = page.recordSource === 'page' ? page.source : editorSource
+    const detailsSource =
+      page.detailsSource === 'page' ? page.source : editorSource
     if (page.name === 'purchase order') {
       assert.match(page.source, /useRef\(openPurchaseOrderRecord\)/u)
       assert.match(page.source, /openPurchaseOrderRecordRef\.current = openPurchaseOrderRecord/u)
     }
     const openEdit = functionSlice(
-      page.editorSource || page.source,
+      editorSource,
       page.openStart,
       page.openEnd
     )
-    assert.match(openEdit, /sourceDocumentOpenEditController\.open\(/u)
+    assert.match(
+      openEdit,
+      page.openControllerCall || /sourceDocumentOpenEditController\.open\(/u
+    )
     assert.match(openEdit, /openSourceDocumentEditWithAccessGate\(/u)
     assert.match(openEdit, /canUpdate(?:\s*:|\s*,)/u)
     assert.match(
       openEdit,
-      /invalidatePending:[\s\S]*?sourceDocumentOpenEditController\.invalidate\(\)/u
+      page.invalidatePendingCall ||
+        /invalidatePending:[\s\S]*?sourceDocumentOpenEditController\.invalidate\(\)/u
     )
     assert.match(openEdit, /isEditable:/u)
     assert.match(openEdit, /loadItems:[\s\S]*?signal/u)
-    assert.match(page.editorSource || page.source, /expected_version/u)
+    assert.match(editorSource, /expected_version/u)
     assert.match(openEdit, /enterEditing: \((?:nextItems|lines|items)\) =>/u)
     assert.match(openEdit, /selectOpenSourceDocumentItems\(/u)
     assert.match(openEdit, page.editBindCall)
@@ -143,29 +166,31 @@ for (const page of pageSources) {
     assert.doesNotMatch(beforeEnterEditing, page.editModalCall)
 
     assert.match(
-      page.editorSource || page.source,
+      editorSource,
       /createSourceDocumentOpenEditController\(/u
     )
     assert.match(page.source, page.recordOpenCall)
     const recordOpen = functionSlice(
-      page.editorSource || page.source,
+      recordSource,
       page.recordOpenStart,
-      page.openEnd
+      page.recordOpenEnd || page.openEnd
     )
     assert.match(recordOpen, page.recordOpenEditCall)
     assert.match(recordOpen, page.detailsOpenCall)
     const detailsOpen = functionSlice(
-      page.editorSource || page.source,
+      detailsSource,
       page.detailsOpenStart,
       page.detailsOpenEnd
     )
     assert.match(
       detailsOpen,
-      /sourceDocumentOpenEditController\.invalidate\(\)/u
+      page.detailsInvalidationCall ||
+        /sourceDocumentOpenEditController\.invalidate\(\)/u
     )
     const invalidationCount = (
-      (page.editorSource || page.source).match(
-        /sourceDocumentOpenEditController\.invalidate\(\)/gu
+      editorSource.match(
+        page.invalidationPattern ||
+          /sourceDocumentOpenEditController\.invalidate\(\)/gu
       ) || []
     ).length
     assert(
@@ -175,8 +200,9 @@ for (const page of pageSources) {
   })
 
   test(`${page.name} separates save failure from accepted post-save work`, () => {
+    const editorSource = page.editorSource || page.source
     const mutation = functionSlice(
-      page.editorSource || page.source,
+      editorSource,
       page.start,
       page.end
     )
@@ -187,7 +213,7 @@ for (const page of pageSources) {
       `${page.name} must handle form validation rejection without an unhandled page error`
     )
     assert.match(
-      page.editorSource || page.source,
+      editorSource,
       new RegExp(page.allItemsCall)
     )
     assert.match(mutation, /expected_version/u)

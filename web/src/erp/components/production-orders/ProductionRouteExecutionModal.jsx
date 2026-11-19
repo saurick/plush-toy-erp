@@ -24,7 +24,7 @@ import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { workflowTaskReturnNavigation } from '../../utils/workflowTaskNavigation.mjs'
 import { productionTaskWipAction } from '../../utils/productionTaskHandling.mjs'
-import { ProductionPackagingConfirmationStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
+import { ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -37,11 +37,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 import {
-  listAllOutsourcingOrderItems,
-  listAllOutsourcingOrders,
-} from '../../api/masterDataOrderApi.mjs'
-import {
-  executeProductionWipAction,
   getProductionWip,
 } from '../../api/productionWipApi.mjs'
 import {
@@ -65,21 +60,27 @@ import {
   productionWipFabricMaterialRequirements,
   productionWipOperationDisplayLabel as productionWipOperationLabel,
   productionWipOperationsForBatch,
-  productionWipActionAllowedForOrder,
   productionWipActionRelevant,
   productionWipOrderItem,
   productionWipOutputLabel,
   productionWipPackagingConfirmationForBatch,
   productionWipPackagingReceiptChoices,
   productionWipTransferRemainingQuantity,
-  productionWipQualityGateLabel,
   productionWipQualitySummary,
   productionWipStatusMeta,
-  productionWipUUID,
 } from '../../utils/productionWipModel.mjs'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
-import { buildProductionWipFormPayload } from '../../utils/productionWipFormPayload.mjs'
+import useProductionRouteSubmission from './useProductionRouteSubmission.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
+import {
+  actionButtonEnabled,
+  canRunProductionRouteAction,
+  operationStepStatus,
+  packagingConfirmationText,
+  qualityGateText,
+  resolveProductionRouteReadOnly,
+} from './productionRouteExecutionModel.mjs'
+import useProductionOutsourcingSources from './useProductionOutsourcingSources.mjs'
 
 const { Text, Title } = Typography
 
@@ -104,131 +105,6 @@ const ACTION_TITLE = Object.freeze({
   [PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION]: '转入下道工序',
   [PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL]: '确认包材要求',
 })
-
-function operationStepStatus(batch, operation, currentOperationID) {
-  const status = String(batch?.status || '').trim()
-  if (status === ProductionWIPStatus.ACCEPTED) return 'finish'
-  if (status === ProductionWIPStatus.REJECTED) return 'error'
-  if (operation?.id === currentOperationID && batch) return 'process'
-  return 'wait'
-}
-
-function qualityGateText(aggregate, operation, batch) {
-  const gates = operation?.required_quality_gates || []
-  if (gates.length === 0) return '本工序无需品质关口'
-  if (batch) return productionWipQualitySummary(aggregate, batch)
-  return gates
-    .map((gateCode) => `${productionWipQualityGateLabel(gateCode)}：尚未到达`)
-    .join('；')
-}
-
-function displayUnixTime(value) {
-  if (!positiveSafeInteger(value)) return ''
-  return new Date(value * 1000).toLocaleString('zh-CN', { hour12: false })
-}
-
-function packagingConfirmationText(confirmation) {
-  if (!confirmation || confirmation.status !== ProductionPackagingConfirmationStatus.CONFIRMED) {
-    return '待业务确认'
-  }
-  return [
-    '业务已确认',
-    confirmation.packaging_version_snapshot
-      ? `包装版本：${confirmation.packaging_version_snapshot}`
-      : '',
-    displayUnixTime(confirmation.confirmed_at),
-    confirmation.note ? `备注：${confirmation.note}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ')
-}
-
-function actionButtonEnabled(
-  action,
-  batch,
-  operation,
-  nextOperation,
-  packagingConfirmation,
-  canAct,
-  order
-) {
-  if (
-    !canAct ||
-    !batch ||
-    !operation ||
-    !productionWipActionAllowedForOrder(order, batch, action)
-  ) {
-    return false
-  }
-  const status = String(batch.status || '').trim()
-  switch (action) {
-    case PRODUCTION_WIP_ACTION.SPLIT_BATCH:
-      return (
-        status === ProductionWIPStatus.PLANNED && operation.operation_code !== 'FABRIC_PROCESSING'
-      )
-    case PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION:
-      return status === ProductionWIPStatus.PLANNED && !batch.execution_mode
-    case PRODUCTION_WIP_ACTION.CANCEL_BATCH:
-      return status === ProductionWIPStatus.PLANNED
-    case PRODUCTION_WIP_ACTION.START_OPERATION:
-      return status === ProductionWIPStatus.PLANNED && Boolean(batch.execution_mode)
-    case PRODUCTION_WIP_ACTION.COMPLETE_OPERATION:
-      return (
-        status === ProductionWIPStatus.IN_PROGRESS &&
-        batch.execution_mode === PRODUCTION_WIP_EXECUTION_MODE.IN_HOUSE
-      )
-    case PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN:
-      return (
-        status === ProductionWIPStatus.OUTSOURCED &&
-        batch.execution_mode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED
-      )
-    case PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION:
-      return status === ProductionWIPStatus.ACCEPTED && Boolean(nextOperation)
-    case PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL:
-      return (
-        packagingConfirmation?.status === ProductionPackagingConfirmationStatus.PENDING &&
-        ![ProductionWIPStatus.SPLIT, ProductionWIPStatus.CANCELLED].includes(status)
-      )
-    default:
-      return false
-  }
-}
-
-async function loadConfirmedOutsourcingSources(options = {}) {
-  const data = await listAllOutsourcingOrders(
-    { lifecycle_status: 'confirmed' },
-    options
-  )
-  const orders = Array.isArray(data?.outsourcing_orders)
-    ? data.outsourcing_orders
-    : []
-  const groups = new Array(orders.length)
-  let cursor = 0
-  const runners = Array.from(
-    { length: Math.min(4, orders.length) },
-    async () => {
-      for (;;) {
-        const index = cursor
-        cursor += 1
-        if (index >= orders.length) return
-        const order = orders[index]
-        const itemData = await listAllOutsourcingOrderItems(
-          {
-            outsourcing_order_id: order.id,
-            expected_version: order.version,
-            line_status: 'open',
-          },
-          options
-        )
-        groups[index] = (itemData?.outsourcing_order_items || []).map(
-          (item) => ({ order, item })
-        )
-      }
-    }
-  )
-  await Promise.all(runners)
-  return groups.flat()
-}
 
 export default function ProductionRouteExecutionModal({
   open,
@@ -273,17 +149,11 @@ export default function ProductionRouteExecutionModal({
   const [activeAction, setActiveAction] = useState('')
   const [prepareOutsourcingOpen, setPrepareOutsourcingOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const { saving, submit, resetSubmission } = useProductionRouteSubmission()
   const [entrySaved, setEntrySaved] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [outsourcingSources, setOutsourcingSources] = useState([])
-  const [outsourcingLoadState, setOutsourcingLoadState] = useState('idle')
-  const [outsourcingLoadError, setOutsourcingLoadError] = useState('')
   const requestSequenceRef = useRef(0)
   const loadedRequestSequenceRef = useRef(0)
-  const actionAttemptRef = useRef(null)
-  const outsourcingAbortControllerRef = useRef(null)
-  const outsourcingLoadStateRef = useRef('idle')
   const executionMode = Form.useWatch('execution_mode', actionForm)
   const selectedFabricRequirementIDs = Form.useWatch(
     'fabric_requirement_ids',
@@ -305,56 +175,26 @@ export default function ProductionRouteExecutionModal({
     .trim()
     .toUpperCase()
   const batchScopeEnabled = originReworkFactID !== null
-  const readOnly = outlet?.taskBusiness?.readOnly === true || (
-    !assignmentOnly &&
-    !canAssign &&
-    !canExecute &&
-    !canReceiveReturn &&
-    !canCreateCompletion &&
-    !canWarehousePackaging &&
-    !canIssueCutting &&
-    !canConfirmPackaging)
+  const readOnly = resolveProductionRouteReadOnly({
+    taskReadOnly: outlet?.taskBusiness?.readOnly === true,
+    assignmentOnly,
+    canAssign,
+    canExecute,
+    canReceiveReturn,
+    canCreateCompletion,
+    canWarehousePackaging,
+    canIssueCutting,
+    canConfirmPackaging,
+  })
   const scopedReworkFactID = Number(originReworkFactID || 0)
-
-  const loadOutsourcingSources = useCallback(
-    async ({ force = false } = {}) => {
-      if (!canReadOutsourcingContracts) return
-      if (
-        !force &&
-        ['loading', 'loaded'].includes(outsourcingLoadStateRef.current)
-      ) {
-        return
-      }
-      outsourcingAbortControllerRef.current?.abort()
-      const controller = new AbortController()
-      outsourcingAbortControllerRef.current = controller
-      outsourcingLoadStateRef.current = 'loading'
-      setOutsourcingLoadState('loading')
-      setOutsourcingLoadError('')
-      try {
-        const nextSources = await loadConfirmedOutsourcingSources({
-          signal: controller.signal,
-        })
-        if (outsourcingAbortControllerRef.current !== controller) return
-        setOutsourcingSources(nextSources)
-        outsourcingLoadStateRef.current = 'loaded'
-        setOutsourcingLoadState('loaded')
-      } catch (error) {
-        if (
-          isRpcAbortError(error) ||
-          outsourcingAbortControllerRef.current !== controller
-        ) {
-          return
-        }
-        outsourcingLoadStateRef.current = 'error'
-        setOutsourcingLoadState('error')
-        setOutsourcingLoadError(
-          getActionErrorMessage(error, '读取加工合同候选')
-        )
-      }
-    },
-    [canReadOutsourcingContracts]
-  )
+  const {
+    abortOutsourcingSources,
+    loadOutsourcingSources,
+    outsourcingLoadError,
+    outsourcingLoadState,
+    outsourcingSources,
+    resetOutsourcingSources,
+  } = useProductionOutsourcingSources(canReadOutsourcingContracts)
 
   const loadCurrentRoute = useCallback(
     async ({ signal } = {}) => {
@@ -384,6 +224,7 @@ export default function ProductionRouteExecutionModal({
   )
 
   useEffect(() => {
+    resetSubmission()
     if (!open || !positiveSafeInteger(orderID)) return undefined
     const controller = new AbortController()
     setAggregate(null)
@@ -392,21 +233,14 @@ export default function ProductionRouteExecutionModal({
     setDirty(false)
     setEntrySaved(false)
     directEntryRef.current = ''
-    setOutsourcingSources([])
-    setOutsourcingLoadState('idle')
-    setOutsourcingLoadError('')
+    resetOutsourcingSources()
     setPrepareOutsourcingOpen(false)
-    outsourcingLoadStateRef.current = 'idle'
-    outsourcingAbortControllerRef.current?.abort()
-    outsourcingAbortControllerRef.current = null
-    actionAttemptRef.current = null
     actionForm.resetFields()
     loadCurrentRoute({ signal: controller.signal })
     return () => {
       requestSequenceRef.current += 1
       controller.abort()
-      outsourcingAbortControllerRef.current?.abort()
-      outsourcingAbortControllerRef.current = null
+      abortOutsourcingSources()
     }
     // Opening a different order is a new source context; stale form values and
     // route responses must not cross that boundary.
@@ -418,6 +252,9 @@ export default function ProductionRouteExecutionModal({
     initialBatchID,
     initialItemID,
     initialFinishedGoodsReceiptID,
+    abortOutsourcingSources,
+    resetOutsourcingSources,
+    resetSubmission,
   ])
 
   const displayedBatches = useMemo(() => {
@@ -519,40 +356,19 @@ export default function ProductionRouteExecutionModal({
     return compareProductionWipQuantity(productionWipTransferRemainingQuantity(aggregate, selectedBatch, candidate), '0') > 0 ? candidate : null
   }, [aggregate, selectedBatch])
   const canRunAction = useCallback(
-    (action) => {
-      if (readOnly) return false
-      if (assignmentOnly && action !== PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) {
-        return false
-      }
-      if (action === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL) {
-        return canConfirmPackaging
-      }
-      if (action === PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION && currentOperation?.operation_code === 'PACKAGING') return canWarehousePackaging
-      if (
-        [
-          PRODUCTION_WIP_ACTION.SPLIT_BATCH,
-          PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION,
-          PRODUCTION_WIP_ACTION.CANCEL_BATCH,
-        ].includes(action)
-      ) {
-        return canAssign
-      }
-      if (currentOperation?.operation_code === 'PACKAGING' || (currentOperation?.operation_code === 'HANDWORK' && action === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION)) return canWarehousePackaging
-      if (currentOperation?.operation_code === 'FABRIC_PROCESSING' && action === PRODUCTION_WIP_ACTION.START_OPERATION) return canIssueCutting
-      if (action === PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN) {
-        return canReceiveReturn
-      }
-      if (
-        [
-          PRODUCTION_WIP_ACTION.START_OPERATION,
-          PRODUCTION_WIP_ACTION.COMPLETE_OPERATION,
-          PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
-        ].includes(action)
-      ) {
-        return canExecute
-      }
-      return false
-    },
+    (action) =>
+      canRunProductionRouteAction({
+        action,
+        assignmentOnly,
+        readOnly,
+        currentOperation,
+        canWarehousePackaging,
+        canIssueCutting,
+        canAssign,
+        canConfirmPackaging,
+        canExecute,
+        canReceiveReturn,
+      }),
     [
       assignmentOnly,
       readOnly,
@@ -665,7 +481,7 @@ export default function ProductionRouteExecutionModal({
       message.warning('当前成品入库记录已无可包装数量，请返回刷新后核对')
       return
     }
-    actionAttemptRef.current = null
+    resetSubmission()
     setDirty(false)
     actionForm.resetFields()
     const selectedExecutionMode = executionModeOptions.some(
@@ -763,57 +579,37 @@ onCancel: () => resolve(false),
       actionForm.resetFields()
       return
     }
-    let values
-    try {
-      values = await actionForm.validateFields()
-    } catch (error) {
-      if (error?.errorFields) return
-      throw error
-    }
-    const payload = buildProductionWipFormPayload({
-      action: activeAction,
-      values,
-      orderID,
-      batch: selectedBatch,
-      nextOperation,
-      packagingConfirmation: selectedPackagingConfirmation,
-      isNormalFabricBatch,
-      materialRequirements: fabricMaterialRequirements,
+    const nextAggregate = await submit({
+      form: actionForm,
+      title: activeActionTitle,
+      context: {
+        action: activeAction,
+        orderID,
+        batch: selectedBatch,
+        nextOperation,
+        packagingConfirmation: selectedPackagingConfirmation,
+        isNormalFabricBatch,
+        materialRequirements: fabricMaterialRequirements,
+      },
     })
-    const signature = JSON.stringify({ action: activeAction, payload })
-    if (actionAttemptRef.current?.signature !== signature) {
-      actionAttemptRef.current = {
-        signature,
-        idempotencyKey: productionWipUUID(),
-      }
-    }
-    setSaving(true)
+    if (!nextAggregate) return
+    setAggregate(nextAggregate)
+    setActiveAction('')
+    setDirty(false)
+    actionForm.resetFields()
+    setEntrySaved(true)
+    message.success(activeActionSuccess)
+    const confirmedRecord = activeAction === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL
+      ? nextAggregate.packagingConfirmations.find((item) => item.id === selectedPackagingConfirmation?.id)
+      : nextAggregate.batches.find((item) => item.id === selectedBatch.id)
+    const receiptRecord = confirmedRecord
+      ? { ...confirmedRecord, order_no: nextAggregate.productionOrder.order_no }
+      : nextAggregate.productionOrder
+    onChanged?.(nextAggregate)
     try {
-      const nextAggregate = await executeProductionWipAction(activeAction, {
-        ...payload,
-        idempotency_key: actionAttemptRef.current.idempotencyKey,
-      })
-      actionAttemptRef.current = null
-      setAggregate(nextAggregate)
-      setActiveAction('')
-      setDirty(false)
-      actionForm.resetFields()
-      const confirmedRecord = activeAction === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL
-        ? nextAggregate.packagingConfirmations.find((item) => item.id === selectedPackagingConfirmation?.id)
-        : nextAggregate.batches.find((item) => item.id === selectedBatch.id)
-      reportBusinessResult(activeActionSuccess, confirmedRecord ? { ...confirmedRecord, order_no: nextAggregate.productionOrder.order_no } : nextAggregate.productionOrder)
-      setEntrySaved(true)
-      message.success(activeActionSuccess)
-      onChanged?.(nextAggregate)
-    } catch (error) {
-      message.error(
-        getActionErrorMessage(
-          error,
-          activeActionTitle || '办理生产工序'
-        )
-      )
-    } finally {
-      setSaving(false)
+      await reportBusinessResult(activeActionSuccess, receiptRecord)
+    } catch {
+      message.warning('工序已办理，任务回执暂未更新，请刷新任务核对')
     }
   }
 
@@ -1381,7 +1177,7 @@ onCancel: () => resolve(false),
               disabled={saving}
               onClick={async () => {
               if (!(await confirmLeave())) return
-              actionAttemptRef.current = null
+              resetSubmission()
               actionForm.resetFields()
               setDirty(false)
               setActiveAction('')
@@ -1581,7 +1377,7 @@ onCancel: () => resolve(false),
                   setDirty(false)
                   setActiveAction('')
                   actionForm.resetFields()
-                  actionAttemptRef.current = null
+                  resetSubmission()
                   setSelectedBatchID(batchID)
                 }}
                 placeholder={assignmentOnly ? '选择返工批次' : '选择在制批次'}
@@ -1602,7 +1398,7 @@ onCancel: () => resolve(false),
                     setDirty(false)
                     setActiveAction('')
                     actionForm.resetFields()
-                    actionAttemptRef.current = null
+                    resetSubmission()
                     setSelectedBatchID(rows[0]?.id || null)
                   },
                 }}
@@ -1612,7 +1408,7 @@ onCancel: () => resolve(false),
                     setDirty(false)
                     setActiveAction('')
                     actionForm.resetFields()
-                    actionAttemptRef.current = null
+                    resetSubmission()
                     setSelectedBatchID(batch.id)
                   },
                 })}

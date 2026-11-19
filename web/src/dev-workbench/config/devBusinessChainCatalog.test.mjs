@@ -441,7 +441,7 @@ test('delivery creates receivable facts but leaves payment and reversal to the f
     )
   )
   const source = readFileSync(
-    resolve(repoRoot, 'server/internal/biz/operational_fact.go'),
+    resolve(repoRoot, 'server/internal/biz/operational_fact_finance.go'),
     'utf8'
   )
   assert.match(source, /return repo\.CreateFinanceFactDraftFromShipment/u)

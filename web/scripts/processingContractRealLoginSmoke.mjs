@@ -15,6 +15,7 @@ import {
   safeScreenshot,
   verifyPdfDownloadButton,
   verifyPrintButtonInvokesWindowPrint,
+  assertPdfPreviewPopupReady,
 } from './realLoginSmokeShared.mjs'
 
 const devPorts = loadDevPorts(path.resolve(import.meta.dirname, '..', '..'))
@@ -160,50 +161,6 @@ async function verifyProcessingContractPreviewPopup(page) {
       await popup.close()
     }
   }
-}
-
-async function assertPdfPreviewPopupReady(popup) {
-  const deadline = Date.now() + 15_000
-  while (Date.now() < deadline) {
-    if (popup.url().startsWith('blob:')) {
-      return
-    }
-    const iframeCount = await popup
-      .locator('iframe.pdf-preview-frame')
-      .count()
-      .catch(() => 0)
-    if (iframeCount > 0) {
-      await popup
-        .locator('iframe.pdf-preview-frame')
-        .waitFor({ state: 'visible', timeout: 1_000 })
-      break
-    }
-    await popup.waitForTimeout(100)
-  }
-  assert.ok(
-    popup.url().startsWith('blob:') ||
-      (await popup
-        .locator('iframe.pdf-preview-frame')
-        .count()
-        .catch(() => 0)) > 0,
-    `PDF 预览页未进入 blob 或 iframe 预览状态，当前 URL: ${popup.url()}`
-  )
-
-  await popup.waitForTimeout(300)
-  const state = await popup.evaluate(() => {
-    const iframe = document.querySelector('iframe.pdf-preview-frame')
-    return {
-      url: location.href,
-      bodyText: document.body?.textContent?.trim() || '',
-      iframeSrc: iframe?.getAttribute('src') || '',
-      iframeCount: document.querySelectorAll('iframe.pdf-preview-frame').length,
-    }
-  })
-
-  assert.equal(state.iframeCount, 1)
-  assert.match(state.iframeSrc, /^blob:/)
-  assert.doesNotMatch(state.bodyText, /正在等待 PDF 预览结果/)
-  assert.doesNotMatch(state.bodyText, /PDF 预览不存在或已过期/)
 }
 
 async function expectProcessingContractValues(page, expected) {

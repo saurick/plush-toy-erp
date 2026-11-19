@@ -47,8 +47,22 @@ const materialIssueAction = readFileSync(
   new URL('../utils/productionMaterialIssueAction.mjs', import.meta.url),
   'utf8'
 )
+const materialIssueFlow = readFileSync(
+  new URL(
+    '../components/production-orders/useProductionMaterialIssue.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
 const completionAction = readFileSync(
   new URL('../utils/productionCompletionAction.mjs', import.meta.url),
+  'utf8'
+)
+const completionFlow = readFileSync(
+  new URL(
+    '../components/production-orders/useProductionCompletion.mjs',
+    import.meta.url
+  ),
   'utf8'
 )
 const router = readFileSync(new URL('../router.jsx', import.meta.url), 'utf8')
@@ -152,7 +166,10 @@ test('production order release explains the atomic scheduling handoff', () => {
 })
 
 test('production order forms remain connected before initialization', () => {
-  assert.equal(page.match(/applyBusinessFormReadback\(form, formValues\)/gu)?.length, 1)
+  assert.equal(
+    page.match(/applyBusinessFormReadback\(form, formValues\)/gu)?.length,
+    1
+  )
   assert.doesNotMatch(page, /form\.setFieldsValue/u)
   assert.equal(page.match(/reasonForm\.resetFields/gu)?.length, 1)
   assert.match(page, /if \(!formMode \|\| !formValues\) return/u)
@@ -175,16 +192,21 @@ test('released and closed production orders create a source-bound completion dra
     page,
     /PRODUCTION_ORDER_STATUS\.RELEASED,[\s\S]*PRODUCTION_ORDER_STATUS\.CLOSED/u
   )
-  assert.match(page, /createProductionCompletionFromOrder\(params\)/u)
-  assert.match(page, /source_type: 'PRODUCTION_ORDER'/u)
-  assert.match(page, /listAllProductionFacts/u)
-  assert.match(page, /listAllWarehouses\(\{ active_only: true \}\)/u)
-  assert.match(page, /listAllInventoryLots\(\{ status: 'ACTIVE' \}\)/u)
-  assert.match(page, /sourceBusinessActionNo/u)
-  assert.match(page, /validateProductionCompletionResult/u)
+  assert.match(page, /useProductionCompletion/u)
+  assert.match(completionFlow, /createProductionCompletionFromOrder\(params\)/u)
+  assert.match(completionFlow, /source_type: 'PRODUCTION_ORDER'/u)
+  assert.match(completionFlow, /listAllProductionFacts/u)
+  assert.match(completionFlow, /listAllWarehouses\([\s\S]*active_only: true/u)
+  assert.match(completionFlow, /listAllInventoryLots\([\s\S]*status: 'ACTIVE'/u)
+  assert.match(completionFlow, /sourceBusinessActionNo/u)
+  assert.match(completionFlow, /validateProductionCompletionResult/u)
+  assert.match(
+    completionFlow,
+    /try \{[\s\S]*attemptsRef\.current\.prepare\(scope, payload\)[\s\S]*sourceBusinessActionNo\([\s\S]*\} catch \(error\) \{[\s\S]*准备成品收仓草稿/u
+  )
   assert.match(page, /返工成品收仓/u)
   assert.match(page, /登记返工成品收仓/u)
-  assert.doesNotMatch(page, /postProductionFact/u)
+  assert.doesNotMatch(`${page}\n${completionFlow}`, /postProductionFact/u)
 })
 
 test('released and closed production orders expose route execution through separate permissions', () => {
@@ -259,25 +281,25 @@ test('WIP readers can open production orders without receiving PMC write permiss
 })
 
 test('routed completion fails closed until packaging is accepted and packaging material is confirmed', () => {
-  assert.match(page, /partitionProductionCompletionItems/u)
-  assert.match(page, /productionWipCompletionEligibility/u)
-  assert.match(page, /hasRoutedItem \? getProductionWip\(orderID\)/u)
-  assert.match(page, /eligibleItems\.length === 0/u)
-  assert.match(page, /暂不能登记成品收仓/u)
-  assert.match(page, /工序状态已变化/u)
+  assert.match(completionFlow, /partitionProductionCompletionItems/u)
+  assert.match(completionFlow, /productionWipCompletionEligibility/u)
+  assert.match(completionFlow, /getProductionWip\(orderID/u)
+  assert.match(completionFlow, /eligibleItems\.length === 0/u)
+  assert.match(completionFlow, /暂不能登记成品收仓/u)
+  assert.match(completionFlow, /工序状态已变化/u)
   assert.match(
-    page,
+    completionFlow,
     /productionWipBatchID:\s*payload\.production_wip_batch_id/u
   )
   assert.match(
-    page,
-    /buildProductionCompletionPayload\([\s\S]*completionContext\.order,[\s\S]*orderItem/u
+    completionFlow,
+    /buildProductionCompletionPayload\([\s\S]*context\.order,[\s\S]*orderItem/u
   )
   assert.match(
-    page,
-    /production-completion:\$\{completionContext\.order\.id\}:\$\{payload\.production_order_item_id\}:\$\{payload\.production_wip_batch_id \|\| 0\}/u
+    completionFlow,
+    /production-completion:\$\{context\.order\.id\}:\$\{payload\.production_order_item_id\}:\$\{payload\.production_wip_batch_id \|\| 0\}/u
   )
-  assert.match(page, /当前账号没有查看生产工序的权限/u)
+  assert.match(completionFlow, /当前账号没有查看生产工序的权限/u)
   assert.match(completionModal, /部分路线明细暂不可登记/u)
   assert.match(completionModal, /name="production_wip_batch_id"/u)
   assert.match(page, /wipAggregate=\{completionContext\.wipAggregate\}/u)
@@ -285,10 +307,6 @@ test('routed completion fails closed until packaging is accepted and packaging m
 
 test('production order page exposes authoritative finished-goods rework progress', () => {
   assert.match(page, /ProductionReworkProgressModal/u)
-  assert.match(page, /beginLatestRequest\('production-rework-progress'\)/u)
-  assert.match(page, /getProductionWip\(orderID/u)
-  assert.match(page, /origin_rework_fact_id/u)
-  assert.match(page, /当前生产订单暂无成品返工进度/u)
   assert.match(page, /查看返工进度/u)
   assert.match(page, /onContinue=\{\(\) => \{/u)
   assert.match(reworkProgressModal, /成品返工进度/u)
@@ -307,20 +325,20 @@ test('production help and completion form explain route order and warehouse inbo
   )
   assert.match(completionModal, /仓库按已完成手工的批次登记收仓/u)
   assert.match(completionModal, /核对实收后确认入库并增加成品库存/u)
-  assert.match(page, /请核对并确认成品入库/u)
+  assert.match(completionFlow, /请核对并确认成品入库/u)
 })
 
 test('production completion keeps unknown attempts and links to filtered records', () => {
-  assert.match(page, /createSourceBusinessActionAttemptStore/u)
-  assert.match(page, /isSourceBusinessActionResultUnknown\(error\)/u)
-  assert.match(page, /findProductionCompletionResult/u)
+  assert.match(completionFlow, /createSourceBusinessActionAttemptStore/u)
+  assert.match(completionFlow, /isSourceBusinessActionResultUnknown\(error\)/u)
+  assert.match(completionFlow, /findProductionCompletionResult/u)
   assert.match(
-    page,
-    /refreshProductionSources\(completionContext\.order\.id\)/u
+    completionFlow,
+    /refreshProductionSources\(context\.order\.id\)/u
   )
-  assert.match(page, /setCompletionContext\(EMPTY_COMPLETION_CONTEXT\)/u)
+  assert.match(completionFlow, /setContext\(EMPTY_CONTEXT\)/u)
   assert.match(
-    page,
+    completionFlow,
     /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
   )
   assert.match(page, /BUSINESS_ROUTE_PATHS\.productionProgress/u)
@@ -347,15 +365,19 @@ test('released production order detail renders frozen requirements and fails clo
   assert.match(form, /物料需求需要复核，暂不能领料/u)
   assert.match(form, /PRODUCTION_MATERIAL_REQUIREMENTS_STATE\.NEEDS_REVIEW/u)
   assert.match(form, /isProductionMaterialIssueEligible/u)
+  assert.match(
+    form,
+    /loading=\{loading\}\s+disabled=\{loading\}\s+onClick=\{\(\) => onCreateMaterialIssue/u
+  )
   assert.match(page, /aggregate\?\.materialRequirementsState/u)
   assert.doesNotMatch(form, />NEEDS_REVIEW</u)
 })
 
 test('production material issue uses exact permission and source-bound RPC contracts', () => {
   assert.match(page, /'production\.material_issue\.create'/u)
-  const openMaterialIssue = page.slice(
-    page.indexOf('const openProductionMaterialIssue'),
-    page.indexOf('const loadProductionMaterialIssueLots')
+  const openMaterialIssue = materialIssueFlow.slice(
+    materialIssueFlow.indexOf('const openForRequirement'),
+    materialIssueFlow.indexOf('const loadLots')
   )
   assert.match(
     openMaterialIssue,
@@ -369,13 +391,16 @@ test('production material issue uses exact permission and source-bound RPC contr
     openMaterialIssue,
     /getProductionOrder[\s\S]*listAllWarehouses[\s\S]*listAllInventoryLots/u
   )
-  assert.match(page, /createProductionMaterialIssueFromOrder\(params\)/u)
+  assert.match(
+    materialIssueFlow,
+    /createProductionMaterialIssueFromOrder\(params\)/u
+  )
   assert.match(
     materialIssueAction,
     /production_order_material_requirement_id:\s*Number\(requirement\.id\)/u
   )
-  assert.match(page, /sourceBusinessActionNo\([\s\S]*'PROD-MI'/u)
-  assert.match(page, /filterProductionMaterialIssueLots/u)
+  assert.match(materialIssueFlow, /sourceBusinessActionNo\([\s\S]*'PROD-MI'/u)
+  assert.match(materialIssueFlow, /filterProductionMaterialIssueLots/u)
   assert.match(materialIssueModal, /需求物料/u)
   assert.match(materialIssueModal, /材料批次/u)
   assert.match(materialIssueModal, /destroyOnHidden/u)
@@ -405,18 +430,33 @@ test('production material issue uses exact permission and source-bound RPC contr
 
 test('production material issue is latest-wins, retry-safe and rereads unknown results', () => {
   assert.match(
-    page,
+    materialIssueFlow,
     /beginLatestRequest\('production-material-issue-context'\)/u
   )
-  assert.match(page, /beginLatestRequest\('production-material-issue-lots'\)/u)
-  assert.match(page, /materialIssueContextRequestRef/u)
-  assert.match(page, /materialIssueInFlightRef\.current/u)
-  assert.match(page, /isSourceBusinessActionResultUnknown\(error\)/u)
-  assert.match(page, /findProductionMaterialIssueResult/u)
-  assert.match(page, /refreshProductionSources\(order\.id\)/u)
-  assert.match(page, /setMaterialIssueContext\(EMPTY_MATERIAL_ISSUE_CONTEXT\)/u)
   assert.match(
-    page,
+    materialIssueFlow,
+    /beginLatestRequest\('production-material-issue-lots'\)/u
+  )
+  const loadLots = materialIssueFlow.slice(
+    materialIssueFlow.indexOf('const loadLots'),
+    materialIssueFlow.indexOf('const submit')
+  )
+  assert.match(
+    loadLots,
+    /const request = beginLatestRequest\('production-material-issue-lots'\)[\s\S]*if \([\s\S]*request\.finish\(\)[\s\S]*setLotsLoading\(false\)[\s\S]*lots: \[\]/u
+  )
+  assert.match(materialIssueFlow, /inFlightRef\.current/u)
+  assert.match(
+    materialIssueFlow,
+    /isSourceBusinessActionResultUnknown\(error\)/u
+  )
+  assert.match(materialIssueFlow, /findProductionMaterialIssueResult/u)
+  assert.match(materialIssueFlow, /refreshProductionSources\(order\.id\)/u)
+  assert.match(materialIssueFlow, /setContext\(EMPTY_CONTEXT\)/u)
+  assert.match(
+    materialIssueFlow,
     /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
   )
+  assert.doesNotMatch(page, /const openProductionMaterialIssue/u)
+  assert.doesNotMatch(page, /const openProductionCompletion/u)
 })

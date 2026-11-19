@@ -8,6 +8,15 @@ export const DATE_TIME_INPUT_DISPLAY_FORMAT = 'YYYY/MM/DD HH:mm'
 
 dayjs.extend(customParseFormat)
 
+export function formatLocalDateTimeInputValue(now = new Date()) {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    throw new TypeError('now must be a valid Date')
+  }
+  const timestamp = now.getTime()
+  const offset = now.getTimezoneOffset() * 60_000
+  return new Date(timestamp - offset).toISOString().slice(0, 16)
+}
+
 export function parseDateInputValue(value) {
   if (dayjs.isDayjs(value)) {
     return value.isValid() ? value : null

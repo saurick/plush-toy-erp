@@ -173,6 +173,11 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRejectsInvalidContract(t *testing
 		{name: "removed subject filter", params: map[string]any{"task_group": "handoff_receipt_inbound"}},
 		{name: "oversized keyword", params: map[string]any{"keyword": strings.Repeat("长", 201)}},
 		{name: "invalid status", params: map[string]any{"status": "unknown"}},
+		{name: "incomplete due date range", params: map[string]any{"due_date_from": "2026-10-16"}},
+		{name: "invalid due date", params: map[string]any{"due_date_from": "2026-02-30", "due_date_to": "2026-03-01"}},
+		{name: "reversed due dates", params: map[string]any{"due_date_from": "2026-10-17", "due_date_to": "2026-10-16"}},
+		{name: "due preset with dates", params: map[string]any{"due": "noDue", "due_date_from": "2026-10-16", "due_date_to": "2026-10-16"}},
+		{name: "finished lane with due dates", params: map[string]any{"lane_key": "finished", "due_date_from": "2026-10-16", "due_date_to": "2026-10-16"}},
 		{name: "non target pending status", params: map[string]any{"status": "pending"}},
 		{name: "non target processing status", params: map[string]any{"status": "processing"}},
 		{name: "non target cancelled status", params: map[string]any{"status": "cancelled"}},
@@ -338,6 +343,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage(t *testing.T) 
 	}
 	_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_board", "all-todo", mustJSONRPCStruct(t, map[string]any{
 		"lane_key": "all", "todo_only": true, "sort": "time_asc", "limit": 20, "offset": 20, "keyword": "包装", "source_section": "production",
+		"due_date_from": "2026-10-16", "due_date_to": "2026-10-18",
 	}))
 	if err != nil || res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("all todo page: %+v %v", res, err)
@@ -348,6 +354,9 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage(t *testing.T) 
 	}
 	if q.VisibilityScope == nil || q.VisibilityScope.StandaloneAllowAllOwnerRoles || len(q.VisibilityScope.StandaloneVisibleOwnerRoleKeys) != 1 || q.VisibilityScope.StandaloneVisibleOwnerRoleKeys[0] != biz.SalesRoleKey {
 		t.Fatalf("all todo query widened responsibility scope: %+v", q.VisibilityScope)
+	}
+	if q.DueFrom == nil || q.DueBefore == nil || q.DueFrom.UTC().Format(time.RFC3339) != "2026-10-15T16:00:00Z" || q.DueBefore.UTC().Format(time.RFC3339) != "2026-10-18T16:00:00Z" {
+		t.Fatalf("unexpected due date bounds: %v to %v", q.DueFrom, q.DueBefore)
 	}
 	lanes := res.Data.AsMap()["lanes"].([]any)
 	if len(lanes) != 1 || lanes[0].(map[string]any)["key"] != "all" || lanes[0].(map[string]any)["offset"] != float64(20) {

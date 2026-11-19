@@ -27,18 +27,21 @@ func ValidWorkflowRoleTaskListOptions(viewKey, sortKey, statusKey string) bool {
 		(statusKey == "" || statusKey == "ready" || statusKey == "blocked")
 }
 
+func workflowCustomDateBounds(dateFrom, dateTo string) (*time.Time, *time.Time, error) {
+	from, fromErr := time.ParseInLocation("2006-01-02", dateFrom, workflowCalendarZone)
+	to, toErr := time.ParseInLocation("2006-01-02", dateTo, workflowCalendarZone)
+	if fromErr != nil || toErr != nil || from.Format("2006-01-02") != dateFrom || to.Format("2006-01-02") != dateTo || from.After(to) {
+		return nil, nil, ErrBadParam
+	}
+	before := to.AddDate(0, 0, 1)
+	return &from, &before, nil
+}
+
 // History periods use whole business days. The cursor's snapshot fixes relative
 // periods across pagination, including requests made after midnight.
 func WorkflowRoleTaskHistoryDateBounds(period, dateFrom, dateTo string, snapshot time.Time) (*time.Time, *time.Time, error) {
-	zone := time.FixedZone("Asia/Shanghai", 8*3600)
 	if period == "custom" {
-		from, fromErr := time.ParseInLocation("2006-01-02", dateFrom, zone)
-		to, toErr := time.ParseInLocation("2006-01-02", dateTo, zone)
-		if fromErr != nil || toErr != nil || from.Format("2006-01-02") != dateFrom || to.Format("2006-01-02") != dateTo || from.After(to) {
-			return nil, nil, ErrBadParam
-		}
-		before := to.AddDate(0, 0, 1)
-		return &from, &before, nil
+		return workflowCustomDateBounds(dateFrom, dateTo)
 	}
 	if dateFrom != "" || dateTo != "" {
 		return nil, nil, ErrBadParam
@@ -60,8 +63,8 @@ func WorkflowRoleTaskHistoryDateBounds(period, dateFrom, dateTo string, snapshot
 	if snapshot.IsZero() {
 		return nil, nil, ErrBadParam
 	}
-	local := snapshot.In(zone)
-	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, zone)
+	local := snapshot.In(workflowCalendarZone)
+	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, workflowCalendarZone)
 	from, before := today.AddDate(0, 0, 1-days), today.AddDate(0, 0, 1)
 	return &from, &before, nil
 }

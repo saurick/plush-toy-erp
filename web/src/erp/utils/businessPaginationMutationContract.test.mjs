@@ -52,6 +52,9 @@ function conditionalBranches(source, condition, fromIndex = 0) {
 
 const masterDataSource = readSource('../pages/MasterDataPage.jsx')
 const salesOrderSource = readSource('../pages/SalesOrdersPage.jsx')
+const salesOrderEditor = readSource(
+  '../components/sales-orders/useSalesOrderEditor.mjs'
+)
 const purchaseOrderSource = readSource('../pages/PurchaseOrdersPage.jsx')
 const outsourcingOrderQuery = readSource(
   '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
@@ -61,7 +64,9 @@ const outsourcingOrderEditor = readSource(
 )
 const bomSource = readSource('../pages/BOMVersionsPage.jsx')
 const shipmentSource = readSource('../pages/ShipmentsPage.jsx')
-const shipmentSubmitSource = readSource('../components/shipments/submitShipmentDraft.mjs')
+const shipmentSubmitSource = readSource(
+  '../components/shipments/submitShipmentDraft.mjs'
+)
 const productionOrderSource = readSource('../pages/ProductionOrdersPage.jsx')
 const purchaseReceiptSource = readSource('../pages/PurchaseReceiptsPage.jsx')
 const qualitySource = readSource('../pages/QualityInspectionsPage.jsx')
@@ -85,29 +90,48 @@ test('newest-first master-data creates return to page one while edits and ordere
     'const toggleRecordActive'
   )
 
-  assert.match(mutation, /const isCreatingRecord = receipt\?\.created \?\? !editingRecord\?\.id/u)
+  assert.match(
+    mutation,
+    /const isCreatingRecord = receipt\?\.created \?\? !editingRecord\?\.id/u
+  )
   assert.match(
     mutation,
     /const shouldShowCreatedRecordOnFirstPage =\s*isCreatingRecord && effectiveType !== 'processes'/u
   )
 
-  const branches = conditionalBranches(mutation, 'shouldShowCreatedRecordOnFirstPage')
-  assert.match(branches.truthy, /resetBusinessPaginationCurrent\(setPagination\)/u)
+  const branches = conditionalBranches(
+    mutation,
+    'shouldShowCreatedRecordOnFirstPage'
+  )
+  assert.match(
+    branches.truthy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
   assert.doesNotMatch(branches.truthy, /loadRecords\(\)/u)
   assert.match(branches.falsy, /await loadRecords\(\)/u)
-  assert.doesNotMatch(branches.falsy, /resetBusinessPaginationCurrent\(setPagination\)/u)
+  assert.doesNotMatch(
+    branches.falsy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
 
-  const productEditor = sourceSlice(masterDataSource, '<ProductRecordEditor', '<BusinessFormPage')
+  const productEditor = sourceSlice(
+    masterDataSource,
+    '<ProductRecordEditor',
+    '<BusinessFormPage'
+  )
   assert.match(productEditor, /onSaved=\{async \(saved\) =>/u)
-  assert.match(productEditor, /if \(!editingRecord\?\.id\) resetBusinessPaginationCurrent\(setPagination\)\s*else await loadRecords\(\)/u)
+  assert.match(
+    productEditor,
+    /if \(!editingRecord\?\.id\) resetBusinessPaginationCurrent\(setPagination\)\s*else await loadRecords\(\)/u
+  )
 })
 
 for (const pageCase of [
   {
     title: '销售订单',
-    source: salesOrderSource,
+    source: salesOrderEditor,
     start: 'const saveOrder = async () => {',
-    end: 'const runLifecycleAction',
+    end: '\n  return {',
     resetPattern: /resetBusinessPaginationCurrent\(setPagination\)/u,
     refreshPattern: /loadOrders\b/u,
   },
@@ -126,7 +150,11 @@ for (const pageCase of [
     assert.match(mutation, /const isCreatingOrder = !editingOrder\?\.id/u)
 
     const savedIndex = mutation.indexOf('const { saved } = saveResult')
-    const branches = conditionalBranches(mutation, 'isCreatingOrder', Math.max(savedIndex, 0))
+    const branches = conditionalBranches(
+      mutation,
+      'isCreatingOrder',
+      Math.max(savedIndex, 0)
+    )
     assert.match(branches.truthy, pageCase.resetPattern)
     assert.doesNotMatch(branches.truthy, /loadOrders\b/u)
     assert.doesNotMatch(branches.truthy, pageCase.refreshPattern)
@@ -142,7 +170,10 @@ test('purchase edit refresh preserves pagination while refreshing purchase follo
     'registerPageRefresh?.(refreshPageData)'
   )
   assert.match(refresh, /loadOrders\(\)/u)
-  assert.match(refresh, /if \(contentView === 'followup'\) reloadFollowupData\(\)/u)
+  assert.match(
+    refresh,
+    /if \(contentView === 'followup'\) reloadFollowupData\(\)/u
+  )
   assert.doesNotMatch(refresh, /setPagination|resetBusinessPaginationCurrent/u)
 })
 
@@ -166,10 +197,7 @@ test('outsourcing create resets only the order page while edit refreshes the cur
   assert.doesNotMatch(outsourcingOrderEditor, /\bloadWorkflowTasks\b/u)
   assert.match(createBranch, /return/u)
   assert.doesNotMatch(createBranch, /loadOrders\(\)/u)
-  assert.match(
-    editTail,
-    /await loadOrders\(\)/u
-  )
+  assert.match(editTail, /await loadOrders\(\)/u)
   assert.doesNotMatch(editTail, /setPagination/u)
 })
 
@@ -194,11 +222,7 @@ test('production order create writes page one while edit refreshes the current q
 })
 
 test('BOM create and copy reset page one while editing refreshes the current page', () => {
-  const mutation = sourceSlice(
-    bomSource,
-    '<BOMEditor',
-    'actions={headerMode'
-  )
+  const mutation = sourceSlice(bomSource, '<BOMEditor', 'actions={headerMode')
   assert.match(mutation, /onSaved=\{async \(saved\) =>/u)
   assert.match(mutation, /const isCreatingVersion = headerMode !== 'edit'/u)
 
@@ -246,7 +270,9 @@ test('shipment edits reload the current page while create-only flows return thei
   assert.doesNotMatch(shipmentRefreshBranches.falsy, /loadRows\(\)/u)
 
   const qualityCreate = sourceSlice(
-    readSource('../components/quality-inspections/useQualityInspectionActions.js'),
+    readSource(
+      '../components/quality-inspections/useQualityInspectionActions.js'
+    ),
     'const handleCreateInspection = useCallback(async () => {',
     'const runInspectionAction'
   )
@@ -311,7 +337,10 @@ test('server-paginated tables label only their current-page sort columns', () =>
     'export function BusinessDataTable({',
     'export const ToolbarButton ='
   )
-  assert.match(dataTable, /paginated \? normalized\.map\(\(column\) =>\s*typeof column\.sorter === 'function'\s*\? \{ \.\.\.column, showSorterTooltip: \{ title: '仅排序当前页' \} \}/u)
+  assert.match(
+    dataTable,
+    /paginated \? normalized\.map\(\(column\) =>\s*typeof column\.sorter === 'function'\s*\? \{ \.\.\.column, showSorterTooltip: \{ title: '仅排序当前页' \} \}/u
+  )
   assert.doesNotMatch(dataTable, /showSorterTooltip=/u)
 })
 
@@ -333,7 +362,7 @@ test('exact linked-record routes use a one-record page instead of injecting into
     assert.match(
       source,
       title === '生产订单'
-        ? /setListResult\(\{ orders: exactPage\.records, total: exactPage\.total, query \}\)/u
+        ? /setListResult\(\{\s*orders: exactPage\.records,\s*total: exactPage\.total,\s*query,?\s*\}\)/u
         : /setTotal\(exactPage\.total\)/u
     )
     assert.doesNotMatch(

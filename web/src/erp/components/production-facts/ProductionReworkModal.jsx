@@ -7,6 +7,7 @@ import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import {
@@ -15,7 +16,6 @@ import {
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
 import {
-  localProductionReworkDateTimeInputValue,
   productionReworkQuantitySummary,
   suggestedProductionReworkNo,
 } from '../../utils/productionReworkAction.mjs'
@@ -45,7 +45,7 @@ export default function ProductionReworkModal({
         initialValues?.fact_no || suggestedProductionReworkNo(source) || '',
       quantity: initialValues?.quantity || summary.remaining || '',
       occurred_at:
-        initialValues?.occurred_at || localProductionReworkDateTimeInputValue(),
+        initialValues?.occurred_at || formatLocalDateTimeInputValue(),
       reason: initialValues?.reason || '',
     })
   }, [

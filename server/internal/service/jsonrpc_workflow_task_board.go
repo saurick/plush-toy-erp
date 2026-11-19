@@ -79,8 +79,8 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 	if !ok || offset > workflowTaskBoardMaxOffset {
 		return biz.WorkflowTaskBoardQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "offset 必须是非负整数"}
 	}
-	var period, dateFrom, dateTo string
-	for key, target := range map[string]*string{"period": &period, "date_from": &dateFrom, "date_to": &dateTo} {
+	var period, dateFrom, dateTo, dueDateFrom, dueDateTo string
+	for key, target := range map[string]*string{"period": &period, "date_from": &dateFrom, "date_to": &dateTo, "due_date_from": &dueDateFrom, "due_date_to": &dueDateTo} {
 		value, failure := getOptionalWorkflowTaskBoardString(pm, key, 10)
 		if failure != nil {
 			return biz.WorkflowTaskBoardQuery{}, failure
@@ -89,6 +89,7 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 	}
 	return biz.WorkflowTaskBoardQuery{
 		Period: period, DateFrom: dateFrom, DateTo: dateTo,
+		DueDateFrom: dueDateFrom, DueDateTo: dueDateTo,
 		Calendar:                    calendar,
 		WorkflowTaskDiscoveryFilter: discovery,
 		Keyword:                     keyword,

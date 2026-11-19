@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	v1 "server/api/jsonrpc/v1"
@@ -200,35 +199,35 @@ func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 	if !ok {
 		return nil, false
 	}
-	salesOrderID, ok := getOptionalShipmentPositiveInt(pm, "sales_order_id")
+	salesOrderID, ok := getOptionalJSONRPCPositiveInt(pm, "sales_order_id")
 	if !ok {
 		return nil, false
 	}
-	customerID, ok := getOptionalShipmentPositiveInt(pm, "customer_id")
+	customerID, ok := getOptionalJSONRPCPositiveInt(pm, "customer_id")
 	if !ok {
 		return nil, false
 	}
-	customerSnapshot, ok := getOptionalShipmentString(pm, "customer_snapshot")
+	customerSnapshot, ok := getOptionalJSONRPCString(pm, "customer_snapshot")
 	if !ok {
 		return nil, false
 	}
-	deliverySnapshot, ok := getOptionalShipmentMap(pm, "delivery_snapshot")
+	deliverySnapshot, ok := getOptionalJSONRPCMap(pm, "delivery_snapshot")
 	if !ok {
 		return nil, false
 	}
-	transportMethod, ok := getOptionalShipmentString(pm, "transport_method")
+	transportMethod, ok := getOptionalJSONRPCString(pm, "transport_method")
 	if !ok {
 		return nil, false
 	}
-	carrierName, ok := getOptionalShipmentString(pm, "carrier_name")
+	carrierName, ok := getOptionalJSONRPCString(pm, "carrier_name")
 	if !ok {
 		return nil, false
 	}
-	trackingNo, ok := getOptionalShipmentString(pm, "tracking_no")
+	trackingNo, ok := getOptionalJSONRPCString(pm, "tracking_no")
 	if !ok {
 		return nil, false
 	}
-	packageCount, ok := getOptionalShipmentPositiveInt(pm, "package_count")
+	packageCount, ok := getOptionalJSONRPCPositiveInt(pm, "package_count")
 	if !ok {
 		return nil, false
 	}
@@ -240,7 +239,7 @@ func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 	if !ok {
 		return nil, false
 	}
-	shippingMark, ok := getOptionalShipmentString(pm, "shipping_mark")
+	shippingMark, ok := getOptionalJSONRPCString(pm, "shipping_mark")
 	if !ok {
 		return nil, false
 	}
@@ -248,11 +247,11 @@ func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 	if !ok {
 		return nil, false
 	}
-	freightCurrency, ok := getOptionalShipmentString(pm, "freight_currency")
+	freightCurrency, ok := getOptionalJSONRPCString(pm, "freight_currency")
 	if !ok {
 		return nil, false
 	}
-	note, ok := getOptionalShipmentString(pm, "note")
+	note, ok := getOptionalJSONRPCString(pm, "note")
 	if !ok {
 		return nil, false
 	}
@@ -297,7 +296,7 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 	if !ok {
 		return nil, false
 	}
-	salesOrderItemID, ok := getOptionalShipmentPositiveInt(pm, "sales_order_item_id")
+	salesOrderItemID, ok := getOptionalJSONRPCPositiveInt(pm, "sales_order_item_id")
 	if !ok {
 		return nil, false
 	}
@@ -305,7 +304,7 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 	if !ok {
 		return nil, false
 	}
-	productSkuID, ok := getOptionalShipmentPositiveInt(pm, "product_sku_id")
+	productSkuID, ok := getOptionalJSONRPCPositiveInt(pm, "product_sku_id")
 	if !ok {
 		return nil, false
 	}
@@ -317,19 +316,19 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 	if !ok {
 		return nil, false
 	}
-	lotID, ok := getOptionalShipmentPositiveInt(pm, "lot_id")
+	lotID, ok := getOptionalJSONRPCPositiveInt(pm, "lot_id")
 	if !ok {
 		return nil, false
 	}
-	packageDescription, ok := getOptionalShipmentString(pm, "package_description")
+	packageDescription, ok := getOptionalJSONRPCString(pm, "package_description")
 	if !ok {
 		return nil, false
 	}
-	caseNo, ok := getOptionalShipmentString(pm, "case_no")
+	caseNo, ok := getOptionalJSONRPCString(pm, "case_no")
 	if !ok {
 		return nil, false
 	}
-	note, ok := getOptionalShipmentString(pm, "note")
+	note, ok := getOptionalJSONRPCString(pm, "note")
 	if !ok {
 		return nil, false
 	}
@@ -565,46 +564,6 @@ func getRequiredJSONRPCNonNegativeInt(pm map[string]any, key string) (int, bool)
 	default:
 		return 0, false
 	}
-}
-
-func getOptionalShipmentPositiveInt(pm map[string]any, key string) (*int, bool) {
-	raw, exists := pm[key]
-	if !exists || raw == nil {
-		return nil, true
-	}
-	value, ok := getRequiredJSONRPCPositiveInt(pm, key)
-	if !ok {
-		return nil, false
-	}
-	return &value, true
-}
-
-func getOptionalShipmentString(pm map[string]any, key string) (*string, bool) {
-	raw, exists := pm[key]
-	if !exists || raw == nil {
-		return nil, true
-	}
-	value, ok := raw.(string)
-	if !ok {
-		return nil, false
-	}
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, true
-	}
-	return &value, true
-}
-
-func getOptionalShipmentMap(pm map[string]any, key string) (map[string]any, bool) {
-	raw, exists := pm[key]
-	if !exists || raw == nil {
-		return map[string]any{}, true
-	}
-	value, ok := raw.(map[string]any)
-	if !ok {
-		return nil, false
-	}
-	return value, true
 }
 
 func getOptionalShipmentTime(pm map[string]any, key string) (*time.Time, bool) {

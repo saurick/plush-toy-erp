@@ -7,7 +7,7 @@ import Table from '@/common/components/table/AppTable'
 
 import {
   currentProductionWipOperation,
-  positiveSafeInteger,
+  isFinishedGoodsReworkRoot,
   productionWipOperationDisplayLabel as productionWipOperationLabel,
   productionWipOrderItem,
   productionWipStatusMeta,
@@ -143,11 +143,7 @@ export function buildProductionReworkProgressItems({
   const operationByID = new Map(
     operations.map((operation) => [operation.id, operation])
   )
-  const roots = batches.filter(
-    (batch) =>
-      positiveSafeInteger(batch.origin_rework_fact_id) &&
-      !positiveSafeInteger(batch.source_batch_id)
-  )
+  const roots = batches.filter(isFinishedGoodsReworkRoot)
 
   return roots
     .map((root, index) => {

@@ -6,6 +6,7 @@ import {
   buildSalesOrderReservationItemChoices,
   buildSalesOrderReservationPayload,
   defaultSalesOrderReservationQuantity,
+  validateSalesOrderReservationResult,
 } from './salesOrderReservationAction.mjs'
 
 const item = {
@@ -239,5 +240,58 @@ test('reservation quantities preserve numeric(20,6) boundaries exactly', () => {
       { productID: 7, productSkuID: 8 }
     )[0].available,
     maximum
+  )
+})
+
+test('reservation result must match the submitted source, stock and retry identity', () => {
+  const request = {
+    reservation_no: 'RSV-SO-001-ABC123',
+    sales_order_id: 5,
+    sales_order_item_id: 11,
+    warehouse_id: 3,
+    lot_id: 4,
+    quantity: '2.500000',
+    idempotency_key: 'rsv-1',
+  }
+  const result = {
+    id: 31,
+    status: 'ACTIVE',
+    reservation_no: request.reservation_no,
+    sales_order_id: request.sales_order_id,
+    sales_order_item_id: request.sales_order_item_id,
+    warehouse_id: request.warehouse_id,
+    lot_id: request.lot_id,
+    quantity: '2.5',
+    idempotency_key: request.idempotency_key,
+  }
+  assert.equal(validateSalesOrderReservationResult(result, request), result)
+
+  for (const override of [
+    { id: 0 },
+    { status: 'RELEASED' },
+    { reservation_no: 'RSV-OTHER' },
+    { sales_order_id: 6 },
+    { sales_order_item_id: 12 },
+    { warehouse_id: 7 },
+    { lot_id: 8 },
+    { quantity: '2.500001' },
+    { idempotency_key: 'rsv-2' },
+  ]) {
+    assert.throws(
+      () =>
+        validateSalesOrderReservationResult(
+          { ...result, ...override },
+          request
+        ),
+      (error) => error?.isInvalidResponse === true
+    )
+  }
+
+  const requestWithoutLot = { ...request }
+  delete requestWithoutLot.lot_id
+  const resultWithoutLot = { ...result, lot_id: null }
+  assert.equal(
+    validateSalesOrderReservationResult(resultWithoutLot, requestWithoutLot),
+    resultWithoutLot
   )
 })

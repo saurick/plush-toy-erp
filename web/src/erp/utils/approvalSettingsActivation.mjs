@@ -1,4 +1,5 @@
 import { normalizeApprovalCondition } from './approvalCondition.mjs'
+import { isMutationResultUnknown } from './mutationAttempt.mjs'
 
 const APPROVAL_SETTINGS_BLOCKER_LABELS = Object.freeze({
   approval_settings_not_published: '尚未发布审批责任',
@@ -48,19 +49,7 @@ function invalidReadback(message) {
   return error
 }
 
-export function approvalSettingsMutationMayHaveSucceeded(error) {
-  const httpStatus = Number(error?.httpStatus || 0)
-  return Boolean(
-    error?.isNetworkError ||
-      error?.isAbortError ||
-      error?.isInvalidResponse ||
-      httpStatus === 408 ||
-      httpStatus >= 500 ||
-      Number(error?.code || 0) >= 50000
-  )
-}
-
-export function getApprovalSettingsBlockingItems(settings) {
+function getApprovalSettingsBlockingItems(settings) {
   return (Array.isArray(settings?.items) ? settings.items : []).filter(
     (item) =>
       item?.configurable === true &&
@@ -68,6 +57,17 @@ export function getApprovalSettingsBlockingItems(settings) {
       Array.isArray(item.blocked_reasons) &&
       item.blocked_reasons.length > 0
   )
+}
+
+export function getApprovalSettingsBlockingMessage(settings) {
+  return getApprovalSettingsBlockingItems(settings)
+    .map(
+      (item) =>
+        `${item.label}：${item.blocked_reasons
+          .map(getApprovalSettingsBlockerLabel)
+          .join('、')}`
+    )
+    .join('；')
 }
 
 export function verifyAppliedApprovalSettings({
@@ -104,4 +104,83 @@ export function verifyAppliedApprovalSettings({
     throw invalidReadback('审批责任生效内容与本次保存不一致，请重新确认')
   }
   return readback
+}
+
+export async function activateApprovalSettings({
+  payload,
+  receipt = null,
+  retrying = false,
+  preview,
+  apply,
+  readback,
+}) {
+  if (receipt || retrying) {
+    try {
+      const current = await readback()
+      verifyAppliedApprovalSettings({
+        readback: current,
+        payload,
+        receipt,
+      })
+      return { status: 'confirmed', readback: current }
+    } catch (error) {
+      if (receipt) {
+        return {
+          status: 'confirmation_pending',
+          confirmationStage: 'existing_receipt',
+          error,
+          receipt,
+        }
+      }
+    }
+  }
+
+  let checked = null
+  if (!retrying) {
+    checked = await preview(payload)
+    const blockingMessage = getApprovalSettingsBlockingMessage(checked)
+    if (blockingMessage) {
+      return { status: 'blocked', preview: checked, blockingMessage }
+    }
+  }
+
+  let appliedReceipt
+  try {
+    appliedReceipt = await apply(payload)
+  } catch (error) {
+    if (!isMutationResultUnknown(error)) throw error
+    try {
+      const current = await readback()
+      verifyAppliedApprovalSettings({ readback: current, payload })
+      return { status: 'confirmed', readback: current, preview: checked }
+    } catch (readbackError) {
+      return {
+        status: 'submission_unknown',
+        error: readbackError,
+        preview: checked,
+      }
+    }
+  }
+
+  try {
+    const current = await readback()
+    verifyAppliedApprovalSettings({
+      readback: current,
+      payload,
+      receipt: appliedReceipt,
+    })
+    return {
+      status: 'confirmed',
+      readback: current,
+      preview: checked,
+    }
+  } catch (error) {
+    return {
+      status: 'confirmation_pending',
+      confirmationStage: 'submitted',
+      error,
+      receipt: appliedReceipt,
+      preview: checked,
+    }
+  }
 }

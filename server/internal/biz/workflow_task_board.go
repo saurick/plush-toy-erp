@@ -212,6 +212,15 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 		}
 	}
 	var dateErr error
+	if query.DueDateFrom != "" || query.DueDateTo != "" {
+		if query.Calendar != nil || query.LaneKey == WorkflowTaskBoardLaneFinished || query.Due != "all" {
+			return WorkflowTaskBoardQuery{}, ErrBadParam
+		}
+		query.DueFrom, query.DueBefore, dateErr = workflowCustomDateBounds(query.DueDateFrom, query.DueDateTo)
+		if dateErr != nil {
+			return WorkflowTaskBoardQuery{}, dateErr
+		}
+	}
 	query.CompletedFrom, query.CompletedBefore, dateErr = WorkflowRoleTaskHistoryDateBounds(query.Period, query.DateFrom, query.DateTo, query.SnapshotAt)
 	if dateErr != nil {
 		return WorkflowTaskBoardQuery{}, dateErr

@@ -1,19 +1,29 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { runInNewContext } from 'node:vm'
 import { readContractSource as readFileSync } from '../../../../scripts/test/publicContractSource.mjs'
+import {
+  actionButtonEnabled,
+  canRunProductionRouteAction,
+  resolveProductionRouteReadOnly,
+} from './productionRouteExecutionModel.mjs'
 
 const source = readFileSync(
   new URL('./ProductionRouteExecutionModal.jsx', import.meta.url),
   'utf8'
 )
+const modelSource = readFileSync(
+  new URL('./productionRouteExecutionModel.mjs', import.meta.url),
+  'utf8'
+)
+const outsourcingSource = readFileSync(
+  new URL('./useProductionOutsourcingSources.mjs', import.meta.url),
+  'utf8'
+)
 
 test('packaging assignment uses warehouse permission and preserves production planning boundaries', () => {
-  const match = source.match(/const canRunAction = useCallback\(\s*([\s\S]*?),\s*\[\s*assignmentOnly,/u)
-  assert(match)
   const actions = Object.fromEntries(['ASSIGN_EXECUTION', 'SPLIT_BATCH', 'CANCEL_BATCH', 'CONFIRM_PACKAGING_MATERIAL'].map((key) => [key, key]))
-  const check = (operation, canAssign, canWarehousePackaging, readOnly = false) => runInNewContext(`(${match[1]})`, {
-    PRODUCTION_WIP_ACTION: actions,
+  const check = (operation, canAssign, canWarehousePackaging, readOnly = false) => (action) => canRunProductionRouteAction({
+    action,
     assignmentOnly: false,
     readOnly,
     currentOperation: { operation_code: operation },
@@ -40,7 +50,6 @@ test('production route modal is a self-contained production-order surface', () =
   assert.match(source, /BusinessFormModal/u)
   assert.match(source, /getProductionWip/u)
   assert.doesNotMatch(source, /initializeProductionWip/u)
-  assert.match(source, /executeProductionWipAction/u)
   for (const permissionProp of [
     'canAssign',
     'canExecute',
@@ -60,8 +69,19 @@ test('production route modal is a self-contained production-order surface', () =
   )
   assert.match(
     source,
-    /const readOnly =[\s\S]*?!canAssign[\s\S]*?!canExecute[\s\S]*?!canWarehousePackaging[\s\S]*?!canConfirmPackaging/u
+    /resolveProductionRouteReadOnly\(\{/u
   )
+  assert.equal(resolveProductionRouteReadOnly({
+    taskReadOnly: false,
+    assignmentOnly: false,
+    canAssign: false,
+    canExecute: false,
+    canReceiveReturn: false,
+    canCreateCompletion: false,
+    canWarehousePackaging: false,
+    canIssueCutting: false,
+    canConfirmPackaging: false,
+  }), true)
 })
 
 test('route actions use separate business permissions and cancellation is assign-only', () => {
@@ -73,7 +93,7 @@ test('route actions use separate business permissions and cancellation is assign
     /\(canExecute \|\| canReceiveReturn \|\| canWarehousePackaging \|\| canIssueCutting\) && !assignmentOnly \? \(/u
   )
   assert.match(
-    source,
+    modelSource,
     /action === PRODUCTION_WIP_ACTION\.RECEIVE_OUTSOURCING_RETURN[\s\S]*?return canReceiveReturn/u
   )
   assert.match(
@@ -102,13 +122,13 @@ test('route actions use separate business permissions and cancellation is assign
 
 test('assignment-only mode is scoped to the trusted rework batch and one mutation', () => {
   assert.match(
-    source,
+    modelSource,
     /assignmentOnly &&\s*action !== PRODUCTION_WIP_ACTION\.ASSIGN_EXECUTION/u
   )
   assert.match(source, /batch\.origin_rework_fact_id === scopedReworkFactID/u)
   assert.match(source, /options=\{displayedBatches\.map/u)
   assert.match(source, /dataSource=\{displayedBatches\}/u)
-  assert.match(source, /status === 'PLANNED' && !batch\.execution_mode/u)
+  assert.match(modelSource, /status === 'PLANNED' && !batch\.execution_mode/u)
   assert.match(source, /只为当前返工任务关联的在制批次选择生产方式/u)
   assert.match(source, /不会自动完成当前任务/u)
   assert.match(source, /不会登记完工、回仓、质检或库存/u)
@@ -120,15 +140,15 @@ test('confirmed flow keeps warehouse receipt before packing and separates produc
   assert.match(source, /裁片 → 车缝 → 手工 → 成品入库 → 查货与包装/u)
   assert.match(source, /车缝、手工可本厂或委外/u)
   assert.match(source, /检验与包装完成后才可发货/u)
-  assert.match(source, /currentOperation\?\.operation_code === 'PACKAGING'[\s\S]*return canWarehousePackaging/u)
-  assert.match(source, /currentOperation\?\.operation_code === 'FABRIC_PROCESSING'[\s\S]*return canIssueCutting/u)
+  assert.match(modelSource, /currentOperation\?\.operation_code === 'PACKAGING'[\s\S]*return canWarehousePackaging/u)
+  assert.match(modelSource, /currentOperation\?\.operation_code === 'FABRIC_PROCESSING'[\s\S]*return canIssueCutting/u)
 })
 
 test('completion, formal quality and transfer are three separate gates', () => {
   assert.match(source, /PRODUCTION_WIP_ACTION\.COMPLETE_OPERATION/u)
   assert.match(source, /PRODUCTION_WIP_ACTION\.RECEIVE_OUTSOURCING_RETURN/u)
   assert.match(source, /PRODUCTION_WIP_ACTION\.TRANSFER_TO_NEXT_OPERATION/u)
-  assert.match(source, /status === 'ACCEPTED' && Boolean\(nextOperation\)/u)
+  assert.match(modelSource, /status === 'ACCEPTED' && Boolean\(nextOperation\)/u)
   assert.match(source, /仓库先清点本批次实收数量/u)
   assert.match(source, /暂不能整批送检/u)
   assert.match(source, /“质量检验”办理/u)
@@ -142,9 +162,9 @@ test('modal uses only canonical batch statuses and operation snapshot fields', (
     'OUTSOURCED',
     'ACCEPTED',
   ]) {
-    assert.match(source, new RegExp(`['"]${status}['"]`, 'u'))
+    assert.match(modelSource, new RegExp(`['"]${status}['"]`, 'u'))
   }
-  assert.doesNotMatch(source, /['"](?:READY|ASSIGNED|COMPLETED|BLOCKED)['"]/u)
+  assert.doesNotMatch(source + modelSource, /['"](?:READY|ASSIGNED|COMPLETED|BLOCKED)['"]/u)
   assert.match(source, /currentProductionWipOperation/u)
   assert.match(source, /productionWipOperationsForBatch/u)
   assert.doesNotMatch(source, /current_operation_id|parent_batch_id/u)
@@ -154,7 +174,6 @@ test('modal uses only canonical batch statuses and operation snapshot fields', (
 test('assignment and split preserve quantity while rework requires an exception decision', () => {
   assert.match(source, /PRODUCTION_WIP_ACTION\.SPLIT_BATCH/u)
   assert.match(source, /拆分数量必须小于当前批次数量/u)
-  assert.match(source, /buildProductionWipFormPayload/u)
   assert.match(source, /batch: selectedBatch/u)
   assert.match(source, /materialRequirements: fabricMaterialRequirements/u)
   assert.doesNotMatch(source, /batch_no/u)
@@ -162,13 +181,13 @@ test('assignment and split preserve quantity while rework requires an exception 
   assert.match(source, /同一份合同/u)
   assert.match(source, /外发开工前还必须把合同对应材料发料过账/u)
   assert.match(source, /关联加工合同明细/u)
-  assert.match(source, /listAllOutsourcingOrders/u)
-  assert.match(source, /lifecycle_status:\s*'confirmed'/u)
-  assert.match(source, /listAllOutsourcingOrderItems/u)
-  assert.match(source, /line_status:\s*'open'/u)
+  assert.match(outsourcingSource, /listAllOutsourcingOrders/u)
+  assert.match(outsourcingSource, /lifecycle_status:\s*'confirmed'/u)
+  assert.match(outsourcingSource, /listAllOutsourcingOrderItems/u)
+  assert.match(outsourcingSource, /line_status:\s*'open'/u)
   assert.match(source, /canReadOutsourcingContracts/u)
   assert.match(source, /提交时会再次核对/u)
-  assert.match(source, /operation\.operation_code !== 'FABRIC_PROCESSING'/u)
+  assert.match(modelSource, /operation\.operation_code !== 'FABRIC_PROCESSING'/u)
   assert.match(source, /布料加工按生产明细整单外发，不在首道拆批/u)
   assert.match(source, /裁片检验合格后再移交缝制/u)
   assert.match(source, /裁片返工按当前返工批次关联一条产品加工/u)
@@ -183,19 +202,8 @@ test('packaging confirmation is item-level and shows only business evidence', ()
   assert.match(source, /包装版本/u)
   assert.match(source, /请填写已确认的包装版本/u)
   assert.match(source, /maxLength=\{128\}/u)
-  assert.match(source, /displayUnixTime\(confirmation\.confirmed_at\)/u)
+  assert.match(modelSource, /displayUnixTime\(confirmation\.confirmed_at\)/u)
   assert.doesNotMatch(source, /confirmed_by_name/u)
-})
-
-test('actions retain one idempotency key across uncertain retries', () => {
-  assert.doesNotMatch(source, /initializationAttemptRef/u)
-  assert.match(source, /actionAttemptRef/u)
-  assert.match(source, /idempotencyKey:\s*productionWipUUID\(\)/u)
-  assert.match(source, /const signature = JSON\.stringify/u)
-  assert.match(
-    source,
-    /idempotency_key:\s*actionAttemptRef\.current\.idempotencyKey/u
-  )
 })
 
 test('missing released route is an integrity error and cannot be initialized from the page', () => {
@@ -216,16 +224,23 @@ test('stale route reads are aborted and raw technical IDs are not visible labels
 })
 
 test('closed orders keep normal batches read-only and continue only finished-goods rework', () => {
-  assert.match(source, /productionWipActionAllowedForOrder/u)
+  assert.match(modelSource, /productionWipActionAllowedForOrder/u)
   assert.match(source, /productionWipBatchLineageMeta/u)
   assert.match(source, /orderStatus === 'CLOSED'/u)
   assert.match(source, /origin_rework_fact_id/u)
   assert.match(source, /成品返工补制/u)
   assert.match(source, /原生产批次只读/u)
   assert.match(source, /成品返工如需撤销，请回到返工记录办理/u)
-  assert.match(
-    source,
-    /actionButtonEnabled\([\s\S]*authoritativeOrder[\s\S]*actionForm\.validateFields/u
+  const canStart = (originReworkFactID) => actionButtonEnabled(
+    'START_OPERATION',
+    { status: 'PLANNED', execution_mode: 'IN_HOUSE', origin_rework_fact_id: originReworkFactID },
+    { operation_code: 'HANDWORK' },
+    null,
+    null,
+    true,
+    { status: 'CLOSED' }
   )
+  assert.equal(canStart(null), false)
+  assert.equal(canStart(901), true)
   assert.doesNotMatch(source, />\s*origin_rework_fact_id\s*</u)
 })

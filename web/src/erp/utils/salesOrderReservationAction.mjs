@@ -20,6 +20,12 @@ function quantityUnits(value) {
   return numeric20Scale6Units(value) ?? '0'
 }
 
+function invalidReservationResponse() {
+  const error = new Error('库存预留返回结果无法确认')
+  error.isInvalidResponse = true
+  return error
+}
+
 export function buildSalesOrderReservationItemChoices(
   items = [],
   reservations = [],
@@ -40,10 +46,16 @@ export function buildSalesOrderReservationItemChoices(
   }
   const shippedByLine = new Map()
   for (const shipment of Array.isArray(shipments) ? shipments : []) {
-    if (String(shipment?.status || '').toUpperCase() !== ShipmentStatus.SHIPPED) continue
+    if (
+      String(shipment?.status || '').toUpperCase() !== ShipmentStatus.SHIPPED
+    ) {
+      continue
+    }
     for (const line of Array.isArray(shipment?.items) ? shipment.items : []) {
       const lineID = positiveID(line?.sales_order_item_id)
-      if (!lineID) continue
+      if (!lineID) {
+        continue
+      }
       shippedByLine.set(
         lineID,
         addNumeric20Scale6Units(
@@ -77,7 +89,8 @@ export function buildSalesOrderReservationItemChoices(
       reservable: positiveUnitsText(reservable),
       disabled:
         itemID <= 0 ||
-        String(item?.line_status || '').toLowerCase() !== SalesOrderItemStatus.OPEN ||
+        String(item?.line_status || '').toLowerCase() !==
+          SalesOrderItemStatus.OPEN ||
         !isPositiveNumeric20Scale6Units(ordered) ||
         !isPositiveNumeric20Scale6Units(reservable),
     }
@@ -137,7 +150,10 @@ export function buildSalesOrderReservationPayload(
   reservations = [],
   shipments = []
 ) {
-  if (String(order?.lifecycle_status || '').toLowerCase() !== SalesOrderStatus.ACTIVE) {
+  if (
+    String(order?.lifecycle_status || '').toLowerCase() !==
+    SalesOrderStatus.ACTIVE
+  ) {
     throw new Error('仅生效中的销售订单可以预留库存')
   }
   const orderID = positiveID(order?.id)
@@ -161,7 +177,8 @@ export function buildSalesOrderReservationPayload(
     !itemChoice ||
     !balance ||
     !quantity ||
-    String(item?.line_status || '').toLowerCase() !== SalesOrderItemStatus.OPEN ||
+    String(item?.line_status || '').toLowerCase() !==
+      SalesOrderItemStatus.OPEN ||
     positiveID(item.sales_order_id) !== orderID ||
     positiveID(balance.warehouse_id) <= 0 ||
     positiveID(balance.subject_id) !== positiveID(item.product_id) ||
@@ -199,4 +216,31 @@ export function buildSalesOrderReservationPayload(
       ? { note: String(values.note).trim() }
       : {}),
   }
+}
+
+export function validateSalesOrderReservationResult(result, request = {}) {
+  const expectedReservationNo = String(request?.reservation_no || '')
+  const expectedIdempotencyKey = String(request?.idempotency_key || '')
+  const expectedQuantity = numeric20Scale6Units(request?.quantity)
+  const actualQuantity = numeric20Scale6Units(result?.quantity)
+  if (
+    !result ||
+    positiveID(result.id) <= 0 ||
+    String(result.status || '').toUpperCase() !==
+      StockReservationStatus.ACTIVE ||
+    !expectedReservationNo ||
+    String(result.reservation_no || '') !== expectedReservationNo ||
+    positiveID(result.sales_order_id) !== positiveID(request.sales_order_id) ||
+    positiveID(result.sales_order_item_id) !==
+      positiveID(request.sales_order_item_id) ||
+    positiveID(result.warehouse_id) !== positiveID(request.warehouse_id) ||
+    positiveID(result.lot_id) !== positiveID(request.lot_id) ||
+    expectedQuantity === null ||
+    actualQuantity !== expectedQuantity ||
+    !expectedIdempotencyKey ||
+    String(result.idempotency_key || '') !== expectedIdempotencyKey
+  ) {
+    throw invalidReservationResponse()
+  }
+  return result
 }

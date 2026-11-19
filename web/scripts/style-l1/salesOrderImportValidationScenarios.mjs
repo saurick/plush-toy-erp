@@ -144,7 +144,7 @@ export function createSalesOrderImportValidationScenarios(deps) {
           await page.locator('[data-sales-order-import-input]').setInputFiles(workbookFile)
           await picker.waitFor({ state: 'visible' })
           await waitForFiniteAnimations(page)
-          await picker.getByRole('button', { name: '全选筛选结果', exact: true }).click()
+          await picker.getByRole('checkbox', { name: '全选本页', exact: true }).check()
           await page.waitForFunction((button) => !button.disabled, await picker.getByRole('button', { name: '核对所选订单', exact: true }).elementHandle())
           assert.equal(await picker.locator('.ant-table-tbody .ant-table-row input[type="checkbox"]:checked').count(), 2, '预览每次打开都能选择全部订单')
           if (attempt < 2) {

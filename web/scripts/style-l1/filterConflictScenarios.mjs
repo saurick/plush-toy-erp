@@ -8,6 +8,7 @@ import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingS
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { assertMobileFilterDensity } from './mobileFilterPopoverAssertions.mjs'
+import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 
 async function waitForFilters(page, filters) {
   await filters.waitFor({ state: 'visible' })
@@ -573,7 +574,7 @@ export function createFilterConflictScenarios(deps) {
       await trigger.click()
       await waitForFilters(page, filters)
       const sortChoices = filters.getByRole('group', { name: '任务排序', exact: true })
-      assert.deepEqual(await sortChoices.getByRole('button').allTextContents(), ['智能优先', '最早到期', '最近创建'])
+      assert.deepEqual(await sortChoices.getByRole('button').allTextContents(), ['智能优先', '最早到期', '最近创建', '任务时间从早到晚', '任务时间从晚到早'])
       assert.equal(await sortChoices.getByRole('button', { name: '智能优先', exact: true }).getAttribute('aria-pressed'), 'true')
       assert.equal(await filters.getByRole('combobox', { name: '任务排序', exact: true }).count(), 0)
       const person = filters.getByRole('combobox', { name: '办理人', exact: true })
@@ -622,5 +623,66 @@ export function createFilterConflictScenarios(deps) {
       await assertNoHorizontalOverflow(page, '桌面任务日期筛选')
     },
   }
-  return [...mobile, progress, taskDates, productionOnly, ...tracking, controls, productionDate, ...lifecycle]
+  const month = currentBusinessDate().slice(0, 7)
+  const firstDay = `${month}-10`
+  const lastDay = `${month}-12`
+  const dueDates = {
+    ...taskDates,
+    name: 'erp-task-board-custom-due-dates',
+    path: '/erp/task-board?mode=todo',
+    workflowTaskFixtures: [`${firstDay}T00:00:00`, `${lastDay}T23:59:59`, `${month}-13T00:00:00`, null].map((at, index) => ({
+      id: 9650 + index, task_code: `STYLE-DUE-DATE-${index}`, task_name: `核对截止日期 ${index}`,
+      task_group: 'trial_warehouse_work', source_type: 'sales_order', source_id: index + 1,
+      owner_role_key: 'warehouse', task_status_key: 'ready', version: 1, payload: {},
+      due_at: at ? Date.parse(`${at}+08:00`) / 1000 : null,
+    })),
+    verify: async (page) => {
+      const trigger = page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ })
+      const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+      const range = filters.getByRole('group', { name: '截止时间', exact: true })
+      const from = range.getByRole('textbox', { name: '开始日期', exact: true })
+      const to = range.getByRole('textbox', { name: '结束日期', exact: true })
+      const results = (count) => page.getByText(`第 1-${count} 条 / 共 ${count} 条`, { exact: true }).waitFor()
+      const selectDay = async (input, date) => {
+        await input.click()
+        await page.locator(`.ant-picker-dropdown:visible .ant-picker-cell-in-view[title="${date}"]`).click()
+      }
+      await results(4)
+      await trigger.click()
+      await waitForFilters(page, filters)
+      for (const label of ['今天', '近 7 天', '近 30 天', '未来 7 天']) {
+        await range.getByRole('button', { name: label, exact: true }).waitFor()
+      }
+      await range.getByRole('button', { name: '自定义日期', exact: true }).click()
+      const fromBox = await from.boundingBox()
+      const toBox = await to.boundingBox()
+      assert(fromBox && toBox && Math.abs(fromBox.y - toBox.y) <= 1 && fromBox.x + fromBox.width < toBox.x, '起止日期应在当前筛选面板内并排显示')
+      await range.screenshot({ path: path.join(outputDir, 'task-due-date-inline.png') })
+      await selectDay(from, firstDay)
+      await results(1)
+      assert.equal(await to.inputValue(), '')
+      await page.reload()
+      await results(1)
+      await trigger.click()
+      await waitForFilters(page, filters)
+      assert.equal(await from.inputValue(), firstDay.replaceAll('-', '/'))
+      await selectDay(to, lastDay)
+      await results(2)
+      await range.getByRole('button', { name: '未设置到期', exact: true }).click()
+      await results(1)
+      assert.equal(new URL(page.url()).searchParams.has('due_date_from'), false)
+      await from.waitFor({ state: 'hidden' })
+      await range.getByRole('button', { name: '自定义日期', exact: true }).click()
+      await selectDay(to, lastDay)
+      await results(1)
+      assert.equal(await from.inputValue(), '')
+      assert.equal(new URL(page.url()).searchParams.has('due'), false)
+      await range.getByRole('button', { name: '今天', exact: true }).click()
+      await page.waitForURL((url) => url.searchParams.get('due_date_from') === currentBusinessDate() && url.searchParams.get('due_date_to') === currentBusinessDate())
+      await from.waitFor({ state: 'hidden' })
+      await filters.getByRole('button', { name: '清空筛选', exact: true }).click()
+      await results(4)
+    },
+  }
+  return [...mobile, progress, taskDates, dueDates, productionOnly, ...tracking, controls, productionDate, ...lifecycle]
 }

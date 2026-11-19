@@ -22,7 +22,7 @@
 | 关联资料选择与更新 | `RemoteReferenceSelect.jsx`、`ReferenceRecordsContext.jsx` | 远程搜索、分页与已选资料回显；物料保存后按权限定点重读，`BusinessFormPage` 承接可重试的读取提示，保留表单草稿与冻结快照 |
 | 产品图片图集 | `business-list/BusinessProductGallery.jsx`、`BusinessDocumentProductGallery.jsx`、`workflow/WorkflowTaskImagePreview.jsx` | 单据列表以主图缩略图和去重款数打开全部关联产品；预览采用常驻产品条与合并操作行，选中边框与底衬跟随主题色，切换不改变尺寸。单图收起翻页，帮助按需展开；单品身份共用主辅图、缩放、失败重试和关闭恢复。打开和关闭预览时，原有缩略图及相邻文字的位置保持稳定。批量摘要仅支持正式关联，物料和未关联需求不借图 |
 | 筛选分组与调用边界 | [`FilterField`](../../common/components/navigation/FilterField.jsx)、[`FilterSelect`](../../common/components/select/FilterSelect.jsx)、[`MobileFilterChoices`](../mobile/components/MobileFilterChoices.jsx) | 分组标题与样式由共享组件维护；固定筛选复用 `FilterChipGroup`，`allowClear` / `emptyValue` 管理不限与查询空值；业务 `SelectFilter` 的排序用 `purpose="sort"` 直接显示默认选项。需要搜索的名单保留下拉，独立标题用 `labelPlacement="stacked"`。外补标题、失效布局参数与排序语义由 `businessFilterComposition.test.mjs` 检查 |
-| 业务日期输入和范围筛选 | [`business-list/BusinessDateInputs.jsx`](business-list/BusinessDateInputs.jsx) | `DateInput`、`DateTimeInput`、`DateRangeFilter` 共用格式与范围约束，范围按业务字段分组，快捷期间一次更新起止日期，自定义支持单边日期；`InheritedDateInput` 供销售、采购、委外明细显示整单交期，单独改期后保存行值，清空恢复沿用。采购优先沿用供应商确认日期 |
+| 业务日期输入和范围筛选 | [`business-list/BusinessDateInputs.jsx`](business-list/BusinessDateInputs.jsx) | `DateInput`、`DateTimeInput`、`DateRangeFilter` 共用格式与范围约束，范围按业务字段分组，快捷期间一次更新起止日期，自定义支持单边日期。任务截止时间通过 `shortcutFilter` 将“已超时”等互斥条件放在同一组选项中。`InheritedDateInput` 供销售、采购、委外明细显示整单交期，单独改期后保存行值，清空恢复沿用。采购优先沿用供应商确认日期 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 共用资料目录操作条 | [`business-list/MaintenanceSelectionBar.jsx`](business-list/MaintenanceSelectionBar.jsx) | 仓库设置与付款方式共用选中摘要、清选及顶部维护动作布局；调用方持有独立选择、权限与状态，不继承来源页面的动作宿主。配合 AppTable 空白单选列表头与整行选择，提交及错误恢复仍归业务组件 |
 | 付款方式录入与目录维护 | [`PaymentMethodInput.jsx`](PaymentMethodInput.jsx)、[`PaymentMethodManager.jsx`](PaymentMethodManager.jsx) | `PaymentMethodField` 供四类表单搜索选择及标签行管理入口；`PaymentMethodEntry` 供基础资料列表集中维护。字段标签与新增窗保留“管理付款方式”入口，下拉只保留候选及查无匹配时的新增并选用，取消仅本次使用；快捷新增可切换管理并返回保留名称，成功后选用并返回；维护窗口整行单选、选择列表头留空；顶部集中改名、启停及删除，未选择时禁用，切换查询 / 状态 / 页码或刷新清空选择；搜索行右侧新增，底部编辑保存 / 取消、删除确认及返回固定可达，单页隐藏翻页。按状态保留搜索与页码，每页只挂载 20 项。支持启停、撤销；删除未使用项由独立 payment_method.delete 授权，默认仅超级管理员可用，返回保留草稿；历史快照和付款周期独立 |
@@ -123,7 +123,7 @@ STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
   `HelpManualDirectory` 提供三册统一章节目录，`HelpProjectManualContent` 安全渲染受控的管理与运维 Markdown。三册手册入口见[项目手册](../../../../docs/manuals/README.md)。
 - `permission-center/` 的 `usePermissionCenterData` 负责账号与岗位加载，`usePermissionRoleSettings` 负责岗位草稿和权限预览，`PermissionAdminAccounts` 自持账号表单与弹窗；页面只协调页签与未保存提醒。
 - `workflow/useSourceOrderWorkflowActions.mjs` 供来源单据的“任务协作”入口统一办理 Workflow 动作；入口提供场景标识。
-- `workflow/WorkflowTaskDocumentFilter.jsx` 用共享页签和筛选按钮展示单据模块与类型。多模块共用等高的类型区，超出两行可滚动查看。名称与归属使用同源单据目录，查询与分页由任务管理页面和服务端承接。
+- `workflow/WorkflowTaskDocumentFilter.jsx` 用共享页签展示模块，所选模块的单据类型按钮自然换行，高度随行数变化。名称与归属使用同源单据目录，查询与分页由任务管理页面和服务端承接。
 - `outsourcing-orders/` 的 `useOutsourcingOrder*` 按查询、编辑和生命周期动作管理状态；`useOutsourcingSourceFacts` 管理委外来源事实与回货质检，应付操作由专用 Hook 管理。
 - `operational-facts/useOperationalFactQuery` 负责来源筛选、分页、详情与导出查询，`useOperationalFactMutations` 负责过账、结清和取消；页面消费这些状态与动作。
 - `production-orders/useProductionFactActions.mjs` 与 `finance/useFinanceReconciliationAction.mjs` 管理事实工作台对应操作的表单状态、请求失效和重试。

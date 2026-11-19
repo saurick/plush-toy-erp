@@ -52,13 +52,21 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 	if !ok {
 		return nil, false
 	}
+	supplierSnapshot, ok := getOptionalJSONRPCMap(pm, "supplier_snapshot")
+	if !ok {
+		return nil, false
+	}
+	contractPartySnapshot, ok := getOptionalJSONRPCMap(pm, "contract_party_snapshot")
+	if !ok {
+		return nil, false
+	}
 	return &biz.OutsourcingOrderMutation{
 		OutsourcingOrderNo:    getString(pm, "outsourcing_order_no"),
 		SupplierID:            supplierID,
 		Currency:              getString(pm, "currency"),
 		PaymentTermDays:       paymentTermDays,
-		SupplierSnapshot:      getMap(pm, "supplier_snapshot"),
-		ContractPartySnapshot: getMap(pm, "contract_party_snapshot"),
+		SupplierSnapshot:      supplierSnapshot,
+		ContractPartySnapshot: contractPartySnapshot,
 		SourceOrderNo:         getWorkflowStringPtr(pm, "source_order_no"),
 		OrderDate:             orderDate,
 		ExpectedReturnDate:    expectedReturnDate,
@@ -111,13 +119,25 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 	if !ok {
 		return nil, false
 	}
+	productID, ok := getOptionalJSONRPCPositiveInt(pm, "product_id")
+	if !ok {
+		return nil, false
+	}
+	skuID, ok := getOptionalJSONRPCPositiveInt(pm, "product_sku_id")
+	if !ok {
+		return nil, false
+	}
+	materialID, ok := getOptionalJSONRPCPositiveInt(pm, "material_id")
+	if !ok {
+		return nil, false
+	}
 	return &biz.OutsourcingOrderItemMutation{
 		OutsourcingOrderID:      getInt(pm, "outsourcing_order_id", 0),
 		LineNo:                  getInt(pm, "line_no", 0),
 		SubjectType:             getString(pm, "subject_type"),
-		ProductID:               getOptionalPositiveIntPtr(pm, "product_id"),
-		ProductSKUID:            getOptionalPositiveIntPtr(pm, "product_sku_id"),
-		MaterialID:              getOptionalPositiveIntPtr(pm, "material_id"),
+		ProductID:               productID,
+		ProductSKUID:            skuID,
+		MaterialID:              materialID,
 		ProcessID:               getInt(pm, "process_id", 0),
 		UnitID:                  getInt(pm, "unit_id", 0),
 		ProductNoSnapshot:       getWorkflowStringPtr(pm, "product_no_snapshot"),

@@ -9,6 +9,7 @@ import {
   createEngineeringPrintDraft,
   engineeringImageSlots,
   normalizeWorkInstructionRowType,
+  renumberWorkInstructionBodyRows,
 } from '../data/engineeringPrintTemplates.mjs'
 import {
   applyTableCellMerge,
@@ -223,7 +224,7 @@ export function editInstructionRow(draft, rowIndex, action, pageIndex = null) {
         }
       : movePrintItem(rows, rowIndex, action)
   if (!result.ok) return result
-  const nextRows = renumberInstructionRows(result.items)
+  const nextRows = renumberWorkInstructionBodyRows(result.items)
   return {
     ok: true,
     draft:
@@ -358,18 +359,6 @@ function createBlankInstructionSectionRowFromNeighbor(
   }
 }
 
-function renumberInstructionRows(rows = []) {
-  let stepNo = 1
-  return rows.map((row) => {
-    const type = normalizeWorkInstructionRowType(row?.type)
-    if (type === WORK_INSTRUCTION_ROW_TYPES.step) {
-      return { ...row, type, no: String(stepNo++) }
-    }
-    stepNo = 1
-    return { ...row, type, no: '' }
-  })
-}
-
 function normalizeInstructionRowType(type) {
   return normalizeWorkInstructionRowType(type)
 }
@@ -502,7 +491,7 @@ export function setInstructionRowType(draft, selectedIndex, type) {
     ok: true,
     draft: {
       ...draft,
-      rows: renumberInstructionRows(
+      rows: renumberWorkInstructionBodyRows(
         rows.map((row, index) =>
           index === selectedIndex
             ? applyInstructionRowTypeToRow(row, normalizedType)
@@ -550,7 +539,7 @@ export function setContinuationInstructionRowType(
         index === pageIndex
           ? {
               ...item,
-              rows: renumberInstructionRows(
+              rows: renumberWorkInstructionBodyRows(
                 rows.map((row, rowIndex) =>
                   rowIndex === selectedIndex
                     ? applyInstructionRowTypeToRow(row, normalizedType)
@@ -810,7 +799,7 @@ export function insertInstructionRow(draft, selectedIndex, position = 'after') {
   )
   return {
     ok: true,
-    draft: { ...draft, rows: renumberInstructionRows(nextRows) },
+    draft: { ...draft, rows: renumberWorkInstructionBodyRows(nextRows) },
     selectedIndex: insertIndex,
     message: `已在第 ${insertIndex + 1} 行插入空白作业行。`,
   }
@@ -853,7 +842,7 @@ export function insertContinuationInstructionRow(
       ...draft,
       continuationPages: pages.map((item, index) =>
         index === pageIndex
-          ? { ...item, rows: renumberInstructionRows(nextRows) }
+          ? { ...item, rows: renumberWorkInstructionBodyRows(nextRows) }
           : item
       ),
     },
@@ -867,7 +856,7 @@ export function removeInstructionRow(draft, selectedIndex) {
   if (!result.ok) return result
   return {
     ok: true,
-    draft: { ...draft, rows: renumberInstructionRows(result.items) },
+    draft: { ...draft, rows: renumberWorkInstructionBodyRows(result.items) },
     selectedIndex: result.selectedIndex,
     message: '已移除当前作业行。',
   }
@@ -893,7 +882,7 @@ export function removeContinuationInstructionRow(
       ...draft,
       continuationPages: pages.map((item, index) =>
         index === pageIndex
-          ? { ...item, rows: renumberInstructionRows(result.items) }
+          ? { ...item, rows: renumberWorkInstructionBodyRows(result.items) }
           : item
       ),
     },

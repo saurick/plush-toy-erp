@@ -95,6 +95,10 @@ type WorkflowTaskFilter struct {
 
 type WorkflowTaskBoardQuery struct {
 	Calendar        *WorkflowTaskCalendarQuery
+	DueDateFrom     string
+	DueDateTo       string
+	DueFrom         *time.Time
+	DueBefore       *time.Time
 	Period          string
 	DateFrom        string
 	DateTo          string

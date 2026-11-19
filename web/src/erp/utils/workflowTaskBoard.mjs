@@ -324,15 +324,19 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
     ? 'finished'
     : requestedLane
   const due = normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES)
+  const dueDateFrom = filters.dueDateFrom || ''
+  const dueDateTo = filters.dueDateTo || ''
+  const hasDueDates = lane !== 'finished' && due === 'all' && isCompleteDateRange({
+    dateFrom: dueDateFrom || dueDateTo,
+    dateTo: dueDateTo || dueDateFrom,
+  })
   const sourceType = getBusinessDocumentTypeKey(normalizeFilterValue(filters.sourceType))
   const sourceSection = sourceType === 'all'
     ? normalizeKnownFilterValue(filters.sourceSection, SOURCE_SECTION_FILTER_VALUES)
     : getBusinessDocumentSectionKey(sourceType) || 'all'
   return {
     ...normalizeTaskDiscoveryFilters(filters, { includeStage: true }),
-    ...(lane !== 'finished' && due === 'all' && isCompleteDateRange({ dateFrom: filters.dueDateFrom, dateTo: filters.dueDateTo })
-      ? { dueDateFrom: filters.dueDateFrom, dueDateTo: filters.dueDateTo }
-      : {}),
+    ...(hasDueDates ? { dueDateFrom, dueDateTo } : {}),
     ...(lane === 'finished' && isWorkflowHistoryDateFilter(filters) && filters.period ? { period: filters.period, dateFrom: filters.dateFrom || '', dateTo: filters.dateTo || '' } : {}),
     keyword: String(filters.keyword || '').trim(),
     status: getWorkflowTaskBoardStatusOptions(lane, mode).some(
@@ -360,7 +364,7 @@ export function hasActiveWorkflowTaskBoardFilters(filters = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
   return (
     Boolean(normalized.period) ||
-    Boolean(normalized.dueDateFrom) ||
+    Boolean(normalized.dueDateFrom || normalized.dueDateTo) ||
     DISCOVERY_FILTER_KEYS.some((key) => Boolean(normalized[key])) ||
     normalized.keyword !== DEFAULT_TASK_BOARD_FILTERS.keyword ||
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status ||
@@ -379,7 +383,7 @@ export function workflowTaskBoardExtraFilterCount(filters = {}, { calendar = fal
     ...DISCOVERY_FILTER_KEYS.map((key) => normalized[key]),
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status,
     normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role,
-    !calendar && (normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due || normalized.dueDateFrom),
+    !calendar && (normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due || normalized.dueDateFrom || normalized.dueDateTo),
     normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType || normalized.sourceSection !== DEFAULT_TASK_BOARD_FILTERS.sourceSection,
   ].filter(Boolean).length
 }
@@ -475,9 +479,10 @@ export function buildWorkflowTaskBoardRequest(filters = {}, { calendar = false }
   if (normalized.period) params.period = normalized.period
   if (normalized.dateFrom) params.date_from = normalized.dateFrom
   if (normalized.dateTo) params.date_to = normalized.dateTo
-  if (!calendar && normalized.dueDateFrom) {
-    params.due_date_from = normalized.dueDateFrom
-    params.due_date_to = normalized.dueDateTo
+  if (!calendar && (normalized.dueDateFrom || normalized.dueDateTo)) {
+    // A single populated input selects that day; the list API takes inclusive bounds.
+    params.due_date_from = normalized.dueDateFrom || normalized.dueDateTo
+    params.due_date_to = normalized.dueDateTo || normalized.dueDateFrom
   }
   if (normalized.keyword) params.keyword = normalized.keyword
   if (normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status) {

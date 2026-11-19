@@ -35,7 +35,6 @@ export function createPermissionCenterScenarios({
     await expectText(page.locator('.erp-role-center-sidebar'), 'PMC')
     const adminTab = page.getByRole('tab', { name: /员工账号/u })
     await adminTab.waitFor({ state: 'visible', timeout: 10_000 })
-    await expectText(adminTab, '7')
   }
   const selectApprovalRoleOption = async (
     page,
@@ -62,23 +61,23 @@ export function createPermissionCenterScenarios({
     })
     await trigger.waitFor({ state: 'visible', timeout: 10_000 })
     await trigger.hover()
-    let tooltip = page.locator('.ant-tooltip:visible').last()
-    await tooltip.waitFor({ state: 'visible', timeout: 10_000 })
-    assert.match(String(await tooltip.textContent()).trim(), expectedText)
+    let popover = page.locator('.erp-supplemental-help-popover:visible').last()
+    await popover.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.match(String(await popover.textContent()).trim(), expectedText)
 
     await page.mouse.move(0, 0)
-    await tooltip.waitFor({ state: 'hidden', timeout: 10_000 })
+    await popover.waitFor({ state: 'hidden', timeout: 10_000 })
     await trigger.focus()
     assert.equal(
       await trigger.evaluate((node) => node === document.activeElement),
       true,
       `${triggerName}应支持键盘聚焦`
     )
-    tooltip = page.locator('.ant-tooltip:visible').last()
-    await tooltip.waitFor({ state: 'visible', timeout: 10_000 })
-    assert.match(String(await tooltip.textContent()).trim(), expectedText)
+    popover = page.locator('.erp-supplemental-help-popover:visible').last()
+    await popover.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.match(String(await popover.textContent()).trim(), expectedText)
     await trigger.evaluate((node) => node.blur())
-    await tooltip.waitFor({ state: 'hidden', timeout: 10_000 })
+    await popover.waitFor({ state: 'hidden', timeout: 10_000 })
   }
   const verifyCurrentRoleNavigation = async (page, { mobile = false } = {}) => {
     let accessReads = 0
@@ -90,31 +89,64 @@ export function createPermissionCenterScenarios({
       if (body?.method === 'set_role_settings') writes.push(body.params)
     })
     await expectHeading(page, '权限管理')
-    let roleAccessRead = page.waitForResponse((response) => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'effective_role_access' && response.request().postDataJSON()?.params?.role_key === 'sales')
-    await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+    let roleAccessRead = page.waitForResponse(
+      (response) =>
+        response.url().includes('/rpc/admin') &&
+        response.request().postDataJSON()?.method === 'effective_role_access' &&
+        response.request().postDataJSON()?.params?.role_key === 'sales'
+    )
+    await page
+      .locator('.erp-role-template-card')
+      .filter({ hasText: '业务' })
+      .click()
     await roleAccessRead
     const save = page.getByRole('button', { name: '保存岗位设置', exact: true })
     const preview = page.getByRole('region', { name: '岗位实际菜单' })
     await preview.waitFor()
     assert.equal(await save.isDisabled(), true)
-    assert.deepEqual(await preview.locator('.erp-role-navigation-preview__group > .ant-typography').allTextContents(), ['工作中心', '业务模块', '系统与帮助'])
-    assert.equal(await page.getByRole('tab', { name: '菜单排列', exact: true }).count(), 0)
+    assert.deepEqual(
+      await preview
+        .locator('.erp-role-navigation-preview__group > .ant-typography')
+        .allTextContents(),
+      ['工作中心', '业务模块', '系统与帮助']
+    )
+    assert.equal(
+      await page.getByRole('tab', { name: '菜单排列', exact: true }).count(),
+      0
+    )
     assert.equal(await page.locator('.erp-role-navigation-editor').count(), 0)
     await assertTextAbsent(preview, '常用工作')
     await assertTextAbsent(preview, '系统推荐')
     const readCount = accessReads
-    const tabsBefore = await page.locator('.erp-role-navigation-workspace-tabs .ant-tabs-nav').boundingBox()
+    const tabsBefore = await page
+      .locator('.erp-role-navigation-workspace-tabs .ant-tabs-nav')
+      .boundingBox()
     await page.getByRole('tab', { name: '页面访问', exact: true }).click()
     await page.locator('.erp-role-effective-access__results').waitFor()
-    await page.getByRole('group', { name: '筛选页面访问' }).getByRole('button', { name: /不可进入/u }).click()
+    await page
+      .getByRole('group', { name: '筛选页面访问' })
+      .getByRole('button', { name: /不可进入/u })
+      .click()
     await page.getByRole('tab', { name: '实际菜单', exact: true }).click()
     await preview.waitFor()
-    const tabsAfter = await page.locator('.erp-role-navigation-workspace-tabs .ant-tabs-nav').boundingBox()
-    assert(Math.abs(tabsAfter.y - tabsBefore.y) < 1 && Math.abs(tabsAfter.height - tabsBefore.height) < 1, '只读视图切换应保持页签条位置稳定')
-    assert.equal(accessReads, readCount, '切换菜单与页面访问不应重新读取权限解释')
+    const tabsAfter = await page
+      .locator('.erp-role-navigation-workspace-tabs .ant-tabs-nav')
+      .boundingBox()
+    assert(
+      Math.abs(tabsAfter.y - tabsBefore.y) < 1 &&
+        Math.abs(tabsAfter.height - tabsBefore.height) < 1,
+      '只读视图切换应保持页签条位置稳定'
+    )
+    assert.equal(
+      accessReads,
+      readCount,
+      '切换菜单与页面访问不应重新读取权限解释'
+    )
     assert.equal(await save.isDisabled(), true)
     const geometry = await preview.evaluate((root) => ({
-      columns: getComputedStyle(root.querySelector('.erp-role-navigation-preview__grid')).gridTemplateColumns.split(' ').length,
+      columns: getComputedStyle(
+        root.querySelector('.erp-role-navigation-preview__grid')
+      ).gridTemplateColumns.split(' ').length,
       overflow: root.scrollWidth > root.clientWidth + 1,
     }))
     assert.equal(geometry.columns, mobile ? 1 : 4)
@@ -124,12 +156,17 @@ export function createPermissionCenterScenarios({
     if (mobile) return
 
     await page.getByRole('tab', { name: '岗位设置', exact: true }).click()
-    await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
+    await page
+      .getByRole('checkbox', { name: '查看进度看板', exact: true })
+      .uncheck()
     await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
     await preview.getByText('未保存的功能草稿', { exact: true }).waitFor()
     assert.equal(await save.isEnabled(), true)
     await save.click()
-    await page.locator('.erp-role-center-save-status').getByText('当前设置已保存', { exact: true }).waitFor()
+    await page
+      .locator('.erp-role-center-save-status')
+      .getByText('当前设置已保存', { exact: true })
+      .waitFor()
     assert.equal(writes.length, 1)
     assert.equal(writes[0].expected_version, 1)
     assert.equal(writes[0].navigation_mode, 'recommended')
@@ -137,15 +174,29 @@ export function createPermissionCenterScenarios({
     assert.deepEqual(writes[0].secondary_menu_paths, [])
     assert.equal(writes[0].data_scopes.length, 1)
     assert.equal(writes[0].data_scopes[0].resource_type, 'warehouse')
-    assert.equal(writes[0].permission_keys.includes(PermissionCode.SALES_ORDER_READ), true)
+    assert.equal(
+      writes[0].permission_keys.includes(PermissionCode.SALES_ORDER_READ),
+      true
+    )
     assert.equal(await save.isDisabled(), true)
     await page.reload()
-    roleAccessRead = page.waitForResponse((response) => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'effective_role_access' && response.request().postDataJSON()?.params?.role_key === 'sales')
-    await page.locator('.erp-role-template-card').filter({ hasText: '业务' }).click()
+    roleAccessRead = page.waitForResponse(
+      (response) =>
+        response.url().includes('/rpc/admin') &&
+        response.request().postDataJSON()?.method === 'effective_role_access' &&
+        response.request().postDataJSON()?.params?.role_key === 'sales'
+    )
+    await page
+      .locator('.erp-role-template-card')
+      .filter({ hasText: '业务' })
+      .click()
     await roleAccessRead
     await page.getByRole('tab', { name: '岗位导航', exact: true }).click()
     await preview.waitFor()
-    assert.equal(await preview.getByText('业务进度', { exact: true }).count(), 0)
+    assert.equal(
+      await preview.getByText('业务进度', { exact: true }).count(),
+      0
+    )
     assert.equal(await save.isDisabled(), true)
   }
   return [
@@ -204,7 +255,9 @@ export function createPermissionCenterScenarios({
         assert.equal(await readSelectValue(backup), '未设置')
         assert.equal(await escalation.inputValue(), '未设置')
         await chooseSelectOption(backup, '老板 / 管理层')
-        await dialog.getByRole('button', { name: '保留调整', exact: true }).click()
+        await dialog
+          .getByRole('button', { name: '保留调整', exact: true })
+          .click()
         await expectText(frame.locator('body'), '主办、备用和升级责任不能重复')
         await chooseSelectOption(backup, '未设置')
         await dialog
@@ -337,7 +390,13 @@ export function createPermissionCenterScenarios({
       verify: async (page) => {
         await expectHeading(page, '权限管理')
         await page.getByRole('tab', { name: '员工账号', exact: true }).waitFor()
-        assert.equal(await page.getByRole('tab', { name: /审批责任/ }).getAttribute('aria-selected'), 'true', '审批责任深链应直接进入对应页签')
+        assert.equal(
+          await page
+            .getByRole('tab', { name: /审批责任/ })
+            .getAttribute('aria-selected'),
+          'true',
+          '审批责任深链应直接进入对应页签'
+        )
         await expectText(page, '设置审批条件，以及主办、备用和升级责任')
         await expectText(page, '销售订单审批')
         await expectText(page, '采购订单审批')
@@ -394,15 +453,42 @@ export function createPermissionCenterScenarios({
         await primaryRole.locator('.ant-select-clear').click()
         await primaryRole.getByText('选择岗位', { exact: true }).waitFor()
         const employee = primaryTier.locator('.ant-select').nth(2)
-        assert.equal(await employee.getByRole('combobox').isDisabled(), true, '清空岗位后不能继续选择员工')
+        assert.equal(
+          await employee.getByRole('combobox').isDisabled(),
+          true,
+          '清空岗位后不能继续选择员工'
+        )
         await employee.getByText('请先选择审批岗位', { exact: true }).waitFor()
-        assert.equal(await employee.locator('.ant-select-selection-item').count(), 0, '清空岗位同步清除指定员工')
-        assert.equal(await primaryTier.locator('.ant-select').nth(1).locator('.ant-select-clear').count(), 0, '承接方式必须保留有效模式')
-        await dialog.getByRole('button', { name: '保存调整', exact: true }).click()
-        await dialog.locator('.ant-form-item-explain-error').filter({ hasText: '请选择主要审批岗位' }).waitFor()
-        await selectApprovalRoleOption(page, primaryRole, { label: '主要审批岗位', roleLabel: '业务' })
+        assert.equal(
+          await employee.locator('.ant-select-selection-item').count(),
+          0,
+          '清空岗位同步清除指定员工'
+        )
+        assert.equal(
+          await primaryTier
+            .locator('.ant-select')
+            .nth(1)
+            .locator('.ant-select-clear')
+            .count(),
+          0,
+          '承接方式必须保留有效模式'
+        )
+        await dialog
+          .getByRole('button', { name: '保存调整', exact: true })
+          .click()
+        await dialog
+          .locator('.ant-form-item-explain-error')
+          .filter({ hasText: '请选择主要审批岗位' })
+          .waitFor()
+        await selectApprovalRoleOption(page, primaryRole, {
+          label: '主要审批岗位',
+          roleLabel: '业务',
+        })
         await employee.click()
-        await page.locator('.ant-select-dropdown:visible').getByText('综合跟单（multi-role-employee）', { exact: true }).click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText('综合跟单（multi-role-employee）', { exact: true })
+          .click()
         const backupTier = dialog
           .locator('.erp-approval-responsibility-form__tier')
           .nth(1)
@@ -571,13 +657,19 @@ export function createPermissionCenterScenarios({
           .locator('td')
           .first()
           .evaluate((cell) => {
-            const table = cell.closest('.ant-table-content')
+            const table = cell.closest('.ant-table-wrapper')
+            if (!table) {
+              throw new Error('审批责任表格容器不存在')
+            }
+            const scrollSurface =
+              table.querySelector('.ant-table-content, .ant-table-body') ||
+              table
             return {
               cellLeft: cell.getBoundingClientRect().left,
               tableLeft: table.getBoundingClientRect().left,
-              width: table.clientWidth,
-              scrollWidth: table.scrollWidth,
-              scrollLeft: table.scrollLeft,
+              width: scrollSurface.clientWidth,
+              scrollWidth: scrollSurface.scrollWidth,
+              scrollLeft: scrollSurface.scrollLeft,
               position: getComputedStyle(cell).position,
             }
           })
@@ -813,7 +905,9 @@ export function createPermissionCenterScenarios({
         await expectHeading(page, '权限管理')
         await expectText(page, '岗位设置')
         await expectText(page, '员工账号')
-        await page.getByRole('table', { name: '岗位功能权限', exact: true }).waitFor()
+        await page
+          .getByRole('table', { name: '岗位功能权限', exact: true })
+          .waitFor()
         await expectText(page, '数据范围')
         await expectText(page, '敏感字段')
         await expectText(page, '岗位导航')
@@ -935,8 +1029,7 @@ export function createPermissionCenterScenarios({
           .click()
         await associatedAccounts.waitFor({ state: 'hidden' })
         await expectText(page, '命中 3/7 个员工账号')
-        const filteredAdminSearch =
-          page.getByPlaceholder('搜员工')
+        const filteredAdminSearch = page.getByPlaceholder('搜员工')
         assert.equal(
           await filteredAdminSearch.inputValue(),
           '财务',
@@ -959,7 +1052,9 @@ export function createPermissionCenterScenarios({
           '只看已选保留已选功能所在业务域'
         )
         await selectedOnlySwitch.click()
-        const financeToggle = page.locator('[data-permission-module="finance"] .erp-permission-checklist__toggle')
+        const financeToggle = page.locator(
+          '[data-permission-module="finance"] .erp-permission-checklist__toggle'
+        )
         await financeToggle.focus()
         await page.keyboard.press('Enter')
         assert.equal(await financeToggle.getAttribute('aria-expanded'), 'false')
@@ -968,10 +1063,7 @@ export function createPermissionCenterScenarios({
         const permissionModuleTitles = await page
           .locator('.erp-permission-checklist__toggle .ant-typography')
           .allTextContents()
-        for (const expectedTitle of [
-          '敏感字段',
-          '财务',
-        ]) {
+        for (const expectedTitle of ['敏感字段', '财务']) {
           assert(
             permissionModuleTitles.includes(expectedTitle),
             `权限中心缺少业务分类“${expectedTitle}”: ${JSON.stringify(permissionModuleTitles)}`
@@ -997,11 +1089,20 @@ export function createPermissionCenterScenarios({
           '.erp-permission-checklist__section[data-permission-module="finance"]'
         )
         await expectText(financePermissionSection, '确认应收')
-        const confirmReceivable = page.getByRole('checkbox', { name: '确认应收', exact: true })
+        const confirmReceivable = page.getByRole('checkbox', {
+          name: '确认应收',
+          exact: true,
+        })
         assert.equal(await confirmReceivable.isChecked(), true)
         assert.equal(await confirmReceivable.isEnabled(), true)
-        assert.ok(await page.locator('.erp-permission-row input:not(:disabled)').count() > 0)
-        await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
+        assert.ok(
+          (await page
+            .locator('.erp-permission-row input:not(:disabled)')
+            .count()) > 0
+        )
+        await page
+          .getByRole('checkbox', { name: '查看进度看板', exact: true })
+          .uncheck()
         await page.getByText('有未保存调整', { exact: true }).waitFor()
         await selectedOnlySwitch.click()
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'auto' }))
@@ -1015,7 +1116,13 @@ export function createPermissionCenterScenarios({
           fullPage: false,
         })
         await selectedOnlySwitch.click()
-        const salesAccessRead = page.waitForResponse((response) => response.url().includes('/rpc/admin') && response.request().postDataJSON()?.method === 'effective_role_access' && response.request().postDataJSON()?.params?.role_key === 'sales')
+        const salesAccessRead = page.waitForResponse(
+          (response) =>
+            response.url().includes('/rpc/admin') &&
+            response.request().postDataJSON()?.method ===
+              'effective_role_access' &&
+            response.request().postDataJSON()?.params?.role_key === 'sales'
+        )
         await page
           .locator('.erp-role-template-card')
           .filter({ hasText: '业务' })
@@ -1062,7 +1169,10 @@ export function createPermissionCenterScenarios({
         await expectText(page, '侧栏入口')
         await expectText(page, '工作中心')
         await assertTextAbsent(page, '常用工作')
-        await assertTextAbsent(page.getByRole('region', { name: '岗位实际菜单' }), '工具与查询')
+        await assertTextAbsent(
+          page.getByRole('region', { name: '岗位实际菜单' }),
+          '工具与查询'
+        )
         await expectText(page, '系统与帮助')
         await assertTextAbsent(page, '更多功能')
         await expectText(page, '工作台')
@@ -1070,11 +1180,17 @@ export function createPermissionCenterScenarios({
         await expectText(page, '基础资料')
         await expectText(page, '销售管理')
         await expectText(page, '仓储管理')
-        await assertTextAbsent(page.getByRole('region', { name: '岗位实际菜单' }), '历史记录中心')
+        await assertTextAbsent(
+          page.getByRole('region', { name: '岗位实际菜单' }),
+          '历史记录中心'
+        )
         await expectText(page, '帮助中心')
         await pageAccessTab.click()
         await expectText(page, '已按公司当前启用配置核对')
-        const accessHelp = page.getByRole('button', { name: '页面访问说明', exact: true })
+        const accessHelp = page.getByRole('button', {
+          name: '页面访问说明',
+          exact: true,
+        })
         await accessHelp.focus()
         await accessHelp.press('Enter')
         await expectText(page, '页面内的操作还会单独校验')
@@ -1129,7 +1245,10 @@ export function createPermissionCenterScenarios({
         await page.locator('.erp-role-navigation-preview').screenshot({
           path: 'output/playwright/style-l1/permission-center-navigation-preview.png',
         })
-        assert.equal(await page.getByRole('button', { name: '保存岗位设置' }).isDisabled(), true)
+        assert.equal(
+          await page.getByRole('button', { name: '保存岗位设置' }).isDisabled(),
+          true
+        )
         await pageAccessTab.click()
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-permission-map.png',
@@ -1252,7 +1371,9 @@ export function createPermissionCenterScenarios({
           scenarioName: 'permission-center-desktop',
         })
         await expectText(page, '只看已选')
-        await page.getByRole('checkbox', { name: '查看进度看板', exact: true }).uncheck()
+        await page
+          .getByRole('checkbox', { name: '查看进度看板', exact: true })
+          .uncheck()
         await expectText(page, '有未保存调整')
         const roleCards = page.locator('.erp-role-template-card')
         if ((await roleCards.count()) > 1) {
@@ -1303,8 +1424,7 @@ export function createPermissionCenterScenarios({
             adminTabMetrics.documentClientWidth + 1,
           `权限管理员工账号 tab 出现横向溢出: ${JSON.stringify(adminTabMetrics)}`
         )
-        const adminSearch =
-          page.getByPlaceholder('搜员工')
+        const adminSearch = page.getByPlaceholder('搜员工')
         await adminSearch.fill('assistant')
         await adminSearch.press('Enter')
         await expectText(page, '命中 1/7 个员工账号')
@@ -1405,7 +1525,15 @@ export function createPermissionCenterScenarios({
         await expectHeading(page, '权限管理')
         await page.getByRole('tab', { name: /员工账号/u }).click()
         await expectText(page, '共 7 个员工账号')
-        assert.equal(await page.getByText('操作记录归属实际登录账号。新账号分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。', { exact: true }).count(), 0)
+        assert.equal(
+          await page
+            .getByText(
+              '操作记录归属实际登录账号。新账号分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。',
+              { exact: true }
+            )
+            .count(),
+          0
+        )
         assert.equal(
           await page
             .locator('.erp-admin-content')
@@ -1422,7 +1550,10 @@ export function createPermissionCenterScenarios({
           .last()
         await expectText(createModal, '初始密码')
         await expectText(createModal, '操作记录归属此登录账号。')
-        await expectText(createModal, '分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。')
+        await expectText(
+          createModal,
+          '分配岗位后才能进入业务页面；多岗位权限合并，仍受公司设置和业务状态限制。'
+        )
         await assertAdminRoleModalLayout(page, {
           scenarioName: 'permission-center-admin-dialogs-create',
           title: '创建员工账号',
@@ -1558,7 +1689,8 @@ export function createPermissionCenterScenarios({
       themeMode: 'dark',
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 2,
-      verify: async (page) => verifyCurrentRoleNavigation(page, { mobile: true }),
+      verify: async (page) =>
+        verifyCurrentRoleNavigation(page, { mobile: true }),
     },
   ]
 }

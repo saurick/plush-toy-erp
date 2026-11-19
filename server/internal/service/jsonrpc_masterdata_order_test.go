@@ -1410,6 +1410,7 @@ func TestJsonrpcDispatcher_ProductSKUAPIRequiresPermissionAndValidRefs(t *testin
 		"id":                float64(1),
 		"product_id":        float64(1),
 		"sku_code":          "SKU-001",
+		"color":             nil,
 		"default_unit_id":   nil,
 		"unit_net_weight_g": nil,
 	}))

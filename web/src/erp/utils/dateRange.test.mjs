@@ -2,12 +2,24 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  formatLocalDateTimeInputValue,
   isDateInputAfter,
   isDateInputBefore,
   isDateInputRangeReversed,
   parseDateInputValue,
   parseDateTimeInputValue,
 } from './dateRange.mjs'
+
+test('dateRange: 表单初始时间使用本地时区和分钟精度', () => {
+  assert.equal(
+    formatLocalDateTimeInputValue(new Date(2026, 6, 14, 15, 30, 59)),
+    '2026-07-14T15:30'
+  )
+  assert.throws(
+    () => formatLocalDateTimeInputValue(new Date(Number.NaN)),
+    TypeError
+  )
+})
 
 test('dateRange: 列表筛选允许同一天范围', () => {
   assert.equal(isDateInputRangeReversed('2026-06-17', '2026-06-17'), false)

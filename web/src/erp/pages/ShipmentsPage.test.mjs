@@ -7,6 +7,13 @@ const source = readFileSync(
   new URL('./ShipmentsPage.jsx', import.meta.url),
   'utf8'
 )
+const sourceImportHook = readFileSync(
+  new URL(
+    '../components/shipments/useShipmentSourceImport.mjs',
+    import.meta.url
+  ),
+  'utf8'
+)
 const draftSubmit = readFileSync(new URL('../components/shipments/submitShipmentDraft.mjs', import.meta.url), 'utf8')
 const qualityModal = readFileSync(
   new URL(
@@ -136,30 +143,32 @@ test('shipment related route uses exact read and keeps the readable number prese
 })
 
 test('shipment source import uses server candidates with remote search and pagination', () => {
-  assert.match(source, /listShipmentSourceCandidates/u)
-  assert.match(source, /shipmentSourceCandidateListParams/u)
+  assert.match(source, /useShipmentSourceImport/u)
+  assert.match(sourceImportHook, /listShipmentSourceCandidates/u)
+  assert.match(sourceImportHook, /shipmentSourceCandidateListParams/u)
   assert.match(
-    source,
+    sourceImportHook,
     /salesOrderID:\s*shipmentForm\.getFieldValue\('sales_order_id'\)/u
   )
-  assert.match(source, /normalizeShipmentSourceCandidate/u)
-  assert.match(source, /setSalesOrderItems\(\(currentItems\) =>/u)
+  assert.match(sourceImportHook, /normalizeShipmentSourceCandidate/u)
+  assert.match(sourceImportHook, /setSalesOrderItems\(\(currentItems\) =>/u)
   assert.match(source, /onSalesOrderSourcePageChange/u)
   assert.match(source, /onSalesOrderSourceSearchChange/u)
   assert.match(source, /onSalesOrderSourceReload/u)
   assert.match(source, /salesOrderSourceLoadFailed/u)
-  assert.doesNotMatch(source, /listSalesOrderItems\(\{\s*limit:\s*500/u)
-  assert.doesNotMatch(source, /listAllSalesOrderItems/u)
-  assert.doesNotMatch(source, /listShipments\(\{\s*limit:\s*500/u)
-  assert.match(source, /currentSourceOrderID !== sourceOrderID/u)
-  assert.match(source, /item\.selectable === true/u)
+  assert.doesNotMatch(source + sourceImportHook, /listSalesOrderItems\(\{\s*limit:\s*500/u)
+  assert.doesNotMatch(source + sourceImportHook, /listAllSalesOrderItems/u)
+  assert.doesNotMatch(source + sourceImportHook, /listShipments\(\{\s*limit:\s*500/u)
+  assert.match(sourceImportHook, /currentSourceOrderID !== sourceOrderID/u)
+  assert.match(sourceImportHook, /item\.selectable === true/u)
   assert.match(
     source,
     /isPositiveNumeric20Scale6Units\(numeric20Scale6Units\(value\)\)/u
   )
   assert.doesNotMatch(source, /remainingQuantity[\s\S]{0,160}value > 0/u)
-  assert.match(source, /currentSourceItemIDs/u)
-  assert.match(source, /newSourceItems/u)
+  assert.match(sourceImportHook, /currentSourceItemIDs/u)
+  assert.match(sourceImportHook, /newSourceItems/u)
+  assert.doesNotMatch(source, /const loadSalesOrderSources = useCallback/u)
   assert.match(
     source,
     /<ProductIdentity[\s\S]*?productId=\{item\.product_id\}/u
@@ -177,7 +186,7 @@ test('shipment freight currency is derived from the selected sales order', () =>
 })
 
 test('new shipment drafts clear prior source selection and cached candidate state', () => {
-  const resetState = source.match(
+  const resetState = sourceImportHook.match(
     /const resetShipmentSourceSelectionState = useCallback\(\(\) => \{([\s\S]*?)\n {2}\}/u
   )?.[1]
   assert.ok(resetState, '应集中清空出货来源选择状态')

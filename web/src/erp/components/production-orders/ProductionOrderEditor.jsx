@@ -135,11 +135,13 @@ function ProductionMaterialRequirementsPanel({
         )
         return (
           <Space size={6}>
+            {/* 只读表单会禁用未声明 disabled 的控件；来源动作只由自身加载态控制。 */}
             {canIssue && canCreateMaterialIssue ? (
               <Button
                 size="small"
                 type="primary"
                 loading={loading}
+                disabled={loading}
                 onClick={() => onCreateMaterialIssue?.(requirement)}
               >
                 领料

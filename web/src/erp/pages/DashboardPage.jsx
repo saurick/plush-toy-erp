@@ -22,6 +22,7 @@ import {
 } from '../components/workflow/WorkflowDashboardViews.jsx'
 import { WORKFLOW_HISTORY_PERIOD_OPTIONS } from '../utils/workflowRoleTaskHistory.mjs'
 import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
 import WorkflowTaskLinkDrawer from '../components/workflow/WorkflowTaskLinkDrawer.jsx'
 import WorkflowExactTaskEntry from '../components/workflow/WorkflowExactTaskEntry.jsx'
 import WorkflowTaskDiscoveryFilters from '../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
@@ -318,7 +319,8 @@ export default function DashboardPage() {
   useEffect(() => {
     const deniedRisk = !canViewRisk && searchParams.get('view') === 'risk'
     const deniedApproval = !canViewApprovalInbox && requestedFilters.mode === 'approval'
-    const retiredFilters = searchParams.has('module_key') || searchParams.has('chain_key') || searchParams.has('task_group') ||
+    const staleDueRange = (searchParams.has('due_date_from') || searchParams.has('due_date_to')) && !filters.dueDateFrom && !filters.dueDateTo
+    const retiredFilters = staleDueRange || searchParams.has('module_key') || searchParams.has('chain_key') || searchParams.has('task_group') ||
       (filters.lane === 'finished' && searchParams.has('due'))
     if (!deniedApproval && !retiredFilters && !deniedRisk) return
     const next = writeWorkflowTaskBoardFiltersToSearch(searchParams, filters)
@@ -1212,13 +1214,19 @@ export default function DashboardPage() {
                               )}
                             </>
                           )}
-                          {!calendarView && filters.lane !== 'finished' && <SelectFilter
-                            aria-label="截止时间"
-                            emptyValue="all"
-                            value={filters.due}
-                            options={dueOptions}
-                            onChange={(value) => updateFilter('due', value)}
-                          />}
+                          {!calendarView && filters.lane !== 'finished' && (
+                            <DateRangeFilter
+                              options={[{ value: 'due_at', label: '截止时间', upcoming: true }]}
+                              startValue={filters.dueDateFrom}
+                              endValue={filters.dueDateTo}
+                              onRangeChange={(dueDateFrom, dueDateTo) => updateFilter({ due: 'all', dueDateFrom, dueDateTo })}
+                              shortcutFilter={{
+                                options: dueOptions.filter(({ value }) => value !== 'all'),
+                                value: filters.due === 'all' ? '' : filters.due,
+                                onChange: (due) => updateFilter({ due, dueDateFrom: '', dueDateTo: '' }),
+                              }}
+                            />
+                          )}
                         </>
                       }
 

@@ -66,6 +66,25 @@ func TestWorkflowTaskFilterParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Run("截止日期范围先过滤再计数和分页", func(t *testing.T) {
+		for i, at := range []*time.Time{nil, from, before} {
+			task := client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("DUE-DATE-%d", i)).SetTaskGroup("filter-parity").SetTaskName("截止日期").SetOwnerRoleKey("production").SetTaskStatusKey("ready").SetPayload(map[string]any{})
+			task.SetNillableDueAt(at).SaveX(ctx)
+		}
+		endOfDay := before.Add(-time.Second)
+		client.WorkflowTask.Create().SetTaskCode("DUE-DATE-END").SetTaskGroup("filter-parity").SetTaskName("当天最后一秒").SetOwnerRoleKey("production").SetTaskStatusKey("ready").SetDueAt(endOfDay).SetPayload(map[string]any{}).SaveX(ctx)
+		usecase := biz.NewWorkflowUsecase(repo)
+		query := biz.WorkflowTaskBoardQuery{OwnerRoleKey: "production", LaneKey: "all", Sort: biz.WorkflowTaskBoardSortTimeAsc, Limit: 1, Offset: 1, SnapshotAt: now, DueDateFrom: "2026-10-16", DueDateTo: "2026-10-16"}
+		board, err := usecase.GetTaskBoard(ctx, query)
+		if err != nil || board.Total != 2 || board.Counts.Due != 2 || len(board.Lanes[0].Tasks) != 1 || board.Lanes[0].Tasks[0].TaskCode != "DUE-DATE-END" {
+			t.Fatalf("single day page: %+v, %v", board, err)
+		}
+		query.DueDateTo = "2026-10-17"
+		board, err = usecase.GetTaskBoard(ctx, query)
+		if err != nil || board.Total != 3 {
+			t.Fatalf("two day page: %+v, %v", board, err)
+		}
+	})
 	for i, at := range []time.Time{from.Add(-time.Nanosecond), *from, before.Add(-time.Nanosecond), *before} {
 		client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("PARITY-HISTORY-%d", i)).SetTaskGroup("filter-parity").SetTaskName("历史筛选").SetSourceType("sales_order").SetSourceID(i + 1).SetOwnerRoleKey("sales").SetTaskStatusKey("done").SetCompletedAt(at).SetPayload(map[string]any{}).SaveX(ctx)
 	}

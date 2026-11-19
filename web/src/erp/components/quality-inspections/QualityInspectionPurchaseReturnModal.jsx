@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
 import { submitValidatedForm } from '../../utils/submitValidatedForm.mjs'
 import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
@@ -6,6 +6,7 @@ import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import {
   sourceBusinessActionNo,
@@ -16,12 +17,6 @@ import {
   numeric20Scale6Units,
 } from '../../utils/numeric20Scale6.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
-
-function localDateTimeValue() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
-}
 
 export default function QualityInspectionPurchaseReturnModal({
   open,
@@ -34,8 +29,8 @@ export default function QualityInspectionPurchaseReturnModal({
 }) {
   const [form] = Form.useForm()
 
-  useEffect(() => {
-    if (!open) return
+  const initializeOpenForm = (visible) => {
+    if (!visible) return
     form.resetFields()
     form.setFieldsValue({
       return_no: sourceBusinessActionNo(
@@ -43,11 +38,11 @@ export default function QualityInspectionPurchaseReturnModal({
         inspection?.inspection_no || 'QUALITY',
         sourceBusinessActionUUID()
       ),
-      returned_at: localDateTimeValue(),
+      returned_at: formatLocalDateTimeInputValue(),
       reason: '来料质检不合格',
       note: '',
     })
-  }, [form, inspection?.id, inspection?.inspection_no, open])
+  }
 
   const submit = () => submitValidatedForm(form, onSubmit)
 
@@ -66,6 +61,7 @@ export default function QualityInspectionPurchaseReturnModal({
       forceRender
       keyboard={!loading}
       maskClosable={!loading}
+      afterOpenChange={initializeOpenForm}
       onCancel={() => {
         if (!loading) onCancel?.()
       }}

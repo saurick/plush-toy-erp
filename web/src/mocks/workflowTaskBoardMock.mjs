@@ -224,10 +224,13 @@ export function buildWorkflowTaskBoardMock({
   const periodDays = { today: 1, '7d': 7, '30d': 30 }[params.period]
   const from = periodDays ? dayStart - (periodDays - 1) * 86400 : params.period === 'custom' ? Date.parse(`${params.date_from}T00:00:00+08:00`) / 1000 : null
   const before = periodDays ? dayStart + 86400 : params.period === 'custom' ? Date.parse(`${params.date_to}T00:00:00+08:00`) / 1000 + 86400 : null
+  const dueFrom = params.due_date_from ? Date.parse(`${params.due_date_from}T00:00:00+08:00`) / 1000 : null
+  const dueBefore = params.due_date_to ? Date.parse(`${params.due_date_to}T00:00:00+08:00`) / 1000 + 86400 : null
   const filteredTasks = visibleTasks
     .filter(
       (task) =>
         (from === null || (task.completed_at >= from && task.completed_at < before)) &&
+        (dueFrom === null || (task.due_at >= dueFrom && task.due_at < dueBefore)) &&
         (params.todo_only !== true || UNSETTLED_TASK_STATUS_KEYS.has(taskStatus(task))) &&
         matchesKeyword(task, params.keyword) &&
         matchesStatus(task, status, normalizedSnapshotAt) &&

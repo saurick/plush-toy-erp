@@ -43,38 +43,47 @@ async function verifyCalendarAlignment(calendar, assert) {
   return geometry
 }
 
-async function verifyCalendarScroll(calendar, assert, { monthSticks, headingSticks }) {
-  const layout = await calendar.evaluate(async (root) => {
-    const scroller = root.closest('[data-testid="mobile-role-scroll"], .erp-admin-content')
-    const month = root.querySelector('.workflow-task-calendar__month')
-    const heading = root.querySelector('.workflow-task-calendar__heading')
-    const firstTask = root.querySelector('.workflow-task-calendar__task')
-    const initialScroll = scroller.scrollTop
-    const scroll = async (top) => {
-      scroller.scrollTo({ top, behavior: 'instant' })
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    }
-    try {
+async function verifyCalendarScroll(calendar, assert, { monthSticks, headingSticks, screenshot }) {
+  const scrollRegion = '[data-testid="mobile-role-scroll"], .erp-admin-content'
+  const initialScroll = await calendar.evaluate((root, selector) => root.closest(selector).scrollTop, scrollRegion)
+  try {
+    const layout = await calendar.evaluate(async (root, selector) => {
+      const scroller = root.closest(selector)
+      const month = root.querySelector('.workflow-task-calendar__month')
+      const heading = root.querySelector('.workflow-task-calendar__heading')
+      const firstTask = root.querySelector('.workflow-task-calendar__task')
+      const scroll = async (top) => {
+        scroller.scrollTo({ top, behavior: 'instant' })
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      }
       await scroll(1000)
       const firstTop = firstTask.getBoundingClientRect().top
+      const firstMonthTop = month.getBoundingClientRect().top
+      const firstHeadingTop = heading.getBoundingClientRect().top
       await scroll(1300)
       const viewport = scroller.getBoundingClientRect()
       const monthBox = month.getBoundingClientRect()
       const headingBox = heading.getBoundingClientRect()
       return {
         taskTravel: firstTop - firstTask.getBoundingClientRect().top,
+        monthTravel: firstMonthTop - monthBox.top,
+        headingTravel: firstHeadingTop - headingBox.top,
         monthVisible: monthBox.top >= viewport.top - 1 && monthBox.bottom <= viewport.bottom + 1,
         monthAbove: monthBox.bottom <= viewport.top,
         headingVisible: headingBox.top >= viewport.top - 1 && headingBox.bottom <= viewport.bottom + 1,
         headingAbove: headingBox.bottom <= viewport.top,
       }
-    } finally {
-      await scroll(initialScroll)
-    }
-  })
-  assert(Math.abs(layout.taskTravel - 300) <= 1, '主滚动区向下滚动时任务卡同步移动')
-  assert(monthSticks ? layout.monthVisible : layout.monthAbove, '月历在高双栏完整可见，在矮屏和单栏随任务滚走')
-  assert(headingSticks ? layout.headingVisible : layout.headingAbove, '日期摘要在桌面双栏保持可见，在单栏随任务滚走')
+    }, scrollRegion)
+    assert(Math.abs(layout.taskTravel - 300) <= 1, '主滚动区向下滚动时任务卡同步移动')
+    assert(monthSticks ? layout.monthVisible && Math.abs(layout.monthTravel) <= 1 : layout.monthAbove, '月历在高双栏保持吸顶，在矮屏和单栏随任务滚走')
+    assert(headingSticks ? layout.headingVisible && Math.abs(layout.headingTravel) <= 1 : layout.headingAbove, '日期摘要在桌面双栏保持吸顶，在单栏随任务滚走')
+    if (screenshot) await calendar.page().screenshot({ path: screenshot })
+  } finally {
+    await calendar.evaluate(async (root, { selector, top }) => {
+      root.closest(selector).scrollTo({ top, behavior: 'instant' })
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    }, { selector: scrollRegion, top: initialScroll })
+  }
 }
 
 export function createTaskCalendarScenarios(deps) {
@@ -250,9 +259,33 @@ revision,
           const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
           assert.equal(await filters.getByText('截止时间', { exact: true }).count(), 0, 'desktop calendar has one date condition')
           await filters.getByRole('button', { name: '收起', exact: true }).click()
+          await page.locator('.erp-business-filter-popover:visible').waitFor({ state: 'hidden' })
         }
         assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30)
-        await verifyCalendarScroll(calendar, assert, { monthSticks: !mobile, headingSticks: !mobile })
+        const captureInsets = !mobile && themeMode === 'light'
+        if (!mobile) {
+          const insets = await calendar.evaluate((root) => {
+            const card = root.closest('.erp-work-center-results')
+            const innerTop = card.getBoundingClientRect().top + card.clientTop
+            const month = root.querySelector('.workflow-task-calendar__month')
+            const heading = root.querySelector('.workflow-task-calendar__heading')
+            return {
+              month: month.getBoundingClientRect().top - innerTop,
+              heading: heading.getBoundingClientRect().top - innerTop,
+            }
+          })
+          assert(Math.abs(insets.month - 12) <= 0.5 && Math.abs(insets.heading - 12) <= 0.5,
+            `月历与任务摘要首屏对齐并留 12px 内距：${JSON.stringify(insets)}`)
+        }
+        if (captureInsets) {
+          await page.mouse.move(0, 0)
+          await page.screenshot({ path: path.join(outputDir, `${name}-first-screen.png`) })
+        }
+        await verifyCalendarScroll(calendar, assert, {
+          monthSticks: !mobile,
+          headingSticks: !mobile,
+          screenshot: captureInsets ? path.join(outputDir, `${name}-sticky.png`) : undefined,
+        })
         const monthPanel = calendar.locator('.workflow-task-calendar__month')
         const emptyDay = calendar.locator('button[data-date][aria-label$="，0 项待办"]').first()
         await emptyDay.scrollIntoViewIfNeeded()

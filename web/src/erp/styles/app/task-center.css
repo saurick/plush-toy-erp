@@ -73,7 +73,10 @@
   flex: 0 1 180px;
 }
 
-.erp-dashboard-task-board-card .workflow-task-calendar,
+.erp-dashboard-task-board-card .workflow-task-calendar {
+  margin: 12px var(--erp-panel-padding-inline, 12px) var(--erp-panel-padding-block, 10px);
+}
+
 .erp-dashboard-task-board-card .workflow-exceptions,
 .erp-dashboard-task-board-card .erp-work-center-results > .ant-card-body > .ant-alert {
   margin: 0 var(--erp-panel-padding-inline, 12px) var(--erp-panel-padding-block, 10px);

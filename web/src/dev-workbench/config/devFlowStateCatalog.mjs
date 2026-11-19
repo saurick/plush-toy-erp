@@ -1746,7 +1746,7 @@ const FLOW_DEFINITIONS = [
     ],
     sourceRefs: [
       'server/internal/core/status/shipment.go',
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_shipment.go',
       'server/internal/service/jsonrpc_operational_fact_shipment.go',
     ],
     evidence: [
@@ -1766,6 +1766,7 @@ const FLOW_DEFINITIONS = [
   ...[
     {
       key: 'fact.production',
+      usecaseSource: 'server/internal/biz/operational_fact_production.go',
       label: '生产事实',
       postAction: 'post_production_fact',
       cancelAction: 'cancel_production_fact',
@@ -1774,6 +1775,7 @@ const FLOW_DEFINITIONS = [
     },
     {
       key: 'fact.outsourcing',
+      usecaseSource: 'server/internal/biz/operational_fact_outsourcing.go',
       label: '委外事实',
       postAction: 'post_outsourcing_fact',
       cancelAction: 'cancel_outsourcing_fact',
@@ -1817,15 +1819,15 @@ const FLOW_DEFINITIONS = [
     guard: 'Fact 不能由 Workflow payload 或页面状态补造。',
     factBoundary: 'fact_ledger',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      item.usecaseSource,
       'server/internal/service/jsonrpc_operational_fact.go',
     ],
     evidence: [
       ...factEvidence,
       evidence(
         'code',
-        'server/internal/biz/operational_fact.go',
-        '生产与委外事实状态集合及命名 post/cancel usecase。'
+        item.usecaseSource,
+        `${item.label}的过账和取消用例。`
       ),
     ],
   })),
@@ -1866,7 +1868,7 @@ const FLOW_DEFINITIONS = [
     guard: '预留影响可用量，但不替代追加式 inventory_txns。',
     factBoundary: 'fact_ledger',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_reservation.go',
       'server/internal/data/operational_fact_repo.go',
       'server/internal/service/jsonrpc_operational_fact_reservation.go',
     ],
@@ -1955,7 +1957,7 @@ const FLOW_DEFINITIONS = [
       '真实收付款、核销和红冲另有各自合同，并在本目录分对象登记；不得把它们合并为 finance_fact 状态。',
     factBoundary: 'fact_ledger',
     sourceRefs: [
-      'server/internal/biz/operational_fact.go',
+      'server/internal/biz/operational_fact_finance.go',
       'server/internal/data/model/schema/finance_fact.go',
       'server/internal/service/jsonrpc_operational_fact_finance.go',
     ],

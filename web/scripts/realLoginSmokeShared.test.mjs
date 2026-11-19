@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 import {
+  assertPdfPreviewPopupReady,
   buildRealLoginSmokePreflightReport,
   buildRealLoginSmokeInputTemplate,
   createRealLoginSmokeRuntime,
@@ -161,6 +162,32 @@ test('real login smoke input template is no-write and keeps downstream write bou
   assert.match(template.boundary, /purchase-receipt-real-write persists/)
 })
 
+test('shared preview assertion accepts a PDF blob or one ready iframe, not pending or expired previews', async () => {
+  await assertPdfPreviewPopupReady({ url: () => 'blob:http://localhost/test' })
+
+  const preview = (state) => ({
+    url: () => 'http://localhost/print-preview',
+    locator: (selector) => {
+      assert.equal(selector, 'iframe.pdf-preview-frame')
+      return {
+        count: async () => 1,
+        waitFor: async ({ state: visibility }) => assert.equal(visibility, 'visible'),
+      }
+    },
+    waitForTimeout: async () => {},
+    evaluate: async () => ({
+      bodyText: '',
+      iframeSrc: 'blob:http://localhost/test',
+      iframeCount: 1,
+      ...state,
+    }),
+  })
+  await assertPdfPreviewPopupReady(preview())
+  for (const bodyText of ['正在等待 PDF 预览结果', 'PDF 预览不存在或已过期']) {
+    await assert.rejects(assertPdfPreviewPopupReady(preview({ bodyText })), { code: 'ERR_ASSERTION' })
+  }
+})
+
 test('contract real login smokes cover preview download and print entrypoints', () => {
   const contractSmokeScripts = [
     'purchaseContractRealLoginSmoke.mjs',
@@ -174,6 +201,7 @@ test('contract real login smokes cover preview download and print entrypoints', 
     )
 
     assert.match(source, /verify\w+ContractPreviewPopup/u)
+    assert.match(source, /await assertPdfPreviewPopupReady\(popup\)/u)
     assert.match(source, /verifyPdfDownloadButton/u)
     assert.match(source, /verifyPrintButtonInvokesWindowPrint/u)
     assert.match(source, /acceptDownloads:\s*true/u)

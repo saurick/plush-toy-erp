@@ -5,9 +5,9 @@ import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import Select from '@/common/components/select/AppSelect'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import {
-  localDateTimeInputValue,
   SHIPMENT_FINANCE_INVOICE_CATEGORY_OPTIONS,
   shipmentFinanceSourceActionConfig,
 } from '../../utils/shipmentFinanceSourceAction.mjs'
@@ -34,7 +34,7 @@ export default function ShipmentFinanceSourceModal({
   useEffect(() => {
     if (!open) return
     form.resetFields()
-    form.setFieldsValue({ occurred_at: localDateTimeInputValue() })
+    form.setFieldsValue({ occurred_at: formatLocalDateTimeInputValue() })
   }, [action, form, open, shipment?.id])
 
   const submit = async () => {

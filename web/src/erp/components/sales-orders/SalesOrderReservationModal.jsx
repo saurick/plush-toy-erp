@@ -9,6 +9,7 @@ import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
 
 import {
   buildReservationBalanceChoices,
@@ -30,12 +31,6 @@ function readableSourceText(values = [], fallback = '-') {
     .filter(Boolean)
     .join(' ')
   return text || fallback
-}
-
-function localDateTimeValue() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
 }
 
 function renderReservationProductOption(option) {
@@ -121,7 +116,7 @@ export default function SalesOrderReservationModal({
       sales_order_item_id: firstItem?.value,
       balance_id: firstBalance?.value,
       quantity: defaultSalesOrderReservationQuantity(firstItem, firstBalance),
-      reserved_at: localDateTimeValue(),
+      reserved_at: formatLocalDateTimeInputValue(),
     })
     if (firstItem?.value) {
       onItemChange?.(firstItem.item)
@@ -173,7 +168,8 @@ export default function SalesOrderReservationModal({
             key: 'status',
             label: '来源状态',
             children:
-              String(order?.lifecycle_status || '').toLowerCase() === SalesOrderStatus.ACTIVE
+              String(order?.lifecycle_status || '').toLowerCase() ===
+              SalesOrderStatus.ACTIVE
                 ? '履约中'
                 : '待核对',
           },
@@ -205,7 +201,12 @@ export default function SalesOrderReservationModal({
             : []),
         ]}
       />
-      <BusinessForm form={form} layout="vertical" preserve={false} disabled={loading}>
+      <BusinessForm
+        form={form}
+        layout="vertical"
+        preserve={false}
+        disabled={loading}
+      >
         <Form.Item
           name="sales_order_item_id"
           label="销售订单明细"
@@ -294,7 +295,11 @@ export default function SalesOrderReservationModal({
           <DateTimeInput />
         </Form.Item>
         <Form.Item name="note" label="备注">
-          <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
+          <BusinessTextArea
+            minRows={2}
+            maxLength={BusinessTextPolicy.noteMaxCharacters}
+            showCount
+          />
         </Form.Item>
       </BusinessForm>
     </BusinessModal>
