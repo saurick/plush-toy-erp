@@ -9,7 +9,9 @@ import {
 import {
   addBusinessChainMapNode,
   arrangeBusinessChainMap,
+  businessChainMapCanCollapseGrowth,
   businessChainMapCanGrow,
+  collapseBusinessChainMapGrowth,
   expandBusinessChainMap,
   focusBusinessChainMap,
   growBusinessChainMap,
@@ -138,6 +140,33 @@ test('逐层扩大只走当前边界的一层，保留原坐标；完整展开�
     new Set(draft.nodes.map(({ id }) => id)).size,
     draft.nodes.length
   )
+})
+
+test('整体范围可收起额外展开，再次展开时复用缓存节点、关系和坐标', () => {
+  const whole = showBusinessChainWhole(
+    emptyBusinessChainDraft(),
+    library,
+    'purchase_to_inventory'
+  )
+  assert.equal(businessChainMapCanCollapseGrowth(whole, library), false)
+
+  const expanded = growBusinessChainMap(whole, library, 'downstream')
+  assert(expanded.map.visibleIds.length > whole.map.visibleIds.length)
+  assert.equal(businessChainMapCanCollapseGrowth(expanded, library), true)
+
+  const collapsed = collapseBusinessChainMapGrowth(expanded, library)
+  assert.deepEqual(collapsed.map.visibleIds, whole.map.visibleIds)
+  assert.deepEqual(collapsed.nodes, expanded.nodes)
+  assert.deepEqual(collapsed.edges, expanded.edges)
+  assert.equal(businessChainMapCanCollapseGrowth(collapsed, library), false)
+
+  const reopened = growBusinessChainMap(collapsed, library, 'downstream')
+  assert.deepEqual(reopened.map.visibleIds, expanded.map.visibleIds)
+  assert.deepEqual(reopened.nodes, expanded.nodes)
+  assert.deepEqual(reopened.edges, expanded.edges)
+  const focused = focusBusinessChainMap(whole, library, start)
+  assert.equal(businessChainMapCanCollapseGrowth(focused, library), false)
+  assert.equal(collapseBusinessChainMapGrowth(focused, library), focused)
 })
 
 test('聚焦、回到整体及不同链路往返保留已缓存和手动调整的节点坐标', () => {

@@ -1,3 +1,4 @@
+import { chooseDisplay, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
 import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 
@@ -18,14 +19,11 @@ export function createDevBusinessChainDesignFullscreenScenarios({
           name: '流程探索',
           exact: true,
         })
-        await editor.getByRole('button', { name: '全库', exact: true }).click()
-        await editor.getByRole('button', { name: '调整布局', exact: true }).click()
+        await searchWholeLibrary(editor)
+        await chooseExplorerAction(editor, '调整布局')
         // Object-level gestures remain available through the complete node library.
         await chooseChainNodeView(page, editor, '全部')
-        await editor
-          .locator('.erp-chain-design__canvas-bar')
-          .getByText('全部已载入节点', { exact: true })
-          .click()
+        await chooseDisplay(editor, '全部已载入节点')
         await expect(
           editor.getByRole('button', { name: '适应画布全图', exact: true })
         ).toBeDisabled()
@@ -61,16 +59,20 @@ export function createDevBusinessChainDesignFullscreenScenarios({
             return {
               canvas: box('.erp-chain-design__viewport'),
               footer: box('.erp-chain-design__footer'),
-              drafts: box('.erp-chain-design__drafts'),
+              drafts: box('.erp-chain-design__file-actions'),
               tools: box('.erp-chain-design__toolbar'),
+              actions: box('.erp-chain-design__canvas-actions'),
+              scope: box('.erp-chain-design__role-filter'),
             }
           })
           console.log(
             `[chain-design-density] ${viewport.width}x${viewport.height} ${JSON.stringify(layout)}`
           )
+          const wrapped = layout.actions.top >= layout.scope.bottom
+          assert(layout.actions.bottom <= layout.canvas.top + 1, '全屏时编辑和缩放操作仍在图上方')
           assert(
-            layout.tools.bottom - layout.drafts.top <= 84,
-            '宽屏页头在两行内放下视图操作和范围工具'
+            layout.tools.bottom - layout.drafts.top <= (wrapped ? 130 : 90),
+            '全屏编辑时，画布操作按可用宽度同排或换一行'
           )
           assert(layout.footer.height <= 40, '图例按需查看，底部仅占一行')
           assert(
@@ -149,7 +151,7 @@ async function assertChainDesignFullscreen(page, editor, assert) {
     .press('Escape')
   await expect(editor.locator('.erp-chain-design__card')).toHaveCount(0)
   await expect(fullscreen).toBeVisible()
-  await editor.getByRole('button', { name: '新建空白视图', exact: true }).click()
+  await chooseExplorerAction(editor, '新建空白视图')
   const confirm = page.getByRole('dialog', { name: '替换当前探索？', exact: true })
   await expect(confirm).toBeVisible()
   await confirm.getByRole('button', { name: '取消', exact: true }).press('Escape')
@@ -207,7 +209,7 @@ async function assertChainDesignFullscreen(page, editor, assert) {
     })
     await expect(filterPanel).toBeVisible()
     await expect(
-      filterPanel.getByRole('button', { name: '收起', exact: true })
+      filterPanel.getByRole('button', { name: '取消', exact: true })
     ).toBeInViewport()
     await filterPanel.press('Escape')
     await expect(filterPanel).toBeHidden()

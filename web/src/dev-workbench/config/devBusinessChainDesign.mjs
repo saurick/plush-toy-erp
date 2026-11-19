@@ -344,6 +344,18 @@ export function buildBusinessChainDesignLibrary(catalog) {
       })
     }
   }
+  const chains = catalog.businessChains.map(({ key, label }) => ({
+    value: key,
+    label,
+  }))
+  const chainByValue = new Map(chains.map((chain) => [chain.value, chain]))
+  const chainOptionGroups = catalog.businessChainOverview.lanes.map(
+    ({ key, label, chainKeys }) => ({
+      key,
+      label,
+      options: chainKeys.map((chainKey) => chainByValue.get(chainKey)),
+    })
+  )
   return {
     nodes,
     overview: catalog.businessChainOverview,
@@ -360,10 +372,8 @@ export function buildBusinessChainDesignLibrary(catalog) {
       ])
     ),
     bypasses,
-    chains: catalog.businessChains.map(({ key, label }) => ({
-      value: key,
-      label,
-    })),
+    chains,
+    chainOptionGroups,
     roles: unique(nodes.flatMap((node) => node.roles)).map((key) => ({
       value: key,
       label: businessChainRoleLabel(catalog, key),

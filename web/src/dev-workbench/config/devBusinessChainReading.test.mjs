@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DEV_FLOW_STATE_CATALOG as catalog } from './devFlowStateCatalog.mjs'
 import { buildBusinessChainDesignLibrary, emptyBusinessChainDraft, parseBusinessChainDraft } from './devBusinessChainDesign.mjs'
-import { showBusinessChainWhole, projectBusinessChainMap } from './devBusinessChainMap.mjs'
+import { showBusinessChainWhole, projectBusinessChainMap, toggleBusinessChainMapRegion } from './devBusinessChainMap.mjs'
 import { CHAIN_DESIGN_NODE_SIZE } from './devBusinessChainDesignView.mjs'
 import {
   CHAIN_READING_LAYERS,
@@ -95,6 +95,29 @@ test('主路径保留拆分动作，异常专题完整显示，点选与明确�
   assert.equal(projectBusinessChainReading(graph, library, { ...base, selection: { nodeId: correction, detailsOnly: true } }).nodes.some((node) => node.id === correction), false)
   assert(projectBusinessChainReading(graph, library, { ...base, selection: { nodeId: iqc } }).nodes.some((node) => node.id === correction))
   assert(projectBusinessChainReading(graph, library, { ...base, expandedNodes: [correction] }).nodes.some((node) => node.id === correction))
+})
+
+test('单链概览展开为步骤后复用主线与分支阅读，卡片和总图不受影响', () => {
+  const chainKey = 'purchase_to_inventory'
+  const draft = showBusinessChainWhole(emptyBusinessChainDraft(), library, chainKey)
+  const overview = { scope: 'whole', mode: 'overview' }
+  const read = (graph, options) => projectBusinessChainReading(graph, library, { ...overview, ...options })
+  const card = projectBusinessChainMap(draft, library, 'overview')
+  assert.equal(read(card), card)
+
+  const expanded = toggleBusinessChainMapRegion(draft, library, chainKey)
+  const steps = projectBusinessChainMap(expanded, library, 'overview')
+  const mainline = read(steps)
+  assert(steps.nodes.length > mainline.nodes.length)
+  assert.deepEqual(mainline.nodes, read(steps, { mode: 'mainline' }).nodes)
+  assert.deepEqual(mainline.edges, read(steps, { mode: 'mainline' }).edges)
+  assert.equal(read(steps, { showBranches: true }), steps)
+  assert.equal(read(steps, { scope: 'local' }), steps)
+
+  const map = showBusinessChainWhole(emptyBusinessChainDraft(), library, 'all')
+  const expandedMap = projectBusinessChainMap(toggleBusinessChainMapRegion(map, library, chainKey), library, 'overview')
+  assert(expandedMap.edges.some((edge) => edge.overview))
+  assert.equal(read(expandedMap), expandedMap)
 })
 
 test('本地视图保存阅读布局、图层和镜头，拒绝非法镜头', () => {

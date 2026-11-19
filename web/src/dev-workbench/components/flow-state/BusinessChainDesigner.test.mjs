@@ -9,6 +9,15 @@ import { CHAIN_DESIGN_WORKING_KEY as workingKey } from './useBusinessChainDraft.
 
 registerMermaidTestRenderer()
 
+async function chooseAction(harness, name) {
+  await harness.act(() => harness.container.querySelector('[aria-label="更多视图操作"]').click())
+  await harness.flush()
+  const item = [...document.querySelectorAll('[role="menuitem"]')].find((node) => node.textContent === name)
+  assert(item, name)
+  await harness.act(() => item.click())
+  await harness.flush()
+}
+
 test('部分载入的视图切换颗粒度只改显示，保留关系、手动坐标与自动记录', async (t) => {
   const harness = await createReactTestHarness(t)
   const { default: Designer } = await import('./BusinessChainDesigner.jsx')
@@ -20,7 +29,10 @@ test('部分载入的视图切换颗粒度只改显示，保留关系、手动�
   const root = harness.container
   const working = () => JSON.parse(window.sessionStorage.getItem(workingKey)).draft
   for (const [label, mode] of [['全部已载入节点', 'all'], ['链路概览', 'overview'], ['业务步骤', 'mainline']]) {
-    const option = [...root.querySelectorAll('[aria-label="流程颗粒度"] label')].find((item) => item.textContent === label)
+    const control = root.querySelector('[aria-label="流程颗粒度"]').closest('.ant-select')
+    await harness.act(() => control.querySelector('.ant-select-selector').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
+    await harness.flush()
+    const option = [...document.querySelectorAll('.ant-select-item-option-content')].find((item) => item.textContent === label)
     assert(option, label)
     await harness.act(() => option.click())
     await harness.flush()
@@ -29,6 +41,7 @@ test('部分载入的视图切换颗粒度只改显示，保留关系、手动�
     assert.deepEqual(working().edges, draft.edges)
     assert.equal(working().map, undefined, '切换显示不会隐式初始化范围或载入关联内容')
   }
+  await chooseAction(harness, '调整布局')
   const undo = root.querySelector('button[aria-label="撤销"]')
   assert(undo)
   assert.equal(undo.disabled, true, '显示切换不占布局撤销历史')
@@ -68,16 +81,16 @@ for (const layout of ['lanes', 'flow']) {
     assert.deepEqual(lanes(), expectedLanes, '展开步骤后遵循所选布局')
     const expanded = positions()
     const scope = root.querySelector('[aria-label="当前探索范围"]')
-    assert.match(scope.textContent, /销售受理到生产准备 · 19 步/)
+    assert.match(scope.textContent, /19 步/)
     assert.equal(root.querySelector('[data-design-node^="map:"]') !== null, false)
     await click('用途与交接')
     assert.match(root.querySelector('.erp-chain-design__card').textContent, /从什么开始/)
     await click('关闭画布说明')
-    await click('收起链路')
+    await click('折叠为链路卡片')
     assert.deepEqual(lanes(), [])
     assert.deepEqual(positions(), [])
     assert.equal(root.querySelectorAll('[data-design-node^="map:"]').length, 1)
-    await click('展开链路')
+    await click('展开链路步骤')
     assert.deepEqual(lanes(), expectedLanes)
     assert.deepEqual(positions(), expanded, '再次展开保留原节点坐标')
   })
@@ -138,6 +151,7 @@ test('拖入单个业务步骤即可探索规则、状态、任务并保存展�
   assert(working().nodes.length > 5)
   assert.deepEqual(working().nodes[0], originalPosition)
   await click('关闭画布说明')
+  await chooseAction(harness, '调整布局')
   await click('撤销')
   assert.equal(working().map.visibleIds.length, 2)
   await click('重做')
@@ -149,10 +163,10 @@ test('拖入单个业务步骤即可探索规则、状态、任务并保存展�
   assert.deepEqual(working(), expanded)
   await harness.render(h(Designer, { catalog, key: 'reload' }))
   assert.deepEqual(working(), expanded)
-  await click('全库')
   await click('筛选业务节点 · 业务步骤')
+  await click('全库')
   await click('全部')
-  await click('收起')
+  await click('应用筛选')
   await click('加入：按业务分支创建岗位任务')
   await tab('任务与单据')
   assert(
@@ -193,16 +207,16 @@ test('损坏视图保留现场并显示错误，编辑画布不覆盖原存储',
     await harness.act(() => button.click())
     await harness.flush()
   }
-  await click('新建空白视图')
+  await chooseAction(harness, '新建空白视图')
   await click('取消')
   assert.equal(window.localStorage.getItem(workingKey), '{broken')
-  await click('新建空白视图')
+  await chooseAction(harness, '新建空白视图')
   await click('直接新建')
   assert.deepEqual(JSON.parse(window.localStorage.getItem(workingKey)).draft.nodes, [])
   assert.equal(!!harness.container.querySelector('[role="alert"]'), false)
 })
 
-test('节点库提交搜索后更新列表，分组筛选即时生效，重置筛选保留关键词和阅读视角', async (t) => {
+test('节点库提交搜索后更新列表，分组筛选应用后生效，重置筛选保留关键词和阅读视角', async (t) => {
   const harness = await createReactTestHarness(t)
   const { default: Designer } = await import('./BusinessChainDesigner.jsx')
   await harness.render(h(Designer, { catalog }))
@@ -220,18 +234,21 @@ test('节点库提交搜索后更新列表，分组筛选即时生效，重置�
     await harness.act(() => button.click())
     await harness.flush()
   }
+  await click(root, '展开节点库')
   await click(root, '加入：IQC 确认本行检验通过')
   await click(root, '关闭画布说明')
   const before = window.sessionStorage.getItem(workingKey)
-  await click(root, '全库')
   await click(root, '筛选业务节点 · 业务步骤')
   const dialog = document.querySelector(
     '[aria-label="筛选业务节点"][role="dialog"]'
   )
   assert(dialog)
   const perspectives = dialog.querySelector('[aria-label="常用视角"]')
+  await click(dialog, '全库')
   await click(perspectives, '岗位任务')
   await click(dialog.querySelector('[aria-label="按业务领域筛选"]'), '工程')
+  assert(dialog.querySelector('[aria-label="已选节点筛选"]').textContent.includes('业务领域：工程'))
+  await click(dialog, '应用筛选')
   assert(
     root
       .querySelector('[aria-label="可加入的节点"]')
@@ -242,9 +259,7 @@ test('节点库提交搜索后更新列表，分组筛选即时生效，重置�
       .querySelector('[aria-label="可加入的节点"]')
       .textContent.includes('订单审批')
   )
-  assert(dialog.querySelector('[aria-label="已选节点筛选"]').textContent.includes('业务领域：工程'))
-  await click(dialog, '收起')
-  assert.equal(findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程').textContent, '岗位任务 · 1')
+  assert.equal(findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程').textContent, '筛选 · 2')
   assert.equal(
     document.activeElement === findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程'),
     true
@@ -255,23 +270,24 @@ test('节点库提交搜索后更新列表，分组筛选即时生效，重置�
     Simulate.change(search)
   })
   await harness.flush()
-  await click(root.querySelector('[aria-label="业务节点库"]'), '搜索')
+  await click(root.querySelector('[aria-label="查找节点"]'), '搜索')
   await click(root, '筛选业务节点 · 岗位任务 · 业务领域：工程')
-  await click(dialog, '重置筛选')
+  const reopened = document.querySelector('[aria-label="筛选业务节点"][role="dialog"]')
+  await click(reopened, '重置筛选')
   assert.equal(search.value, '工程')
   assert.equal(
-    findButton(perspectives, '岗位任务').getAttribute('aria-pressed'),
+    findButton(reopened.querySelector('[aria-label="常用视角"]'), '岗位任务').getAttribute('aria-pressed'),
     'true'
   )
-  assert.equal(!!dialog.querySelector('[aria-label="已选节点筛选"]'), false)
+  assert.equal(!!reopened.querySelector('[aria-label="已选节点筛选"]'), false)
   await harness.act(() =>
-    dialog.dispatchEvent(
+    reopened.dispatchEvent(
       new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
     )
   )
   await harness.flush()
   assert.equal(
-    findButton(root, '筛选业务节点 · 岗位任务').getAttribute('aria-expanded'),
+    findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程').getAttribute('aria-expanded'),
     'false'
   )
   assert.equal(window.sessionStorage.getItem(workingKey), before)
@@ -287,7 +303,8 @@ test('没有匹配节点时查看全部会清掉尚未提交的搜索草稿', as
     nodeScope: 'all',
     setNodeScope() {},
     setFilters() {},
-  }))
+    onShowResults() {},
+  }, (search, results) => h('div', null, search, results)))
   const root = harness.container
   const search = root.querySelector('input[aria-label="搜索业务节点"]')
   await harness.act(() => {

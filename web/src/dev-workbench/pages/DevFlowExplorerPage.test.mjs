@@ -66,11 +66,15 @@ async function setup(t) {
     await ui.act(async () => { element.click() })
     await ui.flush()
   }
+  const menu = async (name) => {
+    await click('更多视图操作')
+    await click(name)
+  }
   const back = async () => {
     await ui.act(() => navigate(-1))
     await ui.flush()
   }
-  return { ui, render, click, back, location: () => location }
+  return { ui, render, click, menu, back, location: () => location }
 }
 
 const previousDraft = {
@@ -239,15 +243,16 @@ test('新建可取消，确认后清空历史并恢复同一页的空态', async
   await app.click('关闭画布说明')
   const working = window.sessionStorage.getItem(workingKey)
   const locationKey = app.location().key
-  await app.click('新建空白视图')
+  await app.menu('新建空白视图')
   await app.click('取消')
   assert.deepEqual(JSON.parse(window.localStorage.getItem(workingKey)), JSON.parse(working))
-  await app.click('新建空白视图')
+  await app.menu('新建空白视图')
   await app.click('直接新建')
   assert.equal(app.ui.container.querySelectorAll('[data-design-node]').length, 0)
+  await app.menu('调整布局')
   assert.equal(app.ui.container.querySelector('[aria-label="撤销"]').disabled, true)
   assert.equal(app.location().key, locationKey)
-  await app.click('新建空白视图')
+  await app.menu('新建空白视图')
   assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
   window.sessionStorage.clear()
   await app.render()
@@ -270,7 +275,7 @@ test('自动保留失败保留页面内容和原存储，显式重试成功后�
   assert.equal(window.localStorage.getItem(workingKey), before)
   assert.equal(window.sessionStorage.getItem(workingKey), before)
   assert.ok(app.ui.container.querySelectorAll('[data-design-node]').length > 1)
-  await app.click('新建空白视图')
+  await app.menu('新建空白视图')
   await app.click('直接新建')
   assert.match(document.querySelector('[role="dialog"]').textContent, /自动保留失败/u)
   await app.click('取消')
@@ -294,6 +299,6 @@ test('仅有历史收藏时直接进入全流程地图，页头和菜单仅提�
   assert.equal(!!app.ui.container.querySelector('[aria-label="选择收藏视图"]'), false)
   await app.click('更多视图操作')
   const menu = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
-  assert.deepEqual(menu, ['视图备注', '在新标签页新建'])
+  assert.deepEqual(menu, ['调整布局', '新建空白视图', '导出当前范围', '视图备注', '员工定位示例', '在新标签页新建'])
   assert.equal(window.localStorage.getItem(key), original)
 })

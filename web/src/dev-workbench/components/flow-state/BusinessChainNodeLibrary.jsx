@@ -20,6 +20,11 @@ import {
 
 const options = (items) =>
   Object.entries(items).map(([value, label]) => ({ value, label }))
+function filtersWithinScope(filters, nodeScope, chainKey) {
+  const currentChain = nodeScope === 'current' && chainKey !== 'all' ? chainKey : ''
+  return { ...filters, chain: filters.chain || currentChain }
+}
+
 const emptyFacets = { domain: '', type: '', role: '', chain: '' }
 
 export default function BusinessChainNodeLibrary({
@@ -32,6 +37,8 @@ export default function BusinessChainNodeLibrary({
   onAdd,
   onInspect,
   onToggle,
+  onShowResults,
+  children,
   filters,
   setFilters,
   chainKey,
@@ -41,7 +48,9 @@ export default function BusinessChainNodeLibrary({
 }) {
   const [searchReset, setSearchReset] = useState(0)
   const [nextOnly, setNextOnly] = useState(true)
-  const [open, setOpen] = useState(false)
+  const [pendingFilters, setDraft] = useState(null)
+  const open = pendingFilters !== null
+  const draft = pendingFilters || { ...filters, nodeScope }
   const [expanded, setExpanded] = useState(null)
   const trigger = useRef(null)
   const panel = useRef(null)
@@ -49,8 +58,9 @@ export default function BusinessChainNodeLibrary({
   const change = (value) => {
     if (value.chain) setNodeScope('all')
     setFilters((previous) => ({ ...previous, ...value }))
+    onShowResults()
   }
-  const effectiveFilters = { ...filters, chain: filters.chain || (nodeScope === 'current' && chainKey !== 'all' ? chainKey : '') }
+  const effectiveFilters = filtersWithinScope(filters, nodeScope, chainKey)
   const allowed =
     connecting && nextOnly
       ? new Set(
@@ -74,15 +84,27 @@ export default function BusinessChainNodeLibrary({
     { key: 'role', label: '参与岗位', options: library.roles },
     { key: 'chain', label: '来源链路', options: library.chains },
   ]
-  const selected = fields.filter((field) => filters[field.key]).map((field) => ({
+  const selections = (values) => fields.filter((field) => values[field.key]).map((field) => ({
     key: field.key,
-    label: `${field.label}：${field.options.find((option) => option.value === filters[field.key])?.label}`,
+    label: `${field.label}：${field.options.find((option) => option.value === values[field.key])?.label}`,
   }))
+  const selected = selections(filters)
   const viewLabel = CHAIN_NODE_VIEWS.find((view) => view.value === filters.view).label
   const filterSummary = [viewLabel, ...selected.map((field) => field.label)].join(' · ')
+  const quickViews = CHAIN_NODE_VIEWS.filter(({ value }) => ['steps', 'tasks', 'exceptions'].includes(value))
+  const count = selected.length + Number(nodeScope === 'all' && chainKey !== 'all') + Number(!quickViews.some(({ value }) => value === filters.view))
+  const edit = (values) => setDraft((previous) => ({ ...previous, ...values }))
+  const setOpen = (visible) => setDraft(visible ? { ...filters, nodeScope } : null)
   const close = () => {
     setOpen(false)
     trigger.current?.focus({ preventScroll: true })
+  }
+  const draftSelected = selections(draft)
+  const apply = () => {
+    const { nodeScope: range, view, domain, type, role, chain } = draft
+    setNodeScope(range)
+    change({ view, domain, type, role, chain })
+    close()
   }
   const closeOnEscape = (event) => {
     if (event.key !== 'Escape') return
@@ -121,7 +143,7 @@ export default function BusinessChainNodeLibrary({
           aria-label={`查看：${actionLabel}`}
           aria-describedby={descriptionId}
           aria-current={selectedNodeId === node.id ? 'true' : undefined}
-          onClick={() => onInspect(node.id)}
+          onClick={(event) => onInspect(node.id, event.currentTarget)}
         >
           <span className="erp-chain-design__library-icon"><DiagramNodeIcon type={node.type} /></span>
           <span className="erp-chain-design__library-copy">
@@ -140,7 +162,143 @@ export default function BusinessChainNodeLibrary({
       </div>
     )
   }
-  return (
+  const searchTools = (
+    <div className="erp-chain-design__search-tools" role="group" aria-label="查找节点">
+      <SearchInput
+        aria-label="搜索业务节点"
+        placeholder="搜节点库：步骤、单据或岗位"
+        resetKey={`${chainKey}:${searchReset}`}
+        value={filters.search}
+        onSearch={(search) => change({ search })}
+        onSubmitted={onShowResults}
+        allowClear
+      />
+
+      <FilterChipGroup
+        aria-label="节点快捷筛选"
+        value={filters.view}
+        options={quickViews}
+        onChange={(view) => change({ view, type: '' })}
+      />
+      <Popover
+        trigger="click"
+        open={open}
+        onOpenChange={setOpen}
+        placement="bottomLeft"
+        autoAdjustOverflow={{ shiftX: true, shiftY: true }}
+        arrow={false}
+        getPopupContainer={(element) => element.closest('.erp-chain-design-shell') || element.parentElement}
+        classNames={{ root: 'erp-chain-node-filter-popover' }}
+        afterOpenChange={(visible) => {
+          if (visible) panel.current?.focus({ preventScroll: true })
+        }}
+        content={
+          <section
+            ref={panel}
+            id={id}
+            tabIndex={-1}
+            role="dialog"
+            aria-label="筛选业务节点"
+            className="erp-chain-node-filters"
+            onKeyDownCapture={closeOnEscape}
+          >
+            <div className="erp-chain-node-filters__fields">
+              <FilterChipGroup
+                label="搜索范围"
+                aria-label="节点库范围"
+                value={chainKey === 'all' ? 'all' : draft.nodeScope}
+                options={[
+                  { value: 'current', label: '当前链', disabled: chainKey === 'all' },
+                  { value: 'all', label: '全库' },
+                ]}
+                onChange={(scope) => edit({ nodeScope: scope, chain: scope === 'current' ? '' : draft.chain })}
+              />
+              <FilterChipGroup
+                label="常用视角"
+                value={draft.view}
+                options={CHAIN_NODE_VIEWS}
+                onChange={(view) => edit({ view, type: '' })}
+              />
+              {draftSelected.length > 0 && (
+                <div className="erp-chain-design__selected-filters" aria-label="已选节点筛选">
+                  {draftSelected.map((field) => (
+                    <Tag
+                      key={field.key}
+                      closable
+                      onClose={(event) => {
+                        event.preventDefault()
+                        edit({ [field.key]: '' })
+                      }}
+                    >
+                      {field.label}
+                    </Tag>
+                  ))}
+                </div>
+              )}
+              {fields.map((field) => (
+                <section key={field.key} aria-label={field.label}>
+                  {field.key === 'chain' ? (
+                    <FilterSelect
+                      label={field.label}
+                      labelPlacement="stacked"
+                      aria-label="按来源链路筛选"
+                      placeholder={`全部 ${library.chains.length} 条链路`}
+                      value={draft.chain}
+                      options={library.chains}
+                      onChange={(chain) => edit({ chain, nodeScope: chain ? 'all' : draft.nodeScope })}
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                    />
+                  ) : (
+                    <FilterChipGroup
+                      label={field.label}
+                      aria-label={`按${field.label}筛选`}
+                      value={draft[field.key]}
+                      options={businessChainFacetOptions(
+                        library,
+                        filtersWithinScope(draft, draft.nodeScope, chainKey),
+                        field.key,
+                        [{ value: '', label: '全部' }, ...field.options],
+                        allowed,
+                      )}
+                      onChange={(value) => edit({ [field.key]: value })}
+                    />
+                  )}
+                </section>
+              ))}
+            </div>
+            <footer>
+              <Button
+                onClick={() => edit({ ...emptyFacets, nodeScope: 'current' })}
+                disabled={!draftSelected.length && draft.nodeScope === 'current'}
+              >
+                重置筛选
+              </Button>
+              <Button onClick={close}>取消</Button>
+              <Button type="primary" onClick={apply}>
+                应用筛选
+              </Button>
+            </footer>
+          </section>
+        }
+      >
+        <Button
+          ref={trigger}
+          icon={<FilterOutlined />}
+          aria-label={`筛选业务节点 · ${filterSummary}`}
+          title={filterSummary}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? id : undefined}
+          onKeyDown={closeOnEscape}
+        >
+          筛选{count ? ` · ${count}` : ''}
+        </Button>
+      </Popover>
+    </div>
+  )
+  const resultsPanel = (
     <aside id={libraryId} hidden={hidden} className="erp-chain-design__library" aria-label="业务节点库">
       <header className="erp-chain-design__library-heading">
         <h2>节点库</h2>
@@ -149,130 +307,7 @@ export default function BusinessChainNodeLibrary({
         </span>
         <Button type="text" icon={<MenuFoldOutlined />} aria-label="收起节点库面板" title="收起节点库" onClick={onToggle} />
       </header>
-      <SearchInput
-        aria-label="搜索业务节点"
-        placeholder="搜索步骤、单据或岗位"
-        resetKey={`${chainKey}:${searchReset}`}
-        value={filters.search}
-        onSearch={(search) => change({ search })}
-        allowClear
-      />
-      <div className="erp-chain-design__filter-bar">
-        <FilterChipGroup
-          aria-label="节点库范围"
-          value={chainKey === 'all' ? 'all' : nodeScope}
-          options={[{ value: 'current', label: '当前链', disabled: chainKey === 'all' }, { value: 'all', label: '全库' }]}
-          onChange={(scope) => {
-            setNodeScope(scope)
-            if (scope === 'current' && filters.chain) change({ chain: '' })
-          }}
-        />
-        <Popover
-          trigger="click"
-          open={open}
-          onOpenChange={setOpen}
-          placement="right"
-          autoAdjustOverflow={{ shiftX: true, shiftY: true }}
-          arrow={false}
-          getPopupContainer={(element) =>
-            element.closest('.erp-chain-design-shell') || element.parentElement
-          }
-          classNames={{ root: 'erp-chain-node-filter-popover' }}
-          afterOpenChange={(visible) => {
-            if (visible) panel.current?.focus({ preventScroll: true })
-          }}
-          content={
-            <section
-              ref={panel}
-              id={id}
-              tabIndex={-1}
-              role="dialog"
-              aria-label="筛选业务节点"
-              className="erp-chain-node-filters"
-              onKeyDownCapture={closeOnEscape}
-            >
-              <div className="erp-chain-node-filters__fields">
-                <FilterChipGroup
-                  label="常用视角"
-                  value={filters.view}
-                  options={CHAIN_NODE_VIEWS}
-                  onChange={(view) => change({ view, type: '' })}
-                />
-                {selected.length > 0 && (
-                  <div className="erp-chain-design__selected-filters" aria-label="已选节点筛选">
-                    {selected.map((field) => (
-                      <Tag
-                        key={field.key}
-                        closable
-                        onClose={(event) => {
-                          event.preventDefault()
-                          change({ [field.key]: '' })
-                        }}
-                      >
-                        {field.label}
-                      </Tag>
-                    ))}
-                  </div>
-                )}
-                {fields.map((field) => (
-                  <section key={field.key} aria-label={field.label}>
-                    {field.key === 'chain' ? (
-                      <FilterSelect
-                        label={field.label}
-                        labelPlacement="stacked"
-                        aria-label="按来源链路筛选"
-                        placeholder={`全部 ${library.chains.length} 条链路`}
-                        value={filters.chain}
-                        options={library.chains}
-                        onChange={(chain) => change({ chain })}
-                        allowClear
-                        showSearch
-                        optionFilterProp="label"
-                      />
-                    ) : (
-                      <FilterChipGroup
-                        label={field.label}
-                        aria-label={`按${field.label}筛选`}
-                        value={filters[field.key]}
-                        options={businessChainFacetOptions(
-                          library,
-                          effectiveFilters,
-                          field.key,
-                          [{ value: '', label: '全部' }, ...field.options],
-                          allowed
-                        )}
-                        onChange={(value) => change({ [field.key]: value })}
-                      />
-                    )}
-                  </section>
-                ))}
-              </div>
-              <footer>
-                <Button
-                  onClick={() => change(emptyFacets)}
-                  disabled={!selected.length}
-                >
-                  重置筛选
-                </Button>
-                <Button onClick={close}>收起</Button>
-              </footer>
-            </section>
-          }
-        >
-          <Button
-            ref={trigger}
-            icon={<FilterOutlined />}
-            aria-label={`筛选业务节点 · ${filterSummary}`}
-            title={filterSummary}
-            aria-haspopup="dialog"
-            aria-expanded={open}
-            aria-controls={open ? id : undefined}
-            onKeyDown={closeOnEscape}
-          >
-            {viewLabel}{selected.length ? ` · ${selected.length}` : ''}
-          </Button>
-        </Popover>
-      </div>
+      <small className="erp-chain-design__library-summary">{chainKey === 'all' || nodeScope === 'all' ? '全库' : '当前链'} · {filterSummary}{filters.search ? ` · “${filters.search}”` : ''}</small>
       {connecting && (
         <Checkbox
           checked={nextOnly}
@@ -334,4 +369,5 @@ export default function BusinessChainNodeLibrary({
       </div>
     </aside>
   )
+  return children(searchTools, resultsPanel)
 }

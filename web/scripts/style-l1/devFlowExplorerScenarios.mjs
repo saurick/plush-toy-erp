@@ -1,3 +1,4 @@
+import { chooseDisplay, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import fs from 'node:fs/promises'
 import { expect } from 'playwright/test'
 import { createFlowExplorerExportScenario } from './devFlowExplorerExportScenario.mjs'
@@ -63,7 +64,7 @@ export function createDevFlowExplorerScenarios({
           })
         ).toBeVisible()
         await assertCompactExplorerLayout(page, editor, assert, assertNoHorizontalOverflow)
-        await editor.getByRole('button', { name: '全库', exact: true }).click()
+        await searchWholeLibrary(editor)
         await editor
           .getByRole('button', { name: '加入：预留现有成品', exact: true })
           .click()
@@ -107,8 +108,8 @@ export function createDevFlowExplorerScenarios({
         await opener.click()
         await expect(page).toHaveURL(/\/__dev\/flow-explorer$/u)
         await expect(
-        editor.getByLabel('当前探索范围', { exact: true })
-        ).toContainText('采购订单')
+          editor.getByLabel('当前探索范围', { exact: true })
+        ).toContainText('局部 · 采购订单')
         const focused = await readWorking()
         await page.reload()
         await expect(editor).toBeVisible()
@@ -156,7 +157,7 @@ function createFlowExplorerOverviewLanesScenario({ assert, assertNoHorizontalOve
       await choose('选择流程范围', '销售受理到生产准备')
       await expect(canvas.locator('.erp-chain-design__lane')).toHaveCount(6)
       const mainlinePositions = await nodePositions()
-      await editor.locator('[aria-label="流程颗粒度"]').getByText('链路概览', { exact: true }).click()
+      await chooseDisplay(editor, '链路概览')
       await expect(canvas.locator('.erp-chain-design__lane')).toHaveCount(0)
       await click('查看节点：销售受理到生产准备')
       await click('展开这条链路的步骤')
@@ -166,7 +167,7 @@ function createFlowExplorerOverviewLanesScenario({ assert, assertNoHorizontalOve
       const overviewPositions = await nodePositions()
       for (const previous of mainlinePositions) assert.deepEqual(overviewPositions.find((node) => node.id === previous.id), previous, '概览展开沿用原步骤位置')
       const scope = editor.locator('[aria-label="当前探索范围"]')
-      await expect(scope).toContainText('销售受理到生产准备 · 19 步')
+      await expect(scope).toContainText('19 步')
       const assertSingleChainFit = async () => {
         await expect(canvas.locator('[data-design-node^="map:"]')).toHaveCount(0)
         await expect.poll(() => canvas.evaluate((area) => {
@@ -190,11 +191,11 @@ function createFlowExplorerOverviewLanesScenario({ assert, assertNoHorizontalOve
       await choose('流程布局', '业务泳道')
       await expect(canvas.locator('.erp-chain-design__lane')).toHaveCount(6)
       const rearrangedOverview = await nodePositions()
-      await scope.getByRole('button', { name: '收起链路' }).click()
+      await scope.getByRole('button', { name: '折叠为链路卡片' }).click()
       await expect(canvas.locator('.erp-chain-design__lane')).toHaveCount(0)
       await expect(canvas.locator('[data-design-node]:not([data-design-node^="map:"])')).toHaveCount(0)
       await expect(canvas.locator('[data-design-node^="map:"]')).toHaveCount(1)
-      await scope.getByRole('button', { name: '展开链路' }).click()
+      await scope.getByRole('button', { name: '展开链路步骤' }).click()
       await expect(canvas.locator('.erp-chain-design__lane')).toHaveCount(6)
       assert.deepEqual(await nodePositions(), rearrangedOverview, '概览收起和再次展开保留泳道内的步骤坐标')
       await page.addInitScript((key) => {
@@ -209,7 +210,7 @@ function createFlowExplorerOverviewLanesScenario({ assert, assertNoHorizontalOve
       await expect(canvas.locator('.erp-chain-design__lane')).toHaveCount(6)
       await assertSingleChainFit()
       assert.deepEqual(await nodePositions(), rearrangedOverview, '刷新恢复概览的泳道布局与步骤坐标')
-      await editor.locator('[aria-label="流程颗粒度"]').getByText('业务步骤', { exact: true }).click()
+      await chooseDisplay(editor, '业务步骤')
       await expect(canvas.locator('.erp-chain-design__lane')).toHaveCount(6)
       await assertNoHorizontalOverflow(page)
       assert.deepEqual(writes.get(page), [], '概览布局切换只调整浏览器内的阅读视图')
@@ -238,14 +239,35 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       }
       const click = (name) => editor.getByRole('button', { name, exact: true }).click()
       const search = editor.getByRole('textbox', { name: '搜索业务节点', exact: true })
+      const crossChain = editor.getByRole('button', { name: '跨链关系', exact: true })
+      const crossChainEdges = canvas.locator('[data-design-edge][data-relation-kind]')
       await expect(editor.locator('[data-design-node^="map:"]')).toHaveCount(11)
-      await expect(editor.getByRole('radio', { name: '业务步骤', exact: true })).toBeDisabled()
+      await expect(editor.getByRole('combobox', { name: '流程颗粒度' })).toBeDisabled()
+      const normalEdgeCount = await crossChainEdges.count()
+      assert(normalEdgeCount > 0, '总图默认显示跨链主线')
+      await crossChain.click()
+      const normalRelations = page.getByRole('checkbox', { name: '主线与供给', exact: true })
+      const exceptionRelations = page.getByRole('checkbox', { name: '异常与回接', exact: true })
+      await exceptionRelations.click()
+      await expect(exceptionRelations).toBeChecked()
+      await expect.poll(() => crossChainEdges.count()).toBeGreaterThan(normalEdgeCount)
+      await exceptionRelations.click()
+      await expect(exceptionRelations).not.toBeChecked()
+      await normalRelations.click()
+      await expect(normalRelations).not.toBeChecked()
+      await expect(crossChainEdges).toHaveCount(0)
+      await expect(crossChain).toBeVisible()
+      await normalRelations.click()
+      await expect(normalRelations).toBeChecked()
+      await expect(crossChainEdges).toHaveCount(normalEdgeCount)
+      await crossChain.click()
       await click('查看节点：销售受理到生产准备')
       await expect(card).toContainText('用途与交接')
       await expect(card).toContainText('从什么开始')
       await expect(card).toContainText('交出什么结果')
       await click('关闭画布说明')
       await choose('选择流程范围', '销售受理到生产准备')
+      await expect(crossChain).toHaveCount(0)
       await expect(editor.locator('.erp-chain-design__layout-filter')).toContainText('业务泳道')
       await expect(canvas.locator('[data-design-node$=":reject_sales_order"]')).toHaveCount(0)
       await expect(editor.locator('.erp-chain-design__lane')).toHaveCount(6)
@@ -272,6 +294,23 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       await expect(canvas.locator('[data-design-node$=":reject_sales_order"]')).toHaveCount(0)
       assert.deepEqual(await nodePositions(), mainlinePositions, '展开收起分支不改变主线节点位置')
       await choose('选择流程范围', '采购下单到入库应付')
+      const expandBranches = editor.getByRole('button', { name: '展开分支', exact: true })
+      const collapseBranches = editor.getByRole('button', { name: '收起分支', exact: true })
+      const rejectEdge = canvas.locator('[data-design-edge][data-edge-to$=":reject_purchase_order"]')
+      await chooseDisplay(editor, '链路概览')
+      await expect(expandBranches).toHaveCount(0)
+      await click('展开链路步骤')
+      await expect(canvas).toHaveAttribute('data-view-mode', 'overview')
+      await expect(crossChain).toHaveCount(0)
+      await expect(rejectEdge).toHaveCount(0)
+      const beforeBranches = await nodePositions()
+      await expandBranches.press('Enter')
+      await expect(collapseBranches).toBeFocused()
+      await expect(rejectEdge).toHaveCount(1)
+      await collapseBranches.click()
+      await expect(rejectEdge).toHaveCount(0)
+      assert.deepEqual(await nodePositions(), beforeBranches, '单链概览切换分支不移动主线步骤')
+      await chooseDisplay(editor, '业务步骤')
       await click('适应画布全图')
       const normalPositions = await nodePositions()
       const normalCamera = await camera()
@@ -287,6 +326,8 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       await click('关闭画布说明')
       await search.fill('创建来料纠正检验')
       await search.press('Enter')
+      await expect(editor.getByRole('complementary', { name: '业务节点库' })).toBeVisible()
+      await click('适应画布全图')
       const beforeInspect = await camera()
       await click('查看：创建来料纠正检验')
       await expect(canvas).toHaveAttribute('data-view-mode', 'mainline')
@@ -321,7 +362,7 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       assert.equal(await camera(), returnCamera, '跨链返回恢复镜头')
       await expect(card).toContainText('质检拒绝进入处置')
       await click('关闭画布说明')
-      await click('调整布局')
+      await chooseExplorerAction(editor, '调整布局')
       const movable = editor.getByRole('button', { name: '查看节点：提交采购订单', exact: true })
       const beforeMove = await nodePositions()
       const box = await movable.boundingBox()
@@ -332,8 +373,8 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       await click('撤销')
       assert.deepEqual(await nodePositions(), beforeMove, '撤销还原坐标')
       await expect(search).toHaveValue('IQC')
-      await click('调整布局')
-      await editor.getByRole('tab', { name: '员工定位示例', exact: true }).click()
+      await click('结束调整')
+      await chooseExplorerAction(editor, '员工定位示例')
       const example = editor.getByRole('region', { name: '员工定位示例', exact: true })
       const notes = example.getByRole('textbox', { name: '检查备注（模拟草稿）', exact: true })
       await notes.fill('核对 A 行后继续填写')
@@ -348,7 +389,7 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       await expect(notes).toHaveValue('核对 A 行后继续填写')
       await example.getByRole('tab', { name: 'B 行 · 检验通过', exact: true }).click()
       await expect(example).toContainText('已通过，尚未入库')
-      await editor.getByRole('tab', { name: '规则探索', exact: true }).click()
+      await click('返回规则探索')
       await click('缩小画布')
       const savedCamera = await camera()
       await page.reload()
@@ -357,9 +398,10 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       await choose('流程布局', '业务泳道')
       await choose('岗位高亮', '仓库')
       await click('适应画布全图')
-      await click('查看节点：自动建立逐行待检 IQC')
+      await searchWholeLibrary(editor)
       await search.fill('采购')
       await search.press('Enter')
+      await click('查看节点：自动建立逐行待检 IQC')
       const list = editor.getByLabel('可加入的节点', { exact: true })
       await list.evaluate((element) => { element.scrollTop = 120 })
       const readWorking = () => page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), workingKey)
@@ -379,7 +421,7 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
         await expect(blankEditor).toBeVisible()
         await expect(blankPage).toHaveURL(/\/__dev\/flow-explorer$/u)
         await expect(blankEditor.locator('[data-design-node]')).toHaveCount(0)
-        await expect(blankEditor.getByLabel('当前探索范围', { exact: true })).toHaveText('空白画布 · 尚未加载链路')
+        await expect(blankEditor.getByLabel('当前探索范围', { exact: true })).toHaveText('尚未加载链路')
         await expect(blankEditor.locator('.erp-chain-design__toolbar')).toContainText('尚未加载链路')
         if (process.env.STYLE_L1_OUTPUT_DIR) await blankPage.screenshot({ path: `${process.env.STYLE_L1_OUTPUT_DIR}/native-blank-tab.png` })
         assert.equal(await blankPage.evaluate(() => window.opener === null), true, '新页使用原生隔离标签，不保留 opener')
@@ -403,6 +445,7 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       assert.equal(await list.evaluate((element) => element.scrollTop), beforeBlank.scroll)
       await assertCurrentPageNewView(page, editor, assert, startNoWriteAudit, writes)
       await choose('选择流程范围', '业务全流程地图')
+      await expect(crossChain).toBeVisible()
       await click('查看节点：销售受理到生产准备')
       await expect(card).toContainText('用途与交接')
       await assertNoHorizontalOverflow(page)
@@ -447,9 +490,11 @@ async function assertCurrentPageNewView(page, editor, assert, startNoWriteAudit,
   const restoreStorage = () => page.evaluate(() => window.__restoreFlowViewStorage?.())
   const assertBlank = async () => {
     await expect(editor.locator('[data-design-node]')).toHaveCount(0)
-    await expect(editor.getByLabel('当前探索范围', { exact: true })).toHaveText('空白画布 · 尚未加载链路')
+    await expect(editor.getByLabel('当前探索范围', { exact: true })).toHaveText('尚未加载链路')
+    await chooseExplorerAction(editor, '调整布局')
     await expect(editor.getByRole('button', { name: '撤销', exact: true })).toBeDisabled()
     await expect(editor.getByRole('button', { name: '重做', exact: true })).toBeDisabled()
+    await click('结束调整')
   }
   await expect(editor.getByRole('button', { name: '保存视图', exact: true })).toHaveCount(0)
   await expect(editor.getByRole('status', { name: '视图保存状态', exact: true })).toHaveCount(0)
@@ -476,21 +521,21 @@ async function assertCurrentPageNewView(page, editor, assert, startNoWriteAudit,
       assert.deepEqual(writes.get(reopened), [])
     } finally { await reopened.close() }
   }
-  await click('新建空白视图')
+  await chooseExplorerAction(editor, '新建空白视图')
   await expect(confirm).toContainText('会替换当前探索')
   await confirm.getByRole('button', { name: '取消', exact: true }).click()
   assert.deepEqual(await snapshot(), original, '取消替换保留探索、镜头和筛选')
-  await click('新建空白视图')
+  await chooseExplorerAction(editor, '新建空白视图')
   await confirm.getByRole('button', { name: '直接新建', exact: true }).click()
   await assertBlank()
   assert.equal(page.context().pages().length, tabCount)
   assert.equal(page.url(), url)
-  await click('新建空白视图')
+  await chooseExplorerAction(editor, '新建空白视图')
   await expect(confirm).toHaveCount(0)
 
   await chooseChain('销售受理到生产准备')
   const beforeReplace = await snapshot()
-  await click('新建空白视图')
+  await chooseExplorerAction(editor, '新建空白视图')
   await failStorage(workingKey)
   try {
     await confirm.getByRole('button', { name: '直接新建', exact: true }).click()
@@ -530,10 +575,50 @@ async function assertCompactExplorerLayout(page, editor, assert, assertNoHorizon
     durable: localStorage.getItem(key), working: sessionStorage.getItem(key),
   }), workingKey)
   const original = await readViews()
+  for (const width of [1280, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 816 })
+    await expect.poll(() => page.evaluate(() => innerWidth)).toBe(width)
+    const rows = await editor.evaluate((root) => {
+      const box = (selector) => root.querySelector(selector).getBoundingClientRect()
+      const title = box('h1'), search = box('.erp-search-input'), scope = box('[aria-label="选择流程范围"]')
+      const display = box('.erp-chain-design__mode'), role = box('[aria-label="岗位高亮"]')
+      const actions = box('.erp-chain-design__canvas-actions'), graph = box('.erp-chain-design__viewport')
+      return {
+        sharedSearchRow: title.top < search.bottom && search.top < title.bottom,
+        sharedViewRow: scope.top < display.bottom && role.top < scope.bottom && display.top < role.bottom,
+        actionsAboveGraph: actions.bottom <= graph.top + 1,
+        sharedActionRow: actions.top < scope.bottom,
+        lastControlGap: graph.top - actions.bottom,
+        height: graph.top - root.getBoundingClientRect().top,
+      }
+    })
+    assert(rows.sharedSearchRow && rows.sharedViewRow, `${width}px 搜索及看图设置各自同排`)
+    assert(rows.actionsAboveGraph && rows.lastControlGap <= 8, `${width}px 画布操作紧贴图的上边界`)
+    if (width >= 1920) assert(rows.sharedActionRow, '宽屏画布操作与范围同行')
+    assert(rows.height <= (rows.sharedActionRow ? 100 : 140), `${width}px 顶部操作最多换一行，实测 ${JSON.stringify(rows)}`)
+  }
   await page.setViewportSize({ width: 1920, height: 816 })
+  await expect(editor.getByRole('button', { name: '展开节点库' })).toBeVisible()
+  await expect(search).toBeVisible()
+  const usedWidth = () => canvas.evaluate((element) => ({
+    canvas: element.getBoundingClientRect().width,
+    workspace: element.closest('.erp-chain-design__workspace').clientWidth,
+  }))
+  await expect.poll(async () => {
+    const { canvas, workspace } = await usedWidth()
+    return Math.abs(canvas - workspace)
+  }, { message: '初始画布占满工作区' }).toBeLessThanOrEqual(2)
+  await editor.getByRole('button', { name: '展开节点库' }).click()
+  await expect(list).toBeVisible()
+  await expect.poll(async () => {
+    const { canvas, workspace } = await usedWidth()
+    return workspace - canvas
+  }, { message: '打开节点库后为右侧结果留出空间' }).toBeGreaterThan(250)
   const initial = await canvas.boundingBox()
   assert(initial.height >= 560, '常见桌面窗口保留至少 560px 画布，容纳入口及范围两行页头')
-  const libraryWidth = (await editor.getByRole('complementary', { name: '业务节点库', exact: true }).boundingBox()).width
+  const libraryBox = await editor.getByRole('complementary', { name: '业务节点库', exact: true }).boundingBox()
+  const libraryWidth = libraryBox.width
+  assert(libraryBox.x >= initial.x + initial.width - 1, '搜索结果在画布右侧展开')
   const visibleItems = await list.evaluate((element) => {
     const area = element.getBoundingClientRect()
     return [...element.children].filter((node) => {
@@ -547,7 +632,8 @@ async function assertCompactExplorerLayout(page, editor, assert, assertNoHorizon
   await list.evaluate((element) => { element.scrollTop = 160 })
   const scrollTop = await list.evaluate((element) => element.scrollTop)
   await editor.getByRole('button', { name: '收起节点库', exact: true }).click()
-  await expect(search).toBeHidden()
+  await expect(search).toBeVisible()
+  await expect(list).toBeHidden()
   await expect.poll(async () => (await canvas.boundingBox()).width,
     { message: '收起节点库把横向空间交还画布' }).toBeGreaterThanOrEqual(initial.width + libraryWidth - 1)
   await editor.getByRole('button', { name: '展开节点库', exact: true }).click()

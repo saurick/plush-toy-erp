@@ -1,3 +1,4 @@
+import { chooseDisplay, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
 import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 import { createDevBusinessChainDesignFullscreenScenarios } from './devBusinessChainDesignFullscreenAssertions.mjs'
@@ -38,7 +39,7 @@ export function createDevBusinessChainDesignScenarios({
           name: '流程探索',
           exact: true,
         })
-        await editor.getByRole('button', { name: '全库', exact: true }).click()
+        await searchWholeLibrary(editor)
         // Object-level gestures remain available through the complete node library.
         await chooseChainNodeView(page, editor, '全部')
         const saveStatus = editor.getByRole('status', {
@@ -46,7 +47,6 @@ export function createDevBusinessChainDesignScenarios({
           exact: true,
         })
         const undo = editor
-          .locator('.erp-chain-design__canvas-bar')
           .getByRole('button', { name: '撤销', exact: true })
         const flowBoundary = page.locator(
           '.erp-dev-fulfillment-guide__boundary'
@@ -58,7 +58,7 @@ export function createDevBusinessChainDesignScenarios({
           await page.getByRole('menuitem', { name, exact: true }).click()
         }
         const add = async (name) => {
-          await editor.getByRole('button', { name: '全库', exact: true }).click()
+          await searchWholeLibrary(editor)
           await editor
             .getByRole('button', { name: `加入：${name}`, exact: true })
             .click()
@@ -68,6 +68,7 @@ export function createDevBusinessChainDesignScenarios({
         }
         await expect(editor.getByRole('status', { name: '节点筛选结果' })).toHaveAttribute('title', '全库 11 条链路')
         await expect(saveStatus).toHaveCount(0)
+        await chooseExplorerAction(editor, '调整布局')
         await expect(undo).toBeDisabled()
         await expect(flowBoundary).toHaveCount(0)
         await expect(
@@ -75,15 +76,12 @@ export function createDevBusinessChainDesignScenarios({
         ).toBeVisible()
         await expect(editor.getByRole('combobox', { name: '选择收藏视图' })).toHaveCount(0)
         await editor.getByRole('button', { name: '更多视图操作', exact: true }).click()
-        await expect(page.getByRole('menuitem')).toHaveText(['视图备注', '在新标签页新建'])
+        await expect(page.getByRole('menuitem')).toHaveText(['结束调整', '新建空白视图', '导出当前范围', '视图备注', '员工定位示例', '在新标签页新建'])
         await page.keyboard.press('Escape')
         await expect(
           page.getByRole('link', { name: '业务规则', exact: true })
         ).toHaveAttribute('href', '/__dev/business-rules')
-        await editor
-          .locator('.erp-chain-design__canvas-bar')
-          .getByText('全部已载入节点', { exact: true })
-          .click()
+        await chooseDisplay(editor, '全部已载入节点')
         await add('销售订单')
         await add('提交后启动受理')
         await add('销售订单受理流程')
@@ -156,6 +154,7 @@ export function createDevBusinessChainDesignScenarios({
         ).not.toHaveAttribute('marker-end', /.+/u)
         await expect(saveStatus).toHaveCount(0)
         await page.reload()
+        await chooseExplorerAction(editor, '调整布局')
         await chooseChainNodeView(page, editor, '全部')
         await expect(saveStatus).toHaveCount(0)
         await expect(editor.locator('[data-design-node]')).toHaveCount(4)
@@ -216,6 +215,7 @@ export function createDevBusinessChainDesignScenarios({
         await expect(flowBoundary).toBeVisible()
         await page.getByRole('link', { name: '流程探索', exact: true }).click()
         await editor.getByRole('button', { name: '展开节点库', exact: true }).click()
+        await chooseExplorerAction(editor, '调整布局')
         await chooseChainNodeView(page, editor, '全部')
         await expect(flowBoundary).toHaveCount(0)
         await expect(saveStatus).toHaveCount(0)

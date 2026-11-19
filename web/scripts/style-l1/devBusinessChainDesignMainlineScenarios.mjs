@@ -1,3 +1,4 @@
+import { chooseDisplay, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
 import { assertChainNodeFilters } from './devBusinessChainNodeFilterAssertions.mjs'
 import { assertChainDesignKeyboard } from './devBusinessChainDesignKeyboardAssertions.mjs'
@@ -19,7 +20,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
           name: '流程探索',
           exact: true,
         })
-        await editor.getByRole('button', { name: '全库', exact: true }).click()
+        await searchWholeLibrary(editor)
         const canvas = editor.getByRole('region', {
           name: '流程探索画布',
           exact: true,
@@ -88,10 +89,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
           .getByRole('button', { name: '关闭画布说明', exact: true })
           .click()
         const beforeGranularity = await working()
-        const allLoaded = editor.getByRole('radio', {
-          name: '全部已载入节点',
-          exact: true,
-        })
+        const display = editor.getByRole('combobox', { name: '流程颗粒度' })
         const displayHelp = editor.getByRole('button', {
           name: '查看全部已载入节点说明',
           exact: true,
@@ -108,7 +106,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
         )).toBeVisible()
         await search.hover()
         await expect(displayExplanation).toBeHidden()
-        await allLoaded.focus()
+        await display.focus()
         await page.keyboard.press('Tab')
         await expect(displayHelp).toBeFocused()
         await expect(displayExplanation).toBeVisible()
@@ -121,14 +119,14 @@ export function createDevBusinessChainDesignMainlineScenarios({
         await displayHelp.click()
         await expect(displayExplanation).toBeHidden()
         assert.deepEqual(await working(), beforeGranularity, '查看显示说明不改变画布或保存内容')
-        await editor.locator('.erp-chain-design__canvas-bar').getByText('全部已载入节点', { exact: true }).click()
-        await expect(allLoaded).toBeChecked()
+        await chooseDisplay(editor, '全部已载入节点')
+        await expect(editor.locator('.erp-chain-design__mode')).toContainText('全部已载入节点')
         await expect(canvas).toHaveAttribute('data-view-mode', 'all')
         const detailed = await working()
         assert.deepEqual(detailed.map, beforeGranularity.map, '颗粒度不扩大范围或改变展开状态')
         assert.deepEqual(detailed.nodes, beforeGranularity.nodes, '颗粒度不新增节点并保留位置')
         assert.deepEqual(detailed.edges, beforeGranularity.edges, '颗粒度切换保留已载入关系')
-        await editor.locator('.erp-chain-design__canvas-bar').getByText('业务步骤', { exact: true }).click()
+        await chooseDisplay(editor, '业务步骤')
         assert.deepEqual((await working()).nodes, beforeGranularity.nodes, '返回业务步骤保留手动位置')
         await editor.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: '选择流程范围', exact: true }) }).locator('.ant-select-selector').click()
         await page.locator('.ant-select-dropdown:visible').getByText('销售受理到生产准备', { exact: true }).click()
@@ -155,6 +153,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
         await editor
           .getByRole('button', { name: '适应画布全图', exact: true })
           .click()
+        await expect.poll(async () => (await working()).presentation?.viewport?.mode).toBe('fit-all')
         const content = await working()
         await editor
           .locator(
@@ -174,18 +173,12 @@ export function createDevBusinessChainDesignMainlineScenarios({
           .click()
         assert.deepEqual(await working(), content, '查看关联任务不改变视图')
         const count = await nodes.count()
-        await editor
-          .locator('.erp-chain-design__canvas-bar')
-          .getByText('全部已载入节点', { exact: true })
-          .click()
+        await chooseDisplay(editor, '全部已载入节点')
         assert(
           (await nodes.count()) > count,
           '全部已载入节点显示办理步骤间已载入的单据和业务记录'
         )
-        await editor
-          .locator('.erp-chain-design__canvas-bar')
-          .getByText('业务步骤', { exact: true })
-          .click()
+        await chooseDisplay(editor, '业务步骤')
         assert.deepEqual(
           (await working()).nodes,
           content.nodes,

@@ -16,7 +16,7 @@
   position: fixed;
   z-index: 1000;
   inset: 0;
-  padding: 0 8px 8px;
+  padding: 0 8px;
   overflow: auto;
   background: var(--erp-surface-bg);
 }
@@ -27,30 +27,34 @@
   --chain-edge-label: var(--erp-text);
   display: flex;
   flex-direction: column;
+  row-gap: 0;
   container: chain-design / inline-size;
 }
 
 
-.erp-chain-design__toolbar .ant-select { width: var(--chain-control-width, 200px); max-width: 100%; }
-.erp-chain-design__layout-filter { --chain-control-width: 112px; }
+.erp-chain-design__toolbar .ant-select { width: var(--chain-control-width, 180px); max-width: 100%; }
+.erp-chain-design__layout-filter { --chain-control-width: 102px; }
+.erp-chain-design__highlight-filter { --chain-control-width: 156px; }
+.erp-chain-design__highlight-filter:has(.ant-select-selection-placeholder) { --chain-control-width: 120px; }
 .erp-chain-design__role-filter { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
 .erp-chain-design__role-filter > label { white-space: nowrap; }
 .erp-chain-design-draft-dialog p { margin-block: 12px 0; }
 .erp-chain-design-draft-dialog [role="alert"] { color: var(--erp-visual-danger-text); }
 
-.erp-chain-design__workspace { display: grid; grid-template-columns: 18.5rem minmax(0, 1fr); flex: 1 0 520px; min-width: 0; border: 1px solid var(--erp-border); border-radius: 8px; overflow: hidden; }
-.erp-chain-design__workspace[data-library-visible="false"] { grid-template-columns: minmax(0, 1fr); }
+.erp-chain-design__workspace { display: grid; grid-template: "settings settings" auto "canvas results" minmax(0, 1fr) / minmax(0, 1fr) 18.5rem; flex: 1 0 520px; min-width: 0; border: 1px solid var(--erp-border); border-radius: 8px; overflow: hidden; }
+.erp-chain-design__workspace[data-library-visible="false"] { grid-template: "settings" auto "canvas" minmax(0, 1fr) / minmax(0, 1fr); }
 .erp-chain-design__workspace[hidden],
 .erp-chain-design__toolbar[hidden],
 .erp-chain-design__footer[hidden] { display: none; }
 .erp-chain-design__library {
+  grid-area: results;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
   min-height: 0;
   padding: 8px 12px;
-  border-inline-end: 1px solid var(--erp-border);
+  border-inline-start: 1px solid var(--erp-border);
   background: var(--erp-surface-bg);
 }
 .erp-chain-design__library[hidden] { display: none; }
@@ -58,7 +62,11 @@
 .erp-chain-design__library-heading h2 { margin: 0; font-size: var(--erp-font-emphasis); font-weight: 600; }
 .erp-chain-design__library-heading > span { flex: 1; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
 .erp-chain-design__library-heading strong { color: var(--erp-text); }
-.erp-chain-design__filter-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding-block-end: 8px; border-block-end: 1px solid var(--erp-border); }
+.erp-chain-design__search-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.erp-chain-design__query-slot { min-width: 0; flex: 1; }
+.erp-chain-design__search-tools .erp-search-input { width: clamp(175px, 16vw, 300px); max-width: 100%; }
+.erp-chain-design__library-summary { color: var(--erp-text-muted); overflow-wrap: anywhere; }
+
 .erp-chain-design__muted { color: var(--erp-text-muted); }
 .erp-chain-design__library-list { flex: 1; min-height: 0; height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .erp-chain-design__library-item,
@@ -78,19 +86,25 @@
 }
 .erp-chain-design__library-list [draggable="true"] > .erp-dev-directory-item { cursor: grab; }
 .erp-chain-design__library-branches { grid-column: 1 / -1; margin: 0 0 6px 22px; padding-inline-start: 4px; border-inline-start: 1px solid var(--erp-border-strong); }
-.erp-chain-design__canvas-area { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.erp-chain-design__reading-split { flex: 1; min-height: 0; }
+.erp-chain-design__canvas-area { grid-area: canvas; min-width: 0; min-height: 0; display: grid; grid-template: "diagram" minmax(0, 1fr) / minmax(0, 1fr); }
+.erp-chain-design__reading-split { grid-area: diagram; min-height: 0; }
 .erp-chain-design__diagram-panel,
 .erp-chain-design__details-panel { display: flex; flex-direction: column; min-height: 0; }
-.erp-chain-design__canvas-bar { min-height: 48px; padding: 6px 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.erp-chain-design__canvas-bar { grid-area: settings; padding: 3px 10px; border-block-end: 1px solid var(--erp-border); }
+.erp-chain-design__canvas-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px 8px; max-width: 100%; margin-inline-start: auto; }
+
+.erp-chain-design__canvas-bar > .erp-workbench-toolbar__controls { column-gap: 8px; }
+
 /* 操作反馈覆盖在画布底边，连线开始与取消均不挤动节点及命中区域。 */
-.erp-chain-design__canvas-status { position: absolute; z-index: 1; bottom: 10px; inset-inline: 10px; width: fit-content; max-width: calc(100% - 20px); display: flex; align-items: center; gap: 12px; padding: 4px 10px; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg); box-shadow: 0 2px 8px rgb(0 0 0 / 8%); }
+.erp-chain-design__canvas-status { grid-area: diagram; align-self: end; justify-self: start; z-index: 1; margin: 10px; width: fit-content; max-width: calc(100% - 20px); display: flex; align-items: center; gap: 12px; padding: 4px 10px; border: 1px solid var(--erp-border); border-radius: 6px; background: var(--erp-surface-bg); box-shadow: 0 2px 8px rgb(0 0 0 / 8%); }
 .erp-chain-design__canvas-status[hidden] { display: none; }
 .erp-chain-design__canvas-status > .ant-btn { flex: none; }
-.erp-chain-design__view-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-inline-start: auto; }
-.erp-chain-design__detail-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.erp-chain-design__scope-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 0 10px 6px; border-block-end: 1px solid var(--erp-border); }
-.erp-chain-design__scope-label { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.erp-chain-design__edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.erp-chain-design__detail-control[data-mode="all"] { --chain-control-width: 190px; }
+.erp-chain-design__detail-control { --chain-control-width: 150px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.erp-chain-design__scope-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-inline-start: auto; }
+.erp-chain-design__scope-summary { display: inline-grid; line-height: 1.2; }
+.erp-chain-design__scope-label { color: var(--erp-text-muted); overflow-wrap: anywhere; }
 .erp-chain-design__viewport[data-adjusting] { --chain-node-cursor: grab; }
 .erp-chain-design__viewport { position: relative; overflow: clip; flex: 1; min-height: 0; overscroll-behavior: contain; touch-action: none; cursor: grab; background-color: var(--erp-surface-bg); background-image: radial-gradient(var(--erp-border) 1px, transparent 1px); }
 .erp-chain-design__viewport[data-panning] { cursor: grabbing; user-select: none; }
@@ -188,9 +202,15 @@
   flex: 1 0 300px;
 }
 
+@container chain-design (max-width: 825px) {
+  .erp-chain-design__header { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .erp-chain-design__query-slot { grid-column: 1 / -1; grid-row: 2; }
+  .erp-chain-design__header .erp-dev-page-header__tools { grid-column: 2; grid-row: 1; }
+}
+
 @container chain-design (max-width: 560px) {
-  .erp-chain-design__workspace { grid-template-columns: minmax(0, 1fr); min-height: max-content; }
-  .erp-chain-design__library { border-inline-end: 0; border-block-end: 1px solid var(--erp-border); }
+  .erp-chain-design__workspace { grid-template: "settings" auto "results" auto "canvas" 1fr / minmax(0, 1fr); min-height: max-content; }
+  .erp-chain-design__library { border-inline-start: 0; border-block-end: 1px solid var(--erp-border); }
   .erp-chain-design__library-list { flex: none; height: 140px; }
   .erp-chain-design__canvas-area { height: 400px; }
 }

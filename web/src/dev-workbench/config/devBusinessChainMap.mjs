@@ -12,6 +12,10 @@ const pair = ({ from, to }) => JSON.stringify([from, to])
 const unique = (values) => [...new Set(values)]
 const currentNodes = (library) =>
   library.nodes.filter((node) => !node.representedBy && !node.splitInto)
+const wholeScopeIds = (library, chainKey) =>
+  currentNodes(library)
+    .filter((node) => chainKey === 'all' || node.chainKey === chainKey)
+    .map(({ id }) => id)
 const visibleChains = (map, library) =>
   unique(map.visibleIds.map((id) => library.byId.get(id).chainKey))
 const focusPositionsById = (map) =>
@@ -94,11 +98,7 @@ export function showBusinessChainWhole(
   library,
   chainKey = businessChainMapState(draft, library).chainKey
 ) {
-  const ids = new Set(
-    currentNodes(library)
-      .filter((node) => chainKey === 'all' || node.chainKey === chainKey)
-      .map(({ id }) => id)
-  )
+  const ids = new Set(wholeScopeIds(library, chainKey))
   const region = layoutBusinessChainDraft(
     {
       nodes: [...ids].map((id) => ({ id, x: 0, y: 0 })),
@@ -277,6 +277,25 @@ export function businessChainMapCanGrow(draft, library, direction) {
       (edge) => !visible.has(direction === 'upstream' ? edge.from : edge.to)
     )
   )
+}
+
+export function businessChainMapCanCollapseGrowth(draft, library) {
+  const map = businessChainMapState(draft, library)
+  if (map.scope !== 'whole') return false
+  const defaultIds = new Set(wholeScopeIds(library, map.chainKey))
+  return map.visibleIds.some((id) => !defaultIds.has(id))
+}
+
+export function collapseBusinessChainMapGrowth(draft, library) {
+  if (!businessChainMapCanCollapseGrowth(draft, library)) return draft
+  const map = businessChainMapState(draft, library)
+  return {
+    ...draft,
+    map: {
+      ...map,
+      visibleIds: wholeScopeIds(library, map.chainKey),
+    },
+  }
 }
 
 function detailedRegion(draft, library, loadedOnly = false) {

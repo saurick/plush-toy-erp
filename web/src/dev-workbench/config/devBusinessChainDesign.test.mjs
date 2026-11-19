@@ -15,6 +15,27 @@ const library = buildBusinessChainDesignLibrary(catalog)
 
 test('节点库完整投影正式链路、动作、状态与责任，不复制业务规则', () => {
   assert.equal(library.chains.length, catalog.businessChains.length)
+  assert.deepEqual(
+    library.chainOptionGroups.map(({ key, label, options }) => ({
+      key,
+      label,
+      chainKeys: options.map((option) => option.value),
+    })),
+    catalog.businessChainOverview.lanes.map(({ key, label, chainKeys }) => ({
+      key,
+      label,
+      chainKeys,
+    }))
+  )
+  assert.equal(
+    new Set(
+      library.chainOptionGroups.flatMap((group) =>
+        group.options.map((option) => option.value)
+      )
+    ).size,
+    library.chains.length,
+    '流程范围分组应完整且不重复覆盖正式链路'
+  )
   assert.equal(
     library.nodes.filter(
       (node) => node.id.startsWith('node:') || node.id.startsWith('step:')

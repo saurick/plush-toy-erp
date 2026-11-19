@@ -1,11 +1,13 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { Button, Dropdown } from 'antd'
 import { DownOutlined, ExportOutlined } from '@ant-design/icons'
 import Modal from '@/common/components/modal/AppModal.jsx'
-import { WorkbenchToolbar } from '../WorkbenchPattern.jsx'
+import BusinessChainDesignExport from './BusinessChainDesignExport.jsx'
 import { DEV_FLOW_EXPLORER_BLANK_HREF } from '../../pages/devFlowExplorerNavigation.mjs'
 
-export default function BusinessChainDesignDrafts({ confirmNew, onNew, notesCount, onNotes }) {
+export default function BusinessChainDesignDrafts({ confirmNew, onNew, notesCount, onNotes, onExample, adjusting, onToggleEditing, exportDisabled, getGraph, onNotice }) {
+  const trigger = useRef(null)
+  const [exportOpen, setExportOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
   const close = () => { setConfirming(false); setError('') }
@@ -18,20 +20,23 @@ export default function BusinessChainDesignDrafts({ confirmNew, onNew, notesCoun
   }
   return (
     <>
-      <WorkbenchToolbar className="erp-chain-design__drafts">
-        <Button onClick={() => confirmNew ? setConfirming(true) : startNew()}>新建空白视图</Button>
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items: [
-              { key: 'notes', label: notesCount ? `视图备注（${notesCount}）` : '视图备注', onClick: onNotes },
-              { key: 'new-tab', icon: <ExportOutlined />, label: <a href={DEV_FLOW_EXPLORER_BLANK_HREF} target="_blank" rel="noopener noreferrer">在新标签页新建</a> },
-            ],
-          }}
-        >
-          <Button aria-label="更多视图操作">更多 <DownOutlined /></Button>
-        </Dropdown>
-      </WorkbenchToolbar>
+      <Dropdown
+        trigger={['click']}
+        getPopupContainer={(element) => element.closest('.erp-chain-design-shell')}
+        menu={{
+          items: [
+            { key: 'edit', label: adjusting ? '结束调整' : '调整布局', onClick: onToggleEditing },
+            { key: 'new', label: '新建空白视图', onClick: () => confirmNew ? setConfirming(true) : startNew() },
+            { key: 'export', label: '导出当前范围', disabled: exportDisabled, onClick: () => setExportOpen(true) },
+            { key: 'notes', label: notesCount ? `视图备注（${notesCount}）` : '视图备注', onClick: onNotes },
+            { key: 'example', label: '员工定位示例', onClick: onExample },
+            { key: 'new-tab', icon: <ExportOutlined />, label: <a href={DEV_FLOW_EXPLORER_BLANK_HREF} target="_blank" rel="noopener noreferrer">在新标签页新建</a> },
+          ],
+        }}
+      >
+        <Button ref={trigger} aria-label="更多视图操作">更多 <DownOutlined /></Button>
+      </Dropdown>
+      <BusinessChainDesignExport open={exportOpen} onClose={() => setExportOpen(false)} triggerRef={trigger} getGraph={getGraph} onNotice={onNotice} />
       {confirming ? (
         <Modal
           title="替换当前探索？"

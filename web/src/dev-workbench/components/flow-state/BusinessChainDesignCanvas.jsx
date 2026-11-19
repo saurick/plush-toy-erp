@@ -13,7 +13,8 @@ import SupplementalHelp from '@/common/components/help/SupplementalHelp.jsx'
 import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
 import { diagramDomainStyle } from '@/common/components/diagram/diagramSemantics.mjs'
-import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
+import AppSelect from '@/common/components/select/AppSelect.jsx'
+import { WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import {
   CHAIN_DESIGN_NODE_SIZE as size,
   CHAIN_DESIGN_TYPES,
@@ -24,9 +25,10 @@ import {
 import { routeBusinessChainEdges, businessChainNeighbors } from '../../config/devBusinessChainDesignView.mjs'
 import {
   businessChainMapState,
-  projectBusinessChainMap,
   expandBusinessChainMap,
   growBusinessChainMap,
+  collapseBusinessChainMapGrowth,
+  businessChainMapCanCollapseGrowth,
   businessChainMapCanGrow,
   focusBusinessChainMap,
   moveBusinessChainMapNode,
@@ -112,11 +114,20 @@ function DraftNotes({ draft, change }) {
 }
 
 export default function BusinessChainDesignCanvas({
+  scopeField,
+  displayFields,
+  returnAction,
+  adjusting,
+  onFinishEditing,
+  resultTrigger,
   frameKey,
   fullscreen,
   toggleFullscreen,
   fullscreenButtonRef,
-  viewMode,
+  map,
+  projected,
+  globalOverview,
+  effectiveMode,
   setViewMode,
   catalog,
   library,
@@ -154,7 +165,6 @@ export default function BusinessChainDesignCanvas({
   const [moving, setMoving] = useState(null)
   const [pointer, setPointer] = useState(null)
   const [panning, setPanning] = useState(false)
-  const [adjusting, setAdjusting] = useState(false)
   const [highlightPath, setHighlightPath] = useState(null)
   const [areaWidth, setAreaWidth] = useState(1000)
   const [detailShare, setDetailShare] = useState(36)
@@ -169,11 +179,9 @@ export default function BusinessChainDesignCanvas({
     return () => { window.clearTimeout(timer); window.removeEventListener('pagehide', commit) }
   }, [cameraDirty, onCameraCommit, view])
   useEffect(() => { setHighlightPath(null) }, [selection?.nodeId])
-  const map = businessChainMapState(draft, library)
-  const globalOverview = map.scope === 'whole' && map.chainKey === 'all'
-  const effectiveMode = globalOverview ? 'overview' : viewMode
   const canGrowUpstream = businessChainMapCanGrow(draft, library, 'upstream')
   const canGrowDownstream = businessChainMapCanGrow(draft, library, 'downstream')
+  const canCollapseGrowth = businessChainMapCanCollapseGrowth(draft, library)
   const cameraScope = useRef(null)
   const pendingFit = useRef(false)
   const [frameRequest, setFrameRequest] = useState({ revision: 0, chainKey: null })
@@ -256,14 +264,6 @@ export default function BusinessChainDesignCanvas({
     return () => area.removeEventListener('wheel', wheel)
   }, [zoomTo, setView])
   const arrow = useId().replaceAll(':', '')
-  const fullNodes = draft.nodes.map((node) =>
-    moving?.id === node.id ? { ...node, x: moving.x, y: moving.y } : node
-  )
-  const projected = projectBusinessChainMap(
-    { ...draft, nodes: fullNodes },
-    library,
-    effectiveMode
-  )
   const { scopeSummary } = projected
   const expandedInScope = Boolean(scopeSummary && map.expandedChains.includes(scopeSummary.chainKey))
   const reading = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode, expandedNodes: map.expandedNodes, showBranches: draft.presentation?.showBranches, selection, pathIds: highlightPath || [] })
@@ -279,10 +279,11 @@ export default function BusinessChainDesignCanvas({
     graph.nodes.find((node) => node.id === id && node.summary) ||
     library.byId.get(id)
   const { nodes } = graph
+  const roleMatchCount = role ? nodes.filter((node) => library.byId.get(node.id)?.roles?.includes(role)).length : 0
   const bands = layout === 'lanes' ? businessChainLaneBands(graph, library) : []
   const routes = routeBusinessChainEdges(graph)
   const positions = new Map(
-    [...fullNodes, ...graph.nodes].map((node) => [node.id, node])
+    [...draft.nodes, ...graph.nodes].map((node) => [node.id, node])
   )
   const width = Math.max(720, ...nodes.map((node) => node.x + size.width + 60))
   const height = Math.max(
@@ -304,6 +305,11 @@ export default function BusinessChainDesignCanvas({
   const close = () => {
     const id = selection?.anchorId || selection?.nodeId || selection?.to
     setSelection(null)
+    if (selection?.detailsOnly && resultTrigger.current?.isConnected) {
+      const source = resultTrigger.current
+      requestAnimationFrame(() => source.focus({ preventScroll: true }))
+      return
+    }
     if (selection?.chainKey === map.chainKey && scopePurpose.current) {
       scopePurpose.current.focus({ preventScroll: true })
       return
@@ -652,7 +658,7 @@ export default function BusinessChainDesignCanvas({
       {effectiveMode === 'overview' ? (
         <Button type="primary" onClick={() => toggleChain(selectedSummary.value)}>
           {map.expandedChains.includes(selectedSummary.value)
-            ? '收起这条链路'
+            ? '折叠这条链路为卡片'
             : '展开这条链路的步骤'}
         </Button>
       ) : null}
@@ -756,176 +762,122 @@ export default function BusinessChainDesignCanvas({
       <Button onClick={close}>继续选点</Button>
     </>
   ) : null
-  return (
-    <div
-      className="erp-chain-design__canvas-area"
+  const handleCanvasKeyDown = (event) => {
+    if (
+      event.defaultPrevented ||
+      event.nativeEvent.isComposing ||
+      !event.currentTarget.contains(event.target)
+    ) {
+      return
+    }
+    if (
+      event.key === 'Escape' &&
+      (connecting || selection || moving || panning)
+    ) {
+      event.preventDefault()
+      cancel()
+      return
+    }
+    if (
+      gesture.current ||
+      event.target.closest(
+        'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"]'
+      )
+    ) {
+      return
+    }
+    if (event.altKey) return
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLowerCase() === 'z'
+    ) {
+      event.preventDefault()
+      if (event.shiftKey ? canRedo : canUndo) {
+        restoreHistory(event.shiftKey ? redo : undo)
+      }
+    } else if (
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      ['Delete', 'Backspace'].includes(event.key) &&
+      canRemove
+    ) {
+      event.preventDefault()
+      removeSelection()
+    }
+  }
+  const toolbar = (
+    <WorkbenchToolbar
+      className="erp-chain-design__toolbar erp-chain-design__canvas-bar"
       onKeyDown={(event) => {
-        if (
-          event.defaultPrevented ||
-          event.nativeEvent.isComposing ||
-          !event.currentTarget.contains(event.target)
-        ) {
-          return
-        }
-        if (
-          event.key === 'Escape' &&
-          (connecting || selection || moving || panning)
-        ) {
-          event.preventDefault()
-          cancel()
-          return
-        }
-        if (
-          gesture.current ||
-          event.target.closest(
-            'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"]'
-          )
-        ) {
-          return
-        }
-        if (event.altKey) return
-        if (
-          (event.metaKey || event.ctrlKey) &&
-          event.key.toLowerCase() === 'z'
-        ) {
-          event.preventDefault()
-          if (event.shiftKey ? canRedo : canUndo) {
-            restoreHistory(event.shiftKey ? redo : undo)
-          }
-        } else if (
-          !event.metaKey &&
-          !event.ctrlKey &&
-          !event.shiftKey &&
-          ['Delete', 'Backspace'].includes(event.key) &&
-          canRemove
-        ) {
-          event.preventDefault()
-          removeSelection()
-        }
+        if (event.target.closest('.erp-chain-design__canvas-actions')) handleCanvasKeyDown(event)
       }}
     >
-      <div className="erp-chain-design__canvas-bar">
-        <div className="erp-chain-design__detail-control">
-          <SlidingSegmented
-            aria-label="流程颗粒度"
-            value={effectiveMode}
-            options={[
-              { value: 'overview', label: '链路概览' },
-              { value: 'mainline', label: '业务步骤', disabled: globalOverview },
-              { value: 'all', label: '全部已载入节点', disabled: globalOverview },
-            ]}
-            onChange={(mode) => {
-              cancel()
-              setViewMode(mode)
-              setNotice('')
-            }}
-          />
-          <SupplementalHelp
-            label="全部已载入节点"
-            placement="bottom"
-            content={
-              <>
-                <p>
-                  仅切换显示内容，展示当前范围内已经载入的全部节点。
-                </p>
-                <p>
-                  不会新增节点，也不会自动载入整条流程。
-                </p>
-                <p>
-                  需要整条流程时，在上方“流程范围”选择链路；已聚焦局部时，点击“回到整体”。
-                </p>
-              </>
-            }
-          />
-          {hasBranches ? (
-            <Button aria-pressed={Boolean(draft.presentation?.showBranches)} onClick={() => setReadingOptions({ showBranches: !draft.presentation?.showBranches })}>
-              {draft.presentation?.showBranches ? '收起分支' : '展开分支'}
-            </Button>
-          ) : null}
-        </div>
-        <div role="status" className="erp-chain-design__canvas-status" hidden={!pending && !notice && !adjusting}>
-          {pending
-            ? `从“${pending.label}”连接：拖到节点松开，或点节点查看条件`
-            : notice ||
-              (adjusting
-                ? '拖动节点调整位置，方向键也可微调。'
-                : '')}
-          {pending ? <Button onClick={cancel}>取消连线</Button> : null}
-        </div>
-        <div className="erp-chain-design__view-actions">
-          <Button
-            aria-label="撤销"
-            title="撤销"
-            icon={<UndoOutlined />}
-            disabled={!canUndo || !!moving || panning}
-            onClick={() => restoreHistory(undo)}
-          />
-          <Button
-            aria-label="重做"
-            title="重做"
-            icon={<RedoOutlined />}
-            disabled={!canRedo || !!moving || panning}
-            onClick={() => restoreHistory(redo)}
-          />
-          <Button
-            aria-pressed={adjusting}
-            type={adjusting ? 'primary' : 'default'}
-            onClick={() => {
-              cancel()
-              setAdjusting(!adjusting)
-            }}
-          >
-            调整布局
-          </Button>
-          <Button
-            disabled={!nodes.length}
-            onClick={() => {
-              change(arrangeBusinessChainMap(draft, library, effectiveMode, layout))
-              cancel()
-              setNotice('已重新排布当前范围，可撤销。')
-            }}
-          >
-            重新排布
-          </Button>
-          <DiagramViewControls
-            label="画布"
-            zoom={view.scale}
-            zoomMode={view.mode}
-            minZoom={0.05}
-            maxZoom={2}
-            onFit={fit}
-            onZoomOut={() => zoomTo((scale) => scale / 1.2)}
-            onZoomIn={() => zoomTo((scale) => scale * 1.2)}
-            onReset={() => zoomTo(1)}
-            disabled={!!moving || panning || inspectorOnly}
-            fitDisabled={!nodes.length || inspectorOnly}
-            fullscreen={fullscreen}
-            onFullscreen={toggleFullscreen}
-            fullscreenButtonRef={fullscreenButtonRef}
-            fullscreenLabel="全屏探索"
-            exitFullscreenLabel="退出全屏"
-          />
-        </div>
+      {scopeField}
+      <div className="erp-chain-design__detail-control" data-mode={effectiveMode}>
+        <AppSelect
+          aria-label="流程颗粒度"
+          label="显示"
+          presentation="compact"
+          className="erp-chain-design__mode"
+          allowClear={false /* 不可清空：显示方式始终有一个选中值。 */}
+          value={effectiveMode}
+          disabled={globalOverview}
+          options={[
+            { value: 'overview', label: '链路概览' },
+            { value: 'mainline', label: '业务步骤' },
+            { value: 'all', label: '全部已载入节点' },
+          ]}
+          onChange={(mode) => {
+            cancel()
+            setViewMode(mode)
+            setNotice('')
+          }}
+        />
+        <SupplementalHelp
+          label="全部已载入节点"
+          placement="bottom"
+          content={
+            <>
+              <p>仅切换显示内容，展示当前范围内已经载入的全部节点。</p>
+              <p>不会新增节点，也不会自动载入整条流程。</p>
+              <p>需要整条流程时，在上方“流程范围”选择链路；已聚焦局部时，点击“回到整体”。</p>
+            </>
+          }
+        />
       </div>
+      {displayFields}
       <div className="erp-chain-design__scope-bar" aria-label="当前探索范围">
-        <span className="erp-chain-design__scope-label">
-          {!draft.nodes.length ? '空白画布 · 尚未加载链路' : `${map.scope === 'whole' ? '整体' : '局部'} · `}
-          {map.focusId && scopeSummary ? `${scopeSummary.label} · ` : null}
-          {!draft.nodes.length ? null : map.focusId
-            ? library.byId.get(map.focusId).label
-            : map.chainKey === 'all'
-              ? '业务全流程地图'
-              : library.chains.find(({ value }) => value === map.chainKey)
-                  ?.label}
-          {scopeSummary ? ` · ${scopeSummary.count} 步` : null}
-          {map.visibleIds.length > 0 && !canGrowUpstream && !canGrowDownstream
-            ? ' · 已登记的上下游均已载入'
-            : null}
+        <span className="erp-chain-design__scope-label erp-chain-design__scope-summary" aria-live="polite">
+          {map.focusId && <span>局部 · {library.byId.get(map.focusId).label}</span>}
+          {!draft.nodes.length ? '尚未加载链路' : scopeSummary ? `${scopeSummary.count} 步` : `${nodes.length} 个节点`}
         </span>
-        {map.chainKey !== 'all' ? <Button ref={scopePurpose} onClick={() => setSelection({ chainKey: map.chainKey })}>用途与交接</Button> : null}
+        {map.chainKey !== 'all' ? (
+          <Button ref={scopePurpose} onClick={() => setSelection({ chainKey: map.chainKey })}>
+            用途与交接
+          </Button>
+        ) : null}
         {scopeSummary ? (
           <Button aria-expanded={expandedInScope} onClick={() => toggleChain(scopeSummary.chainKey)}>
-            {expandedInScope ? '收起链路' : '展开链路'}
+            {expandedInScope ? '折叠为链路卡片' : '展开链路步骤'}
+          </Button>
+        ) : null}
+      </div>
+      <div className="erp-chain-design__canvas-actions" role="group" aria-label="画布操作">
+        {role && <span className="erp-chain-design__scope-label" role="status">{roleMatchCount ? `高亮 ${roleMatchCount} 个节点` : '本图无该岗位节点'}</span>}
+        {returnAction}
+        {map.scope !== 'whole' && draft.nodes.length > 0 ? (
+          <Button onClick={() => (onReturn ? onReturn() : onNavigateChain(map.chainKey))}>回到整体</Button>
+        ) : null}
+        {map.visibleIds.length > 0 && !canGrowUpstream && !canGrowDownstream && (
+          <span className="erp-chain-design__scope-label">已没有更多前后内容可展开</span>
+        )}
+        {hasBranches ? (
+          <Button
+            aria-pressed={Boolean(draft.presentation?.showBranches)}
+            onClick={() => setReadingOptions({ showBranches: !draft.presentation?.showBranches })}
+          >
+            {draft.presentation?.showBranches ? '收起分支' : '展开分支'}
           </Button>
         ) : null}
         {draft.nodes.length > 0 ? (
@@ -933,38 +885,106 @@ export default function BusinessChainDesignCanvas({
             <Button
               disabled={!canGrowUpstream}
               onClick={() => {
-                change((previous) =>
-                  growBusinessChainMap(previous, library, 'upstream')
-                )
+                change((previous) => growBusinessChainMap(previous, library, 'upstream'))
                 cancel()
                 setNotice('已扩大一层上游，已有节点位置保留。')
               }}
             >
-              上游再一层
+              往前展开一步
             </Button>
             <Button
               disabled={!canGrowDownstream}
               onClick={() => {
-                change((previous) =>
-                  growBusinessChainMap(previous, library, 'downstream')
-                )
+                change((previous) => growBusinessChainMap(previous, library, 'downstream'))
                 cancel()
                 setNotice('已扩大一层下游，已有节点位置保留。')
               }}
             >
-              下游再一层
+              往后展开一步
             </Button>
-            <Button
-              disabled={map.scope === 'whole'}
-              onClick={() => {
-                if (onReturn) onReturn()
-                else onNavigateChain(map.chainKey)
-              }}
-            >
-              回到整体
-            </Button>
+            {canCollapseGrowth ? (
+              <Button
+                onClick={() => {
+                  change((previous) => collapseBusinessChainMapGrowth(previous, library))
+                  cancel()
+                  setNotice('已收起额外展开，节点位置已保留。')
+                }}
+              >
+                收起扩展
+              </Button>
+            ) : null}
           </Space>
         ) : null}
+        {adjusting && (
+          <div className="erp-chain-design__edit-actions">
+            <Button
+              aria-label="撤销"
+              title="撤销"
+              icon={<UndoOutlined />}
+              disabled={!canUndo || !!moving || panning}
+              onClick={() => restoreHistory(undo)}
+            />
+            <Button
+              aria-label="重做"
+              title="重做"
+              icon={<RedoOutlined />}
+              disabled={!canRedo || !!moving || panning}
+              onClick={() => restoreHistory(redo)}
+            />
+            <Button
+              disabled={!nodes.length}
+              onClick={() => {
+                change(arrangeBusinessChainMap(draft, library, effectiveMode, layout))
+                cancel()
+                setNotice('已重新排布当前范围，可撤销。')
+              }}
+            >
+              重新排布
+            </Button>
+            <Button
+              onClick={() => {
+                cancel()
+                onFinishEditing()
+              }}
+            >
+              结束调整
+            </Button>
+          </div>
+        )}
+        <DiagramViewControls
+          label="画布"
+          zoom={view.scale}
+          zoomMode={view.mode}
+          minZoom={0.05}
+          maxZoom={2}
+          onFit={fit}
+          onZoomOut={() => zoomTo((scale) => scale / 1.2)}
+          onZoomIn={() => zoomTo((scale) => scale * 1.2)}
+          onReset={() => zoomTo(1)}
+          disabled={!!moving || panning || inspectorOnly}
+          fitDisabled={!nodes.length || inspectorOnly}
+          fullscreen={fullscreen}
+          onFullscreen={toggleFullscreen}
+          fullscreenButtonRef={fullscreenButtonRef}
+          fullscreenLabel="全屏探索"
+          exitFullscreenLabel="退出全屏"
+        />
+      </div>
+    </WorkbenchToolbar>
+  )
+  const canvas = (
+    <div
+      className="erp-chain-design__canvas-area"
+      onKeyDown={handleCanvasKeyDown}
+    >
+      <div role="status" className="erp-chain-design__canvas-status" hidden={!pending && !notice && !adjusting}>
+        {pending
+          ? `从“${pending.label}”连接：拖到节点松开，或点节点查看条件`
+          : notice ||
+            (adjusting
+              ? '拖动节点调整位置，方向键也可微调。'
+              : '')}
+        {pending ? <Button onClick={cancel}>取消连线</Button> : null}
       </div>
       <Splitter
         className="erp-chain-design__reading-split"
@@ -1395,4 +1415,5 @@ export default function BusinessChainDesignCanvas({
       </Splitter>
     </div>
   )
+  return <>{toolbar}{canvas}</>
 }

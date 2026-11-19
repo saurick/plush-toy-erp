@@ -1,3 +1,4 @@
+import { chooseDisplay, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 import { expect } from 'playwright/test'
 
 export async function assertChainDesignKeyboard(page, editor, assert) {
@@ -23,7 +24,8 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   // Reload starts a fresh history for the same automatically recorded canvas.
   await page.reload()
   await expect(canvas).toBeVisible()
-  await editor.getByRole('button', { name: '调整布局', exact: true }).click()
+  await editor.getByRole('button', { name: '展开节点库', exact: true }).click()
+  await chooseExplorerAction(editor, '调整布局')
   const baseline = await working()
   await expect(redo).toBeDisabled()
   await editor
@@ -102,10 +104,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   )
   await page.keyboard.press('Control+z')
 
-  await editor
-    .locator('.erp-chain-design__canvas-bar')
-    .getByText('全部已载入节点', { exact: true })
-    .click()
+  await chooseDisplay(editor, '全部已载入节点')
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()
@@ -146,10 +145,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     '尚未加入视图的候选接点不删除其他关系'
   )
   await editor.getByRole('button', { name: '取消连线', exact: true }).click()
-  await editor
-    .locator('.erp-chain-design__canvas-bar')
-    .getByText('业务步骤', { exact: true })
-    .click()
+  await chooseDisplay(editor, '业务步骤')
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()
@@ -244,6 +240,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   await page.keyboard.press('Control+z')
   assert.deepEqual(await working(), baseline)
   await page.reload()
+  await chooseExplorerAction(editor, '调整布局')
   await expect(redo).toBeDisabled()
   await pan.focus()
   await page.keyboard.press('Meta+Shift+z')

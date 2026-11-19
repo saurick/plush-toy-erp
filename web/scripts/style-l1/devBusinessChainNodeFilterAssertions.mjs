@@ -4,7 +4,7 @@ export async function chooseChainNodeView(page, editor, label) {
   await editor.getByRole('button', { name: /^筛选业务节点 · /u }).click()
   const panel = page.getByRole('dialog', { name: '筛选业务节点', exact: true })
   await panel.getByRole('group', { name: '常用视角' }).getByRole('button', { name: label, exact: true }).click()
-  await panel.getByRole('button', { name: '收起', exact: true }).click()
+  await panel.getByRole('button', { name: '应用筛选', exact: true }).click()
 }
 
 export async function assertChainNodeFilters(page, editor, assert) {
@@ -29,14 +29,14 @@ export async function assertChainNodeFilters(page, editor, assert) {
     .getByRole('group', { name: '按业务领域筛选', exact: true })
     .getByRole('button', { name: /^工程\s+\d+$/u })
     .click()
+  await expect(panel.getByLabel('已选节点筛选')).toContainText('工程')
+  await panel.getByRole('button', { name: '应用筛选', exact: true }).click()
   await expect(items).toContainText('工程资料')
   await expect(
     items.getByRole('button', { name: '选择分支：订单审批', exact: true })
   ).toHaveCount(0)
-  await expect(panel.getByLabel('已选节点筛选')).toContainText('工程')
-  await panel.getByRole('button', { name: '收起', exact: true }).click()
   await expect(trigger).toBeFocused()
-  await expect(trigger).toHaveText('岗位任务 · 1')
+  await expect(trigger).toHaveText('筛选 · 1')
   await expect(trigger).toHaveAccessibleName('筛选业务节点 · 岗位任务 · 业务领域：工程')
   await search.fill('工程')
   await search.press('Enter')
@@ -46,7 +46,7 @@ export async function assertChainNodeFilters(page, editor, assert) {
   await expect(
     perspectives.getByRole('button', { name: '岗位任务', exact: true })
   ).toHaveAttribute('aria-pressed', 'true')
-  await panel.press('Escape')
+  await panel.getByRole('button', { name: '应用筛选' }).click()
   await expect(panel).toBeHidden()
   await expect(trigger).toBeFocused()
   await search.fill('没有这个节点')
@@ -65,9 +65,11 @@ export async function assertChainNodeFilters(page, editor, assert) {
   ).toHaveCount(2)
   const firstSource = items.getByRole('button', { name: /^查看：订单审批（/u }).first()
   await firstSource.click()
-  await expect(firstSource).toHaveAttribute('aria-current', 'true')
-  await expect(firstSource).toHaveAccessibleDescription(/销售 · 协同任务/u)
+  await expect(items).toBeHidden()
+
   await editor.getByRole('button', { name: '关闭画布说明', exact: true }).click()
+  await expect(firstSource).toBeFocused()
+  await expect(firstSource).toHaveAccessibleDescription(/销售 · 协同任务/u)
   await expect(firstSource).not.toHaveAttribute('aria-current', 'true')
   await editor.getByRole('button', { name: '收起节点库面板', exact: true }).press('Enter')
   const reopen = editor.getByRole('button', { name: '展开节点库', exact: true })
@@ -87,10 +89,7 @@ export async function assertChainNodeFilters(page, editor, assert) {
     await page.setViewportSize(size)
     const libraryBox = await editor.getByRole('complementary', { name: '业务节点库' }).boundingBox()
     const resultsBox = await items.boundingBox()
-    assert(resultsBox.y - libraryBox.y <= 150, '标题、搜索和范围筛选在三行内，结果紧随其后')
-    const scopeBox = await editor.getByRole('group', { name: '节点库范围' }).boundingBox()
-    const filterBox = await trigger.boundingBox()
-    assert(Math.abs(scopeBox.y + scopeBox.height / 2 - filterBox.y - filterBox.height / 2) < 2, '范围与筛选入口同一行')
+    assert(resultsBox.y - libraryBox.y <= 100, '结果紧随匹配数和已用条件')
     const anchor = await search.boundingBox()
     await trigger.click()
     // Check the floating box throughout its opening, including the short viewport that cannot fit below the trigger.
@@ -124,9 +123,11 @@ export async function assertChainNodeFilters(page, editor, assert) {
       .getByRole('group', { name: '按节点类型筛选', exact: true })
       .getByRole('button', { name: /^业务单据\s+\d+$/u })
       .click()
+    await panel.getByRole('button', { name: '应用筛选' }).click()
     await expect(items).toContainText('没有匹配节点')
+    await trigger.click()
     await panel.getByRole('button', { name: '重置筛选', exact: true }).click()
-    await panel.getByRole('button', { name: '收起', exact: true }).click()
+    await panel.getByRole('button', { name: '应用筛选', exact: true }).click()
     const after = await search.boundingBox()
     assert(
       Math.abs(anchor.x - after.x) <= 1 &&
@@ -153,7 +154,7 @@ export async function assertChainNodeFilters(page, editor, assert) {
   assert(sidebarBox.y + sidebarBox.height <= canvasBox.y + 1, '画布位于节点库下方')
   assert((await search.boundingBox()).height >= 20, '搜索文字完整可见')
   await trigger.click()
-  await expect(panel.getByRole('button', { name: '收起', exact: true })).toBeInViewport()
+  await expect(panel.getByRole('button', { name: '应用筛选', exact: true })).toBeInViewport()
   await expect.poll(async () => {
     const box = await panel.boundingBox()
     return box && box.width > 200 && box.x >= 0 && box.x + box.width <= 391 && box.y >= 0 && box.y + box.height <= 845

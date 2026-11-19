@@ -102,7 +102,8 @@ function primarySteps(graph, library) {
 }
 
 export function projectBusinessChainReading(graph, library, { scope, mode, expandedNodes = [], showBranches = false, selection, pathIds = [] } = {}) {
-  if (scope !== 'whole' || mode !== 'mainline' || showBranches || graph.nodes.some((node) => node.summary)) return graph
+  const stepView = mode === 'mainline' || (mode === 'overview' && graph.scopeSummary)
+  if (scope !== 'whole' || !stepView || showBranches || graph.nodes.some((node) => node.summary)) return graph
   const chains = new Set(graph.nodes.map((node) => library.byId.get(node.id).chainKey))
   if ([...chains].some((key) => ['exception', 'rework', 'reversal'].includes(library.chainDefinitions.get(key).kind))) return graph
   const primary = primarySteps(graph, library)

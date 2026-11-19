@@ -3,11 +3,8 @@ import { Button, Checkbox, Popover, Typography } from 'antd'
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import DevPageHeader from '../DevPageHeader.jsx'
 import AppSelect from '@/common/components/select/AppSelect.jsx'
-import FilterSelect from '@/common/components/select/FilterSelect.jsx'
-import SlidingTabList from '@/common/components/navigation/SlidingTabList.jsx'
 import {
   WorkbenchSection,
-  WorkbenchToolbar,
   WorkbenchNotice,
 } from '../WorkbenchPattern.jsx'
 import {
@@ -19,13 +16,13 @@ import {
   addBusinessChainMapNode,
   businessChainMapState,
   businessChainMapScope,
+  projectBusinessChainMap,
   showBusinessChainWhole,
   arrangeBusinessChainMap,
 } from '../../config/devBusinessChainMap.mjs'
 import { CHAIN_READING_LAYERS } from '../../config/devBusinessChainReading.mjs'
 import useBusinessChainDraft from './useBusinessChainDraft.mjs'
 import BusinessChainDesignDrafts from './BusinessChainDesignDrafts.jsx'
-import BusinessChainDesignExport from './BusinessChainDesignExport.jsx'
 import { CHAIN_CANVAS_OPERATIONS, CHAIN_CANVAS_RELATIONS } from '../../config/devBusinessChainExport.mjs'
 import useBusinessChainDesignFullscreen from './useBusinessChainDesignFullscreen.mjs'
 import BusinessChainDesignCanvas from './BusinessChainDesignCanvas.jsx'
@@ -51,7 +48,9 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
   const [selection, setSelection] = useState(null)
   const [notice, setNotice] = useState('')
   const [frameKey, setFrameKey] = useState(0)
-  const [libraryVisible, setLibraryVisible] = useState(() => window.innerWidth >= 1440)
+  const [libraryVisible, setLibraryVisible] = useState(false)
+  const [adjusting, setAdjusting] = useState(false)
+  const resultTrigger = useRef(null)
   const [workspace, setWorkspace] = useState('explore')
   const [filters, setFilters] = useState({ view: 'steps', search: '', domain: '', type: '', role: '', chain: '' })
   const [nodeScope, setNodeScope] = useState('current')
@@ -95,6 +94,13 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
   const setViewMode = (mode) => setPresentation({ mode })
   const setRole = (value) => setPresentation({ role: value })
   const map = businessChainMapState(draft, library)
+  const globalOverview = map.scope === 'whole' && map.chainKey === 'all'
+  const effectiveMode = globalOverview ? 'overview' : viewMode
+  const projected = useMemo(
+    () => projectBusinessChainMap(draft, library, effectiveMode),
+    [draft, library, effectiveMode]
+  )
+  const canFilterCrossChain = projected.edges.some((edge) => edge.overview)
   const scope = businessChainMapScope(draft, library)
   const present = new Set(scope.nodes.map((node) => node.id))
   const resetInteraction = () => {
@@ -169,7 +175,83 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
         : { nodeId: id }
     )
   }
-  const editor = (
+  const scopeField = (
+    <div className="erp-chain-design__role-filter">
+      <label htmlFor={`${legendId}-scope`}>流程范围</label>
+      <AppSelect
+        id={`${legendId}-scope`}
+        aria-label="选择流程范围"
+        allowClear={false /* 不可清空：明确选择后加载链路，空白画布保持未选状态。 */}
+        value={draft.nodes.length ? map.chainKey : undefined}
+        placeholder="尚未加载链路"
+        virtual={false}
+        options={[
+          { value: 'all', label: '业务全流程地图' },
+          ...library.chainOptionGroups,
+        ]}
+        onChange={(key) => {
+          if (key !== map.chainKey || map.scope !== 'whole') navigateChain(key)
+        }}
+      />
+    </div>
+  )
+  const displayFields = (
+    <>
+      <div className="erp-chain-design__role-filter erp-chain-design__layout-filter">
+        <label htmlFor={`${legendId}-layout`}>布局</label>
+        <AppSelect
+          id={`${legendId}-layout`}
+          aria-label="流程布局"
+          allowClear={false /* 不可清空：布局必须指定一种已支持的排布方式。 */}
+          value={globalOverview ? 'map' : layout}
+          options={globalOverview ? [{ value: 'map', label: '链路地图' }] : [{ value: 'lanes', label: '业务泳道' }, { value: 'flow', label: '阶段排布' }]}
+          disabled={globalOverview}
+          onChange={(value) => {
+            const next = arrangeBusinessChainMap(draft, library, viewMode, value)
+            const { viewport: _viewport, ...readingOptions } = draft.presentation || {}
+            const nextCamera = value === 'lanes' ? { x: 24, y: 24, scale: 1, mode: 'manual' } : null
+            change({ ...next, presentation: { ...readingOptions, mode: viewMode, role, layout: value, layers, ...(nextCamera ? { viewport: nextCamera } : {}) } })
+            resetInteraction()
+            restoreCamera(nextCamera)
+            setNotice(value === 'lanes' ? '已按领域分行；可平移查看交接，也可适应全图。' : '已调整当前布局，可撤销；业务关系保持不变。')
+          }}
+        />
+      </div>
+      <div className="erp-chain-design__role-filter erp-chain-design__highlight-filter">
+        <label htmlFor={`${legendId}-role`}>岗位高亮</label>
+        <AppSelect
+          presentation="compact"
+          id={`${legendId}-role`}
+          aria-label="岗位高亮"
+          placeholder="全链路视角"
+          value={role || undefined}
+          options={library.roles}
+          virtual={false}
+          onChange={(key) => setRole(key || '')}
+          allowClear
+        />
+      </div>
+      {canFilterCrossChain ? (
+        <Popover
+          trigger="click"
+          placement="bottomLeft"
+          arrow={false}
+          getPopupContainer={(element) => element.closest('.erp-chain-design-shell')}
+          content={<Checkbox.Group
+            aria-label="显示哪些跨链关系"
+            value={layers}
+            options={CHAIN_READING_LAYERS.map(({ value, label }) => ({ value, label }))}
+            onChange={(value) => setPresentation({ layers: value })}
+          />}
+        >
+          <Button>跨链关系</Button>
+        </Popover>
+      ) : null}
+
+    </>
+  )
+  const showLibrary = libraryVisible && !selection?.detailsOnly
+  const renderWorkspace = (searchTools, resultsPanel) => (
     <WorkbenchSection
       flat
       className="erp-chain-design"
@@ -178,17 +260,19 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
       <DevPageHeader
         className="erp-chain-design__header"
         title={<Typography.Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_FLOW_EXPLORER_ROUTE]}</Typography.Title>}
-        navigation={<SlidingTabList
-          aria-label="流程探索入口"
-          value={workspace}
-          onChange={setWorkspace}
-          options={[
-          { value: 'explore', label: '规则探索' },
-          { value: 'example', label: '员工定位示例' },
-        ]}
-        />}
+        navigation={workspace === 'example' ? <Button onClick={() => setWorkspace('explore')}>返回规则探索</Button> : null}
         tools={
           <div className="erp-chain-design__file-actions" hidden={workspace !== 'explore'}>
+            <Button
+              ref={libraryToggle}
+              icon={showLibrary ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+              aria-label={showLibrary ? '收起节点库' : '展开节点库'}
+              aria-expanded={showLibrary}
+              aria-controls={`${legendId}-library`}
+              onClick={() => { if (selection?.detailsOnly) setSelection(null); setLibraryVisible(!showLibrary) }}
+            >
+              节点库
+            </Button>
             <BusinessChainDesignDrafts
               confirmNew={draftModel.needsNewConfirmation}
               onNew={() => {
@@ -200,18 +284,18 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
                 }
                 return error
               }}
+              onExample={() => setWorkspace('example')}
+              adjusting={adjusting}
+              onToggleEditing={() => { setConnecting(null); setSelection(null); setAdjusting(!adjusting) }}
               notesCount={draft.ideas.length}
               onNotes={() => {
                 setConnecting(null)
                 setSelection({ ideas: true })
               }}
-            />
-            <BusinessChainDesignExport
-              disabled={!scope.nodes.length || workspace !== 'explore'}
+              exportDisabled={!scope.nodes.length || workspace !== 'explore'}
               onNotice={setNotice}
               getGraph={() => {
                 const chain = library.chains.find(({ value }) => value === map.chainKey)?.label || '业务全流程地图'
-                const mode = map.scope === 'whole' && map.chainKey === 'all' ? 'overview' : viewMode
                 return {
                   surface: workspaceRef.current.querySelector('.erp-chain-design__surface'),
                   scale: camera.scale,
@@ -219,8 +303,8 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
                   context: [
                     `${map.scope === 'whole' ? '整体' : '局部'} · ${chain}`,
                     map.focusId ? library.byId.get(map.focusId)?.label : '',
-                    { overview: '链路概览', mainline: '业务步骤', all: '全部已载入节点' }[mode],
-                    mode === 'overview' ? '' : layout === 'lanes' ? '业务泳道' : '阶段排布',
+                    { overview: '链路概览', mainline: '业务步骤', all: '全部已载入节点' }[effectiveMode],
+                    effectiveMode === 'overview' ? '' : layout === 'lanes' ? '业务泳道' : '阶段排布',
                     role ? `岗位：${library.roles.find(({ value }) => value === role)?.label}` : '',
                     draft.presentation?.showBranches ? '分支已展开' : '',
                   ].filter(Boolean).join(' · '),
@@ -229,107 +313,26 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
             />
           </div>
         }
-        context={
-          <WorkbenchToolbar className="erp-chain-design__toolbar" hidden={workspace !== 'explore'}>
-            <Button
-              ref={libraryToggle}
-              icon={libraryVisible ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
-              aria-label={libraryVisible ? '收起节点库' : '展开节点库'}
-              aria-expanded={libraryVisible}
-              aria-controls={`${legendId}-library`}
-              onClick={() => setLibraryVisible((value) => !value)}
-            >
-              节点库
-            </Button>
-            <div className="erp-chain-design__role-filter">
-              <label htmlFor={`${legendId}-scope`}>流程范围</label>
-              <AppSelect
-                id={`${legendId}-scope`}
-                aria-label="选择流程范围"
-                allowClear={false /* 不可清空：明确选择后加载链路，空白画布保持未选状态。 */}
-                value={draft.nodes.length ? map.chainKey : undefined}
-                placeholder="尚未加载链路"
-                options={[{ value: 'all', label: '业务全流程地图' }, ...library.chains]}
-                onChange={(key) => {
-                if (key !== map.chainKey || map.scope !== 'whole') navigateChain(key)
-              }}
-              />
-            </div>
-            <div className="erp-chain-design__role-filter">
-              <FilterSelect
-                label="岗位高亮"
-                id={`${legendId}-role`}
-                aria-label="岗位高亮"
-                placeholder="全链路视角"
-                value={role}
-                options={library.roles}
-                onChange={setRole}
-                allowClear
-              />
-            </div>
-            <div className="erp-chain-design__role-filter erp-chain-design__layout-filter">
-              <label htmlFor={`${legendId}-layout`}>布局</label>
-              <AppSelect
-                id={`${legendId}-layout`}
-                aria-label="流程布局"
-                allowClear={false /* 不可清空：布局必须指定一种已支持的排布方式。 */}
-                value={map.scope === 'whole' && map.chainKey === 'all' ? 'map' : layout}
-                options={map.scope === 'whole' && map.chainKey === 'all' ? [{ value: 'map', label: '链路地图' }] : [{ value: 'lanes', label: '业务泳道' }, { value: 'flow', label: '阶段排布' }]}
-                disabled={map.scope === 'whole' && map.chainKey === 'all'}
-                onChange={(value) => {
-                const next = arrangeBusinessChainMap(draft, library, viewMode, value)
-                const { viewport: _viewport, ...readingOptions } = draft.presentation || {}
-                const nextCamera = value === 'lanes' ? { x: 24, y: 24, scale: 1, mode: 'manual' } : null
-                change({ ...next, presentation: { ...readingOptions, mode: viewMode, role, layout: value, layers, ...(nextCamera ? { viewport: nextCamera } : {}) } })
-                resetInteraction()
-                restoreCamera(nextCamera)
-                setNotice(value === 'lanes' ? '已按领域分行；可平移查看交接，也可适应全图。' : '已调整当前布局，可撤销；业务关系保持不变。')
-              }}
-              />
-            </div>
-            <Popover
-              trigger="click"
-              content={<Checkbox.Group
-                aria-label="显示哪些跨链关系"
-                value={layers}
-                options={CHAIN_READING_LAYERS.map(({ value, label }) => ({ value, label }))}
-                onChange={(value) => setPresentation({ layers: value })}
-              />}
-            >
-              <Button aria-label="关系层">关系层</Button>
-            </Popover>
-            {history.length > 0 ? <Button onClick={returnReading}>{history.at(-1).workspace === 'example' ? '返回员工示例' : '返回来处'}</Button> : null}
-          </WorkbenchToolbar>
-        }
-      />
+      >
+        <div className="erp-chain-design__query-slot" hidden={workspace !== 'explore'}>{searchTools}</div>
+      </DevPageHeader>
       {issue ? <WorkbenchNotice tone="error" title={issue} action={!draftModel.restoreFailed ? <Button onClick={draftModel.retryPersistence}>重试自动保留</Button> : null} /> : null}
-      <div className="erp-chain-design__workspace" data-library-visible={libraryVisible} hidden={workspace !== 'explore'}>
-        <BusinessChainNodeLibrary
-          id={`${legendId}-library`}
-          hidden={!libraryVisible}
-          library={library}
-          present={present}
-          selectedNodeId={selection?.nodeId}
-          connecting={connecting}
-          onAdd={addNode}
-          onInspect={(nodeId) => { setConnecting(null); setSelection({ nodeId, detailsOnly: true }) }}
-          onToggle={() => {
-            setLibraryVisible(false)
-            libraryToggle.current?.focus({ preventScroll: true })
-          }}
-          filters={filters}
-          setFilters={setFilters}
-          chainKey={map.chainKey}
-          nodeScope={nodeScope}
-          setNodeScope={setNodeScope}
-          listRef={libraryList}
-        />
+      <div className="erp-chain-design__workspace" data-library-visible={showLibrary} hidden={workspace !== 'explore'}>
         <BusinessChainDesignCanvas
+          scopeField={scopeField}
+          displayFields={displayFields}
+          returnAction={history.length > 0 ? <Button onClick={returnReading}>{history.at(-1).workspace === 'example' ? '返回员工示例' : '返回来处'}</Button> : null}
+          adjusting={adjusting}
+          onFinishEditing={() => setAdjusting(false)}
+          resultTrigger={resultTrigger}
           frameKey={frameKey}
           fullscreen={fullscreen}
           toggleFullscreen={toggleFullscreen}
           fullscreenButtonRef={buttonRef}
-          viewMode={viewMode}
+          map={map}
+          projected={projected}
+          globalOverview={globalOverview}
+          effectiveMode={effectiveMode}
           setViewMode={setViewMode}
           catalog={catalog}
           library={library}
@@ -358,6 +361,7 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
           setReadingOptions={setPresentation}
           onCameraCommit={(viewport) => setPresentation({ viewport })}
         />
+        {resultsPanel}
       </div>
       <div hidden={workspace !== 'example'}>
         <BusinessChainEmployeeExample library={library} onLocate={(value) => navigateChain(value.chainKey, { nodeId: value.nodeId, preview: value.preview })} />
@@ -510,7 +514,29 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
       aria-modal={fullscreen ? 'true' : undefined}
       aria-label={fullscreen ? '流程探索全屏' : undefined}
     >
-      {editor}
+      <BusinessChainNodeLibrary
+        id={`${legendId}-library`}
+        hidden={!showLibrary}
+        library={library}
+        present={present}
+        selectedNodeId={selection?.nodeId}
+        connecting={connecting}
+        onAdd={addNode}
+        onInspect={(nodeId, element) => { resultTrigger.current = element; setConnecting(null); setSelection({ nodeId, detailsOnly: true }) }}
+        onToggle={() => {
+          setLibraryVisible(false)
+          libraryToggle.current?.focus({ preventScroll: true })
+        }}
+        filters={filters}
+        setFilters={setFilters}
+        chainKey={map.chainKey}
+        nodeScope={nodeScope}
+        setNodeScope={setNodeScope}
+        listRef={libraryList}
+        onShowResults={() => { setLibraryVisible(true); setSelection(null) }}
+      >
+        {renderWorkspace}
+      </BusinessChainNodeLibrary>
     </div>
   )
 }
