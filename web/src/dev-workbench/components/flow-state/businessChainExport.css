@@ -1,5 +1,0 @@
-.erp-chain-export { display: grid; gap: 12px; width: min(340px, calc(100vw - 64px)); max-height: calc(100dvh - 180px); overflow: auto; }
-.erp-chain-export > small { color: var(--erp-text-muted); }
-.erp-chain-export__error { color: var(--erp-visual-danger-text); }
-.erp-chain-design__file-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.erp-chain-design__file-actions[hidden] { display: none; }
