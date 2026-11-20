@@ -1,0 +1,1910 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  AuditOutlined,
+  DownOutlined,
+  EditOutlined,
+  EyeOutlined,
+  LinkOutlined,
+  ReconciliationOutlined,
+  SendOutlined,
+  SwapOutlined,
+} from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Dropdown,
+  Input,
+  Popconfirm,
+  Space,
+  Tag,
+} from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
+import InventoryOperationDetails from '../components/inventory/InventoryOperationDetails.jsx'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { BusinessModuleViewTabs } from '../components/BusinessModuleTabs.jsx'
+import BusinessSwitchContent from '../components/BusinessSwitchContent.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import { canReadReference } from '../utils/remoteReferences.mjs'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { useReferenceHydration } from '../hooks/useReferenceRecords.js'
+import useBusinessListStickyHeader from '../components/business-list/useBusinessListStickyHeader.js'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
+import { inventoryOperationActionPresentation } from '../utils/businessFactActionPresentation.mjs'
+import {
+  createInventoryLedgerColumns,
+  VIEW_BALANCES,
+  VIEW_LOTS,
+  VIEW_TXNS,
+  VIEW_LABELS,
+  SUBJECT_TYPE_OPTIONS,
+  LOT_STATUS_OPTIONS,
+  TXN_TYPE_OPTIONS,
+  SOURCE_TYPE_OPTIONS,
+  LOT_DATE_FILTER_OPTIONS,
+  TXN_DATE_FILTER_OPTIONS,
+  subjectTypeText,
+  sourceTypeText,
+  linkedBusinessRef,
+  getRowsFromData,
+  selectedLabelFor,
+  canOpenSourceDocument,
+} from '../components/inventory/inventoryLedgerPresentation.jsx'
+import { InventoryOperationStatus } from '../../common/consts/statuses.generated.mjs'
+import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import useInventoryReferences from '../components/inventory/useInventoryReferences.js'
+import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
+import { useProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import useBusinessPageState from '../hooks/useBusinessPageState'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
+import Table from '@/common/components/table/AppTable'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
+import InventoryMaterialIdentity from '../components/inventory/InventoryMaterialIdentity.jsx'
+import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
+import WarehouseSettingsModal from '../components/inventory/WarehouseSettingsModal.jsx'
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import {
+  listAllInventoryBalances,
+  getInventoryDistribution,
+  listAllInventoryLots,
+  listAllInventoryTxns,
+  listInventoryBalances,
+  createInventoryOperation,
+  getInventoryOperation,
+  listInventoryLots,
+  listInventoryTxns,
+  saveInventoryOperationDraft,
+} from '../api/inventoryApi.mjs'
+import {
+  executeInventoryAdjustmentSubmit,
+  findExceptionProcessActiveNode,
+  getInventoryAdjustmentApprovalProcess,
+  startInventoryAdjustmentApprovalProcess,
+} from '../api/customerConfigApi.mjs'
+import {
+  BusinessActionTooltip,
+  BusinessDataTable,
+  BusinessOperationPanel,
+  BusinessPageLayout,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+  SelectionActionBar,
+  SelectionClearAction,
+  normalizeBusinessTableColumns,
+  useBusinessTableRecordOpen,
+} from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import InventoryDistributionOverview from '../components/business-visualizations/InventoryDistributionOverview.jsx'
+
+import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
+import { executeInventoryOperationTransition, inventoryOperationRequiresApproval } from '../utils/inventoryOperationTransition.mjs'
+import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
+import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
+import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
+import {
+  businessSourceRouteFor,
+  sourceRouteFor,
+} from '../utils/businessSourceNavigation.mjs'
+import {
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+} from '../utils/relatedDocumentNavigation.mjs'
+import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
+  createBusinessTablePagination,
+  getBusinessPaginationParams,
+  resetBusinessPaginationCurrent,
+} from '../utils/businessPagination.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
+import {
+  businessSubjectLabel,
+  inventoryLotOption,
+  materialOption,
+  productOption,
+  productSKUOption,
+  referenceLabel,
+  uniqueReferenceOptions,
+  unitOption,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
+import {
+  searchParamPositiveInt,
+  searchParamText,
+} from '../utils/routeQuery.mjs'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import {
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+} from '../utils/sourceBusinessAction.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
+import { applyBusinessServerColumnSorters, readBusinessServerTableSort } from '../utils/moduleTableColumns.mjs'
+import { BusinessViewPanels } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
+
+const EMPTY_INVENTORY_ROWS = Object.freeze([])
+const INVENTORY_SORT_FIELDS = {
+  [VIEW_BALANCES]: {
+    id: 'registration_order',
+    subject_type: 'stock_kind',
+    subject_id: 'subject_code',
+    unit_id: 'unit_name',
+    warehouse_id: 'warehouse_name',
+    lot_id: 'lot_no',
+    quantity: 'quantity',
+    active_reserved_quantity: 'active_reserved_quantity',
+    available_quantity: 'available_quantity',
+    pending_inspection_quantity: 'pending_inspection_quantity',
+    pending_packaging_quantity: 'pending_packaging_quantity',
+    issuable_quantity: 'issuable_quantity',
+    restricted_quantity: 'restricted_quantity',
+    ready_to_ship_quantity: 'ready_to_ship_quantity',
+  },
+  [VIEW_LOTS]: { lot_no: 'lot_no', received_at: 'received_at' },
+}
+const INVENTORY_BALANCE_SORT_WITH_SKU = {
+  ...INVENTORY_SORT_FIELDS[VIEW_BALANCES],
+  product_sku_id: 'sku_code',
+}
+
+const INVENTORY_OPERATION_SESSION_PREFIX =
+  'plush-erp:inventory-operation:last:v1:'
+const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
+  [InventoryOperationStatus.DRAFT]: '草稿',
+  [InventoryOperationStatus.SUBMITTED]: '待审批',
+  [InventoryOperationStatus.APPROVED]: '已批准待执行',
+  [InventoryOperationStatus.REJECTED]: '已驳回',
+  [InventoryOperationStatus.POSTED]: '已过账',
+  [InventoryOperationStatus.CANCELLED]: '已取消',
+})
+
+export default function InventoryLedgerPage() {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
+  const outletContext = useBusinessPageContext()
+  const InventoryTable = outletContext?.taskBusiness ? BusinessDataTable : Table
+  const tableCardRef = useRef(null)
+  const sticky = useBusinessListStickyHeader(tableCardRef, !outletContext?.taskBusiness)
+  const taskStock = outletContext?.taskCommand?.kind === 'inventory' ? outletContext.taskCommand.selected : null
+  const navigate = useBusinessNavigate()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
+  const operationsOnly = searchParams.get('workspace') === 'operations'
+  const taskOperation = outletContext?.taskBusiness?.task?.source_type === 'inventory_operation'
+  const [operationDetailsOpen, setOperationDetailsOpen] = useState(false)
+  const [operationRecordsRevision, setOperationRecordsRevision] = useState(0)
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
+  const operationAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
+  const [balanceDisplay, setBalanceDisplay] = useBusinessPageState(
+    'balanceDisplay',
+    'list'
+  )
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [listResults, setListResults] = useState({})
+  const [sortByView, setSortByView] = useBusinessPageState('sortByView', {})
+  const [viewSwitchPending, setViewSwitchPending] = useState(false)
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
+  const [subjectType, setSubjectType] = useBusinessPageState('subjectType', '')
+  const [stockCategory, setStockCategory] = useBusinessPageState(
+    'stockCategory',
+    ''
+  )
+  const [warehouseSettingsOpen, setWarehouseSettingsOpen] = useState(false)
+  const [subjectID, setSubjectID] = useBusinessPageState('subjectID', '')
+  const [productSkuID, setProductSkuID] = useBusinessPageState(
+    'productSkuID',
+    ''
+  )
+  const [warehouseID, setWarehouseID] = useBusinessPageState('warehouseID', '')
+  const [lotID, setLotID] = useBusinessPageState('lotID', '')
+  const [lotStatus, setLotStatus] = useBusinessPageState('lotStatus', '')
+  const [txnType, setTxnType] = useBusinessPageState('txnType', '')
+  const [sourceType, setSourceType] = useBusinessPageState('sourceType', '')
+  const [dateFilterStart, setDateFilterStart] = useBusinessPageState(
+    'dateFilterStart',
+    ''
+  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState(
+    'dateFilterEnd',
+    ''
+  )
+  const { materials, products, productSKUs, units, warehouses, inventoryLots, loadReferenceOptions, referenceRecords } = useInventoryReferences({ adminProfile })
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
+  })
+  const [loading, setLoading] = useState(false)
+  const [selectedRecords, setSelectedRecords] = useState([])
+  const selectedRow = selectedRecords.length === 1 ? selectedRecords[0] : null
+  const setSelectedRow = useCallback((record) => setSelectedRecords(record ? [record] : []), [])
+  const [operationSourceRows, setOperationSourceRows] = useState([])
+  const [detailRecord, setDetailRecord] = useState(null)
+  const [operationType, setOperationType] = useState('')
+  const [operationLoading, setOperationLoading] = useState(false)
+  useWorkflowTaskBusinessBusy(operationLoading)
+  const [currentOperation, setCurrentOperation] = useState(null)
+  const [editingOperation, setEditingOperation] = useState(null)
+  const [operationRecoveryError, setOperationRecoveryError] = useState('')
+  const [operationCancelOpen, setOperationCancelOpen] = useState(false)
+  const [operationCancelReason, setOperationCancelReason] = useState('')
+  const routeView = searchParamText(searchParams, 'view')
+  const activeView = Object.hasOwn(VIEW_LABELS, routeView)
+    ? routeView
+    : VIEW_BALANCES
+  const listResult = listResults[activeView]
+  const rows = listResult?.rows || EMPTY_INVENTORY_ROWS
+  const total = listResult?.total || 0
+  const previousView = useRef(activeView)
+  const routeLotID = taskStock?.lot_id || searchParamPositiveInt(searchParams, 'lot_id')
+  const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
+  const routeInventoryOperationID = searchParamPositiveInt(
+    searchParams,
+    'inventory_operation_id'
+  )
+  const routeSourceType = searchParamText(searchParams, 'source_type')
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const operationSessionKey = useMemo(() => {
+    const adminID = Number(adminProfile?.id || 0)
+    const customerKey = String(
+      adminProfile?.effective_session?.customer?.key || 'default'
+    ).trim()
+    return adminID > 0
+      ? `${INVENTORY_OPERATION_SESSION_PREFIX}${adminID}:${customerKey}${taskStock ? `:lot:${taskStock.lot_id}:warehouse:${taskStock.warehouse_id}` : ''}`
+      : ''
+  }, [adminProfile, taskStock])
+  const canCreateInventoryOperation = outletContext?.taskBusiness?.readOnly !== true && hasActionPermission(
+    adminProfile,
+    PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE
+  )
+  const canApproveInventoryOperation = hasActionPermission(
+    adminProfile,
+    PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE
+  )
+  const canRecoverProcess = hasActionPermission(
+    adminProfile,
+    PermissionCode.PROCESS_RUNTIME_RECOVER
+  )
+  const customerKey = String(
+    adminProfile?.effective_session?.customer?.key || ''
+  ).trim()
+  const currentAdminID = Number(adminProfile?.id || 0)
+  const canReadInventory = hasActionPermission(
+    adminProfile,
+    PermissionCode.WAREHOUSE_INVENTORY_READ
+  )
+  const canReadMaterials = hasActionPermission(
+    adminProfile,
+    PermissionCode.MATERIAL_READ
+  )
+  const canReadProducts = hasActionPermission(
+    adminProfile,
+    PermissionCode.PRODUCT_READ
+  )
+  const canReadProductSKUs = hasActionPermission(
+    adminProfile,
+    PermissionCode.PRODUCT_SKU_READ
+  )
+  const sortFields = outletContext?.taskBusiness
+    ? undefined
+    : activeView === VIEW_BALANCES && canReadProductSKUs
+      ? INVENTORY_BALANCE_SORT_WITH_SKU
+      : INVENTORY_SORT_FIELDS[activeView]
+  const requestedSort = sortByView[activeView]
+  const sort = sortFields && requestedSort && Object.values(sortFields).includes(requestedSort.sort_by)
+    ? requestedSort
+    : null
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
+  )
+
+  const beginLatestRequest = useLatestRequestCoordinator()
+
+  const rememberInventoryOperation = useCallback(
+    (operation) => {
+      setCurrentOperation(operation || null)
+      setOperationRecoveryError('')
+      if (!operationSessionKey || !operation?.id) return
+      window.sessionStorage.setItem(operationSessionKey, String(operation.id))
+    },
+    [operationSessionKey]
+  )
+
+  const recoverInventoryOperation = useCallback(
+    async (operationID) => {
+      const id = Number(operationID || 0)
+      if (!id) return null
+      const request = beginLatestRequest('inventory-operation-recovery')
+      try {
+        const operation = await getInventoryOperation({ id }, { signal: request.signal })
+        if (!request.isCurrent()) return null
+        if (operation?.id !== id || (taskStock && (!operation.items?.length || operation.items.some((item) => item.from_lot_id !== taskStock.lot_id || item.from_warehouse_id !== taskStock.warehouse_id)))) throw new Error('库存作业与当前来源批次不匹配')
+        rememberInventoryOperation(operation)
+        return operation
+      } catch (error) {
+        if (isRpcAbortError(error) || !request.isCurrent()) return null
+        const text = getActionErrorMessage(error, '恢复最近库存作业')
+        setOperationRecoveryError(text)
+        return null
+      } finally {
+        if (request.isCurrent()) request.finish()
+      }
+    },
+    [beginLatestRequest, rememberInventoryOperation, taskStock]
+  )
+
+  useEffect(() => {
+    const operationID = routeInventoryOperationID || Number(operationSessionKey ? window.sessionStorage.getItem(operationSessionKey) || 0 : 0)
+    if (operationID > 0) {
+      recoverInventoryOperation(operationID)
+    }
+  }, [operationSessionKey, recoverInventoryOperation, routeInventoryOperationID])
+
+  const inventoryCommonParams = useMemo(
+    () =>
+      compactParams({
+        subject_type: subjectType,
+        stock_category: stockCategory || undefined,
+        subject_id: subjectID || undefined,
+        product_sku_id: productSkuID || undefined,
+        warehouse_id: warehouseID || undefined,
+        lot_id: lotID || routeLotID || undefined,
+        keyword: trimOptional(
+          linkedDocumentRequestKeyword({
+            localKeyword: keyword,
+            linkedKeyword,
+            hasExactContext: Boolean(
+              routeLotID || (routeSourceType && routeSourceID)
+            ),
+          })
+        ),
+      }),
+    [
+      keyword,
+      linkedKeyword,
+      lotID,
+      productSkuID,
+      routeLotID,
+      routeSourceID,
+      routeSourceType,
+      subjectID,
+      stockCategory,
+      subjectType,
+      warehouseID,
+    ]
+  )
+
+  const loadInventoryList = useCallback(
+    ({ signal, all = false }) => {
+      const commonParams = {
+        ...inventoryCommonParams,
+        ...(all ? {} : getBusinessPaginationParams(pagination)),
+      }
+      if (activeView === VIEW_LOTS) {
+        const list = all ? listAllInventoryLots : listInventoryLots
+        return list(
+          compactParams({
+            ...commonParams,
+            ...sort,
+            status: lotStatus,
+            include_status_counts: all ? undefined : true,
+            date_field: 'received_at',
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
+          }),
+          { signal }
+        )
+      }
+      if (activeView === VIEW_TXNS) {
+        const localSourceType = trimOptional(sourceType)
+        const routeSourceMatchesLocal =
+          !localSourceType ||
+          localSourceType.toUpperCase() ===
+            String(routeSourceType || '')
+              .trim()
+              .toUpperCase()
+        const list = all ? listAllInventoryTxns : listInventoryTxns
+        return list(
+          compactParams({
+            ...commonParams,
+            txn_type: txnType,
+            source_type: localSourceType || routeSourceType || undefined,
+            source_id: routeSourceMatchesLocal
+              ? routeSourceID || undefined
+              : undefined,
+            date_field: 'occurred_at',
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
+          }),
+          { signal }
+        )
+      }
+      const list = all ? listAllInventoryBalances : listInventoryBalances
+      return list({ ...commonParams, ...sort }, { signal })
+    },
+    [
+      activeView,
+      dateFilterEnd,
+      dateFilterStart,
+      inventoryCommonParams,
+      lotStatus,
+      pagination,
+      routeSourceID,
+      routeSourceType,
+      sort,
+      sourceType,
+      txnType,
+    ]
+  )
+
+  const loadDistributionBalances = useCallback(
+    async ({ signal }) => {
+      const data = await getInventoryDistribution(inventoryCommonParams, { signal })
+      return data.warehouses
+    },
+    [inventoryCommonParams]
+  )
+
+  const distributionData = useBusinessVisualizationData({
+    enabled: activeView === VIEW_BALANCES && balanceDisplay === 'distribution',
+    load: loadDistributionBalances,
+    actionLabel: '加载仓库库存分布',
+  })
+  const reloadDistributionData = distributionData.reload
+
+  const loadRows = useCallback(async () => {
+    if (operationsOnly || taskOperation) return
+    const request = beginLatestRequest('rows')
+    setStatusCounts(null)
+    if (!canReadInventory) {
+      if (request.isCurrent()) {
+        setListResults({})
+        setSelectedRow(null)
+      }
+      request.finish()
+      return
+    }
+    setLoading(true)
+    try {
+      const data = await loadInventoryList({ signal: request.signal })
+      if (!request.isCurrent()) {
+        return
+      }
+      setStatusCounts(activeView === VIEW_LOTS ? resolveBusinessStatusCounts(data) : null)
+      const nextRows = getRowsFromData(activeView, data)
+      setListResults((current) => ({
+        ...current,
+        [activeView]: { rows: nextRows, total: Number(data?.total || 0), pagination, sort },
+      }))
+      setSelectedRecords((current) => taskStock
+        ? nextRows.filter((item) => item.lot_id === taskStock.lot_id && item.warehouse_id === taskStock.warehouse_id).slice(0, 1)
+        : nextRows.filter((item) => current.some((selected) => selected.id === item.id)))
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
+      showPageLoadError(error, '加载库存台账')
+    } finally {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+    }
+  }, [setSelectedRow, operationsOnly, taskOperation, activeView, beginLatestRequest, canReadInventory, loadInventoryList, pagination, sort, taskStock])
+
+  useEffect(() => {
+    loadRows()
+  }, [loadRows])
+
+  useEffect(() => {
+    setSelectedRow(null)
+    setDetailRecord(null)
+    if (previousView.current !== activeView) {
+      previousView.current = activeView
+      if (activeView !== VIEW_BALANCES) setBalanceDisplay('list')
+      setDateFilterStart('')
+      setDateFilterEnd('')
+      setPagination((current) => current.current === 1 ? current : { ...current, current: 1 })
+    }
+  }, [activeView, setSelectedRow, setBalanceDisplay, setDateFilterStart, setDateFilterEnd, setPagination])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(() => {
+      if (operationsOnly) {
+        setOperationRecordsRevision((value) => value + 1)
+        return undefined
+      }
+      if (activeView === VIEW_BALANCES && balanceDisplay === 'distribution') {
+        reloadDistributionData()
+      }
+      return loadRows()
+    })
+  }, [
+    activeView,
+    balanceDisplay,
+    loadRows,
+    operationsOnly,
+    outletContext,
+    reloadDistributionData,
+  ])
+
+  const resetCurrentPage = useCallback(() => {
+    resetBusinessPaginationCurrent(setPagination)
+  }, [setPagination])
+
+  const handleTableChange = (_pagination, _filters, sorter, { action }) => {
+    if (action !== 'sort' || !sortFields) return
+    const nextSort = readBusinessServerTableSort(sorter, sortFields)
+    setSortByView((current) => ({ ...current, [activeView]: nextSort }))
+    resetCurrentPage()
+  }
+
+  const changeStockCategory = (value) => {
+    setStockCategory(value)
+    setSubjectID('')
+    if (value) setSubjectType('MATERIAL')
+    resetCurrentPage()
+  }
+
+  const activeLabel = VIEW_LABELS[activeView]
+  const inventoryBalanceSwitch = (
+    <div className="erp-business-visual-switch">
+      <Segmented
+        aria-label="库存余额展示方式"
+        value={balanceDisplay}
+        options={[
+          { value: 'list', label: '余额明细' },
+          { value: 'distribution', label: '仓库分布' },
+        ]}
+        onChange={setBalanceDisplay}
+      />
+    </div>
+  )
+  const openInventoryDetails = useCallback((record) => {
+    if (!record?.id) return
+    setSelectedRow(record)
+    setDetailRecord(record)
+  }, [setSelectedRow])
+  const relatedMenuItems = useMemo(() => {
+    if (!selectedRow) return []
+    const sourcePath = businessSourceRouteFor(
+      selectedRow.source_document_type,
+      selectedRow.source_document_id
+    )
+    if (
+      activeView === VIEW_TXNS &&
+      canOpenSourceDocument(selectedRow) &&
+      canOpenRelatedPath(sourcePath)
+    ) {
+      return [{ key: 'source', label: '来源单据' }]
+    }
+    return []
+  }, [activeView, canOpenRelatedPath, selectedRow])
+  const hasRelatedCapability =
+    activeView === VIEW_TXNS &&
+    [
+      'SALES_ORDER',
+      'PRODUCTION_ORDER',
+      'PRODUCTION_FACT',
+      'OUTSOURCING_ORDER',
+      'OUTSOURCING_FACT',
+      'PURCHASE_ORDER',
+      'PURCHASE_RECEIPT',
+      'QUALITY_INSPECTION',
+      'SHIPMENT',
+      'INVENTORY_OPERATION',
+      'PRODUCTION_EXCEPTION',
+    ].some((sourceTypeValue) =>
+      canOpenRelatedPath(sourceRouteFor(sourceTypeValue))
+    )
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: hasRelatedCapability,
+    record: selectedRow,
+    itemCount: relatedMenuItems.length,
+  })
+
+  const openRelatedTable = ({ key }) => {
+    if (!selectedRow) return
+    if (key === 'source') {
+      const targetPath = businessSourceRouteFor(
+        selectedRow.source_document_type,
+        selectedRow.source_document_id,
+        {
+          keyword: selectedRow.source_no,
+          source: 'inventory-ledger',
+        }
+      )
+      if (targetPath) navigate(targetPath)
+    }
+  }
+
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = clearLinkedDocumentParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : ['source_type', 'source_id', 'lot_id']
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetCurrentPage()
+    },
+    [resetCurrentPage, searchParams, setSearchParams]
+  )
+
+  const materialOptions = useMemo(
+    () => uniqueReferenceOptions(materials, materialOption),
+    [materials]
+  )
+  const productOptions = useMemo(
+    () => uniqueReferenceOptions(products, productOption),
+    [products]
+  )
+  const productSKUOptions = useMemo(() => {
+    const selectedProductID = Number(subjectID || 0)
+    const source =
+      selectedProductID > 0
+        ? productSKUs.filter(
+            (item) => Number(item?.product_id || 0) === selectedProductID
+          )
+        : productSKUs
+    return uniqueReferenceOptions(source, productSKUOption)
+  }, [productSKUs, subjectID])
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
+  )
+  const subjectOptions = useMemo(() => {
+    if (subjectType === 'PRODUCT') {
+      return productOptions
+    }
+    if (subjectType === 'MATERIAL') {
+      return materialOptions
+    }
+    return []
+  }, [materialOptions, productOptions, subjectType])
+  const subjectFilterLabel = businessSubjectLabel(subjectType, '存货')
+  const subjectTypeOptions = useMemo(
+    () =>
+      SUBJECT_TYPE_OPTIONS.filter(
+        (option) =>
+          !option.value ||
+          (option.value === 'MATERIAL' && canReadMaterials) ||
+          (option.value === 'PRODUCT' && canReadProducts)
+      ),
+    [canReadMaterials, canReadProducts]
+  )
+  const warehouseOptions = useMemo(
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
+  )
+  const warehouseFilterOptions = useMemo(() => {
+    const selectedID = Number(warehouseID || 0)
+    if (
+      selectedID <= 0 ||
+      warehouseOptions.some(
+        (option) => Number(option.value || 0) === selectedID
+      )
+    ) {
+      return warehouseOptions
+    }
+    return [
+      ...warehouseOptions,
+      { value: selectedID, label: `仓库 #${selectedID}（未启用）` },
+    ]
+  }, [warehouseID, warehouseOptions])
+  const inventoryLotOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
+    [inventoryLots]
+  )
+  const openInventoryOperation = useCallback(
+    (type) => {
+      if (!selectedRecords.length || (type !== 'CYCLE_COUNT' && !selectedRow) || activeView !== VIEW_BALANCES) {
+        message.warning('请先在库存余额中选择一条库存记录')
+        return
+      }
+      setEditingOperation(null)
+      if (selectedRecords.length > 200) {
+        message.warning('单次盘点最多选择 200 行，请缩小盘点范围')
+        return
+      }
+      setOperationSourceRows(type === 'CYCLE_COUNT' ? selectedRecords : [selectedRow])
+      setOperationType(type)
+    },
+    [activeView, selectedRow, selectedRecords]
+  )
+
+  const submitInventoryOperation = useCallback(
+    async (values) => {
+      if (!operationSourceRows.length || !operationType) return
+      if (!Array.isArray(values?.items) || values.items.length !== operationSourceRows.length) return
+      const items = operationSourceRows.map((source, index) => {
+        const draftItem = values.items[index]
+        return compactParams({
+        line_no: String(index + 1),
+        subject_type: source.subject_type,
+        subject_id: source.subject_id,
+        product_sku_id: source.product_sku_id || undefined,
+        from_warehouse_id: source.warehouse_id,
+        from_lot_id: source.lot_id || undefined,
+        to_warehouse_id: draftItem.to_warehouse_id || undefined,
+        unit_id: source.unit_id,
+        expected_quantity:
+          operationType === 'CYCLE_COUNT'
+            ? String(source.quantity ?? '0')
+            : undefined,
+        counted_quantity:
+          operationType === 'CYCLE_COUNT'
+            ? String(draftItem.counted_quantity || '').trim()
+            : undefined,
+        adjustment_quantity:
+          operationType === 'CYCLE_COUNT'
+            ? undefined
+            : String(draftItem.adjustment_quantity || '').trim(),
+        note: trimOptional(draftItem.note),
+      })
+      })
+      const payload = compactParams({
+        operation_no: trimOptional(values.operation_no),
+        operation_type: operationType,
+        reason: trimOptional(values.reason),
+        items,
+      })
+      const scope = `${operationType}:${operationSourceRows.map((row) => row.id).join(',')}`
+      const attempt = operationAttemptsRef.current.prepare(scope, payload)
+      let createdReceipt = null
+      setOperationLoading(true)
+      try {
+        const created = await createInventoryOperation(attempt.params)
+        if (!created?.id || created.status !== InventoryOperationStatus.DRAFT) {
+          throw Object.assign(new Error('库存作业结果暂时无法确认'), {
+            isInvalidResponse: true,
+          })
+        }
+        createdReceipt = created
+        let operation = created
+        let submittedProcess
+        if (inventoryOperationRequiresApproval(operationType)) {
+          let processData
+          try {
+            processData = await startInventoryAdjustmentApprovalProcess({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              inventory_operation_id: created.id,
+              idempotency_key: `inventory-adjustment-approval/${created.id}`,
+            })
+          } catch (error) {
+            if (!isSourceBusinessActionResultUnknown(error)) throw error
+            processData = await getInventoryAdjustmentApprovalProcess({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              inventory_operation_id: created.id,
+            })
+            if (!processData?.process_context) throw error
+          }
+          submittedProcess = processData
+          if (processData.source_readback?.status === InventoryOperationStatus.DRAFT) {
+            const node = findExceptionProcessActiveNode(
+              processData,
+              'submit_inventory_adjustment'
+            )
+            try {
+              const execution = await executeInventoryAdjustmentSubmit({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                process_instance_id:
+                  processData.process_context.process_instance.id,
+                process_node_instance_id: node.id,
+                expected_version: node.version,
+                inventory_operation_id: created.id,
+                idempotency_key: `inventory-adjustment-submit/${created.id}/${node.id}`,
+              })
+              operation = execution.source_readback
+            } catch (error) {
+              if (!isSourceBusinessActionResultUnknown(error)) throw error
+              const readback = await getInventoryAdjustmentApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                inventory_operation_id: created.id,
+              })
+              if (readback?.source_readback?.status !== InventoryOperationStatus.SUBMITTED) throw error
+              operation = readback.source_readback
+            }
+          } else {
+            operation = processData.source_readback
+          }
+        }
+        operationAttemptsRef.current.settle(scope, attempt, null)
+        rememberInventoryOperation(operation)
+        setOperationType('')
+        if (inventoryOperationRequiresApproval(operationType)) {
+          showProcessSubmissionReceipt({
+            result: submittedProcess,
+            record: operation,
+            title: operationType === 'CYCLE_COUNT' ? '库存盘点已提交复核' : '人工库存调整已提交审批',
+          })
+        } else {
+          message.success('库存作业草稿已生成，请核对后按对应动作办理')
+        }
+      } catch (error) {
+        const retained =
+          Boolean(createdReceipt) ||
+          operationAttemptsRef.current.settle(scope, attempt, error)
+        message[retained ? 'warning' : 'error'](
+          createdReceipt
+            ? '草稿已生成，审批提交未完成；保持填写内容不变后重试将继续处理原草稿'
+            : retained
+              ? '提交结果暂时无法确认，请保持填写内容不变后重试'
+              : getActionErrorMessage(error, '生成库存作业')
+        )
+      } finally {
+        setOperationLoading(false)
+      }
+    },
+    [customerKey, operationType, rememberInventoryOperation, operationSourceRows, showProcessSubmissionReceipt]
+  )
+
+  const openInventoryOperationEdit = useCallback(
+    async (record) => {
+      const operationID = Number(record?.id || 0)
+      if (!operationID || !canCreateInventoryOperation) return false
+      const request = beginLatestRequest('inventory-operation-edit')
+      setOperationLoading(true)
+      try {
+        const detail = await getInventoryOperation(
+          { id: operationID },
+          { signal: request.signal }
+        )
+        if (!request.isCurrent()) return false
+        const completeItems =
+          Array.isArray(detail?.items) &&
+          detail.items.length > 0 &&
+          detail.items.every((item) => Number(item?.id || 0) > 0)
+        if (
+          Number(detail?.id || 0) !== operationID ||
+          detail?.status !== InventoryOperationStatus.DRAFT ||
+          Number(detail?.version || 0) <= 0 ||
+          Number(detail?.created_by || 0) !== currentAdminID ||
+          !completeItems
+        ) {
+          const error = new Error('当前库存作业已不可编辑或详情不完整')
+          error.isInvalidResponse = true
+          throw error
+        }
+        rememberInventoryOperation(detail)
+        setOperationType('')
+        setEditingOperation(detail)
+        return true
+      } catch (error) {
+        if (isRpcAbortError(error) || !request.isCurrent()) return false
+        showPageLoadError(error, '读取库存作业草稿')
+        return false
+      } finally {
+        if (request.isCurrent()) {
+          setOperationLoading(false)
+          request.finish()
+        }
+      }
+    },
+    [
+      beginLatestRequest,
+      canCreateInventoryOperation,
+      currentAdminID,
+      rememberInventoryOperation,
+    ]
+  )
+
+  const saveInventoryOperation = useCallback(
+    async (values) => {
+      if (!editingOperation?.id || !editingOperation?.version) return
+      const operationType = editingOperation.operation_type
+      const items = Array.isArray(values?.items) ? values.items : []
+      const payload = compactParams({
+        id: editingOperation.id,
+        expected_version: editingOperation.version,
+        operation_no: trimOptional(values.operation_no),
+        reason: trimOptional(values.reason),
+        items: items.map((item) =>
+          compactParams({
+            id: item.id,
+            counted_quantity:
+              operationType === 'CYCLE_COUNT'
+                ? String(item.counted_quantity || '').trim()
+                : undefined,
+            adjustment_quantity:
+              operationType === 'CYCLE_COUNT'
+                ? undefined
+                : String(item.adjustment_quantity || '').trim(),
+            to_warehouse_id:
+              operationType === 'TRANSFER'
+                ? item.to_warehouse_id || undefined
+                : undefined,
+            note: trimOptional(item.note),
+          })
+        ),
+      })
+      setOperationLoading(true)
+      try {
+        const saved = await saveInventoryOperationDraft(payload)
+        if (
+          Number(saved?.id || 0) !== Number(editingOperation.id) ||
+          saved?.status !== InventoryOperationStatus.DRAFT ||
+          Number(saved?.version || 0) !==
+            Number(editingOperation.version || 0) + 1 ||
+          !Array.isArray(saved?.items) ||
+          saved.items.length !== items.length
+        ) {
+          const error = new Error('库存作业保存结果暂时无法确认')
+          error.isInvalidResponse = true
+          throw error
+        }
+        rememberInventoryOperation(saved)
+        setEditingOperation(null)
+        reportBusinessResult('库存作业草稿已保存，尚未更新库存', saved)
+        message.success('库存作业草稿已保存')
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '保存库存作业草稿'))
+      } finally {
+        setOperationLoading(false)
+      }
+    },
+    [editingOperation, rememberInventoryOperation, reportBusinessResult]
+  )
+
+  const transitionInventoryOperation = useCallback(
+    async (action, reason = '', operation = currentOperation) => {
+      if (!operation?.id || !operation?.version) return
+      const presentation = inventoryOperationActionPresentation(operation, action)
+      setOperationLoading(true)
+      try {
+        const result = await executeInventoryOperationTransition({
+          action,
+          reason,
+          operation,
+          customerKey,
+          actorID: Number(adminProfile?.id || 0),
+        })
+        if (!result) return
+        rememberInventoryOperation(result.operation)
+        if (result.outcome === 'changed') {
+          await loadRows()
+          message.warning('库存作业状态已被其他操作更新，请核对后重试')
+          return
+        }
+        setOperationCancelOpen(false)
+        setOperationCancelReason('')
+        reportBusinessResult(presentation.success, result.operation)
+        await loadRows()
+        if (action === 'submit') {
+          showProcessSubmissionReceipt({
+            title: operation.operation_type === 'CYCLE_COUNT' ? '库存盘点已提交复核' : '人工库存调整已提交审批',
+            loadProcess: () =>
+              getInventoryAdjustmentApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                inventory_operation_id: operation.id,
+              }),
+          })
+        } else {
+          message.success(
+            result.recovered
+              ? '已重新读取库存作业结果'
+              : presentation.success
+          )
+        }
+      } catch (error) {
+        message.error(getActionErrorMessage(error, presentation.label))
+      } finally {
+        setOperationLoading(false)
+      }
+    },
+    [
+      currentOperation,
+      adminProfile?.id,
+      customerKey,
+      loadRows,
+      rememberInventoryOperation,
+      reportBusinessResult,
+      showProcessSubmissionReceipt,
+    ]
+  )
+
+  const renderSubjectReference = useCallback(
+    (value, record) => {
+      if (record?.subject_type === 'PRODUCT') {
+        return referenceLabel(productOptions, value, '成品')
+      }
+      if (record?.subject_type === 'MATERIAL') {
+        return referenceLabel(materialOptions, value, '材料')
+      }
+      return linkedBusinessRef(
+        subjectTypeText(record?.subject_type) || '存货',
+        value
+      )
+    },
+    [materialOptions, productOptions]
+  )
+  const renderSubjectIdentity = useCallback((value, record) => {
+    const name = renderSubjectReference(value, record)
+    if (record?.subject_type === 'PRODUCT') return <ProductIdentity productId={value} name={name} />
+    if (record?.subject_type === 'MATERIAL' && canReadMaterials && Number(value) > 0) {
+      return <InventoryMaterialIdentity materialID={Number(value)} name={name} />
+    }
+    return name
+  }, [canReadMaterials, renderSubjectReference])
+  const renderWarehouseReference = useCallback(
+    (value) => referenceLabel(warehouseFilterOptions, value, '仓库'),
+    [warehouseFilterOptions]
+  )
+  const renderProductSKUReference = useCallback(
+    (value, record) => {
+      if (record?.subject_type !== 'PRODUCT') return '-'
+      if (!Number(value || 0)) return '未分规格'
+      return referenceLabel(productSKUOptions, value, '产品规格')
+    },
+    [productSKUOptions]
+  )
+  const renderLotReference = useCallback(
+    (value) => referenceLabel(inventoryLotOptions, value, '批次'),
+    [inventoryLotOptions]
+  )
+  const renderUnitReference = useCallback(
+    (value) => referenceLabel(unitOptions, value, '单位'),
+    [unitOptions]
+  )
+  const operationSourceLabels = useMemo(
+    () => ({
+      subject: selectedRow
+        ? renderSubjectReference(selectedRow.subject_id, selectedRow)
+        : '',
+      warehouse: selectedRow
+        ? renderWarehouseReference(selectedRow.warehouse_id)
+        : '',
+      lot: selectedRow ? renderLotReference(selectedRow.lot_id) : '',
+      unit: selectedRow ? renderUnitReference(selectedRow.unit_id) : '',
+    }),
+    [
+      renderLotReference,
+      renderSubjectReference,
+      renderUnitReference,
+      renderWarehouseReference,
+      selectedRow,
+    ]
+  )
+  const resolveOperationItemSourceLabels = useCallback(
+    (item) => ({
+      sku: renderProductSKUReference(item?.product_sku_id, item),
+      subject: renderSubjectReference(item?.subject_id, item),
+      warehouse: renderWarehouseReference(item?.from_warehouse_id || item?.warehouse_id),
+      lot: renderLotReference(item?.from_lot_id || item?.lot_id),
+      unit: renderUnitReference(item?.unit_id),
+    }),
+    [
+      renderLotReference,
+      renderProductSKUReference,
+      renderSubjectReference,
+      renderUnitReference,
+      renderWarehouseReference,
+    ]
+  )
+
+  const columns = useMemo(
+    () => createInventoryLedgerColumns({ activeView, renderLotReference, renderProductSKUReference, renderSubjectReference, renderSubjectIdentity, renderUnitReference, renderWarehouseReference }),
+    [activeView, renderLotReference, renderProductSKUReference, renderSubjectReference, renderSubjectIdentity, renderUnitReference, renderWarehouseReference]
+  )
+  const {
+    tableColumns,
+    exportColumns,
+    visibleColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: `inventory-${activeView}`,
+    moduleTitle: `库存台账 / ${activeLabel}`,
+    columns,
+  })
+  const copyableTableColumns = useMemo(
+    () => normalizeBusinessTableColumns(
+      sortFields ? applyBusinessServerColumnSorters(tableColumns, sortFields, listResult?.sort ?? null) : tableColumns
+    ),
+    [tableColumns, sortFields, listResult?.sort]
+  )
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      if (!canReadInventory) return []
+      const data = await loadInventoryList({ signal, all: true })
+      return getRowsFromData(activeView, data)
+    },
+    [activeView, canReadInventory, loadInventoryList]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: `inventory-export:${activeView}`,
+    loadRows: loadExportRows,
+    filename: `库存明细-${currentBusinessDate()}.csv`,
+    columns: exportColumns,
+    recordLabel: `${activeLabel}记录`,
+  })
+
+  const activeFilterCount = [
+    subjectType,
+    stockCategory,
+    subjectID,
+    productSkuID,
+    warehouseID,
+    lotID,
+    activeView === VIEW_TXNS && txnType,
+    activeView === VIEW_TXNS && sourceType,
+    activeView !== VIEW_BALANCES && (dateFilterStart || dateFilterEnd),
+    Boolean(routeSourceType && routeSourceID),
+    Boolean(routeLotID),
+  ].filter(Boolean).length
+  const clearFilters = useCallback(() => {
+    setSubjectType('')
+    setStockCategory('')
+    setSubjectID('')
+    setProductSkuID('')
+    setWarehouseID('')
+    setLotID('')
+    setTxnType('')
+    setSourceType('')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    setKeyword(linkedKeyword || keyword)
+    clearRouteContext()
+  }, [
+    clearRouteContext,
+    setKeyword,
+    keyword,
+    linkedKeyword,
+    setDateFilterEnd,
+    setDateFilterStart,
+    setLotID,
+    setProductSkuID,
+    setSourceType,
+    setStockCategory,
+    setSubjectID,
+    setSubjectType,
+    setTxnType,
+    setWarehouseID,
+  ])
+  const openOperationCancellation = async () => {
+    if (!currentOperation?.id) return
+    if (
+      !inventoryOperationRequiresApproval(currentOperation.operation_type) ||
+      currentOperation.status === InventoryOperationStatus.POSTED
+    ) {
+      setOperationCancelOpen(true)
+      return
+    }
+    setOperationLoading(true)
+    try {
+      const processData = await getInventoryAdjustmentApprovalProcess({
+        ...(customerKey ? { customer_key: customerKey } : {}),
+        inventory_operation_id: currentOperation.id,
+      })
+      const operation = processData.source_readback
+      rememberInventoryOperation(operation)
+      if (
+        ![InventoryOperationStatus.DRAFT, InventoryOperationStatus.SUBMITTED, InventoryOperationStatus.APPROVED].includes(operation.status) ||
+        (processData.process_context &&
+          processData.process_context.process_instance.status !== 'blocked')
+      ) {
+        message.warning(
+          [InventoryOperationStatus.DRAFT, InventoryOperationStatus.SUBMITTED, InventoryOperationStatus.APPROVED].includes(operation.status)
+            ? '该人工调整流程仍在办理，请先在任务中心驳回或阻塞流程'
+            : '当前状态不能取消人工库存调整'
+        )
+        return
+      }
+      setOperationCancelReason('')
+      setOperationCancelOpen(true)
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '核对库存作业取消条件'))
+    } finally {
+      setOperationLoading(false)
+    }
+  }
+  const inventoryPostPresentation = inventoryOperationActionPresentation(currentOperation)
+  const inventoryCancelPresentation = inventoryOperationActionPresentation(currentOperation, 'cancel')
+  const currentOperationCanCancel =
+    canCreateInventoryOperation &&
+    currentOperation?.id &&
+    [InventoryOperationStatus.DRAFT, InventoryOperationStatus.SUBMITTED, InventoryOperationStatus.APPROVED, InventoryOperationStatus.POSTED].includes(
+      currentOperation.status
+    ) &&
+    (Number(currentOperation.created_by || 0) === currentAdminID ||
+      (currentOperation.status === InventoryOperationStatus.POSTED &&
+        Number(currentOperation.posted_by || 0) === currentAdminID))
+  const renderOperationActions = (children) => outletContext?.taskBusiness?.formEditing ? null
+    : outletContext?.taskBusiness?.actionHost ? createPortal(children, outletContext.taskBusiness.actionHost) : children
+  const inventoryRecordOpen = useBusinessTableRecordOpen({
+    dataSource: rows,
+    rowKey: (record) => `${activeView}-${record.id}`,
+    onRow: (record) => ({ onClick: () => setSelectedRow(record) }),
+    onOpenRecord: openInventoryDetails,
+  })
+
+  const referenceRows = [...rows, ...operationSourceRows, selectedRow, detailRecord, ...(currentOperation?.items || [])].filter(Boolean)
+  useReferenceHydration({
+    materials: { ids: referenceRows.filter((row) => row.subject_type === 'MATERIAL').map((row) => row.subject_id), records: materials, onRecords: referenceRecords.materials, enabled: canReadMaterials },
+    products: { ids: referenceRows.filter((row) => row.subject_type === 'PRODUCT').map((row) => row.subject_id), records: products, onRecords: referenceRecords.products, enabled: canReadProducts },
+    product_skus: { ids: referenceRows.map((row) => row.product_sku_id), records: productSKUs, onRecords: referenceRecords.product_skus, enabled: canReadProductSKUs },
+    inventory_lots: { ids: referenceRows.flatMap((row) => [row.lot_id, row.from_lot_id, row.to_lot_id]), records: inventoryLots, onRecords: referenceRecords.inventory_lots, enabled: canReadReference(adminProfile, 'inventory_lots') },
+  }, adminProfile, rows)
+
+  return (
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ ...referenceRecords }} className="erp-inventory-ledger-page">
+      <PageHeaderCard
+        compact
+        helpKey="inventory"
+        title={operationsOnly ? '库存作业' : getBusinessDocumentTitle('inventory')}
+      />
+
+      {currentOperation || operationRecoveryError ? (
+        <Alert
+          className="erp-inventory-operation-receipt"
+          type={operationRecoveryError ? 'warning' : 'info'}
+          showIcon
+          message={
+            currentOperation
+              ? `${outletContext?.taskBusiness ? '本次库存作业' : '最近库存作业'}：${currentOperation.operation_no || '已登记'} / ${
+                  INVENTORY_OPERATION_STATUS_LABELS[currentOperation.status] ||
+                  '状态待核对'
+                }`
+              : '最近库存作业暂时无法恢复'
+          }
+          description={
+            operationRecoveryError || (outletContext?.taskBusiness ? '' :
+            (currentOperation?.status === InventoryOperationStatus.DRAFT
+              ? inventoryOperationRequiresApproval(currentOperation.operation_type)
+                ? '请核对后提交审批；创建人不能审批，批准后仍须由仓库确认执行。'
+                : `请核对后${inventoryPostPresentation.label}；确认前库存不会变化。`
+              : currentOperation?.status === InventoryOperationStatus.SUBMITTED
+                ? '等待另一位有权人员批准或驳回；审批本身不会改变库存。'
+                : currentOperation?.status === InventoryOperationStatus.APPROVED
+                  ? `审批已通过，请由仓库${inventoryPostPresentation.label}，之后才会形成库存结果。`
+                  : currentOperation?.reject_reason ||
+                    currentOperation?.cancel_reason ||
+                    currentOperation?.reason ||
+                    ''))
+          }
+          action={
+            currentOperation?.id ? renderOperationActions(
+              <Space wrap size={6}>
+                <Button size="small" onClick={() => setOperationDetailsOpen(true)}>查看明细</Button>
+                {currentOperation.status === InventoryOperationStatus.DRAFT &&
+                canCreateInventoryOperation &&
+                Number(currentOperation.created_by || 0) === currentAdminID ? (
+                  <Button
+                    icon={<EditOutlined aria-hidden="true" />}
+                    className="erp-action-button"
+                    size="small"
+                    disabled={operationLoading}
+                    onClick={() => openInventoryOperationEdit(currentOperation)}
+                  >
+                    编辑草稿
+                  </Button>
+                ) : null}
+                {currentOperation.status === InventoryOperationStatus.DRAFT &&
+                canCreateInventoryOperation &&
+                Number(currentOperation.created_by || 0) === currentAdminID ? (
+                  inventoryOperationRequiresApproval(currentOperation.operation_type) ? (
+                    <Popconfirm
+                      title="确认提交这张库存作业复核？"
+                      okText="提交审批"
+                      cancelText="返回"
+                      onConfirm={() => transitionInventoryOperation('submit')}
+                    >
+                      <Button
+                        icon={<SendOutlined aria-hidden="true" />}
+                        className="erp-action-button"
+                        type="primary"
+                        size="small"
+                        loading={operationLoading}
+                      >
+                        提交审批
+                      </Button>
+                    </Popconfirm>
+                  ) : (
+                    <Popconfirm
+                      title={inventoryPostPresentation.title}
+                      description={inventoryPostPresentation.description}
+                      okText={inventoryPostPresentation.label}
+                      cancelText="返回"
+                      onConfirm={() => transitionInventoryOperation('post')}
+                    >
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={operationLoading}
+                      >
+                        {inventoryPostPresentation.label}
+                      </Button>
+                    </Popconfirm>
+                  )
+                ) : null}
+                {currentOperation.status === InventoryOperationStatus.APPROVED &&
+                canCreateInventoryOperation ? (
+                  <Popconfirm
+                    title={inventoryPostPresentation.title}
+                    description={inventoryPostPresentation.description}
+                    okText={inventoryPostPresentation.label}
+                    cancelText="返回"
+                    onConfirm={() => transitionInventoryOperation('post')}
+                  >
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={operationLoading}
+                    >
+                      {inventoryPostPresentation.label}
+                    </Button>
+                  </Popconfirm>
+                ) : null}
+                {currentOperation.status === InventoryOperationStatus.SUBMITTED &&
+                canApproveInventoryOperation && !outletContext?.taskBusiness ? (
+                  <Button
+                    icon={<AuditOutlined aria-hidden="true" />}
+                    className="erp-action-button"
+                    size="small"
+                    onClick={() => navigate('/erp/task-board')}
+                  >
+                    去任务中心审批
+                  </Button>
+                ) : null}
+                {currentOperationCanCancel && !outletContext?.taskBusiness ? (
+                  <Button
+                    danger
+                    size="small"
+                    disabled={operationLoading}
+                    onClick={openOperationCancellation}
+                  >
+                    {inventoryCancelPresentation.label}
+                  </Button>
+                ) : null}
+                {inventoryOperationRequiresApproval(currentOperation.operation_type) && !outletContext?.taskBusiness ? (
+                  <WorkflowSourceProgressButton
+                    sourceType="inventory_operation"
+                    sourceID={currentOperation.id}
+                    profile={adminProfile}
+                    disabled={operationLoading}
+                  />
+                ) : null}
+                <ExceptionProcessRecoveryButton
+                  canRecover={
+                    !outletContext?.taskBusiness && canRecoverProcess &&
+                    inventoryOperationRequiresApproval(currentOperation.operation_type)
+                  }
+                  disabled={operationLoading}
+                  disabledReason="当前操作完成后可核对异常流程"
+                  loadProcess={() =>
+                    getInventoryAdjustmentApprovalProcess({
+                      ...(customerKey ? { customer_key: customerKey } : {}),
+                      inventory_operation_id: currentOperation.id,
+                    })
+                  }
+                  onRecovered={async () => {
+                    await recoverInventoryOperation(currentOperation.id)
+                    await loadRows()
+                  }}
+                />
+                <Button
+                  size="small"
+                  onClick={() => recoverInventoryOperation(currentOperation.id)}
+                >
+                  重新读取
+                </Button>
+              </Space>
+            ) : null
+          }
+        />
+      ) : null}
+
+      {taskOperation && currentOperation?.id ? <InventoryOperationDetails operation={currentOperation} /> : null}
+
+      {!operationsOnly && !taskOperation ? (
+        <>
+          <BusinessOperationPanel
+            compact
+            switching={viewSwitchPending}
+            contentSwitch={outletContext?.moduleWorkspace?.secondaryNavigation?.items.length ? <BusinessModuleViewTabs navigation={outletContext.moduleWorkspace.secondaryNavigation} onPendingChange={setViewSwitchPending} /> : null}
+            viewSwitch={activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
+            onClearFilters={clearFilters}
+            activeFilterCount={activeFilterCount}
+            filters={
+              <>
+                <SearchInput
+                  resetKey={activeView}
+                  value={linkedKeyword || keyword}
+                  {...BUSINESS_SEARCH_SCOPES[activeView]}
+                  onSearch={(value) => {
+                if (
+                  linkedKeyword ||
+                  routeLotID ||
+                  (routeSourceType && routeSourceID)
+                ) {
+                  clearRouteContext()
+                }
+                setKeyword(value)
+                resetCurrentPage()
+              }}
+                />
+                <SelectFilter
+                  className="erp-business-filter-control--status"
+                  aria-label="存货类型"
+                  value={subjectType}
+                  options={subjectTypeOptions}
+                  onChange={(nextType) => {
+                setSubjectType(nextType || '')
+                setStockCategory('')
+                setSubjectID('')
+                setProductSkuID('')
+                resetCurrentPage()
+              }}
+                />
+                <div className="erp-business-filter-field erp-business-filter-field--choices">
+                  <SelectFilter
+                    className="erp-business-filter-control--status"
+                    aria-label="材料库存类别"
+                    value={stockCategory}
+                    disabled={subjectType === 'PRODUCT'}
+                    options={MATERIAL_STOCK_CATEGORY_OPTIONS}
+                    onChange={changeStockCategory}
+                  />
+                  <Checkbox
+                    checked={stockCategory === 'UNCLASSIFIED'}
+                    disabled={subjectType === 'PRODUCT'}
+                    onChange={({ target }) =>
+                      changeStockCategory(target.checked ? 'UNCLASSIFIED' : '')
+                    }
+                  >
+                    只看待分类
+                  </Checkbox>
+                </div>
+                <RemoteReferenceSelect
+                  component={SelectFilter}
+                  referenceType={subjectType === 'PRODUCT' ? 'products' : 'materials'}
+                  className="erp-business-filter-control--status"
+                  aria-label={subjectFilterLabel}
+                  value={subjectID}
+                  options={subjectOptions}
+                  placeholder={subjectType ? `选择${subjectFilterLabel}` : '先选存货类型'}
+                  disabled={!subjectType}
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={(nextID) => {
+                setSubjectID(nextID || '')
+                setProductSkuID('')
+                resetCurrentPage()
+              }}
+                />
+                <RemoteReferenceSelect
+                  component={SelectFilter}
+                  referenceType="product_skus"
+                  params={{ product_id: Number(subjectID) || undefined, active_only: false }}
+                  className="erp-business-filter-control--status"
+                  aria-label="产品规格"
+                  value={productSkuID}
+                  options={[
+                { label: '全部产品规格', value: '' },
+                ...productSKUOptions,
+              ]}
+                  placeholder={
+                subjectType === 'PRODUCT' ? '选择产品规格' : '仅成品可选规格'
+              }
+                  disabled={subjectType !== 'PRODUCT' || !canReadProductSKUs}
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={(nextID) => {
+                setProductSkuID(nextID || '')
+                resetCurrentPage()
+              }}
+                />
+                <SelectFilter
+                  className="erp-business-filter-control--status"
+                  aria-label="仓库"
+                  value={warehouseID}
+                  options={[
+                { label: '全部仓库', value: '' },
+                ...warehouseFilterOptions,
+              ]}
+                  placeholder={
+                activeView === VIEW_LOTS ? '选择有余额的仓库' : '选择仓库'
+              }
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={(nextID) => {
+                setWarehouseID(nextID || '')
+                resetCurrentPage()
+              }}
+                />
+                <RemoteReferenceSelect
+                  component={SelectFilter}
+                  referenceType="inventory_lots"
+                  className="erp-business-filter-control--status"
+                  aria-label="批次"
+                  value={lotID}
+                  options={[
+                { label: '全部批次', value: '' },
+                ...inventoryLotOptions,
+              ]}
+                  placeholder="批次"
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={(nextID) => {
+                setLotID(nextID || '')
+                resetCurrentPage()
+              }}
+                />
+                {activeView === VIEW_LOTS ? (
+                  <BusinessStatusFilter
+                    inline
+                    counts={statusCounts}
+                    loading={loading}
+                    aria-label="批次状态"
+                    value={lotStatus}
+                    options={LOT_STATUS_OPTIONS}
+                    onChange={(nextStatus) => {
+                  setLotStatus(nextStatus)
+                  resetCurrentPage()
+                }}
+                  />
+            ) : null}
+                {activeView === VIEW_TXNS ? (
+                  <>
+                    <SelectFilter
+                      aria-label="出入库类型"
+                      className="erp-business-filter-control--status"
+                      value={txnType}
+                      options={TXN_TYPE_OPTIONS}
+                      onChange={(nextType) => {
+                    setTxnType(nextType)
+                    resetCurrentPage()
+                  }}
+                    />
+                    <SelectFilter
+                      aria-label="来源单据"
+                      className="erp-business-filter-control--status"
+                      value={sourceType}
+                      options={SOURCE_TYPE_OPTIONS}
+                      onChange={(nextType) => {
+                    if (routeSourceType || routeSourceID || linkedKeyword) {
+                      clearRouteContext(['source_type', 'source_id'])
+                    }
+                    setSourceType(nextType)
+                    resetCurrentPage()
+                  }}
+                    />
+                  </>
+            ) : null}
+                {activeView !== VIEW_BALANCES ? (
+                  <DateRangeFilter
+                    options={activeView === VIEW_LOTS ? LOT_DATE_FILTER_OPTIONS : TXN_DATE_FILTER_OPTIONS}
+                    value={activeView === VIEW_LOTS ? 'received_at' : 'occurred_at'}
+                    startValue={dateFilterStart}
+                    endValue={dateFilterEnd}
+                    onRangeChange={(from, to) => {
+                      setDateFilterStart(from)
+                      setDateFilterEnd(to)
+                      resetCurrentPage()
+                    }}
+                  />
+            ) : null}
+                {routeSourceType && routeSourceID ? (
+                  <Tag
+                    closable
+                    color="blue"
+                    onClose={() => clearRouteContext(['source_type', 'source_id'])}
+                  >
+                    已按{sourceTypeText(routeSourceType)}筛选
+                  </Tag>
+            ) : null}
+                {routeLotID ? (
+                  <Tag
+                    closable
+                    color="blue"
+                    onClose={() => clearRouteContext(['lot_id'])}
+                  >
+                    已按批次筛选
+                  </Tag>
+            ) : null}
+              </>
+        }
+            actions={
+              <Space size={8} wrap>
+                {hasActionPermission(
+              adminProfile,
+              PermissionCode.WAREHOUSE_MANAGE
+            ) ? (
+              <Button onClick={() => setWarehouseSettingsOpen(true)}>
+                仓库设置
+              </Button>
+            ) : null}
+                <BusinessListToolbarActions
+                  moduleTitle="库存台账"
+                  onExport={exportRows}
+                  exportDisabled={loading || exporting || total === 0}
+                  exportDisabledReason={
+                exporting
+                  ? '正在准备导出，请稍候'
+                  : loading
+                    ? '库存台账加载完成后可导出'
+                    : total === 0
+                      ? `当前筛选没有可导出的${activeLabel}记录`
+                      : ''
+              }
+                  onOpenColumnOrder={openColumnOrder}
+                />
+              </Space>
+        }
+            primaryAction={!outletContext?.moduleWorkspace && (canCreateInventoryOperation || canApproveInventoryOperation) ? (
+              <Button data-business-action-key="inventory-operation-records" onClick={() => navigate('/erp/warehouse/inventory?workspace=operations')}>
+                库存作业
+              </Button>
+        ) : null}
+          >
+            <SelectionActionBar
+              embedded
+              selectedCount={selectedRecords.length}
+              selectedLabel={selectedRecords.length > 1 ? `已选 ${selectedRecords.length} 行盘点范围` : selectedLabelFor(activeView, selectedRow)}
+              boundaryText="盘点、调拨和人工调整只从所选库存余额生成受控作业；草稿不会改变库存，确认出库、批次状态和预留仍由各自业务入口处理。"
+            >
+              <SelectionClearAction
+                selectedCount={selectedRecords.length}
+                selectionLabel="库存记录"
+                onClear={() => setSelectedRow(null)}
+              />
+              {relatedActionAvailability.visible ? (
+                <BusinessActionTooltip
+                  disabled={relatedActionAvailability.disabled}
+                  disabledReason={
+                !selectedRow
+                  ? '请先选择一条库存变动记录'
+                  : relatedActionAvailability.disabledReason
+              }
+                >
+                  <Dropdown
+                    trigger={['click']}
+                    destroyOnHidden
+                    disabled={relatedActionAvailability.disabled}
+                    menu={{
+                  items: relatedMenuItems,
+                  onClick: openRelatedTable,
+                }}
+                  >
+                    <Button
+                      size="small"
+                      icon={<LinkOutlined />}
+                      data-business-action-key="related-records"
+                      data-business-action-role="related"
+                      disabled={relatedActionAvailability.disabled}
+                    >
+                      相关单据 <DownOutlined />
+                    </Button>
+                  </Dropdown>
+                </BusinessActionTooltip>
+          ) : null}
+              <BusinessActionTooltip
+                disabled={!selectedRow}
+                disabledReason="请先选择一条库存记录"
+              >
+                <Button
+                  size="small"
+                  icon={<EyeOutlined />}
+                  disabled={!selectedRow}
+                  onClick={() => openInventoryDetails(selectedRow)}
+                  data-business-action-key="inventory-details"
+                  data-business-action-role="view"
+                >
+                  查看详情
+                </Button>
+              </BusinessActionTooltip>
+              {canCreateInventoryOperation && activeView === VIEW_BALANCES ? (
+                <>
+                  {[
+                ['CYCLE_COUNT', '盘点', true, ReconciliationOutlined],
+                ['TRANSFER', '调拨', false, SwapOutlined],
+                ['MANUAL_ADJUSTMENT', '人工调整', false, EditOutlined],
+              ].map(([type, label, primary, Icon]) => (
+                <BusinessActionTooltip
+                  key={type}
+                  disabled={!(type === 'CYCLE_COUNT' ? selectedRecords.length : selectedRow) || operationLoading}
+                  disabledReason={
+                    !selectedRow
+                      ? '请先选择一条库存余额'
+                      : '当前库存作业完成后可继续'
+                  }
+                >
+                  <Button
+                    icon={<Icon aria-hidden="true" />}
+                    className="erp-action-button"
+                    data-business-action-key={`inventory-${type.toLowerCase()}`}
+                    data-business-action-role="action"
+                    size="small"
+                    type={primary ? 'primary' : 'default'}
+                    disabled={!(type === 'CYCLE_COUNT' ? selectedRecords.length : selectedRow) || operationLoading}
+                    onClick={() => openInventoryOperation(type)}
+                  >
+                    {label}
+                  </Button>
+                </BusinessActionTooltip>
+              ))}
+                </>
+          ) : null}
+            </SelectionActionBar>
+          </BusinessOperationPanel>
+
+          <BusinessSwitchContent pending={viewSwitchPending}>
+            <Card ref={tableCardRef} className={`erp-business-data-table-card erp-business-module-table-card${sticky ? ' erp-business-data-table-card--sticky' : ''}`} onClickCapture={inventoryRecordOpen.onClickCapture} onDoubleClickCapture={inventoryRecordOpen.onDoubleClickCapture}>
+              <BusinessViewPanels activeView={activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? 'distribution' : activeView} views={outletContext?.taskBusiness ? [] : [VIEW_BALANCES, VIEW_LOTS, VIEW_TXNS, 'distribution']}>
+                {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
+                  <InventoryDistributionOverview
+                    distribution={distributionData.rows}
+                    loading={distributionData.loading}
+                    error={distributionData.error}
+                    onRetry={distributionData.reload}
+                    onSelectWarehouse={(warehouse) => {
+                if (warehouse.warehouseID <= 0) return
+                setWarehouseID(warehouse.warehouseID)
+                setBalanceDisplay('list')
+                resetCurrentPage()
+              }}
+                  />
+          ) : (
+            <InventoryTable
+              tableLayout="fixed"
+              scrollToolbar
+              sticky={sticky}
+              rowKey={(record) => `${activeView}-${record.id}`}
+              loading={loading}
+              dataSource={canReadInventory ? rows : EMPTY_INVENTORY_ROWS}
+              columns={copyableTableColumns}
+              onChange={handleTableChange}
+              pagination={createBusinessTablePagination({
+                pagination: listResult?.pagination || pagination,
+                total,
+                onChange: (current, pageSize) =>
+                  setPagination({ current, pageSize }),
+              })}
+              rowSelection={{
+                type: activeView === VIEW_BALANCES ? 'checkbox' : 'radio',
+                selectedRowKeys: selectedRecords.map((row) => `${activeView}-${row.id}`),
+                onChange: (_keys, nextSelected) => setSelectedRecords(nextSelected),
+              }}
+              rowClassName={(record) =>
+                selectedRecords.some((row) => row.id === record.id) ? 'ant-table-row-selected' : ''
+              }
+              onRow={inventoryRecordOpen.onRow}
+              locale={{
+                emptyText: <Empty description={`暂无${activeLabel}`} />,
+              }}
+            />
+          )}
+              </BusinessViewPanels>
+            </Card>
+          </BusinessSwitchContent>
+        </>
+      ) : operationsOnly && !taskOperation ? (
+        <InventoryOperationRecordsModal inline open refreshKey={`${operationRecordsRevision}:${currentOperation?.id || 0}:${currentOperation?.version || 0}`} currentAdminID={currentAdminID} canCreate={canCreateInventoryOperation} onCreate={canCreateInventoryOperation ? () => navigate('/erp/warehouse/inventory') : null} onSelect={async (record) => { const recovered = await recoverInventoryOperation(record.id); if (recovered?.id) setOperationDetailsOpen(true) }} onEdit={openInventoryOperationEdit} />
+      ) : null}
+      {columnOrderModal}
+      <BusinessDetailsModal
+        descriptionInHelp
+        columns={visibleColumns}
+        description="当前弹窗只用于库存查询和追溯，不会修改库存、批次状态、预留或变动记录。"
+        open={Boolean(detailRecord)}
+        record={detailRecord}
+        title={`${activeLabel}详情`}
+        onClose={() => setDetailRecord(null)}
+      />
+      <BusinessModal title={`库存作业明细 · ${currentOperation?.operation_no || ''}`} open={operationDetailsOpen} onCancel={() => setOperationDetailsOpen(false)} footer={null} size="lineItems" destroyOnHidden>
+        <InventoryOperationDetails operation={currentOperation} />
+      </BusinessModal>
+      <InventoryOperationModal
+        customerKey={customerKey}
+        open={Boolean(operationType || editingOperation)}
+        mode={editingOperation ? 'edit' : 'create'}
+        operation={editingOperation}
+        operationType={editingOperation?.operation_type || operationType}
+        sourceRecords={operationSourceRows}
+        sourceLabels={operationSourceLabels}
+        resolveSourceLabels={resolveOperationItemSourceLabels}
+        warehouseOptions={warehouseOptions}
+        loading={operationLoading}
+        onCancel={() => {
+          setOperationType('')
+          setEditingOperation(null)
+        }}
+        onSubmit={
+          editingOperation ? saveInventoryOperation : submitInventoryOperation
+        }
+      />
+      <BusinessModal
+        size="confirm"
+        title={inventoryCancelPresentation.label}
+        open={operationCancelOpen}
+        okText={inventoryCancelPresentation.label}
+        cancelText="返回"
+        okButtonProps={{ danger: true }}
+        confirmLoading={operationLoading}
+        closable={!operationLoading}
+        maskClosable={!operationLoading}
+        onCancel={() => !operationLoading && setOperationCancelOpen(false)}
+        onOk={() => {
+          if (!operationCancelReason.trim()) {
+            message.warning('请填写业务原因')
+            return
+          }
+          transitionInventoryOperation('cancel', operationCancelReason)
+        }}
+      >
+        <p>{inventoryCancelPresentation.description}</p>
+        <Input.TextArea
+          value={operationCancelReason}
+          rows={3}
+          maxLength={255}
+          showCount
+          placeholder="请填写业务原因"
+          onChange={(event) => setOperationCancelReason(event.target.value)}
+        />
+      </BusinessModal>
+      <WarehouseSettingsModal
+        open={warehouseSettingsOpen}
+        onCancel={() => setWarehouseSettingsOpen(false)}
+        onSaved={() => {
+          loadReferenceOptions()
+          loadRows()
+        }}
+      />
+    </ReferenceRecordsProvider>
+  )
+}

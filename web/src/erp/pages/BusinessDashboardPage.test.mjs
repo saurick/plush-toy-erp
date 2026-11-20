@@ -1,0 +1,229 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import test from 'node:test'
+import { transformWithEsbuild } from 'vite'
+
+const source = readFileSync(
+  fileURLToPath(new URL('./BusinessDashboardPage.jsx', import.meta.url)),
+  'utf8'
+)
+const summary = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/business-visualizations/BusinessProgressSummary.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
+const drawer = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/business-visualizations/BusinessProgressDrawer.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
+const mobileSummary = readFileSync(
+  fileURLToPath(
+    new URL('../mobile/components/MobileProgressSummary.jsx', import.meta.url)
+  ),
+  'utf8'
+)
+const mobilePanel = readFileSync(
+  fileURLToPath(
+    new URL('../mobile/components/MobileProgressPanel.jsx', import.meta.url)
+  ),
+  'utf8'
+)
+const salesDelivery = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/business-visualizations/ProgressDeliveryLines.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
+const productIdentity = readFileSync(
+  fileURLToPath(
+    new URL('../components/master-data/ProductIdentity.jsx', import.meta.url)
+  ),
+  'utf8'
+)
+const progressContent = readFileSync(new URL('../components/business-visualizations/ProgressCompactContent.jsx', import.meta.url), 'utf8')
+const taskImage = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/workflow/WorkflowTaskProductImage.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
+const taskImageStyles = readFileSync(
+  fileURLToPath(
+    new URL('../components/workflow/workflowTaskIdentity.css', import.meta.url)
+  ),
+  'utf8'
+)
+const productIdentityStyles = readFileSync(
+  fileURLToPath(
+    new URL('../components/master-data/productIdentity.css', import.meta.url)
+  ),
+  'utf8'
+)
+const progressSummaryStyles = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/business-visualizations/businessProgressSummary.css',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
+const mobileProgressStyles = readFileSync(
+  fileURLToPath(new URL('../mobile/mobileProgress.css', import.meta.url)),
+  'utf8'
+)
+const designTokens = readFileSync(
+  fileURLToPath(new URL('../styles/app/design-tokens.css', import.meta.url)),
+  'utf8'
+)
+const materialSummaryStyles = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/sales-orders/EngineeringMaterialRequest.css',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
+
+test('business dashboard remains valid JSX', async () => {
+  await transformWithEsbuild(source, 'BusinessDashboardPage.jsx', {
+    loader: 'jsx',
+    jsx: 'automatic',
+  })
+})
+
+test('progress lists and details share independently previewable product identities', () => {
+  assert.match(source, /<table\s+className="erp-progress-table"/u)
+  assert.doesNotMatch(source, /className="erp-progress-summary"/u)
+  assert.match(
+    mobilePanel,
+    /<WorkflowTaskCard[\s\S]*?contentClassName="mobile-progress-card-main"/u
+  )
+  assert.match(
+    salesDelivery,
+    /<table className="erp-progress-table erp-progress-table--delivery"/u
+  )
+  assert.doesNotMatch(
+    [source, mobilePanel, salesDelivery].join('\n'),
+    /preview=\{false\}/u
+  )
+  assert.match(
+    productIdentity,
+    /export function ProductThumbnail[\s\S]*?preview = true/u
+  )
+  assert.match(
+    productIdentity,
+    /renderProductOption[\s\S]*?<ProductIdentity[\s\S]*?preview=\{false\}/u
+  )
+  assert.match(taskImage, /aria-haspopup="dialog"/u)
+  assert.match(taskImage, /onMouseDown=\{\(event\) =>/u)
+  assert.match(taskImage, /closest\('\[role="option"\]'\)/u)
+  assert.match(progressContent, /<ProductIdentity className="erp-progress-product"[\s\S]*?compact/u)
+  assert.doesNotMatch(progressContent, /return row\.product_match_count/u)
+  assert.match(progressContent, /<BusinessProductGallery\b[^>]*loadProducts=\{loadProducts\}/u)
+  assert.match(progressContent, /row\.product_count > 1[\s\S]*?canReadDocumentProductGallery/u)
+  assert.match(progressContent, /<ProductIdentity\b[^>]*thumbnail=\{\w+\}/u)
+  assert.match(source, /<ProgressIdentity row=\{row\}/u)
+  assert.match(summary, /<ProgressProductIdentity row=\{row\}/u)
+  assert.match(mobileSummary, /<BusinessProgressSummary/u)
+  assert.match(drawer, /<BusinessProgressHeader/u)
+  assert.match(progressContent, /<ProductIdentity\b[^>]*productId=\{row\.product_id\}/u)
+  assert.match(drawer, /record\.kind === 'sales_line'/u)
+  assert.match(drawer, /productId=\{record\.product_id\}/u)
+})
+
+test('business product images share the standard size and retain compact controls', () => {
+  assert.match(
+    taskImageStyles,
+    /\.erp-task-product-image \{[\s\S]*?width: var\(--erp-task-product-image-size, 64px\);/u
+  )
+  assert.doesNotMatch(
+    productIdentityStyles,
+    /\.erp-product-identity \.erp-task-product-image \{/u
+  )
+  assert.match(
+    productIdentityStyles,
+    /\.erp-product-identity--compact \.erp-task-product-image \{[\s\S]*?width: 48px;/u
+  )
+  assert.match(
+    progressSummaryStyles,
+    /\.erp-progress-overview-product \.erp-task-product-image \{[\s\S]*?width: 64px;/u
+  )
+  assert.match(
+    taskImageStyles,
+    /\.erp-task-identity--compact \.erp-task-product-image \{[\s\S]*?width: var\(--erp-work-item-image-size\);/u
+  )
+  assert.deepEqual(
+    [...designTokens.matchAll(/--erp-work-item-image-size:\s*([^;]+);/gu)].map((match) => match[1]),
+    ['64px']
+  )
+  assert.match(
+    materialSummaryStyles,
+    /\.erp-material-product \.erp-task-product-image \{[\s\S]*?width: 64px;/u
+  )
+})
+
+test('mobile progress restores history details without replaying the drawer opening motion', () => {
+  assert.match(
+    mobilePanel,
+    /const \[suppressDetailOpenMotion, setSuppressDetailOpenMotion\] = useState\(\s*Boolean\(initial\.selection\)\s*\)/u
+  )
+  assert.match(
+    mobilePanel,
+    /setSuppressDetailOpenMotion\(Boolean\(restored\.selection\)\)[\s\S]*?setSelection\(restored\.selection\)/u
+  )
+  assert.match(
+    mobilePanel,
+    /const open = \(row, section = null\) => \{[\s\S]*?setSuppressDetailOpenMotion\(false\)/u
+  )
+  assert.match(
+    mobilePanel,
+    /<BusinessProgressDrawer[\s\S]*?suppressOpenMotion=\{suppressDetailOpenMotion\}/u
+  )
+  assert.match(
+    drawer,
+    /suppressOpenMotion[\s\S]*?maskMotion: SUPPRESS_OPEN_MOTION,[\s\S]*?motion: SUPPRESS_OPEN_MOTION/u
+  )
+})
+
+test('mobile progress groups business details without desktop source links', async () => {
+  await transformWithEsbuild(drawer, 'BusinessProgressDrawer.jsx', {
+    loader: 'jsx',
+    jsx: 'automatic',
+  })
+  assert.match(
+    drawer,
+    /const MOBILE_TABS = \[[\s\S]*?总览[\s\S]*?产品[\s\S]*?生产[\s\S]*?任务/u
+  )
+  assert.match(drawer, /const PRODUCTION_SECTIONS = \['production', 'batches', 'materials'\]/u)
+  assert.match(drawer, /!mobile && sourcePath && canOpen\(sourcePath\)/u)
+  assert.match(drawer, /!mobile && canOpen\(path\)/u)
+  assert.doesNotMatch(drawer, /mobile-progress-detail-source/u)
+  assert.match(
+    drawer,
+    /mobile-progress-detail-group-trigger[\s\S]*?aria-expanded=\{expanded\}/u
+  )
+  assert.doesNotMatch(drawer, /查看业务明细|查看关联任务/u)
+  assert.match(drawer, /erp-progress-detail-scroll/u)
+  assert.match(
+    mobileProgressStyles,
+    /\.mobile-progress-detail-group-trigger \{[\s\S]*?min-height: 52px;/u
+  )
+})
