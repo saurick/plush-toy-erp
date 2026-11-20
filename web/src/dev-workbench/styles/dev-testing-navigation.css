@@ -1,0 +1,41 @@
+.erp-dev-testing-group-nav {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.erp-dev-testing-scope {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-testing-scope .erp-dev-testing-primary-nav {
+  justify-content: flex-start;
+}
+
+.erp-dev-testing-environment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  min-width: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-dev-testing-environment strong {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--erp-text);
+  font-weight: 600;
+}
+
+.erp-dev-testing-environment > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

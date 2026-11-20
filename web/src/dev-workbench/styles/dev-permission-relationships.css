@@ -1,0 +1,374 @@
+.erp-dev-permission-relationships-header,
+.erp-dev-permission-relationships-shell {
+  display: grid;
+  gap: 10px;
+}
+.erp-permission-relationship {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+.erp-permission-relationship__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.erp-permission-relationship__toolbar > .ant-select {
+  flex: 0 1 320px;
+  min-width: 220px;
+}
+.erp-dev-permission-lookups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: 0;
+}
+.erp-dev-permission-search {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.erp-permission-relationship__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  color: var(--erp-text-muted);
+}
+.erp-permission-relationship__summary strong {
+  margin-left: 4px;
+  color: var(--erp-text);
+}
+.erp-permission-relationship__tabs,
+.erp-permission-relationship__active-panel {
+  min-width: 0;
+}
+.erp-permission-relationship__tabs > .ant-tabs-nav {
+  margin-bottom: 12px;
+}
+.erp-permission-relationship__tab-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.erp-permission-relationship__tab-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+.erp-permission-relationship__tab-toolbar > .ant-select {
+  width: 320px;
+  max-width: 100%;
+}
+.erp-permission-relationship__graph {
+  min-width: 0;
+}
+.erp-dev-permission-search > .ant-input-affix-wrapper {
+  max-width: 420px;
+  flex: 1 1 240px;
+}
+.erp-dev-permission-capabilities {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 12px;
+}
+.erp-dev-permission-capabilities__groups {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.erp-dev-permission-capabilities__groups button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.erp-dev-permission-capabilities__groups button[aria-pressed='true'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+.erp-dev-permission-capabilities__groups button:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+.erp-dev-permission-capabilities__groups small {
+  grid-column: 1 / -1;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+.erp-dev-permission-capabilities__results {
+  min-width: 0;
+}
+.erp-permission-relationship__section-head,
+.erp-dev-permission-evidence__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.erp-permission-relationship__section-head .ant-typography {
+  margin: 0;
+}
+.erp-dev-permission-function {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.erp-dev-permission-evidence {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.erp-permission-relationship__evidence {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 12px;
+  background: var(--erp-surface-bg-soft);
+  border-radius: 6px;
+}
+.erp-permission-relationship__evidence dt {
+  color: var(--erp-text-muted);
+}
+.erp-permission-relationship__evidence dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.erp-permission-navigation {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 14px;
+  background: var(--erp-surface-bg, #ffffff);
+  padding: 14px;
+}
+
+.erp-permission-navigation__context {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--erp-border, #e2e8f0);
+  padding-bottom: 10px;
+}
+
+.erp-permission-navigation__context > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.erp-permission-navigation__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-permission-navigation__group {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: 12px;
+  background: var(--erp-surface-bg-soft);
+  padding: 12px;
+}
+
+.erp-permission-navigation__group-head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-permission-navigation__items {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-permission-navigation__items li {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--erp-border);
+  border-radius: 9px;
+  background: var(--erp-surface-bg, #ffffff);
+  padding: 7px 8px;
+  color: var(--erp-text);
+  font-size: var(--erp-font-small);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.erp-permission-navigation__order {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--erp-primary-soft, #e8f5ea);
+  color: var(--erp-primary, #267a3a);
+  font-size: var(--erp-font-micro);
+  font-weight: 700;
+  line-height: 1;
+}
+
+@media (max-width: 1100px) {
+  .erp-permission-navigation__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.erp-dev-role-responsibilities__layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.85fr) minmax(0, 1.5fr);
+  gap: 24px;
+  align-items: start;
+}
+.erp-dev-role-responsibilities__duties,
+.erp-dev-role-responsibilities__role {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.erp-dev-role-responsibilities__duties {
+  gap: 24px;
+}
+.erp-dev-role-responsibilities__heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.erp-dev-role-responsibilities__nodes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.erp-dev-role-responsibilities__node {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  color: var(--erp-text);
+  background: var(--erp-surface-bg);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.erp-dev-role-responsibilities__node small {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+.erp-dev-role-responsibilities__node[aria-pressed='true'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+.erp-dev-role-responsibilities__node:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+.erp-dev-role-responsibilities__optional,
+.erp-dev-role-responsibilities__core,
+.erp-dev-role-responsibilities__gaps {
+  padding-top: 10px;
+  border-top: 1px solid var(--erp-border);
+}
+.erp-dev-role-responsibilities__optional > div,
+.erp-dev-role-responsibilities__core > div,
+.erp-dev-role-responsibilities__gaps > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 6px;
+}
+.erp-dev-role-responsibilities__core[open] {
+  max-height: 320px;
+  overflow: auto;
+}
+.erp-dev-role-responsibilities__core summary {
+  cursor: pointer;
+}
+.erp-dev-role-responsibilities__detail {
+  min-width: 0;
+  padding-left: 24px;
+  border-left: 1px solid var(--erp-border);
+}
+.erp-dev-role-responsibilities__gaps {
+  margin-top: 16px;
+}
+@media (max-width: 800px) {
+  .erp-permission-relationship {
+    padding: 12px;
+  }
+  .erp-permission-relationship__toolbar > .ant-select {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .erp-dev-permission-lookups {
+    margin-left: 0;
+  }
+  .erp-dev-permission-capabilities {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .erp-dev-permission-capabilities__groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .erp-dev-permission-capabilities__results .ant-btn {
+    min-height: 44px;
+    padding-inline: 4px;
+  }
+  .erp-permission-navigation__grid {
+    grid-template-columns: 1fr;
+  }
+  .erp-permission-navigation__context {
+    flex-direction: column;
+  }
+  .erp-dev-role-responsibilities__layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .erp-dev-role-responsibilities__detail {
+    padding: 16px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--erp-border);
+  }
+}

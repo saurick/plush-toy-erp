@@ -1,0 +1,80 @@
+.erp-dev-quality-guide {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-dev-quality-guide[hidden],
+.erp-dev-quality-guide [hidden] {
+  display: none;
+}
+
+.erp-dev-quality-guide code {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-quality-guide .erp-dev-disclosure {
+  margin-top: 16px;
+}
+
+.erp-dev-quality-guide__file-chain,
+.erp-dev-quality-guide__diagram {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.erp-dev-quality-guide__file-chain {
+  justify-items: start;
+}
+
+.erp-dev-quality-guide__detail {
+  border-top: 1px solid var(--erp-border);
+  margin-top: 16px;
+  padding-top: 16px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-quality-guide__detail-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.erp-dev-quality-guide__fields {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.erp-dev-quality-guide__fields dt {
+  color: var(--erp-text-muted);
+  margin-bottom: 6px;
+}
+
+.erp-dev-quality-guide__fields dd {
+  margin: 0;
+}
+
+.erp-dev-quality-guide__fields ul,
+.erp-dev-quality-guide__fields ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.erp-dev-quality-guide__fields li + li {
+  margin-top: 6px;
+}
+
+.erp-dev-quality-guide__group {
+  min-width: 220px;
+}
+
+@media (width <= 1100px) {
+  .erp-dev-quality-guide__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
