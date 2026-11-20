@@ -1,0 +1,19 @@
+.workflow-task-receipt { padding: 16px; min-width: 0; }
+.workflow-task-receipt__heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.workflow-task-receipt__heading h2 { margin: 0; font-size: 18px; line-height: 1.5; }
+.workflow-task-receipt__source { color: var(--erp-text-muted); overflow-wrap: anywhere; margin: 8px 0 16px; }
+.workflow-task-receipt dl { display: grid; gap: 12px; margin: 0; }
+.workflow-task-receipt dl > div { display: grid; grid-template-columns: 5em minmax(0, 1fr); gap: 12px; }
+.workflow-task-receipt dt { color: var(--erp-text-muted); }
+.workflow-task-receipt dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.workflow-task-receipt__items { margin-top: 16px; }
+.workflow-task-receipt__items h3 { font-size: 14px; margin: 0 0 8px; }
+.workflow-task-receipt__items ul { list-style: none; padding: 0; margin: 0; }
+.workflow-task-receipt__items li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 16px; padding-block: 8px; border-bottom: 1px solid var(--erp-border); }
+.workflow-task-receipt__items li span { min-width: 0; overflow-wrap: anywhere; }
+.workflow-task-receipt__items li strong { white-space: nowrap; }
+.workflow-task-receipt__source-details {
+  margin-block-start: 16px;
+  border-block-start: 1px solid var(--erp-border);
+  padding-block-start: 12px;
+}

@@ -1,0 +1,117 @@
+.workflow-task-scope-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.workflow-task-scope-help {
+  display: grid;
+  width: min(360px, calc(100vw - 64px));
+  min-width: 0;
+  gap: 12px;
+  color: var(--erp-text);
+  font-size: var(--erp-font-small);
+  line-height: 1.6;
+}
+
+.workflow-task-scope-help__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.workflow-task-scope-help__heading strong {
+  min-width: 0;
+}
+
+.workflow-task-scope-help__heading .ant-btn {
+  flex: 0 0 auto;
+}
+
+.workflow-task-scope-help__map,
+.workflow-task-scope-help__related {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+}
+
+.workflow-task-scope-help__map {
+  background: var(--erp-surface-bg-soft);
+}
+
+.workflow-task-scope-help__related {
+  background: var(--erp-surface-bg);
+}
+
+.workflow-task-scope-help [data-active] {
+  border-color: var(--erp-primary);
+}
+
+.workflow-task-scope-help__tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workflow-task-scope-help__tasks > span {
+  min-width: 0;
+  padding: 3px 7px;
+  border: 1px solid var(--erp-border);
+  border-radius: 4px;
+  color: var(--erp-text-muted);
+}
+
+.workflow-task-scope-help__tasks > [data-included] {
+  border-color: var(--erp-primary);
+  background: var(--erp-interactive-bg-hover);
+  color: var(--erp-primary-strong);
+}
+
+.workflow-task-scope-help__secondary,
+.workflow-task-scope-help__boundary {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.workflow-task-scope-help__definitions {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 98px minmax(0, 1fr);
+  gap: 8px 10px;
+  margin: 0;
+}
+
+.workflow-task-scope-help__definitions dt {
+  color: var(--erp-text);
+  font-weight: 500;
+}
+
+.workflow-task-scope-help__definitions dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.workflow-task-scope-help__boundary {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--erp-border);
+}
+
+@media (max-width: 640px) {
+  .workflow-task-scope-help__definitions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .workflow-task-scope-help__definitions dd + dt {
+    margin-top: 4px;
+  }
+}

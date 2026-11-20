@@ -1,0 +1,209 @@
+.erp-task-copy-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.erp-task-copy-field__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-copy.ant-btn {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--erp-text-muted, #64748b);
+  vertical-align: middle;
+}
+
+.erp-task-copy.ant-btn:hover {
+  color: var(--erp-primary, #237234);
+  background: var(--erp-primary-soft, #eaf4ed);
+}
+
+.erp-task-copy--label.ant-btn {
+  width: auto;
+  padding-inline: 8px;
+  font-size: var(--erp-font-caption);
+  font-weight: 400;
+}
+
+.erp-task-copy.ant-btn:focus-visible {
+  outline: 2px solid var(--erp-primary, #237234);
+  outline-offset: 2px;
+}
+
+.erp-task-copy-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-task-copy-heading > :first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.erp-task-more.ant-btn {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  color: var(--erp-text-muted);
+}
+
+.erp-task-source-link.ant-btn {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+  text-align: left;
+  white-space: normal;
+}
+
+.ant-dropdown.erp-task-copy-menu .ant-dropdown-menu {
+  width: 180px;
+  padding: 5px;
+  border: 1px solid var(--erp-border);
+  border-radius: 7px;
+  background: var(--erp-surface-bg);
+}
+
+.ant-dropdown.erp-task-copy-menu .ant-dropdown-menu .ant-dropdown-menu-item {
+  min-height: 40px;
+  gap: 8px;
+  padding: 10px 9px;
+  border-radius: 4px;
+  box-shadow: none;
+  font-size: var(--erp-font-small);
+}
+
+.ant-dropdown.erp-task-copy-menu .ant-dropdown-menu-item .anticon {
+  font-size: 16px;
+}
+
+.erp-task-card {
+  position: relative;
+  isolation: isolate;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+@media (hover: hover) {
+  .erp-task-card:has(> .erp-task-card__open:not(:disabled, [aria-disabled='true'], [aria-pressed='true'])):hover {
+    background: var(--erp-interactive-bg-hover);
+  }
+
+  .erp-task-card:where(
+    .workflow-task-calendar__task,
+    .erp-progress-row,
+    .mobile-progress-card,
+    .mobile-workflow-tracking-card
+  ):has(> .erp-task-card__open:not(:disabled, [aria-disabled='true'], [aria-pressed='true'])):hover {
+    border-color: var(--erp-interactive-border-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-task-card {
+    transition: none;
+  }
+}
+
+.erp-task-card__open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.erp-task-card__open:focus-visible {
+  outline: 2px solid var(--erp-primary, #237234);
+  outline-offset: 2px;
+}
+
+.erp-task-card__content {
+  position: relative;
+  display: grid;
+  gap: inherit;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.erp-task-card__content .erp-task-copy {
+  pointer-events: auto;
+}
+
+.erp-task-card--compact {
+  min-width: 0;
+  padding: var(--erp-work-item-padding);
+  border: 1px solid var(--erp-border-strong);
+  border-radius: var(--erp-work-item-radius);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  overflow-wrap: anywhere;
+}
+
+.erp-task-card--compact > .erp-task-card__content {
+  gap: 4px;
+}
+
+.erp-task-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-width: 0;
+  min-height: calc(var(--erp-font-caption) * 1.5 + 5px);
+  padding-top: 4px;
+  border-top: 1px solid var(--erp-border);
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
+.erp-task-card__footer:empty {
+  display: none;
+}
+
+.erp-task-source__type {
+  color: var(--erp-text-muted);
+}
+
+.erp-task-source__number {
+  color: var(--erp-text);
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .erp-task-more.ant-btn,
+  .ant-dropdown.erp-task-copy-menu .ant-dropdown-menu .ant-dropdown-menu-item {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .erp-task-copy.ant-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .erp-task-copy--label.ant-btn {
+    width: auto;
+    font-size: var(--erp-font-small);
+  }
+}

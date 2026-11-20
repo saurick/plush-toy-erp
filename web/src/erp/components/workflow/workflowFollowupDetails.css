@@ -1,0 +1,28 @@
+.erp-workflow-followup-details {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px 0;
+}
+
+.erp-workflow-followup-details p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.erp-business-task-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
+.erp-business-task-form__wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 575px) {
+  .erp-business-task-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
