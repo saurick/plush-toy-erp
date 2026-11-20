@@ -1,0 +1,48 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "customer-trial-133",
+  "releaseVersion": "yoyoosun-20260711-20c96d38-amd64",
+  "rehearsedAt": "2026-07-11T05:44:18.772Z",
+  "rehearsalType": "rollback-forward-fix",
+  "triggerScenario": "post-deploy health, PDF, migration, RBAC, or business confirmation fails",
+  "rollbackTargetRelease": "yoyoosun-20260711-71144182-amd64",
+  "rollbackRunbook": "deployments/yoyoosun/runbooks/03-rollback.md",
+  "steps": [
+    {
+      "name": "identify retained previous server and web image IDs",
+      "status": "pass"
+    },
+    {
+      "name": "verify pre-deploy backup ID hash and isolated restore",
+      "status": "pass"
+    },
+    {
+      "name": "verify no reverse migration because before equals after",
+      "status": "pass"
+    },
+    {
+      "name": "verify rollback env scope and post-action smoke plan",
+      "status": "pass"
+    }
+  ],
+  "postCheck": {
+    "smokeStatus": "passed",
+    "smokeReport": "smoke-test-report.json",
+    "smokeCheckCount": 7,
+    "evidenceReviewStatus": "passed",
+    "customerConfigEffectiveSession": {
+      "status": "verified",
+      "expectedRevision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      "target": "jsonrpc:customer_config.get_effective_session"
+    }
+  },
+  "summary": {
+    "rehearsalCompleted": true,
+    "rollbackPathStatus": "passed"
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsFullDsn": false
+  }
+}

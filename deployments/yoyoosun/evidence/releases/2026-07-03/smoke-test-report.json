@@ -1,0 +1,61 @@
+{
+  "customerCode": "yoyoosun",
+  "releaseVersion": "yoyoosun-20260703-c298a2a3-amd64",
+  "environment": "customer-trial-133",
+  "generatedAt": "2026-07-03T05:17:27.232Z",
+  "endpointAlias": "http://192.168.0.133:5175",
+  "backendEndpointAlias": "remote-loopback:http://127.0.0.1:8300",
+  "checks": [
+    {
+      "name": "web-root",
+      "target": "http://192.168.0.133:5175/",
+      "httpCode": 200,
+      "status": "pass"
+    },
+    {
+      "name": "customer-config-js",
+      "target": "http://192.168.0.133:5175/customer-config.js",
+      "httpCode": 200,
+      "status": "pass"
+    },
+    {
+      "name": "admin-login-route",
+      "target": "http://192.168.0.133:5175/admin-login",
+      "httpCode": 200,
+      "status": "pass"
+    },
+    {
+      "name": "customer-config-effective-session-unauth-boundary",
+      "target": "jsonrpc:customer_config.get_effective_session unauthenticated",
+      "httpCode": 200,
+      "resultCode": 40302,
+      "status": "pass",
+      "responseBodyStored": false
+    },
+    {
+      "name": "backend-healthz",
+      "target": "remote-loopback:http://127.0.0.1:8300/healthz",
+      "httpCode": 200,
+      "status": "pass"
+    },
+    {
+      "name": "backend-readyz",
+      "target": "remote-loopback:http://127.0.0.1:8300/readyz",
+      "httpCode": 200,
+      "status": "pass"
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "responseBodiesStored": false
+  },
+  "limitations": [
+    "authenticated customer_config.get_effective_session active revision readback not run because CUSTOMER_CONFIG_ADMIN_TOKEN was not provided"
+  ]
+}

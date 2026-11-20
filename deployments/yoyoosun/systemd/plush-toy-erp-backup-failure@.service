@@ -1,0 +1,7 @@
+[Unit]
+Description=Record Plush Toy ERP backup failure for %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemd-cat --identifier=plush-toy-erp-backup --priority=err /usr/bin/echo BACKUP_FAILURE unit=%i
+NoNewPrivileges=true
