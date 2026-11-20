@@ -1,0 +1,256 @@
+.erp-dev-visualization__examples {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  container: visualization-examples / inline-size;
+}
+
+.erp-dev-visualization__examples p,
+.erp-dev-visualization__rule {
+  margin-block: 0;
+}
+
+.erp-dev-visualization__rule {
+  color: var(--erp-text-muted);
+}
+
+@media (min-width: 981px) and (min-height: 440px) {
+  .erp-dev-visualization .erp-workbench-reading__catalog {
+    position: sticky;
+    top: 8px;
+  }
+}
+
+.erp-dev-visualization__calendar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.erp-dev-visualization__calendar > * {
+  min-width: 0;
+}
+
+.erp-dev-visualization__calendar-header,
+.erp-dev-visualization__calendar-header > div,
+.erp-dev-visualization__calendar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.erp-dev-visualization__calendar-header {
+  justify-content: space-between;
+  margin-block-end: 8px;
+}
+
+.erp-dev-visualization__calendar-day {
+  display: grid;
+  place-items: center;
+  inline-size: 100%;
+  min-block-size: 36px;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--erp-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.erp-dev-visualization__calendar-day[data-outside] {
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-visualization__calendar-number {
+  min-inline-size: 24px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.erp-dev-visualization__calendar-day[data-reference] .erp-dev-visualization__calendar-number {
+  border-color: var(--erp-primary);
+}
+
+.erp-dev-visualization__calendar-day:hover,
+.erp-dev-visualization__calendar-day[aria-pressed='true'] {
+  background: var(--erp-primary-soft);
+}
+
+.erp-dev-visualization__calendar-day:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+
+.erp-dev-visualization__calendar-day small {
+  color: var(--erp-primary);
+  white-space: nowrap;
+}
+
+.erp-dev-visualization__tasks {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-visualization__tasks li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3px 8px;
+  padding-block: 5px;
+  border-block-end: 1px solid var(--erp-border);
+}
+
+.erp-dev-visualization__tasks li:last-child {
+  border-block-end: 0;
+}
+
+@container visualization-examples (max-width: 490px) {
+  .erp-dev-visualization__calendar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.erp-dev-visualization__trace {
+  margin-block: 4px 0;
+}
+
+.erp-dev-visualization__lane-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-visualization__lane-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.erp-dev-visualization__lane-legend span::before {
+  inline-size: 14px;
+  block-size: 8px;
+  border-radius: 2px;
+  background: var(--erp-primary);
+  content: '';
+}
+
+.erp-dev-visualization__lane-legend [data-waiting]::before,
+.erp-dev-visualization__track > [data-waiting] {
+  background: repeating-linear-gradient(135deg, var(--erp-text-muted) 0 1px, var(--erp-surface-bg) 1px 4px);
+}
+
+.erp-dev-visualization__lane-axis,
+.erp-dev-visualization__lane,
+.erp-dev-visualization__bar {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+}
+
+.erp-dev-visualization__lane-axis,
+.erp-dev-visualization__lane {
+  grid-template-columns: minmax(66px, 16%) minmax(0, 1fr);
+}
+
+.erp-dev-visualization__bar {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.erp-dev-visualization__lane-axis {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-dev-visualization__lane-axis > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+.erp-dev-visualization__lane,
+.erp-dev-visualization__bar {
+  inline-size: 100%;
+  min-block-size: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.erp-dev-visualization__lane[aria-pressed='true'],
+.erp-dev-visualization__bar[aria-pressed='true'] {
+  background: var(--erp-primary-soft);
+}
+
+.erp-dev-visualization__lane:focus-visible,
+.erp-dev-visualization__bar:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 1px;
+}
+
+.erp-dev-visualization__track {
+  position: relative;
+  display: block;
+  block-size: 11px;
+  border-radius: 3px;
+  background: var(--erp-border);
+}
+
+.erp-dev-visualization__track > span {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: var(--dev-example-offset);
+  inline-size: var(--dev-example-duration);
+  block-size: 100%;
+  border-radius: 3px;
+  background: var(--erp-primary);
+}
+
+.erp-dev-visualization__paper-shell {
+  position: relative;
+}
+
+.erp-dev-visualization__paper {
+  padding: 8px;
+  border: 1px solid #d9dedb;
+  background: #fff;
+  color: #262924;
+  color-scheme: light;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-visualization__paper-title {
+  display: block;
+  margin-block-end: 4px;
+  text-align: center;
+}
+
+.erp-dev-visualization__paper [data-guide-zone] {
+  padding: 4px;
+}
+
+.erp-dev-visualization__paper table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.erp-dev-visualization__paper :is(th, td) {
+  padding: 2px 4px;
+  border: 1px solid #aeb7b0;
+  text-align: start;
+}
+
+.erp-dev-visualization__paper-print {
+  max-inline-size: 420px;
+}
