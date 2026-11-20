@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -77,14 +78,13 @@ func main() {
 }
 
 func buildPostgresDSN(user, password, host, port, db string) string {
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		url.QueryEscape(user),
-		url.QueryEscape(password),
-		host,
-		port,
-		db,
-	)
+	return (&url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(user, password),
+		Host:     net.JoinHostPort(host, port),
+		Path:     "/" + db,
+		RawQuery: "sslmode=disable",
+	}).String()
 }
 
 func testPostgres(ctx context.Context, dsn string) error {

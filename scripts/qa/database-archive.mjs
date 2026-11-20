@@ -233,21 +233,18 @@ function readMigration(databaseURL, serverRoot) {
   return normalizeAtlasMigrationStatus(JSON.parse(String(output)));
 }
 
+export function postgresArchiveBinary(name) {
+  for (const version of [18, 17, 16]) {
+    const candidate = `/opt/homebrew/opt/postgresql@${version}/bin/${name}`;
+    if (existsSync(candidate)) return candidate;
+  }
+  return name;
+}
+
 function defaultRuntime(repoRoot) {
   const serverRoot = path.join(repoRoot, "server");
-  const postgresBinary = (name) => {
-    for (const candidate of [
-      `/opt/homebrew/opt/postgresql@18/bin/${name}`,
-      `/opt/homebrew/opt/postgresql@17/bin/${name}`,
-      `/opt/homebrew/opt/postgresql@16/bin/${name}`,
-      name,
-    ]) {
-      if (!candidate.startsWith("/") || existsSync(candidate)) return candidate;
-    }
-    return name;
-  };
-  const pgDump = postgresBinary("pg_dump");
-  const pgRestore = postgresBinary("pg_restore");
+  const pgDump = postgresArchiveBinary("pg_dump");
+  const pgRestore = postgresArchiveBinary("pg_restore");
   return {
     activeConnections(databaseURL) {
       return Number(

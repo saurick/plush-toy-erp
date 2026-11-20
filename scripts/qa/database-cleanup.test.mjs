@@ -16,6 +16,26 @@ const databaseName = "plush_erp_acceptance_cleanup_fixture_dev";
 const backupHash = "a".repeat(64);
 const sourceFingerprint = "b".repeat(64);
 
+function verifiedRuntime({ matches = true } = {}) {
+  let exists = true;
+  let allowConnections = true;
+  return {
+    findEvidenceReferences: () => [],
+    databaseState: () => ({ exists, owner: "postgres", oid: 42, connections: 0, allowConnections }),
+    setDatabaseConnections: (_url, _name, allowed) => {
+      allowConnections = allowed;
+    },
+    verifyFrozenArchive: () => {
+      assert.equal(allowConnections, false);
+      return matches;
+    },
+    dropDatabase: () => {
+      assert.equal(allowConnections, false);
+      exists = false;
+    },
+  };
+}
+
 function fixture() {
   const manifestDir = fs.mkdtempSync(
     path.join(os.tmpdir(), "plush-db-cleanup-"),
@@ -62,7 +82,6 @@ function fixture() {
 
 test("cleanup requires exact archive-bound confirmation and verifies disappearance", () => {
   const { actualHash, inventory, manifest, manifestDir } = fixture();
-  let exists = true;
   const confirmation = databaseCleanupConfirmation({
     backupHash: actualHash,
     databaseName,
@@ -77,23 +96,37 @@ test("cleanup requires exact archive-bound confirmation and verifies disappearan
     inventory,
     manifest,
     manifestDir,
-    runtime: {
-      findEvidenceReferences: () => [],
-      databaseState: () =>
-        exists
-          ? { exists: true, owner: "postgres", connections: 0 }
-          : { exists: false, owner: "", connections: 0 },
-      dropDatabase: () => {
-        exists = false;
-      },
-    },
+    runtime: verifiedRuntime(),
   });
   assert.equal(report.schemaVersion, DATABASE_CLEANUP_SCHEMA);
   assert.equal(report.status, "passed");
   assert.equal(report.databaseName, databaseName);
   assert.equal(report.dropped, true);
+  assert.equal(report.sourceContentsVerified, true);
   assert.equal(report.residualDatabase, "");
   assert.equal(report.containsSecrets, false);
+});
+
+test("cleanup keeps and reopens a changed source even when its owner and connection count are unchanged", () => {
+  const base = fixture();
+  const runtime = verifiedRuntime({ matches: false });
+  assert.throws(
+    () => runDatabaseCleanup({
+      ...base,
+      adminURL: "postgres://postgres@127.0.0.1:55432/postgres",
+      databaseName,
+      confirmation: databaseCleanupConfirmation({
+        backupHash: base.actualHash,
+        databaseName,
+        sourceFingerprint,
+      }),
+      runtime,
+    }),
+    /source no longer matches the verified archive/u,
+  );
+  assert.deepEqual(runtime.databaseState(), {
+    exists: true, owner: "postgres", oid: 42, connections: 0, allowConnections: true,
+  });
 });
 
 test("cleanup fails closed on references, active connections, bad backup, and long-lived names", () => {
@@ -210,20 +243,10 @@ test("cleanup requires an explicit flag for the registered development cluster",
     /loopback/u,
   );
 
-  let exists = true;
   const report = runDatabaseCleanup({
     ...request,
     allowRegisteredDevelopment: true,
-    runtime: {
-      findEvidenceReferences: () => [],
-      databaseState: () =>
-        exists
-          ? { exists: true, owner: "postgres", connections: 0 }
-          : { exists: false, owner: "", connections: 0 },
-      dropDatabase: () => {
-        exists = false;
-      },
-    },
+    runtime: verifiedRuntime(),
   });
   assert.equal(report.dropped, true);
 });

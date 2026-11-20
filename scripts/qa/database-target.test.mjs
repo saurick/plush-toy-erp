@@ -6,6 +6,7 @@ import {
   assertDisposableDatabaseTarget,
   buildDisposableDatabaseTarget,
   classifyDatabaseName,
+  createDatabaseRunID,
   databaseNameForRun,
   isLoopbackDatabaseHost,
   normalizeDatabaseRunID,
@@ -15,6 +16,15 @@ import {
 
 const BASE_URL =
   "postgres://tester:local-secret@127.0.0.1:55432/postgres?sslmode=disable";
+
+test("default run IDs fit every database profile including browser actions", () => {
+  const runID = createDatabaseRunID(new Date("2026-11-20T00:00:00Z"));
+  for (const profile of Object.keys(DATABASE_LIFECYCLE_PROFILES)) {
+    const name = databaseNameForRun(profile, runID);
+    assert.ok(name.length <= 63);
+    assert.equal(classifyDatabaseName(name).runID, runID);
+  }
+});
 
 test("database target generates one exact name for every lifecycle profile", () => {
   const expected = {

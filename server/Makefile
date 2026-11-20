@@ -264,7 +264,9 @@ db_create:
 			read DBNAME || exit 1; \
 			read ADMIN_URL || exit 1; \
 		echo "Creating database $$DBNAME ..."; \
-		psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$$DBNAME\"" 2>/dev/null || psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = '$$DBNAME'" >/dev/null; \
+		if ! psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$$DBNAME\""; then \
+			found=$$(psql "$$ADMIN_URL" -XAtq -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = '$$DBNAME'") && test "$$found" = 1; \
+		fi; \
 	}
 
 INVENTORY_PG_DB_URL ?=

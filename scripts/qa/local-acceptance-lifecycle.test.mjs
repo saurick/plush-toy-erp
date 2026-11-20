@@ -359,6 +359,27 @@ test("local acceptance lifecycle runs read-only evidence before cloned real writ
   assert.doesNotMatch(JSON.stringify(report), /password|postgres:\/\//iu);
 });
 
+test("local acceptance lifecycle stops before the next stage and cleans children and databases after interruption", async () => {
+  const controller = new AbortController();
+  const runtime = fakeRuntime();
+  runtime.runManualBrowser = async () => {
+    controller.abort(new Error("interrupted by SIGTERM"));
+    return { passed: true };
+  };
+  const report = await runLocalAcceptanceLifecycle({
+    commit: COMMIT,
+    runID: "interrupted",
+    runtime,
+    signal: controller.signal,
+  });
+  assert.equal(report.status, "failed");
+  assert.match(report.failure, /interrupted by SIGTERM/u);
+  assert.ok(report.stages.some(({ stage }) => stage === "interrupted"));
+  assert.equal(report.cleanup.complete, true);
+  assert.deepEqual(runtime.state(), { backend: false, web: false, existing: [] });
+  assert.ok(!runtime.events.some((event) => event.startsWith("clone:")));
+});
+
 test("local acceptance lifecycle fails closed on backend log hygiene and still cleans the database", async () => {
   const identity = buildLocalAcceptanceLifecycleIdentity({
     commit: COMMIT,

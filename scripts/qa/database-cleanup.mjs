@@ -4,17 +4,26 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   renameSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
-import { classifyDatabaseName, parseDatabaseURL } from "./database-target.mjs";
-import { DATABASE_ARCHIVE_SCHEMA } from "./database-archive.mjs";
+import {
+  classifyDatabaseName,
+  createDatabaseRunID,
+  databaseNameForRun,
+  parseDatabaseURL,
+  replaceDatabaseName,
+} from "./database-target.mjs";
+import { DATABASE_ARCHIVE_SCHEMA, postgresArchiveBinary } from "./database-archive.mjs";
 import {
   DATABASE_INVENTORY_SCHEMA,
   findEvidenceReferences,
@@ -79,6 +88,8 @@ function defaultRuntime() {
           (
             SELECT json_build_object(
               'exists', true,
+              'oid', database.oid::bigint,
+              'allowConnections', database.datallowconn,
               'owner', pg_get_userbyid(database.datdba),
               'connections', (
                 SELECT count(*)
@@ -93,6 +104,52 @@ function defaultRuntime() {
         );`,
       );
       return JSON.parse(output);
+    },
+    setDatabaseConnections(adminURL, databaseName, allowed) {
+      psqlScalar(
+        adminURL,
+        `ALTER DATABASE "${databaseName}" ALLOW_CONNECTIONS ${allowed ? "true" : "false"}`,
+      );
+    },
+    verifyFrozenArchive(adminURL, databaseName, backupPath, backupHash, allowRegisteredDevelopment) {
+      // PostgreSQL refuses to clone a template with a connected session.
+      // Keep the original closed while comparing its full logical contents.
+      const clone = databaseNameForRun("restore", createDatabaseRunID());
+      const cloneURL = replaceDatabaseName(adminURL, clone, { allowRegisteredDevelopment });
+      const tmp = mkdtempSync(path.join(os.tmpdir(), "plush-cleanup-archive-"));
+      let created = false;
+      try {
+        psqlScalar(adminURL, `CREATE DATABASE "${clone}" WITH TEMPLATE "${databaseName}"`);
+        created = true;
+        const currentDump = path.join(tmp, "current.dump");
+        command(
+          postgresArchiveBinary("pg_dump"),
+          ["--format=custom", "--no-owner", "--no-acl", "--file", currentDump, cloneURL],
+          { failure: "database cleanup frozen source dump failed" },
+        );
+        const logicalHash = (dump, name) => {
+          const sql = path.join(tmp, name);
+          command(
+            postgresArchiveBinary("pg_restore"),
+            ["--no-owner", "--no-acl", "--restrict-key=PlushArchiveComparison", "--file", sql, dump],
+            { failure: "database cleanup archive comparison failed" },
+          );
+          return sha256File(sql);
+        };
+        const matches = logicalHash(currentDump, "current.sql") === logicalHash(backupPath, "archive.sql");
+        return matches && sha256File(backupPath) === backupHash;
+      } finally {
+        try {
+          if (created) {
+            this.dropDatabase(adminURL, clone);
+            if (this.databaseState(adminURL, clone).exists !== false) {
+              throw new Error("database cleanup left an archive comparison database");
+            }
+          }
+        } finally {
+          rmSync(tmp, { recursive: true, force: true });
+        }
+      }
     },
     dropDatabase(adminURL, databaseName) {
       command(
@@ -280,16 +337,43 @@ export function runDatabaseCleanup({
   if (
     before.exists !== true ||
     before.owner !== inventoryRow.owner ||
-    Number(before.connections) !== 0
+    Number(before.connections) !== 0 ||
+    !Number.isSafeInteger(before.oid) ||
+    before.oid <= 0 ||
+    typeof before.allowConnections !== "boolean"
   ) {
     throw new Error(
       "database cleanup live readback does not match the zero-connection inventory",
     );
   }
-  executor.dropDatabase(adminURL, databaseName);
-  const after = executor.databaseState(adminURL, databaseName);
-  if (after.exists !== false) {
-    throw new Error(`database cleanup left residual database ${databaseName}`);
+  const assertFrozen = () => {
+    const current = executor.databaseState(adminURL, databaseName);
+    if (current.exists !== true || current.oid !== before.oid ||
+        current.owner !== before.owner || current.allowConnections !== false ||
+        Number(current.connections) !== 0) {
+      throw new Error("database cleanup could not verify the frozen source identity");
+    }
+  };
+  let dropped = false;
+  try {
+    if (before.allowConnections) executor.setDatabaseConnections(adminURL, databaseName, false);
+    assertFrozen();
+    if (executor.verifyFrozenArchive(adminURL, databaseName, backupFile, backupHash, allowRegisteredDevelopment) !== true) {
+      throw new Error("database cleanup source no longer matches the verified archive");
+    }
+    assertFrozen();
+    executor.dropDatabase(adminURL, databaseName);
+    if (executor.databaseState(adminURL, databaseName).exists !== false) {
+      throw new Error(`database cleanup left residual database ${databaseName}`);
+    }
+    dropped = true;
+  } finally {
+    if (!dropped && before.allowConnections) {
+      const current = executor.databaseState(adminURL, databaseName);
+      if (current.exists && current.oid === before.oid && current.owner === before.owner && current.allowConnections === false) {
+        executor.setDatabaseConnections(adminURL, databaseName, true);
+      }
+    }
   }
 
   return Object.freeze({
@@ -301,6 +385,7 @@ export function runDatabaseCleanup({
     sourceFingerprint,
     backupHash,
     restoreVerified: true,
+    sourceContentsVerified: true,
     dropped: true,
     residualDatabase: "",
     recoverableFrom: path.relative(process.cwd(), backupFile),

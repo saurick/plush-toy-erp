@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -81,7 +81,8 @@ export function createDatabaseRunID(date = new Date()) {
     .replace(/\.\d{3}Z$/u, "z")
     .replace(/[-:T]/gu, "")
     .toLowerCase();
-  return normalizeDatabaseRunID(`${timestamp}_${randomBytes(4).toString("hex")}`);
+  const suffix = randomInt(36 ** 6).toString(36).padStart(6, "0");
+  return normalizeDatabaseRunID(`${timestamp}_${suffix}`);
 }
 
 function assertKnownProfile(profile) {

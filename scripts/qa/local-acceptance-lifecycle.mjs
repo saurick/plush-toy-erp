@@ -17,6 +17,7 @@ import net from "node:net";
 import path from "node:path";
 import process from "node:process";
 import { createInterface } from "node:readline";
+import { setImmediate as yieldToSignals, setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
@@ -253,6 +254,7 @@ export async function runLocalAcceptanceLifecycle({
   generatedAt = new Date(),
   runID,
   runtime,
+  signal,
 }) {
   const identity = buildLocalAcceptanceLifecycleIdentity({ commit, runID });
   if (!runtime)
@@ -270,6 +272,10 @@ export async function runLocalAcceptanceLifecycle({
 
   const stage = async (name, action, summarize = () => ({})) => {
     try {
+      if (signal) {
+        await yieldToSignals();
+        signal.throwIfAborted();
+      }
       const result = await action();
       recordStage(stages, name, "passed", summarize(result));
       return result;
@@ -522,10 +528,17 @@ export async function runLocalAcceptanceLifecycle({
     }
   }
 
+  if (signal?.aborted) {
+    const interruption = safeError(signal.reason);
+    failure ||= interruption;
+    recordStage(stages, "interrupted", "failed", { error: interruption });
+  }
   const residualDatabases = [...created].sort();
+  const cleanupComplete = !backendStarted && !webStarted && residualDatabases.length === 0 &&
+    !stages.some(({ stage, status }) => stage.startsWith("cleanup-") && status === "failed");
   const passed =
     !failure &&
-    residualDatabases.length === 0 &&
+    cleanupComplete &&
     stages.every((item) => item.status === "passed");
   return Object.freeze({
     schemaVersion: LOCAL_ACCEPTANCE_LIFECYCLE_SCHEMA,
@@ -549,7 +562,7 @@ export async function runLocalAcceptanceLifecycle({
       }),
     }),
     cleanup: Object.freeze({
-      complete: residualDatabases.length === 0,
+      complete: cleanupComplete,
       residualDatabases,
     }),
     failure,
@@ -706,6 +719,7 @@ function startLoggedService({ command, args, cwd, env, logPath, label }) {
   const child = spawn(command, args, {
     cwd,
     env,
+    detached: true,
     stdio: ["ignore", descriptor, descriptor],
   });
   child.once("error", () => {
@@ -726,32 +740,28 @@ function startLoggedService({ command, args, cwd, env, logPath, label }) {
 }
 
 async function stopLoggedService(handle) {
-  if (!handle?.child || handle.child.exitCode !== null) return;
+  if (!handle?.child?.pid) return;
   const child = handle.child;
-  const exited = new Promise((resolve) => child.once("exit", resolve));
-  child.kill("SIGTERM");
-  const graceful = await Promise.race([
-    exited.then(() => true),
-    new Promise((resolve) => setTimeout(() => resolve(false), 15_000)),
-  ]);
-  if (!graceful && child.exitCode === null) {
-    child.kill("SIGKILL");
-    await Promise.race([
-      exited,
-      new Promise((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new LocalAcceptanceLifecycleError(
-                handle.label,
-                `${handle.label} did not stop`,
-              ),
-            ),
-          10_000,
-        ),
-      ),
-    ]);
+  const group = -child.pid;
+  const send = (signal) => {
+    try {
+      process.kill(group, signal);
+      return true;
+    } catch (error) {
+      if (error.code === "ESRCH") return false;
+      throw error;
+    }
+  };
+  if (!send("SIGTERM")) return;
+  for (const [timeout, signal] of [[15_000, "SIGKILL"], [10_000, null]]) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      if (!send(0)) return;
+      await delay(100);
+    }
+    if (signal && !send(signal)) return;
   }
+  throw new LocalAcceptanceLifecycleError(handle.label, `${handle.label} did not stop`);
 }
 
 function atlasStatus(repoRoot, databaseURL) {
@@ -1422,6 +1432,10 @@ const isDirectRun =
   pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isDirectRun) {
+  const controller = new AbortController();
+  const interrupt = (signal) => controller.abort(new Error(`interrupted by ${signal}`));
+  process.on("SIGINT", interrupt);
+  process.on("SIGTERM", interrupt);
   try {
     const options = parseArgs(process.argv.slice(2));
     const identity = buildLocalAcceptanceLifecycleIdentity(options);
@@ -1468,6 +1482,7 @@ if (isDirectRun) {
         commit: options.commit,
         runID: options.runID,
         runtime: createDirectRuntime(context),
+        signal: controller.signal,
       });
       const reportPath = writePrivateJSON(
         path.join(context.outputDir, "receipt.json"),
@@ -1481,5 +1496,8 @@ if (isDirectRun) {
   } catch (error) {
     process.stderr.write(`[local-acceptance-lifecycle] ${safeError(error)}\n`);
     process.exitCode = 1;
+  } finally {
+    process.off("SIGINT", interrupt);
+    process.off("SIGTERM", interrupt);
   }
 }

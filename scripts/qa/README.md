@@ -791,6 +791,8 @@ node scripts/qa/manual-acceptance-data-depth.mjs
 
 浏览器启动前会重新扫描规范辅助端口，并在健康检查后复核本轮 Vite 子进程仍存活，不能把并发任务占用端口上的外部页面误认成本轮服务。只读验收完成并停后端后才克隆 `browser_actions` 库；无论成功失败都会停服务、逐库强制删除和读回残留，清理失败返回非零并报告精确库名。
 
+收到 SIGINT 或 SIGTERM 时，当前步骤返回后停止进入下一步。验收入口先停止自己启动的服务与子进程，再清理隔离库并写入中断回执。
+
 默认只打印 plan；真实执行必须传入 exact commit、run id、由 plan 生成的确认串和 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，回执不保存 DSN、密码或 token：
 
 ```bash
@@ -1836,7 +1838,7 @@ fast 保留试用账号 RBAC、浏览器 smoke 脚本语法与真实登录共享
 | `node --test scripts/qa/dev-page-governance.test.mjs` | 检查 DEV 菜单 route 唯一且留在 `/__dev`，普通页面由单一模块登记 affected 桌面渲染/溢出 smoke，专属页面保留各自唯一桌面场景；full/strict 默认不运行 DEV 视觉场景，且不登记 DEV 移动端、暗色、成功截图、固定密度或通用键盘合同 | 新增菜单、页面或修改工作台可见内容时 |
 | `node --test scripts/qa/dev-quality-gate-provider-boundary.test.mjs` | 检查质量工作台直接投影服务器 provider 返回的 CI Job，并只用正式流水线与终态门禁判定结果；前端不保存需随 Job 增删改名同步的第二份拓扑 | 修改 GitLab CI 证据 provider、质量工作台或 Job 编排时 |
 | `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json` | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件 | 定期检查本地证据膨胀 |
-| `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation` | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 133 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝 | archive / restore 已通过后清理同一 disposable 库 |
+| `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation` | 从同一 inventory 与 archive manifest 生成精确确认串。执行时暂时关闭源库连接，逐项比较其隔离克隆与归档的逻辑内容，匹配后才删除并读回。内容变化时保留源库并恢复原连接设置。执行需具备克隆、导出和清理权限，登记 133 仍要求显式传入 `--allow-registered-development` | archive / restore 已通过后清理同一 disposable 库 |
 | `node --test scripts/qa/dev-entry-boundary.test.mjs` | 锁住 `make dev_restart`先预检再停服、启动预检只读，以及 Product Core / 客户开发入口共用同一 web preflight | 调整本地启动命令、Vite 代理或 migration 预检后 |
 | `node scripts/qa/exception-flow-real-write-browser.mjs ...` | 仅在精确确认的全新 browser_actions 隔离库验证三条异常流真实写链；详见下文。 | 异常流主路径完成 API / 单元验证后的本地写验收 |
 
