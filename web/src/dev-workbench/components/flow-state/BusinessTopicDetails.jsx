@@ -1,0 +1,110 @@
+import React from 'react'
+import { Button, Space } from 'antd'
+import { describeDevBusinessChainResponsibility } from '../../config/devBusinessChainProjection.mjs'
+import './businessTopicDetails.css'
+import { ChainEvidenceLinks } from '../DevProductCoreRelations.jsx'
+
+const evidenceLabels = {
+  dataset: '模拟数据',
+  contract_test: '规则测试',
+  browser: '浏览器验证',
+}
+
+export default function BusinessTopicDetails({
+  topic,
+  node,
+  onSelect,
+  onExploreChain,
+  onOpenExplorer,
+  onInspectStep,
+  visibleStepKeys,
+}) {
+  const nodes = new Map(topic.nodes.map((item) => [item.key, item]))
+  const steps = new Map(topic.steps.map((item) => [item.key, item]))
+  const relations = topic.edges.filter(
+    (edge) => (!visibleStepKeys || visibleStepKeys.has(edge.key)) && (edge.from === node.key || edge.to === node.key)
+  )
+  return (
+    <aside
+      className="erp-dev-chain-topics__detail"
+      aria-label={`${node.label}关联条件`}
+    >
+      <div className="erp-dev-fulfillment-guide__focus" aria-live="polite">
+        <strong>{node.label}</strong>
+        {node.summary ? <p>{node.summary}</p> : null}
+      </div>
+      <ul className="erp-dev-chain-topics__relations" aria-label="当前对象的关联条件">
+        {relations.map((edge) => {
+          const outgoing = edge.from === node.key
+          const related = nodes.get(outgoing ? edge.to : edge.from)
+          const step = steps.get(edge.key)
+          const responsibility = step
+            ? describeDevBusinessChainResponsibility(step.responsibility)
+            : ''
+          return (
+            <li key={edge.key} data-topic-relation={edge.key}>
+              <div className="erp-dev-chain-topics__relation-heading">
+                <span>{outgoing ? '交接至' : '来自'}</span>
+                <Button type="link" onClick={() => onSelect(related.key)}>
+                  {related.label}
+                </Button>
+              </div>
+              <p>{edge.label}</p>
+              {edge.condition && edge.condition !== edge.label ? (
+                <p className="erp-dev-chain-topics__condition">
+                  <span>条件：</span>{edge.condition}
+                </p>
+              ) : null}
+              {responsibility ? (
+                <p className="erp-dev-chain-topics__responsibility">
+                  {step.responsibility.mode === 'human' ? '相关岗位：' : '处理方式：'}
+                  {responsibility}
+                </p>
+              ) : null}
+              {step && onInspectStep ? (
+                <Button
+                  type="link"
+                  aria-label={`查看${edge.label}的规则与验证`}
+                  onClick={(event) => onInspectStep(step.key, event.currentTarget)}
+                >
+                  规则与验证
+                </Button>
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+      <Space wrap>
+        {node.machineKeys?.length && onExploreChain ? (
+          <Button onClick={() => onExploreChain(topic.key, node.key)}>查看规则</Button>
+        ) : null}
+        {onOpenExplorer ? (
+          <Button onClick={(event) => onOpenExplorer(topic.key, node.key, event.currentTarget)}>从此节点探索</Button>
+        ) : null}
+      </Space>
+    </aside>
+  )
+}
+
+export function BusinessTopicVerification({ topic }) {
+  return (
+    <details className="erp-dev-disclosure erp-dev-chain-topics__verification">
+      <summary>数据与验证（{topic.acceptanceScenarios.length} 类场景）</summary>
+      <p>本链路的登记范围；实际执行结果见链路实测报告。</p>
+      <ChainEvidenceLinks chainKey={topic.key} />
+      <table data-table-lines="appearance">
+        <thead>
+          <tr><th scope="col">场景</th><th scope="col">验证方式</th></tr>
+        </thead>
+        <tbody>
+          {topic.acceptanceScenarios.map((scenario) => (
+            <tr key={scenario.key}>
+              <th scope="row">{scenario.label}</th>
+              <td>{scenario.evidenceModes.map((mode) => evidenceLabels[mode]).join('、')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
+  )
+}
