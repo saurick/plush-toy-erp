@@ -1,0 +1,408 @@
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
+export async function assertDevDocsDirectorySpace(page, assert) {
+  const tree = page.locator('.erp-dev-docs-tree')
+  await tree.waitFor()
+  const geometry = await page.locator('.erp-dev-docs-page').evaluate((root) => {
+    const header = root.querySelector('.erp-dev-docs-header')
+    const sidebar = root.querySelector('.erp-dev-docs-sidebar')
+    const shellBox = root
+      .querySelector('.erp-dev-docs-shell')
+      .getBoundingClientRect()
+    const sidebarBox = sidebar.getBoundingClientRect()
+    const readerBox = root
+      .querySelector('.erp-dev-docs-reader')
+      .getBoundingClientRect()
+    const treeBox = sidebar
+      .querySelector('.erp-dev-docs-tree')
+      .getBoundingClientRect()
+    const controls =
+      '.erp-dev-docs-lifecycle, .erp-dev-docs-search, [role="group"][aria-label="项目文档搜索范围"]'
+    return {
+      headerControls: header.querySelectorAll(controls).length,
+      sidebarControls: sidebar.querySelectorAll(controls).length,
+      repeatedPaths: sidebar.querySelectorAll('.erp-dev-docs-tree__doc-path, .erp-dev-docs-pinned__path').length,
+      readableDirectory: sidebar.querySelector('[data-dev-doc-dir="docs"]')?.textContent,
+      treeRatio: treeBox.height / sidebarBox.height,
+      directoryTop: treeBox.top - sidebarBox.top,
+      bottomDelta:
+        shellBox.bottom -
+        root.getBoundingClientRect().bottom +
+        Number.parseFloat(getComputedStyle(root).paddingBottom),
+      readerBottomDelta: sidebarBox.bottom - readerBox.bottom,
+      pageOverflowsVertically:
+        document.documentElement.scrollHeight > innerHeight + 1,
+    }
+  })
+  assert.equal(
+    geometry.headerControls,
+    3,
+    '文档层级、搜索与搜索范围应集中在页头'
+  )
+  assert.equal(geometry.sidebarControls, 0, '目录栏不再重复放置检索控件')
+  assert.equal(geometry.repeatedPaths, 0, '目录只展示标题，完整路径在提示和阅读栏中保留')
+  assert(geometry.readableDirectory.includes('项目文档'), '目录以可读主题名导航')
+  assert(geometry.treeRatio >= 0.78, '收起置顶时，目录应占据侧栏主要高度')
+  assert(geometry.directoryTop <= 110, '目录应紧接置顶和目录标题')
+  assert(Math.abs(geometry.bottomDelta) <= 1, '目录与正文应填满页头之外的视口')
+  assert(Math.abs(geometry.readerBottomDelta) <= 1, '目录与正文底边应对齐')
+  assert.equal(
+    geometry.pageOverflowsVertically,
+    false,
+    '页头换行后仍由目录和正文各自滚动'
+  )
+}
+
+export async function verifyDevDocsScopeHelp(page, assert) {
+  const header = page.locator('.erp-dev-docs-header')
+  const trigger = header.getByRole('button', { name: /收录范围/u })
+  const help = page.getByText(/^只读加载当前工作区的 Markdown/u)
+  await trigger.waitFor()
+  await waitForFiniteAnimations(page, { selector: '.erp-dev-docs-page' })
+  assert.equal(await trigger.getAttribute('aria-expanded'), 'false')
+
+  await trigger.evaluate((button) => {
+    const root = button.closest('.erp-dev-docs-page')
+    const nodes = [
+      ['收录范围', button],
+      ...['header', 'controls', 'search', 'sidebar', 'reader'].map((part) => [
+        part,
+        root.querySelector(`.erp-dev-docs-${part}`),
+      ]),
+    ]
+    const read = (node) => {
+      const { x, y, width, height } = node.getBoundingClientRect()
+      return [x, y, width, height]
+    }
+    const before = nodes.map(([, node]) => read(node))
+    let frameId
+    let frames = 0
+    let shift = null
+    const sample = () => {
+      frames += 1
+      for (const [index, [part, node]] of nodes.entries()) {
+        const after = read(node)
+        if (!node.isConnected || after.some((value, i) => Math.abs(value - before[index][i]) > 1)) {
+          shift ??= { part, before: before[index], after }
+          break
+        }
+      }
+      frameId = requestAnimationFrame(sample)
+    }
+    frameId = requestAnimationFrame(sample)
+    root.stopScopeHelpLayoutSample = () => {
+      cancelAnimationFrame(frameId)
+      delete root.stopScopeHelpLayoutSample
+      return { frames, shift }
+    }
+  })
+
+  let sample
+  try {
+    await trigger.click()
+    await help.waitFor({ state: 'visible' })
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'true')
+    await waitForFiniteAnimations(page, { selector: '.erp-supplemental-help-popover' })
+    assert(await help.evaluate((element) => {
+      const { left, right, top, bottom } = element.closest('.erp-supplemental-help-popover').getBoundingClientRect()
+      return left >= -1 && right <= innerWidth + 1 && top >= -1 && bottom <= innerHeight + 1
+    }), '收录范围浮层应在视口内完整显示')
+    await trigger.click()
+    await help.waitFor({ state: 'hidden' })
+
+    await header.getByRole('button', { name: '文档首页', exact: true }).focus()
+    await page.keyboard.press('Tab')
+    await help.waitFor({ state: 'visible' })
+    await page.keyboard.press('Escape')
+    await help.waitFor({ state: 'hidden' })
+    assert(await trigger.evaluate((button) => document.activeElement === button), '关闭说明后键盘焦点应留在触发按钮')
+
+    await trigger.click()
+    await help.waitFor({ state: 'visible' })
+    await header.getByRole('heading', { name: '项目文档', exact: true }).click()
+    await help.waitFor({ state: 'hidden' })
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false')
+  } finally {
+    sample = await page.locator('.erp-dev-docs-page').evaluate((root) => root.stopScopeHelpLayoutSample())
+  }
+  assert(sample.frames > 1, '收录范围开关期间应采到真实浏览器帧')
+  assert.equal(sample.shift, null, `收录范围开关推动了布局：${JSON.stringify(sample.shift)}`)
+}
+
+export function createDevDocsReadingFixture(keyword) {
+  return [
+    '# 归档全文检索探针',
+    keyword,
+    ...Array.from(
+      { length: 20 },
+      (_, index) =>
+        `${'#'.repeat(2 + (index % 5))} 阅读章节 ${index + 1}\n\n${'示例正文，用于验证滚动定位与章节层级。'.repeat(45)}`
+    ),
+  ].join('\n\n')
+}
+
+export async function verifyDevDocsReadingNavigation(page, assert) {
+  await page
+    .locator('.erp-dev-docs-list__open')
+    .filter({ hasText: '归档全文检索探针' })
+    .click()
+  await page
+    .locator('.erp-dev-docs-markdown')
+    .getByRole('heading', { name: '归档全文检索探针', exact: true })
+    .waitFor()
+  const toc = page.locator('.erp-dev-docs-toc')
+  const chapters = toc.locator('[data-dev-doc-heading-id]')
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll('.erp-dev-docs-toc [data-dev-doc-heading-id]')
+        .length === 20
+  )
+  assert.equal(
+    await chapters.count(),
+    20,
+    '保留全部正文章节及深层标题，不重复列出文档标题'
+  )
+  assert.equal(
+    await chapters.filter({ hasText: '归档全文检索探针' }).count(),
+    0,
+    '文档标题由回到顶部承接'
+  )
+  const top = page.getByRole('button', { name: '回到顶部', exact: true })
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('.erp-dev-docs-reader__top')
+        ?.getAttribute('aria-current') === 'location'
+  )
+  const toggle = page.locator('[data-dev-doc-toc-toggle]')
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+    await toggle.click()
+  }
+  assert((await toc.boundingBox()).height <= 193, '全部章节在有界区域内滚动')
+  const lastId = await chapters.last().getAttribute('data-dev-doc-heading-id')
+  await chapters.last().click()
+  await page.waitForFunction(
+    (id) =>
+      document.querySelector('.erp-dev-docs-toc [aria-current="location"]')
+        ?.dataset.devDocHeadingId === id,
+    lastId
+  )
+  assert.equal(decodeURIComponent(new URL(page.url()).hash.slice(1)), lastId)
+
+  await top.click()
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.erp-dev-docs-markdown').scrollTop <= 1 &&
+      document
+        .querySelector('.erp-dev-docs-reader__top')
+        ?.getAttribute('aria-current') === 'location'
+  )
+  assert.equal(new URL(page.url()).hash, '', '回到顶部仍清理显式章节锚点')
+
+  const firstId = await chapters.first().getAttribute('data-dev-doc-heading-id')
+  await chapters.first().press('Enter')
+  await page.waitForFunction(
+    (id) =>
+      document.querySelector('.erp-dev-docs-toc [aria-current="location"]')
+        ?.dataset.devDocHeadingId === id,
+    firstId
+  )
+  const focus = await chapters.first().evaluate((element) => ({
+    width: getComputedStyle(element).outlineWidth,
+    style: getComputedStyle(element).outlineStyle,
+    active: document.activeElement === element,
+    visible: element.matches(':focus-visible'),
+  }))
+  assert(
+    Number.parseFloat(focus.width) >= 2 && focus.style !== 'none',
+    `键盘定位章节应有清楚焦点：${JSON.stringify(focus)}`
+  )
+  const hashBeforeScroll = new URL(page.url()).hash
+  await page
+    .locator('.erp-dev-docs-markdown')
+    .evaluate((element) =>
+      element.scrollTo({ top: element.scrollHeight * 0.55 })
+    )
+  await page.waitForFunction((id) => {
+    const selected = document.querySelector(
+      '.erp-dev-docs-toc [aria-current="location"]'
+    )
+    return selected && selected.dataset.devDocHeadingId !== id
+  }, firstId)
+  assert.equal(
+    new URL(page.url()).hash,
+    hashBeforeScroll,
+    '手工阅读不应生成章节浏览历史'
+  )
+  await toggle.click()
+  const visual = await toc.evaluate((element) => {
+    const selected = element.querySelector('[aria-current="location"]')
+    const idle = element.querySelector('button:not([aria-current])')
+    const activeStyle = getComputedStyle(selected)
+    const idleStyle = getComputedStyle(idle)
+    const box = selected.getBoundingClientRect()
+    const frame = element.getBoundingClientRect()
+    return {
+      selectedCount: element.querySelectorAll('[aria-current="location"]')
+        .length,
+      backgroundDistinct:
+        activeStyle.backgroundColor !== idleStyle.backgroundColor,
+      textDistinct: activeStyle.color !== idleStyle.color,
+      shadow: activeStyle.boxShadow,
+      weight: activeStyle.fontWeight,
+      visible: box.left >= frame.left - 1 && box.right <= frame.right + 1,
+    }
+  })
+  assert.equal(visual.selectedCount, 1)
+  assert(
+    visual.backgroundDistinct && visual.textDistinct && visual.weight === '600',
+    '当前章节以主题浅底和加粗文字突出'
+  )
+  assert.equal(visual.shadow, 'none', '章节目录不叠加选中底线')
+  assert(visual.visible, '收起后当前章节仍应可见')
+
+  await page.goto(
+    new URL(
+      `/__dev/docs?path=${encodeURIComponent('docs/部署约定.md')}`,
+      page.url()
+    ).href
+  )
+  await page.locator('.erp-dev-docs-markdown h1').waitFor()
+  await page.locator('.erp-dev-docs-toc__tag').first().waitFor()
+  for (const width of [1440, 1024]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.evaluate(() => document.fonts.ready)
+    await waitForFiniteAnimations(page)
+    const geometry = await page
+      .locator('.erp-dev-docs-reader')
+      .evaluate((root) => {
+        const toolbar = root.querySelector('.erp-dev-docs-reader__toolbar')
+        const name = root.querySelector('.erp-dev-docs-reader__name')
+        const path = root.querySelector('.erp-dev-docs-reader__path')
+        const shell = root.querySelector('.erp-dev-docs-toc-shell')
+        const chapter = root.querySelector('.erp-dev-docs-toc__tag')
+        const toggle = root.querySelector('[data-dev-doc-toc-toggle]')
+        const center = (element) => {
+          const box = element.getBoundingClientRect()
+          return box.top + box.height / 2
+        }
+        const toolbarBox = toolbar.getBoundingClientRect()
+        const shellBox = shell.getBoundingClientRect()
+        const shellStyle = getComputedStyle(shell)
+        return {
+          viewport: { width: innerWidth, height: innerHeight },
+          documentSize: {
+            width: document.documentElement.scrollWidth,
+            height: document.documentElement.scrollHeight,
+          },
+          toolbarHeight: toolbarBox.height,
+          tocHeight: shellBox.height,
+          chapterHeight: chapter.getBoundingClientRect().height,
+          tocInsets: ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((sum, key) => sum + parseFloat(shellStyle[key]), 0),
+          titlePathCenterDelta: Math.abs(center(name) - center(path)),
+          chapterToggleCenterDelta: Math.abs(center(chapter) - center(toggle)),
+          titleHint: name.title.startsWith(name.textContent),
+          pathHint: path.title === path.textContent,
+          fontSize: Number.parseFloat(getComputedStyle(chapter).fontSize),
+          allControlsInside: [
+            ...toolbar.querySelectorAll('button'),
+            toggle,
+          ].every((button) => {
+            const box = button.getBoundingClientRect()
+            const parent = toolbar.contains(button) ? toolbarBox : shellBox
+            return (
+              box.left >= parent.left &&
+              box.right <= parent.right &&
+              box.top >= parent.top &&
+              box.bottom <= parent.bottom
+            )
+          }),
+          pageOverflow:
+            document.documentElement.scrollWidth > innerWidth + 1 ||
+            document.documentElement.scrollHeight > innerHeight + 1,
+        }
+      })
+    console.info(
+      `[style:l1:docs-reader] width=${width} ${JSON.stringify(geometry)}`
+    )
+    assert(
+      geometry.toolbarHeight <= (width === 1440 ? 50 : 90),
+      '标题、路径和操作按可用宽度紧凑排列'
+    )
+    assert.equal(geometry.chapterHeight, 40, '章节目录保留共享点击高度')
+    assert(geometry.tocHeight <= geometry.chapterHeight + geometry.tocInsets + 1, '章节标签、导航和展开操作共用一行')
+    assert(geometry.titlePathCenterDelta <= 1, '标题与路径同行对齐')
+    assert(geometry.chapterToggleCenterDelta <= 1, '章节与展开操作同行对齐')
+    assert(
+      geometry.titleHint && geometry.pathHint,
+      '截断标题和路径仍保留完整提示'
+    )
+    assert(
+      geometry.fontSize >= 14 &&
+        geometry.allControlsInside &&
+        !geometry.pageOverflow,
+      `压缩后保留字号、完整操作和独立滚动：${JSON.stringify(geometry)}`
+    )
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.getByRole('textbox', { name: '搜索项目文档' }).fill('没有该标题 docs-governance')
+  await page.getByRole('textbox', { name: '搜索项目文档' }).press('Enter')
+  await page.getByRole('button', { name: '文档首页', exact: true }).click()
+  const home = page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '文档入口与治理 / docs Guide', exact: true })
+  await home.waitFor()
+  assert.equal(await page.getByRole('textbox', { name: '搜索项目文档' }).inputValue(), '')
+  assert.equal(new URL(page.url()).searchParams.get('path'), 'docs/README.md')
+  await page.reload()
+  await home.waitFor()
+  await page.locator('.erp-dev-docs-markdown').getByRole('link', { name: '产品与路线', exact: true }).click()
+  await page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '产品与路线 / Product Docs', exact: true }).waitFor()
+  await page.goBack()
+  await home.waitFor()
+  const reader = page.locator('.erp-dev-docs-reader')
+  await reader.getByRole('button', { name: '取消置顶', exact: true }).click()
+  await page.reload()
+  await home.waitFor()
+  assert.equal(await reader.getByRole('button', { name: '置顶文档', exact: true }).getAttribute('aria-pressed'), 'false')
+  await reader.getByRole('button', { name: '置顶文档', exact: true }).click()
+  await page.setViewportSize({ width: 3840, height: 2160 })
+  await waitForFiniteAnimations(page)
+  await assertDevDocsDirectorySpace(page, assert)
+  const prose = await page.locator('.erp-dev-docs-document > p').first().evaluate((element) => ({
+    width: element.getBoundingClientRect().width,
+    font: parseFloat(getComputedStyle(element).fontSize),
+    line: parseFloat(getComputedStyle(element).lineHeight),
+  }))
+  assert(prose.font >= 14 && prose.width <= prose.font * 50 + 1 && prose.line >= prose.font * 1.8, `正文保持字号、适当行宽与行距：${JSON.stringify(prose)}`)
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '4K 下正文与目录不造成页面横向溢出')
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const bookmarkPath = 'docs/product/移动端岗位任务页改版.md'
+  const bookmark = new URL('/__dev/docs', page.url())
+  bookmark.searchParams.set('path', bookmarkPath)
+  bookmark.hash = 'ui-交互设计'
+  const expectBookmarkedSection = async (anchor) => {
+    await page.waitForFunction(() => {
+      const reader = document.querySelector('.erp-dev-docs-markdown')
+      const heading = document.getElementById('交互设计')
+      if (!reader || !heading || !document.getElementById('ui-交互设计')) return false
+      const frame = reader.getBoundingClientRect()
+      const section = heading.getBoundingClientRect()
+      return reader.scrollTop > 0 && section.top >= frame.top - 1 && section.bottom <= frame.bottom + 1
+    })
+    const url = new URL(page.url())
+    assert.equal(url.searchParams.get('path'), bookmarkPath)
+    assert.equal(decodeURIComponent(url.hash.slice(1)), anchor)
+  }
+  await page.goto(bookmark.href)
+  await expectBookmarkedSection('ui-交互设计')
+  await page.reload()
+  await expectBookmarkedSection('ui-交互设计')
+  await page.getByRole('button', { name: '文档首页', exact: true }).click()
+  await home.waitFor()
+  await page.goBack()
+  await expectBookmarkedSection('ui-交互设计')
+  await page.locator('.erp-dev-docs-toc').getByRole('button', { name: '交互设计', exact: true }).click()
+  await expectBookmarkedSection('交互设计')
+  await page.reload()
+  await expectBookmarkedSection('交互设计')
+}
