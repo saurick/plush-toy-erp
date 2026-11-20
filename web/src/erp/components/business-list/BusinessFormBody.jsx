@@ -19,6 +19,20 @@ function formSectionScroller(body) {
   return body
 }
 
+function revealFocusedFormControl({ currentTarget: body, target }) {
+  if (!body.contains(target)) return
+  window.requestAnimationFrame(() => {
+    if (document.activeElement !== target || !target.matches(':focus-visible') || body.scrollHeight <= body.clientHeight) return
+    const control = target.closest('.ant-select, .ant-picker') || target
+    const bounds = control.getBoundingClientRect()
+    const visibleBottom = body.getBoundingClientRect().top + body.clientTop + body.clientHeight
+    // 浏览器可能只滚到能看到一部分的位置，正文需要露出完整控件。
+    if (bounds.height <= body.clientHeight && bounds.bottom > visibleBottom) {
+      body.scrollTop += Math.ceil(bounds.bottom - visibleBottom)
+    }
+  })
+}
+
 const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, busy, children, navigation = true, formDisplay = 'all' }, ref) => {
   const bodyRef = useRef(null)
   const navigationAnchor = useRef(null)
@@ -304,6 +318,7 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
       <div
         ref={bodyRef}
         className="erp-business-form-page__body"
+        onFocusCapture={revealFocusedFormControl}
         inert={busy || loading ? '' : undefined}
       >
         <BusinessFormSectionContext.Provider value={sectionNavigation}>

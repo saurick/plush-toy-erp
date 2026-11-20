@@ -12,6 +12,8 @@ import { assertVisibleBusinessFormControlHeight } from './inputControlAssertions
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 const longText = '布底贴12g衬，衣片与披肩按尺寸配套，腰带两端留孔。'.repeat(4)
+const longProductName = '中秋限定月亮兔毛绒玩偶蓝灰礼盒版，含可拆卸星纹披肩、刺绣眼罩与配套便携收纳袋'
+const longProductNumber = 'SKU-PLUSH-ACCESSORIES-SEASONAL-2026-CHILDREN-XL-MOONLIGHT-BLUE-002'
 const multilineNote = Array.from(
   { length: 7 },
   (_, index) => `第${index + 1}项：保留尺寸和加工说明，整段文字应完整显示。`
@@ -83,6 +85,79 @@ async function exerciseText(control, assert, value = longText) {
   await assertVisibleBusinessFormControlHeight(control.page(), '清空文本域恢复基线')
   await control.fill(value)
   await assertReadable(control, assert)
+}
+
+async function assertNarrowPurchaseOrder(page, editor, line, { assert, outputDir }) {
+  await page.setViewportSize({ width: 390, height: 720 })
+  await revealLineItemDetails(line)
+  const name = line.getByLabel('产品名称', { exact: true })
+  const number = line.getByLabel('产品编号', { exact: true })
+  await name.fill(longProductName)
+  await number.fill(longProductNumber)
+  const nameMetrics = await assertReadable(name, assert)
+  assert.equal(nameMetrics.value, longProductName)
+
+  const tabKey = process.platform === 'darwin' && page.context().browser().browserType().name() === 'webkit'
+    ? 'Alt+Tab'
+    : 'Tab'
+  const readFocus = () => editor.evaluate(async (root) => {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    const active = document.activeElement
+    const footer = root.querySelector('.erp-business-form-page__footer')
+    const body = root.querySelector('.erp-business-form-page__body')
+    const control = active.closest('.ant-select, .ant-picker') || active
+    const controlRect = control.getBoundingClientRect()
+    const footerRect = footer.getBoundingClientRect()
+    return {
+      field: active.labels?.[0]?.textContent || active.getAttribute('aria-label') || active.id || active.tagName,
+      inBody: body.contains(active),
+      inFooter: footer.contains(active),
+      controlTop: controlRect.top,
+      controlBottom: controlRect.bottom,
+      footerTop: footerRect.top,
+      footerInViewport: footerRect.top >= 0 && footerRect.bottom <= innerHeight + 1,
+    }
+  })
+
+  await line.getByLabel('产品订单编号', { exact: true }).focus()
+  await page.keyboard.press('Tab')
+  assert.equal(await number.evaluate((node) => node === document.activeElement), true)
+  const focusSteps = [await readFocus()]
+  await page.keyboard.press('Tab')
+  assert.equal(await name.evaluate((node) => node === document.activeElement), true)
+  for (let index = 0; index < 35; index += 1) {
+    const state = await readFocus()
+    focusSteps.push(state)
+    if (state.inFooter) break
+    await page.keyboard.press(tabKey)
+  }
+  assert.equal(focusSteps.at(-1).inFooter, true, JSON.stringify(focusSteps))
+  for (let index = 0; index < 6; index += 1) {
+    await page.keyboard.press(`Shift+${tabKey}`)
+    const state = await readFocus()
+    focusSteps.push(state)
+    if (state.inBody) break
+  }
+  assert.equal(focusSteps.at(-1).inBody, true, JSON.stringify(focusSteps.slice(-6)))
+  const bodySteps = focusSteps.filter((step) => step.inBody)
+  const obstructed = bodySteps.filter((step) => !step.footerInViewport || step.controlBottom > step.footerTop + 1)
+  assert.deepEqual(obstructed, [], '底栏应保持可见并让出键盘聚焦的字段')
+
+  const metrics = await textMetrics(number)
+  assert.equal(metrics.value, longProductNumber)
+  assert.ok(metrics.scrollWidth <= metrics.width + 1 && metrics.scrollHeight <= metrics.height + 1,
+    `长产品编号未完整显示：${JSON.stringify(metrics)}`)
+  await number.focus()
+  await number.evaluate((node) => node.scrollIntoView({ block: 'center' }))
+  await waitForFiniteAnimations(page)
+  await page.screenshot({ path: `${outputDir}/purchase-order-narrow-identity.png` })
+  console.log(`[style:l1] 采购订单 390px：核对 ${bodySteps.length} 个正文焦点，产品编号显示 ${metrics.width}×${metrics.height}px，内容 ${metrics.scrollWidth}×${metrics.scrollHeight}px`)
+
+  const maximumNumber = longProductNumber.padStart(128, 'X')
+  await number.fill(maximumNumber.replace('-002', '-\n002'))
+  assert.equal(await number.inputValue(), maximumNumber, '去除换行后保留完整的 128 字符编号')
+  await number.fill(`${maximumNumber}3`)
+  assert.equal(await number.inputValue(), maximumNumber, '产品编号仍限制为 128 字符')
 }
 
 export function createBusinessCellTextScenarios(deps) {
@@ -364,6 +439,7 @@ export function createBusinessCellTextScenarios(deps) {
       if (!config.readonly) {
         deps.assert.equal(await note.evaluate((node) => node === document.activeElement), true, '切换宽度保留备注焦点')
       }
+      if (config.key === 'purchase') await assertNarrowPurchaseOrder(page, editor, line, deps)
       await assertBusinessFormPage(page, editor)
       await closeBusinessFormPage(page, editor)
     },

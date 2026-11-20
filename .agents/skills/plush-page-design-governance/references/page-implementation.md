@@ -49,6 +49,7 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
    - Treat anti-aliasing, subpixel, font-rendering, or screenshot compression differences as rendering noise unless readability, geometry, interaction, or print output changes. Treat overlap, clipping, wrong focus, wrong row/cell selection, stale artifacts, missing text, or misleading business UI as product defects.
    - For field chain changes, validate relevant stale/missing value paths: new value replaces old value, source switching clears or replaces old values, missing truth is not fabricated, snapshot gaps fall back only by documented rules, and historical records do not display incorrect values.
    - For interactive controls, validate focus, keyboard, disabled/loading, and accessible-name behavior in the changed surface.
+   - 改动涉及固定底栏、吸顶区域或表单滚动时，在受影响的窄视口用 `Tab` 和 `Shift+Tab` 实测，确认当前控件及焦点标记在滚动后仍清楚可见。
    - 下拉浮层位置或宽度变化时，按[候选宽度与展开合同](../../../../docs/product/ui-design/交互设计说明.md#select-overflow)选测。记录打开前的触发框和邻区，从浮层首个可见帧到稳定逐帧核对位置、尺寸和展开方向；即使最终归位也要捕捉中途跳动。涉及异步候选时，核对慢响应、取消后不再展开、失败后重试。通过 affected 查当前相关浏览器场景。
    - 默认列或列配置变化时，按[列设置合同](../../../../docs/product/ui-design/交互设计说明.md#3-列设置选择保存恢复)同时核对新默认、旧配置缺列、已保存的列序和显隐。字段权限优先；按影响检查详情、导出与列表个人偏好的边界。
    - For changed tabs or view switches, verify at least one real intermediate indicator position, stable tab-strip box metrics before/after switching, the final active state, and zero-duration behavior under reduced motion. A computed transition declaration alone is not evidence because a remounted indicator can still jump directly to its destination.

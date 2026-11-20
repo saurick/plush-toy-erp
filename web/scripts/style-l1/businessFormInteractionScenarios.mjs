@@ -637,12 +637,14 @@ export function createBusinessFormInteractionScenarios({
         assert.equal(await rows.count(), 1, '全空保存保留手工录入入口')
         await editor.getByLabel('供应商', { exact: true }).click()
         await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: '样式供应商' }).first().click()
+        await revealLineItemDetails(rows.first())
         await rows.first().getByLabel('备注', { exact: true }).fill('保留只有备注的草稿行')
         const add = editor.getByRole('button', { name: '添加采购明细', exact: true })
         await add.click()
         await add.click()
         await rows.nth(2).getByLabel('采购数量', { exact: true }).fill('0')
         await add.click()
+        await revealLineItemDetails(rows.nth(3))
         await rows.nth(3).getByLabel('产品订单编号', { exact: true }).fill('SO-INPUT-ONLY')
         assert.equal(await enteredCount.innerText(), '3')
         const source = editor.getByRole('button', { name: '从材料库添加', exact: true })
@@ -695,6 +697,8 @@ export function createBusinessFormInteractionScenarios({
         assert.equal(await rows.first().getByLabel('采购数量', { exact: true }).inputValue(), savedQuantity)
         await undo.click()
         assert.equal(await rows.count(), 2, '撤销恢复已保存行和手工新增的空白行')
+        await revealLineItemDetails(rows.first())
+        await rows.first().getByLabel('产品编号', { exact: true }).fill('SKU-PURCHASE-\n002')
         await editor.getByLabel('付款周期（天）', { exact: true }).fill('0')
         await editor.getByRole('button', { name: '保存草稿', exact: true }).click()
         await editor.waitFor({ state: 'hidden' })
@@ -702,6 +706,7 @@ export function createBusinessFormInteractionScenarios({
         assert.equal(writes[0].params.items.length, 1)
         assert.equal(String(writes[0].params.items[0].id), savedID)
         assert.equal(writes[0].params.items[0].purchased_quantity, savedQuantity)
+        assert.equal(writes[0].params.items[0].product_no_snapshot, 'SKU-PURCHASE-002')
       },
     },
     {

@@ -615,8 +615,9 @@ export function PurchaseOrderFormFields({
                 className="erp-line-item-field erp-line-item-field--snapshot-code"
                 name={[field.name, 'product_no_snapshot']}
                 label="产品编号"
+                normalize={(value) => [...value.replace(/[\r\n]/gu, '')].slice(0, 128).join('')}
               >
-                <Input maxLength={128} />
+                <BusinessTextArea minRows={1} />
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--snapshot-name"
