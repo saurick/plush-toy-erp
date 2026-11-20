@@ -1,0 +1,222 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { act, createElement } from 'react'
+import {
+  registerJSXTestLoader,
+  installTestDOM,
+} from '../../../../scripts/test/reactRuntime.mjs'
+
+test('mobile task keeps source context as text and offers only authorized task actions', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [
+    { createRoot },
+    { default: Detail },
+    { MemoryRouter, Routes, Route, Outlet, useLocation },
+    { JsonRpc },
+  ] = await Promise.all([
+    import('react-dom/client'),
+    import('./MobileTaskDetailScreen.jsx'),
+    import('react-router-dom'),
+    import('../../../common/utils/jsonRpc.js'),
+  ])
+  const calls = []
+  const copied = []
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => copied.push(value) } })
+  const original = JsonRpc.prototype.call
+  JsonRpc.prototype.call = async function call(method) {
+    calls.push(method)
+    if (method === 'list_task_events') {
+      return { data: { items: [], truncated: false } }
+    }
+    if (method === 'list_attachments') return { data: { items: [] } }
+    if (method === 'get_task_process_context') {
+      return {
+        data: {
+          process_context: {
+            source: { type: 'finance_payment', id: 3, no: 'SIM-PAYMENT-3' },
+            process_instance: {
+              id: 10,
+              process_key: 'finance_payment_approval',
+              process_version: 'v1',
+              status: 'active',
+              started_at: 1_800_000_000,
+            },
+            nodes: [],
+            current_nodes: [],
+            completed_nodes: [],
+            current_responsibilities: [],
+            approval_form: null,
+          },
+        },
+      }
+    }
+    throw new Error(`Unexpected RPC: ${method}`)
+  }
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    JsonRpc.prototype.call = original
+    dom.restore()
+  })
+  const task = {
+    id: 7,
+    version: 1,
+    task_name: '收付款审批',
+    task_status_key: 'ready',
+    source_type: 'finance_payment',
+    source_id: 3,
+    source_no: 'SIM-PAYMENT-3',
+    process_instance_id: 10,
+    owner_role_key: 'boss',
+    required_capability_key: 'finance.payment.approve',
+  }
+  const sourceAccess = { applicable: true, resolved: true, allowed: true }
+  const actions = []
+  let props = {
+    selectedTask: task,
+    selectedSeverity: { badgeClass: '' },
+    savedEvidenceRefs: [],
+    actionAccess: { sourceAccess },
+    selectedCanOperate: true,
+    selectedCanUrge: false,
+    onOpenAction: (mode) => actions.push(mode),
+  }
+  function Frame() {
+    const location = useLocation()
+    return createElement(
+      'div',
+      null,
+      createElement(
+        'output',
+        { 'data-location': true },
+        `${location.pathname}${location.search}`
+      ),
+      createElement(Outlet, {
+        context: { adminProfile: { id: 12, menus: ['/erp/finance/payments'] } },
+      })
+    )
+  }
+  const render = async (patch = {}) => {
+    props = { ...props, ...patch }
+    await act(async () =>
+      root.render(
+        createElement(
+          MemoryRouter,
+          {
+            initialEntries: ['/m/boss/tasks'],
+            future: { v7_startTransition: true, v7_relativeSplatPath: true },
+          },
+          createElement(
+            Routes,
+            null,
+            createElement(
+              Route,
+              { element: createElement(Frame) },
+              createElement(Route, {
+                path: '*',
+                element: createElement(Detail, props),
+              })
+            )
+          )
+        )
+      )
+    )
+  }
+  const buttons = () => [
+    ...container.querySelectorAll('.mobile-role-action-bar button'),
+  ]
+  const button = (label) =>
+    buttons().find((node) => node.textContent.trim() === label)
+
+  for (const [owner, capability] of [
+    ['boss', 'finance.payment.approve'],
+    ['finance', 'workflow.task.complete'],
+  ]) {
+    await render({
+      selectedTask: {
+        ...task,
+        owner_role_key: owner,
+        required_capability_key: capability,
+      },
+    })
+    assert.equal(button('进入单据办理'), undefined)
+    assert.match(container.querySelector('.mobile-detail-source').textContent, /SIM-PAYMENT-3/u)
+    assert.equal(container.querySelectorAll('.mobile-detail-source a, .mobile-detail-source .erp-task-source-link').length, 0, '即使有单据权限，手机来源仍不提供跳转')
+    assert.equal(container.querySelectorAll('.mobile-detail-source button').length, 1)
+    const beforeCopy = actions.length
+    await act(async () => container.querySelector('.mobile-detail-source [aria-label="复制单据编号"]').click())
+    assert.equal(copied.at(-1), 'SIM-PAYMENT-3')
+    assert.equal(actions.length, beforeCopy, '复制编号不触发任务办理')
+    assert.equal(container.querySelectorAll('.workflow-task-current__guidance').length, 0, '可办理时由任务信息和按钮表达操作，不重复通用说明')
+    assert.ok(
+      button('选择处理方式'),
+      `${owner} must be able to open the authorized workflow action`
+    )
+    assert.deepEqual(
+      buttons().map((node) => node.textContent.trim()),
+      ['任务附件', '选择处理方式']
+    )
+    const before = actions.length
+    await act(async () => button('选择处理方式').click())
+    assert.equal(actions.length, before + 1)
+    assert.equal(actions.at(-1), undefined)
+    assert.equal(
+      container.querySelector('[data-location]').textContent,
+      '/m/boss/tasks'
+    )
+  }
+
+  await render({ selectedTask: { ...task, assignee_id: 9, discovery: { assignee_name: '林工' } } })
+  assert.match(container.querySelector('.workflow-task-current').textContent, /林工/u)
+  await render({ selectedTask: { ...task, id: 8, assignee_id: null } })
+  assert.doesNotMatch(container.querySelector('.workflow-task-current').textContent, /林工/u, 'the current assignee is shown without carrying it to a new task')
+
+  await render({ selectedCanOperate: false, selectedCanUrge: true })
+  assert.equal(button('进入单据办理'), undefined)
+  assert.equal(button('选择处理方式'), undefined)
+  assert.ok(button('催办任务'))
+  assert.equal(container.querySelectorAll('.workflow-task-current__guidance').length, 0, '催办按钮已表达可用动作，不重复普通操作说明')
+  assert.deepEqual(
+    buttons().map((node) => node.textContent.trim()),
+    ['任务附件', '催办任务']
+  )
+  await act(async () => button('催办任务').click())
+  assert.equal(actions.at(-1), 'urge')
+
+  for (const access of [
+    { sourceAccess },
+    { loading: true },
+    { failed: true },
+  ]) {
+    await render({ selectedCanUrge: false, actionAccess: access })
+    assert.equal(button('选择处理方式'), undefined)
+    assert.equal(button('催办任务'), undefined)
+    if (access.loading) {
+      assert.match(container.textContent, /正在确认/u)
+      assert.equal(container.querySelectorAll('.workflow-task-current__guidance').length, 0)
+    }
+    if (access.failed) assert.match(container.textContent, /暂时无法确认处理权限/u)
+  }
+  await render({
+    actionAccess: { sourceAccess },
+    selectedTask: { ...task, task_status_key: 'done' },
+    processingComplete: true,
+  })
+  assert.equal(buttons().length, 1, '已结束任务仍可从底栏查看附件')
+  assert.equal(Boolean(container.querySelector('.mobile-role-action-bar [data-testid="mobile-task-attachment-action"]')), true)
+  assert.equal(button('进入单据办理'), undefined)
+  assert.equal(
+    container.querySelector('[data-location]').textContent,
+    '/m/boss/tasks'
+  )
+  assert.ok(calls.length > 0)
+  assert.deepEqual([...new Set(calls)].sort(), [
+    'get_task_process_context',
+    'list_attachments',
+    'list_task_events',
+  ])
+})
