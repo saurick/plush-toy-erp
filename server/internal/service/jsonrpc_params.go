@@ -1,0 +1,371 @@
+package service
+
+import (
+	"strings"
+	"time"
+
+	"server/internal/biz"
+	corevalue "server/internal/core/value"
+
+	"github.com/shopspring/decimal"
+)
+
+const (
+	jsonRPCNumeric20Scale6MaxIntegerDigits  = corevalue.NumericIntegerDigits
+	jsonRPCNumeric20Scale6MaxFractionDigits = corevalue.NumericScale
+	jsonRPCNumeric20Scale6MaxTextBytes      = corevalue.NumericMaxTextBytes
+)
+
+func getMap(pm map[string]any, key string) map[string]any {
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return map[string]any{}
+	}
+	if value, ok := raw.(map[string]any); ok {
+		return value
+	}
+	return map[string]any{}
+}
+
+func getOptionalJSONRPCPositiveInt(pm map[string]any, key string) (*int, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	value, ok := getRequiredJSONRPCPositiveInt(pm, key)
+	if !ok {
+		return nil, false
+	}
+	return &value, true
+}
+
+func getOptionalJSONRPCString(pm map[string]any, key string) (*string, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return nil, false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, true
+	}
+	return &value, true
+}
+
+func getOptionalJSONRPCMap(pm map[string]any, key string) (map[string]any, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return map[string]any{}, true
+	}
+	value, ok := raw.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	return value, true
+}
+
+func getOptionalJSONRPCNonNegativeInt(pm map[string]any, key string) (*int, bool) {
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return nil, true
+	}
+	const maxJSONSafeInteger = float64(9007199254740991)
+	var value int
+	switch typed := raw.(type) {
+	case float64:
+		if typed < 0 || typed > maxJSONSafeInteger || typed != float64(int64(typed)) {
+			return nil, false
+		}
+		value = int(typed)
+	case int:
+		if typed < 0 || float64(typed) > maxJSONSafeInteger {
+			return nil, false
+		}
+		value = typed
+	default:
+		return nil, false
+	}
+	return &value, true
+}
+
+// Omitted or zero IDs remain unset for the owning domain. A supplied null or a
+// coerced value must never select a different document, line or reference.
+func getOptionalJSONRPCID(pm map[string]any, key string) (int, bool) {
+	raw, exists := pm[key]
+	if !exists {
+		return 0, true
+	}
+	switch value := raw.(type) {
+	case int:
+		if value == 0 {
+			return 0, true
+		}
+	case float64:
+		if value == 0 {
+			return 0, true
+		}
+	}
+	return getRequiredJSONRPCPositiveInt(pm, key)
+}
+
+func getOptionalJSONRPCBool(pm map[string]any, key string) (*bool, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	value, ok := raw.(bool)
+	if !ok {
+		return nil, false
+	}
+	return &value, true
+}
+
+func getRequiredJSONRPCBool(pm map[string]any, key string) (bool, bool) {
+	value, valid := pm[key].(bool)
+	return value, valid
+}
+
+func getRequiredJSONRPCPositiveInt(pm map[string]any, key string) (int, bool) {
+	const maxJSONSafeInteger = float64(9007199254740991)
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return 0, false
+	}
+	switch value := raw.(type) {
+	case float64:
+		if value <= 0 || value > maxJSONSafeInteger || value != float64(int64(value)) {
+			return 0, false
+		}
+		return int(value), true
+	case int:
+		return value, value > 0 && float64(value) <= maxJSONSafeInteger
+	default:
+		return 0, false
+	}
+}
+
+func getRequiredJSONRPCTime(pm map[string]any, key string) (time.Time, bool) {
+	if _, ok := pm[key]; !ok {
+		return time.Time{}, false
+	}
+	return parseJSONRPCTime(pm[key])
+}
+
+func getOptionalJSONRPCTime(pm map[string]any, key string) (*time.Time, bool) {
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return nil, true
+	}
+	parsed, ok := parseJSONRPCTime(raw)
+	if !ok {
+		return nil, false
+	}
+	return &parsed, true
+}
+
+func parseJSONRPCTime(raw any) (time.Time, bool) {
+	switch value := raw.(type) {
+	case float64:
+		if value <= 0 {
+			return time.Time{}, false
+		}
+		return time.Unix(int64(value), 0).UTC(), true
+	case int:
+		if value <= 0 {
+			return time.Time{}, false
+		}
+		return time.Unix(int64(value), 0).UTC(), true
+	case string:
+		text := strings.TrimSpace(value)
+		if text == "" {
+			return time.Time{}, false
+		}
+		for _, layout := range []string{time.RFC3339, "2006-01-02"} {
+			if parsed, err := time.Parse(layout, text); err == nil {
+				return parsed, true
+			}
+		}
+		return time.Time{}, false
+	default:
+		return time.Time{}, false
+	}
+}
+
+// getRequiredJSONRPCNumeric20Scale6 accepts the public numeric(20,6) contract:
+// a decimal string with at most 14 integer digits and 6 fractional digits.
+// JSON numbers are rejected so transport decoding cannot round business values.
+func getRequiredJSONRPCNumeric20Scale6(pm map[string]any, key string) (decimal.Decimal, bool) {
+	raw, ok := pm[key]
+	if !ok {
+		return decimal.Zero, false
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return decimal.Zero, false
+	}
+	return parseJSONRPCNumeric20Scale6String(value)
+}
+
+// getOptionalJSONRPCDecimalString preserves decimal precision for fields whose
+// public contract is string-or-null. It deliberately rejects JSON numbers.
+func getOptionalJSONRPCDecimalString(pm map[string]any, key string) (*decimal.Decimal, bool) {
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return nil, true
+	}
+	text, ok := raw.(string)
+	if !ok {
+		return nil, false
+	}
+	parsed, ok := parseJSONRPCNumeric20Scale6String(text)
+	if !ok {
+		return nil, false
+	}
+	return &parsed, true
+}
+
+func parseJSONRPCNumeric20Scale6String(value string) (decimal.Decimal, bool) {
+	if value == "" || len(value) > jsonRPCNumeric20Scale6MaxTextBytes {
+		return decimal.Zero, false
+	}
+	text := strings.TrimSpace(value)
+	if text == "" || text != value {
+		return decimal.Zero, false
+	}
+
+	index := 0
+	if text[index] == '-' {
+		index++
+		if index == len(text) {
+			return decimal.Zero, false
+		}
+	}
+	integerDigits := 0
+	for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+		integerDigits++
+		index++
+	}
+	if integerDigits == 0 || integerDigits > jsonRPCNumeric20Scale6MaxIntegerDigits {
+		return decimal.Zero, false
+	}
+	if index < len(text) {
+		if text[index] != '.' {
+			return decimal.Zero, false
+		}
+		index++
+		fractionDigits := 0
+		for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+			fractionDigits++
+			index++
+		}
+		if fractionDigits == 0 || fractionDigits > jsonRPCNumeric20Scale6MaxFractionDigits {
+			return decimal.Zero, false
+		}
+	}
+	if index != len(text) {
+		return decimal.Zero, false
+	}
+	parsed, err := decimal.NewFromString(text)
+	return parsed, err == nil
+}
+
+func optionalStringValue(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalIntValue(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalBoolValue(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalDecimalString(value *decimal.Decimal) any {
+	if value == nil {
+		return nil
+	}
+	return value.String()
+}
+
+func optionalTimeUnix(value *time.Time) any {
+	if value == nil {
+		return nil
+	}
+	return value.Unix()
+}
+
+func normalizedBusinessListLimit(pm map[string]any) int {
+	return biz.NormalizeBusinessListLimit(getInt(pm, "limit", biz.BusinessListDefaultLimit))
+}
+
+func normalizedLimit(pm map[string]any) int {
+	limit := getInt(pm, "limit", 50)
+	if limit <= 0 || limit > 200 {
+		return 50
+	}
+	return limit
+}
+
+func normalizedOffset(pm map[string]any) int {
+	offset := getInt(pm, "offset", 0)
+	if offset < 0 {
+		return 0
+	}
+	return offset
+}
+
+func jsonRPCParamsAllowed(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// Omitted items represent an empty replacement list. New rows may omit their
+// ID; a supplied ID is checked before the domain parser handles the row.
+func parseSourceOrderItems[T any](pm map[string]any, parseRow func(map[string]any, int) (*T, bool)) ([]*T, bool) {
+	raw, exists := pm["items"]
+	if !exists || raw == nil {
+		return []*T{}, true
+	}
+	rows, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	result := make([]*T, 0, len(rows))
+	for _, rawRow := range rows {
+		fields, ok := rawRow.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		id, ok := getOptionalJSONRPCID(fields, "id")
+		if !ok {
+			return nil, false
+		}
+		row, ok := parseRow(fields, id)
+		if !ok {
+			return nil, false
+		}
+		result = append(result, row)
+	}
+	return result, true
+}
