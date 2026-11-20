@@ -1,0 +1,598 @@
+.erp-progress-board {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  color: var(--erp-text);
+  font-size: var(--erp-font-small);
+}
+.erp-progress-controls {
+  container: progress-controls / inline-size;
+  flex: 0 0 auto;
+  margin-top: var(--erp-page-gap);
+  margin-bottom: var(--erp-page-gap);
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-progress-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.erp-progress-toolbar > .ant-btn,
+.erp-progress-lookup > .ant-btn {
+  flex: 0 0 auto;
+}
+.erp-progress-order-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.erp-progress-query,
+.erp-progress-lookup {
+  display: flex;
+  flex: 1 1 min-content;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: inherit;
+}
+.erp-progress-lookup {
+  flex-wrap: wrap;
+}
+.erp-progress-toolbar--delivery {
+  align-items: flex-start;
+}
+.erp-progress-toolbar--delivery > .erp-progress-query {
+  /* The lookup fits first, so only the whole status group moves down. */
+  flex-basis: 0%;
+  flex-flow: row-reverse wrap;
+}
+.erp-progress-toolbar--delivery .erp-progress-lookup {
+  display: grid;
+  grid-template-columns: minmax(var(--erp-business-search-min-width, 268px), 1fr) auto auto;
+}
+.erp-progress-toolbar .erp-sliding-segmented {
+  flex: 0 0 auto;
+}
+.erp-progress-search {
+  flex: 1 1 220px;
+  min-width: min(220px, 100%);
+}
+.erp-progress-scope {
+  flex: 0 0 116px;
+}
+.erp-progress-metric-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0;
+}
+.erp-progress-due-options {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.erp-progress-toolbar--delivery .erp-progress-query > .erp-progress-due-options {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline-end: auto;
+}
+.erp-progress-metric-row > .erp-filter-chip,
+.mobile-progress-risks > .erp-filter-chip {
+  margin-left: 4px;
+}
+.erp-progress-filter-fields {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.erp-progress-active-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 9px;
+}
+.erp-progress-active-filters .ant-tag {
+  margin: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@container progress-controls (max-width: 1160px) {
+  .erp-progress-metric-row {
+    flex-basis: 100%;
+  }
+}
+@container progress-controls (max-width: 600px) {
+  .erp-progress-toolbar--delivery > .erp-progress-query {
+    flex-basis: 100%;
+  }
+  .erp-progress-toolbar--delivery .erp-progress-lookup {
+    display: flex;
+    flex-basis: 100%;
+  }
+}
+.erp-progress-board > .ant-spin-nested-loading {
+  flex: 1;
+  min-height: 0;
+}
+.erp-progress-board > .ant-spin-nested-loading > .ant-spin-container {
+  height: 100%;
+}
+.erp-progress-list-panel {
+  container: progress-list / inline-size;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+  overflow: hidden;
+}
+.erp-progress-list {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.erp-progress-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.erp-progress-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--erp-border);
+  padding: 10px 12px;
+  color: var(--erp-text-muted);
+  background: var(--erp-table-header-bg, var(--erp-surface-bg-soft));
+  text-align: left;
+  font-weight: 500;
+  font-size: var(--erp-font-caption);
+}
+.erp-progress-table:where(:not(.erp-progress-table--delivery)) th:nth-child(1) {
+  width: 32%;
+}
+.erp-progress-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.erp-progress-sort-icons {
+  display: inline-flex;
+  flex-direction: column;
+  color: var(--erp-text-muted);
+  font-size: 10px;
+}
+.erp-progress-sort::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.erp-progress-sort-icons > :last-child { margin-top: -3px; }
+.erp-progress-sort:hover,
+.erp-progress-table [aria-sort="ascending"] .erp-progress-sort-icons > :first-child,
+.erp-progress-table [aria-sort="descending"] .erp-progress-sort-icons > :last-child {
+  color: var(--erp-primary);
+}
+.erp-progress-sort:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+.erp-progress-table:where(:not(.erp-progress-table--delivery)) th:nth-child(2) {
+  width: 15%;
+}
+.erp-progress-table:where(:not(.erp-progress-table--delivery)) th:nth-child(3) {
+  width: 22%;
+}
+.erp-progress-table:where(:not(.erp-progress-table--delivery)) th:nth-child(4) {
+  width: 31%;
+}
+.erp-progress-table--delivery th:nth-child(1) { width: 18%; }
+.erp-progress-table--delivery th:nth-child(2) { width: 24%; }
+.erp-progress-table--delivery th:nth-child(3) { width: 14%; }
+.erp-progress-table--delivery th:nth-child(4) { width: 19%; }
+.erp-progress-table--delivery th:nth-child(5) { width: 11%; }
+.erp-progress-table--delivery th:nth-child(6) { width: 14%; }
+.erp-progress-table--delivery :is(th, td):nth-child(5) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.erp-progress-line-open.ant-btn {
+  align-self: start;
+  justify-self: start;
+}
+.erp-progress-record[data-progress-line-selected] {
+  background: var(--erp-primary-softer);
+}
+.erp-progress-table td {
+  min-width: 0;
+  padding: var(--erp-table-cell-padding-block) var(--erp-work-item-padding);
+  border-top: 1px solid var(--erp-border);
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.erp-progress-row.is-selected {
+  background: var(--erp-primary-softer);
+}
+@media (hover: hover) {
+  .erp-progress-row[data-row-action]:hover {
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+.erp-progress-row-open {
+  width: 100%;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.erp-progress-identity {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.erp-progress-product {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: var(--erp-work-item-association-height);
+}
+.erp-progress-product:where(.erp-product-identity--compact) .erp-task-product-image,
+.erp-progress-product--empty > .erp-task-product-image {
+  width: var(--erp-work-item-image-size);
+  height: var(--erp-work-item-image-size);
+  flex-basis: var(--erp-work-item-image-size);
+}
+.erp-progress-product--empty > .erp-task-product-image {
+  font-size: 22px;
+}
+.erp-progress-table .erp-progress-row {
+  height: var(--erp-work-item-table-height);
+}
+.erp-progress-table .erp-progress-product {
+  align-items: center;
+}
+.erp-progress-identity > strong,
+.erp-progress-row-open {
+  color: var(--erp-text);
+  font-size: var(--erp-font-body);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.erp-progress-row-open:focus-visible {
+  outline: 2px solid var(--erp-control-focus-border);
+  outline-offset: 3px;
+}
+.erp-progress-reference,
+.erp-progress-customer {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+.erp-progress-customer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.erp-progress-customer .ant-tag {
+  margin: 0;
+  padding: 0 5px;
+  font-size: inherit;
+  line-height: 1.5;
+}
+.erp-progress-due {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.erp-progress-due > strong {
+  font-weight: 500;
+}
+.erp-progress-due > span {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+.erp-progress-delivery {
+  display: block;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.erp-progress-delivery-copy {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+.erp-progress-delivery-copy > span {
+  color: var(--erp-text-muted);
+}
+.erp-progress-delivery-copy > strong {
+  font-size: var(--erp-font-small);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.erp-progress-quantity-detail {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--erp-primary-strong);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.erp-progress-track {
+  display: block;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: var(--erp-border);
+  overflow: hidden;
+}
+.erp-progress-track > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--erp-visual-info-text);
+}
+.erp-progress-attention {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  font-size: var(--erp-font-caption);
+}
+.erp-progress-attention > strong {
+  color: var(--erp-text);
+  font-size: var(--erp-font-small);
+  font-weight: 500;
+}
+.erp-progress-attention > span:where(:not(.erp-task-reason)) {
+  color: var(--erp-text-muted);
+}
+.erp-progress-attention-cell {
+  text-align: left;
+}
+.erp-progress-attention-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.erp-progress-attention-content > .erp-progress-attention {
+  flex: 1;
+}
+.erp-progress-task-entry.ant-btn {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 32px;
+  padding: 4px 0;
+  font-size: var(--erp-font-caption);
+}
+.erp-progress-warning {
+  color: var(--erp-warning-text);
+}
+@container progress-list (max-width: 720px) {
+  .erp-progress-table {
+    --erp-table-column-shadow: none;
+  }
+
+  .erp-progress-table,
+  .erp-progress-table tbody {
+    display: block;
+  }
+  .erp-progress-table thead {
+    display: none;
+  }
+  .erp-progress-table .erp-progress-row {
+    display: grid;
+    height: auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--erp-work-item-gap);
+    padding: var(--erp-work-item-padding);
+    border-bottom: 1px solid var(--erp-border);
+  }
+  .erp-progress-table td {
+    padding: 0;
+    border: 0;
+  }
+  .erp-progress-identity-cell {
+    grid-column: 1;
+  }
+  .erp-progress-due-cell {
+    grid-column: 2;
+    text-align: right;
+  }
+  .erp-progress-delivery-cell {
+    grid-column: 1 / -1;
+  }
+  .erp-progress-attention-cell {
+    grid-column: 1 / -1;
+  }
+  .erp-progress-table .erp-progress-line-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .erp-progress-line-row :is(.erp-progress-line-identity, .erp-progress-line-product) {
+    grid-column: 1 / -1;
+  }
+  .erp-progress-line-row td[data-label]::before {
+    display: block;
+    content: attr(data-label);
+    color: var(--erp-text-muted);
+    font-size: var(--erp-font-caption);
+  }
+  .erp-progress-task-entry.ant-btn {
+    min-height: 44px;
+  }
+}
+.erp-progress-record-main,
+.erp-progress-record-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.erp-progress-record-main > span,
+.erp-progress-hint {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.erp-progress-danger {
+  color: var(--erp-visual-danger-text);
+}
+.erp-progress-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 16px;
+  color: var(--erp-text-muted);
+  text-align: center;
+}
+.erp-progress-help {
+  width: min(320px, 80vw);
+  line-height: 1.6;
+}
+
+.erp-progress-drawer .ant-drawer-body {
+  padding: 20px 24px;
+}
+.erp-progress-record {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--erp-border, #dfe7e2);
+}
+.erp-progress-record-main > strong {
+  font-size: var(--erp-font-body);
+  overflow-wrap: anywhere;
+}
+.erp-progress-record-main > p {
+  margin: 2px 0;
+  font-size: var(--erp-font-small);
+  overflow-wrap: anywhere;
+}
+.erp-progress-record-actions {
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: center;
+}
+.erp-progress-record-actions .ant-tag {
+  margin: 0;
+}
+.erp-progress-error {
+  margin-top: 12px;
+}
+.erp-progress-modal .ant-modal-body {
+  display: flex;
+  flex-direction: column;
+  height: min(74dvh, 800px);
+  overflow: hidden;
+}
+.erp-progress-detail-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 16px 28px 20px 0;
+}
+.erp-progress-detail-scroll:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+.erp-progress-detail-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  border-bottom: 1px solid var(--erp-border);
+}
+.erp-progress-modal .erp-progress-detail-tabs.erp-navigation-tabs > [role='tab'] { min-height: 44px; }
+.erp-progress-detail-scroll > .ant-spin-nested-loading { min-height: 80px; }
+.erp-progress-record-main { min-width: 0; overflow-wrap: anywhere; }
+.erp-progress-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.erp-progress-metric:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.erp-progress-board button:focus-visible,
+.erp-progress-summary h2:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+.erp-progress-help p:last-child {
+  margin-bottom: 0;
+}
+@media (width <= 600px) {
+  .erp-progress-toolbar {
+    gap: 8px;
+  }
+  .erp-progress-toolbar .erp-sliding-segmented {
+    width: 100%;
+  }
+  .erp-progress-search {
+    flex-basis: 100%;
+  }
+  .erp-progress-drawer .ant-drawer-body {
+    padding: 16px;
+  }
+}
+
+.erp-progress-attention.is-blocked > strong,
+.erp-progress-attention.is-blocked > .erp-progress-attention-reason {
+  color: var(--erp-visual-danger-text);
+}
+.erp-progress-identity-cell:hover .erp-progress-identity > strong {
+  color: var(--erp-primary-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (width <= 600px) {
+  .erp-progress-modal .erp-progress-detail-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .erp-progress-modal .erp-progress-overview-identity { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .erp-progress-modal .erp-progress-header-meta { justify-items: start; }
+}
