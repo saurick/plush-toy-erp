@@ -1,0 +1,912 @@
+import { writeFile } from 'node:fs/promises'
+import { chooseSelectOption, readSelectValue } from './selectControlActions.mjs'
+import { printTemplateCatalog } from '../../src/erp/config/printTemplates.mjs'
+import { measureEmptyEditorHints } from './printEmptyEditorAssertions.mjs'
+import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
+export function createPrintWorkspaceControlScenarios({
+  assert,
+  path,
+  outputDir,
+  gotoScenarioPath,
+}) {
+  return [
+    {
+      name: 'print-workspace-bootstrap-without-storage',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh&state=bootstrap-source',
+      auth: 'admin',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => {
+          if (new URLSearchParams(location.search).get('source') !== 'business') return
+          const { getItem } = Storage.prototype
+          Storage.prototype.getItem = function getDraftItem(key) {
+            if (String(key).startsWith('__plush_erp_print_workspace_draft__:v3:')) {
+              throw new DOMException('draft storage unavailable', 'SecurityError')
+            }
+            return getItem.call(this, key)
+          }
+          Object.defineProperty(window, 'indexedDB', {
+            configurable: true,
+            get() { throw new DOMException('draft storage unavailable', 'SecurityError') },
+          })
+        })
+      },
+      verify: async (page) => {
+        await page.locator('.erp-print-shell--ready').waitFor()
+        const destination = await page.evaluate(async () => {
+          const workspaceModule = new URL('/src/erp/utils/printWorkspace.js', location.origin).href
+          const scopeModule = new URL('/src/erp/utils/printWorkspaceScope.mjs', location.origin).href
+          const { openPrintWorkspaceWindow, PRINT_WORKSPACE_ENTRY_SOURCE } = await import(workspaceModule)
+          const { getPrintWorkspaceDraftScope } = await import(scopeModule)
+          const { open } = window
+          const { setItem } = Storage.prototype
+          const popup = {
+            name: '',
+            url: '',
+            location: { replace(url) { popup.url = url } },
+            focus() {},
+          }
+          try {
+            window.open = () => popup
+            Storage.prototype.setItem = function setDraftItem(key, value) {
+              if (String(key).startsWith('__plush_erp_print_workspace_draft__:v3:')) {
+                throw new DOMException('draft storage unavailable', 'QuotaExceededError')
+              }
+              return setItem.call(this, key, value)
+            }
+            openPrintWorkspaceWindow('material-purchase-contract', {
+              ...getPrintWorkspaceDraftScope(new URLSearchParams(location.search)),
+              entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+              initialDraft: {
+                contractNo: 'PO-BOOTSTRAP-01',
+                lines: [{ materialName: '本次带入的样式材料', quantity: '2', unitPrice: '1.50' }],
+              },
+            })
+            window.name = popup.name
+            const url = new URL(popup.url)
+            return { path: url.pathname + url.search, hasBootstrap: Boolean(popup.name) }
+          } finally {
+            window.open = open
+            Storage.prototype.setItem = setItem
+          }
+        })
+        assert.equal(destination.hasBootstrap, true)
+        await gotoScenarioPath(page, destination.path)
+        const incoming = page.getByText('本次带入的样式材料', { exact: true })
+        const failure = page.getByRole('alert').filter({ hasText: '无法恢复此窗口的草稿' })
+        await incoming.or(failure).waitFor()
+        if (await incoming.isVisible()) {
+          await incoming.fill('本次带入的样式材料（已编辑）')
+          await page.getByText('本次带入的样式材料（已编辑）', { exact: true }).press('Tab')
+          await page.locator('[data-print-draft-save-status="error"]').waitFor()
+        }
+        await page.evaluate(() => document.fonts.ready)
+        await page.screenshot({ path: path.join(outputDir, 'print-workspace-bootstrap-without-storage-4k.png') })
+        assert.equal(await failure.count(), 0, '有效的一次性草稿不依赖浏览器持久化存储')
+        assert.equal(await page.getByText('本次带入的样式材料（已编辑）', { exact: true }).isVisible(), true)
+      },
+    },
+    {
+      name: 'print-workspace-zoom-clear',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 3840, height: 2160 },
+      verify: async (page) => {
+        const records = []
+        const measure = () => page.locator('.print-zoom-control').evaluate((control) => {
+          const selected = control.querySelector('.ant-select-selection-item, .ant-select-selection-placeholder')
+          const clear = control.querySelector('.ant-select-clear')
+          const stage = document.querySelector('.erp-print-shell__stage')
+          const paper = stage.querySelector('.erp-print-shell__stage-wrap > *')
+          return {
+            text: control.innerText,
+            selected: selected?.textContent,
+            textWidth: selected?.scrollWidth,
+            availableWidth: selected?.clientWidth,
+            fontSize: selected ? getComputedStyle(selected).fontSize : '',
+            controlWidth: control.getBoundingClientRect().width,
+            clearVisible: Boolean(clear && getComputedStyle(clear).opacity === '1'),
+            scale: Number(stage.style.getPropertyValue('--print-view-scale')),
+            paperWidth: paper.offsetWidth,
+            overflow: document.documentElement.scrollWidth > innerWidth + 1,
+          }
+        })
+        for (const template of printTemplateCatalog.filter((item) => item.runtime?.workspace)) {
+          await page.setViewportSize({ width: 3840, height: 2160 })
+          await gotoScenarioPath(page, `/erp/print-workspace/${template.key}?draft=fresh&state=zoom-clear`)
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          const zoom = page.getByRole('combobox', { name: '显示比例', exact: true })
+          const control = page.locator('.print-zoom-control')
+          const initial = await measure()
+          records.push({ template: template.key, initial })
+          await writeFile(path.join(outputDir, 'print-zoom-clear.json'), JSON.stringify(records, null, 2))
+          assert.equal((initial.text.match(/显示比例/gu) || []).length, 1, '显示比例用途只显示一次')
+          assert(initial.textWidth <= initial.availableWidth + 1, '适应宽度的选中值必须完整显示')
+          assert(initial.clearVisible, '默认显示比例也提供无需悬停的清空入口')
+          for (const viewport of [{ width: 3840, height: 2160 }, { width: 760, height: 960 }]) {
+            await page.setViewportSize(viewport)
+            await chooseSelectOption(zoom, '1.5')
+            const enlarged = await measure()
+            assert.equal(enlarged.scale, 1.5)
+            assert.equal(enlarged.paperWidth, initial.paperWidth, '缩放不改变纸张排版宽度')
+            assert(enlarged.textWidth <= enlarged.availableWidth + 1, '选择比例后文字完整显示')
+            await page.mouse.move(0, 0)
+            assert((await measure()).clearVisible, '移开指针后清空入口仍然可见')
+            await control.locator('.ant-select-clear').click()
+            await control.locator('.ant-select-selection-placeholder').waitFor()
+            const cleared = await measure()
+            assert.equal(cleared.selected, '显示比例')
+            assert.equal(cleared.clearVisible, false)
+            assert(Number.isFinite(cleared.scale) && cleared.scale > 0 && cleared.scale <= 1, '清空恢复有效的适应宽度')
+            assert.equal(cleared.paperWidth, initial.paperWidth, '清空不修改纸张排版')
+            assert.equal(cleared.overflow, false, '清空后页面无横向溢出')
+            await zoom.press('ArrowDown')
+            await zoom.press('Escape')
+            assert.equal(await control.locator('.ant-select-selection-item').count(), 0, '打开再关闭选项不自动回选')
+            await chooseSelectOption(zoom, 'fit')
+            const restored = await measure()
+            records.push({ template: template.key, viewport, enlarged, cleared, restored })
+            await writeFile(path.join(outputDir, 'print-zoom-clear.json'), JSON.stringify(records, null, 2))
+            assert(Math.abs(restored.scale - cleared.scale) < 0.001, '主动选择适应宽度与清空后的纸面比例一致')
+            assert(restored.textWidth <= restored.availableWidth + 1, '窄窗口也完整显示适应宽度')
+            assert.equal(restored.overflow, false, '重新选择后页面无横向溢出')
+          }
+        }
+        await writeFile(path.join(outputDir, 'print-zoom-clear.json'), JSON.stringify(records, null, 2))
+      },
+    },
+    {
+      name: 'print-workspace-session-isolation',
+      path: '/print-window-shell.html?state=retired-window',
+      mockAdminRpc: true,
+      viewport: { width: 3840, height: 2160 },
+      verify: async (page) => {
+        const { origin } = new URL(page.url())
+        const authModuleURL = new URL('/src/common/auth/auth.js', origin).href
+        const workspacePath =
+          '/erp/print-workspace/processing-contract?state=session-isolation&config_revision=session-review'
+        const selector =
+          '.erp-processing-contract-table tbody td [contenteditable="true"]'
+        const marker = '账号A私有打印字段'
+        const tokenA = createMockAdminSessionToken({
+          userID: 41,
+          sessionKey: 'print-account-A',
+        })
+        const tokenB = createMockAdminSessionToken({
+          userID: 42,
+          sessionKey: 'print-account-B',
+        })
+        const signIn = async (target, token) =>
+          target.evaluate(
+            async ({ accessToken, moduleURL }) => {
+              const { persistAuth } = await import(moduleURL)
+              persistAuth({ access_token: accessToken })
+            },
+            { accessToken: token, moduleURL: authModuleURL }
+          )
+        await page.evaluate(async () => {
+          localStorage.setItem(
+            '__plush_erp_print_window_state__:retired-window',
+            JSON.stringify({
+              version: 1,
+              updatedAt: Date.now(),
+              templateKey: 'processing-contract',
+              workspaceURL:
+                '/erp/print-workspace/processing-contract?state=retired-window',
+              windowHTML: '<p>退役缓存敏感字段</p>',
+            })
+          )
+          const db = await new Promise((resolve) => {
+            const request = indexedDB.open(
+              '__plush_erp_print_window_state_db__',
+              1
+            )
+            request.onupgradeneeded = () =>
+              request.result.createObjectStore('states', { keyPath: 'stateID' })
+            request.onsuccess = () => resolve(request.result)
+          })
+          await new Promise((resolve) => {
+            const tx = db.transaction('states', 'readwrite')
+            tx.objectStore('states').put({
+              stateID: 'retired-window',
+              windowHTML: '<p>退役缓存敏感字段</p>',
+            })
+            tx.oncomplete = resolve
+          })
+          db.close()
+        })
+        await page.reload()
+        assert.equal(await page.getByText('退役缓存敏感字段').count(), 0)
+        await page
+          .getByRole('heading', { name: '请重新打开打印窗口' })
+          .waitFor()
+        await gotoScenarioPath(
+          page,
+          '/erp/print-workspace/processing-contract?state=retired-window'
+        )
+        await page.waitForURL('**/admin-login')
+        await signIn(page, tokenA)
+        await gotoScenarioPath(page, workspacePath)
+        await page.locator('.erp-print-shell--ready').waitFor()
+        const editor = page.locator(selector).first()
+        await editor.fill(marker)
+        await editor.press('Tab')
+        await page.locator('[data-print-draft-save-status="saved"]').waitFor()
+        await page.reload()
+        await page.locator('.erp-print-shell--ready').waitFor()
+        assert.equal(await page.locator(selector).first().textContent(), marker)
+        await page.screenshot({
+          path: path.join(outputDir, 'print-session-account-A.png'),
+        })
+
+        const controller = await page.context().newPage()
+        try {
+          await controller.goto(`${origin}/print-window-shell.html`)
+          await signIn(controller, tokenB)
+          await page.waitForFunction(
+            (value) => !document.body.textContent.includes(value),
+            marker
+          )
+          await page.locator('.erp-print-shell--ready').waitFor()
+          assert.equal(await page.getByText(marker, { exact: true }).count(), 0)
+          await page.reload()
+          await page.locator('.erp-print-shell--ready').waitFor()
+          assert.equal(await page.getByText(marker, { exact: true }).count(), 0)
+          await controller.evaluate(async (moduleURL) => {
+            const { logout } = await import(moduleURL)
+            logout()
+          }, authModuleURL)
+          await page.waitForURL('**/admin-login')
+          await gotoScenarioPath(page, workspacePath)
+          await page.waitForURL('**/admin-login')
+        } finally {
+          await controller.close()
+        }
+        await signIn(page, tokenA)
+        await gotoScenarioPath(page, workspacePath)
+        await page.locator('.erp-print-shell--ready').waitFor()
+        assert.equal(await page.locator(selector).first().textContent(), marker)
+        const expiresAt = Math.floor(Date.now() / 1000) + 2
+        await signIn(
+          page,
+          createMockAdminSessionToken({
+            userID: 41,
+            sessionKey: 'print-short-session',
+            expiresAt,
+          })
+        )
+        await page.waitForURL('**/admin-login', { timeout: 5000 })
+        assert.equal(await page.getByText(marker, { exact: true }).count(), 0)
+        assert.equal(
+          await page.evaluate(() =>
+            localStorage.getItem(
+              '__plush_erp_print_window_state__:retired-window'
+            )
+          ),
+          null
+        )
+        assert.equal(
+          await page.evaluate(async () =>
+            (await indexedDB.databases()).some(
+              (db) => db.name === '__plush_erp_print_window_state_db__'
+            )
+          ),
+          false
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'print-session-expired.png'),
+        })
+      },
+    },
+    {
+      name: 'print-workspace-all-empty-fields',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1100 },
+      verify: async (page) => {
+        // Document navigation must respect the draft's unsaved-change protection.
+        await page.locator('.erp-print-shell--ready').waitFor()
+        await page.locator('[data-print-draft-save-status="saved"]').waitFor()
+        const reports = []
+        for (const template of printTemplateCatalog.filter(
+          (item) => item.runtime?.workspace
+        )) {
+          await gotoScenarioPath(
+            page,
+            `/erp/print-workspace/${template.key}?draft=fresh&state=all-empty-fields`
+          )
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          const editors = page.locator(
+            '.erp-print-shell__stage [contenteditable="true"]:not(:has([contenteditable="true"]))'
+          )
+          const count = await editors.count()
+          assert(count > 0, `${template.key} 必须遍历实际编辑字段`)
+          const assertEditorInventory = async (phase) => {
+            const inventory = await editors.evaluateAll((nodes) => ({
+              count: nodes.length,
+              hiddenIndexes: nodes.flatMap((node, index) => {
+                const visible = node.checkVisibility
+                  ? node.checkVisibility({
+                      checkOpacity: false,
+                      checkVisibilityCSS: true,
+                    })
+                  : Boolean(node.getClientRects().length)
+                return visible ? [] : [index]
+              }),
+            }))
+            assert.equal(
+              inventory.count,
+              count,
+              `${template.key} ${phase}不能删除字段或移动后续索引`
+            )
+            assert.deepEqual(
+              inventory.hiddenIndexes,
+              [],
+              `${template.key} ${phase}全部空字段仍须可见`
+            )
+          }
+          const stepNumbers = await editors.evaluateAll((nodes) =>
+            nodes.map((node) =>
+              node.closest('.erp-work-instruction-paper__step-no')
+                ? node.textContent.replace(/\u200b/g, '').trim()
+                : null
+            )
+          )
+          const report = { key: template.key, fields: count, states: [] }
+          const zoomControl = page.locator(
+            '.erp-print-shell__zoom-control .ant-select'
+          )
+          // 非编辑控件承接真实焦点和失焦事件，避免自动滚回工具栏或恢复编辑焦点。
+          const blurEditor = async () => {
+            const focused = await zoomControl.getByRole('combobox').evaluate((node) => {
+              node.focus({ preventScroll: true })
+              return node.ownerDocument.activeElement === node
+            })
+            assert(focused, `${template.key} 显示比例控件必须承接真实焦点`)
+          }
+          for (const scale of ['1', '0.75', '1.25', '1.5']) {
+            await chooseSelectOption(zoomControl, scale)
+            await page.waitForFunction((expected) => {
+              const stage = document.querySelector('.erp-print-shell__stage')
+              return stage?.style.getPropertyValue('--print-view-scale') === expected
+            }, scale)
+            await waitForFiniteAnimations(page)
+            await assertEditorInventory(`${scale} 缩放清空前`)
+            for (let index = 0; index < count; index += 1) {
+              const editor = editors.nth(index)
+              // 每个字段都实际清空，不能按 display / align 抽样漏掉收缩的日期等字段。
+              await editor.fill('')
+              await editor.press('Backspace')
+              report.states.push({
+                scale,
+                index,
+                state: 'focused',
+                ...(await measureEmptyEditorHints(editor))[0],
+              })
+              await blurEditor()
+              report.states.push({
+                scale,
+                index,
+                state: 'blurred',
+                ...(await measureEmptyEditorHints(editor))[0],
+              })
+              if (scale === '1') {
+                await editor.click()
+                await editor.fill('12')
+                assert.equal(
+                  await editor.textContent(),
+                  '12',
+                  `${template.key} 字段 ${index} 清空失焦后应能点击并重新填写`
+                )
+                await editor.fill('')
+                await blurEditor()
+              }
+            }
+            await assertEditorInventory(`${scale} 缩放清空后`)
+            if (scale === '1') {
+              await page.locator('.erp-print-shell__stage-wrap').screenshot({
+                path: path.join(
+                  outputDir,
+                  `print-${template.key}-all-empty.png`
+                ),
+              })
+            }
+          }
+          assert.equal(
+            report.states.length,
+            count * 4 * 2,
+            `${template.key} 必须检查全部字段和状态，不能静默跳过`
+          )
+          assert(
+            report.states.every(
+              ({ empty, blankDateHint, focused, state }) =>
+                (empty || (state === 'blurred' && blankDateHint)) &&
+                focused === (state === 'focused')
+            ),
+            `${template.key} 清空后必须保持空值和预期焦点，不能回填或退出编辑: ${JSON.stringify(report.states.filter(({ empty, blankDateHint, focused, state }) => !(empty || (state === 'blurred' && blankDateHint)) || focused !== (state === 'focused')).slice(0, 8))}`
+          )
+          await page.emulateMedia({ media: 'print' })
+          const printHints = await editors.evaluateAll(
+            (nodes) =>
+              nodes.filter(
+                (node) => getComputedStyle(node, '::before').content !== 'none'
+              ).length
+          )
+          assert.equal(printHints, 0, `${template.key} 空值提示不能进入打印`)
+          await page.emulateMedia({ media: 'screen' })
+          await page.locator('[data-print-draft-save-status="saved"]').waitFor()
+          const readValues = () =>
+            editors.evaluateAll((nodes) =>
+              nodes.map((node) =>
+                node.textContent.replace(/\u200b/g, '').trim()
+              )
+            )
+          const savedValues = await readValues()
+          const restoreURL = new URL(page.url())
+          restoreURL.searchParams.delete('draft')
+          await page.goto(restoreURL.href, { waitUntil: 'networkidle' })
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          assert.equal(
+            await editors.count(),
+            count,
+            `${template.key} 恢复草稿不能丢失空字段`
+          )
+          assert.deepEqual(
+            await readValues(),
+            // 作业序号按行结构自动编号，恢复时沿用既有编号规则。
+            savedValues.map((value, index) => stepNumbers[index] ?? value),
+            `${template.key} 空值草稿恢复后不能错位或回填样例`
+          )
+          report.restored = await measureEmptyEditorHints(editors)
+          assert(
+            report.restored.every((state) => state.textFits),
+            `${template.key} 恢复后的空值提示必须完整显示: ${JSON.stringify(report.restored.filter((state) => !state.textFits))}`
+          )
+          await page.locator('[data-print-draft-save-status="saved"]').waitFor()
+          reports.push(report)
+          console.log(
+            `[print-all-empty] ${template.key}: ${count} fields, ${report.states.filter((state) => !state.textFits).length} clipped states`
+          )
+        }
+        await writeFile(
+          path.join(outputDir, 'print-all-empty-fields.json'),
+          JSON.stringify(reports, null, 2)
+        )
+        const failures = reports.flatMap((report) =>
+          report.states
+            .filter((state) => !state.textFits)
+            .map((state) => ({ template: report.key, ...state }))
+        )
+        assert.equal(
+          failures.length,
+          0,
+          `空字段提示必须完整显示: ${JSON.stringify(failures.slice(0, 12))}`
+        )
+      },
+    },
+    {
+      name: 'print-workspace-controls-and-empty-hints',
+      path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 1440, height: 960 },
+      verify: async (page) => {
+        const records = []
+        for (const template of printTemplateCatalog.filter(
+          (item) => item.runtime?.workspace
+        )) {
+          await page.setViewportSize({ width: 1440, height: 960 })
+          await gotoScenarioPath(
+            page,
+            `/erp/print-workspace/${template.key}?draft=fresh&state=control-contract`
+          )
+          await page.locator('.erp-print-shell--ready').waitFor()
+          await page.evaluate(() => document.fonts.ready)
+          const panel = page.getByRole('complementary', {
+            name: '打印编辑工具',
+          })
+          await panel.waitFor({ state: 'visible' })
+          const headings = await panel.getByRole('heading').allTextContents()
+          assert.equal(
+            new Set(headings).size,
+            headings.length,
+            '每个工具分组只显示一个标题'
+          )
+          assert(
+            !headings.some((title) =>
+              ['编辑工具', '当前草稿', '纸面编辑'].includes(title)
+            ),
+            '工具区不保留冗余总标题或说明分组'
+          )
+          assert.equal(
+            await page.locator('.erp-print-shell__feedback').count(),
+            0,
+            '准备成功不生成额外反馈横条'
+          )
+          assert.equal(
+            await page
+              .getByRole('button', { name: '返回编辑', exact: true })
+              .count(),
+            0,
+            '默认编辑态不显示重复的返回按钮'
+          )
+
+          assert.equal(
+            await page.locator('.erp-print-shell__view-bar').count(),
+            0,
+            '纸面不再被独立模式栏占高'
+          )
+          assert.equal(
+            await page.getByText('点击纸面填写', { exact: true }).count(),
+            0
+          )
+          for (const title of ['表格操作', '条款编辑', '末尾附图', '模板内容']) {
+            const group = panel.getByRole('region', { name: title, exact: true })
+            if (await group.count()) {
+              assert.equal(await group.locator(':scope > details').count(), 0, `${title} 不隐藏编辑入口`)
+              assert(await group.locator(':scope > .erp-print-shell__tool-content').isVisible(), `${title} 直接可见`)
+              const heading = await group.locator(':scope > h3').evaluate((node) => ({ font: Number.parseFloat(getComputedStyle(node).fontSize), gap: Number.parseFloat(getComputedStyle(node).columnGap) }))
+              assert(heading.font >= 14 && heading.gap >= 8, `${title} 标题与数量保持可读间距: ${JSON.stringify(heading)}`)
+            }
+          }
+          const zoom = page.getByRole('combobox', { name: '显示比例', exact: true })
+          assert(
+            await zoom.evaluate((node) =>
+              Boolean(node.closest('.erp-print-shell__toolbar-actions'))
+            ),
+            '显示比例与 PDF 操作同在顶栏'
+          )
+          await chooseSelectOption(zoom, '1')
+          const controls = await page.evaluate(() => {
+            const styles = (node) => {
+              const style = getComputedStyle(node)
+              return Object.fromEntries(
+                [
+                  'appearance',
+                  'fontFamily',
+                  'fontSize',
+                  'fontWeight',
+                  'lineHeight',
+                  'letterSpacing',
+                  'height',
+                  'width',
+                  'padding',
+                  'border',
+                  'borderRadius',
+                  'backgroundColor',
+                  'backgroundImage',
+                  'boxShadow',
+                ].map((key) => [key, style[key]])
+              )
+            }
+            const panel = document.querySelector(
+              '.erp-print-shell__record-panel'
+            )
+            const hint = getComputedStyle(document.querySelector('.print-zoom-select .ant-select-arrow'))
+            return {
+              zoom: styles(document.querySelector('.print-zoom-select .ant-select-selector')),
+              button: styles(panel.querySelector('.erp-print-shell__button')),
+              panel: {
+                width: panel.getBoundingClientRect().width,
+                padding: getComputedStyle(panel).padding,
+              },
+              arrow: {
+                width: hint.width,
+                height: hint.height,
+                pointerEvents: hint.pointerEvents,
+                borderRight: hint.borderRight,
+                borderBottom: hint.borderBottom,
+              },
+            }
+          })
+          assert.equal(await page.locator('select').count(), 0, '打印工具不再打开系统原生菜单')
+          assert.equal(controls.zoom.width, '200px')
+          assert.equal(controls.zoom.height, '32px')
+          assert.equal(
+            controls.zoom.borderRadius,
+            '6px',
+            '逻辑圆角不能被全局控件样式覆盖'
+          )
+          assert.equal(controls.arrow.pointerEvents, 'none', '箭头不截获点击')
+          assert.equal(controls.panel.width, 248, '所有模板使用共享侧栏宽度')
+          assert.equal(controls.panel.padding, '12px')
+          assert.equal(controls.button.fontSize, '13px')
+          assert.equal(controls.button.height, '32px')
+          await page.mouse.move(0, 0)
+          await zoom.press('ArrowDown')
+          const activeOption = page.locator('.ant-select-dropdown:visible .ant-select-item-option-active')
+          await activeOption.waitFor()
+          // 单选列表打开后先恢复当前选项，再验证下一次方向键。
+          await page.evaluate(() => new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+          ))
+          await page.waitForFunction(() =>
+            document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-active')
+              ?.dataset.selectValue === '1'
+          )
+          await zoom.press('ArrowDown')
+          await page.waitForFunction(() =>
+            document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-active')
+              ?.dataset.selectValue === '1.25'
+          )
+          assert.equal(await activeOption.getAttribute('data-select-value'), '1.25', '方向键可定位目标比例')
+          await zoom.press('Enter')
+          await page.waitForFunction(() => {
+            const control = document.querySelector('.print-zoom-select .ant-select')
+            const stage = document.querySelector('.erp-print-shell__stage')
+            return control?.dataset.value === '1.25' &&
+              stage?.style.getPropertyValue('--print-view-scale') === '1.25'
+          })
+          assert.equal(
+            await readSelectValue(zoom),
+            '1.25',
+            '缩放选择能更新当前比例'
+          )
+
+          const selector = '.erp-print-shell__stage [contenteditable="true"]'
+          const candidates = await page.locator(selector).evaluateAll((nodes) =>
+            nodes.map((node, index) => ({
+              index,
+              text: node.textContent,
+              empty: node.dataset.printEmpty === 'true',
+              align: getComputedStyle(node).textAlign,
+              table: Boolean(node.closest('td, th')),
+              width: node.clientWidth,
+            }))
+          )
+          const chosen = new Set(
+            [
+              0,
+              candidates.find((item) => item.table && item.align === 'center')
+                ?.index,
+              candidates.find(
+                (item) => item.empty && ['left', 'start'].includes(item.align)
+              )?.index,
+              candidates
+                .filter((item) => item.empty)
+                .sort((a, b) => a.width - b.width)[0]?.index,
+            ].filter((index) => index !== undefined)
+          )
+          const hints = []
+          for (const scale of ['1', '1.25']) {
+            await chooseSelectOption(zoom, scale)
+            for (const index of chosen) {
+              const field = page.locator(selector).nth(index)
+              await field.fill('')
+              await field.evaluate((node) => node.blur())
+              await page.mouse.move(0, 0)
+              const readHint = () =>
+                field.evaluate((node) => {
+                  const hint = getComputedStyle(node, '::before')
+                  const measure = document.createElement('span')
+                  measure.textContent = '点击填写'
+                  Object.assign(measure.style, {
+                    position: 'fixed',
+                    visibility: 'hidden',
+                    width: hint.width,
+                    fontFamily: hint.fontFamily,
+                    fontSize: hint.fontSize,
+                    fontWeight: hint.fontWeight,
+                    lineHeight: hint.lineHeight,
+                    whiteSpace: hint.whiteSpace,
+                    overflowWrap: hint.overflowWrap,
+                  })
+                  document.body.append(measure)
+                  const requiredHeight = measure.getBoundingClientRect().height
+                  measure.remove()
+                  return {
+                    content: hint.content,
+                    fieldText: node.textContent.trim(),
+                    fieldWidth: node.clientWidth,
+                    fieldHeight: node.clientHeight,
+                    fieldAlign: getComputedStyle(node).textAlign,
+                    align: hint.textAlign,
+                    left: Number.parseFloat(hint.left),
+                    right: Number.parseFloat(hint.right),
+                    width: Number.parseFloat(hint.width),
+                    height: Number.parseFloat(hint.height),
+                    requiredHeight,
+                    active: document.activeElement === node,
+                  }
+                })
+              const normal = await readHint()
+              assert.equal(
+                normal.content,
+                '"点击填写"',
+                `${template.key} 空值提示无需悬停`
+              )
+              assert.equal(normal.fieldText, '', '提示不是字段值')
+              assert.equal(
+                normal.align,
+                normal.fieldAlign,
+                '提示沿用字段对齐方式'
+              )
+              assert(
+                normal.left >= 0 &&
+                  normal.right >= 0 &&
+                  normal.width + normal.left + normal.right <=
+                    normal.fieldWidth + 1,
+                '窄字段提示不能越过原编辑框'
+              )
+              assert(
+                normal.height <= normal.fieldHeight + 1,
+                '提示不能高过原编辑框'
+              )
+              assert(
+                normal.requiredHeight <= normal.height + 1,
+                '窄字段内的四字提示完整显示，不靠裁切隐藏溢出'
+              )
+              await field.hover()
+              const hovered = await readHint()
+              assert.equal(
+                hovered.content,
+                normal.content,
+                '悬停不改变提示是否显示'
+              )
+              assert.equal(
+                hovered.fieldHeight,
+                normal.fieldHeight,
+                '悬停不改变纸面高度'
+              )
+              await field.click()
+              const focused = await readHint()
+              assert(focused.active, '空字段整格可进入编辑')
+              assert.equal(
+                focused.content,
+                normal.content,
+                '空值焦点态仍保留输入提示'
+              )
+              await field.fill('输入测试')
+              assert.equal(
+                (await readHint()).content,
+                'none',
+                '输入真实值后提示消失'
+              )
+              await field.fill(candidates[index].text)
+              await field.evaluate((node) => node.blur())
+              hints.push({ index, scale, normal })
+            }
+          }
+
+          const selectActions = await panel
+            .getByRole('button', {
+              name: /^选择(?:明细行|色卡块|色卡行|单元格|行)$/,
+            })
+            .all()
+          for (const action of selectActions) {
+            const label = (await action.textContent()).trim()
+            await action.click()
+            await page
+              .getByRole('button', { name: '返回编辑', exact: true })
+              .waitFor({ state: 'visible' })
+            assert.equal(
+              await page
+                .locator('[data-print-edit-mode]')
+                .getAttribute('data-print-edit-mode'),
+              label,
+              '所属工具内准确区分行、色卡块和单元格选择'
+            )
+            assert.equal(
+              await page.locator('.erp-print-shell__feedback').count(),
+              0,
+              '选择状态不另占纸面高度'
+            )
+            assert.equal(
+              await page
+                .getByRole('button', { name: '返回编辑', exact: true })
+                .count(),
+              1,
+              '活动组只有一个退出选择入口'
+            )
+            assert.equal(
+              await page
+                .getByRole('button', { name: /取消选择|取消选区/ })
+                .count(),
+              0,
+              '不并列同义退出按钮'
+            )
+            const selection = page.locator('[data-print-edit-mode]')
+            assert(
+              await selection.evaluate((node) =>
+                Boolean(node.closest('[data-print-tool]'))
+              ),
+              '选择状态和返回入口紧邻当前工具'
+            )
+            await page.getByRole('button', { name: '返回编辑', exact: true }).click()
+            await page.waitForFunction(() => document.querySelector('[data-print-workspace-mode]').dataset.printWorkspaceMode === 'edit')
+            assert.equal(await selection.count(), 0, '返回编辑清除选择并保留工具')
+            await action.click()
+            await page.keyboard.press('Escape')
+            await page.waitForFunction(() =>
+              document.querySelector('[data-print-workspace-mode]').dataset
+                .printWorkspaceMode === 'edit'
+            )
+            assert.equal(
+              await page
+                .getByRole('button', { name: '返回编辑', exact: true })
+                .count(),
+              0,
+              'Esc退出选择，不遗留重复编辑入口'
+            )
+            assert.equal(
+              await page.locator('.erp-print-shell__feedback').count(),
+              0,
+              '退出后不残留旧选择提示'
+            )
+          }
+          const formula = panel
+            .getByRole('region', { name: '计算规则', exact: true })
+            .locator('summary')
+          if (await formula.count()) {
+            await formula.click()
+            assert(
+              await page.locator('.erp-print-shell__formula-panel').isVisible(),
+              '分组标题直接展开计算规则'
+            )
+            await formula.click()
+            assert.equal(
+              await page.locator('.erp-print-shell__formula-panel').isVisible(),
+              false,
+              '同一标题可收起规则'
+            )
+          }
+          await page.emulateMedia({ media: 'print' })
+          assert(
+            await page
+              .locator(selector)
+              .evaluateAll((nodes) =>
+                nodes.every((node) =>
+                  ['none', 'normal'].includes(
+                    getComputedStyle(node, '::before').content
+                  )
+                )
+              ),
+            '打印不保留空值提示'
+          )
+          assert.equal(
+            await page
+              .getByRole('complementary', {
+                name: '打印编辑工具',
+                includeHidden: true,
+              })
+              .evaluate((node) => getComputedStyle(node).display),
+            'none',
+            '打印不输出工具栏'
+          )
+          await page.emulateMedia({ media: 'screen' })
+          await chooseSelectOption(zoom, 'fit')
+          await panel.scrollIntoViewIfNeeded()
+          await page.screenshot({
+            path: path.join(outputDir, `print-controls-${template.key}.png`),
+          })
+
+          await page.setViewportSize({ width: 760, height: 960 })
+          await zoom.scrollIntoViewIfNeeded()
+          assert(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth + 1
+            ),
+            '窄窗口没有整页水平溢出'
+          )
+          const narrowZoom = await page.locator('.print-zoom-select .ant-select').boundingBox()
+          assert(
+            Math.abs(narrowZoom.width - 200) < 1,
+            '窄窗口的缩放控件保持完整宽度'
+          )
+          await chooseSelectOption(zoom, '1.5')
+          assert.equal(await readSelectValue(zoom), '1.5', '窄窗口仍可调整缩放')
+          records.push({ template: template.key, controls, hints })
+        }
+        await writeFile(
+          path.join(outputDir, 'print-workspace-controls.json'),
+          JSON.stringify(records, null, 2)
+        )
+      },
+    },
+  ]
+}
