@@ -1,0 +1,619 @@
+import assert from 'node:assert/strict'
+import path from 'node:path'
+import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
+import { createMobileTouchSession } from './mobileGestureAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
+const productName = '图片预览模拟长耳兔抱枕（可拆卸围巾礼盒款）'
+const auxiliaryProductName = '图片预览模拟小鹿'
+const previewButtonName = `查看${productName}大图`
+const stageSelector = '.erp-task-image-preview__stage'
+const mobilePermissions = [
+  'mobile.engineering.access',
+  'workflow.task.read',
+  'product.read',
+]
+const fixture = {
+  id: 990001,
+  version: 1,
+  task_code: 'STYLE-L1-PREVIEW-001',
+  task_name: '核对图片预览样品',
+  task_group: 'engineering_check',
+  task_status_key: 'blocked',
+  blocked_reason: '等待确认样品颜色',
+  owner_role_key: 'engineering',
+  source_type: 'sales_order',
+  source_no: 'SO-PREVIEW-001',
+  created_at: 1_900_000_000,
+  updated_at: 1_900_000_000,
+  payload: {},
+  display_context: {
+    available: true,
+    source_no: 'SO-PREVIEW-001',
+    items: [
+      {
+        kind: 'product',
+        product_id: 7,
+        image_attachment_id: 8801,
+        name: productName,
+        code: 'PRODUCT-7',
+      },
+      {
+        kind: 'product',
+        product_id: 8,
+        has_product_images: true,
+        name: auxiliaryProductName,
+        code: 'PRODUCT-8',
+      },
+    ],
+  },
+}
+
+async function installPreviewImage(page) {
+  await page.route('**/rpc/workflow', async (route) => {
+    const body = route.request().postDataJSON()
+    if (body.method !== 'get_task_board') {
+      return route.fallback()
+    }
+    await route.fulfill({
+      json: {
+        jsonrpc: '2.0',
+        id: body.id,
+        result: {
+          code: 0,
+          message: '',
+          data: buildWorkflowTaskBoardMock({
+            tasks: [fixture],
+            params: body.params,
+            snapshotAt: 1_800_000_000,
+          }),
+        },
+      },
+    })
+  })
+  // A large raster makes fit, zoom and drag observable without depending on customer media.
+  const image = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1000
+    canvas.height = 900
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#d5e5d9'
+    ctx.fillRect(0, 0, 1000, 900)
+    ctx.fillStyle = '#748f80'
+    for (let y = 0; y < 900; y += 100) {
+      for (let x = 0; x < 1000; x += 100) {
+        ctx.fillRect(x + 20, y + 20, 60, 60)
+      }
+    }
+    return canvas.toDataURL('image/png').split(',')[1]
+  })
+  page.__previewProbe = {
+    reads: [],
+    albumReads: [],
+    fail: false,
+    corrupt: false,
+    hold: false,
+    release: null,
+  }
+  await page.route('**/rpc/attachment', async (route) => {
+    const body = route.request().postDataJSON()
+    const probe = page.__previewProbe
+    if (body.method === 'list_attachments' && body.params.owner_type === 'product' && [7, 8].includes(body.params.owner_id)) {
+      const ownerID = body.params.owner_id
+      probe.albumReads.push(ownerID)
+      return route.fulfill({
+        json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data: {
+          attachments: [{
+            id: ownerID === 7 ? 8801 : 8802, owner_type: 'product', owner_id: ownerID,
+            attachment_type: 'product_image', slot_key: ownerID === 7 ? 'primary' : 'secondary', mime_type: 'image/png',
+          }],
+        } } },
+      })
+    }
+    if (body.method !== 'download_attachment' || ![8801, 8802].includes(body.params.id)) {
+      return route.fallback()
+    }
+    probe.reads.push(body.params.variant || 'original')
+    const original = !body.params.variant
+    const failed = original && probe.fail
+    const content = original && probe.corrupt ? 'bm90LWFuLWltYWdl' : image
+    if (original && probe.hold) {
+      await new Promise((resolve) => {
+        probe.release = resolve
+      })
+    }
+    await route.fulfill({
+      json: {
+        jsonrpc: '2.0',
+        id: body.id,
+        result: {
+          code: failed ? 40010 : 0,
+          message: failed ? '图片暂不可用' : '',
+          data: failed
+            ? {}
+            : {
+                attachment: {
+                  id: body.params.id,
+                  owner_type: 'product',
+                  owner_id: body.params.id === 8801 ? 7 : 8,
+                  mime_type: 'image/png',
+                  content_base64: content,
+                },
+              },
+        },
+      },
+    })
+  })
+}
+
+async function waitImage(page) {
+  await page.waitForFunction(
+    (selector) =>
+      document.querySelector(`${selector} img`)?.naturalWidth === 1000,
+    stageSelector
+  )
+}
+
+async function closePreview(page, button, { escape = false } = {}) {
+  const close = page.getByRole('button', { name: '关闭图片预览', exact: true })
+  if (escape) await close.press('Escape')
+  else await close.click()
+  await page.locator(stageSelector).waitFor({ state: 'detached' })
+  assert.equal(
+    await button.evaluate((node) => node === document.activeElement),
+    true,
+    '关闭后焦点返回原图按钮'
+  )
+}
+
+async function assertLinkedItemsPreviewStability(page) {
+  await page.getByRole('button', { name: '查看2 款产品', exact: true }).click()
+  const association = page.locator('.erp-task-linked-items-modal')
+  const thumbnail = association.getByRole('button', { name: previewButtonName, exact: true })
+  await thumbnail.waitFor()
+  await waitForFiniteAnimations(page)
+
+  const text = association.locator('.erp-task-identity__item').first()
+  const before = await text.boundingBox()
+  await thumbnail.click()
+  await waitImage(page)
+  const during = await text.boundingBox()
+  await closePreview(page, thumbnail)
+  const after = await text.boundingBox()
+  for (const box of [during, after]) {
+    assert.ok(
+      before && box && ['x', 'y', 'width', 'height'].every((key) => Math.abs(box[key] - before[key]) <= 1),
+      `打开和关闭大图时，关联产品文字位置与尺寸应保持稳定: ${JSON.stringify({ before, during, after })}`
+    )
+  }
+  await assertAuxiliaryOnlyPreview(page, association)
+}
+
+async function assertAuxiliaryOnlyPreview(page, association) {
+  const trigger = association.getByRole('button', { name: `查看产品图：${auxiliaryProductName}`, exact: true })
+  await trigger.waitFor()
+  assert.equal(await trigger.locator('img').count(), 0, '辅图不替代主图缩略图')
+  assert.equal(page.__previewProbe.albumReads.includes(8), false, '相册仅在打开时读取')
+  await trigger.click()
+  await waitImage(page)
+  await page.getByText('辅图 · 1 / 1 张', { exact: true }).waitFor()
+  await closePreview(page, trigger)
+  assert.equal(await association.isVisible(), true, '关闭相册保留关联产品列表')
+}
+
+async function assertPreview(
+  page,
+  button,
+  outputDir,
+  name,
+  { touch = false } = {}
+) {
+  await button.scrollIntoViewIfNeeded()
+  const before = await page.evaluate(() => ({ url: location.href, y: scrollY }))
+  const details = page.locator(
+    '.erp-task-action-drawer:visible, [data-testid="mobile-task-detail-screen"]'
+  )
+  const detailCount = await details.count()
+  const readsBefore = page.__previewProbe.reads.filter(
+    (v) => v === 'original'
+  ).length
+  await button.focus()
+  if (touch) {
+    await button.tap()
+  } else await button.press('Enter')
+  await waitImage(page)
+  assert.equal(await details.count(), detailCount, '点图不改变任务详情')
+  assert.equal(
+    page.__previewProbe.reads.filter((v) => v === 'original').length,
+    readsBefore + 1
+  )
+  const dialog = page.getByRole('dialog', {
+    name: `${productName}图片预览`,
+    exact: true,
+  })
+  await dialog.waitFor({ state: 'visible' })
+  await page.waitForFunction(() => {
+    const preview = document.querySelector(
+      '.erp-task-image-preview .ant-image-preview'
+    )
+    return (
+      preview &&
+      getComputedStyle(preview).transform === 'none' &&
+      getComputedStyle(preview).opacity === '1'
+    )
+  })
+  await dialog
+    .getByRole('button', { name: '关闭图片预览', exact: true })
+    .hover()
+  const help = dialog.getByRole('button', { name: '查看看图操作帮助', exact: true })
+  assert.equal(await help.getAttribute('aria-expanded'), 'false', '看图帮助默认收起')
+  const footerBeforeHelp = await dialog.locator('.erp-task-image-preview__footer').boundingBox()
+  await help.click()
+  if (touch) {
+    await page
+      .getByText('双指缩放 · 放大后拖动', { exact: true })
+      .waitFor({ state: 'visible' })
+  } else {
+    await page.getByText('滚轮缩放 · 拖动查看', { exact: true }).waitFor({ state: 'visible' })
+  }
+  const footerWithHelp = await dialog.locator('.erp-task-image-preview__footer').boundingBox()
+  assert.ok(Math.abs(footerBeforeHelp.height - footerWithHelp.height) <= 1, '按需帮助不增加底栏高度')
+  await help.press('Escape')
+  assert.equal(await help.getAttribute('aria-expanded'), 'false')
+  assert.equal(await dialog.isVisible(), true, 'Escape 先关闭帮助，保留图片预览')
+  await page.screenshot({ path: path.join(outputDir, `${name}-open.png`) })
+  assert.equal(
+    await dialog.locator('button, summary').count(),
+    5,
+    '预览保留关闭、缩放和按需帮助'
+  )
+  const geometry = await page.evaluate((selector) => {
+    const rect = document.querySelector(selector).getBoundingClientRect()
+    const image = document
+      .querySelector(`${selector} img`)
+      .getBoundingClientRect()
+    const header = document
+      .querySelector('.erp-task-image-preview__header')
+      .getBoundingClientRect()
+    const footer = document
+      .querySelector('.erp-task-image-preview__footer')
+      .getBoundingClientRect()
+    const buttons = Array.from(
+      document.querySelectorAll('.erp-task-image-preview button, .erp-task-image-preview summary')
+    ).filter((el) => el.getBoundingClientRect().width > 0)
+    return {
+      stageTop: rect.top,
+      stageBottom: rect.bottom,
+      headerBottom: header.bottom,
+      footerTop: footer.top,
+      footerHeight: footer.height,
+      imageWidth: image.width,
+      stageWidth: rect.width,
+      buttons: buttons.map((el) => ({
+        w: el.getBoundingClientRect().width,
+        h: el.getBoundingClientRect().height,
+      })),
+    }
+  }, stageSelector)
+  assert.ok(
+    geometry.headerBottom <= geometry.stageTop &&
+      geometry.stageBottom <= geometry.footerTop,
+    JSON.stringify(geometry)
+  )
+  assert.ok(geometry.imageWidth <= geometry.stageWidth)
+  assert.ok(geometry.footerHeight <= 72, JSON.stringify(geometry))
+  assert.ok(
+    geometry.buttons.every((box) => box.w >= 44 && box.h >= 44),
+    JSON.stringify(geometry)
+  )
+  const img = page.locator(`${stageSelector} img`)
+  const initial = await img.getAttribute('style')
+  await dialog.getByRole('button', { name: '放大图片', exact: true }).click()
+  await page.waitForFunction(
+    ({ selector, initial }) =>
+      document.querySelector(`${selector} img`).getAttribute('style') !==
+      initial,
+    { selector: stageSelector, initial }
+  )
+  assert.equal(
+    await dialog
+      .getByRole('button', { name: '缩小图片', exact: true })
+      .isEnabled(),
+    true
+  )
+  await dialog.getByRole('button', { name: '适应屏幕', exact: true }).click()
+  await page.waitForFunction(
+    ({ selector, initial }) =>
+      document.querySelector(`${selector} img`).getAttribute('style') ===
+      initial,
+    { selector: stageSelector, initial }
+  )
+  if (touch) {
+    const cdp = page.__previewTouchSession
+    const box = await img.boundingBox()
+    const cx = box.x + box.width / 2
+    const cy = box.y + box.height / 2
+    const points = (distance) => [
+      { id: 1, x: cx - distance, y: cy },
+      { id: 2, x: cx + distance, y: cy },
+    ]
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: points(35),
+    })
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: points(90),
+    })
+    await page.waitForFunction(
+      (selector) =>
+        new DOMMatrix(
+          getComputedStyle(document.querySelector(`${selector} img`)).transform
+        ).a > 1.5,
+      stageSelector
+    )
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ id: 1, x: cx, y: cy }],
+    })
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ id: 1, x: cx + 45, y: cy + 25 }],
+    })
+    await page.waitForFunction(
+      (selector) =>
+        Math.abs(
+          new DOMMatrix(
+            getComputedStyle(
+              document.querySelector(`${selector} img`)
+            ).transform
+          ).e
+        ) > 10,
+      stageSelector
+    )
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+  } else {
+    await img.hover()
+    await page.mouse.wheel(0, -120)
+    await page.waitForFunction(
+      (selector) =>
+        new DOMMatrix(
+          getComputedStyle(document.querySelector(`${selector} img`)).transform
+        ).a > 1,
+      stageSelector
+    )
+    await page.mouse.down()
+    const box = await img.boundingBox()
+    await page.mouse.move(
+      box.x + box.width / 2 + 60,
+      box.y + box.height / 2 + 30
+    )
+    await page.waitForFunction(
+      (selector) =>
+        Math.abs(
+          new DOMMatrix(
+            getComputedStyle(
+              document.querySelector(`${selector} img`)
+            ).transform
+          ).e
+        ) > 10,
+      stageSelector
+    )
+    await page.mouse.up()
+  }
+  for (let i = 0; i < 7; i += 1) {
+    await page.keyboard.press('Tab')
+    assert.equal(
+      await dialog.evaluate((el) => el.contains(document.activeElement)),
+      true,
+      'Tab 焦点不得离开预览'
+    )
+  }
+  await closePreview(page, button, { escape: !touch })
+  assert.deepEqual(
+    await page.evaluate(() => ({ url: location.href, y: scrollY })),
+    before,
+    '关闭后保留地址和滚动位置'
+  )
+}
+
+export function createTaskImagePreviewScenarios({
+  outputDir,
+  customerRuntimeEffectiveSession,
+}) {
+  const common = {
+    auth: 'admin',
+    customerKey: 'yoyoosun',
+    effectiveSession: customerRuntimeEffectiveSession,
+    workflowTaskFixtures: [fixture],
+    beforeNavigate: installPreviewImage,
+  }
+  return [
+    {
+      ...common,
+      name: 'business-split-image-preview',
+      path: '/erp/task-board?q=图片预览',
+      viewport: { width: 1920, height: 1080 },
+      verify: async (page) => {
+        await page.getByRole('button', { name: '分栏', exact: true }).first().click()
+        const left = page.locator('.erp-split-pane--left')
+        const right = page.locator('.erp-split-pane--right')
+        const button = left.getByRole('button', { name: previewButtonName, exact: true }).first()
+        await button.click()
+        const dialog = page.getByRole('dialog', { name: `${productName}图片预览`, exact: true })
+        await dialog.waitFor()
+        await waitImage(page)
+        await waitForFiniteAnimations(page)
+        const region = await left.boundingBox()
+        const preview = await dialog.boundingBox()
+        assert.ok(preview.x >= region.x - 1 && preview.y >= region.y - 1 && preview.x + preview.width <= region.x + region.width + 1 && preview.y + preview.height <= region.y + region.height + 1, JSON.stringify({ region, preview }))
+        assert.equal(await dialog.getAttribute('aria-modal'), 'false')
+        const picker = right.getByRole('combobox', { name: '选择右栏页面' })
+        await picker.click()
+        await picker.fill('任务管理')
+        await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
+        await picker.focus()
+        await dialog.getByRole('button', { name: '关闭图片预览', exact: true }).evaluate((node) => node.click())
+        await dialog.waitFor({ state: 'hidden' })
+        assert.equal(await picker.evaluate((node) => document.activeElement === node), true, '关闭另一栏图片不能抢走当前焦点')
+        assert.equal(await left.getAttribute('inert'), null)
+        await button.click()
+        await closePreview(page, button, { escape: true })
+      },
+    },
+    {
+      ...common,
+      name: 'task-image-preview-desktop',
+      path: '/erp/task-board?q=图片预览',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const button = page
+          .getByRole('button', { name: previewButtonName, exact: true })
+          .first()
+        await button.waitFor()
+        assert.equal(
+          page.__previewProbe.reads.includes('original'),
+          false,
+          '打开预览前不请求原图'
+        )
+        await assertPreview(
+          page,
+          button,
+          outputDir,
+          'task-image-preview-desktop'
+        )
+        await page
+          .getByRole('button', {
+            name: '查看核对图片预览样品详情',
+            exact: true,
+          })
+          .click()
+        const drawer = page.locator('.erp-task-action-drawer:visible')
+        await drawer.waitFor()
+        await assertPreview(
+          page,
+          drawer.getByRole('button', { name: previewButtonName, exact: true }),
+          outputDir,
+          'task-image-preview-detail'
+        )
+        assert.equal(await drawer.isVisible(), true, '关闭图片保留任务详情')
+        await drawer.locator('.ant-drawer-close').click()
+        for (const [url, name] of [
+          [
+            '/erp/task-board?q=图片预览&lane=exception',
+            'task-image-preview-table',
+          ],
+          ['/erp/task-board?view=risk', 'task-image-preview-risk'],
+        ]) {
+          await page.goto(new URL(url, page.url()).href)
+          await assertPreview(page, button, outputDir, name)
+        }
+        await assertLinkedItemsPreviewStability(page)
+      },
+    },
+    {
+      ...common,
+      name: 'task-image-preview-mobile',
+      path: '/m/engineering/tasks?keyword=图片预览',
+      adminProfile: {
+        username: 'style-l1-image-preview',
+        is_super_admin: false,
+        roles: [{ role_key: 'engineering', name: '工程' }],
+        permissions: mobilePermissions,
+        menus: [],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: mobilePermissions,
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['engineering'],
+        },
+      },
+      viewport: { width: 390, height: 844 },
+      themeMode: 'dark',
+      beforeNavigate: async (page) => {
+        await installPreviewImage(page)
+        page.__previewTouchSession = await createMobileTouchSession(page)
+      },
+      verify: async (page) => {
+        const button = page
+          .getByRole('button', { name: previewButtonName, exact: true })
+          .first()
+        await button.waitFor()
+        await assertPreview(
+          page,
+          button,
+          outputDir,
+          'task-image-preview-mobile',
+          { touch: true }
+        )
+        await page.setViewportSize({ width: 320, height: 640 })
+        await assertPreview(
+          page,
+          button,
+          outputDir,
+          'task-image-preview-mobile-narrow',
+          { touch: true }
+        )
+        for (const failure of ['fail', 'corrupt']) {
+          page.__previewProbe[failure] = true
+          await button.click()
+          await page
+            .getByRole('alert')
+            .filter({ hasText: '图片加载失败，请重试' })
+            .waitFor()
+          assert.equal(
+            await page
+              .getByRole('button', { name: '放大图片', exact: true })
+              .isDisabled(),
+            true
+          )
+          page.__previewProbe[failure] = false
+          await page
+            .getByRole('button', { name: '重新加载', exact: true })
+            .click()
+          await waitImage(page)
+          await closePreview(page, button)
+        }
+        page.__previewProbe.hold = true
+        const pending = page.waitForRequest(
+          (request) =>
+            request.url().endsWith('/rpc/attachment') &&
+            !request.postDataJSON()?.params?.variant
+        )
+        await button.click()
+        await pending
+        await page
+          .getByRole('status')
+          .filter({ hasText: '正在加载图片' })
+          .waitFor()
+        await closePreview(page, button)
+        const finished = page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/rpc/attachment') &&
+            !response.request().postDataJSON()?.params?.variant
+        )
+        page.__previewProbe.release()
+        await finished
+        assert.equal(
+          await page.locator(stageSelector).count(),
+          0,
+          '迟到响应不能重新打开预览'
+        )
+        page.__previewProbe.hold = false
+        await button.click()
+        await waitImage(page)
+        await closePreview(page, button)
+        await page.getByRole('button', { name: '查看2 款产品', exact: true }).click()
+        await assertAuxiliaryOnlyPreview(page, page.locator('.erp-task-linked-items-modal'))
+      },
+    },
+  ]
+}
