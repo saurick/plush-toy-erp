@@ -1,0 +1,501 @@
+import React, { useCallback, useLayoutEffect, useRef } from 'react'
+import ContractBlankRows from './ContractBlankRows.jsx'
+import {
+  formatContractPaperPrice,
+  formatContractPaperAmount,
+  formatContractPaperDate,
+} from '../../utils/contractPaperPresentation.mjs'
+
+import PrintEditableText from './PrintEditableText.jsx'
+import {
+  calculateProcessingContractTotals,
+  PROCESSING_CONTRACT_TABLE_COLUMNS,
+  resolveProcessingLineAmount,
+} from '../../data/processingContractTemplate.mjs'
+import {
+  findMergeAtCell,
+  isCellInsideSelection,
+  isMergeTopLeftCell,
+} from '../../utils/detailCellMerge.mjs'
+import { PrintAppendixImages } from './PrintAppendixImages.jsx'
+import { visibleContractClauseGroups } from '../../utils/contractClauseEditor.mjs'
+import { renderPrintValue } from './printValue.mjs'
+
+function normalizeEditableText(value, multiline = false) {
+  const rawText = String(value ?? '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\r/g, '')
+  if (multiline) {
+    return rawText.replace(/\n{3,}/g, '\n\n').trimEnd()
+  }
+  return rawText.replace(/\s+/g, ' ').trim()
+}
+
+function EditableText({
+  as: Component = 'span',
+  value,
+  className,
+  multiline = false,
+  onCommit,
+  disabled = false,
+  formatValue = String,
+}) {
+  const displayText = formatValue(value ?? '') || '\u00A0'
+  const presentedText = useRef(displayText)
+  const rawValue = useRef(value ?? '')
+  useLayoutEffect(() => {
+    rawValue.current = value ?? ''
+    presentedText.current = displayText
+  }, [value, displayText])
+  const commitElementValue = useCallback(
+    (element, { normalizeElement = false } = {}) => {
+      if (disabled) {
+        return
+      }
+      if (typeof onCommit === 'function') {
+        const nextValue = normalizeEditableText(
+          multiline ? element.innerText : element.textContent,
+          multiline
+        )
+        const unchanged =
+          (presentedText.current !== null &&
+            nextValue ===
+              normalizeEditableText(presentedText.current, multiline)) ||
+          nextValue === normalizeEditableText(rawValue.current, multiline)
+        if (!unchanged) {
+          rawValue.current = nextValue
+          presentedText.current = null
+          onCommit(nextValue)
+        }
+        if (normalizeElement) {
+          presentedText.current = formatValue(rawValue.current) || '\u00A0'
+          element.textContent = presentedText.current
+        }
+      }
+    },
+    [disabled, multiline, onCommit, formatValue]
+  )
+
+  return (
+    <PrintEditableText
+      as={Component}
+      value={value}
+      text={displayText}
+      commitElementValue={commitElementValue}
+      disabled={disabled}
+      className={`${className}${disabled ? ' erp-processing-contract-editable--disabled' : ''}`}
+    />
+  )
+}
+
+function ContractMetaRow({ label, value, onCommit, disabled = false }) {
+  return (
+    <div
+      className="erp-processing-contract-meta__row"
+      data-print-blank-field=""
+    >
+      <span className="erp-processing-contract-meta__label">{label}</span>
+      <EditableText
+        value={value}
+        className="erp-processing-contract-meta__value"
+        onCommit={onCommit}
+        disabled={disabled}
+      />
+    </div>
+  )
+}
+
+function ContractTableCell({
+  value,
+  className,
+  multiline = false,
+  onCommit,
+  readOnly = false,
+  disabled = false,
+  formatValue = String,
+}) {
+  if (readOnly || disabled) {
+    return (
+      <span className={className}>
+        {renderPrintValue(formatValue(value ?? ''))}
+      </span>
+    )
+  }
+
+  return (
+    <EditableText
+      formatValue={formatValue}
+      value={value}
+      className={className}
+      multiline={multiline}
+      onCommit={onCommit}
+      disabled={disabled}
+    />
+  )
+}
+
+export default function ProcessingContractPaper({
+  paperRef = null,
+  contract,
+  selectedLineIndex = null,
+  lineSelectionMode = false,
+  cellSelectionMode = false,
+  mergeSelection = null,
+  activeCell = null,
+  onSelectLine,
+  onSelectCell,
+  onFieldChange,
+  onLineFieldChange,
+  onClauseChange,
+  onClauseTitleChange,
+  onClauseFocus,
+  readOnly = false,
+  preview = false,
+}) {
+  const printableLines = Array.isArray(contract?.lines) ? contract.lines : []
+  const totals = calculateProcessingContractTotals(contract?.lines || [], {
+    merges: contract?.merges,
+  })
+  const templateModesActive = readOnly || lineSelectionMode || cellSelectionMode
+  const clauseGroups = visibleContractClauseGroups(contract.clauses)
+
+  return (
+    <div
+      className={`erp-processing-contract-paper${preview ? ' erp-processing-contract-paper--preview' : ''}`}
+      ref={paperRef}
+    >
+      <header className="erp-processing-contract-paper__header">
+        <div className="erp-processing-contract-paper__title">合同订单</div>
+      </header>
+
+      <section
+        className="erp-processing-contract-meta"
+        data-print-blank-region=""
+      >
+        <div className="erp-processing-contract-meta__column">
+          <ContractMetaRow
+            label="合同编号："
+            value={contract.contractNo}
+            onCommit={(value) => onFieldChange('contractNo', value)}
+            disabled={templateModesActive}
+          />
+          <ContractMetaRow
+            label="加工方名称："
+            value={contract.supplierName}
+            onCommit={(value) => onFieldChange('supplierName', value)}
+            disabled={templateModesActive}
+          />
+          <ContractMetaRow
+            label="联系人："
+            value={contract.supplierContact}
+            onCommit={(value) => onFieldChange('supplierContact', value)}
+            disabled={templateModesActive}
+          />
+          <ContractMetaRow
+            label="联系电话："
+            value={contract.supplierPhone}
+            onCommit={(value) => onFieldChange('supplierPhone', value)}
+            disabled={templateModesActive}
+          />
+          <ContractMetaRow
+            label="供应商地址："
+            value={contract.supplierAddress}
+            onCommit={(value) => onFieldChange('supplierAddress', value)}
+            disabled={templateModesActive}
+          />
+        </div>
+
+        <div className="erp-processing-contract-meta__column">
+          <div className="erp-processing-contract-meta__top-row">
+            <ContractMetaRow
+              label="下单日期："
+              value={contract.orderDateText}
+              onCommit={(value) => onFieldChange('orderDateText', value)}
+              disabled={templateModesActive}
+            />
+            <ContractMetaRow
+              label="回货日期："
+              value={contract.returnDateText}
+              onCommit={(value) => onFieldChange('returnDateText', value)}
+              disabled={templateModesActive}
+            />
+          </div>
+          <ContractMetaRow
+            label="委托单位："
+            value={contract.buyerCompany}
+            onCommit={(value) => onFieldChange('buyerCompany', value)}
+            disabled={templateModesActive}
+          />
+          <ContractMetaRow
+            label="委托人："
+            value={contract.buyerContact}
+            onCommit={(value) => onFieldChange('buyerContact', value)}
+            disabled={templateModesActive}
+          />
+          <ContractMetaRow
+            label="联系电话："
+            value={contract.buyerPhone}
+            onCommit={(value) => onFieldChange('buyerPhone', value)}
+            disabled={templateModesActive}
+          />
+          <ContractMetaRow
+            label="公司地址："
+            value={contract.buyerAddress}
+            onCommit={(value) => onFieldChange('buyerAddress', value)}
+            disabled={templateModesActive}
+          />
+        </div>
+      </section>
+
+      <table className="erp-processing-contract-table" data-table-lines="fixed">
+        <colgroup>
+          {PROCESSING_CONTRACT_TABLE_COLUMNS.map((column) => (
+            <col
+              key={column.key}
+              style={{
+                width: `${(column.width / PROCESSING_CONTRACT_TABLE_COLUMNS.reduce((sum, item) => sum + item.width, 0)) * 100}%`,
+              }}
+            />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            {PROCESSING_CONTRACT_TABLE_COLUMNS.map((column) => (
+              <th key={column.key}>{column.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {printableLines.map((line, index) => {
+            const isSelected = selectedLineIndex === index
+            const isPlaceholderLine = index >= (contract?.lines?.length || 0)
+            return (
+              <tr
+                key={`line-${index}`}
+                data-print-blank-row=""
+                className={
+                  isSelected
+                    ? 'erp-processing-contract-table__row--selected'
+                    : ''
+                }
+                onMouseDown={() => {
+                  if (lineSelectionMode && !isPlaceholderLine) {
+                    onSelectLine(index)
+                  }
+                }}
+              >
+                {PROCESSING_CONTRACT_TABLE_COLUMNS.map((column, colIndex) => {
+                  const merge = findMergeAtCell(
+                    contract.merges,
+                    index,
+                    colIndex
+                  )
+                  if (merge && !isMergeTopLeftCell(merge, index, colIndex)) {
+                    return null
+                  }
+
+                  const isSelectionAnchor =
+                    activeCell?.rowIndex === index &&
+                    activeCell?.colIndex === colIndex
+                  const isSelectedCell = isCellInsideSelection(
+                    mergeSelection,
+                    index,
+                    colIndex
+                  )
+                  const value =
+                    column.key === 'amount'
+                      ? resolveProcessingLineAmount(line)
+                      : line[column.fieldKey]
+
+                  return (
+                    <td
+                      key={`${column.key}-${index}`}
+                      data-print-blank-field={
+                        column.readOnly || isPlaceholderLine
+                          ? undefined
+                          : column.key
+                      }
+                      rowSpan={
+                        merge ? merge.rowEnd - merge.rowStart + 1 : undefined
+                      }
+                      colSpan={
+                        merge ? merge.colEnd - merge.colStart + 1 : undefined
+                      }
+                      className={[
+                        merge
+                          ? 'erp-processing-contract-table__cell-merged'
+                          : '',
+                        isSelectedCell
+                          ? 'erp-processing-contract-table__cell-selected'
+                          : '',
+                        isSelectionAnchor
+                          ? 'erp-processing-contract-table__cell-selected-anchor'
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onMouseDown={(event) => {
+                        if (!cellSelectionMode || isPlaceholderLine) {
+                          return
+                        }
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onSelectCell(index, colIndex)
+                      }}
+                    >
+                      <ContractTableCell
+                        formatValue={
+                          column.key === 'unitPrice'
+                            ? formatContractPaperPrice
+                            : column.key === 'amount'
+                              ? formatContractPaperAmount
+                              : String
+                        }
+                        value={value}
+                        className={`erp-processing-contract-table__cell${
+                          column.multiline
+                            ? ' erp-processing-contract-table__cell--multiline'
+                            : ''
+                        }`}
+                        multiline={column.multiline}
+                        onCommit={(value) =>
+                          column.fieldKey
+                            ? onLineFieldChange(index, column.fieldKey, value)
+                            : column.key === 'amount'
+                              ? onLineFieldChange(index, 'amount', value)
+                              : undefined
+                        }
+                        readOnly={column.readOnly}
+                        disabled={templateModesActive || isPlaceholderLine}
+                      />
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+          <ContractBlankRows
+            lineCount={printableLines.length}
+            columns={PROCESSING_CONTRACT_TABLE_COLUMNS}
+          />
+          <tr className="erp-processing-contract-table__total">
+            {PROCESSING_CONTRACT_TABLE_COLUMNS.slice(0, 6).map(({ key }) => (
+              <td key={key} />
+            ))}
+            <td className="erp-processing-contract-table__total-label">合计</td>
+            <td />
+            <td />
+            <td className="erp-contract-table__total-value">
+              {totals.totalQuantityText || '\u00A0'}
+            </td>
+            <td className="erp-contract-table__total-value">
+              {formatContractPaperAmount(totals.totalAmountText) || '\u00A0'}
+            </td>
+            <td />
+          </tr>
+        </tbody>
+      </table>
+
+      {clauseGroups.length > 0 ? (
+        <section className="erp-processing-contract-clauses">
+          {clauseGroups.map((group) => (
+            <div
+              className="erp-processing-contract-clauses__group"
+              key={group.key}
+              data-print-clause-group={group.key}
+            >
+              <div className="erp-processing-contract-clauses__title">
+                {group.number}、
+                <span
+                  data-print-blank-field=""
+                  onFocusCapture={() => onClauseFocus?.(group.key, null)}
+                >
+                  <EditableText
+                    as="span"
+                    value={group.label}
+                    className="erp-contract-clause-title__value"
+                    disabled={templateModesActive}
+                    onCommit={(value) => onClauseTitleChange(group.key, value)}
+                  />
+                </span>
+                ：
+              </div>
+              <ol>
+                {group.items.map((item, index) => (
+                  <li
+                    key={`${group.key}-${index}`}
+                    className="erp-processing-contract-clauses__item"
+                    data-print-blank-field=""
+                    data-print-clause-index={index}
+                    onFocusCapture={() => onClauseFocus?.(group.key, index)}
+                  >
+                    <span className="erp-processing-contract-clauses__item-index">
+                      {index + 1}、
+                    </span>
+                    <EditableText
+                      as="span"
+                      value={item}
+                      className="erp-processing-contract-clauses__editable"
+                      multiline
+                      disabled={templateModesActive}
+                      onCommit={(value) =>
+                        onClauseChange(group.key, index, value)
+                      }
+                    />
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      <section className="erp-processing-contract-signature">
+        <div className="erp-processing-contract-signature__block">
+          <div className="erp-processing-contract-signature__label">
+            甲方（委托方）：
+            <EditableText
+              value={contract.buyerSigner}
+              className="erp-processing-contract-signature__name-value"
+              disabled={templateModesActive}
+              onCommit={(value) => onFieldChange('buyerSigner', value)}
+            />
+          </div>
+          <div className="erp-processing-contract-signature__date">
+            日期：
+            <EditableText
+              formatValue={formatContractPaperDate}
+              value={contract.buyerSignDateText}
+              className="erp-processing-contract-signature__date-value"
+              disabled={templateModesActive}
+              onCommit={(value) => onFieldChange('buyerSignDateText', value)}
+            />
+          </div>
+        </div>
+        <div className="erp-processing-contract-signature__block">
+          <div className="erp-processing-contract-signature__label">
+            乙方（受托方）：
+            <EditableText
+              value={contract.supplierSigner}
+              className="erp-processing-contract-signature__name-value"
+              disabled={templateModesActive}
+              onCommit={(value) => onFieldChange('supplierSigner', value)}
+            />
+          </div>
+          <div className="erp-processing-contract-signature__date">
+            日期：
+            <EditableText
+              formatValue={formatContractPaperDate}
+              value={contract.supplierSignDateText}
+              className="erp-processing-contract-signature__date-value"
+              disabled={templateModesActive}
+              onCommit={(value) => onFieldChange('supplierSignDateText', value)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <PrintAppendixImages images={contract.appendixImages} autoColumns={3} />
+    </div>
+  )
+}
