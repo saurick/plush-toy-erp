@@ -1,0 +1,54 @@
+package data
+
+import (
+	"context"
+	"server/internal/biz"
+)
+
+// Counts share the list predicates, but never its selected status or pagination.
+func scanBusinessStatusCounts(ctx context.Context, scan func(context.Context, any) error) (map[string]int, error) {
+	var rows []struct {
+		Status          string `json:"status"`
+		LifecycleStatus string `json:"lifecycle_status"`
+		TaskStatusKey   string `json:"task_status_key"`
+		Count           int    `json:"count"`
+	}
+	if err := scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int, len(rows))
+	for _, row := range rows {
+		status := row.Status
+		if status == "" {
+			status = row.LifecycleStatus
+		}
+		if status == "" {
+			status = row.TaskStatusKey
+		}
+		counts[status] = row.Count
+	}
+	return counts, nil
+}
+
+var (
+	_ biz.SalesOrdersStatusCounter        = (*salesOrderRepo)(nil)
+	_ biz.PurchaseOrdersStatusCounter     = (*purchaseOrderRepo)(nil)
+	_ biz.OutsourcingOrdersStatusCounter  = (*outsourcingOrderRepo)(nil)
+	_ biz.ProductionOrdersStatusCounter   = (*productionOrderRepo)(nil)
+	_ biz.QualityInspectionsStatusCounter = (*inventoryRepo)(nil)
+	_ biz.ShipmentsStatusCounter          = (*operationalFactRepo)(nil)
+	_ biz.FinancePaymentsStatusCounter    = (*operationalFactRepo)(nil)
+	_ biz.FinanceCreditNotesStatusCounter = (*operationalFactRepo)(nil)
+)
+
+var _ biz.FinanceFactsStatusCounter = (*operationalFactRepo)(nil)
+
+var (
+	_ biz.PurchaseReceiptsStatusCounter     = (*inventoryRepo)(nil)
+	_ biz.InventoryLotsStatusCounter        = (*inventoryRepo)(nil)
+	_ biz.BOMHeadersStatusCounter           = (*inventoryRepo)(nil)
+	_ biz.WorkflowTasksStatusCounter        = (*workflowRepo)(nil)
+	_ biz.ProductionFactsStatusCounter      = (*operationalFactRepo)(nil)
+	_ biz.StockReservationsStatusCounter    = (*operationalFactRepo)(nil)
+	_ biz.ProductionExceptionsStatusCounter = (*operationalFactRepo)(nil)
+)
