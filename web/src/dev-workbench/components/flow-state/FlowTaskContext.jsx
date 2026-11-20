@@ -1,0 +1,282 @@
+import React, { useEffect, useRef, useState } from 'react'
+import { Alert, Button, Space, Spin, Tag } from 'antd'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
+import { Text, cleanText } from './FlowStateShared.jsx'
+import SearchInput from '@/common/components/SearchInput'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { listWorkflowTasks } from '@/erp/api/workflowApi.mjs'
+import { getWorkflowTaskDisplayName } from '@/erp/utils/processRuntimePresentation.mjs'
+import {
+  getWorkflowTaskOwnerRoleLabel,
+  getWorkflowTaskStatusMeta,
+} from '@/erp/utils/workflowTaskBoard.mjs'
+import { getPermissionCenterRoleName } from '../../../erp/utils/permissionCenterAccess.mjs'
+import { SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS } from '../../../../../config/catalog/customerPackageCatalog.mjs'
+import {
+  buildDevFlowStateTaskLookupQuery,
+  parseDevFlowStateTaskIDReference,
+  resolveDevFlowStateTaskLookupPage,
+} from '../../pages/devFlowStateTaskLookup.mjs'
+
+function getProcessOwnerPoolLabel(ownerPool) {
+  const roleKey = SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.find(
+    (item) => item.pool_key === ownerPool
+  )?.source_pool_key || ownerPool
+  const label = getPermissionCenterRoleName({ role_key: roleKey })
+  return label === '已配置岗位' ? ownerPool : label
+}
+
+function BusinessChainProjectionContext({
+  projection,
+  onBackToChain,
+  onClearChainContext,
+}) {
+  if (!projection) return null
+  const nodeLabel = projection.node ? ` · ${projection.node.label}` : ''
+  return (
+    <section
+      className="erp-dev-flow-chain-projection-context"
+      data-chain-projection-context={projection.chain?.key || 'all'}
+    >
+      <div>
+        <Text type="secondary">关联业务</Text>
+        <strong>
+          {projection.contextLabel || projection.chain.label}
+          {nodeLabel}
+        </strong>
+      </div>
+      <Space wrap>
+        {onBackToChain ? <Button size="small" onClick={onBackToChain}>回到链路步骤</Button> : null}
+        <Button size="small" onClick={onClearChainContext}>
+          查看全部定义
+        </Button>
+      </Space>
+    </section>
+  )
+}
+
+function TaskLookupResults({ lookup, onSelectTask, onRetry }) {
+  if (lookup.status === 'loading') {
+    return (
+      <div className="erp-dev-flow-loading" role="status" aria-live="polite">
+        <Spin />
+        <span>正在当前账号可见任务中查找…</span>
+      </div>
+    )
+  }
+  if (lookup.status === 'error') {
+    return (
+      <Alert
+        showIcon
+        type="error"
+        message="任务查找失败"
+        action={<Button onClick={onRetry}>重试</Button>}
+        description={lookup.error}
+      />
+    )
+  }
+  if (lookup.status !== 'ready') return null
+  if (lookup.candidates.length === 0) {
+    return (
+      <Empty
+        description="没有找到名称、任务编号或来源单号相符的可见任务"
+      />
+    )
+  }
+  return (
+    <section className="erp-dev-flow-task-results" aria-label="任务查询结果">
+      <div className="erp-dev-flow-section-heading">
+        <div>
+          <Text strong>
+            {lookup.candidates.length > 1
+              ? `找到 ${lookup.candidates.length} 条同名或相关任务`
+              : '找到 1 条相关任务'}
+          </Text>
+          <Text type="secondary">
+            名称可能重复，请结合任务编号、来源单号、负责岗位和状态选择。
+          </Text>
+        </div>
+        <Tag>{lookup.serverMatchCount} 条后端匹配</Tag>
+      </div>
+      {!lookup.complete ? (
+        <Alert
+          showIcon
+          type="warning"
+          message={`当前只读取最新 ${lookup.loadedCount} 条匹配任务`}
+          description="结果不完整时不会自动选择；请补全任务名称、任务编号或来源单号。"
+        />
+      ) : null}
+      <ul>
+        {lookup.candidates.map((task) => {
+          const status = getWorkflowTaskStatusMeta(task)
+          const sourceNo = cleanText(task.source_no) || '未记录来源单号'
+          return (
+            <li key={task.id}>
+              <button
+                type="button"
+                className="erp-dev-directory-item erp-dev-directory-item--stacked"
+                onClick={() => onSelectTask(task)}
+                aria-label={`读取任务：${getWorkflowTaskDisplayName(task)}；任务编号：${task.task_code}；来源单号：${sourceNo}`}
+              >
+                <span>
+                  <strong>{getWorkflowTaskDisplayName(task)}</strong>
+                  <Tag color={status.color}>{status.label}</Tag>
+                </span>
+                <small>任务编号：{task.task_code}</small>
+                <small>来源单号：{sourceNo}</small>
+                <small>负责岗位：{getWorkflowTaskOwnerRoleLabel(task)}</small>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
+function TaskFinder({
+  draft,
+  onDraftChange,
+  onClearTask,
+  onSelectTask,
+  taskId,
+}) {
+  const controllerRef = useRef(null)
+  const inputRef = useRef(null)
+  const requestedKeywordRef = useRef(null)
+  const [lookup, setLookup] = useState({
+    status: 'idle',
+    candidates: [],
+    complete: true,
+    loadedCount: 0,
+    serverMatchCount: 0,
+    error: '',
+  })
+  useEffect(() => () => controllerRef.current?.abort(), [])
+
+  const selectTask = (task) => {
+    controllerRef.current?.abort()
+    setLookup((current) => ({
+      ...current,
+      status: 'selected',
+      candidates: [],
+      error: '',
+    }))
+    onDraftChange(task.task_name)
+    onSelectTask(task.id, task)
+  }
+
+  const submit = async (keyword) => {
+    requestedKeywordRef.current = keyword
+    controllerRef.current?.abort()
+    onDraftChange(keyword)
+    const directTaskId = parseDevFlowStateTaskIDReference(keyword)
+    if (directTaskId) {
+      setLookup((current) => ({
+        ...current,
+        status: 'selected',
+        candidates: [],
+        error: '',
+      }))
+      onSelectTask(directTaskId, null)
+      return
+    }
+    let query
+    try {
+      query = buildDevFlowStateTaskLookupQuery(keyword)
+    } catch (error) {
+      setLookup({
+        status: 'invalid',
+        candidates: [],
+        complete: true,
+        loadedCount: 0,
+        serverMatchCount: 0,
+        error: error.message,
+      })
+      inputRef.current?.focus()
+      return
+    }
+    const controller = new AbortController()
+    controllerRef.current = controller
+    setLookup({
+      status: 'loading',
+      candidates: [],
+      complete: true,
+      loadedCount: 0,
+      serverMatchCount: 0,
+      error: '',
+    })
+    try {
+      const data = await listWorkflowTasks(query, { signal: controller.signal })
+      if (controller.signal.aborted) return
+      const resolved = resolveDevFlowStateTaskLookupPage(data, keyword)
+      if (resolved.autoSelectedTask) {
+        selectTask(resolved.autoSelectedTask)
+        return
+      }
+      onClearTask()
+      setLookup({ status: 'ready', error: '', ...resolved })
+    } catch (error) {
+      if (controller.signal.aborted || isRpcAbortError(error)) return
+      setLookup({
+        status: 'error',
+        candidates: [],
+        complete: true,
+        loadedCount: 0,
+        serverMatchCount: 0,
+        error: getActionErrorMessage(error, '查找任务', {
+          fallback: '查找任务失败，请确认已登录且具备任务查看权限',
+        }),
+      })
+    }
+  }
+
+  return (
+    <div className="erp-dev-flow-task-finder">
+      <div className="erp-dev-flow-task-finder__controls">
+        <label htmlFor="dev-flow-task-search">定位业务</label>
+        <SearchInput
+          ref={inputRef}
+          id="dev-flow-task-search"
+          allowClear
+          maxLength={200}
+          value={draft}
+          placeholder="搜单号或任务"
+          searchHint="查询当前账号可见任务；数字任务 ID 可用于开发排障"
+          status={lookup.status === 'invalid' ? 'error' : undefined}
+          aria-invalid={lookup.status === 'invalid' || undefined}
+          aria-describedby={lookup.status === 'invalid' ? 'dev-flow-task-input-error' : undefined}
+          onSearch={(keyword) => {
+            if (keyword) return submit(keyword)
+            controllerRef.current?.abort()
+            requestedKeywordRef.current = null
+            onDraftChange('')
+            setLookup({ status: 'idle', candidates: [], complete: true, loadedCount: 0, serverMatchCount: 0, error: '' })
+          }}
+          onSubmitted={(keyword) => {
+            // A keyword carried from definition search has not been looked up yet.
+            if (!keyword || requestedKeywordRef.current !== keyword) submit(keyword)
+          }}
+          onInput={() => {
+            if (lookup.status === 'invalid') setLookup((current) => ({ ...current, status: 'idle', error: '' }))
+          }}
+        />
+        {taskId ? <Button onClick={onClearTask}>清除当前任务</Button> : null}
+        {lookup.status === 'invalid' ? (
+          <Text
+            type="danger"
+            id="dev-flow-task-input-error"
+            className="erp-dev-flow-task-input-error"
+            role="alert"
+          >
+            {lookup.error}
+          </Text>
+        ) : null}
+      </div>
+      <TaskLookupResults lookup={lookup} onSelectTask={selectTask} onRetry={() => submit(draft)} />
+    </div>
+  )
+}
+
+export { getProcessOwnerPoolLabel, BusinessChainProjectionContext, TaskFinder }
