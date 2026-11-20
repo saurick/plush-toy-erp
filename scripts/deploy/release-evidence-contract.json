@@ -1,0 +1,17 @@
+{
+  "evidenceContract": "plush.release-evidence/v1",
+  "profiles": {
+    "BASE_RELEASE": "base-release",
+    "CUSTOMER_TRIAL_ACCEPTANCE": "customer-trial-acceptance"
+  },
+  "preflightChecks": {
+    "ENV_REQUIRED_KEYS": "env-required-keys",
+    "PRODUCTION_BOUNDARIES": "production-boundaries",
+    "COMPOSE_AND_MIGRATION": "compose-and-migration",
+    "COMPOSE_RUNTIME_SERVICES": "compose-runtime-services",
+    "RUNTIME_HEALTH_READY": "runtime-health-ready",
+    "SMS_PROVIDER_RUNTIME": "sms-provider-runtime",
+    "PDF_RUNTIME": "pdf-runtime",
+    "CHROMIUM_RUNTIME": "chromium-runtime"
+  }
+}
