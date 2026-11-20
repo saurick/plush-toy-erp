@@ -449,7 +449,10 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerModuleEnabled(ctx cont
 
 func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerAccess(ctx context.Context, ownerType string, ownerID int, write bool) *v1.JsonrpcResult {
 	if ownerType != biz.BusinessAttachmentOwnerFinanceFact {
-		return d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, write)
+		if res := d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, write); res != nil {
+			return res
+		}
+		return d.requireBusinessAttachmentWarehouseAccess(ctx, ownerType, ownerID)
 	}
 	if d.operationalFactUC == nil {
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
@@ -465,6 +468,23 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerAccess(ctx context.Con
 		return res
 	}
 	return d.requireFinanceFactAccess(ctx, ownerID, scope)
+}
+
+func (d *jsonrpcDispatcher) requireBusinessAttachmentWarehouseAccess(ctx context.Context, ownerType string, ownerID int) *v1.JsonrpcResult {
+	if ownerType != biz.BusinessAttachmentOwnerPurchaseReceipt {
+		return nil
+	}
+	if d.inventoryUC == nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	scope, res := d.currentWarehouseDataScope(ctx)
+	if res != nil {
+		return res
+	}
+	if _, err := d.inventoryUC.GetPurchaseReceiptForAccess(ctx, ownerID, scope); err != nil {
+		return d.mapPurchaseError(ctx, err)
+	}
+	return nil
 }
 
 func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerPermission(ctx context.Context, ownerType string, write bool) *v1.JsonrpcResult {
@@ -572,7 +592,10 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentWithdrawalAccess(ctx contex
 	if len(withdrawalPermissions) == 0 {
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	}
-	return d.RequireAdminAnyPermission(ctx, withdrawalPermissions...)
+	if res := d.RequireAdminAnyPermission(ctx, withdrawalPermissions...); res != nil {
+		return res
+	}
+	return d.requireBusinessAttachmentWarehouseAccess(ctx, ownerType, ownerID)
 }
 
 func businessAttachmentWritePermissions(ownerType string) []string {

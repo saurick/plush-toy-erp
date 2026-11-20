@@ -3683,11 +3683,13 @@
       }
     },
     "params": {
+      "allocations": [],
+      "cash_only": true,
       "expected_version": 1,
+      "finance_payment_id": 1,
       "idempotency_key": "demo-customer_config-execute_finance_payment_post-001",
       "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "reason": "接口调用示例"
+      "process_node_instance_id": 1
     }
   },
   "customer_config.execute_inventory_adjustment_post": {
@@ -3922,9 +3924,9 @@
     "params": {
       "expected_version": 1,
       "idempotency_key": "demo-customer_config-execute_inventory_adjustment_post-001",
+      "inventory_operation_id": 1,
       "process_instance_id": 1,
-      "process_node_instance_id": 1,
-      "reason": "接口调用示例"
+      "process_node_instance_id": 1
     }
   },
   "customer_config.execute_inventory_adjustment_submit": {
@@ -4212,6 +4214,7 @@
       "customer_key": "demo",
       "expected_version": 2,
       "idempotency_key": "inventory-adjustment/submit/104",
+      "inventory_operation_id": 104,
       "process_instance_id": 1,
       "process_node_instance_id": 1
     },
@@ -4564,6 +4567,7 @@
       "idempotency_key": "demo-customer_config-execute_production_exception_process-001",
       "process_instance_id": 1,
       "process_node_instance_id": 1,
+      "production_exception_id": 1,
       "reason": "接口调用示例"
     }
   },
@@ -5013,7 +5017,8 @@
     },
     "message": "OK",
     "params": {
-      "customer_key": "demo"
+      "customer_key": "demo",
+      "finance_payment_id": 102
     },
     "test": "TestCustomerConfigExceptionProcessesStartReadAndReplay"
   },
@@ -5247,10 +5252,7 @@
       }
     },
     "params": {
-      "expected_version": 1,
-      "idempotency_key": "demo-customer_config-get_inventory_adjustment_approval_process-001",
-      "process_instance_id": 1,
-      "process_node_instance_id": 1
+      "inventory_operation_id": 1
     }
   },
   "customer_config.get_process_recovery_context": {
@@ -5576,7 +5578,8 @@
     },
     "message": "OK",
     "params": {
-      "customer_key": "demo"
+      "customer_key": "demo",
+      "production_exception_id": 103
     },
     "test": "TestCustomerConfigExceptionProcessesStartReadAndReplay"
   },
@@ -9370,6 +9373,7 @@
     "message": "OK",
     "params": {
       "customer_key": "demo",
+      "finance_payment_id": 102,
       "idempotency_key": "finance_payment_approval/start/1"
     },
     "test": "TestCustomerConfigExceptionProcessesStartReadAndReplay"
@@ -9860,7 +9864,8 @@
     "message": "OK",
     "params": {
       "customer_key": "demo",
-      "idempotency_key": "inventory-adjustment/start/104"
+      "idempotency_key": "inventory-adjustment/start/104",
+      "inventory_operation_id": 104
     },
     "test": "TestCustomerConfigInventoryAdjustmentStartExecutesSubmitOnceAndReplays"
   },
@@ -10326,7 +10331,8 @@
     "message": "OK",
     "params": {
       "customer_key": "demo",
-      "idempotency_key": "production_exception_approval/start/1"
+      "idempotency_key": "production_exception_approval/start/1",
+      "production_exception_id": 103
     },
     "test": "TestCustomerConfigExceptionProcessesStartReadAndReplay"
   },
@@ -14197,8 +14203,8 @@
     },
     "params": {
       "name": "示例名称",
-      "owner_id": 9,
-      "owner_type": "finance_fact"
+      "owner_id": 1,
+      "owner_type": "CUSTOMER"
     }
   },
   "masterdata.create_customer": {
@@ -15289,8 +15295,8 @@
     "params": {
       "id": 2,
       "name": "示例名称",
-      "owner_id": 9,
-      "owner_type": "finance_fact"
+      "owner_id": 1,
+      "owner_type": "CUSTOMER"
     }
   },
   "masterdata.update_customer": {
@@ -16135,7 +16141,10 @@
       }
     },
     "params": {
+      "disposition_no": "SIM-OUT-DISP-001",
+      "disposition_type": "RETURN_TO_VENDOR",
       "idempotency_key": "demo-operational_fact-create_outsourcing_return_disposition-001",
+      "quality_inspection_id": 1,
       "quantity": "6",
       "reason": "接口调用示例"
     }

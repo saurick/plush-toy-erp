@@ -40,6 +40,61 @@ type stubAttachmentJSONRPCRepo struct {
 	clearAttachmentID int
 }
 
+type attachmentReceiptRepo struct {
+	biz.InventoryRepo
+	receipt *biz.PurchaseReceipt
+}
+
+func (r attachmentReceiptRepo) GetPurchaseReceipt(_ context.Context, id int) (*biz.PurchaseReceipt, error) {
+	if id != r.receipt.ID {
+		return nil, biz.ErrPurchaseReceiptNotFound
+	}
+	return r.receipt, nil
+}
+
+func TestJsonrpcDispatcher_PurchaseReceiptAttachmentUsesReceiptWarehouseScope(t *testing.T) {
+	const ownerID = 22
+	const attachmentID = 102
+	typeKey := biz.BusinessAttachmentOwnerPurchaseReceipt
+	attachments := &stubAttachmentJSONRPCRepo{
+		current: &biz.BusinessAttachment{ID: attachmentID, OwnerType: typeKey, OwnerID: ownerID},
+	}
+	admin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWarehouseInboundRead, biz.PermissionWarehouseInboundConfirm)
+	d := newAttachmentJSONRPCTestDispatcher(t, attachments, admin)
+	d.inventoryUC = biz.NewInventoryUsecase(attachmentReceiptRepo{
+		receipt: &biz.PurchaseReceipt{ID: ownerID, Items: []*biz.PurchaseReceiptItem{{WarehouseID: 8}, {WarehouseID: 9}}},
+	})
+	scopeRepo := &receiptWarehouseScopeAdminRepo{
+		memAdminManageRepoForData: newMemAdminManageRepoForData(),
+		scope:                     biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{8}},
+	}
+	d.adminManageUC = biz.NewAdminManageUsecase(scopeRepo, log.NewStdLogger(io.Discard), nil)
+	ctx := workflowJSONRPCAdminContext()
+	owner := map[string]any{"owner_type": typeKey, "owner_id": ownerID}
+	for _, tc := range []struct {
+		method string
+		params map[string]any
+	}{
+		{"list_attachments", owner},
+		{"upload_attachment", owner},
+		{"download_attachment", map[string]any{"id": attachmentID}},
+		{"withdraw_attachment", map[string]any{"id": attachmentID, "reason": "上传错误"}},
+	} {
+		_, result, err := d.Handle(ctx, "attachment", "2.0", tc.method, "scope", mustJSONRPCStruct(t, tc.params))
+		if err != nil || result == nil || result.Code != errcode.PermissionDenied.Code {
+			t.Fatalf("%s should require access to every receipt warehouse: result=%v err=%v", tc.method, result, err)
+		}
+	}
+	if attachments.listCalls != 0 || attachments.contentCalls != 0 || attachments.createCalls != 0 || attachments.withdrawCalls != 0 {
+		t.Fatal("denied receipt access reached attachment data or a mutation")
+	}
+	scopeRepo.scope.WarehouseIDs = []int{8, 9}
+	_, result, err := d.Handle(ctx, "attachment", "2.0", "list_attachments", "scope", mustJSONRPCStruct(t, owner))
+	if err != nil || result == nil || result.Code != errcode.OK.Code || attachments.listCalls != 1 {
+		t.Fatalf("fully assigned receipt should be readable: result=%v err=%v", result, err)
+	}
+}
+
 func newAttachmentJSONRPCTestDispatcher(t *testing.T, repo *stubAttachmentJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
 	t.Helper()
 	if repo == nil {

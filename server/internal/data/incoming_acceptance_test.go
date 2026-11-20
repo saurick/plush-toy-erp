@@ -71,6 +71,9 @@ func runIncomingAcceptanceFlow(t *testing.T, data *Data, client *ent.Client) {
 		if err != nil || len(passed.CheckItems) != 1 || passed.CheckItems[0].Name != decision.CheckItems[0].Name {
 			t.Fatalf("persist checks: %+v %v", passed, err)
 		}
+		if err := client.QualityInspection.UpdateOneID(passed.ID).AppendCheckItems(decision.CheckItems).Exec(ctx); err == nil {
+			t.Fatal("appending checks to completed quality evidence must be rejected")
+		}
 		if _, err := uc.PassQualityInspection(ctx, decision); err != nil {
 			t.Fatalf("repeat decision: %v", err)
 		}

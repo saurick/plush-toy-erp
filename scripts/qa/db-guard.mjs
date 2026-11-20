@@ -10,10 +10,10 @@ import {
 } from "./lib/git-range.mjs";
 
 const STRUCTURAL_SCHEMA_CHANGE =
-  /^[+-].*(field\.|edge\.(?:To|From)\(|index\.|entsql\.Annotation|\bTable:\s*"|"[a-z0-9_]+"\s*:\s*"|\.(Unique|Optional|Nillable|Default|MaxLen|MinLen|Positive|NonNegative|SchemaType|StorageKey|Annotations|GoType|Enum|Values|NotEmpty|Match|Required|Field|Through)\()/mu;
+  /^[+-].*(field\.|edge\.(?:To|From)\(|index\.|entsql\.Annotation|\bTable:\s*"|"[a-z0-9_]+"\s*:\s*"|\.(Unique|Optional|Nillable|Default|MaxLen|MaxRuneLen|MinLen|Positive|NonNegative|SchemaType|StorageKey|Annotations|GoType|Enum|Values|NotEmpty|Match|Required|Field|Through)\()/mu;
 
 const DETACHED_DDL_MODIFIER =
-  /\.(?:Unique|Optional|Nillable|Default|MaxLen|MinLen|Positive|NonNegative|SchemaType|StorageKey|Annotations|GoType|Enum|Values|NotEmpty|Match|Required|Field|Through)\(/u;
+  /\.(?:Unique|Optional|Nillable|Default|MaxLen|MaxRuneLen|MinLen|Positive|NonNegative|SchemaType|StorageKey|Annotations|GoType|Enum|Values|NotEmpty|Match|Required|Field|Through)\(/u;
 
 const BUILDER_START =
   /\b(?:field\.[A-Za-z][A-Za-z0-9]*\(|index\.(?:Fields|Edges)\(|edge\.(?:To|From)\()/u;
@@ -270,7 +270,7 @@ function postgresSchemaWithoutApplicationValidation(source) {
       // Ent's PostgreSQL varchar mapping has no physical length limit. Keep text
       // thresholds and explicit database types conservative; see schema-doc.
       if (!/\.(?:SchemaType|GoType)\(/u.test(chain)) {
-        chain = chain.replace(/\.MaxLen\((\d+)\)/gu, (modifier, size) =>
+        chain = chain.replace(/\.Max(?:Rune)?Len\((\d+)\)/gu, (modifier, size) =>
           Number(size) > 0 && Number(size) <= 10485760 ? "" : modifier,
         );
       }

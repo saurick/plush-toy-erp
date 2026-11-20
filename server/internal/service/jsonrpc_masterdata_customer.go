@@ -36,6 +36,10 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		if !ok {
 			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
 		}
+		ctx, res := d.contactPrimaryWriteContext(ctx)
+		if res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.SaveCustomerWithContacts(ctx, ownerID, customerMutationFromParams(pm), contacts)
 		return id, customerWithContactsMutationResult(ctx, d, item, err), nil
 	case "create_customer":

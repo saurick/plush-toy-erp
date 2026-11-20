@@ -129,6 +129,16 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 	if err != nil {
 		return nil, err
 	}
+	if handler == nil && in.TaskStatusKey == "done" && current.TaskStatusKey == "ready" &&
+		current.BusinessStatusKey != nil && *current.BusinessStatusKey == workflowBlockedStatusKey {
+		// Resume preserves the source's blocked projection until the task is handled.
+		resumed := *current
+		resumed.BusinessStatusKey = nil
+		handler, err = selectWorkflowTaskTransitionHandler(&resumed)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if handler != nil {
 		if err := handler.Apply(uc, current, in); err != nil {
 			return nil, err

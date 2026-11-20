@@ -267,6 +267,17 @@ type ContactSaveMutation struct {
 	ContactMutation
 }
 
+type contactPrimaryWriteRestrictionKey struct{}
+
+func WithContactPrimaryWriteRestriction(ctx context.Context) context.Context {
+	return context.WithValue(ctx, contactPrimaryWriteRestrictionKey{}, true)
+}
+
+func ContactPrimaryWriteRestricted(ctx context.Context) bool {
+	restricted, _ := ctx.Value(contactPrimaryWriteRestrictionKey{}).(bool)
+	return restricted
+}
+
 type CustomerWithContacts struct {
 	Customer *Customer
 	Contacts []*Contact
@@ -763,6 +774,9 @@ func (uc *MasterDataUsecase) SetProductSKUActive(ctx context.Context, id int, ac
 func (uc *MasterDataUsecase) CreateContact(ctx context.Context, in *ContactMutation) (*Contact, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
+	}
+	if in.IsPrimary && ContactPrimaryWriteRestricted(ctx) {
+		return nil, ErrForbidden
 	}
 	normalized, err := normalizeContactMutation(*in)
 	if err != nil {

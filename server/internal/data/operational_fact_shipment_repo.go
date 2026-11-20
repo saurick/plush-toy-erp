@@ -1131,7 +1131,7 @@ func (r *operationalFactRepo) shipShipment(
 		}
 		if cancelledShippedFact {
 			for _, item := range items {
-				if err := r.applyShipmentItemInventory(ctx, tx, parent, item, true); err != nil {
+				if err := r.applyShipmentItemInventory(ctx, tx, parent, item, true, actorID); err != nil {
 					return nil, err
 				}
 			}
@@ -1187,7 +1187,7 @@ func (r *operationalFactRepo) shipShipment(
 			return nil, err
 		}
 		for _, item := range items {
-			if err := r.applyShipmentItemInventory(ctx, tx, parent, item, false); err != nil {
+			if err := r.applyShipmentItemInventory(ctx, tx, parent, item, false, actorID); err != nil {
 				return nil, err
 			}
 		}
@@ -2064,7 +2064,7 @@ func optionalPositiveInt(value int) *int {
 	return &value
 }
 
-func (r *operationalFactRepo) applyShipmentItemInventory(ctx context.Context, tx *inventoryDBTx, parent *ent.Shipment, item *ent.ShipmentItem, cancel bool) error {
+func (r *operationalFactRepo) applyShipmentItemInventory(ctx context.Context, tx *inventoryDBTx, parent *ent.Shipment, item *ent.ShipmentItem, cancel bool, actorID int) error {
 	return r.applyOperationalFactInventory(ctx, tx, operationalFactInventoryArgs{
 		sourceType:   biz.ShipmentSourceType,
 		sourceID:     parent.ID,
@@ -2079,6 +2079,7 @@ func (r *operationalFactRepo) applyShipmentItemInventory(ctx context.Context, tx
 		direction:    -1,
 		txnType:      biz.InventoryTxnOut,
 		occurredAt:   time.Now(),
+		actorID:      actorID,
 		cancel:       cancel,
 	})
 }

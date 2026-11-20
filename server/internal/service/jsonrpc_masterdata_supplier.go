@@ -41,6 +41,10 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		if !ok {
 			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
 		}
+		ctx, res := d.contactPrimaryWriteContext(ctx)
+		if res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.SaveSupplierWithContacts(ctx, ownerID, mutation, contacts)
 		return id, supplierWithContactsMutationResult(ctx, d, item, err), nil
 	case "create_supplier":

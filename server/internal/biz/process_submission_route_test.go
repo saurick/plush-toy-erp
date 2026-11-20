@@ -64,7 +64,10 @@ func TestProcessSubmissionRouteUsesNamedMemberAndRejectsMissingResponsibility(t 
 			repo.memberships[key][index].UserID = 42
 		}
 	}
-	uc.adminDirectory = approvalSettingsAdminDirectory{admins: []*AdminUser{{ID: 42, Username: "approver", DisplayName: "审核负责人", Roles: []AdminRole{{Key: BossRoleKey}}}}}
+	uc.adminDirectory = approvalSettingsAdminDirectory{admins: []*AdminUser{{
+		ID: 42, Username: "approver", DisplayName: "审核负责人", Roles: []AdminRole{{Key: BossRoleKey}},
+		Permissions: []string{PermissionWorkflowTaskApprove},
+	}}}
 	route, err := uc.GetProcessSubmissionRoute(context.Background(), active.CustomerKey, ProcessKeySalesOrderAcceptance)
 	if err != nil || route.AssigneeDisplayName != "审核负责人" {
 		t.Fatalf("route=%+v err=%v", route, err)

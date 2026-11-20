@@ -52,13 +52,24 @@ func (QualityInspection) Hooks() []ent.Hook {
 					return nil, errors.New("quality_inspections are quality decision facts; cancel inspections instead of deleting them")
 				}
 				if m.Op().Is(ent.OpUpdate|ent.OpUpdateOne) &&
-					(mutationTouchesAny(m, qualityInspectionLockedFields) || mutationTouchesEdges(m)) {
+					(mutationTouchesAny(m, qualityInspectionLockedFields) || mutationTouchesEdges(m) || appendsQualityCheckItems(m)) {
 					return nil, errors.New("quality_inspection protected fields are immutable; use quality inspection status actions instead")
 				}
 				return next.Mutate(ctx, m)
 			})
 		},
 	}
+}
+
+func appendsQualityCheckItems(m ent.Mutation) bool {
+	appender, ok := m.(interface {
+		AppendedCheckItems() ([]qualitycheck.Item, bool)
+	})
+	if !ok {
+		return false
+	}
+	items, _ := appender.AppendedCheckItems()
+	return len(items) > 0
 }
 
 func (QualityInspection) Annotations() []schema.Annotation {

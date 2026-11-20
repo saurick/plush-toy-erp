@@ -6,7 +6,32 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
+
+	"github.com/shopspring/decimal"
 )
+
+func TestFinancePaymentProcessReadbackUsesSettlementFieldPermission(t *testing.T) {
+	for _, method := range []string{"get_finance_payment_approval_process", "start_finance_payment_approval_process", "execute_finance_payment_post"} {
+		t.Run(method, func(t *testing.T) {
+			payment := &biz.FinancePayment{ID: 102, Amount: decimal.NewFromInt(120)}
+			for _, allowed := range []bool{false, true} {
+				permissions := []string{biz.PermissionFinancePaymentRead}
+				if allowed {
+					permissions = append(permissions, biz.PermissionFieldFinanceSettlementRead)
+				}
+				admin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, permissions...)
+				ctx := withAdminPermissionCache(biz.WithCurrentAdmin(workflowJSONRPCAdminContext(), admin))
+				result := &v1.JsonrpcResult{Data: newDataStruct(map[string]any{"source_readback": financePaymentToMap(payment)})}
+				(&jsonrpcDispatcher{}).applySensitiveFieldReadPolicy(ctx, "customer_config", method, result)
+				readback := result.Data.AsMap()["source_readback"].(map[string]any)
+				_, hasAmount := readback["amount"]
+				if readback["id"] != float64(payment.ID) || hasAmount != allowed {
+					t.Fatalf("finance settlement permission=%t, readback=%v", allowed, readback)
+				}
+			}
+		})
+	}
+}
 
 func TestPurchaseSourceReadPolicyKeepsRoleQuantitiesWithoutLeakingPrices(t *testing.T) {
 	for _, role := range biz.BuiltinRoles() {
@@ -47,6 +72,9 @@ func TestPurchaseSourceReadPolicyKeepsRoleQuantitiesWithoutLeakingPrices(t *test
 
 func TestRedactSensitiveFieldMapRemovesNestedPrivateAndCommercialFields(t *testing.T) {
 	data := map[string]any{
+		"contract_party_snapshot": map[string]any{
+			"buyerName": "模拟客户", "buyerPhone": "10000", "buyerAddress": "模拟地址", "sellerBankAccount": "demo-account",
+		},
 		"customer": map[string]any{
 			"name": "客户甲", "phone": "13800138000", "tax_no": "TAX-1",
 			"quoted_freight_amount": "88.5", "goods_amount": "25", "order_total": "113.5",
@@ -57,6 +85,10 @@ func TestRedactSensitiveFieldMapRemovesNestedPrivateAndCommercialFields(t *testi
 		},
 	}
 	redactSensitiveFieldMap(data, "sales", sensitiveFieldReadPolicy{})
+	contractParty := data["contract_party_snapshot"].(map[string]any)
+	if contractParty["buyerName"] != "模拟客户" || len(contractParty) != 1 {
+		t.Fatalf("contract party redaction mismatch: %#v", contractParty)
+	}
 	customer := data["customer"].(map[string]any)
 	if customer["name"] != "客户甲" || customer["phone"] != nil || customer["tax_no"] != nil || customer["quoted_freight_amount"] != nil || customer["goods_amount"] != nil || customer["order_total"] != nil {
 		t.Fatalf("party redaction mismatch: %#v", customer)

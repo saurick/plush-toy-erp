@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -141,6 +142,77 @@ func (s *rpcInspector) expression(node ast.Node) string {
 	_ = format.Node(&b, s.positions, node)
 	return b.String()
 }
+
+func (s *rpcInspector) bindExceptionProcessContract(statement *ast.AssignStmt, env rpcInspectionEnv) {
+	if len(statement.Lhs) != 4 || len(statement.Rhs) != 1 || s.shapes == nil {
+		return
+	}
+	call, ok := statement.Rhs[0].(*ast.CallExpr)
+	if !ok || rpcInspectionName(call.Fun) != "customerConfigExceptionProcessContractForMethod" || len(call.Args) != 1 {
+		return
+	}
+	method, known := s.value(call.Args[0], env)
+	if !known {
+		return
+	}
+	table, ok := s.shapes.constants["service.customerConfigExceptionProcessContracts"].(*ast.CompositeLit)
+	if !ok {
+		return
+	}
+	var targets [4]string
+	for i, expression := range statement.Lhs {
+		id, ok := expression.(*ast.Ident)
+		if !ok {
+			return
+		}
+		targets[i] = id.Name
+	}
+	for _, element := range table.Elts {
+		entry, ok := element.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		fields := map[string]string{}
+		action, command := "", ""
+		for _, element := range entry.Elts {
+			pair, ok := element.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			key := rpcInspectionName(pair.Key)
+			if value, known := s.value(pair.Value, env); known {
+				fields[key] = value
+			}
+			if commands, ok := pair.Value.(*ast.CompositeLit); ok && key == "executeMethods" {
+				for _, element := range commands.Elts {
+					if item, ok := element.(*ast.KeyValueExpr); ok {
+						if name, known := s.value(item.Key, env); known && name == method {
+							action = "execute"
+							command, _ = s.value(item.Value, env)
+							break
+						}
+					}
+				}
+			}
+		}
+		switch method {
+		case fields["startMethod"]:
+			action = "start"
+		case fields["getMethod"]:
+			action = "get"
+		}
+		if action == "" {
+			continue
+		}
+		for key, value := range fields {
+			env.strings[targets[0]+"."+key] = value
+		}
+		env.strings[targets[1]], env.strings[targets[2]], env.strings[targets[3]] = action, command, "true"
+		return
+	}
+	env.strings[targets[3]] = "false"
+}
+
 func (s *rpcInspector) value(expr ast.Expr, env rpcInspectionEnv) (string, bool) {
 	if v, err := text(expr); err == nil {
 		return v, true
@@ -172,9 +244,22 @@ func (s *rpcInspector) value(expr ast.Expr, env rpcInspectionEnv) (string, bool)
 			return "false", true
 		}
 	}
+	if call, ok := expr.(*ast.CallExpr); ok && len(call.Args) == 2 {
+		name := rpcQualifiedName(call.Fun)
+		if name == "strings.HasSuffix" {
+			if value, known := s.condition(call, env); known {
+				return strconv.FormatBool(value), true
+			}
+		}
+	}
 	return "", false
 }
 func (s *rpcInspector) condition(expr ast.Expr, env rpcInspectionEnv) (bool, bool) {
+	if call, ok := expr.(*ast.CallExpr); ok && rpcQualifiedName(call.Fun) == "strings.HasSuffix" && len(call.Args) == 2 {
+		value, valueKnown := s.value(call.Args[0], env)
+		suffix, suffixKnown := s.value(call.Args[1], env)
+		return strings.HasSuffix(value, suffix), valueKnown && suffixKnown
+	}
 	if id, ok := expr.(*ast.Ident); ok {
 		if id.Name == "true" || id.Name == "false" {
 			return id.Name == "true", true
@@ -413,6 +498,7 @@ func (s *rpcInspector) walk(node ast.Node, env rpcInspectionEnv) {
 				}
 			}
 		case *ast.AssignStmt:
+			s.bindExceptionProcessContract(x, env)
 			if len(x.Rhs) == 1 && len(x.Lhs) == 2 {
 				if flag, ok := x.Lhs[1].(*ast.Ident); ok {
 					delete(env.validations, flag.Name)

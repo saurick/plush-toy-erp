@@ -39,7 +39,7 @@ func TestSecurityHeadersFilterSetsBaselineHeaders(t *testing.T) {
 	if csp == "" {
 		t.Fatal("Content-Security-Policy header is empty")
 	}
-	if !containsAll(csp, "default-src 'self'", "frame-ancestors 'none'", "object-src 'none'") {
+	if !containsAll(csp, "default-src 'self'", "frame-ancestors 'none'", "frame-src 'self' blob:", "object-src 'none'") {
 		t.Fatalf("Content-Security-Policy missing required directives: %q", csp)
 	}
 }

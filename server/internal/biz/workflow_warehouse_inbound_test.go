@@ -141,6 +141,24 @@ func TestWorkflowUsecase_WarehouseInboundBlockedUpsertsBlockedState(t *testing.T
 	}
 }
 
+func TestWorkflowUsecase_ResumedWarehouseInboundCompletionRestoresBusinessProjection(t *testing.T) {
+	task := warehouseInboundWorkflowTask()
+	task.TaskStatusKey = "ready"
+	task.BusinessStatusKey = ptrString(workflowBlockedStatusKey)
+	repo := &stubWorkflowRepo{currentTask: task}
+	_, err := updateWorkflowTaskStatusForTest(t, NewWorkflowUsecase(repo), context.Background(), &WorkflowTaskStatusUpdate{
+		ID: task.ID, TaskStatusKey: "done", Payload: map[string]any{},
+	}, 7, "warehouse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	update := repo.updateTaskInput
+	if update.BusinessStatusKey != workflowInboundDoneStatusKey || update.SideEffects == nil ||
+		update.SideEffects.BusinessState == nil || update.SideEffects.BusinessState.BusinessStatusKey != workflowInboundDoneStatusKey {
+		t.Fatalf("resumed completion missed inbound projection: %#v", update)
+	}
+}
+
 func TestWorkflowUsecase_WarehouseInboundRejectedRequiresReason(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
 	uc := NewWorkflowUsecase(repo)

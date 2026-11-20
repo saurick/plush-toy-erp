@@ -48,7 +48,7 @@ func (PurchaseOrder) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			NonNegative(),
-		field.String("payment_method").Optional().Nillable().MaxLen(128),
+		field.String("payment_method").Optional().Nillable().MaxRuneLen(128),
 		field.Bool("invoice_required").Optional().Nillable(),
 		field.String("invoice_category").Optional().Nillable().MaxLen(32),
 		field.String("supplier_purchase_order_no").

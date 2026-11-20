@@ -55,6 +55,10 @@ func TestWorkflowTaskDisplayContextTrustedFollowup(t *testing.T) {
 	if err != nil || untrusted.DisplayContext != nil {
 		t.Fatalf("untrusted follow-up exposed source projection: task=%#v err=%v", untrusted, err)
 	}
+	items, count, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{Keyword: product.Code, Limit: 10})
+	if err != nil || count != 1 || len(items) != 1 || items[0].ID != followup.ID {
+		t.Fatalf("derived identity search included an untrusted follow-up: count=%d rows=%#v err=%v", count, items, err)
+	}
 }
 
 func TestWorkflowTaskDisplayContextProductionBatch(t *testing.T) {

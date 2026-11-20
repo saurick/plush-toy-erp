@@ -8,6 +8,7 @@ import (
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/workflowtask"
 
+	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
 )
@@ -112,6 +113,27 @@ func workflowIdentitySourceBinding(selector *entsql.Selector, source workflowIde
 				b.WriteString(" = CAST(").Ident(selector.C(workflowtask.FieldSourceID)).WriteString(" AS TEXT)")
 			}),
 			entsql.Or(fulfillmentGroups...),
+		))
+	}
+	if _, supported := biz.WorkflowFollowupSourceSpecFor(source.kind); supported {
+		code := selector.C(workflowtask.FieldTaskCode)
+		bound = entsql.Or(bound, entsql.And(
+			entsql.EQ(selector.C(workflowtask.FieldSourceType), source.kind),
+			entsql.EQ(selector.C(workflowtask.FieldTaskGroup), biz.WorkflowFollowupTaskGroup),
+			entsql.IsNull(selector.C(workflowtask.FieldConfigRevision)),
+			entsql.IsNull(selector.C(workflowtask.FieldProcessInstanceID)),
+			entsql.IsNull(selector.C(workflowtask.FieldProcessNodeInstanceID)),
+			entsql.GT(selector.C(workflowtask.FieldCreatedBy), 0),
+			entsql.GT(selector.C(workflowtask.FieldSourceID), 0),
+			entsql.P(func(b *entsql.Builder) {
+				b.WriteString("TRIM(").Ident(selector.C(workflowtask.FieldSourceNo)).WriteString(") <> '' AND ")
+				if b.Dialect() == dialect.Postgres {
+					b.Ident(code).WriteString(" ~ ").Arg("^FOLLOWUP-[0-9a-f]{40}$")
+				} else {
+					b.WriteString("SUBSTR(").Ident(code).WriteString(",1,9) = 'FOLLOWUP-' AND LENGTH(").
+						Ident(code).WriteString(") = 49 AND SUBSTR(").Ident(code).WriteString(",10) NOT GLOB '*[^0-9a-f]*'")
+				}
+			}),
 		))
 	}
 	return entsql.And(entsql.In(selector.C(workflowtask.FieldSourceType), source.types...), bound)

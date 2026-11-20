@@ -3,6 +3,8 @@ package data
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -30,7 +32,12 @@ func workflowTaskStageSQL(column func(string) string) string {
 	gate := `(SELECT gate_code FROM quality_inspections WHERE id=` + sourceID + `)`
 	var out strings.Builder
 	out.WriteString("CASE ")
-	for _, stage := range biz.WorkflowTaskStages() {
+	stages := biz.WorkflowTaskStages()
+	sort.SliceStable(stages, func(i, j int) bool {
+		return slices.Contains(stages[i].Groups, biz.WorkflowFollowupTaskGroup) &&
+			!slices.Contains(stages[j].Groups, biz.WorkflowFollowupTaskGroup)
+	})
+	for _, stage := range stages {
 		clauses := []string{}
 		for _, part := range []struct {
 			expression string

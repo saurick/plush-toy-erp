@@ -430,7 +430,7 @@ func (uc *CustomerConfigUsecase) ExplainProcessDefinition(ctx context.Context, c
 	out.StartBlockedReasons = processDefinitionStartBlockedReasons(out)
 	approvalKey := approvalSettingKeyForProcessKey(processKey)
 	approvalEnabled, approvalConfigured := approvalSettingsEnabledMap(active.CompiledSnapshot)[approvalKey]
-	if approvalKey == "" || !approvalConfigured || !approvalEnabled {
+	if approvalKey != "" && (!approvalConfigured || !approvalEnabled) {
 		out.StartBlockedReasons = sortedUniqueStrings(append(out.StartBlockedReasons, "approval_disabled"))
 	}
 	out.ExecuteBlockedReasons = processDefinitionExecuteBlockedReasons(out)
@@ -752,7 +752,7 @@ func (uc *CustomerConfigUsecase) workflowCandidateOwnerRoleKeysAtRevision(ctx co
 		if !item.Enabled {
 			continue
 		}
-		if approvalAdmins != nil && !approvalMembershipHasActiveAdmin(item, approvalAdmins) {
+		if approvalAdmins != nil && !approvalMembershipHasActiveAdmin(item, approvalAdmins, out.RequiredCapabilities...) {
 			continue
 		}
 		if roleKey := NormalizeRoleKey(item.RoleKey); roleKey != "" {
@@ -818,16 +818,25 @@ func (uc *CustomerConfigUsecase) workflowCandidateOwnerRoleKeysAtRevision(ctx co
 func approvalMembershipHasActiveAdmin(
 	membership WorkPoolMembershipInput,
 	admins []*AdminUser,
+	requiredCapabilities ...string,
 ) bool {
 	roleKey := NormalizeRoleKey(membership.RoleKey)
 	if roleKey == "" {
 		return false
 	}
 	for _, admin := range admins {
-		if !admin.IsActive() || !AdminHasRole(admin, roleKey) {
+		if !admin.IsActive() || !AdminHasRole(admin, roleKey) ||
+			(membership.UserID > 0 && membership.UserID != admin.ID) {
 			continue
 		}
-		if membership.UserID == 0 || membership.UserID == admin.ID {
+		eligible := true
+		for _, capability := range requiredCapabilities {
+			if !AdminHasPermission(admin, capability) {
+				eligible = false
+				break
+			}
+		}
+		if eligible {
 			return true
 		}
 	}

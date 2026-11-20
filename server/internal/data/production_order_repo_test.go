@@ -168,6 +168,10 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "production_order_repo_lifecycle")
 	create := &biz.ProductionOrderCreate{Draft: f.draft("MO-REPO-001", 10), ActorID: f.actorID, IdempotencyKey: "create-replay"}
+	start := time.Now().UTC().Truncate(time.Second)
+	end := start.Add(time.Hour)
+	note := "模拟旧备注"
+	create.Draft.PlannedStartAt, create.Draft.PlannedEndAt, create.Draft.Note = &start, &end, &note
 	created, err := f.uc.CreateDraft(ctx, create)
 	if err != nil {
 		t.Fatalf("create draft: %v", err)
@@ -192,6 +196,9 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 	saved, err := f.uc.SaveDraft(ctx, save)
 	if err != nil || saved.Order.Version != 2 || !saved.Items[0].PlannedQuantity.Equal(decimal.NewFromInt(12)) {
 		t.Fatalf("save draft = %#v, %v", saved, err)
+	}
+	if saved.Order.PlannedStartAt != nil || saved.Order.PlannedEndAt != nil || saved.Order.Note != nil {
+		t.Fatalf("cleared draft values persisted: %#v", saved.Order)
 	}
 	replayedSaveInput := *save
 	replayedSaveInput.ExpectedVersion = 999

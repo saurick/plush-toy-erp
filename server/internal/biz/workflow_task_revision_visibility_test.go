@@ -77,8 +77,9 @@ func TestCustomerConfigUsecaseWorkflowTaskRevisionRoleScopesRepositoryErrorFails
 func TestWorkflowTaskRevisionRoleScopesFreezeMultiRoleApprovalResponsibility(t *testing.T) {
 	repo := newMemCustomerConfigRepo()
 	admin := &AdminUser{
-		ID:    22,
-		Roles: []AdminRole{{Key: SalesRoleKey}, {Key: FinanceRoleKey}},
+		ID:          22,
+		Roles:       []AdminRole{{Key: SalesRoleKey}, {Key: FinanceRoleKey}},
+		Permissions: []string{PermissionWorkflowTaskApprove},
 	}
 	for _, item := range []struct {
 		revision string
@@ -171,6 +172,22 @@ func TestWorkflowTaskVisibilityScopeIncludesTaskRequiresCompleteCategoryAnchor(t
 	runtime.ConfigRevision = &missingRevision
 	if WorkflowTaskVisibilityScopeIncludesTask(scope, runtime) {
 		t.Fatal("unknown runtime revision must fail closed before assignee visibility")
+	}
+}
+
+func TestWorkflowTaskVisibilityScopeIncludesStandaloneFollowupCreator(t *testing.T) {
+	creatorID, otherID := 8, 9
+	task := &WorkflowTask{TaskGroup: WorkflowFollowupTaskGroup, OwnerRoleKey: QualityRoleKey, CreatedBy: &creatorID}
+	scope := &WorkflowTaskVisibilityScope{FollowupCreatorID: &creatorID}
+	if !WorkflowTaskVisibilityScopeIncludesTask(scope, task) {
+		t.Fatal("creator must see the events for their follow-up with another role")
+	}
+	if WorkflowTaskVisibilityScopeIncludesTask(&WorkflowTaskVisibilityScope{FollowupCreatorID: &otherID}, task) {
+		t.Fatal("unrelated viewer must not see follow-up events")
+	}
+	task.TaskGroup = "other"
+	if WorkflowTaskVisibilityScopeIncludesTask(scope, task) {
+		t.Fatal("creator visibility must not extend to other task groups")
 	}
 }
 

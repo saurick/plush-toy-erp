@@ -71,7 +71,7 @@ func (SalesOrder) Fields() []ent.Field {
 		field.String("payment_method").
 			Optional().
 			Nillable().
-			MaxLen(128),
+			MaxRuneLen(128),
 		field.Int("payment_term_days").
 			Optional().
 			Nillable().

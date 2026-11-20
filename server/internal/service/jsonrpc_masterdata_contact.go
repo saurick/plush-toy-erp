@@ -22,6 +22,10 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 		if res := d.requireContactOwnerModuleEnabled(ctx, getString(pm, "customer_key"), getString(pm, "owner_type")); res != nil {
 			return id, res, nil
 		}
+		ctx, res := d.contactPrimaryWriteContext(ctx)
+		if res != nil {
+			return id, res, nil
+		}
 		item, err := d.masterDataUC.CreateContact(ctx, contactMutationFromParams(pm))
 		return id, contactMutationResult(ctx, d, item, err), nil
 	case "update_contact":
@@ -29,6 +33,10 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 			return id, res, nil
 		}
 		if res := d.requireContactOwnerModuleEnabled(ctx, getString(pm, "customer_key"), getString(pm, "owner_type")); res != nil {
+			return id, res, nil
+		}
+		ctx, res := d.contactPrimaryWriteContext(ctx)
+		if res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.UpdateContact(ctx, getInt(pm, "id", 0), contactMutationFromParams(pm))
@@ -140,6 +148,17 @@ func (d *jsonrpcDispatcher) requireContactAggregatePermissions(ctx context.Conte
 		}
 	}
 	return nil
+}
+
+func (d *jsonrpcDispatcher) contactPrimaryWriteContext(ctx context.Context) (context.Context, *v1.JsonrpcResult) {
+	permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
+	if res != nil {
+		return ctx, res
+	}
+	if !biz.PermissionSetHasAny(biz.PermissionKeySet(permissions), biz.PermissionContactSetPrimary) {
+		ctx = biz.WithContactPrimaryWriteRestriction(ctx)
+	}
+	return ctx, nil
 }
 
 func (d *jsonrpcDispatcher) requireContactOwnerModuleEnabled(ctx context.Context, customerKey string, ownerType string) *v1.JsonrpcResult {

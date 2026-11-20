@@ -121,7 +121,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory", workflowModuleKeyTasks); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CancelShippedShipmentWithActor(ctx, getInt(pm, "id", 0), actorID)
+		shipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
+		pkglogger.SetRequestObject(ctx, "shipment", shipmentID)
+		item, err := d.operationalFactUC.CancelShippedShipmentWithActor(ctx, shipmentID, actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "get_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {

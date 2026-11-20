@@ -685,6 +685,27 @@ func TestMasterDataRepoSaveCustomerWithContactsIsAtomic(t *testing.T) {
 	if !saved.Contacts[0].IsPrimary {
 		t.Fatalf("expected primary contact first, got %#v", saved.Contacts)
 	}
+	restricted := biz.WithContactPrimaryWriteRestriction(ctx)
+	customerID := saved.Customer.ID
+	primary, backup := saved.Contacts[0], saved.Contacts[1]
+	for _, intent := range []*biz.ContactMutation{
+		{OwnerType: biz.ContactOwnerCustomer, OwnerID: customerID, Name: "改变主联系人", IsPrimary: true},
+		{OwnerType: biz.ContactOwnerCustomer, OwnerID: customerID, Name: "保持普通联系人", IsPrimary: false},
+	} {
+		_, err := uc.UpdateContact(restricted, backup.ID, intent)
+		if (intent.IsPrimary && !errors.Is(err, biz.ErrForbidden)) || (!intent.IsPrimary && err != nil) {
+			t.Fatalf("restricted contact update is_primary=%v err=%v", intent.IsPrimary, err)
+		}
+	}
+	draft := &biz.CustomerMutation{Code: "C-AGG", Name: "聚合客户"}
+	if _, err := uc.SaveCustomerWithContacts(restricted, customerID, draft,
+		[]*biz.ContactSaveMutation{{ID: backup.ID, ContactMutation: biz.ContactMutation{Name: "备用联系人"}}},
+	); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("aggregate without primary permission cleared the original: %v", err)
+	}
+	if item, err := uc.GetContact(ctx, primary.ID); err != nil || !item.IsPrimary || !item.IsActive {
+		t.Fatalf("rejected update altered primary: %#v %v", item, err)
+	}
 
 	updated, err := uc.SaveCustomerWithContacts(ctx, saved.Customer.ID, &biz.CustomerMutation{
 		Code: "C-AGG-A",

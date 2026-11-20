@@ -954,6 +954,9 @@ func (r *masterDataRepo) SetProductSKUActive(ctx context.Context, id int, active
 }
 
 func (r *masterDataRepo) CreateContact(ctx context.Context, in *biz.ContactMutation) (*biz.Contact, error) {
+	if in.IsPrimary && biz.ContactPrimaryWriteRestricted(ctx) {
+		return nil, biz.ErrForbidden
+	}
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -1000,7 +1003,8 @@ func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.Cont
 	if err := ensureContactOwner(ctx, tx.Client(), id, in.OwnerType, in.OwnerID); err != nil {
 		return nil, err
 	}
-	if in.IsPrimary {
+	restrictPrimary := biz.ContactPrimaryWriteRestricted(ctx)
+	if in.IsPrimary && !restrictPrimary {
 		if _, err := tx.Contact.Update().
 			Where(contact.OwnerType(in.OwnerType), contact.OwnerID(in.OwnerID), contact.IDNEQ(id), contact.IsPrimary(true)).
 			SetIsPrimary(false).
@@ -1011,6 +1015,9 @@ func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.Cont
 	update := tx.Contact.UpdateOneID(id).
 		SetName(in.Name).
 		SetIsPrimary(in.IsPrimary)
+	if restrictPrimary {
+		update.Where(contact.IsPrimary(in.IsPrimary))
+	}
 	if in.Phone == nil {
 		update.ClearPhone()
 	} else {
@@ -1039,6 +1046,9 @@ func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.Cont
 	row, err := update.Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
+			if restrictPrimary {
+				return nil, biz.ErrForbidden
+			}
 			return nil, biz.ErrContactNotFound
 		}
 		return nil, err
@@ -1318,6 +1328,7 @@ func updateSupplierWithClient(ctx context.Context, client *ent.Client, sqlDialec
 
 func saveContactsForOwner(ctx context.Context, client *ent.Client, ownerType string, ownerID int, items []*biz.ContactSaveMutation) ([]*biz.Contact, error) {
 	retainedIDs := make([]int, 0, len(items))
+	restrictPrimary := biz.ContactPrimaryWriteRestricted(ctx)
 	for _, item := range items {
 		item.OwnerType = ownerType
 		item.OwnerID = ownerID
@@ -1325,7 +1336,7 @@ func saveContactsForOwner(ctx context.Context, client *ent.Client, ownerType str
 			if err := ensureContactOwner(ctx, client, item.ID, ownerType, ownerID); err != nil {
 				return nil, err
 			}
-			if item.IsPrimary {
+			if item.IsPrimary && !restrictPrimary {
 				if err := clearOtherPrimaryContacts(ctx, client, ownerType, ownerID, item.ID); err != nil {
 					return nil, err
 				}
@@ -1336,6 +1347,9 @@ func saveContactsForOwner(ctx context.Context, client *ent.Client, ownerType str
 			}
 			retainedIDs = append(retainedIDs, row.ID)
 			continue
+		}
+		if item.IsPrimary && restrictPrimary {
+			return nil, biz.ErrForbidden
 		}
 		if item.IsPrimary {
 			if err := clearOtherPrimaryContacts(ctx, client, ownerType, ownerID, 0); err != nil {
@@ -1353,6 +1367,22 @@ func saveContactsForOwner(ctx context.Context, client *ent.Client, ownerType str
 		Where(contact.OwnerType(ownerType), contact.OwnerID(ownerID), contact.IsActive(true))
 	if len(retainedIDs) > 0 {
 		disableQuery = disableQuery.Where(contact.IDNotIn(retainedIDs...))
+	}
+	if restrictPrimary {
+		primary := client.Contact.Query().Where(
+			contact.OwnerType(ownerType), contact.OwnerID(ownerID), contact.IsActive(true), contact.IsPrimary(true),
+		)
+		if len(retainedIDs) > 0 {
+			primary.Where(contact.IDNotIn(retainedIDs...))
+		}
+		omitted, err := primary.Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if omitted {
+			return nil, biz.ErrForbidden
+		}
+		disableQuery.Where(contact.IsPrimary(false))
 	}
 	if _, err := disableQuery.SetIsActive(false).SetIsPrimary(false).Save(ctx); err != nil {
 		return nil, err
@@ -1404,6 +1434,10 @@ func updateContactWithClient(ctx context.Context, client *ent.Client, id int, in
 		SetName(in.Name).
 		SetIsPrimary(in.IsPrimary).
 		SetIsActive(true)
+	restrictPrimary := biz.ContactPrimaryWriteRestricted(ctx)
+	if restrictPrimary {
+		update.Where(contact.IsPrimary(in.IsPrimary))
+	}
 	if in.Phone == nil {
 		update.ClearPhone()
 	} else {
@@ -1432,6 +1466,9 @@ func updateContactWithClient(ctx context.Context, client *ent.Client, id int, in
 	row, err := update.Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
+			if restrictPrimary {
+				return nil, biz.ErrForbidden
+			}
 			return nil, biz.ErrContactNotFound
 		}
 		return nil, err

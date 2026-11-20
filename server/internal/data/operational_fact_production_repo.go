@@ -1016,6 +1016,20 @@ func validateProductionReworkRootCancellable(
 	return root, nil
 }
 
+func requireNoProductionReworkRoot(ctx context.Context, client *ent.Client, factID int) error {
+	exists, err := client.ProductionWIPBatch.Query().Where(
+		productionwipbatch.OriginReworkFactID(factID),
+		productionwipbatch.SourceBatchIDIsNil(),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return biz.ErrProductionReworkExecutionDependency
+	}
+	return nil
+}
+
 func validateProductionReworkRootCancellationReceipt(
 	ctx context.Context,
 	client *ent.Client,
@@ -1986,6 +2000,12 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *
 			return nil, err
 		}
 		if replay {
+			if row.PostedAt == nil && row.PostedBy == nil {
+				if err := requireNoProductionReworkRoot(ctx, tx.client, row.ID); err != nil {
+					return nil, err
+				}
+				return commitProductionFact(ctx, tx, row)
+			}
 			if err := validateProductionReworkRootCancellationReceipt(ctx, tx.client, row); err != nil {
 				return nil, err
 			}
@@ -1996,15 +2016,8 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *
 			return commitProductionFact(ctx, tx, row)
 		}
 		if row.Status == biz.OperationalFactStatusDraft {
-			hasRoot, err := tx.client.ProductionWIPBatch.Query().Where(
-				productionwipbatch.OriginReworkFactID(row.ID),
-				productionwipbatch.SourceBatchIDIsNil(),
-			).Exist(ctx)
-			if err != nil {
+			if err := requireNoProductionReworkRoot(ctx, tx.client, row.ID); err != nil {
 				return nil, err
-			}
-			if hasRoot {
-				return nil, biz.ErrProductionReworkExecutionDependency
 			}
 			if err := updateVersionedOperationalFactCancellation(
 				ctx, tx, "production_facts", in.ID, in.ExpectedVersion,

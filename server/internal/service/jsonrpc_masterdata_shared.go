@@ -148,6 +148,8 @@ func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *
 		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品不存在，请刷新后重新选择"}
 	case errors.Is(err, biz.ErrProductInactive):
 		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品已停用"}
+	case errors.Is(err, biz.ErrForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrContactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "联系人不存在"}
 	case errors.Is(err, biz.ErrUnitNotFound):

@@ -390,33 +390,6 @@ func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSet
 	return in, true
 }
 
-func approvalSettingsWouldIncludeActor(items []biz.ApprovalSettingItemInput, admin *biz.AdminUser) bool {
-	if admin == nil {
-		return true
-	}
-	actorRoles := map[string]struct{}{}
-	for _, roleKey := range biz.AdminRoleKeys(admin) {
-		actorRoles[biz.NormalizeRoleKey(roleKey)] = struct{}{}
-	}
-	for _, item := range items {
-		if !item.Enabled {
-			continue
-		}
-		for _, member := range item.Members {
-			if !member.Enabled {
-				continue
-			}
-			if member.UserID == admin.ID {
-				return true
-			}
-			if _, matchesActorRole := actorRoles[biz.NormalizeRoleKey(member.RoleKey)]; matchesActorRole {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (d *jsonrpcDispatcher) validateApprovalSettingsCandidate(
 	ctx context.Context,
 	settings *biz.ApprovalSettingsExplanation,
@@ -557,7 +530,7 @@ func approvalSettingsActorMembership(
 			if !member.Enabled {
 				continue
 			}
-			if member.UserID == admin.ID || biz.AdminHasRole(admin, roleKey) {
+			if member.UserID == admin.ID || (member.UserID == 0 && biz.AdminHasRole(admin, roleKey)) {
 				out[item.ApprovalKey] = true
 				break
 			}

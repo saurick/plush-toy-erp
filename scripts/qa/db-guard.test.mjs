@@ -246,12 +246,15 @@ test("db guard separates PostgreSQL string validation from physical schema chang
     await write(root, schemaPath, after);
     await write(root, "server/internal/data/model/schema/item_test.go", 'package schema\nfunc TestFields() { _ = field.String("test_fixture_only") }\n');
     assert.equal(evaluateDbGuard({ root, range: "HEAD...HEAD" }).ok, true);
+    await write(root, schemaPath, before.replace("MaxLen(255)", "MaxRuneLen(255)"));
+    assert.equal(evaluateDbGuard({ root, range: "HEAD...HEAD" }).ok, true);
     for (const source of [
       after.replace(".Optional()", ""),
       after.replace('field.String("note")', 'field.String("renamed_note")'),
       after.replace('field.String("note")', 'field.Text("note")'),
       after.replace(".Optional()", '.SchemaType(map[string]string{"postgres": "varchar(2000)"}).Optional()'),
       before.replace("MaxLen(255)", "MaxLen(10485761)"),
+      before.replace("MaxLen(255)", "MaxRuneLen(10485761)"),
     ]) {
       await write(root, schemaPath, source);
       const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });

@@ -406,10 +406,11 @@ func TestApprovalCandidateResolverHonorsNamedMultiRoleAndFallbackOrder(t *testin
 		Roles:    []AdminRole{{Key: SalesRoleKey}, {Key: FinanceRoleKey}},
 	}
 	backup := &AdminUser{
-		ID:    23,
-		Roles: []AdminRole{{Key: PurchaseRoleKey}, {Key: FinanceRoleKey}},
+		ID:          23,
+		Roles:       []AdminRole{{Key: PurchaseRoleKey}, {Key: FinanceRoleKey}},
+		Permissions: []string{PermissionWorkflowTaskApprove},
 	}
-	escalation := &AdminUser{ID: 24, Roles: []AdminRole{{Key: BossRoleKey}}}
+	escalation := &AdminUser{ID: 24, Roles: []AdminRole{{Key: BossRoleKey}}, Permissions: []string{PermissionWorkflowTaskApprove}}
 	uc.adminDirectory = approvalSettingsAdminDirectory{
 		admins: []*AdminUser{primary, backup, escalation},
 	}
@@ -473,6 +474,13 @@ func TestApprovalCandidateResolverHonorsNamedMultiRoleAndFallbackOrder(t *testin
 	}
 
 	primary.Disabled = false
+	withoutPermission, err := uc.WorkflowCandidateOwnerRoleKeysAtRevision(
+		context.Background(), in.CustomerKey, active.Revision, "approval.sales_order", PermissionWorkflowTaskApprove,
+	)
+	if err != nil || len(withoutPermission.CandidateOwnerRoleKeys) != 1 || withoutPermission.CandidateOwnerRoleKeys[0] != PurchaseRoleKey {
+		t.Fatalf("active primary without approval RBAC must fall back: %#v, %v", withoutPermission, err)
+	}
+	primary.Permissions = []string{PermissionWorkflowTaskApprove}
 	selected, err := uc.WorkflowCandidateOwnerRoleKeysAtRevision(
 		context.Background(),
 		in.CustomerKey,

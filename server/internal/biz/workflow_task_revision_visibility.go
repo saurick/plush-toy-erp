@@ -140,7 +140,7 @@ func workflowApprovalCandidatePoolRolesForAdmin(
 	for _, membership := range revision.WorkPoolMemberships {
 		if !membership.Enabled ||
 			!IsApprovalSettingsPoolKey(membership.PoolKey) ||
-			!approvalMembershipHasActiveAdmin(membership, approvalAdmins) {
+			!approvalMembershipHasActiveAdmin(membership, approvalAdmins, requiredCapabilities...) {
 			continue
 		}
 		membershipRoleKeys = append(membershipRoleKeys, membership.RoleKey)
@@ -159,7 +159,7 @@ func workflowApprovalCandidatePoolRolesForAdmin(
 		roleKey := NormalizeRoleKey(membership.RoleKey)
 		if !membership.Enabled ||
 			!IsApprovalSettingsPoolKey(poolKey) ||
-			!approvalMembershipHasActiveAdmin(membership, approvalAdmins) {
+			!approvalMembershipHasActiveAdmin(membership, approvalAdmins, requiredCapabilities...) {
 			continue
 		}
 		if _, eligible := eligibleRoles[roleKey]; !eligible {
@@ -184,7 +184,7 @@ func workflowApprovalCandidatePoolRolesForAdmin(
 		if !membership.Enabled ||
 			selectedPriorityByPool[poolKey] == 0 ||
 			priority != selectedPriorityByPool[poolKey] ||
-			!approvalMembershipHasActiveAdmin(membership, approvalAdmins) ||
+			!approvalMembershipHasActiveAdmin(membership, approvalAdmins, requiredCapabilities...) ||
 			!AdminHasRole(admin, roleKey) ||
 			(membership.UserID > 0 && membership.UserID != admin.ID) {
 			continue
@@ -393,6 +393,7 @@ func WorkflowTaskVisibilityScopeIncludesTask(scope *WorkflowTaskVisibilityScope,
 		}
 		return scope.StandaloneAllowAllOwnerRoles ||
 			workflowRoleKeyInList(roleKey, scope.StandaloneVisibleOwnerRoleKeys) ||
+			(scope.FollowupCreatorID != nil && IsWorkflowFollowupCreator(task, *scope.FollowupCreatorID)) ||
 			assigneeVisible
 	}
 	if task.ProcessInstanceID == nil || *task.ProcessInstanceID <= 0 ||

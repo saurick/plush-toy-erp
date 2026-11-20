@@ -30,7 +30,7 @@ func (Customer) Fields() []ent.Field {
 		field.String("default_payment_method").
 			Optional().
 			Nillable().
-			MaxLen(128),
+			MaxRuneLen(128),
 		field.Int("default_payment_term_days").
 			Optional().
 			Nillable().

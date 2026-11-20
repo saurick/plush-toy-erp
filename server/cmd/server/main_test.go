@@ -370,6 +370,21 @@ func TestValidateProductionBootstrapConfigRejectsPlaceholders(t *testing.T) {
 	}
 }
 
+func TestValidateProductionBootstrapConfigRejectsPlaceholderWithDirectoryPath(t *testing.T) {
+	for _, path := range []string{"./configs/prod", "./server/configs/prod/", "/app/configs", "/app/configs/config.yaml"} {
+		t.Run(path, func(t *testing.T) {
+			cfg := &conf.Data{
+				Postgres: &conf.Data_Postgres{Dsn: "postgres://app:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+				Auth:     &conf.Data_Auth{JwtSecret: "change-this-prod-jwt-secret"},
+			}
+			if err := validateProductionBootstrapConfig(path, cfg, func(string) string { return "" }); err == nil ||
+				!strings.Contains(err.Error(), "APP_JWT_SECRET still contains placeholder") {
+				t.Fatalf("production directory did not enforce preflight, got %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateProductionBootstrapConfigAllowsBlankBootstrapAdminPassword(t *testing.T) {
 	t.Parallel()
 

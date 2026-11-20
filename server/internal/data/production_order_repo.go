@@ -359,14 +359,23 @@ func (r *productionOrderRepo) SaveProductionOrderDraft(ctx context.Context, in *
 		if err := validateProductionOrderSalesPlanning(ctx, client, in.ID, in.Draft.Items); err != nil {
 			return nil, err
 		}
-		affected, err := client.ProductionOrder.Update().
+		update := client.ProductionOrder.Update().
 			Where(productionorder.ID(in.ID), productionorder.Status(biz.ProductionOrderStatusDraft), productionorder.Version(in.ExpectedVersion)).
 			SetOrderNo(in.Draft.OrderNo).
 			SetNillablePlannedStartAt(in.Draft.PlannedStartAt).
 			SetNillablePlannedEndAt(in.Draft.PlannedEndAt).
 			SetNillableNote(in.Draft.Note).
-			AddVersion(1).
-			Save(ctx)
+			AddVersion(1)
+		if in.Draft.PlannedStartAt == nil {
+			update.ClearPlannedStartAt()
+		}
+		if in.Draft.PlannedEndAt == nil {
+			update.ClearPlannedEndAt()
+		}
+		if in.Draft.Note == nil {
+			update.ClearNote()
+		}
+		affected, err := update.Save(ctx)
 		if err != nil {
 			return nil, err
 		}

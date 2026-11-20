@@ -83,7 +83,7 @@ func TestApprovalSettingsRevisionConditionUsesStrictDecimalContract(t *testing.T
 	}
 }
 
-func TestApprovalSettingsOrdinaryAdminCannotIncludeSelfOrOwnRole(t *testing.T) {
+func TestApprovalSettingsActorMembershipRequiresNamedUserMatch(t *testing.T) {
 	admin := &biz.AdminUser{
 		ID: 12,
 		Roles: []biz.AdminRole{
@@ -91,28 +91,29 @@ func TestApprovalSettingsOrdinaryAdminCannotIncludeSelfOrOwnRole(t *testing.T) {
 			{Key: biz.SalesRoleKey},
 		},
 	}
-	items := []biz.ApprovalSettingItemInput{
+	settings := &biz.ApprovalSettingsExplanation{Items: []biz.ApprovalSettingItemExplanation{
 		{
-			ApprovalKey: biz.ApprovalSettingSalesOrder,
-			Enabled:     true,
-			Members: []biz.ApprovalSettingMemberInput{
-				{RoleKey: biz.PurchaseRoleKey, UserID: 12, Strategy: biz.ApprovalMemberStrategyPrimary, Enabled: true},
+			ApprovalKey:  biz.ApprovalSettingSalesOrder,
+			Configurable: true,
+			Enabled:      true,
+			Members: []biz.ApprovalSettingMemberExplanation{
+				{RoleKey: biz.SalesRoleKey, UserID: 17, Strategy: biz.ApprovalMemberStrategyPrimary, Enabled: true},
 			},
 		},
+	}}
+	if approvalSettingsActorMembership(settings, admin)[biz.ApprovalSettingSalesOrder] {
+		t.Fatal("a coworker's named membership does not grant the actor approval eligibility")
 	}
-	if !approvalSettingsWouldIncludeActor(items, admin) {
-		t.Fatal("named self membership must be rejected")
+	settings.Items[0].Members[0].UserID = admin.ID
+	if !approvalSettingsActorMembership(settings, admin)[biz.ApprovalSettingSalesOrder] {
+		t.Fatal("named actor membership must count when guarding self-assignment")
 	}
-	items[0].Members[0] = biz.ApprovalSettingMemberInput{
-		RoleKey: biz.SalesRoleKey, Strategy: biz.ApprovalMemberStrategyPrimary, Enabled: true,
+	settings.Items[0].Members[0].UserID = 0
+	if !approvalSettingsActorMembership(settings, admin)[biz.ApprovalSettingSalesOrder] {
+		t.Fatal("a role-wide membership includes the actor")
 	}
-	if !approvalSettingsWouldIncludeActor(items, admin) {
-		t.Fatal("own role membership must be rejected")
-	}
-	items[0].Members[0] = biz.ApprovalSettingMemberInput{
-		RoleKey: biz.PurchaseRoleKey, Strategy: biz.ApprovalMemberStrategyPrimary, Enabled: true,
-	}
-	if approvalSettingsWouldIncludeActor(items, admin) {
+	settings.Items[0].Members[0].RoleKey = biz.PurchaseRoleKey
+	if approvalSettingsActorMembership(settings, admin)[biz.ApprovalSettingSalesOrder] {
 		t.Fatal("unrelated responsibility must remain manageable")
 	}
 }

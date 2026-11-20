@@ -59,7 +59,7 @@ func (Supplier) Fields() []ent.Field {
 		field.String("default_payment_method").
 			Optional().
 			Nillable().
-			MaxLen(128),
+			MaxRuneLen(128),
 		field.Bool("default_invoice_required").
 			Optional().
 			Nillable(),

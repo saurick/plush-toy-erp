@@ -481,6 +481,10 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	if repo.shipShipmentActorID != 7 {
 		t.Fatalf("expected authenticated direct shipment actor 7, got %d", repo.shipShipmentActorID)
 	}
+	_, invalidCancel, err := j.handleOperationalFact(ctx, "cancel_shipment", "fractional-cancel", mustJSONRPCStruct(t, map[string]any{"id": 100.5}))
+	if err != nil || invalidCancel == nil || invalidCancel.Code != errcode.InvalidParam.Code || repo.cancelShipmentActorID != 0 {
+		t.Fatalf("fractional cancellation must fail before the repository: %#v, actor=%d, err=%v", invalidCancel, repo.cancelShipmentActorID, err)
+	}
 	_, cancelRes, err := j.handleOperationalFact(ctx, "cancel_shipment", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": 100}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)

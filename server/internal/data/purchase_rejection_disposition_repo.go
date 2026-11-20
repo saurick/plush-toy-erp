@@ -48,6 +48,9 @@ func (r *inventoryRepo) CreatePurchaseRejectionDisposition(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
+	if replay, found, err := r.resolvePurchaseRejectionReplay(ctx, tx.client, in, intentHash); err != nil || found {
+		return replay, err
+	}
 	receipt, item, err := validatePurchaseRejectionSource(ctx, tx.client, inspection, in.Quantity)
 	if err != nil {
 		return nil, err
@@ -434,7 +437,7 @@ func createPurchaseReplacementReceipt(ctx context.Context, tx *inventoryDBTx, so
 	}
 	receiptNo := "RPL-" + disposition.DispositionNo
 	if len(receiptNo) > 64 {
-		receiptNo = receiptNo[:64]
+		receiptNo = fmt.Sprintf("RPLID-%d", disposition.ID)
 	}
 	note := "供应商补换来源：" + disposition.DispositionNo
 	replacement, err := tx.client.PurchaseReceipt.Create().SetReceiptNo(receiptNo).SetNillableSupplierID(source.SupplierID).SetSupplierName(source.SupplierName).SetStatus(biz.PurchaseReceiptStatusDraft).SetReceivedAt(time.Now()).SetNote(note).SetIdempotencyKey(fmt.Sprintf("PURCHASE_REJECTION:%d:REPLACEMENT", disposition.ID)).SetIdempotencyPayloadHash(disposition.IdempotencyPayloadHash).SetIdempotencyItemCount(1).Save(ctx)

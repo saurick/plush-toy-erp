@@ -46,6 +46,12 @@ func TestWorkflowFollowupLifecycleReceiptAndCreatorVisibility(t *testing.T) {
 	if err != nil || count != 1 || len(rows) != 1 {
 		t.Fatalf("creator list count=%d rows=%d err=%v", count, len(rows), err)
 	}
+	count, err = client.WorkflowTask.Query().
+		Where(workflowTaskDiscoveryPredicate(biz.WorkflowTaskDiscoveryFilter{StageKey: "followup", ChainKey: "collaboration"})).
+		Count(ctx)
+	if err != nil || count != 1 {
+		t.Fatalf("follow-up must appear in the collaboration stage count=%d err=%v", count, err)
+	}
 	strangerID := 8
 	_, count, err = repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{Limit: 10, VisibilityScope: &biz.WorkflowTaskVisibilityScope{FollowupCreatorID: &strangerID}})
 	if err != nil || count != 0 {

@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/paymentmethodpreference"
 	"server/internal/data/model/ent/runtimeauditevent"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -60,6 +61,23 @@ func TestPaymentMethodCatalogueSearchOnlyPublishesMaintainedChoices(t *testing.T
 	if _, err := uc.ListPaymentMethods(canceled, biz.PaymentMethodFilter{}); !errors.Is(err, context.Canceled) {
 		t.Fatal("cancellation lost")
 	}
+}
+
+func TestPaymentMethodSnapshotsAcceptCatalogueMultibyteNames(t *testing.T) {
+	fixture, cleanup := newBusinessAttachmentRepoTest(t, "payment_catalogue_multibyte")
+	defer cleanup()
+	ctx := context.Background()
+	client := fixture.data.postgres
+	method := strings.Repeat("转", 64)
+	client.PaymentMethodPreference.Create().SetMethod(method).SaveX(ctx)
+	customer := client.Customer.Create().SetCode("PM-RUNES-C").SetName("模拟客户").
+		SetDefaultPaymentMethod(method).SetDefaultPaymentTermDays(30).SaveX(ctx)
+	supplier := client.Supplier.Create().SetCode("PM-RUNES-S").SetName("模拟供应商").
+		SetDefaultPaymentMethod(method).SetDefaultPaymentTermDays(30).SaveX(ctx)
+	client.SalesOrder.Create().SetOrderNo("PM-RUNES-SO").SetCustomerID(customer.ID).
+		SetOrderDate(time.Now()).SetPaymentMethod(method).SetPaymentTermDays(30).SaveX(ctx)
+	client.PurchaseOrder.Create().SetPurchaseOrderNo("PM-RUNES-PO").SetSupplierID(supplier.ID).
+		SetPurchaseDate(time.Now()).SetPaymentMethod(method).SetPaymentTermDays(30).SaveX(ctx)
 }
 
 func TestPaymentMethodCatalogueLifecyclePreservesSnapshotsAndAuditsAtomically(t *testing.T) {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	v1 "server/api/jsonrpc/v1"
@@ -105,7 +106,7 @@ func (d *jsonrpcDispatcher) applySensitiveFieldReadPolicy(
 	url, method string,
 	result *v1.JsonrpcResult,
 ) {
-	if result == nil || result.Data == nil || result.Code != 0 || !sensitiveFieldBusinessURL(url) {
+	if result == nil || result.Data == nil || result.Code != 0 || !sensitiveFieldBusinessEndpoint(url, method) {
 		return
 	}
 	permissions, permissionResult := d.CurrentEffectiveAdminPermissions(ctx)
@@ -124,10 +125,13 @@ func (d *jsonrpcDispatcher) applySensitiveFieldReadPolicy(
 	result.Data = newDataStruct(data)
 }
 
-func sensitiveFieldBusinessURL(url string) bool {
+func sensitiveFieldBusinessEndpoint(url, method string) bool {
 	switch strings.TrimSpace(url) {
 	case "business", "workflow", "masterdata", "sales_order", "purchase_order", "outsourcing_order", "purchase", "inventory", "quality", "operational_fact", "production_order", "production_wip":
 		return true
+	case "customer_config":
+		_, _, _, ok := customerConfigExceptionProcessContractForMethod(method)
+		return ok
 	default:
 		return false
 	}
@@ -149,6 +153,11 @@ func sensitiveCommercialDomain(url, method string) string {
 		return "sales"
 	case "purchase_order", "purchase", "outsourcing_order":
 		return "procurement"
+	case "customer_config":
+		contract, _, _, _ := customerConfigExceptionProcessContractForMethod(method)
+		if contract.processKey == biz.ProcessKeyFinancePaymentApproval {
+			return "finance"
+		}
 	case "operational_fact":
 		normalizedMethod := strings.ToLower(strings.TrimSpace(method))
 		switch {
@@ -163,9 +172,11 @@ func sensitiveCommercialDomain(url, method string) string {
 	return "strict"
 }
 
+var fieldKeyWordBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+
 func redactSensitiveFieldMap(value map[string]any, commercialDomain string, policy sensitiveFieldReadPolicy) {
 	for key, item := range value {
-		normalizedKey := strings.ToLower(strings.TrimSpace(key))
+		normalizedKey := strings.ToLower(fieldKeyWordBoundary.ReplaceAllString(strings.TrimSpace(key), "${1}_${2}"))
 		// Imported cells can include unlabelled payment and contact notes. Do not
 		// let the original-file evidence bypass any of the existing read policies.
 		if normalizedKey == "import_source" && (!policy.partyPrivate || !policy.salesCommercial || !policy.financeSettlement) {

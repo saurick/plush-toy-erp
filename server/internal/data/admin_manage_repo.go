@@ -343,6 +343,16 @@ ORDER BY sort_order ASC, id ASC`)
 		if err != nil {
 			return nil, err
 		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		item := &out[i]
 		item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
 		if err != nil {
 			return nil, err
@@ -351,9 +361,8 @@ ORDER BY sort_order ASC, id ASC`)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, item)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (r *adminManageRepo) loadRolePermissionKeys(ctx context.Context, roleID int) ([]string, error) {

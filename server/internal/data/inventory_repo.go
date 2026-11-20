@@ -1397,6 +1397,20 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 	if err != nil {
 		return nil, err
 	}
+	sourceQuery := tx.BOMHeader.Query().Where(bomheader.ID(sourceHeaderID), bomheader.ProductID(source.ProductID))
+	if r.data.sqlDialect == dialect.Postgres {
+		sourceQuery.Where(func(s *entsql.Selector) { s.ForShare() })
+	}
+	source, err = sourceQuery.Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrBOMHeaderNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !biz.IsKnownBOMStatus(source.Status) {
+		return nil, biz.ErrBadParam
+	}
 	sourceOrderNo := source.SourceOrderNo
 	if in.SourceOrderNo != nil {
 		sourceOrderNo = in.SourceOrderNo

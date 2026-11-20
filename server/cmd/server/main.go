@@ -309,7 +309,8 @@ func applyLocalAdminCredentialDefaults(confPath string, dataCfg *conf.Data, gete
 
 func isProductionRuntime(confPath string, getenv func(string) string) bool {
 	normalizedPath := filepath.ToSlash(filepath.Clean(strings.TrimSpace(confPath)))
-	if strings.Contains(normalizedPath, "/configs/prod/") || strings.HasPrefix(normalizedPath, "configs/prod/") {
+	if strings.Contains("/"+normalizedPath+"/", "/configs/prod/") ||
+		normalizedPath == "/app/configs" || strings.HasPrefix(normalizedPath, "/app/configs/") {
 		return true
 	}
 	if getenv == nil {

@@ -86,6 +86,9 @@ func (r *inventoryRepo) CreateQualityInspectionFromPurchaseReceipt(
 		}
 		return nil, originalErr
 	}
+	if err := syncQualityHandoffs(ctx, tx.client, row.ID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
