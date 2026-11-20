@@ -1,0 +1,374 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import test from 'node:test'
+
+function readSource(relativePath) {
+  return readFileSync(
+    fileURLToPath(new URL(relativePath, import.meta.url)),
+    'utf8'
+  )
+}
+
+function sourceSlice(source, start, end) {
+  const startIndex = source.indexOf(start)
+  const endIndex = source.indexOf(end, startIndex + start.length)
+  assert.ok(startIndex >= 0, `missing source anchor: ${start}`)
+  assert.ok(endIndex > startIndex, `missing source anchor: ${end}`)
+  return source.slice(startIndex, endIndex)
+}
+
+function matchingBraceIndex(source, openingBraceIndex) {
+  let depth = 0
+  for (let index = openingBraceIndex; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') depth -= 1
+    if (depth === 0) return index
+  }
+  assert.fail('conditional branch has no matching closing brace')
+}
+
+function conditionalBranches(source, condition, fromIndex = 0) {
+  const conditionAnchor = `if (${condition})`
+  const conditionIndex = source.indexOf(conditionAnchor, fromIndex)
+  assert.ok(conditionIndex >= 0, `missing conditional: ${conditionAnchor}`)
+
+  const truthyOpen = source.indexOf(
+    '{',
+    conditionIndex + conditionAnchor.length
+  )
+  const truthyClose = matchingBraceIndex(source, truthyOpen)
+  const elseIndex = source.indexOf('else', truthyClose + 1)
+  assert.ok(elseIndex >= 0, `missing else branch: ${conditionAnchor}`)
+  const falsyOpen = source.indexOf('{', elseIndex + 4)
+  const falsyClose = matchingBraceIndex(source, falsyOpen)
+
+  return {
+    falsy: source.slice(falsyOpen + 1, falsyClose),
+    nextIndex: falsyClose + 1,
+    truthy: source.slice(truthyOpen + 1, truthyClose),
+  }
+}
+
+const masterDataSource = readSource('../pages/MasterDataPage.jsx')
+const salesOrderSource = readSource('../pages/SalesOrdersPage.jsx')
+const salesOrderEditor = readSource(
+  '../components/sales-orders/useSalesOrderEditor.mjs'
+)
+const purchaseOrderSource = readSource('../pages/PurchaseOrdersPage.jsx')
+const outsourcingOrderQuery = readSource(
+  '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
+)
+const outsourcingOrderEditor = readSource(
+  '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
+)
+const bomSource = readSource('../pages/BOMVersionsPage.jsx')
+const shipmentSource = readSource('../pages/ShipmentsPage.jsx')
+const shipmentSubmitSource = readSource(
+  '../components/shipments/submitShipmentDraft.mjs'
+)
+const productionOrderSource = readSource('../pages/ProductionOrdersPage.jsx')
+const purchaseReceiptSource = readSource('../pages/PurchaseReceiptsPage.jsx')
+const qualitySource = readSource('../pages/QualityInspectionsPage.jsx')
+const productionActions = readSource(
+  '../components/production-orders/useProductionFactActions.mjs'
+)
+const reconciliationAction = readSource(
+  '../components/finance/useFinanceReconciliationAction.mjs'
+)
+const purchaseOperationPanelSource = readSource(
+  '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
+)
+const businessListLayoutSource = readSource(
+  '../components/business-list/BusinessListLayout.jsx'
+)
+
+test('newest-first master-data creates return to page one while edits and ordered processes stay on the current page', () => {
+  const mutation = sourceSlice(
+    masterDataSource,
+    'const saveRecord = async () => {',
+    'const toggleRecordActive'
+  )
+
+  assert.match(
+    mutation,
+    /const isCreatingRecord = receipt\?\.created \?\? !editingRecord\?\.id/u
+  )
+  assert.match(
+    mutation,
+    /const shouldShowCreatedRecordOnFirstPage =\s*isCreatingRecord && effectiveType !== 'processes'/u
+  )
+
+  const branches = conditionalBranches(
+    mutation,
+    'shouldShowCreatedRecordOnFirstPage'
+  )
+  assert.match(
+    branches.truthy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+  assert.doesNotMatch(branches.truthy, /loadRecords\(\)/u)
+  assert.match(branches.falsy, /await loadRecords\(\)/u)
+  assert.doesNotMatch(
+    branches.falsy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+
+  const productEditor = sourceSlice(
+    masterDataSource,
+    '<ProductRecordEditor',
+    '<BusinessFormPage'
+  )
+  assert.match(productEditor, /onSaved=\{async \(saved\) =>/u)
+  assert.match(
+    productEditor,
+    /if \(!editingRecord\?\.id\) resetBusinessPaginationCurrent\(setPagination\)\s*else await loadRecords\(\)/u
+  )
+})
+
+for (const pageCase of [
+  {
+    title: '销售订单',
+    source: salesOrderEditor,
+    start: 'const saveOrder = async () => {',
+    end: '\n  return {',
+    resetPattern: /resetBusinessPaginationCurrent\(setPagination\)/u,
+    refreshPattern: /loadOrders\b/u,
+  },
+  {
+    title: '采购订单',
+    source: purchaseOrderSource,
+    start: 'const handleSave = async () => {',
+    end: 'const runLifecycleAction',
+    resetPattern:
+      /setPagination\(\(current\) => \(\{ \.\.\.current, current: 1 \}\)\)/u,
+    refreshPattern: /settleSourceDocumentPostSaveEffect\(refreshPageData\)/u,
+  },
+]) {
+  test(`${pageCase.title} create resets page one and edit refreshes the current page`, () => {
+    const mutation = sourceSlice(pageCase.source, pageCase.start, pageCase.end)
+    assert.match(mutation, /const isCreatingOrder = !editingOrder\?\.id/u)
+
+    const savedIndex = mutation.indexOf('const { saved } = saveResult')
+    const branches = conditionalBranches(
+      mutation,
+      'isCreatingOrder',
+      Math.max(savedIndex, 0)
+    )
+    assert.match(branches.truthy, pageCase.resetPattern)
+    assert.doesNotMatch(branches.truthy, /loadOrders\b/u)
+    assert.doesNotMatch(branches.truthy, pageCase.refreshPattern)
+    assert.match(branches.falsy, pageCase.refreshPattern)
+    assert.doesNotMatch(branches.falsy, pageCase.resetPattern)
+  })
+}
+
+test('purchase edit refresh preserves pagination while refreshing purchase followups', () => {
+  const refresh = sourceSlice(
+    purchaseOrderSource,
+    'const refreshPageData = useCallback',
+    'registerPageRefresh?.(refreshPageData)'
+  )
+  assert.match(refresh, /loadOrders\(\)/u)
+  assert.match(
+    refresh,
+    /if \(contentView === 'followup'\) reloadFollowupData\(\)/u
+  )
+  assert.doesNotMatch(refresh, /setPagination|resetBusinessPaginationCurrent/u)
+})
+
+test('outsourcing create resets only the order page while edit refreshes the current page', () => {
+  const mutation = sourceSlice(
+    outsourcingOrderEditor,
+    'const submitForm = async () => {',
+    '\n  return {'
+  )
+  assert.match(mutation, /const isCreatingOrder = !editingRow\?\.id/u)
+
+  const conditionIndex = mutation.indexOf('if (isCreatingOrder)')
+  const createOpen = mutation.indexOf('{', conditionIndex)
+  const createClose = matchingBraceIndex(mutation, createOpen)
+  const createBranch = mutation.slice(createOpen + 1, createClose)
+  const editTail = mutation.slice(createClose + 1)
+  assert.match(
+    createBranch,
+    /setPagination\(\(current\) => \(\{ \.\.\.current, current: 1 \}\)\)/u
+  )
+  assert.doesNotMatch(outsourcingOrderEditor, /\bloadWorkflowTasks\b/u)
+  assert.match(createBranch, /return/u)
+  assert.doesNotMatch(createBranch, /loadOrders\(\)/u)
+  assert.match(editTail, /await loadOrders\(\)/u)
+  assert.doesNotMatch(editTail, /setPagination/u)
+})
+
+test('production order create writes page one while edit refreshes the current query page', () => {
+  const mutation = sourceSlice(
+    productionOrderSource,
+    'const submitDraft = async (values) => {',
+    'const runLifecycle'
+  )
+  assert.match(mutation, /const isCreate = formMode === 'create'/u)
+
+  const conditionIndex = mutation.indexOf('if (isCreate)')
+  const createOpen = mutation.indexOf('{', conditionIndex)
+  const createClose = matchingBraceIndex(mutation, createOpen)
+  const createBranch = mutation.slice(createOpen + 1, createClose)
+  const editTail = mutation.slice(createClose + 1)
+  assert.match(createBranch, /writeQuery\(\{ page: 1 \}\)/u)
+  assert.match(createBranch, /return/u)
+  assert.doesNotMatch(createBranch, /refreshAfterSuccess\(\)/u)
+  assert.match(editTail, /await refreshAfterSuccess\(\)/u)
+  assert.doesNotMatch(editTail, /writeQuery\(\{ page: 1 \}\)/u)
+})
+
+test('BOM create and copy reset page one while editing refreshes the current page', () => {
+  const mutation = sourceSlice(bomSource, '<BOMEditor', 'actions={headerMode')
+  assert.match(mutation, /onSaved=\{async \(saved\) =>/u)
+  assert.match(mutation, /const isCreatingVersion = headerMode !== 'edit'/u)
+
+  const branches = conditionalBranches(mutation, 'isCreatingVersion')
+  assert.match(
+    branches.truthy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+  assert.doesNotMatch(branches.truthy, /loadVersions\(\)/u)
+  assert.match(branches.falsy, /await loadVersions\(\)/u)
+  assert.doesNotMatch(
+    branches.falsy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+})
+
+test('shipment edits reload the current page while create-only flows return their list to page one', () => {
+  const shipmentMutation = shipmentSubmitSource
+  assert.match(shipmentSource, /submitShipmentDraft\(\{/u)
+
+  const shipmentSaveBranches = conditionalBranches(
+    shipmentMutation,
+    'editingShipment?.id',
+    shipmentMutation.indexOf('let savedShipment')
+  )
+  assert.match(shipmentSaveBranches.truthy, /saveShipmentDraft\(/u)
+  assert.doesNotMatch(shipmentSaveBranches.truthy, /createShipmentWithItems\(/u)
+  assert.match(shipmentSaveBranches.falsy, /createShipmentWithItems\(/u)
+  assert.doesNotMatch(shipmentSaveBranches.falsy, /saveShipmentDraft\(/u)
+
+  const shipmentRefreshBranches = conditionalBranches(
+    shipmentMutation,
+    'editingShipment?.id',
+    shipmentMutation.indexOf('closeShipmentModal()')
+  )
+  assert.match(shipmentRefreshBranches.truthy, /await loadRows\(\)/u)
+  assert.doesNotMatch(
+    shipmentRefreshBranches.truthy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+  assert.match(
+    shipmentRefreshBranches.falsy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+  assert.doesNotMatch(shipmentRefreshBranches.falsy, /loadRows\(\)/u)
+
+  const qualityCreate = sourceSlice(
+    readSource(
+      '../components/quality-inspections/useQualityInspectionActions.js'
+    ),
+    'const handleCreateInspection = useCallback(async () => {',
+    'const runInspectionAction'
+  )
+  assert.match(qualityCreate, /createQualityInspectionDraft\(/u)
+  assert.match(
+    qualityCreate,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+  assert.doesNotMatch(qualityCreate, /loadRows\(\)/u)
+
+  const productionReworkCreate = sourceSlice(
+    productionActions,
+    'const submitProductionRework = async (values) => {',
+    '\n  return {'
+  )
+  assert.match(
+    productionReworkCreate,
+    /createProductionReworkFromCompletion\(/u
+  )
+  assert.match(productionReworkCreate, /resetPaginationForKey\('production'\)/u)
+  assert.doesNotMatch(productionReworkCreate, /loadRows\('production'\)/u)
+
+  const financeReconciliationCreate = sourceSlice(
+    reconciliationAction,
+    'const submitFinanceSourceAction = async (values) => {',
+    '\n  return {'
+  )
+  assert.match(
+    financeReconciliationCreate,
+    /createReconciliationFromFinanceFact\(/u
+  )
+  assert.match(
+    financeReconciliationCreate,
+    /resetPaginationForKey\(currentActiveKey\)/u
+  )
+  assert.doesNotMatch(
+    financeReconciliationCreate,
+    /loadRows\(currentActiveKey\)/u
+  )
+})
+
+test('purchase sort changes reset page one before applying the new server sort', () => {
+  const sortControl = sourceSlice(
+    purchaseOperationPanelSource,
+    'purpose="sort"',
+    'actions={'
+  )
+  assert.match(
+    sortControl,
+    /onChange=\{\(value\) => \{\s*resetPagination\(\)\s*setSortValue\(value\)\s*\}\}/u
+  )
+  assert.ok(
+    sortControl.indexOf('resetPagination()') <
+      sortControl.indexOf('setSortValue(value)'),
+    'page reset must be scheduled before the sort state changes'
+  )
+})
+
+test('server-paginated tables label only their current-page sort columns', () => {
+  const dataTable = sourceSlice(
+    businessListLayoutSource,
+    'export function BusinessDataTable({',
+    'export const ToolbarButton ='
+  )
+  assert.match(
+    dataTable,
+    /paginated \? normalized\.map\(\(column\) =>\s*typeof column\.sorter === 'function'\s*\? \{ \.\.\.column, showSorterTooltip: \{ title: '仅排序当前页' \} \}/u
+  )
+  assert.doesNotMatch(dataTable, /showSorterTooltip=/u)
+})
+
+test('exact linked-record routes use a one-record page instead of injecting into paginated rows', () => {
+  for (const [title, source] of [
+    ['销售订单', salesOrderSource],
+    ['采购订单', purchaseOrderSource],
+    ['加工合同', outsourcingOrderQuery],
+    ['生产订单', productionOrderSource],
+    ['出货单', shipmentSource],
+    ['采购入库单', purchaseReceiptSource],
+    ['质量检验单', qualitySource],
+  ]) {
+    assert.match(
+      source,
+      /const exactPage = resolveExactRecordPage\(\{/u,
+      `${title} must resolve exact route records outside ordinary page totals`
+    )
+    assert.match(
+      source,
+      title === '生产订单'
+        ? /setListResult\(\{\s*orders: exactPage\.records,\s*total: exactPage\.total,\s*query,?\s*\}\)/u
+        : /setTotal\(exactPage\.total\)/u
+    )
+    assert.doesNotMatch(
+      source,
+      /setTotal\([\s\S]{0,180}\? 1\s*:\s*0/u,
+      `${title} must not increment the server total for an existing cross-page record`
+    )
+  }
+})
