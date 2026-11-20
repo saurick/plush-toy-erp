@@ -1,0 +1,9 @@
+.erp-horizontal-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.erp-horizontal-scroll::-webkit-scrollbar {
+  display: none;
+}
