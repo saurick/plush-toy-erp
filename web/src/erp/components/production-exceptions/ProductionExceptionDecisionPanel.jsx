@@ -1,0 +1,950 @@
+import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Button, Input, Tag } from 'antd'
+import useBusinessSearchParams from '../../hooks/useBusinessSearchParams.js'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
+import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
+import { ProcessStatus, ProductionExceptionExecutionStatus, ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
+import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
+import WorkflowSourceProgressButton from '../workflow/WorkflowSourceProgressButton.jsx'
+import { useProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+
+import {
+  cancelProductionException,
+  getProductionException,
+  listProductionExceptions,
+  reverseProductionException,
+} from '../../api/operationalFactApi.mjs'
+import {
+  executeProductionExceptionProcess,
+  findExceptionProcessActiveNode,
+  getProductionExceptionApprovalProcess,
+  startProductionExceptionApprovalProcess,
+} from '../../api/customerConfigApi.mjs'
+import ExceptionProcessRecoveryButton from '../workflow/ExceptionProcessRecoveryButton.jsx'
+import {
+  BusinessActionTooltip,
+  BusinessDataTable,
+  BusinessOperationPanel,
+  SelectionActionBar,
+  SelectionClearAction,
+  SelectFilter,
+  SearchInput,
+} from '../business-list/BusinessListLayout.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../business-list/BusinessListToolbarActions.jsx'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+import {
+  canReadProductionExceptionDecisions, productionExceptionSummary, productionExceptionExecutionLabel,
+  PRODUCTION_EXCEPTION_APPROVAL_LABELS, PRODUCTION_EXCEPTION_EXECUTION_LABELS,
+} from '../../utils/productionRecordViews.mjs'
+import ProductionRecordDrawer from '../production-records/ProductionRecordDrawer.jsx'
+import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import useBusinessPageState from '../../hooks/useBusinessPageState.js'
+import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
+import { resolveProductionExceptionActionAvailability } from '../../utils/operationalActionAvailability.mjs'
+import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
+import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
+  createBusinessTablePagination,
+  resetBusinessPaginationCurrent,
+} from '../../utils/businessPagination.mjs'
+import {
+  buildProductionExceptionListQuery,
+  productionExceptionHandlingKey,
+  productionExceptionApprovalCounts,
+  PRODUCTION_EXCEPTION_HANDLING_OPTIONS,
+  reconcileProductionExceptionPage,
+  requireProductionExceptionPage,
+  requireProductionExceptionRecord,
+} from '../../utils/productionExceptionListModel.mjs'
+
+function renderExceptionSource(record, showPhoto = false) {
+  const source = record?.source_identity
+  if (!source || !(source.subject_id > 0)) return '处置对象待核对'
+  const name = source.name || source.code || (source.subject_type === 'MATERIAL' ? '材料已关联' : '产品已关联')
+  const label = (
+    <BusinessCellStack
+      primary={name}
+      secondary={[source.code !== name ? source.code : '', source.sku_code, source.batch_no].filter(Boolean).join(' · ')}
+    />
+  )
+  return showPhoto && source.subject_type === 'PRODUCT' ? (
+    <ProductIdentity productId={source.subject_id} name={name}>{label}</ProductIdentity>
+  ) : label
+}
+
+const TYPE_LABELS = {
+  SCRAP: '放弃本批（报废）',
+  REWORK_ORIGINAL: '原厂／本厂返工',
+  REWORK_SWITCH: '换厂返工',
+  REMAKE: '补料重做',
+  OVER_ISSUE: '超领申请',
+  WIP_CONCESSION: '在制品让步',
+}
+const TYPE_FILTER_OPTIONS = [
+  { label: '全部异常类型', value: '' },
+  ...['SCRAP', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE'].map((value) => ({ label: TYPE_LABELS[value], value })),
+  { label: TYPE_LABELS.OVER_ISSUE, value: 'OVER_ISSUE' },
+  { label: TYPE_LABELS.WIP_CONCESSION, value: 'WIP_CONCESSION' },
+]
+const EXECUTION_FILTER_OPTIONS = [
+  { label: '全部业务状态', value: '' },
+  { label: '待办理 / 额度生效', value: ProductionExceptionExecutionStatus.PENDING },
+  { label: PRODUCTION_EXCEPTION_EXECUTION_LABELS.APPLIED, value: ProductionExceptionExecutionStatus.APPLIED },
+  { label: PRODUCTION_EXCEPTION_EXECUTION_LABELS.REVERSED, value: ProductionExceptionExecutionStatus.REVERSED },
+]
+function mutationReceiptMatches(item, action, reason, actorID) {
+  const record = action?.record
+  if (
+    !item?.id ||
+    Number(item.id) !== Number(record?.id) ||
+    Number(item.version) !== Number(record?.version) + 1
+  ) {
+    return false
+  }
+  if (action.targetStatus && item.status !== action.targetStatus) return false
+  if (
+    action.targetExecutionStatus &&
+    item.execution_status !== action.targetExecutionStatus
+  ) {
+    return false
+  }
+  if (
+    action.actorField &&
+    Number(item[action.actorField]) !== Number(actorID)
+  ) {
+    return false
+  }
+  if (
+    action.reasonField &&
+    String(item[action.reasonField] || '').trim() !== reason
+  ) {
+    return false
+  }
+  return true
+}
+
+export default function ProductionExceptionDecisionPanel({
+  adminProfile,
+  onRefreshReady,
+}) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskBusiness = useBusinessPageContext()?.taskBusiness
+  const inTask = Boolean(taskBusiness)
+  const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
+  const navigate = useBusinessNavigate()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
+  const beginLatestRequest = useLatestRequestCoordinator()
+  const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [pagination, setPagination] = useBusinessPageState('exceptionPagination', { current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE })
+  const [loading, setLoading] = useState(false)
+  const [action, setAction] = useState(null)
+  const [selectedID, setSelectedID] = useBusinessPageState('exceptionSelectedID', null)
+  const [detailID, setDetailID] = useState(null)
+  const linkedDetailOpenedRef = useRef(0)
+  const [reason, setReason] = useState('')
+  const [decisionTypeFilter, setDecisionTypeFilter] = useBusinessPageState('exceptionType', '')
+  const [keyword, setKeyword] = useBusinessPageState('exceptionKeyword', '')
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [handlingStatus, setHandlingStatus] = useBusinessPageState('exceptionHandlingStatus', '')
+  const [executionStatusFilter, setExecutionStatusFilter] = useBusinessPageState('exceptionExecutionStatus', '')
+  const canRead = canReadProductionExceptionDecisions(adminProfile)
+  const canDecide = !taskBusiness && hasActionPermission(
+    adminProfile,
+    PermissionCode.PRODUCTION_EXCEPTION_APPROVE
+  )
+  const canExecute = taskBusiness?.readOnly !== true && hasActionPermission(adminProfile, PermissionCode.PRODUCTION_EXCEPTION_EXECUTE)
+  const canRecoverProcess = !taskBusiness && hasActionPermission(
+    adminProfile,
+    PermissionCode.PROCESS_RUNTIME_RECOVER
+  )
+  const adminID = Number(adminProfile?.id || 0)
+  const customerKey =
+    adminProfile?.effective_session?.customer?.key || undefined
+  const linkedProductionExceptionID = Number(
+    searchParams.get('production_exception_id') || 0
+  )
+  const routeProductionOrderID = Number(
+    searchParams.get('production_order_id') || 0
+  )
+  const hasRouteProductionOrder = Boolean(
+    Number.isSafeInteger(routeProductionOrderID) && routeProductionOrderID > 0
+  )
+  const hasListFilters = Boolean(
+    keyword || handlingStatus || decisionTypeFilter || executionStatusFilter
+  )
+  const hasExactContext = Boolean(
+    !hasListFilters &&
+      Number.isSafeInteger(linkedProductionExceptionID) &&
+      linkedProductionExceptionID > 0
+  )
+  const activeFilterCount = [
+    decisionTypeFilter,
+    executionStatusFilter,
+    hasRouteProductionOrder,
+    hasExactContext,
+  ].filter(Boolean).length
+
+  useEffect(() => {
+    if (!Number.isSafeInteger(linkedProductionExceptionID) || linkedProductionExceptionID <= 0) {
+      linkedDetailOpenedRef.current = 0
+      return
+    }
+    setHandlingStatus('')
+    setKeyword('')
+    setDecisionTypeFilter('')
+    setExecutionStatusFilter('')
+    resetBusinessPaginationCurrent(setPagination)
+  }, [linkedProductionExceptionID, setHandlingStatus, setKeyword, setDecisionTypeFilter, setExecutionStatusFilter, setPagination])
+
+  const load = useCallback(async () => {
+    const request = beginLatestRequest('production-exception-decisions')
+    setStatusCounts(null)
+    if (!canRead) {
+      if (request.isCurrent()) {
+        setRows([])
+        setTotal(0)
+        setSelectedID(null)
+        setLoading(false)
+        request.finish()
+      }
+      return []
+    }
+    setLoading(true)
+    try {
+      if (hasExactContext) {
+        const linked = await getProductionException(
+          { id: linkedProductionExceptionID },
+          { signal: request.signal }
+        )
+        if (!request.isCurrent()) return null
+        const exactRecord = requireProductionExceptionRecord(linked, {
+          id: linkedProductionExceptionID,
+          productionOrderID: hasRouteProductionOrder
+            ? routeProductionOrderID
+            : 0,
+        })
+        setStatusCounts(resolveBusinessStatusCounts(null, { hasExactContext: true, exactRecord: { status: productionExceptionHandlingKey(exactRecord) } }))
+        setRows([exactRecord])
+        setTotal(1)
+        setSelectedID(exactRecord.id)
+        if (!inTask && linkedDetailOpenedRef.current !== exactRecord.id) {
+          linkedDetailOpenedRef.current = exactRecord.id
+          setDetailID(exactRecord.id)
+        }
+        return [exactRecord]
+      }
+
+      const query = buildProductionExceptionListQuery({
+        keyword,
+        handlingStatus,
+        decisionType: decisionTypeFilter,
+        executionStatus: executionStatusFilter,
+        productionOrderID: hasRouteProductionOrder
+          ? routeProductionOrderID
+          : 0,
+        pagination,
+      })
+      const data = await listProductionExceptions({ ...query, include_status_counts: true }, {
+        signal: request.signal,
+      })
+      if (!request.isCurrent()) return null
+      const page = requireProductionExceptionPage(data, {
+        limit: query.limit,
+        productionOrderID: hasRouteProductionOrder
+          ? routeProductionOrderID
+          : 0,
+      })
+      const pageState = reconcileProductionExceptionPage({
+        records: page.records,
+        total: page.total,
+        pagination,
+      })
+      setStatusCounts(resolveBusinessStatusCounts(data))
+      setRows(pageState.records)
+      setTotal(page.total)
+      setSelectedID((current) =>
+        reconcileProductionExceptionPage({
+          records: page.records,
+          total: page.total,
+          pagination,
+          selectedID: current,
+        }).selectedID
+      )
+      if (pageState.shouldRetreat) {
+        setPagination((current) => ({
+          ...current,
+          current: pageState.current,
+        }))
+      }
+      return pageState.records
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return null
+      setRows([])
+      setTotal(0)
+      setSelectedID(null)
+      message.error(getActionErrorMessage(error, '读取生产异常处置申请'))
+      return null
+    } finally {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+    }
+  }, [
+    inTask,
+    keyword,
+    handlingStatus,
+    beginLatestRequest,
+    canRead,
+    decisionTypeFilter,
+    executionStatusFilter,
+    setPagination,
+    setSelectedID,
+    hasExactContext,
+    hasRouteProductionOrder,
+    linkedProductionExceptionID,
+      pagination,
+    routeProductionOrderID,
+  ])
+  useEffect(() => {
+    onRefreshReady?.(load)
+    return () => onRefreshReady?.(null)
+  }, [load, onRefreshReady])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const openCancellation = async (record) => {
+    setLoading(true)
+    try {
+      const processData = await getProductionExceptionApprovalProcess({
+        ...(customerKey ? { customer_key: customerKey } : {}),
+        production_exception_id: record.id,
+      })
+      const latest = processData.source_readback
+      if (
+        latest?.status !== ProductionExceptionStatus.SUBMITTED ||
+        (processData.process_context &&
+          processData.process_context.process_instance.status !== ProcessStatus.BLOCKED)
+      ) {
+        message.warning(
+          latest?.status === ProductionExceptionStatus.SUBMITTED
+            ? '该异常审批仍在办理，请先在任务中心驳回或阻塞流程'
+            : '当前状态不能撤回生产异常申请'
+        )
+        await load()
+        return
+      }
+      setAction({
+        record: latest,
+        kind: 'cancel',
+        run: cancelProductionException,
+        success: '生产异常申请已取消',
+        targetStatus: 'CANCELLED',
+        actorField: 'decided_by',
+        reasonField: 'decision_reason',
+      })
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '核对生产异常撤回条件'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const ensureApprovalProcess = async (record) => {
+    if (
+      !record?.id ||
+      record.status !== ProductionExceptionStatus.SUBMITTED ||
+      Number(record.requested_by) !== adminID
+    ) {
+      return
+    }
+    setLoading(true)
+    try {
+      let processData = await getProductionExceptionApprovalProcess({
+        ...(customerKey ? { customer_key: customerKey } : {}),
+        production_exception_id: record.id,
+      })
+      const alreadyStarted = Boolean(processData?.process_context)
+      if (!alreadyStarted) {
+        try {
+          processData = await startProductionExceptionApprovalProcess({
+            ...(customerKey ? { customer_key: customerKey } : {}),
+            production_exception_id: record.id,
+            idempotency_key: `production-exception-approval/${record.id}`,
+          })
+        } catch (error) {
+          if (!isSourceBusinessActionResultUnknown(error)) throw error
+          processData = await getProductionExceptionApprovalProcess({
+            ...(customerKey ? { customer_key: customerKey } : {}),
+            production_exception_id: record.id,
+          })
+          if (!processData?.process_context) throw error
+        }
+      }
+      if (!processData?.process_context || !processData?.source_readback?.id) {
+        throw Object.assign(new Error('生产异常审批流结果暂时无法确认'), {
+          isInvalidResponse: true,
+        })
+      }
+      await load()
+      showProcessSubmissionReceipt({ result: processData, record: processData.source_readback, title: alreadyStarted ? '生产异常审批流已存在' : '生产异常审批流已恢复发起' })
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '核对生产异常审批流'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const submit = async () => {
+    const text = reason.trim()
+    if (!text || !action?.record?.id) return
+    setLoading(true)
+    try {
+      const params = {
+        id: action.record.id,
+        expected_version: action.record.version,
+        reason: text,
+      }
+      let next
+      if (action.kind === 'execute') {
+        const processData = await getProductionExceptionApprovalProcess({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          production_exception_id: action.record.id,
+        })
+        const node = findExceptionProcessActiveNode(
+          processData,
+          ['execute_production_exception', 'execute_warehouse_production_exception']
+        )
+        const execution = await executeProductionExceptionProcess({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          process_instance_id: processData.process_context.process_instance.id,
+          process_node_instance_id: node.id,
+          expected_version: node.version,
+          production_exception_id: action.record.id,
+          idempotency_key: `production-exception-execute/${action.record.id}/${node.id}`,
+          reason: text,
+        })
+        next = execution.source_readback
+      } else {
+        next = await action.run(params)
+      }
+      if (!mutationReceiptMatches(next, action, text, adminID)) {
+        throw Object.assign(new Error('生产异常处置结果暂时无法确认'), {
+          isInvalidResponse: true,
+        })
+      }
+      setAction(null)
+      setReason('')
+      await load()
+      reportBusinessResult(action.success, next)
+      message.success(action.success)
+    } catch (error) {
+      if (isSourceBusinessActionResultUnknown(error)) {
+        let latest = null
+        if (action?.kind === 'execute') {
+          latest = await getProductionExceptionApprovalProcess({
+            ...(customerKey ? { customer_key: customerKey } : {}),
+            production_exception_id: action.record.id,
+          })
+            .then((data) => data.source_readback)
+            .catch(() => null)
+        }
+        if (!latest) {
+          latest = await getProductionException({
+            id: action?.record?.id,
+          }).catch(() => null)
+        }
+        if (mutationReceiptMatches(latest, action, text, adminID)) {
+          setAction(null)
+          setReason('')
+          await load()
+          reportBusinessResult(action.success, latest)
+          message.success('已重新读取生产异常处置结果')
+          return
+        }
+        if (latest?.id) {
+          await load()
+          message.warning('生产异常状态已被其他操作更新，请核对后重试')
+          return
+        }
+      }
+      message.error(getActionErrorMessage(error, '办理生产异常处置'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const columns = useMemo(
+    () => [
+      { defaultPriority: 10, title: '异常单号', dataIndex: 'decision_no' },
+      {
+        defaultPriority: 20,
+        title: '异常类型',
+        dataIndex: 'decision_type',
+        render: (value) => TYPE_LABELS[value] || '生产异常',
+      },
+      {
+        defaultPriority: 25,
+        title: '处置对象 / 批次',
+        key: 'source_identity',
+        width: 255,
+        render: (_, record) => renderExceptionSource(record),
+        detailValue: (record) => renderExceptionSource(record, true),
+      },
+      {
+        align: 'right',
+        defaultPriority: 50,
+        title: '申请数量',
+        dataIndex: 'requested_quantity',
+      },
+      {
+        defaultPriority: 30,
+        title: '审批状态',
+        dataIndex: 'status',
+        render: (value) => <Tag>{PRODUCTION_EXCEPTION_APPROVAL_LABELS[value] || '状态待确认'}</Tag>,
+      },
+      {
+        defaultPriority: 40,
+        title: '业务状态',
+        dataIndex: 'execution_status',
+        render: (_, record) => <Tag>{productionExceptionExecutionLabel(record)}</Tag>,
+      },
+      { align: 'left', title: '原因', dataIndex: 'reason' },
+    ],
+    []
+  )
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: 'production-exceptions-decisions',
+      moduleTitle: '生产异常处置申请',
+      columns,
+    })
+
+  const detailColumns = useMemo(() => [
+    ...visibleColumns,
+    { title: '批准数量', dataIndex: 'approved_quantity' },
+    { title: '审批意见', dataIndex: 'decision_reason' },
+    { title: '执行原因', dataIndex: 'execution_reason' },
+    { title: '冲正原因', dataIndex: 'reverse_reason' },
+  ], [visibleColumns])
+
+  if (!canRead) return null
+
+  const selectedRecord = rows.find((item) => item.id === selectedID) || null
+  const canCancel = hasActionPermission(
+    adminProfile,
+    selectedRecord?.decision_type === 'OVER_ISSUE'
+      ? PermissionCode.PRODUCTION_OVER_ISSUE_SUBMIT
+      : PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
+  )
+  const detailRecord = rows.find((item) => item.id === detailID) || null
+  const selectedRequesterOwned = Boolean(
+    selectedRecord && Number(selectedRecord.requested_by) === adminID
+  )
+  const actionAvailability = {
+    approval: resolveProductionExceptionActionAvailability({
+      action: 'approval',
+      authorized: canCancel,
+      productionException: selectedRecord,
+      requesterOwned: selectedRequesterOwned,
+      busy: loading,
+    }),
+    decide: resolveProductionExceptionActionAvailability({
+      action: 'decide',
+      authorized: canDecide,
+      productionException: selectedRecord,
+      busy: loading,
+    }),
+    withdraw: resolveProductionExceptionActionAvailability({
+      action: 'withdraw',
+      authorized: canCancel,
+      productionException: selectedRecord,
+      requesterOwned: selectedRequesterOwned,
+      busy: loading,
+    }),
+    execute: resolveProductionExceptionActionAvailability({
+      action: 'execute',
+      authorized: canExecute,
+      productionException: selectedRecord,
+      busy: loading,
+    }),
+    reverse: resolveProductionExceptionActionAvailability({
+      action: 'reverse',
+      authorized: canExecute,
+      productionException: selectedRecord,
+      busy: loading,
+    }),
+    revokeQuota: resolveProductionExceptionActionAvailability({
+      action: 'revokeQuota',
+      authorized: canExecute,
+      productionException: selectedRecord,
+      busy: loading,
+    }),
+  }
+  const clearFilters = () => {
+    setDecisionTypeFilter('')
+    setExecutionStatusFilter('')
+    setSelectedID(null)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('production_exception_id')
+    nextParams.delete('production_order_id')
+    setSearchParams(nextParams, { replace: true })
+    resetBusinessPaginationCurrent(setPagination)
+  }
+  const beginExecution = () => {
+    if (!selectedRecord || !actionAvailability.execute.visible || actionAvailability.execute.disabled) return
+    setDetailID(null)
+    setAction({
+      record: selectedRecord,
+      kind: 'execute',
+      success: '生产异常已执行',
+      targetExecutionStatus: 'APPLIED',
+      actorField: 'executed_by',
+      reasonField: 'execution_reason',
+    })
+  }
+  const reasonLabel = action?.kind === 'execute'
+    ? '执行原因'
+    : action?.targetExecutionStatus === 'REVERSED' ? '冲正或撤销原因' : '撤回原因'
+
+  return (
+    <>
+      <BusinessOperationPanel
+        compact
+        filters={
+          <>
+            <BusinessStatusFilter
+              inline
+              aria-label="异常审批状态"
+              value={handlingStatus}
+              counts={productionExceptionApprovalCounts(statusCounts)}
+              loading={loading}
+              exact={hasExactContext}
+              options={PRODUCTION_EXCEPTION_HANDLING_OPTIONS}
+              onChange={(value) => {
+                setHandlingStatus(value)
+                setSelectedID(null)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SearchInput
+              value={keyword}
+              {...BUSINESS_SEARCH_SCOPES.production_exception}
+              onSearch={(value) => {
+                setKeyword(value)
+                setSelectedID(null)
+                const nextParams = new URLSearchParams(searchParams)
+                nextParams.delete('production_exception_id')
+                setSearchParams(nextParams, { replace: true })
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="异常类型"
+              value={decisionTypeFilter}
+              options={TYPE_FILTER_OPTIONS}
+              onChange={(value) => {
+                setDecisionTypeFilter(value || '')
+                setSelectedID(null)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="业务状态"
+              value={executionStatusFilter}
+              options={EXECUTION_FILTER_OPTIONS}
+              onChange={(value) => {
+                setExecutionStatusFilter(value || '')
+                setSelectedID(null)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            {hasRouteProductionOrder ? (
+              <Tag
+                closable
+                onClose={(event) => {
+                  event.preventDefault()
+                  const nextParams = new URLSearchParams(searchParams)
+                  nextParams.delete('production_order_id')
+                  setSearchParams(nextParams, { replace: true })
+                  setSelectedID(null)
+                  resetBusinessPaginationCurrent(setPagination)
+                }}
+              >
+                已按生产订单筛选
+              </Tag>
+            ) : null}
+            {hasExactContext ? (
+              <Tag color="blue">已定位异常申请</Tag>
+            ) : null}
+          </>
+        }
+        onClearFilters={clearFilters}
+        activeFilterCount={activeFilterCount}
+        actions={
+          <BusinessListToolbarActions
+            showExport={false}
+            onOpenColumnOrder={openColumnOrder}
+          />
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRecord ? 1 : 0}
+          selectedLabel={
+            selectedRecord?.decision_no || '请选择生产异常处置申请'
+          }
+        >
+          <SelectionClearAction
+            selectedCount={selectedRecord ? 1 : 0}
+            selectionLabel="生产异常处置申请"
+            onClear={() => setSelectedID(null)}
+          />
+          <Button size="small" data-business-action-role="view" disabled={!selectedRecord} onClick={() => setDetailID(selectedID)}>查看异常详情</Button>
+          <WorkflowSourceProgressButton sourceType="production_exception_decision" sourceID={selectedRecord?.id} profile={adminProfile} disabled={loading} />
+          {actionAvailability.approval.visible ? (
+            <BusinessActionTooltip
+              disabled={actionAvailability.approval.disabled}
+              disabledReason={actionAvailability.approval.disabledReason}
+            >
+              <Button
+                icon={<AuditOutlined aria-hidden="true" />}
+                className="erp-action-button"
+                size="small"
+                data-business-action-key="production-exception-approval"
+                data-business-action-role="action"
+                data-business-action-group="collaboration"
+                disabled={actionAvailability.approval.disabled}
+                onClick={() => ensureApprovalProcess(selectedRecord)}
+              >
+                核对审批流
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {actionAvailability.decide.visible ? (
+            <BusinessActionTooltip
+              disabled={actionAvailability.decide.disabled}
+              disabledReason={actionAvailability.decide.disabledReason}
+            >
+              <Button
+                icon={<AuditOutlined aria-hidden="true" />}
+                className="erp-action-button"
+                size="small"
+                type="primary"
+                data-business-action-key="production-exception-decide"
+                data-business-action-role="primary"
+                data-business-action-group="collaboration"
+                onClick={() => navigate('/erp/task-board')}
+                disabled={actionAvailability.decide.disabled}
+              >
+                去任务中心审批
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {actionAvailability.withdraw.visible ? (
+            <BusinessActionTooltip
+              disabled={actionAvailability.withdraw.disabled}
+              disabledReason={actionAvailability.withdraw.disabledReason}
+            >
+              <Button
+                icon={<RollbackOutlined aria-hidden="true" />}
+                className="erp-action-button"
+                size="small"
+                danger
+                data-business-action-key="production-exception-withdraw"
+                data-business-action-role="danger"
+                disabled={actionAvailability.withdraw.disabled}
+                onClick={() => openCancellation(selectedRecord)}
+              >
+                核对并撤回
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {actionAvailability.execute.visible ? (
+            <BusinessActionTooltip
+              disabled={actionAvailability.execute.disabled}
+              disabledReason={actionAvailability.execute.disabledReason}
+            >
+              <Button
+                size="small"
+                type="primary"
+                data-business-action-key="production-exception-execute"
+                data-business-action-role="primary"
+                disabled={actionAvailability.execute.disabled}
+                onClick={beginExecution}
+              >
+                确认执行
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {actionAvailability.reverse.visible ? (
+            <BusinessActionTooltip
+              disabled={actionAvailability.reverse.disabled}
+              disabledReason={actionAvailability.reverse.disabledReason}
+            >
+              <Button
+                icon={<RollbackOutlined aria-hidden="true" />}
+                className="erp-action-button"
+                size="small"
+                danger
+                data-business-action-key="production-exception-reverse"
+                data-business-action-role="danger"
+                disabled={actionAvailability.reverse.disabled}
+                onClick={() =>
+                  setAction({
+                    record: selectedRecord,
+                    run: reverseProductionException,
+                    success: '生产异常已冲正',
+                    targetExecutionStatus: 'REVERSED',
+                    actorField: 'reversed_by',
+                    reasonField: 'reverse_reason',
+                  })
+                }
+              >
+                确认冲正
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {actionAvailability.revokeQuota.visible ? (
+            <BusinessActionTooltip
+              disabled={actionAvailability.revokeQuota.disabled}
+              disabledReason={actionAvailability.revokeQuota.disabledReason}
+            >
+              <Button
+                icon={<RollbackOutlined aria-hidden="true" />}
+                className="erp-action-button"
+                size="small"
+                danger
+                data-business-action-key="production-exception-revoke-quota"
+                data-business-action-role="danger"
+                disabled={actionAvailability.revokeQuota.disabled}
+                onClick={() =>
+                  setAction({
+                    record: selectedRecord,
+                    run: reverseProductionException,
+                    success: '未使用的超领额度已撤销',
+                    targetExecutionStatus: 'REVERSED',
+                    actorField: 'reversed_by',
+                    reasonField: 'reverse_reason',
+                  })
+                }
+              >
+                撤销额度
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          <ExceptionProcessRecoveryButton
+            canRecover={canRecoverProcess}
+            disabled={!selectedRecord || loading}
+            disabledReason="请先选择一条生产异常处置申请"
+            loadProcess={() =>
+              getProductionExceptionApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                production_exception_id: selectedRecord.id,
+              })
+            }
+            onRecovered={load}
+          />
+        </SelectionActionBar>
+      </BusinessOperationPanel>
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        columns={tableColumns}
+        taskDetailColumns={detailColumns}
+        dataSource={rows}
+        rowSelection={{
+            type: 'radio',
+            selectedRowKeys: selectedID ? [selectedID] : [],
+            onChange: (keys) => setSelectedID(keys[0] || null),
+          }}
+        onRow={(record) => ({
+            onClick: () => setSelectedID(record.id),
+          })}
+        onOpenRecord={(record) => { setSelectedID(record.id); setDetailID(record.id) }}
+        rowClassName={(record) =>
+            record.id === selectedID ? 'ant-table-row-selected' : ''
+          }
+        pagination={
+            hasExactContext
+              ? false
+              : createBusinessTablePagination({
+                  pagination,
+                  total,
+                  onChange: (current, pageSize) => {
+                    setSelectedID(null)
+                    setPagination({ current, pageSize })
+                  },
+                })
+          }
+        scroll={{ x: 960 }}
+        emptyDescription="暂无生产异常处置申请"
+      />
+      {columnOrderModal}
+      <ProductionRecordDrawer
+        open={Boolean(detailRecord)}
+        onClose={() => setDetailID(null)}
+        title="生产异常详情"
+        record={detailRecord}
+        summary={productionExceptionSummary(detailRecord || {})}
+        columns={detailColumns}
+        actions={detailID === selectedID && actionAvailability.execute.visible ? (
+          <Button type="primary" disabled={actionAvailability.execute.disabled} onClick={beginExecution}>确认执行</Button>
+        ) : null}
+      />
+      <BusinessModal
+        taskInline
+        size="confirm"
+        title="确认生产异常处置"
+        hasChanges={reason.length > 0}
+        open={Boolean(action)}
+        confirmLoading={loading}
+        maskClosable={!loading}
+        okText="确认办理"
+        cancelText="返回"
+        onCancel={() => {
+          if (!loading) {
+            setAction(null)
+            setReason('')
+          }
+        }}
+        onOk={submit}
+      >
+        <div className="erp-production-exception-context">
+          <strong>{action?.record?.decision_no || '异常申请待核对'} · {TYPE_LABELS[action?.record?.decision_type] || '生产异常'}</strong>
+          {action?.record ? renderExceptionSource(action.record, true) : null}
+          <p>{productionExceptionSummary(action?.record || {}).next}</p>
+          {action?.kind === 'execute' && action.record.approved_quantity != null ? <p>批准数量：{action.record.approved_quantity}</p> : null}
+          {action?.record?.decision_reason ? <p>审批意见：{action.record.decision_reason}</p> : null}
+          <label htmlFor="production-exception-reason">{reasonLabel}</label>
+          <Input.TextArea
+            id="production-exception-reason"
+            aria-label={reasonLabel}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            rows={3}
+            maxLength={255}
+            showCount
+            placeholder={`请填写${reasonLabel}`}
+          />
+        </div>
+      </BusinessModal>
+    </>
+  )
+}
