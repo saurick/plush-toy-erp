@@ -1,0 +1,390 @@
+.business-attachment-panel {
+  container-type: inline-size;
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+.business-attachment-panel--inline {
+  grid-column: 1 / -1;
+  margin-block-start: 16px;
+}
+
+.business-attachment-panel--manager {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.business-attachment-panel--compact {
+  padding: 0;
+}
+
+.business-attachment-panel--compact > .business-attachment-panel__content {
+  --erp-empty-inline-padding-block: 4px;
+  --erp-empty-inline-padding-inline: 0px;
+
+  padding: 0 12px 8px;
+}
+
+.business-attachment-panel__header {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.business-attachment-panel__compact-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  color: var(--erp-text);
+  font-size: var(--erp-font-body);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.business-attachment-panel__compact-copy {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.business-attachment-panel__header .ant-typography {
+  margin: 0;
+}
+
+.business-attachment-panel__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.business-attachment-panel__toolbar > .erp-sliding-segmented {
+  min-width: 0;
+}
+
+.business-attachment-panel__compact-header > .business-attachment-panel__toolbar {
+  flex: 1 1 360px;
+}
+
+.business-attachment-panel__refresh {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+}
+
+.business-attachment-panel__dropzone {
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  width: 100%;
+  min-height: 104px;
+  margin-block: 12px;
+  padding: 14px;
+  border: 1px dashed var(--erp-border-strong);
+  border-radius: 10px;
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text);
+  text-align: center;
+}
+
+.business-attachment-panel--compact .business-attachment-panel__dropzone {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px 12px;
+  min-height: 0;
+  margin-block: 0;
+  padding: 8px 12px;
+  text-align: start;
+}
+
+.business-attachment-panel__upload-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.business-attachment-panel__drop-hint,
+.business-attachment-panel__queue-hint,
+.business-attachment-panel__upload-limit {
+  color: var(--erp-text-subtle);
+  font-size: var(--erp-font-caption);
+}
+
+.business-attachment-panel--compact .business-attachment-panel__upload-limit {
+  flex: 1 1 280px;
+}
+
+.business-attachment-panel__upload-actions > .business-attachment-panel__mobile-action {
+  display: none;
+}
+
+.business-attachment-panel__dropzone[aria-disabled='true'] {
+  opacity: 0.65;
+}
+
+.business-attachment-panel__list {
+  display: grid;
+  gap: 8px;
+  margin-block-start: 12px;
+}
+
+.business-attachment-panel__row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: 9px;
+  background: var(--erp-surface-bg);
+}
+
+.business-attachment-panel__row--failed {
+  border-color: color-mix(
+    in srgb,
+    var(--erp-visual-danger-text) 45%,
+    var(--erp-border)
+  );
+}
+
+.business-attachment-panel__thumbnail {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text-subtle);
+  font-size: 22px;
+}
+
+.business-attachment-panel__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.business-attachment-panel__file-copy {
+  min-width: 0;
+}
+
+.business-attachment-panel__file-name {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--erp-text);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.business-attachment-panel__file-name:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.business-attachment-panel__dropzone--active {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+}
+
+.business-attachment-panel__file-name:hover {
+  color: var(--erp-primary-strong);
+}
+
+.business-attachment-panel__file-name--expanded {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.business-attachment-panel__file-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-block-start: 5px;
+  color: var(--erp-text-subtle);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
+.business-attachment-panel__file-meta .ant-typography {
+  color: var(--erp-text-subtle);
+  font-size: inherit;
+}
+
+.business-attachment-panel__file-meta .ant-tag {
+  margin-inline-end: 0;
+}
+
+.business-attachment-panel__file-error {
+  margin-block-start: 6px;
+  color: var(--erp-visual-danger-text);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
+.business-attachment-panel__row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.business-attachment-panel__footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-start: 12px;
+  padding-block-start: 12px;
+  border-top: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg);
+}
+
+.business-attachment-panel--manager .business-attachment-panel__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  padding-block-end: 2px;
+}
+
+.business-attachment-panel__status {
+  display: flex;
+  flex: 1 1 240px;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--erp-text-subtle);
+  font-size: var(--erp-font-caption);
+}
+
+.business-attachment-panel__footer-actions {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.business-attachment-panel__preview-frame {
+  width: 100%;
+  height: min(72vh, 720px);
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+}
+
+.business-attachment-panel__preview-image-wrap {
+  display: grid;
+  place-items: center;
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg-muted);
+  padding: 12px;
+}
+
+.business-attachment-panel__preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(min(72vh, 720px) - 24px);
+  object-fit: contain;
+}
+
+@container (max-width: 640px) {
+  .business-attachment-panel__row {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .business-attachment-panel__row-actions {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .business-attachment-panel__upload-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .business-attachment-panel__toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .business-attachment-panel__toolbar > .erp-filter-chip-group {
+    grid-column: 1 / -1;
+  }
+
+  .business-attachment-panel__toolbar > .erp-business-help-label {
+    justify-self: end;
+  }
+
+  .business-attachment-panel__toolbar .erp-business-inline-help-trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .business-attachment-panel__refresh {
+    grid-column: 2;
+    margin-inline-start: 0;
+  }
+
+  .business-attachment-panel__refresh,
+  .business-attachment-panel__upload-actions > .ant-btn,
+  .business-attachment-panel__footer-actions > .ant-btn {
+    min-height: 44px;
+  }
+
+  .business-attachment-panel__upload-actions > .ant-btn:not(.business-attachment-panel__mobile-action) {
+    grid-column: 1 / -1;
+  }
+
+  .business-attachment-panel__dropzone {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .business-attachment-panel__drop-hint {
+    display: none;
+  }
+
+  .business-attachment-panel__upload-actions > .business-attachment-panel__mobile-action {
+    display: inline-flex;
+  }
+
+  .business-attachment-panel__status {
+    flex-basis: 100%;
+  }
+
+  .business-attachment-panel__preview-frame,
+  .business-attachment-panel__preview-image-wrap {
+    height: min(68vh, 560px);
+  }
+}
