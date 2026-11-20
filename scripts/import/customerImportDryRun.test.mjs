@@ -69,6 +69,18 @@ test("金额前缀统一按 CNY 或 RMB 解析", () => {
   assert.deepEqual(warnings, []);
 });
 
+test("纯数字代码、税号和手机号保留前导零，业务数量仍按小数规范化", () => {
+  const warnings = [];
+  assert.deepEqual(normalizeFields({
+    customer_code: "00123", product_no: "0005", tax_no: "00012",
+    contact_phone: "008610001", quantity: "0005.000",
+  }, warnings), {
+    customer_code: "00123", product_no: "0005", tax_no: "00012",
+    contact_phone: "008610001", quantity: "5",
+  });
+  assert.deepEqual(warnings, []);
+});
+
 test("缺少 --source 返回非 0", async () => {
   const outDir = await tempOutDir();
   const result = runCli(["--existing", existingFixture, "--out", outDir]);

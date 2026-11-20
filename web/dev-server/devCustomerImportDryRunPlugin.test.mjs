@@ -511,6 +511,7 @@ test('service reload freezes an unowned running operation without replaying it',
 test('runtime manifest only compiles for the matching loopback customer context', async (t) => {
   const root = await temporaryRoot(t)
   const calls = []
+  let revision = 'runtime-v1'
   const service = createDevCustomerConfigService({
     projectRoot: root,
     apiOrigin: 'http://127.0.0.1:8300',
@@ -520,10 +521,10 @@ test('runtime manifest only compiles for the matching loopback customer context'
       return {
         status: 'success',
         customerKey,
-        manifest: { customer_key: customerKey, revision: 'runtime-v1' },
+        manifest: { customer_key: customerKey, revision },
         manifestPath: 'output/runtime.json',
         generatedAt: '2026-09-25T01:00:00.000Z',
-        summary: { revision: 'runtime-v1' },
+        summary: { revision },
       }
     },
   })
@@ -534,6 +535,19 @@ test('runtime manifest only compiles for the matching loopback customer context'
   assert.equal(result.payload.manifest.customer_key, 'yoyoosun')
   assert.equal(result.payload.operation.status, 'passed')
   assert.deepEqual(calls, [{ projectRoot: root, customerKey: 'yoyoosun' }])
+  revision = 'runtime-v2'
+  const newer = await service.act('runtime-manifest', {
+    customerKey: 'yoyoosun',
+    idempotencyKey: 'customer-config:runtime-manifest:yoyoosun:33333333-3333-4333-8333-333333333333',
+  })
+  assert.notEqual(newer.payload.manifestPath, result.payload.manifestPath)
+  const replay = await service.act('runtime-manifest', {
+    customerKey: 'yoyoosun',
+    idempotencyKey: IDEMPOTENCY.runtimeManifest,
+  })
+  assert.equal(replay.payload.reused, true)
+  assert.equal(replay.payload.manifest.revision, 'runtime-v1')
+  assert.equal(replay.payload.summary.revision, 'runtime-v1')
 
   const blocked = createDevCustomerConfigService({
     projectRoot: await temporaryRoot(t),

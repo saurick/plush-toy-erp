@@ -285,7 +285,7 @@ async function readManifestWorkbooks(manifestResult) {
 
 export function extractSourcesFromWorkbooks(workbooks, options = {}) {
   requireOption(options.customerKey, "customerKey");
-  const collector = createCollector(options.customerKey, { workbooks });
+  const collector = createCollector(options.customerKey, workbooks);
   for (const workbook of workbooks) {
     for (const sheet of workbook.sheets) {
       if (isMaterialSummarySheet(sheet.name)) {
@@ -318,14 +318,13 @@ export function extractSourcesFromWorkbooks(workbooks, options = {}) {
   };
 }
 
-function createCollector(customerKey, options = {}) {
+function createCollector(customerKey, workbooks) {
   const sources = [];
   const unique = new Set();
-  const workbookSourceIndex = new Map(
-    (options.workbooks ?? [])
-      .map((workbook) => [workbook.fileName, workbook.sourceManifest])
-      .filter(([, source]) => source),
-  );
+  const workbookNameCounts = new Map();
+  for (const workbook of workbooks) {
+    workbookNameCounts.set(workbook.fileName, (workbookNameCounts.get(workbook.fileName) ?? 0) + 1);
+  }
   const counters = {
     byDomain: {},
     bySourceType: {},
@@ -344,7 +343,8 @@ function createCollector(customerKey, options = {}) {
     addWarning(warning) {
       this.warnings.push(warning);
     },
-    addSource(input) {
+    addSource(workbook, input) {
+      const manifest = workbook.sourceManifest;
       const fields = cleanFields(input.fields);
       if (Object.keys(fields).length === 0) {
         return null;
@@ -354,7 +354,9 @@ function createCollector(customerKey, options = {}) {
         buildSourceId({
           customerKey,
           domain: input.domain,
-          fileName: input.fileName,
+          fileName: workbookNameCounts.get(input.fileName) > 1
+            ? manifest?.relativePath ?? input.fileName
+            : input.fileName,
           sheetName: input.sheetName,
           rowNumber: input.rowNumber,
           fields,
@@ -364,12 +366,9 @@ function createCollector(customerKey, options = {}) {
         sourceType: input.sourceType ?? "Data Import Source",
         sourceKind: input.sourceKind ?? "xlsx_sheet",
         moduleKey: input.moduleKey ?? "unknown",
-        sourceManifestId:
-          workbookSourceIndex.get(input.fileName)?.sourceId ?? null,
-        sourceManifestPath:
-          workbookSourceIndex.get(input.fileName)?.relativePath ?? null,
-        sourceFileSha256:
-          workbookSourceIndex.get(input.fileName)?.sha256 ?? null,
+        sourceManifestId: manifest?.sourceId ?? null,
+        sourceManifestPath: manifest?.relativePath ?? null,
+        sourceFileSha256: manifest?.sha256 ?? null,
         fileName: input.fileName,
         sheetName: input.sheetName,
         rowNumber: input.rowNumber ?? null,
@@ -383,7 +382,7 @@ function createCollector(customerKey, options = {}) {
       increment(counters.byModuleKey, source.moduleKey);
       return source;
     },
-    addUnique(input) {
+    addUnique(workbook, input) {
       const key = `${input.domain}:${input.uniqueKey}`;
       this.uniqueKeys[input.domain] ??= 0;
       if (unique.has(key)) {
@@ -391,7 +390,7 @@ function createCollector(customerKey, options = {}) {
       }
       unique.add(key);
       this.uniqueKeys[input.domain] += 1;
-      return this.addSource(input);
+      return this.addSource(workbook, input);
     },
   };
 }
@@ -450,7 +449,7 @@ function extractMaterialSummarySheet(workbook, sheet, collector) {
       sourceOrderNo:
         valueByAlias(row, header.map, "orderNo") || context.orderNo,
     });
-    collector.addSource({
+    collector.addSource(workbook, {
       sourceType: "Data Import Source",
       sourceKind: "xlsx_sheet",
       moduleKey: "purchase_orders",
@@ -517,11 +516,14 @@ function extractMaterialDetailSheet(workbook, sheet, collector) {
       "materialCategory",
       valueByAlias(row, header.map, "materialCategory"),
     );
-    carryField(
-      carried,
-      "materialName",
-      valueByAlias(row, header.map, "materialName"),
-    );
+    const explicitMaterial = valueByAlias(row, header.map, "materialName");
+    if (explicitMaterial && explicitMaterial !== carried.materialName) {
+      carried.materialName = explicitMaterial;
+      carried.vendorItemNo = "";
+      carried.materialSpec = "";
+      carried.color = "";
+      carried.unit = "";
+    }
     carryField(
       carried,
       "vendorItemNo",
@@ -558,7 +560,7 @@ function extractMaterialDetailSheet(workbook, sheet, collector) {
       color: carried.color,
       sourceOrderNo: context.orderNo,
     });
-    collector.addSource({
+    collector.addSource(workbook, {
       sourceType: "Data Import Source",
       sourceKind: "xlsx_sheet",
       moduleKey: "bom",
@@ -625,9 +627,7 @@ function extractPurchaseSummarySheet(workbook, sheet, collector) {
     if (!materialName && !productNo) {
       continue;
     }
-    const supplierName =
-      valueByAlias(row, header.map, "supplierShortName") ||
-      valueByAlias(row, header.map, "vendorItemNo");
+    const supplierName = valueByAlias(row, header.map, "supplierShortName");
 
     addProductCandidate(collector, workbook, sheet, row, {
       productNo,
@@ -648,7 +648,7 @@ function extractPurchaseSummarySheet(workbook, sheet, collector) {
       shortName: valueByAlias(row, header.map, "supplierShortName"),
       supplierType: "材料 / 辅材 / 包材供应商",
     });
-    collector.addSource({
+    collector.addSource(workbook, {
       sourceType: "Data Import Source",
       sourceKind: "xlsx_sheet",
       moduleKey: "purchase_orders",
@@ -735,7 +735,7 @@ function extractOutsourcingSummarySheet(workbook, sheet, collector) {
       shortName: supplierName,
       supplierType: "outsourcing",
     });
-    collector.addSource({
+    collector.addSource(workbook, {
       sourceType: "Data Import Source",
       sourceKind: "xlsx_sheet",
       moduleKey: "outsourcing",
@@ -840,7 +840,7 @@ function extractSupplierDirectorySheet(workbook, sheet, collector) {
     const contactName = valueByAlias(row, header.map, "contactName");
     const phone = valueByAlias(row, header.map, "phone");
     if (contactName || phone) {
-      collector.addUnique({
+      collector.addUnique(workbook, {
         uniqueKey: `${supplierName || shortName}|${contactName}|${phone}`,
         sourceType: "Data Import Source",
         sourceKind: "xlsx_sheet",
@@ -870,7 +870,7 @@ function extractSupplierDirectorySheet(workbook, sheet, collector) {
       "companyLiaisonPhone",
     );
     if (companyLiaisonName || companyLiaisonPhone) {
-      collector.addSource({
+      collector.addSource(workbook, {
         sourceType: "Customer Material",
         sourceKind: "xlsx_sheet",
         moduleKey: "customer_material",
@@ -935,7 +935,7 @@ function extractContractTemplateSheet(workbook, sheet, collector) {
     if (!productNo && !lineName) {
       continue;
     }
-    collector.addSource({
+    collector.addSource(workbook, {
       sourceType: "Print Template Input",
       sourceKind: "xlsx_sheet",
       moduleKey: domain,
@@ -973,7 +973,7 @@ function addProductCandidate(collector, workbook, sheet, row, input) {
   if (!productNo && !productName) {
     return null;
   }
-  return collector.addUnique({
+  return collector.addUnique(workbook, {
     uniqueKey: `${productNo}|${productName}`,
     sourceType: "Data Import Source",
     sourceKind: "xlsx_sheet",
@@ -995,7 +995,7 @@ function addMaterialCandidate(collector, workbook, sheet, row, input) {
   if (!materialName) {
     return null;
   }
-  return collector.addUnique({
+  return collector.addUnique(workbook, {
     uniqueKey: `${materialName}|${normalizeText(input.vendorItemNo)}|${normalizeText(input.materialSpec)}|${normalizeText(input.unit)}`,
     sourceType: "Data Import Source",
     sourceKind: "xlsx_sheet",
@@ -1022,7 +1022,7 @@ function addUnitCandidate(collector, workbook, sheet, row, unit) {
   if (!unitText || isBadIdentityValue(unitText)) {
     return null;
   }
-  return collector.addUnique({
+  return collector.addUnique(workbook, {
     uniqueKey: unitText,
     sourceType: "Data Import Source",
     sourceKind: "xlsx_sheet",
@@ -1043,7 +1043,7 @@ function addProcessCandidate(collector, workbook, sheet, row, processName) {
   if (!normalizedName || isBadIdentityValue(normalizedName)) {
     return null;
   }
-  return collector.addUnique({
+  return collector.addUnique(workbook, {
     uniqueKey: normalizedName,
     sourceType: "Data Import Source",
     sourceKind: "xlsx_sheet",
@@ -1077,7 +1077,7 @@ function addSupplierProcessCapabilityCandidate(
   ) {
     return null;
   }
-  return collector.addUnique({
+  return collector.addUnique(workbook, {
     uniqueKey: `${normalizedSupplierName}|${normalizedProcessName}`,
     sourceType: "Data Import Source",
     sourceKind: "xlsx_sheet",
@@ -1104,7 +1104,7 @@ function addSupplierCandidate(collector, workbook, sheet, row, input) {
   ) {
     return null;
   }
-  return collector.addUnique({
+  return collector.addUnique(workbook, {
     uniqueKey: [
       normalizeText(input.supplierCode),
       supplierName,

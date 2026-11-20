@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import {
   mkdir,
   readFile,
@@ -408,6 +408,7 @@ function publicStoredResult(action, payload) {
       status: payload.status,
       customerKey: payload.customerKey,
       manifestPath: payload.manifestPath,
+      manifestSha256: payload.manifestSha256,
       generatedAt: payload.generatedAt,
       summary: payload.summary,
     }
@@ -415,9 +416,21 @@ function publicStoredResult(action, payload) {
   return payload
 }
 
+function operationManifestPath(customerKey, operationID) {
+  return path.join('output', 'customers', customerKey, 'runtime-manifests', `${operationID}.json`)
+}
+
+function manifestFingerprint(manifest) {
+  return createHash('sha256').update(JSON.stringify(manifest)).digest('hex')
+}
+
 async function restoredPayload(projectRoot, operation) {
   if (operation.action !== 'runtime-manifest' || !operation.result) {
     return operation.result
+  }
+  const expectedPath = operationManifestPath(operation.customerKey, operation.id)
+  if (operation.result.manifestPath !== expectedPath) {
+    throw new Error('runtime manifest has no operation-bound artifact')
   }
   const manifest = JSON.parse(
     await readFile(
@@ -425,6 +438,9 @@ async function restoredPayload(projectRoot, operation) {
       'utf8'
     )
   )
+  if (manifestFingerprint(manifest) !== operation.result.manifestSha256) {
+    throw new Error('runtime manifest does not match its operation receipt')
+  }
   return { ...operation.result, manifest }
 }
 
@@ -524,7 +540,7 @@ export function createDevCustomerConfigService({
     }
 
     try {
-      const payload =
+      let payload =
         action === 'dry-run'
           ? await dryRunRunner(root, customerKey, created.operation.id)
           : action === 'runtime-manifest'
@@ -534,6 +550,12 @@ export function createDevCustomerConfigService({
                 customerKey,
                 input.releaseBatch
               )
+      if (action === 'runtime-manifest') {
+        const manifestPath = operationManifestPath(customerKey, created.operation.id)
+        const manifestSha256 = manifestFingerprint(payload.manifest)
+        await writeJsonAtomically(path.join(root, manifestPath), payload.manifest)
+        payload = { ...payload, manifestPath, manifestSha256 }
+      }
       const terminalStatus = payload.status === 'blocked' ? 'blocked' : 'passed'
       const operation = transitionDevCustomerConfigOperation(
         store,

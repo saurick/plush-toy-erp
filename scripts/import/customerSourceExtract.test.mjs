@@ -283,6 +283,34 @@ test("委外汇总与加工厂资料保持加工项目、工序能力和公司�
   assert.doesNotMatch(JSON.stringify(extraction), /6222000000001111/u);
 });
 
+test("同名工作簿保留各自原件引用，新材料和缺厂商的采购行保持缺值", () => {
+  const makeWorkbook = (sourceId) => ({
+    fileName: "模拟辅材模板.xlsx",
+    sourceManifest: {
+      sourceId, relativePath: `${sourceId}/模拟辅材模板.xlsx`,
+      sha256: sourceId.padEnd(64, "a"),
+    },
+    sheets: [
+      { name: "材料分析明细表", rows: [
+        { rowNumber: 1, values: ["物料名称", "厂商料号", "规格", "颜色", "单位", "组装部位", "单位用量"] },
+        { rowNumber: 2, values: ["模拟布料", "M-1", "10mm", "红色", "码", "身体", "1"] },
+        { rowNumber: 3, values: ["模拟填充", "", "", "", "千克", "身体", "2"] },
+      ] },
+      { name: "原辅料采购汇总", rows: [
+        { rowNumber: 1, values: ["产品订单编号", "材料品名", "厂商料号", "厂商简称", "单位", "采购数量"] },
+        { rowNumber: 2, values: ["PO-SYNTHETIC", "模拟填充", "PART-55", "", "千克", "2"] },
+      ] },
+    ],
+  });
+  const result = extractSourcesFromWorkbooks([makeWorkbook("111"), makeWorkbook("222")], { customerKey: "synthetic" });
+  const rows = result.sources.filter((row) => row.domain === "bom" && row.fields.material_name === "模拟填充");
+  assert.deepEqual(rows.map((row) => row.sourceManifestId), ["111", "222"]);
+  assert.equal(new Set(rows.map((row) => row.sourceId)).size, 2);
+  assert.ok(rows.every((row) => row.fields.unit === "千克" && !row.fields.spec && !row.fields.vendor_item_no && !row.fields.color));
+  assert.ok(result.sources.some((row) => row.domain === "purchase_orders" && row.fields.vendor_item_no === "PART-55" && !row.fields.supplier_name));
+  assert.ok(!result.sources.some((row) => row.domain === "suppliers" && row.fields.factory_name === "PART-55"));
+});
+
 test("extractSourcesFromWorkbooks 不把非日期回货说明写入预计回货日期", () => {
   const extraction = extractSourcesFromWorkbooks(
     [

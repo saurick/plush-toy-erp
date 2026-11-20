@@ -47,6 +47,9 @@ function normalizeValue(key, value, warnings) {
   if (trimmed === "") {
     return null;
   }
+  if (/(?:^|[_-])(?:id|code|no|number|phone|mobile)$|编号|料号|税号|电话|手机/iu.test(key)) {
+    return trimmed;
+  }
   if (isDateField(key)) {
     const date = normalizeDate(trimmed);
     if (!date) {
@@ -63,7 +66,7 @@ function normalizeValue(key, value, warnings) {
     }
     return money;
   }
-  if (isDecimalField(key) || looksDecimal(trimmed)) {
+  if (isDecimalField(key)) {
     const decimal = normalizeDecimal(trimmed);
     if (decimal === null) {
       warnings.push(`Invalid decimal value for ${key}: ${trimmed}`);
@@ -114,10 +117,6 @@ export function normalizeDate(text) {
     return null;
   }
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function looksDecimal(text) {
-  return /^[-+]?\d{1,3}(,\d{3})*(\.\d+)?$|^[-+]?\d+(\.\d+)?$/.test(text);
 }
 
 function normalizeDecimal(text) {
