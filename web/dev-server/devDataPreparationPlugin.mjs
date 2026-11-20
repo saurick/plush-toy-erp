@@ -1,0 +1,2140 @@
+import { execFile } from 'node:child_process'
+import { createHash, randomBytes } from 'node:crypto'
+import { constants } from 'node:fs'
+import { lstat, open } from 'node:fs/promises'
+import { isIPv4 } from 'node:net'
+import path from 'node:path'
+import process from 'node:process'
+import { pathToFileURL } from 'node:url'
+import { promisify } from 'node:util'
+
+import {
+  acquireDataPreparationIdempotencyLock,
+  acquireDataPreparationExecutionLock,
+  createOrReuseDataPreparationOperation,
+  DATA_PREPARATION_TARGET_KEYS,
+  DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES,
+  DATA_PREPARATION_TERMINAL_STATUSES,
+  hashDataPreparationPlan,
+  listDataPreparationOperations,
+  readDataPreparationOperation,
+  readDataPreparationOperationByIdempotencyKey,
+  readDataPreparationIdempotencyLock,
+  readDataPreparationExecutionLock,
+  recoverInterruptedDataPreparationOperations,
+  releaseDataPreparationIdempotencyLock,
+  releaseDataPreparationExecutionLock,
+  resolveDataPreparationOperationStore,
+  transitionDataPreparationOperation,
+} from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
+import { projectDataPreparationAcceptancePlan, supportsDataPreparationTarget } from '../src/dev-workbench/config/devDataPreparation.mjs'
+import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
+import { readScenarioGeneration } from '../../scripts/qa/scenario-generation-snapshot.mjs'
+import { createCustomerTrial133DataBackup } from '../../scripts/qa/customer-trial-133-data.mjs'
+import { buildManualAcceptanceBusinessChainReviewPlan } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../scripts/qa/manual-acceptance-core-contract.mjs'
+import {
+  MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  buildManualAcceptanceSemanticPlan,
+  digestManualAcceptanceSemanticPlan,
+} from '../../scripts/qa/manual-acceptance-dataset.mjs'
+import { buildManualAcceptancePageDataContract } from '../../scripts/qa/manual-acceptance-page-data-contract.mjs'
+import {
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_DATABASE,
+  CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET,
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+} from '../../scripts/qa/manual-acceptance-target-policy.mjs'
+import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
+import {
+  isSameOriginRequest,
+  readJsonBody,
+  isDevWorkbenchRequest,
+} from './devServerSecurity.mjs'
+
+export const DEV_DATA_PREPARATION_API_PREFIX = '/__dev/api/data-preparation'
+export const DEV_DATA_PREPARATION_SESSION_API_PATH = `${DEV_DATA_PREPARATION_API_PREFIX}/session`
+export const DEV_DATA_PREPARATION_SUMMARY_API_PATH = `${DEV_DATA_PREPARATION_API_PREFIX}/summary`
+export const DEV_DATA_PREPARATION_ACTION_API_PATH = `${DEV_DATA_PREPARATION_API_PREFIX}/actions`
+export const MAX_DEV_DATA_PREPARATION_REQUEST_BYTES = 16 * 1024
+
+const execFileAsync = promisify(execFile)
+const IDEMPOTENCY_PATTERN =
+  /^data-preparation:prepare:(scenario-demo|full-acceptance):(local-development|customer-trial-133|isolated-local):([0-9a-f-]{36})$/u
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+const OPERATION_PATH_PATTERN = new RegExp(
+  `^${DEV_DATA_PREPARATION_API_PREFIX}/operations/([0-9a-f-]{36})$`,
+  'u'
+)
+const REGISTERED_DEVELOPMENT_HOST = '192.168.0.133'
+const REGISTERED_DEVELOPMENT_PORT = 5432
+const SCENARIO_DEMO_LOCAL_DATABASE = 'plush_erp'
+const SCENARIO_DEMO_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION
+const SCENARIO_DEMO_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID
+const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 50
+const SCENARIO_DEMO_CATALOG_READY_COUNT = 40
+const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
+const DATA_PREPARATION_OPERATION_CONTRACT_KIND =
+  'plush.dev-data-preparation-operation-contract'
+const INTERRUPTED_OPERATION_RECOVERY_GRACE_MS = 30_000
+const LOCAL_DEVELOPMENT_TARGET = 'local-development'
+const ISOLATED_LOCAL_TARGET = 'isolated-local'
+const LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV =
+  'LOCAL_ACCEPTANCE_DATABASE_BASE_URL'
+const DATABASE_TARGET_MODULE_URL = pathToFileURL(
+  path.join(
+    path.resolve(import.meta.dirname, '..', '..'),
+    'scripts',
+    'qa',
+    'database-target.mjs'
+  )
+).href
+let databaseTargetModulePromise
+
+const MANUAL_ACCEPTANCE_REVIEW_PLAN =
+  buildManualAcceptanceBusinessChainReviewPlan({
+    catalogTargetCount: buildManualAcceptancePageDataContract().targetCount,
+    datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  })
+
+const MANUAL_ACCEPTANCE_SEMANTIC_DIGEST = digestManualAcceptanceSemanticPlan(
+  buildManualAcceptanceSemanticPlan({ sourceScaleProfile: 'acceptance' })
+)
+const SCENARIO_DEMO_SOURCE_SCALE_PROFILE = 'volume'
+const SCENARIO_DEMO_SEMANTIC_DIGEST = digestManualAcceptanceSemanticPlan(
+  buildManualAcceptanceSemanticPlan({
+    sourceScaleProfile: SCENARIO_DEMO_SOURCE_SCALE_PROFILE,
+  })
+)
+export const DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS = Object.freeze({
+  'core-demo': MANUAL_ACCEPTANCE_SEMANTIC_DIGEST,
+  'scenario-demo': SCENARIO_DEMO_SEMANTIC_DIGEST,
+  'full-acceptance': MANUAL_ACCEPTANCE_SEMANTIC_DIGEST,
+})
+
+const MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT = Object.freeze({
+  kind: 'plush.dev-data-environment-contract',
+  datasetKey: MANUAL_ACCEPTANCE_CORE_CONTRACT.datasetKey,
+  dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
+  runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
+  semanticDigest: MANUAL_ACCEPTANCE_SEMANTIC_DIGEST,
+  profileSemanticDigests: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS,
+  simulatedOnly: MANUAL_ACCEPTANCE_CORE_CONTRACT.simulatedOnly,
+  realCustomerImport: MANUAL_ACCEPTANCE_CORE_CONTRACT.realCustomerImport,
+  unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
+  warehouseCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.warehouses.length,
+  customerTrial133: Object.freeze({
+    target: MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.target,
+    deploymentTarget:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.deploymentTarget,
+    databaseName: MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseName,
+    databaseLifecycle:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseLifecycle,
+    minimumMigration:
+      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  }),
+})
+
+function loadDatabaseTargetModule() {
+  databaseTargetModulePromise ||= import(DATABASE_TARGET_MODULE_URL)
+  return databaseTargetModulePromise
+}
+
+export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
+  Object.freeze({
+    key: 'full-acceptance',
+    title: '完整回归',
+    purpose: '在新隔离库运行全部已登记业务链、场景合同与现有完整验收生命周期',
+    writesDatabase: true,
+    dataRetention: 'ephemeral',
+    cleanupMode: 'automatic',
+    exactCleanCommitRequired: true,
+    requiredEnvironment: Object.freeze([
+      LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV,
+    ]),
+  }),
+  Object.freeze({
+    key: 'scenario-demo',
+    title: '手测数据',
+    purpose:
+      '本地开发与 demo-133 分别按固定目标身份，共用当前数据合同精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
+    writesDatabase: true,
+    dataRetention: 'long-lived',
+    cleanupMode: 'forward-only',
+    exactCleanCommitRequired: false,
+    requiredEnvironment: Object.freeze([
+      '登记本地开发库与本机 8300 后端',
+      '登记 demo 演练库、固定隧道与带外证明',
+    ]),
+  }),
+])
+
+function assertExactKeys(value, expected, field) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.getPrototypeOf(value) !== Object.prototype
+  ) {
+    throw new Error(`${field} must be an object`)
+  }
+  const actual = Object.keys(value).sort()
+  const wanted = [...expected].sort()
+  if (
+    actual.length !== wanted.length ||
+    actual.some((key, index) => key !== wanted[index])
+  ) {
+    throw new Error(`${field} contains unsupported fields`)
+  }
+}
+
+export function validateDevDataPreparationAction(value) {
+  assertExactKeys(value, ['action', 'payload'], 'data preparation action')
+  if (value.action === 'prepare') {
+    assertExactKeys(
+      value.payload,
+      ['idempotencyKey', 'profileKey', 'targetKey'],
+      'prepare payload'
+    )
+    const idempotency = IDEMPOTENCY_PATTERN.exec(
+      String(value.payload.idempotencyKey || '')
+    )
+    if (
+      !supportsDataPreparationTarget(value.payload.profileKey, value.payload.targetKey) ||
+      idempotency?.[1] !== value.payload.profileKey ||
+      idempotency?.[2] !== value.payload.targetKey ||
+      !UUID_PATTERN.test(String(idempotency?.[3] || ''))
+    ) {
+      throw new Error('prepare payload is invalid')
+    }
+  } else if (value.action === 'execute') {
+    assertExactKeys(
+      value.payload,
+      ['confirmation', 'operationId'],
+      'execute payload'
+    )
+    if (
+      !UUID_PATTERN.test(String(value.payload.operationId || '')) ||
+      typeof value.payload.confirmation !== 'string' ||
+      value.payload.confirmation.length < 32 ||
+      value.payload.confirmation.length > 240
+    ) {
+      throw new Error('execute payload is invalid')
+    }
+  } else {
+    throw new Error('data preparation action is not allowlisted')
+  }
+  return value
+}
+
+function targetSummary(
+  parsed,
+  {
+    targetKey,
+    disposable,
+    automaticCleanup,
+    preflightFingerprint = '0'.repeat(64),
+  }
+) {
+  if (!DATA_PREPARATION_TARGET_KEYS.includes(targetKey)) {
+    throw new Error('data preparation target key is invalid')
+  }
+  return Object.freeze({
+    targetKey,
+    safeTarget: `${targetKey}:${parsed.databaseName}`,
+    targetFingerprint: parsed.targetFingerprint,
+    preflightFingerprint,
+    disposable,
+    automaticCleanup,
+  })
+}
+
+export function customerTrialBackupAlias(repository, runId) {
+  const commit = String(repository?.commit || '')
+  if (
+    !/^[0-9a-f]{40}$/u.test(commit) ||
+    !/^d[0-9]{12}_[0-9a-f]{8}$/u.test(runId)
+  ) {
+    throw new Error('customer-trial-133 backup identity is invalid')
+  }
+  return `pre-data-${commit.slice(0, 12)}-${runId}`
+}
+
+function operationTargetSummary(target, { profileKey, repository, runId }) {
+  const customerConfigRevision =
+    target.customerConfigRevision || 'activated-during-lifecycle'
+  const migrationVersion =
+    target.migrationVersion || 'verified-during-lifecycle'
+  const rollbackPoint =
+    target.targetKey === CUSTOMER_TRIAL_133_TARGET
+      ? customerTrialBackupAlias({ commit: target.releaseSha }, runId)
+      : profileKey === 'full-acceptance'
+        ? `automatic-cleanup:${runId}`
+        : `forward-only:${target.databaseName}:${SCENARIO_DEMO_RUN_ID}`
+  return Object.freeze({
+    targetKey: target.targetKey,
+    safeTarget: target.safeTarget,
+    targetFingerprint: target.targetFingerprint,
+    preflightFingerprint: target.preflightFingerprint,
+    disposable: target.disposable,
+    automaticCleanup: target.automaticCleanup,
+    releaseSha: target.releaseSha || repository.commit,
+    databaseName: target.databaseName,
+    migrationVersion,
+    customerConfigRevision,
+    datasetVersion: SCENARIO_DEMO_DATA_VERSION,
+    datasetRunId: SCENARIO_DEMO_RUN_ID,
+    semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS[profileKey],
+    rollbackPoint,
+  })
+}
+
+function assertRegisteredDevelopmentTarget(parsed) {
+  if (
+    parsed.host !== REGISTERED_DEVELOPMENT_HOST ||
+    parsed.port !== REGISTERED_DEVELOPMENT_PORT
+  ) {
+    throw new Error('registered development database target is required')
+  }
+  return parsed
+}
+
+async function defaultCommandRunner(command, args, options) {
+  return execFileAsync(command, args, {
+    ...options,
+    encoding: 'utf8',
+    maxBuffer: options.maxBuffer || 8 * 1024 * 1024,
+  })
+}
+
+export function developmentDatabaseTargetCommand(projectRoot) {
+  return Object.freeze({
+    command: 'go',
+    args: Object.freeze([
+      'run',
+      './cmd/dburl',
+      '-conf',
+      './configs/dev/config.yaml',
+    ]),
+    options: Object.freeze({
+      cwd: path.join(path.resolve(projectRoot), 'server'),
+    }),
+  })
+}
+
+function scenarioTargetArgs(targetKey, attestation) {
+  if (targetKey === LOCAL_DEVELOPMENT_TARGET) return []
+  if (targetKey !== CUSTOMER_TRIAL_133_TARGET || !attestation) {
+    throw new Error('scenario demo target context is invalid')
+  }
+  return [
+    '--target',
+    CUSTOMER_TRIAL_133_TARGET,
+    '--target-attestation-json',
+    JSON.stringify(attestation),
+  ]
+}
+
+export function scenarioDemoPlanCommand(
+  projectRoot,
+  targetKey = LOCAL_DEVELOPMENT_TARGET,
+  attestation = null
+) {
+  const root = path.resolve(projectRoot)
+  return Object.freeze({
+    command: process.execPath,
+    args: Object.freeze([
+      path.join(root, 'scripts', 'qa', 'scenario-demo-data.mjs'),
+      '--source-scale-profile',
+      SCENARIO_DEMO_SOURCE_SCALE_PROFILE,
+      ...scenarioTargetArgs(targetKey, attestation),
+    ]),
+    options: Object.freeze({ cwd: root }),
+  })
+}
+
+export function scenarioDemoExecutionCommand(
+  projectRoot,
+  operation,
+  attestation
+) {
+  const root = path.resolve(projectRoot)
+  return Object.freeze({
+    command: process.execPath,
+    args: Object.freeze([
+      path.join(root, 'scripts', 'qa', 'scenario-demo-data.mjs'),
+      '--source-scale-profile',
+      SCENARIO_DEMO_SOURCE_SCALE_PROFILE,
+      '--apply',
+      '--expected-plan-digest',
+      operation.targetSummary.preflightFingerprint,
+      '--execution-id',
+      operation.id,
+      ...scenarioTargetArgs(operation.targetSummary.targetKey, attestation),
+    ]),
+    options: Object.freeze({ cwd: root }),
+  })
+}
+
+export function fullAcceptancePlanCommand(projectRoot, repository, runId) {
+  const root = path.resolve(projectRoot)
+  return Object.freeze({
+    command: process.execPath,
+    args: Object.freeze([
+      path.join(root, 'scripts', 'qa', 'local-acceptance-lifecycle.mjs'),
+      '--commit',
+      repository.commit,
+      '--run-id',
+      runId,
+    ]),
+    options: Object.freeze({ cwd: root }),
+  })
+}
+
+export async function fullAcceptanceExecutionCommand(projectRoot, operation) {
+  const { databaseNameForRun } = await loadDatabaseTargetModule()
+  const root = path.resolve(projectRoot)
+  const acceptanceDatabase = databaseNameForRun('acceptance', operation.runId)
+  const browserActionsDatabase = databaseNameForRun(
+    'browser-actions',
+    operation.runId
+  )
+  const lifecycleConfirmation = [
+    'RUN_LOCAL_ACCEPTANCE_LIFECYCLE',
+    acceptanceDatabase,
+    browserActionsDatabase,
+    operation.repository.commit,
+  ].join(':')
+  return Object.freeze({
+    command: process.execPath,
+    args: Object.freeze([
+      path.join(root, 'scripts', 'qa', 'local-acceptance-lifecycle.mjs'),
+      '--execute',
+      '--commit',
+      operation.repository.commit,
+      '--run-id',
+      operation.runId,
+      '--confirm',
+      lifecycleConfirmation,
+    ]),
+    options: Object.freeze({ cwd: root }),
+  })
+}
+
+function redactError(error) {
+  const message = String(error?.message || error || 'unknown failure')
+    .replace(
+      /postgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
+      'postgres://<redacted>@'
+    )
+    .replace(
+      /\b(?:password|token|secret|dsn)=([^\s&]+)/giu,
+      'credential=<redacted>'
+    )
+    .replace(
+      /\b(?:password|token|secret|authorization|cookie|dsn)\b/giu,
+      'credential'
+    )
+    .replace(/\/(?:Users|home|private|var|tmp)\/[^\s:]+/gu, '<local-path>')
+    .replace(/\p{Cc}+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .slice(0, 400)
+  return message || 'unknown failure'
+}
+
+function validateRepositoryIdentity(repository) {
+  if (
+    !repository ||
+    typeof repository !== 'object' ||
+    Array.isArray(repository) ||
+    !/^[0-9a-f]{40}$/u.test(String(repository.commit || '')) ||
+    typeof repository.dirty !== 'boolean' ||
+    !/^[0-9a-f]{64}$/u.test(String(repository.fingerprint || ''))
+  ) {
+    throw new Error('repository identity is invalid')
+  }
+  return repository
+}
+
+async function fullAcceptancePlanFingerprint(stdout, repository, runId) {
+  const { databaseNameForRun } = await loadDatabaseTargetModule()
+  let plan
+  try {
+    plan = JSON.parse(String(stdout || ''))
+  } catch {
+    throw new Error('full acceptance lifecycle plan is invalid')
+  }
+  const acceptanceDatabase = databaseNameForRun('acceptance', runId)
+  const browserActionsDatabase = databaseNameForRun('browser-actions', runId)
+  const expectedConfirmation = [
+    'RUN_LOCAL_ACCEPTANCE_LIFECYCLE',
+    acceptanceDatabase,
+    browserActionsDatabase,
+    repository.commit,
+  ].join(':')
+  if (
+    plan.mode !== 'plan' ||
+    plan.writesDatabase !== false ||
+    plan.startsServices !== false ||
+    plan.commit !== repository.commit ||
+    plan.runID !== runId ||
+    plan.acceptanceDatabase !== acceptanceDatabase ||
+    plan.browserActionsDatabase !== browserActionsDatabase ||
+    plan.confirmation !== expectedConfirmation ||
+    plan.boundary?.registeredDevelopmentPostgresOnly !== true ||
+    plan.boundary?.automaticCleanup !== true ||
+    plan.boundary?.customerUAT !== false
+  ) {
+    throw new Error('full acceptance lifecycle plan identity is invalid')
+  }
+  return hashDataPreparationPlan({
+    kind: 'plush.dev-data-preparation-full-plan',
+    plan,
+    acceptanceIdentity: {
+      contract: MANUAL_ACCEPTANCE_REVIEW_PLAN.contract,
+      sourceContract: MANUAL_ACCEPTANCE_REVIEW_PLAN.sourceContract,
+      chainDataDigest: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest,
+      chainVerificationDigest:
+        MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest,
+      chainCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainCount,
+      stepCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.stepCount,
+      scenarioCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.scenarioCount,
+      dataStageCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.dataStageCount,
+      catalogTargetCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.catalogTargetCount,
+    },
+  })
+}
+
+function scenarioDemoPlanFingerprint(stdout, repository, target) {
+  let plan
+  try {
+    plan = JSON.parse(String(stdout || ''))
+  } catch {
+    throw new Error('scenario demo plan is invalid')
+  }
+  const expectedAlias =
+    target.targetKey === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_TARGET
+      : 'scenario-demo'
+  const expectedOrigin =
+    target.targetKey === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_ORIGIN
+      : 'http://127.0.0.1:8300'
+  if (
+    plan.schemaVersion !== 'plush.scenario-demo-plan/v2' ||
+    plan.profileKey !== 'scenario-demo' ||
+    plan.targetAlias !== expectedAlias ||
+    plan.datasetKey !== 'yoyoosun-manual-acceptance' ||
+    plan.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
+    plan.runId !== SCENARIO_DEMO_RUN_ID ||
+    !/^20[0-9]{12}$/u.test(String(plan.migrationVersion || '')) ||
+    plan.semanticDigest !==
+      SCENARIO_DEMO_SEMANTIC_DIGEST ||
+    plan.backendURL !== expectedOrigin ||
+    plan.databaseName !== target.databaseName ||
+    plan.repository?.commit !== repository.commit ||
+    plan.repository?.dirty !== repository.dirty ||
+    plan.repository?.fingerprint !== repository.fingerprint ||
+    !/^[0-9a-f]{64}$/u.test(String(plan.sourceFingerprint || '')) ||
+    plan.target?.targetFingerprint !== target.targetFingerprint ||
+    plan.target?.disposable !== false ||
+    plan.target?.registeredTargetOnly !== true ||
+    plan.target?.registeredEndpointOnly !== true ||
+    plan.canonicalRunner?.stageCount !==
+      MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
+    plan.canonicalRunner?.semanticDigest !== plan.semanticDigest ||
+    plan.canonicalRunner?.persistentBaseline !== true ||
+    plan.execution?.replayMode !== 'exact-create-or-readback' ||
+    plan.execution?.dataRetention !== 'long-lived' ||
+    plan.execution?.cleanupSupported !== false ||
+    plan.execution?.cleanupMode !== 'forward-only' ||
+    plan.execution?.directBusinessSQL !== false ||
+    plan.execution?.manualAcceptanceCompleted !== false ||
+    !/^[0-9a-f]{64}$/u.test(String(plan.planDigest || ''))
+  ) {
+    throw new Error('scenario demo plan identity is invalid')
+  }
+  return Object.freeze({
+    fingerprint: plan.planDigest,
+    migrationVersion: plan.migrationVersion,
+    customerConfigRevision: plan.runtime.configRevision,
+    customerConfigProductVersion: plan.runtime.configProductVersion,
+  })
+}
+
+function parseScenarioDemoReadback(stdout, operation) {
+  let readback
+  try {
+    readback = JSON.parse(String(stdout || ''))
+  } catch {
+    throw new Error('scenario demo readback is invalid')
+  }
+  if (
+    readback?.schemaVersion !== 'plush.dev-data-preparation-readback/v1' ||
+    readback?.profileKey !== 'scenario-demo' ||
+    readback?.targetKey !== operation.targetSummary.targetKey ||
+    readback?.targetEnvironment !== operation.targetSummary.targetKey ||
+    readback?.targetFingerprint !== operation.targetSummary.targetFingerprint ||
+    readback?.databaseName !==
+      operation.targetSummary.safeTarget.split(':').slice(1).join(':') ||
+    readback?.release !== operation.targetSummary.releaseSha ||
+    !/^20[0-9]{12}$/u.test(String(readback?.migrationVersion || '')) ||
+    typeof readback?.customerConfigRevision !== 'string' ||
+    readback.customerConfigRevision.length < 1 ||
+    readback?.datasetKey !== 'yoyoosun-manual-acceptance' ||
+    readback?.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
+    readback?.runId !== SCENARIO_DEMO_RUN_ID ||
+    readback?.semanticDigest !==
+      SCENARIO_DEMO_SEMANTIC_DIGEST ||
+    readback?.stageCount !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
+    !Number.isSafeInteger(readback?.sourceDocumentCount) ||
+    readback.sourceDocumentCount < 1 ||
+    !Number.isSafeInteger(readback?.processRuntimeCount) ||
+    readback.processRuntimeCount < 1 ||
+    !Number.isSafeInteger(readback?.factCount) ||
+    readback.factCount < 1 ||
+    readback?.catalogReadyCount !== SCENARIO_DEMO_CATALOG_READY_COUNT ||
+    readback?.catalogTargetCount !== SCENARIO_DEMO_CATALOG_TARGET_COUNT ||
+    readback?.browserChecksPending !== SCENARIO_DEMO_BROWSER_CHECKS_PENDING ||
+    readback?.manualAcceptanceCompleted !== false ||
+    readback?.cleanupSupported !== false ||
+    readback?.replayMode !== 'exact-create-or-readback'
+  ) {
+    throw new Error('scenario demo readback contract did not match')
+  }
+  return readback
+}
+
+function validateScenarioDemoPublicReadback(readback, operation) {
+  const parsed = parseScenarioDemoReadback(JSON.stringify(readback), operation)
+  const remoteTarget =
+    operation.targetSummary.targetKey === CUSTOMER_TRIAL_133_TARGET
+  assertExactKeys(
+    parsed,
+    [
+      ...(remoteTarget ? ['backupReceipt'] : []),
+      'browserChecksPending',
+      'catalogReadyCount',
+      'catalogTargetCount',
+      'cleanupSupported',
+      'customerConfigRevision',
+      'databaseName',
+      'dataVersion',
+      'datasetKey',
+      'factCount',
+      'manualAcceptanceCompleted',
+      'migrationVersion',
+      'processRuntimeCount',
+      'profileKey',
+      'release',
+      'replayMode',
+      'runId',
+      'schemaVersion',
+      'semanticDigest',
+      'sourceDocumentCount',
+      'stageCount',
+      'targetEnvironment',
+      'targetFingerprint',
+      'targetKey',
+    ],
+    'scenario demo public readback'
+  )
+  if (!remoteTarget) return parsed
+
+  assertExactKeys(
+    parsed.backupReceipt,
+    [
+      'backupAlias',
+      'containsCredentials',
+      'containsPaths',
+      'containsSecrets',
+      'createdAt',
+      'databaseName',
+      'migrationVersion',
+      'releaseSha',
+      'schemaVersion',
+      'sha256',
+      'sizeBytes',
+      'status',
+    ],
+    'scenario demo public backup receipt'
+  )
+  const backup = parsed.backupReceipt
+  if (
+    backup.schemaVersion !== 'plush.customer-trial-133-data-backup/v1' ||
+    backup.status !== 'passed' ||
+    backup.backupAlias !== operation.targetSummary.rollbackPoint ||
+    backup.releaseSha !== parsed.release ||
+    backup.databaseName !== parsed.databaseName ||
+    backup.migrationVersion !== parsed.migrationVersion ||
+    !/^[0-9a-f]{64}$/u.test(String(backup.sha256 || '')) ||
+    !Number.isSafeInteger(backup.sizeBytes) ||
+    backup.sizeBytes < 1 ||
+    !validReceiptTimestamp(backup.createdAt) ||
+    backup.containsSecrets !== false ||
+    backup.containsCredentials !== false ||
+    backup.containsPaths !== false
+  ) {
+    throw new Error('scenario demo public backup receipt is invalid')
+  }
+  return parsed
+}
+
+function operationContract(operation) {
+  const dataVersion =
+    operation.readback?.dataVersion ||
+    operation.targetSummary?.datasetVersion ||
+    null
+  const datasetRunId =
+    operation.readback?.runId || operation.targetSummary?.datasetRunId || null
+  const semanticDigest =
+    operation.readback?.semanticDigest ||
+    operation.targetSummary?.semanticDigest ||
+    null
+  const currentIdentity =
+    dataVersion === SCENARIO_DEMO_DATA_VERSION &&
+    datasetRunId === SCENARIO_DEMO_RUN_ID &&
+    semanticDigest === DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS[operation.profileKey]
+  const historicalIdentity =
+    DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES.some(
+      (baseline) =>
+        dataVersion === baseline.dataVersion && datasetRunId === baseline.runId
+    )
+  let classification = currentIdentity
+    ? 'current'
+    : historicalIdentity
+      ? 'historical'
+      : 'unresolved'
+  if (
+    classification === 'current' &&
+    operation.profileKey === 'full-acceptance' &&
+    operation.status === 'passed'
+  ) {
+    const chainDataDigest = operation.readback?.chainDataDigest
+    const chainVerificationDigest = operation.readback?.chainVerificationDigest
+    const hasChainIdentity =
+      /^[0-9a-f]{64}$/u.test(String(chainDataDigest || '')) &&
+      /^[0-9a-f]{64}$/u.test(String(chainVerificationDigest || ''))
+    if (
+      chainDataDigest !== MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest ||
+      chainVerificationDigest !==
+        MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest
+    ) {
+      classification = hasChainIdentity ? 'historical' : 'unresolved'
+    }
+  }
+  if (
+    classification === 'current' &&
+    operation.profileKey === 'scenario-demo' &&
+    operation.status === 'passed'
+  ) {
+    try {
+      validateScenarioDemoPublicReadback(operation.readback, operation)
+    } catch {
+      classification = 'unresolved'
+    }
+  }
+  return Object.freeze({
+    kind: DATA_PREPARATION_OPERATION_CONTRACT_KIND,
+    classification,
+    dataVersion,
+    datasetRunId,
+    semanticDigest,
+  })
+}
+
+function isCurrentPublicOperation(operation) {
+  if (operationContract(operation).classification !== 'current') return false
+  if (operation.profileKey !== 'scenario-demo') {
+    if (
+      operation.profileKey === 'full-acceptance' &&
+      operation.status === 'passed'
+    ) {
+      return (
+        operation.readback?.chainDataDigest ===
+          MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest &&
+        operation.readback?.chainVerificationDigest ===
+          MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest
+      )
+    }
+    return true
+  }
+  if (operation.readback == null) return operation.status !== 'passed'
+  try {
+    validateScenarioDemoPublicReadback(operation.readback, operation)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function readPrivateReceipt(file, maxBytes = 256 * 1024) {
+  const stats = await lstat(file)
+  if (!stats.isFile() || stats.isSymbolicLink() || stats.size > maxBytes) {
+    throw new Error('acceptance receipt is invalid')
+  }
+  const handle = await open(
+    file,
+    constants.O_RDONLY + (constants.O_NOFOLLOW || 0)
+  )
+  try {
+    const content = await handle.readFile()
+    if (content.byteLength > maxBytes) {
+      throw new Error('acceptance receipt is too large')
+    }
+    return JSON.parse(content.toString('utf8'))
+  } finally {
+    await handle.close()
+  }
+}
+
+function validReceiptTimestamp(value) {
+  return (
+    typeof value === 'string' &&
+    Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value
+  )
+}
+
+function validateDatasetTiming(dataset, receiptStatus) {
+  if (!dataset) {
+    if (receiptStatus === 'passed') {
+      throw new Error('passed acceptance receipt is missing dataset evidence')
+    }
+    return null
+  }
+  const expectedStageKeys = MANUAL_ACCEPTANCE_REVIEW_PLAN.dataStages.map(
+    (stage) => stage.key
+  )
+  if (
+    typeof dataset.ok !== 'boolean' ||
+    dataset.dataVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
+    dataset.chainDataDigest !== MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest ||
+    dataset.chainVerificationDigest !==
+      MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest ||
+    !validReceiptTimestamp(dataset.startedAt) ||
+    !validReceiptTimestamp(dataset.completedAt) ||
+    !Number.isFinite(dataset.durationMs) ||
+    dataset.durationMs < 0 ||
+    !Array.isArray(dataset.stageTimings) ||
+    dataset.stageTimings.length !== expectedStageKeys.length
+  ) {
+    throw new Error('acceptance dataset timing evidence is invalid')
+  }
+  dataset.stageTimings.forEach((stage, index) => {
+    const hasTiming = stage.status === 'completed' || stage.status === 'failed'
+    if (
+      stage.key !== expectedStageKeys[index] ||
+      !['completed', 'failed', 'not_started'].includes(stage.status) ||
+      (hasTiming &&
+        (!validReceiptTimestamp(stage.startedAt) ||
+          !validReceiptTimestamp(stage.completedAt) ||
+          !Number.isFinite(stage.durationMs) ||
+          stage.durationMs < 0)) ||
+      (!hasTiming &&
+        (stage.startedAt !== null ||
+          stage.completedAt !== null ||
+          stage.durationMs !== null))
+    ) {
+      throw new Error('acceptance dataset stage timing is invalid')
+    }
+  })
+  if (
+    receiptStatus === 'passed' &&
+    (dataset.ok !== true ||
+      dataset.stageTimings.some((stage) => stage.status !== 'completed'))
+  ) {
+    throw new Error('passed acceptance receipt has incomplete dataset evidence')
+  }
+  return dataset
+}
+
+export function validateAcceptanceReceipt(receipt, operation) {
+  if (
+    !receipt ||
+    receipt.schemaVersion !== 'plush-local-acceptance-lifecycle/v1' ||
+    receipt.commit !== operation.repository.commit ||
+    receipt.runID !== operation.runId ||
+    !['passed', 'failed'].includes(receipt.status) ||
+    typeof receipt.cleanup?.complete !== 'boolean' ||
+    !Array.isArray(receipt.cleanup?.residualDatabases)
+  ) {
+    throw new Error('acceptance receipt identity is invalid')
+  }
+  const dataset = validateDatasetTiming(
+    receipt.evidence?.dataset,
+    receipt.status
+  )
+  return {
+    schemaVersion: 'plush.dev-data-preparation-readback/v1',
+    profileKey: 'full-acceptance',
+    targetFingerprint: operation.targetSummary.targetFingerprint,
+    reportStatus: receipt.status,
+    cleanupComplete: receipt.cleanup.complete,
+    residualDatabaseCount: receipt.cleanup.residualDatabases.length,
+    dataVersion: dataset?.dataVersion || null,
+    chainDataDigest: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest,
+    chainVerificationDigest:
+      MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest,
+    chainCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainCount,
+    stepCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.stepCount,
+    scenarioCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.scenarioCount,
+    dataStageCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.dataStageCount,
+    catalogTargetCount: MANUAL_ACCEPTANCE_REVIEW_PLAN.catalogTargetCount,
+    datasetStartedAt: dataset?.startedAt || null,
+    datasetCompletedAt: dataset?.completedAt || null,
+    datasetDurationMs: dataset?.durationMs ?? null,
+    stageTimings: dataset?.stageTimings || [],
+  }
+}
+
+function operationTiming(operation) {
+  const startedAt = operation.events.find((event) =>
+    ['launching', 'running'].includes(event.status)
+  )?.at
+  const completedAt = DATA_PREPARATION_TERMINAL_STATUSES.includes(
+    operation.status
+  )
+    ? [...operation.events]
+        .reverse()
+        .find((event) =>
+          DATA_PREPARATION_TERMINAL_STATUSES.includes(event.status)
+        )?.at || operation.updatedAt
+    : null
+  return {
+    startedAt: startedAt || null,
+    completedAt,
+    durationMs:
+      startedAt && completedAt
+        ? Math.max(0, Date.parse(completedAt) - Date.parse(startedAt))
+        : null,
+  }
+}
+
+function publicOperation(operation) {
+  const targetKey =
+    operation.targetSummary.targetKey ||
+    (operation.profileKey === 'full-acceptance'
+      ? ISOLATED_LOCAL_TARGET
+      : LOCAL_DEVELOPMENT_TARGET)
+  const confirmation =
+    operation.status === 'ready'
+      ? [
+          'DATA_PREPARATION',
+          operation.profileKey,
+          targetKey,
+          operation.runId,
+          operation.planHash,
+          operation.id,
+        ].join(':')
+      : ''
+  return {
+    id: operation.id,
+    profileKey: operation.profileKey,
+    status: operation.status,
+    planHash: operation.planHash,
+    runId: operation.runId,
+    contract: operationContract(operation),
+    repository: operation.repository,
+    targetSummary: { ...operation.targetSummary, targetKey },
+    createdAt: operation.createdAt,
+    updatedAt: operation.updatedAt,
+    timing: operationTiming(operation),
+    events: operation.events,
+    issues: operation.issues,
+    readback: operation.readback,
+    confirmationRequired: confirmation,
+    terminal: DATA_PREPARATION_TERMINAL_STATUSES.includes(operation.status),
+  }
+}
+
+function publicOperationReference(operation) {
+  return {
+    id: operation.id,
+    profileKey: operation.profileKey,
+    status: operation.status,
+    targetKey: [LOCAL_DEVELOPMENT_TARGET, ISOLATED_LOCAL_TARGET, CUSTOMER_TRIAL_133_TARGET].includes(operation.targetSummary?.targetKey)
+      ? operation.targetSummary.targetKey : null,
+    updatedAt: operation.updatedAt,
+    terminal: DATA_PREPARATION_TERMINAL_STATUSES.includes(operation.status),
+    contract: operationContract(operation),
+  }
+}
+
+function laterScenarioReadbackResolves(operation, operations) {
+  if (
+    operation.profileKey !== 'scenario-demo' ||
+    operation.status !== 'not_proven'
+  ) {
+    return false
+  }
+  return operations.some(
+    (candidate) =>
+      candidate.profileKey === 'scenario-demo' &&
+      candidate.status === 'passed' &&
+      candidate.targetSummary.targetFingerprint ===
+        operation.targetSummary.targetFingerprint &&
+      (candidate.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET) ===
+        (operation.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET) &&
+      candidate.readback?.dataVersion === SCENARIO_DEMO_DATA_VERSION &&
+      candidate.readback?.runId === SCENARIO_DEMO_RUN_ID &&
+      isCurrentPublicOperation(candidate) &&
+      Date.parse(candidate.updatedAt) > Date.parse(operation.updatedAt)
+  )
+}
+
+export function unresolvedDataPreparationOutcomeBlocksExecution(operation, operations) {
+  return blockingDataPreparationOperations(operation, operations).length > 0
+}
+
+function legacyScenarioTargetsDifferentDevelopmentDatabase(candidate, operation) {
+  const previous = candidate.targetSummary
+  const current = operation.targetSummary
+  if (candidate.profileKey !== 'scenario-demo' || previous.targetKey ||
+    previous.disposable !== false || previous.automaticCleanup !== false ||
+    operation.profileKey !== 'scenario-demo' || current.targetKey !== LOCAL_DEVELOPMENT_TARGET) {
+    return false
+  }
+  // Older receipts stored the connection identity before targetKey existed.
+  const match = /^host=(192\.168\.[0-9.]+) port=(\d+) database=([a-z0-9_]+)$/u.exec(previous.safeTarget)
+  if (!match) return false
+  const [, host, port, database] = match
+  if (!isIPv4(host) || host === REGISTERED_DEVELOPMENT_HOST ||
+    port !== String(REGISTERED_DEVELOPMENT_PORT) || database !== SCENARIO_DEMO_LOCAL_DATABASE) {
+    return false
+  }
+  const hasFingerprint = (targetHost, fingerprint) => ['postgres', 'postgresql'].some((scheme) =>
+    createHash('sha256').update(`${scheme}://${targetHost}:${port}/${database}`).digest('hex') === fingerprint
+  )
+  return hasFingerprint(host, previous.targetFingerprint) &&
+    hasFingerprint(REGISTERED_DEVELOPMENT_HOST, current.targetFingerprint)
+}
+
+function blockingDataPreparationOperations(operation, operations) {
+  return operations.filter((candidate) => {
+    if (operationContract(candidate).classification === 'historical') {
+      return false
+    }
+    if (
+      !['not_proven', 'launching', 'running'].includes(candidate.status) ||
+      candidate.id === operation.id
+    ) {
+      return false
+    }
+    if (['launching', 'running'].includes(candidate.status)) {
+      return true
+    }
+    if (laterScenarioReadbackResolves(candidate, operations)) {
+      return false
+    }
+    if (legacyScenarioTargetsDifferentDevelopmentDatabase(candidate, operation)) {
+      return false
+    }
+    const operationTargetKey =
+      operation.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET
+    const candidateTargetKey =
+      candidate.targetSummary.targetKey || LOCAL_DEVELOPMENT_TARGET
+    if (candidateTargetKey !== operationTargetKey) {
+      return false
+    }
+    return !(
+      operation.profileKey === 'scenario-demo' &&
+      candidate.profileKey === 'scenario-demo' &&
+      candidate.targetSummary.targetFingerprint ===
+        operation.targetSummary.targetFingerprint &&
+      Date.parse(candidate.updatedAt) < Date.parse(operation.createdAt)
+    )
+  })
+}
+
+function createRunId(now = new Date(), random = randomBytes) {
+  const timestamp = now
+    .toISOString()
+    .slice(2, 19)
+    .replace(/[-:T]/gu, '')
+    .toLowerCase()
+  return `d${timestamp}_${random(4).toString('hex')}`
+}
+
+export function createDevDataPreparationService({
+  projectRoot,
+  operationStore,
+  commandRunner = defaultCommandRunner,
+  readRepositoryState = readRepositoryIdentity,
+  readGeneration = readScenarioGeneration,
+  environment = process.env,
+  now = () => new Date(),
+  random = randomBytes,
+  readCustomerTrialPreflight = () =>
+    runTargetPreflightAsync(CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET),
+  createCustomerTrialBackup = createCustomerTrial133DataBackup,
+  processId = process.pid,
+  isProcessAlive = (pid) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  },
+  sleep = (milliseconds) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  prepareLockTimeoutMs = 180_000,
+  summaryTtlMs = 15_000,
+} = {}) {
+  const root = path.resolve(projectRoot || process.cwd())
+  const store = operationStore || resolveDataPreparationOperationStore(root)
+  const active = new Set()
+  let summaryCache = null
+  let summaryInFlight = null
+  let summaryGeneration = 0
+
+  function invalidateSummary() {
+    summaryGeneration += 1
+    summaryCache = null
+    summaryInFlight = null
+  }
+
+  function recoverOrphanedOperations() {
+    const executionLock = readDataPreparationExecutionLock(store)
+    if (executionLock && isProcessAlive(executionLock.pid)) {
+      return
+    }
+    if (executionLock) {
+      releaseDataPreparationExecutionLock(store, executionLock.operationId)
+    }
+    recoverInterruptedDataPreparationOperations(store, now().toISOString(), {
+      minimumAgeMs: INTERRUPTED_OPERATION_RECOVERY_GRACE_MS,
+    })
+  }
+  recoverOrphanedOperations()
+
+  async function readFullAcceptanceTarget() {
+    const { parseDatabaseURL } = await loadDatabaseTargetModule()
+    const value = String(
+      environment[LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV] || ''
+    ).trim()
+    if (!value) {
+      throw new Error('full acceptance database environment is required')
+    }
+    const parsed = assertRegisteredDevelopmentTarget(
+      parseDatabaseURL(value, { allowRegisteredDevelopment: true })
+    )
+    return Object.freeze({
+      ...targetSummary(parsed, {
+        targetKey: ISOLATED_LOCAL_TARGET,
+        disposable: true,
+        automaticCleanup: true,
+      }),
+      databaseName: 'isolated-per-run',
+    })
+  }
+
+  async function readScenarioTargetIdentity() {
+    const { classifyDatabaseName, parseDatabaseURL } =
+      await loadDatabaseTargetModule()
+    const command = developmentDatabaseTargetCommand(root)
+    const result = await commandRunner(command.command, command.args, {
+      ...command.options,
+      env: environment,
+    })
+    const parsed = assertRegisteredDevelopmentTarget(
+      parseDatabaseURL(String(result.stdout || '').trim(), {
+        allowRegisteredDevelopment: true,
+      })
+    )
+    const classification = classifyDatabaseName(parsed.databaseName)
+    if (
+      parsed.databaseName !== SCENARIO_DEMO_LOCAL_DATABASE ||
+      classification.disposable ||
+      classification.profile !== 'development'
+    ) {
+      throw new Error(
+        'scenario demo requires a registered non-disposable development database'
+      )
+    }
+    return Object.freeze({
+      databaseName: parsed.databaseName,
+      summary: targetSummary(parsed, {
+        targetKey: LOCAL_DEVELOPMENT_TARGET,
+        disposable: false,
+        automaticCleanup: false,
+      }),
+    })
+  }
+
+  function assertCustomerTrialPreflight(report) {
+    const runtime = report?.remote?.runtime
+    const config = runtime?.activeCustomerConfig
+    const debug = runtime?.debug
+    const debugDisabled =
+      debug?.environment === 'prod' &&
+      [
+        debug.seedEnabled,
+        debug.seedAllowed,
+        debug.cleanupEnabled,
+        debug.cleanupAllowed,
+        debug.businessDataClearEnabled,
+        debug.businessDataClearAllowed,
+      ].every((value) => value === false)
+    if (
+      report?.status !== 'passed' ||
+      report?.target !== CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET ||
+      report?.trialTarget !== CUSTOMER_TRIAL_133_TARGET ||
+      report?.customer !== 'yoyoosun' ||
+      !/^[0-9a-f]{40}$/u.test(String(runtime?.serverSha || '')) ||
+      runtime?.webSha !== runtime.serverSha ||
+      report?.remote?.publicEntry?.gitSha !== runtime.serverSha ||
+      runtime?.databaseName !== CUSTOMER_TRIAL_133_DATABASE ||
+      runtime?.resourceIdentity !== 'passed' ||
+      !/^20[0-9]{12}$/u.test(String(runtime?.migrationVersion || '')) ||
+      runtime.migrationVersion <
+        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration ||
+      config?.revision !== CUSTOMER_TRIAL_133_CONFIG_REVISION ||
+      config?.productVersion !== CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION ||
+      config?.datasetVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
+      runtime?.serverHealth !== 'passed' ||
+      runtime?.serverReady !== 'passed' ||
+      runtime?.webHealth !== 'passed' ||
+      report?.remote?.publicEntry?.status !== 'passed' ||
+      report?.remote?.backup?.tooling !== 'passed' ||
+      !debugDisabled
+    ) {
+      throw new Error(
+        'customer-trial-133 release, migration, configuration, debug, health, or backup preflight is not aligned'
+      )
+    }
+    return report
+  }
+
+  function customerTrialAttestation(report) {
+    const { runtime } = report.remote
+    return Object.freeze({
+      target: CUSTOMER_TRIAL_133_TARGET,
+      origin: CUSTOMER_TRIAL_133_ORIGIN,
+      customerKey: 'yoyoosun',
+      environment: 'prod',
+      release: runtime.serverSha,
+      migration: runtime.migrationVersion,
+      debug: Object.freeze({
+        seedEnabled: false,
+        seedAllowed: false,
+        cleanupEnabled: false,
+        cleanupAllowed: false,
+        businessDataClearEnabled: false,
+        businessDataClearAllowed: false,
+      }),
+    })
+  }
+
+  async function readCustomerTrialTargetIdentity() {
+    const report = assertCustomerTrialPreflight(
+      await readCustomerTrialPreflight()
+    )
+    const attestation = customerTrialAttestation(report)
+    const { runtime } = report.remote
+    const fingerprint = hashDataPreparationPlan({
+      targetAlias: CUSTOMER_TRIAL_133_TARGET,
+      databaseName: runtime.databaseName,
+      release: runtime.serverSha,
+      migration: runtime.migrationVersion,
+    })
+    return Object.freeze({
+      databaseName: runtime.databaseName,
+      attestation,
+      preflight: report,
+      summary: Object.freeze({
+        targetKey: CUSTOMER_TRIAL_133_TARGET,
+        releaseSha: runtime.serverSha,
+        safeTarget: `${CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET}:${runtime.databaseName}`,
+        targetFingerprint: fingerprint,
+        preflightFingerprint: '0'.repeat(64),
+        disposable: false,
+        automaticCleanup: false,
+      }),
+    })
+  }
+
+  async function resolvePreparedTarget(
+    profileKey,
+    targetKey,
+    repository,
+    runId
+  ) {
+    if (
+      profileKey === 'scenario-demo' &&
+      targetKey === LOCAL_DEVELOPMENT_TARGET
+    ) {
+      const before = await readScenarioTargetIdentity()
+      const command = scenarioDemoPlanCommand(root)
+      const result = await commandRunner(command.command, command.args, {
+        ...command.options,
+        env: environment,
+        maxBuffer: 4 * 1024 * 1024,
+      })
+      const after = await readScenarioTargetIdentity()
+      if (
+        after.summary.targetFingerprint !== before.summary.targetFingerprint ||
+        after.databaseName !== before.databaseName
+      ) {
+        throw new Error('scenario demo target changed during preflight')
+      }
+      const plan = scenarioDemoPlanFingerprint(result.stdout, repository, {
+        targetKey: LOCAL_DEVELOPMENT_TARGET,
+        databaseName: after.databaseName,
+        targetFingerprint: after.summary.targetFingerprint,
+      })
+      return Object.freeze({
+        ...after.summary,
+        databaseName: after.databaseName,
+        preflightFingerprint: plan.fingerprint,
+        migrationVersion: plan.migrationVersion,
+        customerConfigRevision: plan.customerConfigRevision,
+        customerConfigProductVersion: plan.customerConfigProductVersion,
+      })
+    }
+    if (profileKey === 'scenario-demo') {
+      const target = await readCustomerTrialTargetIdentity()
+      const command = scenarioDemoPlanCommand(
+        root,
+        CUSTOMER_TRIAL_133_TARGET,
+        target.attestation
+      )
+      const result = await commandRunner(command.command, command.args, {
+        ...command.options,
+        env: environment,
+        maxBuffer: 4 * 1024 * 1024,
+      })
+      const plan = scenarioDemoPlanFingerprint(result.stdout, repository, {
+        targetKey: CUSTOMER_TRIAL_133_TARGET,
+        databaseName: target.databaseName,
+        targetFingerprint: target.summary.targetFingerprint,
+      })
+      return Object.freeze({
+        ...target.summary,
+        databaseName: target.databaseName,
+        preflightFingerprint: plan.fingerprint,
+        migrationVersion: plan.migrationVersion,
+        customerConfigRevision: plan.customerConfigRevision,
+        customerConfigProductVersion: plan.customerConfigProductVersion,
+        attestation: target.attestation,
+      })
+    }
+    const target = await readFullAcceptanceTarget()
+    const command = fullAcceptancePlanCommand(root, repository, runId)
+    const result = await commandRunner(command.command, command.args, {
+      ...command.options,
+      env: environment,
+    })
+    return Object.freeze({
+      ...target,
+      preflightFingerprint: await fullAcceptancePlanFingerprint(
+        result.stdout,
+        repository,
+        runId
+      ),
+    })
+  }
+
+  async function buildSummary() {
+    recoverOrphanedOperations()
+    const issues = []
+    const repositoryResult = await Promise.resolve(readRepositoryState(root))
+      .then(validateRepositoryIdentity)
+      .catch(() => null)
+    if (!repositoryResult) {
+      issues.push({
+        code: 'repository_identity_unavailable',
+        severity: 'blocked',
+        message: '当前仓库身份不可用，禁止准备数据操作',
+      })
+    } else if (repositoryResult.dirty) {
+      issues.push({
+        code: 'full_acceptance_requires_clean_repository',
+        severity: 'warning',
+        message: '完整验收要求 exact clean commit；核心演示资料仍可单独准备',
+      })
+    }
+    const target = {
+      scenarioDemo133: {
+        status: 'not_proven',
+        safeTarget: `${CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET}:${CUSTOMER_TRIAL_133_DATABASE}`,
+        databaseName: CUSTOMER_TRIAL_133_DATABASE,
+        migrationVersion:
+          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
+        customerConfigRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+        customerConfigProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+        targetFingerprint: hashDataPreparationPlan({
+          target: CUSTOMER_TRIAL_133_TARGET,
+          databaseName: CUSTOMER_TRIAL_133_DATABASE,
+          status: 'not_proven',
+        }),
+      },
+    }
+    for (const [key, profileKey, targetKey, prepareTarget] of [
+      ['scenarioDemo', 'scenario-demo', LOCAL_DEVELOPMENT_TARGET, true],
+      ['fullAcceptance', 'full-acceptance', ISOLATED_LOCAL_TARGET, false],
+    ]) {
+      try {
+        const resolved = prepareTarget
+          ? await resolvePreparedTarget(
+              profileKey,
+              targetKey,
+              repositoryResult,
+              'summary'
+            )
+          : await readFullAcceptanceTarget()
+        target[key] = {
+          status: 'available',
+          safeTarget: resolved.safeTarget,
+          databaseName: resolved.databaseName || 'not-proven',
+          migrationVersion: resolved.migrationVersion || 'not-proven',
+          customerConfigRevision:
+            resolved.customerConfigRevision || 'not-proven',
+          customerConfigProductVersion:
+            resolved.customerConfigProductVersion || 'not-proven',
+          targetFingerprint: resolved.targetFingerprint,
+        }
+      } catch {
+        target[key] = {
+          status: 'blocked',
+          safeTarget: 'not-proven',
+          databaseName: 'not-proven',
+          migrationVersion: 'not-proven',
+          customerConfigRevision: 'not-proven',
+          customerConfigProductVersion: 'not-proven',
+          targetFingerprint: '0'.repeat(64),
+        }
+        issues.push({
+          code: `${profileKey.replace(/-/gu, '_')}_target_unavailable`,
+          severity: 'blocked',
+          message:
+            profileKey === 'scenario-demo'
+              ? '本地开发库、迁移或后端服务未通过检查。'
+              : '本地临时数据库未配置或不属于登记开发目标。',
+        })
+      }
+    }
+    const operations = listDataPreparationOperations(store, { limit: 100 })
+    const currentOperations = operations.filter(isCurrentPublicOperation)
+    const executionHistory = currentOperations.some((operation) => operation.status === 'ready')
+      ? listDataPreparationOperations(store, { limit: 200 }) : []
+    const historicalOperations = operations.filter(
+      (operation) =>
+        operationContract(operation).classification === 'historical'
+    )
+    const unresolvedContractOperations = operations.filter(
+      (operation) =>
+        operationContract(operation).classification === 'unresolved'
+    )
+    const blockingUnresolvedContractOperations =
+      unresolvedContractOperations.filter((operation) =>
+        ['launching', 'running', 'not_proven'].includes(operation.status)
+      )
+    if (historicalOperations.length > 0) {
+      issues.push({
+        code: 'historical_operation_contract_preserved',
+        severity: 'warning',
+        message: `已保留 ${historicalOperations.length} 条旧合同历史回执，但不会参与当前数据合同的执行或环境判断`,
+      })
+    }
+    if (unresolvedContractOperations.length > 0) {
+      issues.push({
+        code: 'unresolved_operation_contract_preserved',
+        severity:
+          blockingUnresolvedContractOperations.length > 0
+            ? 'blocked'
+            : 'warning',
+        message:
+          blockingUnresolvedContractOperations.length > 0
+            ? `存在 ${blockingUnresolvedContractOperations.length} 条合同版本无法判定且结果未收口的操作；请核对原记录，能否执行以所选目标的准备计划为准`
+            : `另有 ${unresolvedContractOperations.length} 条无法判定版本合同的旧回执，仅供历史核对`,
+      })
+    }
+    const unresolvedOutcomes = currentOperations.filter(
+      (operation) =>
+        operation.status === 'not_proven' &&
+        !laterScenarioReadbackResolves(operation, operations)
+    )
+    if (unresolvedOutcomes.length > 0) {
+      const scenarioReplayAvailable = unresolvedOutcomes.every(
+        (operation) => operation.profileKey === 'scenario-demo'
+      )
+      issues.push({
+        code: scenarioReplayAvailable
+          ? 'scenario_demo_explicit_resume_available'
+          : 'unresolved_operation_outcome',
+        severity: scenarioReplayAvailable ? 'warning' : 'blocked',
+        message: scenarioReplayAvailable
+          ? '存在重启后结果未知的场景数据操作；可重新准备同目标计划并确认补齐，不会自动重试'
+          : '存在重启后结果未知的数据操作，核对前禁止再次执行',
+      })
+    }
+    return {
+      kind: 'plush.dev-data-preparation-summary',
+      status: issues.some((issue) => issue.severity === 'blocked')
+        ? 'blocked'
+        : issues.length
+          ? 'partial'
+          : 'success',
+      generatedAt: now().toISOString(),
+      repository: repositoryResult,
+      datasetContract: MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT,
+      target,
+      acceptancePlan: projectDataPreparationAcceptancePlan(
+        MANUAL_ACCEPTANCE_REVIEW_PLAN
+      ),
+      profiles: DEV_DATA_PREPARATION_PROFILES,
+      currentOperations: currentOperations.slice(0, 50).map((operation) => operationForPage(operation, executionHistory)),
+      historicalOperations: historicalOperations
+        .slice(0, 50)
+        .map(publicOperationReference),
+      unresolvedOperations: unresolvedContractOperations
+        .slice(0, 50)
+        .map(publicOperationReference),
+      issues,
+      boundaries: {
+        developmentOnly: true,
+        browserTargetInputAllowed: false,
+        browserShellAccess: false,
+        arbitraryPathInputAllowed: false,
+        fullAcceptanceAutomaticCleanup: true,
+        customerUAT: false,
+      },
+    }
+  }
+
+  function getSummary({ force = false } = {}) {
+    const currentTime = Date.now()
+    if (summaryInFlight) return summaryInFlight
+    if (
+      !force &&
+      summaryCache &&
+      currentTime - summaryCache.readAt < summaryTtlMs
+    ) {
+      return Promise.resolve(summaryCache.value)
+    }
+
+    const generation = summaryGeneration
+    const pending = buildSummary()
+      .then((value) => {
+        if (generation === summaryGeneration) {
+          summaryCache = { readAt: Date.now(), value }
+        }
+        return value
+      })
+      .finally(() => {
+        if (summaryInFlight === pending) summaryInFlight = null
+      })
+    summaryInFlight = pending
+    return pending
+  }
+
+  function readOperationGeneration(operation) {
+    const generation = operation.profileKey === 'scenario-demo' ? readGeneration(root, operation.id) : null
+    if (generation && (
+      generation.id !== operation.id ||
+      generation.repositoryFingerprint !== operation.repository.fingerprint ||
+      generation.planDigest !== operation.targetSummary.preflightFingerprint ||
+      generation.targetKey !== operation.targetSummary.targetKey
+    )) throw new Error('generation snapshot does not belong to this operation')
+    return generation
+  }
+
+  function operationForPage(operation, executionHistory) {
+    const projection = { ...publicOperation(operation), generation: null }
+    try {
+      projection.generation = readOperationGeneration(operation)
+    } catch {
+      projection.issues = [...projection.issues, {
+        code: 'generation_snapshot_unverified',
+        severity: 'blocked',
+        message: '代码与参数快照未能核验，请检查原始存档；该快照不能作为复现依据。',
+      }]
+    }
+    if (operation.status !== 'ready') return projection
+    const blockers = blockingDataPreparationOperations(operation, executionHistory || listDataPreparationOperations(store, { limit: 200 }))
+    if (!blockers.length) return projection
+    return { ...projection,
+issues: [...projection.issues, {
+      code: 'unresolved_operation_outcome',
+severity: 'blocked',
+      message: `本计划仍受 ${blockers.length} 条未收口记录阻断：${blockers.slice(0, 3).map(({ id }) => id).join('、')}${blockers.length > 3 ? '等' : ''}。请在执行记录中核对目标和原始结果。`,
+    }] }
+  }
+
+  async function prepare(payload) {
+    const existing = readDataPreparationOperationByIdempotencyKey(
+      store,
+      payload.idempotencyKey,
+      payload.profileKey
+    )
+    if (existing) {
+      if (!isCurrentPublicOperation(existing)) {
+        throw new Error(
+          'data preparation idempotency key belongs to a previous contract'
+        )
+      }
+      return {
+        kind: 'plush.dev-data-preparation-action-result',
+        action: 'prepare',
+        operation: operationForPage(existing),
+        reused: true,
+      }
+    }
+    const deadline = Date.now() + prepareLockTimeoutMs
+    let claim
+    while (!claim) {
+      try {
+        claim = acquireDataPreparationIdempotencyLock(
+          store,
+          payload.idempotencyKey,
+          {
+            pid: processId,
+            now: now().toISOString(),
+          }
+        )
+      } catch (error) {
+        if (error?.code !== 'DATA_PREPARATION_IDEMPOTENCY_LOCKED') throw error
+        const completed = readDataPreparationOperationByIdempotencyKey(
+          store,
+          payload.idempotencyKey,
+          payload.profileKey
+        )
+        if (completed) {
+          if (!isCurrentPublicOperation(completed)) {
+            throw new Error(
+              'data preparation idempotency key belongs to a previous contract'
+            )
+          }
+          return {
+            kind: 'plush.dev-data-preparation-action-result',
+            action: 'prepare',
+            operation: operationForPage(completed),
+            reused: true,
+          }
+        }
+        const currentLock = readDataPreparationIdempotencyLock(
+          store,
+          payload.idempotencyKey
+        )
+        if (currentLock && !isProcessAlive(currentLock.pid)) {
+          releaseDataPreparationIdempotencyLock(
+            store,
+            payload.idempotencyKey,
+            currentLock.lockId
+          )
+          continue
+        }
+        if (Date.now() >= deadline) {
+          throw new Error('data preparation idempotency claim timed out')
+        }
+        await sleep(10)
+      }
+    }
+    try {
+      const completed = readDataPreparationOperationByIdempotencyKey(
+        store,
+        payload.idempotencyKey,
+        payload.profileKey
+      )
+      if (completed) {
+        if (!isCurrentPublicOperation(completed)) {
+          throw new Error(
+            'data preparation idempotency key belongs to a previous contract'
+          )
+        }
+        return {
+          kind: 'plush.dev-data-preparation-action-result',
+          action: 'prepare',
+          operation: operationForPage(completed),
+          reused: true,
+        }
+      }
+      const repository = validateRepositoryIdentity(
+        await readRepositoryState(root)
+      )
+      if (payload.profileKey === 'full-acceptance' && repository.dirty) {
+        throw new Error(
+          'full acceptance requires the exact clean current commit'
+        )
+      }
+      const runId = createRunId(now(), random)
+      const resolvedTarget = await resolvePreparedTarget(
+        payload.profileKey,
+        payload.targetKey,
+        repository,
+        runId
+      )
+      const target = operationTargetSummary(resolvedTarget, {
+        profileKey: payload.profileKey,
+        repository,
+        runId,
+      })
+      const planHash = hashDataPreparationPlan({
+        profileKey: payload.profileKey,
+        repository,
+        runId,
+        targetSummary: target,
+      })
+      const created = createOrReuseDataPreparationOperation(store, {
+        idempotencyKey: payload.idempotencyKey,
+        profileKey: payload.profileKey,
+        repository,
+        runId,
+        targetSummary: target,
+        planHash,
+        now: now().toISOString(),
+      })
+      invalidateSummary()
+      return {
+        kind: 'plush.dev-data-preparation-action-result',
+        action: 'prepare',
+        operation: operationForPage(created.operation),
+        reused: created.reused,
+      }
+    } finally {
+      releaseDataPreparationIdempotencyLock(
+        store,
+        payload.idempotencyKey,
+        claim.lockId
+      )
+    }
+  }
+
+  async function verifyExecutionIdentity(operation) {
+    const repository = validateRepositoryIdentity(
+      await readRepositoryState(root)
+    )
+    const expectedPlanHash = hashDataPreparationPlan({
+      profileKey: operation.profileKey,
+      repository: operation.repository,
+      runId: operation.runId,
+      targetSummary: operation.targetSummary,
+    })
+    if (
+      repository.commit !== operation.repository.commit ||
+      repository.dirty !== operation.repository.dirty ||
+      repository.fingerprint !== operation.repository.fingerprint ||
+      expectedPlanHash !== operation.planHash
+    ) {
+      throw new Error('repository identity changed after preparation')
+    }
+    const currentTarget = await resolvePreparedTarget(
+      operation.profileKey,
+      operation.targetSummary.targetKey ||
+        (operation.profileKey === 'full-acceptance'
+          ? ISOLATED_LOCAL_TARGET
+          : LOCAL_DEVELOPMENT_TARGET),
+      repository,
+      operation.runId
+    )
+    if (
+      currentTarget.targetFingerprint !==
+        operation.targetSummary.targetFingerprint ||
+      currentTarget.preflightFingerprint !==
+        operation.targetSummary.preflightFingerprint
+    ) {
+      throw new Error('database target changed after preparation')
+    }
+    if (operation.profileKey === 'full-acceptance' && repository.dirty) {
+      throw new Error('full acceptance requires the exact clean current commit')
+    }
+    return currentTarget
+  }
+
+  async function runFullAcceptance(operation) {
+    const command = await fullAcceptanceExecutionCommand(root, operation)
+    let commandError = null
+    try {
+      await commandRunner(command.command, command.args, {
+        ...command.options,
+        env: environment,
+        maxBuffer: 4 * 1024 * 1024,
+      })
+    } catch (error) {
+      commandError = error
+    }
+    const receiptPath = path.join(
+      root,
+      'output',
+      'qa',
+      'local-acceptance-lifecycle',
+      operation.runId,
+      'receipt.json'
+    )
+    let readback
+    try {
+      readback = validateAcceptanceReceipt(
+        await readPrivateReceipt(receiptPath),
+        operation
+      )
+    } catch (receiptError) {
+      if (commandError) throw commandError
+      throw receiptError
+    }
+    if (
+      commandError ||
+      readback.reportStatus !== 'passed' ||
+      !readback.cleanupComplete ||
+      readback.residualDatabaseCount !== 0
+    ) {
+      const error = new Error(
+        'full acceptance did not produce a clean passed receipt'
+      )
+      error.readback = readback
+      throw error
+    }
+    return readback
+  }
+
+  async function runScenarioDemo(operation, target) {
+    const local = operation.targetSummary.targetKey === LOCAL_DEVELOPMENT_TARGET
+    const current = local ? await readScenarioTargetIdentity() : target
+    const currentSummary = local ? current.summary : current
+    if (
+      currentSummary.targetFingerprint !==
+      operation.targetSummary.targetFingerprint
+    ) {
+      throw new Error('scenario demo target readback changed')
+    }
+    const backupReceipt = local
+      ? null
+      : await createCustomerTrialBackup({
+          backupAlias: operation.targetSummary.rollbackPoint,
+          releaseSha: operation.targetSummary.releaseSha,
+          migrationVersion: operation.targetSummary.migrationVersion,
+        })
+    const command = scenarioDemoExecutionCommand(
+      root,
+      operation,
+      current.attestation
+    )
+    const scenarioConfirmation = [
+      'APPLY_SCENARIO_DEMO',
+      local ? 'scenario-demo' : CUSTOMER_TRIAL_133_TARGET,
+      current.databaseName,
+      SCENARIO_DEMO_DATA_VERSION,
+      SCENARIO_DEMO_RUN_ID,
+      operation.targetSummary.preflightFingerprint,
+    ].join(':')
+    try {
+      const result = await commandRunner(command.command, command.args, {
+        ...command.options,
+        env: {
+          ...environment,
+          SCENARIO_DEMO_CONFIRM: scenarioConfirmation,
+          ...(current.attestation
+            ? {
+                MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON: JSON.stringify(
+                  current.attestation
+                ),
+                MANUAL_ACCEPTANCE_ADMIN_PASSWORD:
+                  environment.CUSTOMER_TRIAL_133_ADMIN_PASSWORD || '',
+                MANUAL_ACCEPTANCE_PASSWORD:
+                  environment.CUSTOMER_TRIAL_133_ROLE_PASSWORD || '',
+              }
+            : {}),
+        },
+        maxBuffer: 4 * 1024 * 1024,
+      })
+      const readback = parseScenarioDemoReadback(result.stdout, operation)
+      const generation = readOperationGeneration(operation)
+      if (!generation || generation.status !== 'passed') {
+        throw new Error('造数快照与本次执行未能核对，结果需要重新确认')
+      }
+      const completedReadback = backupReceipt
+        ? Object.freeze({ ...readback, backupReceipt })
+        : readback
+      return validateScenarioDemoPublicReadback(completedReadback, operation)
+    } catch {
+      const unknownOutcome = new Error(
+        'scenario demo write outcome is not proven; authoritative readback is required'
+      )
+      unknownOutcome.outcomeUnknown = true
+      throw unknownOutcome
+    }
+  }
+
+  function execute(payload) {
+    if (active.size > 0) {
+      throw new Error('another data preparation operation is running')
+    }
+    let operation = readDataPreparationOperation(store, payload.operationId)
+    if (!isCurrentPublicOperation(operation)) {
+      throw new Error('data preparation operation contract is not current')
+    }
+    if (!supportsDataPreparationTarget(operation.profileKey, operation.targetSummary.targetKey)) {
+      throw new Error('data preparation operation is read-only or has an invalid target')
+    }
+    const persistedOperations = listDataPreparationOperations(store, {
+      limit: 200,
+    })
+    if (
+      unresolvedDataPreparationOutcomeBlocksExecution(
+        operation,
+        persistedOperations
+      )
+    ) {
+      throw new Error('an unresolved data preparation outcome blocks execution')
+    }
+    if (operation.status === 'not_proven') {
+      throw new Error('an unresolved data preparation outcome blocks execution')
+    }
+    if (operation.status !== 'ready') {
+      throw new Error('data preparation operation is not ready')
+    }
+    const expected = publicOperation(operation).confirmationRequired
+    if (payload.confirmation !== expected) {
+      throw new Error('explicit data preparation confirmation does not match')
+    }
+    acquireDataPreparationExecutionLock(store, operation.id, {
+      pid: processId,
+      now: now().toISOString(),
+    })
+    try {
+      if (
+        listDataPreparationOperations(store, { limit: 200 }).some(
+          (item) =>
+            item.id !== operation.id &&
+            (item.status === 'launching' || item.status === 'running')
+        )
+      ) {
+        throw new Error(
+          'another persisted data preparation operation is active'
+        )
+      }
+      operation = transitionDataPreparationOperation(store, operation.id, {
+        status: 'launching',
+        message: 'fixed profile executor is launching',
+        now: now().toISOString(),
+      })
+      invalidateSummary()
+    } catch (error) {
+      releaseDataPreparationExecutionLock(store, operation.id)
+      throw error
+    }
+    active.add(operation.id)
+    ;(async () => {
+      try {
+        const executionTarget = await verifyExecutionIdentity(operation)
+        transitionDataPreparationOperation(store, operation.id, {
+          status: 'running',
+          message: 'fixed profile execution started',
+          now: now().toISOString(),
+        })
+        const readback =
+          operation.profileKey === 'scenario-demo'
+            ? await runScenarioDemo(operation, executionTarget)
+            : await runFullAcceptance(operation)
+        transitionDataPreparationOperation(store, operation.id, {
+          status: 'passed',
+          message: 'fixed profile execution and readback passed',
+          readback,
+          now: now().toISOString(),
+        })
+        invalidateSummary()
+      } catch (error) {
+        const readback = error?.readback
+        transitionDataPreparationOperation(store, operation.id, {
+          status: error?.outcomeUnknown === true ? 'not_proven' : 'failed',
+          message:
+            error?.outcomeUnknown === true
+              ? 'fixed profile write outcome requires authoritative readback'
+              : 'fixed profile execution failed',
+          issues: [
+            {
+              code:
+                error?.outcomeUnknown === true
+                  ? 'profile_execution_outcome_not_proven'
+                  : 'profile_execution_failed',
+              severity: 'blocked',
+              message:
+                error?.outcomeUnknown === true
+                  ? '数据写入结果未证明；请先权威读回，不自动重试或新建操作'
+                  : `数据准备未完成：${redactError(error)}`,
+            },
+          ],
+          ...(readback ? { readback } : {}),
+          now: now().toISOString(),
+        })
+        invalidateSummary()
+      } finally {
+        active.delete(operation.id)
+        releaseDataPreparationExecutionLock(store, operation.id)
+      }
+    })().catch(() => {
+      active.delete(operation.id)
+      try {
+        releaseDataPreparationExecutionLock(store, operation.id)
+      } catch {
+        // A mismatched persistent lock must remain fail-closed.
+      }
+    })
+    return {
+      kind: 'plush.dev-data-preparation-action-result',
+      action: 'execute',
+      operation: operationForPage(operation),
+    }
+  }
+
+  return {
+    summary: getSummary,
+    readOperation(operationId) {
+      recoverOrphanedOperations()
+      return operationForPage(readDataPreparationOperation(store, operationId))
+    },
+    async act(value) {
+      const request = validateDevDataPreparationAction(value)
+      return request.action === 'prepare'
+        ? prepare(request.payload)
+        : execute(request.payload)
+    },
+  }
+}
+
+function sendJson(response, statusCode, payload, extraHeaders = {}) {
+  response.statusCode = statusCode
+  response.setHeader('cache-control', 'no-store')
+  response.setHeader('content-type', 'application/json; charset=utf-8')
+  response.setHeader('x-content-type-options', 'nosniff')
+  response.setHeader('referrer-policy', 'no-referrer')
+  for (const [name, value] of Object.entries(extraHeaders)) {
+    response.setHeader(name, value)
+  }
+  response.end(JSON.stringify(payload))
+}
+
+export function createDevDataPreparationMiddleware({
+  projectRoot,
+  service,
+  csrfToken = randomBytes(32).toString('base64url'),
+} = {}) {
+  const dataService =
+    service || createDevDataPreparationService({ projectRoot })
+  return async (request, response, next) => {
+    let requestURL
+    try {
+      requestURL = new URL(request.url || '/', 'http://localhost')
+    } catch {
+      next()
+      return
+    }
+    const requestPath = requestURL.pathname
+    if (!requestPath.startsWith(`${DEV_DATA_PREPARATION_API_PREFIX}/`)) {
+      next()
+      return
+    }
+    if (!isDevWorkbenchRequest(request)) {
+      sendJson(response, 403, {
+        status: 'failed',
+        message: '数据准备只允许通过当前开发服务的本机或内网地址访问',
+      })
+      return
+    }
+    try {
+      if (
+        request.method === 'GET' &&
+        requestPath === DEV_DATA_PREPARATION_SESSION_API_PATH
+      ) {
+        sendJson(response, 200, {
+          kind: 'plush.dev-data-preparation-session',
+          csrfToken,
+          apiPrefix: DEV_DATA_PREPARATION_API_PREFIX,
+        })
+        return
+      }
+      if (
+        request.method === 'GET' &&
+        requestPath === DEV_DATA_PREPARATION_SUMMARY_API_PATH
+      ) {
+        const summaryQuery = [...requestURL.searchParams.entries()]
+        if (
+          summaryQuery.length > 1 ||
+          (summaryQuery.length === 1 &&
+            (summaryQuery[0][0] !== 'refresh' ||
+              summaryQuery[0][1] !== 'authoritative'))
+        ) {
+          throw new Error('summary refresh query is unsupported')
+        }
+        sendJson(
+          response,
+          200,
+          await dataService.summary({ force: summaryQuery.length === 1 })
+        )
+        return
+      }
+      const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
+      if (request.method === 'GET' && operationMatch) {
+        sendJson(response, 200, {
+          kind: 'plush.dev-data-preparation-operation-result',
+          operation: dataService.readOperation(operationMatch[1]),
+        })
+        return
+      }
+      if (
+        request.method === 'POST' &&
+        requestPath === DEV_DATA_PREPARATION_ACTION_API_PATH
+      ) {
+        if (
+          !isSameOriginRequest(request) ||
+          request.headers?.['x-csrf-token'] !== csrfToken ||
+          !/^application\/json(?:\s*;\s*charset=utf-8)?$/iu.test(
+            String(request.headers?.['content-type'] || '')
+          )
+        ) {
+          sendJson(response, 403, {
+            status: 'failed',
+            message: '请求来源或会话校验失败',
+          })
+          return
+        }
+        const result = await dataService.act(
+          validateDevDataPreparationAction(
+            await readJsonBody(request, {
+              maxBytes: MAX_DEV_DATA_PREPARATION_REQUEST_BYTES,
+              label: 'request',
+            })
+          )
+        )
+        sendJson(response, result.action === 'execute' ? 202 : 200, result)
+        return
+      }
+      sendJson(
+        response,
+        405,
+        { status: 'failed', message: '该数据准备接口不支持此方法或路径' },
+        { allow: 'GET, POST' }
+      )
+    } catch (error) {
+      const inputError =
+        /invalid|unsupported|allowlisted|confirmation|fields|body|JSON|profile/iu.test(
+          String(error?.message || '')
+        )
+      sendJson(response, inputError ? 400 : 409, {
+        status: 'failed',
+        message: inputError
+          ? '请求参数不符合固定数据准备合同'
+          : '操作未完成；请刷新测试数据中心查看持久回执',
+      })
+    }
+  }
+}
+
+export function createDevDataPreparationPlugin(options = {}) {
+  return {
+    name: 'plush-dev-data-preparation',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(createDevDataPreparationMiddleware(options))
+    },
+  }
+}
