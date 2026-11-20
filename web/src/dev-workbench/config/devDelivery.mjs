@@ -907,10 +907,8 @@ function validatePipelineRun(run) {
     !SHA_PATTERN.test(String(run.gitSha || '')) ||
     !Array.isArray(run.jobs) ||
     run.jobs.length > 100 ||
-    ![
-      `https://github.com/saurick/plush-toy-erp/actions/runs/${String(run.id)}`,
-      `https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/${String(run.id)}`,
-    ].includes(run.url)
+    run.url !==
+      `https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/${String(run.id)}`
   ) {
     throw new Error('pipeline run is invalid')
   }
@@ -1020,12 +1018,9 @@ function validateReleaseVersionPolicy(value) {
 }
 
 export function deliveryReadOnlyReleasePresentation(summary) {
-  const provider =
-    summary?.boundaries?.provider === 'github' ? 'GitHub' : 'GitLab'
   const readIssue = summary?.issues?.find((issue) =>
     [
       'gitlab_provider_unavailable',
-      'github_provider_unavailable',
       'release_version_catalog_invalid',
     ].includes(issue.code)
   )
@@ -1033,7 +1028,7 @@ export function deliveryReadOnlyReleasePresentation(summary) {
     return {
       color: 'warning',
       label: '读取未就绪',
-      title: `${provider} 版本尚未读取`,
+      title: 'GitLab 版本尚未读取',
       description:
         readIssue?.message || '先取得正式版本目录，再核对发布与部署资格。',
     }
@@ -1050,9 +1045,7 @@ export function deliveryReadOnlyReleasePresentation(summary) {
       ? '版本与流水线可查看，当前不能创建新发布'
       : '版本可查看，流水线耗时尚未取得',
     description:
-      provider === 'GitHub'
-        ? '当前 Provider 读取历史版本；目标部署资格见预检结果。'
-        : '创建新发布需要短期 GitLab 发布凭据；已有版本的部署资格见目标预检结果。',
+      '创建新发布需要短期 GitLab 发布凭据；已有版本的部署资格见目标预检结果。',
   }
 }
 
@@ -1069,7 +1062,7 @@ export function validateDevDeliverySummary(summary) {
     !Array.isArray(summary.issues) ||
     !Object.hasOwn(summary, 'timings') ||
     !Object.hasOwn(summary, 'releaseVersionPolicy') ||
-    !['gitlab', 'github'].includes(summary.boundaries?.provider) ||
+    summary.boundaries?.provider !== 'gitlab' ||
     typeof summary.boundaries?.releaseDispatchAllowed !== 'boolean' ||
     summary.boundaries?.target !== 'demo-133' ||
     !Array.isArray(summary.boundaries?.targets) ||

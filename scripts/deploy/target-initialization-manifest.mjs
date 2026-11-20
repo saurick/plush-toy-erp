@@ -129,9 +129,6 @@ export function buildTargetInitializationManifest({
   if (
     !UUID_V4_PATTERN.test(String(operationId || "")) ||
     !SHA256_PATTERN.test(String(releaseManifestSha256 || "")) ||
-    release.schemaVersion !== "plush.release-manifest/v2" ||
-    release.rehearsal?.status !== "passed" ||
-    release.rehearsal?.cleanup?.residualContainers !== 0 ||
     initializationPreflight?.schemaVersion !==
       "plush.target-initialization-preflight/v1" ||
     !["eligible", "blocked"].includes(initializationPreflight?.status) ||

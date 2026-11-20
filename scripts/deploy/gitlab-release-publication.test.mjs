@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { RELEASE_ASSET_NAMES } from "./github-release-asset-set.mjs";
+import { DELIVERY_RELEASE_ASSETS } from "./delivery-provider.mjs";
 import {
   planGitlabReleasePublication,
   planGitlabReleaseSourcePublication,
@@ -66,7 +66,7 @@ function localAssets() {
   return {
     status: "passed",
     state: "local",
-    assets: RELEASE_ASSET_NAMES.map((name, index) => ({
+    assets: DELIVERY_RELEASE_ASSETS.map((name, index) => ({
       name,
       size: index + 100,
       digest: `sha256:${String(index + 1).padStart(64, "0")}`,
@@ -74,7 +74,7 @@ function localAssets() {
   };
 }
 
-function remoteAssets(names = RELEASE_ASSET_NAMES) {
+function remoteAssets(names = DELIVERY_RELEASE_ASSETS) {
   const local = new Map(localAssets().assets.map((asset) => [asset.name, asset]));
   return names.map((name) => ({
     file_name: name,
@@ -246,7 +246,7 @@ function backfillFixture(t) {
       .map(([name, sha256]) => `${sha256}  ${name}`)
       .join("\n")}\n`,
   );
-  const formalRemote = RELEASE_ASSET_NAMES.map((name) => {
+  const formalRemote = DELIVERY_RELEASE_ASSETS.map((name) => {
     const file = path.join(controlsDir, name);
     if (large.has(name)) {
       return {
@@ -310,14 +310,14 @@ test("selects at most one exact immutable GitLab package identity", () => {
 });
 
 test("plans only missing assets from an exact verified remote subset", () => {
-  const existing = RELEASE_ASSET_NAMES.slice(0, 3);
+  const existing = DELIVERY_RELEASE_ASSETS.slice(0, 3);
   const result = planGitlabReleasePublication({
     local: localAssets(),
     remote: remoteAssets(existing),
   });
   assert.equal(result.state, "partial");
   assert.equal(result.existingCount, 3);
-  assert.deepEqual(result.missingAssets, RELEASE_ASSET_NAMES.slice(3));
+  assert.deepEqual(result.missingAssets, DELIVERY_RELEASE_ASSETS.slice(3));
 });
 
 test("blocks unknown, duplicate or mismatched existing package files", () => {
@@ -341,13 +341,13 @@ test("blocks unknown, duplicate or mismatched existing package files", () => {
       planGitlabReleasePublication({
         local,
         remote: [
-          ...remoteAssets([RELEASE_ASSET_NAMES[0]]),
-          ...remoteAssets([RELEASE_ASSET_NAMES[0]]),
+          ...remoteAssets([DELIVERY_RELEASE_ASSETS[0]]),
+          ...remoteAssets([DELIVERY_RELEASE_ASSETS[0]]),
         ],
       }),
     /invalid file/u,
   );
-  const mismatched = remoteAssets([RELEASE_ASSET_NAMES[0]]);
+  const mismatched = remoteAssets([DELIVERY_RELEASE_ASSETS[0]]);
   mismatched[0].file_sha256 = "f".repeat(64);
   assert.throws(
     () => planGitlabReleasePublication({ local, remote: mismatched }),
@@ -367,7 +367,7 @@ test("requires an exact seven-asset readback before publication is complete", ()
     () =>
       verifyGitlabReleasePublication({
         local: localAssets(),
-        remote: remoteAssets(RELEASE_ASSET_NAMES.slice(0, -1)),
+        remote: remoteAssets(DELIVERY_RELEASE_ASSETS.slice(0, -1)),
       }),
     /incomplete/u,
   );
@@ -414,7 +414,7 @@ test("select keeps formal and source package identities separate", () => {
   );
 });
 
-test("backfills source only for one exact historical v2 seven-asset release", (t) => {
+test("backfills source only for one exact historical GitLab release with seven assets", (t) => {
   const fixture = backfillFixture(t);
   const result = validateGitlabReleaseSourceBackfill(fixture);
   assert.equal(result.state, "eligible");

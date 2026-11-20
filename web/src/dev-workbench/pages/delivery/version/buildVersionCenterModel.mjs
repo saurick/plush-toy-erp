@@ -122,9 +122,7 @@ export function buildVersionCenterModel({
       : hasOpenOperation
         ? '已有未结束的操作'
         : !releaseDispatchAllowed
-          ? summary?.boundaries?.provider === 'github'
-            ? 'GitHub Provider 只读取历史 Release，不能创建新发布'
-            : deliveryReadOnlyReleasePresentation(summary).description
+          ? deliveryReadOnlyReleasePresentation(summary).description
           : repository?.dirty
             ? '当前工作树有改动，不能创建 exact-SHA 发布'
             : !releaseVersion

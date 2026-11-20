@@ -120,7 +120,7 @@ test("preserves protocol, release, data format and business versions", () => {
     "active.md": [
       "server/api/jsonrpc/v1",
       "workflow.task-mutation-result/v1 and WorkflowSourceTaskContractV1",
-      "plush.release-manifest/v2 and v1.2.3",
+      "plush.target-release-fetch/v2 and v1.2.3",
       "plush-toy-erp-v5 is a recorded deployment identity",
       "PLUSH_SEW_HAND_V1 / route_version=1",
       "BOM V1 and V2",
@@ -304,7 +304,7 @@ test("rejects hand-maintained package identities and startup predecessor windows
   }
   const allowed = runFixture({
     "config/customers/example/customerPackage.mjs": 'export const config = { packageKey: "example-customer-package" };',
-    "receipt.json": '{ "schemaVersion": "plush.release-manifest/v2", "revision": "historical-package-v12" }',
+    "receipt.json": '{ "schemaVersion": "plush.target-release-fetch/v2", "revision": "historical-package-v12" }',
   });
   assert.equal(allowed.status, 0, allowed.stderr);
 });

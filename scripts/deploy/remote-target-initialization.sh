@@ -573,7 +573,7 @@ jq -e \
   --arg sha "$release_sha" \
   --arg version "$release_version" \
   --arg artifactSha "$(sha256sum "$incoming/release-artifact.json" | awk '{print $1}')" \
-  '.schemaVersion == "plush.release-manifest/v2" and .passed == true and
+  '.passed == true and
    .gitSha == $sha and .version == $version and
    .strict.status == "passed" and .rehearsal.status == "passed" and
    .rehearsal.cleanup.passed == true and .rehearsal.cleanup.residualContainers == 0 and

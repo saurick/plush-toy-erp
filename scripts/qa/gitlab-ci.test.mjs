@@ -862,7 +862,7 @@ test("GitLab release reuses push CI, builds one candidate and freezes rehearsal 
   );
   assert.match(publish, /cleanup_publish_credentials/u);
   assert.doesNotMatch(publish, /--header\s+"(?:PRIVATE|JOB)-TOKEN:/u);
-  assert.match(workflow, /github-release-asset-set[.]mjs finalize/u);
+  assert.match(workflow, /release-asset-set[.]mjs finalize/u);
   assert.match(workflow, /output\/ci\/release-assets[.]json/u);
   assert.match(workflow, /gitlab-release-publication[.]mjs plan/u);
   assert.match(workflow, /--missing-out "\$missing_assets"/u);

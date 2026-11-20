@@ -15,7 +15,7 @@ import {
   validateDatabaseRebuildManifest,
   writeDatabaseRebuildManifest,
 } from "./database-rebuild-manifest.mjs";
-import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
+import { releaseManifestFixture } from "./release-catalog-test-fixtures.mjs";
 
 const SHA = "a".repeat(40);
 const HASH = "b".repeat(64);
@@ -38,51 +38,11 @@ function ancestry(currentGitSha = SHA, relation = "current") {
 }
 
 function releaseManifest() {
-  return {
-    schemaVersion: "plush.release-manifest/v1",
-    passed: true,
-    version: "2026.08.03-1",
+  return releaseManifestFixture({
     gitSha: SHA,
-    strict: releaseManifestStrictEvidenceFixture({
-      fingerprint: "c".repeat(64),
-    }),
-    artifact: {
-      manifestSha256: "d".repeat(64),
-      sourceArchiveSha256: "e".repeat(64),
-    },
-    migration: {
-      latest: "20260731124000",
-      sequenceSha256: "f".repeat(64),
-    },
-    customerConfig: { sourceSha256: "1".repeat(64) },
-    images: [
-      {
-        kind: "server",
-        repository: "ghcr.io/saurick/plush-toy-erp-server",
-        digest: `sha256:${"2".repeat(64)}`,
-        ref: `ghcr.io/saurick/plush-toy-erp-server@sha256:${"2".repeat(64)}`,
-        sourceContentId: `sha256:${"3".repeat(64)}`,
-        platform: "linux/amd64",
-      },
-      {
-        kind: "web",
-        repository: "ghcr.io/saurick/plush-toy-erp-web",
-        digest: `sha256:${"4".repeat(64)}`,
-        ref: `ghcr.io/saurick/plush-toy-erp-web@sha256:${"4".repeat(64)}`,
-        sourceContentId: `sha256:${"5".repeat(64)}`,
-        platform: "linux/amd64",
-      },
-    ],
-    rollback: {
-      targetRollbackPointRequiredBeforePromotion: true,
-      databaseDownMigrationAutomatic: false,
-    },
-    redaction: {
-      containsSecrets: false,
-      containsCredentials: false,
-      containsAbsoluteWorkspacePaths: false,
-    },
-  };
+    version: "2026.08.03-1",
+    migration: { latest: "20260731124000", sequenceSha256: "f".repeat(64) },
+  });
 }
 
 function targetPreflight({ runtimeSha = SHA, blocked = false } = {}) {

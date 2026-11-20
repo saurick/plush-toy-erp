@@ -108,9 +108,6 @@ export async function runGitlabReleaseCLI(
         "status --sha SHA",
       ],
     };
-  if (env.PLUSH_DELIVERY_PROVIDER && env.PLUSH_DELIVERY_PROVIDER !== "gitlab") {
-    reject("provider_invalid", "此入口只支持本项目 GitLab 发布");
-  }
   if (options.command === "check-credentials") {
     const credential = await readWriteCredential({ env });
     return {

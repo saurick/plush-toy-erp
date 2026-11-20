@@ -39,7 +39,7 @@ test("remote code rollback is fixed to the registered targets and has no build o
   assert.match(source, /--no-build --pull never/u);
   assert.match(source, /migration[.]sequenceSha256/u);
   assert.match(source, /customerConfig[.]sourceSha256/u);
-  assert.match(source, /plush[.]release-manifest\/v2/u);
+  assert.match(source, /[.]rehearsal[.]status == "passed"/u);
   assert.match(source, /releaseVersion == \$version/u);
   assert.match(
     source,
@@ -118,19 +118,8 @@ test("remote rollback acquires the exact formal release on the target host befor
     source,
     /\$releases_root"\/\*\/scripts\/deploy\/remote-(?:code-rollback|release-acquire)[.]sh/u,
   );
-  const acquisitionSwitch = source.slice(
-    source.indexOf('case "$cache_contract_mode" in'),
-    source.indexOf("enter_stage package_verification"),
-  );
-  const legacyArm = acquisitionSwitch.slice(
-    acquisitionSwitch.indexOf("legacy_v1_existing_only)"),
-    acquisitionSwitch.indexOf("v2_direct)"),
-  );
-  assert.doesNotMatch(legacyArm, /target_fetch_token|live_acquire_script|source /u);
-  assert.match(
-    source,
-    /"\$rollback_transport_mode" != legacy_target_cache[\s\S]+?fail "legacy rollback cache is unavailable"/u,
-  );
+  assert.match(source, /[.]cacheMode == "v2_direct"/u);
+  assert.doesNotMatch(source, /release-manifest\/v\d+|legacy_target_cache/u);
 });
 
 test("remote rollback normalizes the runtime identity proxy contract", () => {
@@ -181,16 +170,7 @@ test("remote rollback reports failed only after proving previous runtime and pub
 
 test("remote rollback reuses only checksum-bound retained content", () => {
   assert.match(source, /plush[.]target-release-cache\/v2/u);
-  assert.match(source, /cache_root_v2=\$root\/release-cache-v2/u);
-  assert.match(
-    source,
-    /legacy_cache_root=\$root\/release-cache/u,
-  );
-  assert.match(
-    source,
-    /legacy_v1_existing_only\)[\s\S]+?cache_root=\$legacy_cache_root/u,
-  );
-  assert.match(source, /v2_direct\)[\s\S]+?cache_root=\$cache_root_v2/u);
+  assert.match(source, /cache_root=\$root\/release-cache-v2/u);
   assert.match(source, /target_manifest_sha256/u);
   assert.match(source, /cache_avoided_bytes/u);
   assert.match(source, /dockerLoadSkipped: \$cacheImageHit/u);

@@ -676,7 +676,7 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
           }
           return { status: 0, stdout: "", stderr: "" };
         },
-        environment: { RELEASE_BUILDKIT_CACHE_MODE: "gha" },
+        environment: {},
       },
     );
     assert.equal(report.releaseCheckPassed, true);
@@ -693,7 +693,7 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
     assert.deepEqual(report.buildPerformance, {
       schemaVersion: "plush.release-build-performance/v1",
       durationMs: report.buildPerformance.durationMs,
-      cacheMode: "gha",
+      cacheMode: "builder",
       completedVertexCount: 2,
       cacheHitCount: 1,
       cacheMissCount: 1,
@@ -727,12 +727,8 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
       assert.equal(target.args.GIT_SHA, report.commit);
       assert.equal(target.args.RELEASE_VERSION, report.releaseVersion);
       assert.equal(target.dockerfile, "server/Dockerfile");
-      assert.deepEqual(target["cache-from"], [
-        `type=gha,scope=plush-release-${target.target === "web-runtime" ? "web" : "server"}-v1`,
-      ]);
-      assert.deepEqual(target["cache-to"], [
-        `type=gha,mode=max,scope=plush-release-${target.target === "web-runtime" ? "web" : "server"}-v1`,
-      ]);
+      assert.equal(Object.hasOwn(target, "cache-from"), false);
+      assert.equal(Object.hasOwn(target, "cache-to"), false);
     }
   } finally {
     removeFixtureRepo(root);

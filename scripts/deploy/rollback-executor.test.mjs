@@ -431,14 +431,10 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
   assert.doesNotMatch(source, /process[.]env[.]PLUSH_GITLAB_TOKEN/u);
   assert.match(source, /input: targetFetchToken \? `\$\{targetFetchToken\}\\n` : ""/u);
   assert.doesNotMatch(source, /target-release-fetch[.]secret/u);
-  const v2ControlTransfer = source.match(
-    /const V2_CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
+  const controlTransfer = source.match(
+    /const CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
   )?.[0];
-  const legacyControlTransfer = source.match(
-    /const LEGACY_CONTROL_TRANSFER_FILES = Object[.]freeze\(\[[\s\S]+?\]\);/u,
-  )?.[0];
-  assert.ok(v2ControlTransfer);
-  assert.ok(legacyControlTransfer);
+  assert.ok(controlTransfer);
   for (const file of [
     "checksums.sha256",
     "release-artifact.json",
@@ -450,7 +446,7 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
     "web-image.tar",
   ]) {
     assert.doesNotMatch(
-      v2ControlTransfer,
+      controlTransfer,
       new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
     );
   }
@@ -462,22 +458,7 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
     "transfer-checksums.sha256",
   ]) {
     assert.match(
-      v2ControlTransfer,
-      new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
-    );
-  }
-  assert.doesNotMatch(legacyControlTransfer, /remote-release-acquire[.]sh/u);
-  for (const file of [
-    "release-artifact.json",
-    "release-manifest.json",
-    "release-rehearsal.json",
-    "sbom.cdx.json",
-    "server-image.tar",
-    "source.tar",
-    "web-image.tar",
-  ]) {
-    assert.doesNotMatch(
-      legacyControlTransfer,
+      controlTransfer,
       new RegExp(`"${file.replaceAll(".", "[.]")}"`, "u"),
     );
   }

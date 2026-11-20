@@ -175,7 +175,7 @@ export const MANUAL_TAKEOVER_STEPS = [
   {
     title: '生成不可变 Release',
     description:
-      '优先回到版本发布页使用“发布当前版本制品”；页面不可用时，才在 GitLab 手动运行受保护的 release pipeline，并填写同一 exact SHA 和新版本号。GitHub 只保留历史 Release 读取，不提供发布入口。',
+      '优先回到版本发布页使用“发布当前版本制品”；页面不可用时，才在 GitLab 手动运行受保护的 release pipeline，并填写同一 exact SHA 和新版本号。',
     boundary: '不要手工创建、移动或覆盖 tag，也不要上传自行拼装的制品。',
   },
   {

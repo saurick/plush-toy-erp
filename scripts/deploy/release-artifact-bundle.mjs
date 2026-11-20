@@ -890,7 +890,7 @@ export function assertReleaseArtifactManifest(manifest) {
     (buildPerformance?.schemaVersion === "plush.release-build-performance/v1" &&
       Number.isSafeInteger(buildPerformance.durationMs) &&
       buildPerformance.durationMs >= 0 &&
-      ["builder", "gha"].includes(buildPerformance.cacheMode) &&
+      buildPerformance.cacheMode === "builder" &&
       Number.isSafeInteger(buildPerformance.completedVertexCount) &&
       buildPerformance.completedVertexCount >= 0 &&
       Number.isSafeInteger(buildPerformance.cacheHitCount) &&

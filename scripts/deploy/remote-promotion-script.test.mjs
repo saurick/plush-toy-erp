@@ -93,7 +93,7 @@ test("remote promotion builds nothing and never runs automatic down migration", 
   assert.doesNotMatch(source, /atlas\s+migrate\s+down/u);
   assert.match(source, /automaticDownMigration: false/u);
   assert.match(source, /--no-build --pull never/u);
-  assert.match(source, /plush[.]release-manifest\/v2/u);
+  assert.doesNotMatch(source, /plush[.]release-manifest\/v\d+/u);
   assert.match(source, /rehearsal[.]receiptSha256/u);
   assert.match(source, /release-rehearsal[.]json/u);
   assert.match(source, /releaseRehearsalSha256/u);

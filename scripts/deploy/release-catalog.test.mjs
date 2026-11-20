@@ -225,7 +225,7 @@ test("release catalog binds strict, artifact, registry digests and rollback boun
   assert.equal(manifest.rollback.databaseDownMigrationAutomatic, false);
 });
 
-test("release catalog accepts CI v3 strict identity while preserving v2 rollback manifests", () => {
+test("release catalog requires strict CI identity to match the release inputs", () => {
   const manifest = buildCurrentRelease({ version: "2026.08.09-1" });
   assert.equal(manifest.strict.contract, "plush.exact-sha-strict/v3");
   assert.equal(manifest.strict.provenance.job, "quality_aggregate");
@@ -238,30 +238,7 @@ test("release catalog accepts CI v3 strict identity while preserving v2 rollback
   assert.throws(() => validateReleaseManifest(sourceDrifted), /identity/u);
 });
 
-test("release catalog keeps legacy v1 GitLab strict provenance readable", () => {
-  const terminal = ciStrictTerminal();
-  terminal.provenance = {
-    source: "gitlab-ci",
-    repository: "saurick/plush-toy-erp",
-    workflowRef:
-      "saurick/plush-toy-erp/.gitlab-ci.yml@refs/heads/main",
-    runId: "9001",
-    runAttempt: "27",
-    job: "strict",
-    eventName: "web",
-    ref: "refs/heads/main",
-    refName: "main",
-    headRepository: "saurick/plush-toy-erp",
-    conclusion: "success",
-  };
-  const manifest = buildCurrentRelease({ version: "2026.08.09-gitlab" });
-  manifest.schemaVersion = "plush.release-manifest/v1";
-  manifest.strict.provenance = terminal.provenance;
-  delete manifest.rehearsal;
-  assert.equal(validateReleaseManifest(manifest), manifest);
-});
-
-test("release catalog v2 binds canonical GitLab push CI to one rehearsal receipt", () => {
+test("release catalog binds canonical GitLab push CI to one rehearsal receipt", () => {
   const terminal = ciStrictTerminal();
   terminal.provenance = {
     source: "gitlab-ci",
@@ -278,10 +255,26 @@ test("release catalog v2 binds canonical GitLab push CI to one rehearsal receipt
     conclusion: "success",
   };
   const manifest = buildCurrentRelease({ strictTerminal: terminal });
-  assert.equal(manifest.schemaVersion, "plush.release-manifest/v2");
+  assert.equal(Object.hasOwn(manifest, "schemaVersion"), false);
   assert.equal(manifest.rehearsal.status, "passed");
   assert.equal(manifest.rehearsal.receiptSha256, "8".repeat(64));
   assert.equal(validateReleaseManifest(manifest), manifest);
+  const { contract, fingerprint, receipt, provenance } = strictTerminal();
+  const legacyStrict = {
+    contract,
+    fingerprint,
+    receiptSha256: receipt.sha256,
+    status: "passed",
+    provenance,
+  };
+  assert.throws(
+    () => validateReleaseManifest({ ...manifest, strict: legacyStrict }),
+    /canonical GitLab push CI evidence/u,
+  );
+  const manualPipeline = structuredClone(manifest);
+  manualPipeline.strict.provenance.eventName = "web";
+  manualPipeline.strict.provenance.job = "strict";
+  assert.throws(() => validateReleaseManifest(manualPipeline), /canonical GitLab push CI evidence/u);
   const drifted = structuredClone(manifest);
   drifted.rehearsal.cleanup.residualContainers = 1;
   assert.throws(() => validateReleaseManifest(drifted), /rehearsal/u);
@@ -316,12 +309,13 @@ test("release catalog write is idempotent but never overwrites another identity"
     const manifest = buildCurrentRelease({ version: "2026.07.29-1" });
     assert.equal(writeReleaseManifest(file, manifest).reused, false);
     assert.equal(writeReleaseManifest(file, manifest).reused, true);
-    const legacy = structuredClone(manifest);
-    legacy.schemaVersion = "plush.release-manifest/v1";
-    delete legacy.rehearsal;
+    const written = JSON.parse(readFileSync(file, "utf8"));
+    assert.equal(Object.hasOwn(written, "schemaVersion"), false);
+    const withoutRehearsal = structuredClone(manifest);
+    delete withoutRehearsal.rehearsal;
     assert.throws(
-      () => writeReleaseManifest(path.join(root, "legacy.json"), legacy),
-      /only release manifest v2/u,
+      () => writeReleaseManifest(path.join(root, "invalid.json"), withoutRehearsal),
+      /rehearsal/u,
     );
     const changed = JSON.parse(readFileSync(file, "utf8"));
     changed.version = "2026.07.29-2";

@@ -178,7 +178,7 @@ function committedFilesFingerprint(root, sha, label, files) {
 
 function repositoryIdentity(env = process.env) {
   const fromEnvironment = String(
-    env.CI_PROJECT_PATH || env.GITHUB_REPOSITORY || "",
+    env.CI_PROJECT_PATH || "",
   );
   if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(fromEnvironment)) {
     return fromEnvironment;
@@ -330,45 +330,26 @@ export function buildExactShaProvenance(
   env = process.env,
   conclusion = "success",
 ) {
-  let provenance;
-  if (env.GITLAB_CI === "true") {
-    const repository = String(env.CI_PROJECT_PATH || "");
-    const refName = String(env.CI_COMMIT_REF_NAME || "");
-    const refPrefix = env.CI_COMMIT_TAG ? "refs/tags" : "refs/heads";
-    provenance = {
-      source: "gitlab-ci",
-      repository,
-      workflowRef: `${repository}/.gitlab-ci.yml@${refPrefix}/${refName}`,
-      runId: String(env.CI_PIPELINE_ID || ""),
-      runAttempt: String(env.CI_PIPELINE_IID || ""),
-      job: String(env.CI_JOB_NAME || ""),
-      eventName: String(env.CI_PIPELINE_SOURCE || ""),
-      ref: `${refPrefix}/${refName}`,
-      refName,
-      headRepository: repository,
-      conclusion,
-    };
-  } else if (env.GITHUB_ACTIONS === "true") {
-    provenance = {
-      source: "github-actions",
-      repository: String(env.GITHUB_REPOSITORY || ""),
-      workflowRef: String(env.GITHUB_WORKFLOW_REF || ""),
-      runId: String(env.GITHUB_RUN_ID || ""),
-      runAttempt: String(env.GITHUB_RUN_ATTEMPT || ""),
-      job: String(env.GITHUB_JOB || ""),
-      eventName: String(env.GITHUB_EVENT_NAME || ""),
-      ref: String(env.GITHUB_REF || ""),
-      refName: String(env.GITHUB_REF_NAME || ""),
-      headRepository: String(
-        env.GITHUB_HEAD_REPOSITORY || env.GITHUB_REPOSITORY || "",
-      ),
-      conclusion,
-    };
-  } else {
+  if (env.GITLAB_CI !== "true") {
     return Object.freeze({ source: "local" });
   }
+  const repository = String(env.CI_PROJECT_PATH || "");
+  const refName = String(env.CI_COMMIT_REF_NAME || "");
+  const refPrefix = env.CI_COMMIT_TAG ? "refs/tags" : "refs/heads";
+  const provenance = {
+    source: "gitlab-ci",
+    repository,
+    workflowRef: `${repository}/.gitlab-ci.yml@${refPrefix}/${refName}`,
+    runId: String(env.CI_PIPELINE_ID || ""),
+    runAttempt: String(env.CI_PIPELINE_IID || ""),
+    job: String(env.CI_JOB_NAME || ""),
+    eventName: String(env.CI_PIPELINE_SOURCE || ""),
+    ref: `${refPrefix}/${refName}`,
+    refName,
+    headRepository: repository,
+    conclusion,
+  };
   if (
-    !["github-actions", "gitlab-ci"].includes(provenance.source) ||
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(provenance.repository) ||
     !provenance.workflowRef ||
     !/^\d+$/u.test(provenance.runId) ||
@@ -388,7 +369,7 @@ export function buildExactShaProvenance(
 function assertTerminalProvenance(provenance) {
   if (provenance?.source === "local") return;
   if (
-    !["github-actions", "gitlab-ci"].includes(provenance?.source) ||
+    provenance?.source !== "gitlab-ci" ||
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(
       String(provenance.repository || ""),
     ) ||

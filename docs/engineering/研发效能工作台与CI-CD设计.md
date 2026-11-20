@@ -6,7 +6,7 @@
 
 **GitLab 代码真源与 CI/CD + 独立 KVM Runner VM + GitHub 单向 GPT Review 镜像 + GHCR digest 镜像 + GitLab Release 可移植制品 + 开发态同源 Bridge + 固定目标 operation。**
 
-GitLab 独立承担 main CI。GitLab 负责 protected main、merge request、七分片 exact-SHA aggregate、`CI Gate`、Generic Package 与 Release；GitHub main 只接收 protected-main push mirror，供 GPT 审查、外部只读浏览和历史 Release 读取，不运行仓库 CI，也不保留发布写路径。工作台读取 GitLab 证据，不复制一套 CI 状态机。原生 CI 任务明细、日志和历史直接跳转 GitLab，工作台保留 exact-SHA 资格、近期摘要、项目耗时与运行检查。
+GitLab 独立承担 main CI。GitLab 负责 protected main、merge request、七分片 exact-SHA aggregate、`CI Gate`、Generic Package 与 Release；GitHub main 只接收 protected-main push mirror，供 GPT 审查和外部只读浏览。工作台读取 GitLab 证据，不复制一套 CI 状态机。原生 CI 任务明细、日志和历史直接跳转 GitLab，工作台保留 exact-SHA 资格、近期摘要、项目耗时与运行检查。
 
 GitLab、KVM Runner、公网入口、protected main 和 mirror 已是实际主链，但仓库定义和历史绿灯都不能代替当前读回。每次结论仍分别绑定当前 pipeline/job、CI evidence Package、Release Package、Runner 配置、backup/restore、目标 operation 与 UAT。
 
@@ -15,7 +15,7 @@ GitLab、KVM Runner、公网入口、protected main 和 mirror 已是实际主�
 | 要解决的问题 | 阅读入口 | 实际核对 |
 | --- | --- | --- |
 | 代码、CI、镜像与目标之间如何衔接 | [拓扑与职责](#拓扑与职责)、[CI 主链](#ci-主链) | `.gitlab-ci.yml`、Provider 与正式发布脚本 |
-| GitLab、GitHub 与审查镜像如何分工 | [双 Provider 边界](#双-provider-边界) | 当前保护规则、镜像和不可变制品 |
+| GitLab、GitHub 与审查镜像如何分工 | [GitLab 交付边界](#gitlab-交付边界) | 当前保护规则、镜像和不可变制品 |
 | 工作台页面、工具与受控操作如何维护 | [本地开发入口](#本地开发入口-dev-only-surfaces) | 对应页面、Bridge、命令与 operation 回执 |
 | 独立工作台如何运行 | [独立部署说明](../../server/deploy/workbench/README.md) | 登录、资源与工具 API 的实际可达性 |
 | 备份、恢复和回滚如何核对 | [备份恢复](#备份恢复和回滚)、[GitLab 运维](../../server/deploy/gitlab/README.md) | 固定目标、备份身份与恢复演练 |
@@ -32,7 +32,7 @@ flowchart TB
   G -->|main / MR pipeline| R["KVM Runner VM<br/>isolated shell + VM Docker"]
   G -->|protected push mirror| H["GitHub<br/>GPT Review mirror"]
   R -->|image by digest| C["GHCR"]
-  R -->|v2 seven immutable assets| P["GitLab Package + Release"]
+  R -->|seven immutable assets| P["GitLab Package + Release"]
   W["DEV-only version center"] -->|development same-origin fixed API| B["Delivery Bridge"]
   B -->|read/dispatch| G
   B -->|download exact assets| P
@@ -44,7 +44,7 @@ flowchart TB
 | --- | --- | --- |
 | GitLab repository | main、MR、保护规则、pipeline 与 Release 目录 | 不替代业务字段、schema、migration 或 UAT 真源 |
 | Runner VM | 候选验证、一次性数据库、镜像构建与发布 | 不挂宿主 Docker socket，不保存长期业务数据 |
-| GitHub mirror | GPT Review、外部只读浏览、历史 Release 读取 | 不接受直接 main 写入，不运行仓库 CI，不创建新 publication |
+| GitHub mirror | GPT Review、外部只读浏览 | 单向接收 GitLab main |
 | GHCR | 保存按 digest 固定的 Server/Web 镜像 | tag 不能替代 manifest digest |
 | Delivery Bridge | 固定 Provider、固定动作、operation 与目标执行器 | 浏览器不能传 repo、host、path、shell、SQL、Docker 或 secret |
 | 研发效能工作台 | 展示证据、选择固定版本、显式确认 | 不成为 CI、部署、数据库或凭据真源 |
@@ -114,7 +114,7 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 
 同一候选包完成 migration、health/ready、smoke、备份恢复、重启恢复和零残留演练，回执在 `plush-release-rehearsal/artifact-<sha>` 冻结。
 
-只有这三层 exact 身份通过后，registry publisher 才把候选包内的同一镜像推到 `ghcr.io/saurick/plush-toy-erp-{server,web}` 取得 digest，并生成带演练 digest 的 `plush.release-manifest/v2` 与固定七资产：
+只有这三层 exact 身份通过后，registry publisher 才把候选包内的同一镜像推到 `ghcr.io/saurick/plush-toy-erp-{server,web}` 取得 digest，并生成绑定演练摘要的发布清单和固定七项制品：
 
 创建 pipeline 时 Bridge 同时传入带时区的版本参考时刻；GitLab 在首次候选构建前重新读取 catalog，只接受与 pipeline 创建时刻相差不超过 10 分钟的同一下一版本。已冻结候选的显式重试保持原版本，不再发号；无候选且 catalog 已前进时必须新建发布，不得占用旧序号。
 
@@ -126,15 +126,15 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 6. `web-image.tar`
 7. `release-rehearsal.json`
 
-Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时先逐项校验现有 v2 文件的名称、大小和 SHA-256，只续传完全一致子集所缺的资产，并在创建或复用 Release 前读回完整七资产；未知文件、重复文件、同名异内容、同版本异 SHA、同 SHA 异版本或演练不完整均失败关闭。
+Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时先逐项校验现有制品的名称、大小和 SHA-256，只续传完全一致子集所缺的资产，并在创建或复用 Release 前读回完整七资产；未知文件、重复文件、同名异内容、同版本异 SHA、同 SHA 异版本或演练不完整均失败关闭。
 
 Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标显式版本提升（Explicit Promotion）必须指向同一 SHA、同一 artifact/rehearsal digest。
 
-旧 v1 六资产只允许精确读取、展示、校验和既有回滚点兼容，`promotionEligible=false`；不得补传、重新封装或作为新版本提升输入。
+历史发布档案留供审计。当前发布、部署、重建与回滚统一消费 GitLab 制品。
 
-## 双 Provider 边界
+## GitLab 交付边界
 
-`scripts/deploy/gitlab-delivery-provider.mjs` 是默认 Provider，固定 GitLab base URL、项目、Generic Package、release tag、pipeline API 和本地下载根。它从服务端环境读取 `PLUSH_GITLAB_TOKEN`，限制 JSON 大小、asset 名、文件大小、URL、SHA、版本和符号链接路径，返回值不含 token。
+`scripts/deploy/gitlab-delivery-provider.mjs` 固定 GitLab base URL、项目、Generic Package、release tag、pipeline API 和本地下载根。它从服务端环境读取 `PLUSH_GITLAB_TOKEN`，限制 JSON 大小、asset 名、文件大小、URL、SHA、版本和符号链接路径，返回值不含 token。
 
 质量门禁与版本中心读取 GitLab pipeline / job、不可变版本目录、发布状态和控制制品时使用独立的 `PLUSH_GITLAB_READ_TOKEN`，不复用发布与部署写凭据。macOS 本地启动从固定钥匙串项加载；Linux 从当前服务用户的受控凭据文件加载，来源与权限合同见 [前端启动脚本](../../web/scripts/README.md)。
 
@@ -142,15 +142,12 @@ Release、Package、GHCR digest、manifest、`release-rehearsal.json` 和目标�
 
 发布凭据复用、有效期和换发按[发布令牌复用与轮换](../../scripts/deploy/README.md#release-credential-lifecycle)执行。
 
-`scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。
-
-仓库不保留 GitHub Actions workflow、发布 publisher 或 strict 复用 writer；adapter 的发布方法在调用 `gh` 前固定拒绝。恢复 GitHub 写路径必须重新专项评审 canonical v2 七资产、同一演练回执、Provider 并发与凭据边界。浏览器不知道 token，也不能选择 Provider。
 
 GitLab Jobs API 是 Job 运行事实真源。质量门禁只为当前提交读取完整 Pipeline / Job，核对全部必要分片、聚合、零跳过与 CI Gate，同名重试取最新 attempt。最近 20 条 main 流水线仅从列表接口读取编号、SHA、原生结果和链接，不抓取历史 Job；历史“成功”不等于已证明完整门禁。原生测试报告复用同次选中的 Pipeline / Job，并发页面请求共用一次读取；历史列表或报告失败单独提示，不覆盖已取得的当前 CI 证据。详细性能、排队、依赖和趋势跳转 GitLab，不另存 CI 历史库。
 
 目标部署与回滚通过原有执行器登记 GitLab Environments / Deployments，三环境名称和 tier 从 target registry 派生。项目 operation / receipt 是执行事实，GitLab 原生状态是自动投影；本地仅新增可恢复的远端引用缓存，不建第二套 CI 库。工作台“操作记录”提供同环境汇总、原始时间、项目检查、GitLab 跳转和仅登记的补录入口；已有迁移、回滚、数据库重建、准备与显式执行保持原合同。历史补录、状态映射、未知创建结果、归档与凭据详见 [部署登记协议](../../scripts/deploy/README.md#gitlab-部署登记与回执归档)。 三个现役目标的历史合并本机操作与已校验 GitLab 终态归档，按 UUID 去重；归档只供查阅，不复制为本机可执行状态。跨执行端的回执同样绑定原始 SHA、迁移与备份恢复，读取失败或冲突保留缺口。
 
-GitLab 未提供 step timing 时继续返回空 steps，不推算或伪造 GitHub 式 step timing。显式选择历史 GitHub Provider 时只展示既有 release / Actions 运行，不提供发布动作，也不把历史审查 CI 当作当前流水线证据。
+GitLab 的耗时按 pipeline 和 job 展示。缺少步骤耗时时，steps 返回空数组。
 
 ## GitHub 单向镜像与 GPT Review
 
@@ -158,7 +155,6 @@ GitLab 项目使用 push mirror 将 protected main 同步到 `github.com/saurick
 
 需要 GPT 审查时，先让 GitLab `main` 的 exact SHA 通过正式 `CI Gate` 并镜像，再按该次推送前后的 base/head SHA 审查 GitHub `main` 提交差异。
 
-GitHub 不保留仓库 workflow 或发布写入 helper；历史 Actions 运行只作审计，不能证明当前候选。恢复任何 GitHub publication 能力都必须重新进入专项设计、代码与远端权限评审，不能把旧 workflow 直接补回。
 
 GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 GitLab main 主链，经正式测试、commit/push 授权和 pipeline 证明。
 
@@ -261,7 +257,7 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 | 仓库定义已实现 | YAML、Provider、脚本、文档和测试合同存在 | GitLab 已部署 |
 | 本地定向测试通过 | 受影响代码合同当前可执行 | Runner、mirror、域名、备份运行正常 |
 | GitLab pipeline 通过 | 固定 SHA 的远端 QA/strict 与 artifact | 目标环境已发布 |
-| Release/Package 完整 | v2 七资产、GHCR digest、manifest 与同一演练回执身份；或明确标记不可用于显式版本提升（Explicit Promotion）的 legacy v1 六资产 | migration、health、UAT |
+| Release/Package 完整 | 七项制品、GHCR digest、manifest 与同一演练回执身份 | migration、health、UAT |
 | target operation passed | 目标制品、migration、运行和公开入口读回 | 客户业务结果与签收 |
 | 客户 UAT | 指定岗位与数据在固定版本的真实使用结果 | 下一版本或其他环境 |
 
@@ -283,7 +279,7 @@ GitLab 升级固定镜像 digest，遵循官方逐版本路径。升级前固定
 1. 当前提交的定向合同与 YAML / Shell 静态检查，以及获准的 commit / push。
 2. GitLab、KVM Runner、DNS / FRP / Nginx、保护规则、最小权限变量和单向 mirror 的实际读回。
 3. 同一 SHA 的 main `CI Gate` 与 release pipeline 成功证据。
-4. GHCR digest、GitLab Package / Release 的 v2 七资产、同一演练回执与工作台读回一致。
+4. GHCR digest、GitLab Package / Release 的 七项制品、同一演练回执与工作台读回一致。
 5. 同批 application backup / config archive、checksum、在线 verify 与一次性同版本 VM restore drill；恢复后可登录、clone 和读取 artifact / Package / Release。
 6. 现有业务容器、持久数据、端口和公网入口没有回归。
 
@@ -1271,12 +1267,12 @@ flowchart LR
 自动续办 Mermaid 固定“等待心跳只读重查 → 全部会话与 writer 结束 → 先删除并读回心跳 → 同一次续办进入执行”的交接；删除失败不得开始实现、造数、Git 或部署，执行阶段也不重建同目的心跳，只有用户后来再次要求等待才新建。
 
 Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定、当前 index 备份、旧候选隔离、读回与继续条件；空锁和非空锁走同一证据流程，非空候选不会被直接删除或覆盖当前 index，已有提交 / 锁恢复授权也不会因候选非空重复询问。
-- “发布与部署耗时”中的远端流水线读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面保留状态、SHA 与总耗时，具体 Job、关键路径和日志跳转同一次 GitLab 流水线；不自动并发、重跑或复制 GitLab 状态。目标部署仍以工作台 operation 独立计时和读回。 历史 GitHub 流水线保留简短状态与原始记录链接，不再绘制本地性能图或计算关键路径；已有流水线、操作及回执记录不删除。
+- “发布与部署耗时”读取固定 GitLab 项目的 pipeline 和 job。页面显示状态、SHA 与总耗时，具体 job、关键路径和日志跳转同一次 GitLab 流水线。目标部署继续使用工作台 operation 的实际计时和读回。已落盘的历史操作和回执可在操作记录查看。
 #### 发布身份与制品读取
 
 - 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。
 
-  版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider。创建新发布通过 GitLab 写 Provider 使用专用 `PLUSH_GITLAB_TOKEN`。缺少发布凭据时页面保持可读并停用该动作。显式 `PLUSH_DELIVERY_PROVIDER=github` 只启用 GitHub 历史只读 adapter，其发布方法固定拒绝。
+  版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider。创建新发布通过 GitLab 写 Provider 使用专用 `PLUSH_GITLAB_TOKEN`。缺少发布凭据时页面保持可读并停用该动作。
 - 命令行发布入口为 `scripts/deploy/gitlab-release-cli.mjs`，复用同一 Delivery Service 与 operation store；默认计划不读凭据、不触网，显式执行才按当前 clean SHA、完整 CI 与版本目录发起流水线。
 
   CLI 从独立 Keychain / 受控文件读取带到期日的项目发布身份，不把只读 token 当作写凭据，不调整既有 CI 机器人的权限；命令及凭据来源见 [部署脚本](../../scripts/deploy/README.md#命令行发起-gitlab-发布)。此入口只发布制品，目标提升仍独立执行。

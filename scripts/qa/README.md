@@ -317,9 +317,9 @@ Go 运行与包编译并发由 workflow 统一限制为 4；govulncheck 保留�
 
 main 完整 CI 聚合后的 exact-SHA terminal 绑定 repository、40 位 SHA、source archive、policy / workflow / toolchain / migration / lock / 客户配置指纹、分类执行数和真实 `gitlab-ci` push / web provenance，`CI Gate` 再将 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 Generic Package。
 
-release 只接受 `CI_COMMIT_SHA == RELEASE_SHA` 的 protected main，服务器端回读该普通 CI 证据而不重跑 strict；同 SHA 候选制品只构建一次，以 `candidate.tar` 冻结后复用同一 bytes 做 migration、health/ready、smoke、备份恢复和重启演练，最后生成含同一 `release-rehearsal.json` 的 v2 七资产 Release。
+release 只接受 `CI_COMMIT_SHA == RELEASE_SHA` 的 protected main，服务器端回读该普通 CI 证据而不重跑 strict；同 SHA 候选制品只构建一次，以 `candidate.tar` 冻结后复用同一 bytes 做 migration、health/ready、smoke、备份恢复和重启演练，最后生成含同一 `release-rehearsal.json` 的 七项制品的 GitLab Release。
 
-v1 六资产只允许精确读取、目录展示、校验和既有回滚，不能补传、重封装或 promotion；GitHub provider 只读历史证据，并在任何发布副作用前固定拒绝写入。缓存只能缩短安装，不能跳过 checksum、依赖合同或门禁。
+GitLab 发布、部署和回滚统一核验现行七项制品。安装缓存复用已校验的依赖，checksum、依赖合同和门禁仍按原入口执行。
 
 `db-guard` 仍只是提前阻断的静态启发式，不能替代 Ent / Atlas 零漂移、冻结树 fresh / upgrade 验证或目标环境 evidence。
 
@@ -1879,7 +1879,7 @@ fast 保留试用账号 RBAC、浏览器 smoke 脚本语法与真实登录共享
 | `node scripts/qa/run-gate-with-receipt.mjs --gate <full&#124;strict>` | 执行正式门禁并写入同一脱敏回执；passed 必须具备完整阶段耗时、非零测试、零失败、零 skip 和运行前后仓库身份一致，工作台据此展示总耗时与瓶颈 | 需要可核验效能证据时 |
 | `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>` | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布 | 最终候选第一次正式 push 前 |
 | `.gitlab-ci.yml` | canonical `plan → prepare → 七类外部证据 DAG → aggregate → CI Gate`；Node 与 resource-sensitive 分别在内部按真实资源边界 fan-in，并保留每条 lane 的时间窗，对外仍只有七类规范回执；MR 保留 affected，main 完整 CI 签发可复用 exact-SHA 证据，纯文档只运行三个轻量 Job，受保护 release 不重跑 strict，同 SHA 只构建一次候选制品并冻结演练回执后登记 GitLab Package/Release | GitLab main、merge request、受保护 release |
-| `node --test scripts/qa/github-write-boundary.test.mjs` | 锁住 GitHub 只读镜像边界：仓库没有 Actions workflow 和发布 writer，历史 Release adapter 在调用 `gh` 前拒绝写入 | GitHub 镜像、发布 Provider 或 release 目录变化时 |
+| `node --test scripts/qa/github-write-boundary.test.mjs` | 检查 GitHub 只读镜像的仓库边界，包括 workflow 和交付适配器的退役 | GitHub 镜像、发布 Provider 或 release 目录变化时 |
 | `node --test scripts/qa/gitlab-storage.test.mjs scripts/qa/gitlab-backup-governance.test.mjs` | 校验 GitLab 控制主机、RAID/异机挂载、加密副本、状态新鲜度、systemd timer 与 HTTPS 失败通知的 fail-closed 合同；不执行真实备份或发出网络通知 | GitLab backup、offsite、systemd 或告警入口变化时 |
 
 `affected` 的 v2 计划协议把验证范围与本地门禁强度分开：`affectedScopes` / `maxAffectedScope` 只使用 T0-T8 稳定键，`localGate` 只取 `focused` 或 `full`。本地完整门禁命令使用独立的 `LOCAL_FULL` scope，不会因此把 T8 写入受影响范围；T8 只用于真实发布、部署、恢复或回滚证据。

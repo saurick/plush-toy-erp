@@ -1,32 +1,12 @@
-export function releaseManifestStrictEvidenceFixture({
-  fingerprint = "d".repeat(64),
-  receiptSha256 = "e".repeat(64),
-} = {}) {
-  return {
-    contract: "plush.exact-sha-strict/v2",
-    profile: "strict",
-    status: "passed",
-    fingerprint,
-    receiptSha256,
-    provenance: {
-      source: "github-actions",
-      repository: "saurick/plush-toy-erp",
-      workflowRef:
-        "saurick/plush-toy-erp/.github/workflows/release.yml@refs/heads/main",
-      runId: "123",
-      runAttempt: "1",
-      job: "strict",
-    },
-  };
-}
-
-export function releaseManifestV2Fixture({
+export function releaseManifestFixture({
   gitSha,
   version,
-  artifactSha256,
-  receiptSha256,
+  artifactSha256 = "c".repeat(64),
+  receiptSha256 = "e".repeat(64),
+  migration = { latest: "20260729000000", sequenceSha256: "f".repeat(64) },
+  customerConfig = { sourceSha256: "1".repeat(64) },
 }) {
-  const strict = releaseManifestStrictEvidenceFixture();
+  const fingerprint = "d".repeat(64);
   const counts = { executed: 1, passed: 1, failed: 0, skipped: 0 };
   const runtime = {
     serverHealth: "passed",
@@ -38,23 +18,25 @@ export function releaseManifestV2Fixture({
     embeddedGitSha: gitSha,
   };
   return {
-    schemaVersion: "plush.release-manifest/v2",
     passed: true,
     version,
     gitSha,
     strict: {
-      ...strict,
       contract: "plush.exact-sha-strict/v3",
+      profile: "strict",
+      status: "passed",
+      fingerprint,
+      receiptSha256: "e".repeat(64),
       identity: {
         repository: "saurick/plush-toy-erp",
         gitSha,
         sourceArchiveSha256: "e".repeat(64),
-        policyFingerprint: strict.fingerprint,
+        policyFingerprint: fingerprint,
         workflowFingerprint: "8".repeat(64),
         toolchainFingerprint: "9".repeat(64),
-        migrationSequenceSha256: "f".repeat(64),
+        migrationSequenceSha256: migration.sequenceSha256,
         dependencyLockFingerprint: "a".repeat(64),
-        customerConfigFingerprint: "1".repeat(64),
+        customerConfigFingerprint: customerConfig.sourceSha256,
       },
       checks: Object.fromEntries(
         ["web", "server", "database", "browser", "security"].map((key) => [
@@ -88,11 +70,8 @@ export function releaseManifestV2Fixture({
       manifestSha256: artifactSha256,
       sourceArchiveSha256: "e".repeat(64),
     },
-    migration: {
-      latest: "20260729000000",
-      sequenceSha256: "f".repeat(64),
-    },
-    customerConfig: { sourceSha256: "1".repeat(64) },
+    migration,
+    customerConfig,
     sbom: { sha256: "7".repeat(64) },
     images: [
       {
@@ -123,7 +102,7 @@ export function releaseManifestV2Fixture({
         manifestSchema: "plush-release-artifact/v1",
         serverContentId: `sha256:${"3".repeat(64)}`,
         webContentId: `sha256:${"5".repeat(64)}`,
-        migrationSequenceSha256: "f".repeat(64),
+        migrationSequenceSha256: migration.sequenceSha256,
         sbomSha256: "7".repeat(64),
       },
       environment: {
@@ -132,8 +111,7 @@ export function releaseManifestV2Fixture({
         databaseIdentityBound: true,
       },
       migration: {
-        latest: "20260729000000",
-        sequenceSha256: "f".repeat(64),
+        ...migration,
         directoryValidation: "passed",
         dryRun: "passed",
         apply: "passed",

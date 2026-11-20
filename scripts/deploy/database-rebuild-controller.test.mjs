@@ -17,7 +17,7 @@ import {
   readDatabaseRebuildPlan,
 } from "./database-rebuild-controller.mjs";
 import { resolveDeliveryOperationStore } from "./delivery-operation-store.mjs";
-import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
+import { releaseManifestFixture } from "./release-catalog-test-fixtures.mjs";
 
 const SHA = "a".repeat(40);
 const IDEMPOTENCY_KEY =
@@ -36,51 +36,11 @@ function classifyRelation({ currentGitSha, candidateGitSha }) {
 }
 
 function releaseManifest() {
-  return {
-    schemaVersion: "plush.release-manifest/v1",
-    passed: true,
-    version: "2026.08.03-1",
+  return releaseManifestFixture({
     gitSha: SHA,
-    strict: releaseManifestStrictEvidenceFixture({
-      fingerprint: "b".repeat(64),
-    }),
-    artifact: {
-      manifestSha256: "c".repeat(64),
-      sourceArchiveSha256: "d".repeat(64),
-    },
-    migration: {
-      latest: "20260731124000",
-      sequenceSha256: "e".repeat(64),
-    },
-    customerConfig: { sourceSha256: "f".repeat(64) },
-    images: [
-      {
-        kind: "server",
-        repository: "ghcr.io/saurick/plush-toy-erp-server",
-        digest: `sha256:${"1".repeat(64)}`,
-        ref: `ghcr.io/saurick/plush-toy-erp-server@sha256:${"1".repeat(64)}`,
-        sourceContentId: `sha256:${"2".repeat(64)}`,
-        platform: "linux/amd64",
-      },
-      {
-        kind: "web",
-        repository: "ghcr.io/saurick/plush-toy-erp-web",
-        digest: `sha256:${"3".repeat(64)}`,
-        ref: `ghcr.io/saurick/plush-toy-erp-web@sha256:${"3".repeat(64)}`,
-        sourceContentId: `sha256:${"4".repeat(64)}`,
-        platform: "linux/amd64",
-      },
-    ],
-    rollback: {
-      targetRollbackPointRequiredBeforePromotion: true,
-      databaseDownMigrationAutomatic: false,
-    },
-    redaction: {
-      containsSecrets: false,
-      containsCredentials: false,
-      containsAbsoluteWorkspacePaths: false,
-    },
-  };
+    version: "2026.08.03-1",
+    migration: { latest: "20260731124000", sequenceSha256: "f".repeat(64) },
+  });
 }
 
 function preflight({ blocked = false, sha = SHA } = {}) {

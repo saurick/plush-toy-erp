@@ -15,13 +15,12 @@ import {
   DELIVERY_RELEASE_ASSETS,
   DELIVERY_PROVIDER_CONTRACT,
   DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
-  LEGACY_DELIVERY_RELEASE_ASSETS,
   exactAssetSet,
   validateDeliveryReleaseVersion,
   validateReleaseDispatchRequest,
 } from "./delivery-provider.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
-import { parseReleaseChecksums } from "./github-release-asset-set.mjs";
+import { parseReleaseChecksums } from "./release-asset-set.mjs";
 import {
   validateReleaseArtifactBinding,
   validateReleaseManifest,
@@ -39,8 +38,6 @@ export { GITLAB_DELIVERY_BASE_URL, GITLAB_DELIVERY_PROJECT };
 export const GITLAB_DELIVERY_PACKAGE = "plush-release";
 export const GITLAB_CANDIDATE_PACKAGE = "plush-release-candidate";
 export const GITLAB_SOURCE_PACKAGE = "plush-release-source";
-export const GITLAB_LEGACY_RELEASE_ASSETS = LEGACY_DELIVERY_RELEASE_ASSETS;
-export const GITLAB_RELEASE_ASSETS = DELIVERY_RELEASE_ASSETS;
 export const GITLAB_PIPELINE_TIMINGS_CONTRACT =
   "plush.delivery-pipeline-timings/v1";
 
@@ -58,33 +55,11 @@ const CONTROL_RELEASE_ASSETS = Object.freeze([
   "release-manifest.json",
   "release-rehearsal.json",
 ]);
-const LEGACY_CONTROL_RELEASE_ASSETS = Object.freeze([
-  "checksums.sha256",
-  "release-artifact.json",
-  "release-manifest.json",
-]);
-const ALLOWED_CONTROL_RELEASE_ASSETS = new Set([
-  ...CONTROL_RELEASE_ASSETS,
-  ...LEGACY_CONTROL_RELEASE_ASSETS,
-]);
+const CONTROL_DIRECTORY_FILES = Object.freeze(
+  [...CONTROL_RELEASE_ASSETS, TARGET_RELEASE_FETCH_FILE].sort(),
+);
+const ALLOWED_CONTROL_RELEASE_ASSETS = new Set(CONTROL_RELEASE_ASSETS);
 const TERMINAL_STATUSES = new Set(["success", "failed", "canceled", "skipped"]);
-
-function releaseTransportForFiles(formalFiles) {
-  const names = formalFiles.map((file) => file.name);
-  if (exactAssetSet(names, GITLAB_RELEASE_ASSETS)) {
-    return Object.freeze({
-      transportMode: "v2_direct",
-      controlAssets: CONTROL_RELEASE_ASSETS,
-    });
-  }
-  if (exactAssetSet(names, GITLAB_LEGACY_RELEASE_ASSETS)) {
-    return Object.freeze({
-      transportMode: "legacy_v1_cache_only",
-      controlAssets: LEGACY_CONTROL_RELEASE_ASSETS,
-    });
-  }
-  throw new Error("GitLab release package asset set is unsupported");
-}
 
 function sha256Buffer(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
@@ -250,7 +225,7 @@ function normalizePackageFiles(files) {
   }
   if (
     files.some(
-      (file) => !GITLAB_RELEASE_ASSETS.includes(String(file?.file_name || "")),
+      (file) => !DELIVERY_RELEASE_ASSETS.includes(String(file?.file_name || "")),
     )
   ) {
     throw new Error("GitLab package contains an unknown release asset");
@@ -310,9 +285,7 @@ function normalizeRelease(release, files) {
     },
     buildPerformance: null,
     imageDigests: null,
-    completeAssets:
-      exactAssetSet(assets, GITLAB_RELEASE_ASSETS) ||
-      exactAssetSet(assets, GITLAB_LEGACY_RELEASE_ASSETS),
+    completeAssets: exactAssetSet(assets, DELIVERY_RELEASE_ASSETS),
     promotionEligible: false,
   });
 }
@@ -607,19 +580,12 @@ export function createGitlabDeliveryProvider({
     formalFiles,
     sourceFile,
   ) {
-    const transport = releaseTransportForFiles(formalFiles);
-    const expectedFiles = [
-      ...transport.controlAssets,
-      ...(transport.transportMode === "v2_direct"
-        ? [TARGET_RELEASE_FETCH_FILE]
-        : []),
-    ].sort();
     const files = readdirSync(target).sort();
-    if (!exactAssetSet(files, expectedFiles)) {
+    if (!exactAssetSet(files, CONTROL_DIRECTORY_FILES)) {
       throw new Error("GitLab release control directory is not exact");
     }
     const controls = new Map(
-      transport.controlAssets.map((name) => {
+      CONTROL_RELEASE_ASSETS.map((name) => {
         const buffer = Buffer.from(
           readBoundedManifest(path.join(target, name)),
         );
@@ -688,25 +654,13 @@ export function createGitlabDeliveryProvider({
         throw new Error(`GitLab release payload identity mismatch: ${name}`);
       }
     }
-    if (transport.transportMode === "legacy_v1_cache_only") {
-      if (manifest.schemaVersion !== "plush.release-manifest/v1") {
-        throw new Error("GitLab legacy release manifest is invalid");
-      }
-      return {
-        transportMode: transport.transportMode,
-        fetch: null,
-      };
-    }
     const rehearsalBuffer = controls.get("release-rehearsal.json");
     validateReleaseRehearsalReceipt(
       JSON.parse(rehearsalBuffer.toString("utf8")),
       artifact,
       { sha: gitSha, version: manifest.version, customer: "yoyoosun" },
     );
-    if (
-      manifest.schemaVersion !== "plush.release-manifest/v2" ||
-      manifest.rehearsal?.receiptSha256 !== sha256Buffer(rehearsalBuffer)
-    ) {
+    if (manifest.rehearsal.receiptSha256 !== sha256Buffer(rehearsalBuffer)) {
       throw new Error(
         "GitLab release control evidence is not promotion eligible",
       );
@@ -731,7 +685,7 @@ export function createGitlabDeliveryProvider({
       );
     }
     return {
-      transportMode: transport.transportMode,
+      transportMode: "v2_direct",
       fetch,
     };
   }
@@ -758,30 +712,24 @@ export function createGitlabDeliveryProvider({
     ) {
       throw new Error("GitLab release detail identity is invalid");
     }
-    let promotionEligible = false;
-    if (manifest.schemaVersion === "plush.release-manifest/v2") {
-      if (!exactAssetSet(version.assets, GITLAB_RELEASE_ASSETS)) {
-        throw new Error("GitLab v2 release assets are incomplete");
-      }
-      const rehearsalAsset = await readSmallPackageJson(
-        packageValue,
-        "release-rehearsal.json",
-      );
-      validateReleaseRehearsalReceipt(rehearsalAsset.value, artifact, {
-        sha: version.gitSha,
-        version: version.version,
-        customer: "yoyoosun",
-      });
-      if (rehearsalAsset.sha256 !== manifest.rehearsal?.receiptSha256) {
-        throw new Error("GitLab release rehearsal digest is invalid");
-      }
-      const source = await sourceForSha(version.gitSha);
-      if (source && source.file.sha256 !== artifact.sourceArchive.sha256) {
-        throw new Error("GitLab release source package digest is invalid");
-      }
-      promotionEligible = source !== null;
-    } else if (!exactAssetSet(version.assets, GITLAB_LEGACY_RELEASE_ASSETS)) {
-      throw new Error("GitLab legacy release assets are incomplete");
+    if (!exactAssetSet(version.assets, DELIVERY_RELEASE_ASSETS)) {
+      throw new Error("GitLab release assets are incomplete");
+    }
+    const rehearsalAsset = await readSmallPackageJson(
+      packageValue,
+      "release-rehearsal.json",
+    );
+    validateReleaseRehearsalReceipt(rehearsalAsset.value, artifact, {
+      sha: version.gitSha,
+      version: version.version,
+      customer: "yoyoosun",
+    });
+    if (rehearsalAsset.sha256 !== manifest.rehearsal.receiptSha256) {
+      throw new Error("GitLab release rehearsal digest is invalid");
+    }
+    const source = await sourceForSha(version.gitSha);
+    if (source && source.file.sha256 !== artifact.sourceArchive.sha256) {
+      throw new Error("GitLab release source package digest is invalid");
     }
     const imageDigests = Object.fromEntries(
       manifest.images.map((image) => [image.kind, image.digest]),
@@ -796,7 +744,7 @@ export function createGitlabDeliveryProvider({
       ...version,
       buildPerformance: artifact?.performance?.build || null,
       imageDigests,
-      promotionEligible,
+      promotionEligible: source !== null,
     });
     releaseDetailCache.set(version.gitSha, detail);
     return detail;
@@ -893,7 +841,7 @@ export function createGitlabDeliveryProvider({
         const item = versions[index];
         const requiresPromotionEvidence = exactAssetSet(
           item.version.assets,
-          GITLAB_RELEASE_ASSETS,
+          DELIVERY_RELEASE_ASSETS,
         );
         if (
           !item.version.completeAssets ||
@@ -1142,41 +1090,37 @@ export function createGitlabDeliveryProvider({
       }
       const target = assertDownloadDirectory(root, destination, "control");
       const packageValue = await packageForSha(gitSha);
-      if (!packageValue) {
+      if (
+        !packageValue ||
+        !exactAssetSet(
+          packageValue.files.map((file) => file.name),
+          DELIVERY_RELEASE_ASSETS,
+        )
+      ) {
         throw new Error("GitLab direct target release transport is incomplete");
       }
-      const transport = releaseTransportForFiles(packageValue.files);
-      const sourceValue =
-        transport.transportMode === "v2_direct"
-          ? await sourceForSha(gitSha)
-          : null;
-      if (transport.transportMode === "v2_direct" && !sourceValue) {
+      const sourceValue = await sourceForSha(gitSha);
+      if (!sourceValue) {
         throw new Error("GitLab direct target release transport is incomplete");
       }
-      const expectedFiles = [
-        ...transport.controlAssets,
-        ...(transport.transportMode === "v2_direct"
-          ? [TARGET_RELEASE_FETCH_FILE]
-          : []),
-      ].sort();
       if (existsSync(target)) {
         const validated = validateReleaseControlDirectory(
           target,
           gitSha,
           packageValue.files,
-          sourceValue?.file,
+          sourceValue.file,
         );
         return {
           directory: target,
           reused: true,
-          assets: expectedFiles,
+          assets: CONTROL_DIRECTORY_FILES,
           ...validated,
         };
       }
       mkdirSync(target, { recursive: true, mode: 0o700 });
       try {
         const controls = new Map();
-        for (const name of transport.controlAssets) {
+        for (const name of CONTROL_RELEASE_ASSETS) {
           const control = await readSmallPackageAsset(packageValue, name);
           controls.set(name, control.buffer);
           writeFileSync(path.join(target, name), control.buffer, {
@@ -1188,29 +1132,27 @@ export function createGitlabDeliveryProvider({
         const manifest = validateReleaseManifest(
           JSON.parse(manifestBuffer.toString("utf8")),
         );
-        if (transport.transportMode === "v2_direct") {
-          const fetch = buildTargetReleaseFetch({
-            gitSha,
-            version: manifest.version,
-            formalFiles: packageValue.files,
-            sourceFile: sourceValue.file,
-          });
-          writeFileSync(
-            path.join(target, TARGET_RELEASE_FETCH_FILE),
-            `${JSON.stringify(fetch, null, 2)}\n`,
-            { flag: "wx", mode: 0o600 },
-          );
-        }
+        const fetch = buildTargetReleaseFetch({
+          gitSha,
+          version: manifest.version,
+          formalFiles: packageValue.files,
+          sourceFile: sourceValue.file,
+        });
+        writeFileSync(
+          path.join(target, TARGET_RELEASE_FETCH_FILE),
+          `${JSON.stringify(fetch, null, 2)}\n`,
+          { flag: "wx", mode: 0o600 },
+        );
         const validated = validateReleaseControlDirectory(
           target,
           gitSha,
           packageValue.files,
-          sourceValue?.file,
+          sourceValue.file,
         );
         return {
           directory: target,
           reused: false,
-          assets: expectedFiles,
+          assets: CONTROL_DIRECTORY_FILES,
           ...validated,
         };
       } catch (error) {

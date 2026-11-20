@@ -24,9 +24,9 @@ Docker save 结果用 zstd level 3 预压缩但保持现有归档文件名，man
 
 正式 promotion 前必须先用 `scripts/deploy/local-release-rehearsal.mjs` 在一次性数据库和本文件登记的唯一 Compose 上完成 migration、运行身份、登录、PDF、备份恢复与 steady-state restart；本地回执不能替代目标 preflight、active config、rollback 或 UAT。
 
-GitLab `.gitlab-ci.yml` 是 main / MR 的 canonical CI/CD；GitHub main 只接收单向镜像，仓库不保留 GitHub Actions workflow 或发布写入 helper。历史 GitHub Release 只作只读审计和既有回滚输入，不得创建新的 publication。
+GitLab `.gitlab-ci.yml` 是 main 和 MR 的 CI/CD 真源。GitHub main 的单向镜像用于代码审查。
 
-GitLab release pipeline 对 main 的 exact SHA 恢复并校验同一 protected push pipeline 的完整 `CI Gate` 证据，不重复 strict；随后只构建一次不可变候选，将镜像按 digest 发布到 GHCR，并把含同一演练回执的 v2 七资产登记到 GitLab Generic Package 与 Release，同时把同 SHA 的 `source.tar` 单独登记为目标内部物化输入。
+GitLab release pipeline 对 main 的 exact SHA 恢复并校验同一 protected push pipeline 的完整 `CI Gate` 证据，不重复 strict；随后只构建一次不可变候选，将镜像按 digest 发布到 GHCR，并把含同一演练回执的 七项制品登记到 GitLab Generic Package 与 Release，同时把同 SHA 的 `source.tar` 单独登记为目标内部物化输入。
 
 发布中断后只续传已校验远端子集所缺的资产，最后必须读回完整七资产和精确 source 包。
 
@@ -36,7 +36,7 @@ Mac 只传 operation、manifest、执行脚本和目标取件描述符；专用 
 
 目标宿主通过固定内网 GitLab TLS 入口直接取得七资产与 `source.tar`，再校验名称、大小、SHA-256、manifest、演练回执、image content ID 和 cache v2 身份。Mac 不再下载后回传镜像、SBOM 或 source，也没有大文件中转 fallback。
 
-首次升级前还必须证明当前运行 SHA 具备同样的直接取件回滚输入；已有 v2 七资产但缺少 source 包时，只能由 protected main 的受控 `backfill_release_source` job 在 Runner 内校验旧 Release 后补齐该 SHA 的单一 source 包，不改写七资产或 Release。
+首次升级前还必须证明当前运行 SHA 具备同样的直接取件回滚输入；已有 七项制品但缺少 source 包时，只能由 protected main 的受控 `backfill_release_source` job 在 Runner 内校验旧 Release 后补齐该 SHA 的单一 source 包，不改写七资产或 Release。
 
 执行器复用既有 digest，不在目标机重新构建，并分别读回 `demo.yoyoosun.net` 与 `test.yoyoosun.net` 的 Compose、`GIT_SHA`、健康和 Provider 能力。
 

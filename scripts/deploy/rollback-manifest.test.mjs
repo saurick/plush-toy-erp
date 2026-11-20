@@ -5,7 +5,7 @@ import {
   buildRollbackManifest,
   validateRollbackManifest,
 } from "./rollback-manifest.mjs";
-import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
+import { releaseManifestFixture } from "./release-catalog-test-fixtures.mjs";
 
 const FROM_SHA = "a".repeat(40);
 const TO_SHA = "b".repeat(40);
@@ -24,44 +24,13 @@ function ancestry() {
 }
 
 function release(gitSha, overrides = {}) {
-  return {
-    schemaVersion: "plush.release-manifest/v1",
-    passed: true,
-    version: gitSha === FROM_SHA ? "2026.07.29-2" : "2026.07.29-1",
+  return releaseManifestFixture({
     gitSha,
-    strict: releaseManifestStrictEvidenceFixture(),
-    artifact: {
-      manifestSha256: "e".repeat(64),
-      sourceArchiveSha256: "f".repeat(64),
-    },
+    version: gitSha === FROM_SHA ? "2026.07.29-2" : "2026.07.29-1",
     migration: { latest: "20260729000000", sequenceSha256: HASH },
     customerConfig: { sourceSha256: HASH },
-    images: [
-      {
-        kind: "server",
-        repository: "ghcr.io/saurick/plush-toy-erp-server",
-        digest: `sha256:${"1".repeat(64)}`,
-        ref: `ghcr.io/saurick/plush-toy-erp-server@sha256:${"1".repeat(64)}`,
-        sourceContentId: `sha256:${"2".repeat(64)}`,
-        platform: "linux/amd64",
-      },
-      {
-        kind: "web",
-        repository: "ghcr.io/saurick/plush-toy-erp-web",
-        digest: `sha256:${"3".repeat(64)}`,
-        ref: `ghcr.io/saurick/plush-toy-erp-web@sha256:${"3".repeat(64)}`,
-        sourceContentId: `sha256:${"4".repeat(64)}`,
-        platform: "linux/amd64",
-      },
-    ],
-    rollback: { databaseDownMigrationAutomatic: false },
-    redaction: {
-      containsSecrets: false,
-      containsCredentials: false,
-      containsAbsoluteWorkspacePaths: false,
-    },
     ...overrides,
-  };
+  });
 }
 
 function preflight(runtimeSha = FROM_SHA, blockers = []) {
@@ -95,8 +64,10 @@ test("rollback qualification permits only equal migration and config identity", 
   assert.equal(validateRollbackManifest(manifest).status, "eligible");
   assert.equal(manifest.rollback.mode, "code_and_images_only");
   assert.equal(manifest.rollback.automaticDatabaseDownMigration, false);
+  assert.equal(Object.hasOwn(manifest.from, "schemaVersion"), false);
+  assert.equal(Object.hasOwn(manifest.to, "schemaVersion"), false);
   assert.deepEqual(manifest.transport, {
-    mode: "legacy_target_cache",
+    mode: "gitlab_internal_or_target_cache",
     targetManifestSha256: "6".repeat(64),
   });
   assert.deepEqual(manifest.blockers, []);
@@ -112,11 +83,11 @@ test("rollback qualification permits only equal migration and config identity", 
     () => validateRollbackManifest(withoutTransport),
     /transport identity/u,
   );
-  const withoutReleaseSchema = structuredClone(manifest);
-  delete withoutReleaseSchema.to.schemaVersion;
+  const withoutReleaseVersion = structuredClone(manifest);
+  delete withoutReleaseVersion.to.version;
   assert.throws(
-    () => validateRollbackManifest(withoutReleaseSchema),
-    /image identity/u,
+    () => validateRollbackManifest(withoutReleaseVersion),
+    /release identity/u,
   );
 });
 

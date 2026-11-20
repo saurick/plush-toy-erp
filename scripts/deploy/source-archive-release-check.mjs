@@ -27,7 +27,6 @@ const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const MODES = new Set(["plan", "light", "release"]);
 const MAX_COMMAND_DIAGNOSTIC_CHARS = 4096;
-const BUILDKIT_CACHE_MODES = new Set(["builder", "gha"]);
 const ANSI_ESCAPE_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/gu;
 const CUSTOMER_SOURCE_EXTENSIONS = new Set([
   ".doc",
@@ -635,19 +634,6 @@ export function summarizeBuildxRawJson(rawOutput) {
   });
 }
 
-function releaseBuildCacheMode(environment) {
-  const requested = String(
-    environment.RELEASE_BUILDKIT_CACHE_MODE ||
-      (environment.GITHUB_ACTIONS === "true" ? "gha" : "builder"),
-  );
-  if (!BUILDKIT_CACHE_MODES.has(requested)) {
-    throw new ReleaseCheckError(
-      `unsupported RELEASE_BUILDKIT_CACHE_MODE: ${requested}`,
-    );
-  }
-  return requested;
-}
-
 function buildBakeDefinition({
   archiveRoot,
   customer,
@@ -655,7 +641,6 @@ function buildBakeDefinition({
   releaseVersion,
   webImage,
   serverImage,
-  cacheMode,
 }) {
   const shared = {
     context: archiveRoot,
@@ -668,16 +653,6 @@ function buildBakeDefinition({
       RELEASE_VERSION: releaseVersion,
     },
   };
-  const withCache = (target, scope) => ({
-    ...shared,
-    target,
-    ...(cacheMode === "gha"
-      ? {
-          "cache-from": [`type=gha,scope=${scope}`],
-          "cache-to": [`type=gha,mode=max,scope=${scope}`],
-        }
-      : {}),
-  });
   return {
     group: {
       default: {
@@ -686,11 +661,13 @@ function buildBakeDefinition({
     },
     target: {
       "release-web": {
-        ...withCache("web-runtime", "plush-release-web-v1"),
+        ...shared,
+        target: "web-runtime",
         tags: [webImage],
       },
       "release-server": {
-        ...withCache("server-runtime", "plush-release-server-v1"),
+        ...shared,
+        target: "server-runtime",
         tags: [serverImage],
         args: {
           ...shared.args,
@@ -738,7 +715,6 @@ async function runReleaseBuilds({
     });
     const webImage = `plush-source-archive-web:${gitState.shortCommit}`;
     const serverImage = `plush-source-archive-server:${gitState.shortCommit}`;
-    const cacheMode = releaseBuildCacheMode(environment);
     const bakePath = path.join(
       path.dirname(archiveRoot),
       "release-buildx-bake.json",
@@ -753,7 +729,6 @@ async function runReleaseBuilds({
           releaseVersion,
           webImage,
           serverImage,
-          cacheMode,
         }),
         null,
         2,
@@ -804,7 +779,7 @@ async function runReleaseBuilds({
       buildPerformance: {
         schemaVersion: "plush.release-build-performance/v1",
         durationMs: buildDurationMs,
-        cacheMode,
+        cacheMode: "builder",
         ...cache,
       },
     };

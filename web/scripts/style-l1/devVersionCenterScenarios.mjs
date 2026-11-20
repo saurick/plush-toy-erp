@@ -23,7 +23,7 @@ function buildPerformance() {
   return {
     schemaVersion: 'plush.release-build-performance/v1',
     durationMs: 240_000,
-    cacheMode: 'gha',
+    cacheMode: 'builder',
     completedVertexCount: 20,
     cacheHitCount: 16,
     cacheMissCount: 4,
@@ -84,7 +84,7 @@ export function createVersionCenterSummary() {
       gitSha,
       version: `2026.08.08-${String(sequence)}`,
       publishedAt: new Date(Date.UTC(2026, 7, 8, sequence, 0, 0)).toISOString(),
-      url: `https://github.com/saurick/plush-toy-erp/releases/tag/artifact-${gitSha}`,
+      url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/releases/artifact-${gitSha}`,
       assets: ASSETS,
       artifactSummary: {
         totalBytes: 1_300_000_000 + sequence,
@@ -311,7 +311,7 @@ export function createVersionCenterSummary() {
           id: 9_001,
           attempt: 1,
           workflow: 'release',
-          event: 'workflow_dispatch',
+          event: 'web',
           status: 'completed',
           conclusion: 'success',
           gitSha: versions[0].gitSha,
@@ -379,7 +379,7 @@ export function createVersionCenterSummary() {
     },
     issues: [],
     boundaries: {
-      provider: 'github',
+      provider: 'gitlab',
       releaseDispatchAllowed: true,
       target: 'demo-133',
       targets: DEV_DELIVERY_TARGETS.map(({ key }) => key),
@@ -668,8 +668,6 @@ async function verifyHistoryIsolationRecovery(page, assert, assertNoHorizontalOv
         await assertNoHorizontalOverflow(page, 'dev-version-history-isolation-recovery-desktop')
 
         const gitlabSummary = await installSummaryRoute(page)
-        gitlabSummary.boundaries.provider = 'gitlab'
-        gitlabSummary.timings.runs[0].url = 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/9001'
         gitlabSummary.timings.runs[0].event = 'api'
         gitlabSummary.timings.runs[0].jobs = [{
           ...gitlabSummary.timings.runs[0].jobs[1],
@@ -715,7 +713,7 @@ export function createDevVersionCenterScenarios({
   let summaryRequests = 0
 
   return [
-    ...['historical', 'empty'].map((state) => ({
+    ...['gitlab', 'empty'].map((state) => ({
       name: `dev-version-center-${state}-pipeline-desktop`,
       path: '/__dev/version-center?view=pipeline&target=demo-133',
       viewport: { width: 1280, height: 720 },
@@ -724,9 +722,6 @@ export function createDevVersionCenterScenarios({
       beforeNavigate: async (page) => {
         const summary = await installSummaryRoute(page)
         if (state === 'empty') summary.timings.runs = []
-        else {
-          summary.timings.runs[0].url = 'https://github.com/saurick/plush-toy-erp/actions/runs/9001'
-        }
       },
       verify: async (page) => {
         await waitForView(page, 'pipeline')
@@ -734,13 +729,13 @@ export function createDevVersionCenterScenarios({
         const panel = page.locator('.erp-dev-pipeline-timing')
         await panel.waitFor({ state: 'visible' })
         assert.equal(await panel.locator('.erp-dev-pipeline-timing__details').count(), 0)
-        if (state === 'historical') {
-          const link = panel.getByRole('link', { name: '查看历史流水线记录', exact: true })
+        if (state === 'gitlab') {
+          const link = panel.getByRole('link', { name: '在 GitLab 查看全部任务与日志', exact: true })
           await link.waitFor({ state: 'visible' })
-          assert.equal(await link.getAttribute('href'), 'https://github.com/saurick/plush-toy-erp/actions/runs/9001')
+          assert.equal(await link.getAttribute('href'), 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/9001')
           assert.equal(await link.getAttribute('target'), '_blank')
           assert.match(await link.getAttribute('rel'), /noopener/u)
-          assert.equal(await page.getByRole('link', { name: '查看历史发布记录', exact: true }).getAttribute('href'), await link.getAttribute('href'))
+          assert.equal(await page.getByRole('link', { name: '查看 GitLab 发布记录', exact: true }).getAttribute('href'), await link.getAttribute('href'))
         } else {
           await panel.getByText('尚无 GitLab 流水线记录', { exact: true }).waitFor()
           assert.equal(await panel.getByRole('link').count(), 0)
@@ -985,7 +980,10 @@ export function createDevVersionCenterScenarios({
           }
           assert.equal(
             await ciGuide.locator('.erp-markdown-mermaid').count(),
-            CI_WORKFLOW_SECTIONS.filter(({ chart }) => chart).length
+            CI_WORKFLOW_SECTIONS.reduce(
+              (count, { chart, charts }) => count + (charts?.length ?? Number(Boolean(chart))),
+              0
+            )
           )
           const chapterNav = guidePage.getByRole('navigation', {
             name: '操作指引章节目录',

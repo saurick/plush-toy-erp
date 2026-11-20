@@ -438,7 +438,6 @@ test("real command plan completes without loading an inherited write secret", as
         ...process.env,
         GIT_OPTIONAL_LOCKS: "0",
         PLUSH_GITLAB_TOKEN: writeToken,
-        PLUSH_DELIVERY_PROVIDER: "gitlab",
       },
       timeout: 20000,
     },

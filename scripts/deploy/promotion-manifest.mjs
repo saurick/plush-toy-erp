@@ -157,13 +157,6 @@ export function buildPromotionManifest({
     throw new Error("promotion identity is invalid");
   }
   if (
-    release.schemaVersion !== "plush.release-manifest/v2" ||
-    release.rehearsal?.status !== "passed" ||
-    release.rehearsal?.cleanup?.residualContainers !== 0
-  ) {
-    throw new Error("promotion requires a release v2 rehearsal receipt");
-  }
-  if (
     targetPreflight?.schemaVersion !== "plush.target-preflight/v1" ||
     !targetPreflight?.target ||
     targetPreflight?.customer !== "yoyoosun" ||

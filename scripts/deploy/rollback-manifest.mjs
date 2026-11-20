@@ -40,7 +40,6 @@ function releaseIdentity(manifest, manifestSha256) {
     throw new Error("rollback release manifest SHA-256 is invalid");
   }
   return {
-    schemaVersion: release.schemaVersion,
     gitSha: release.gitSha,
     version: release.version,
     manifestSha256,
@@ -95,10 +94,8 @@ export function validateRollbackManifest(manifest) {
   }
   for (const release of [manifest.from, manifest.to]) {
     if (
-      ![
-        "plush.release-manifest/v1",
-        "plush.release-manifest/v2",
-      ].includes(release.schemaVersion) ||
+      typeof release.version !== "string" ||
+      release.version.length === 0 ||
       !Array.isArray(release.images) ||
       release.images.length !== 2 ||
       new Set(release.images.map((image) => image.kind)).size !== 2 ||
@@ -110,21 +107,16 @@ export function validateRollbackManifest(manifest) {
           image.platform !== "linux/amd64",
       )
     ) {
-      throw new Error("rollback image identity is invalid");
+      throw new Error("rollback release identity is invalid");
     }
   }
   if (
     !manifest.transport ||
     Object.keys(manifest.transport).sort().join(",") !==
       "mode,targetManifestSha256" ||
-    ![
-      "legacy_target_cache",
-      "gitlab_internal_or_target_cache",
-    ].includes(manifest.transport.mode) ||
+    manifest.transport.mode !== "gitlab_internal_or_target_cache" ||
     manifest.transport.targetManifestSha256 !==
-      manifest.to.manifestSha256 ||
-    (manifest.transport.mode === "legacy_target_cache") !==
-      (manifest.to.schemaVersion === "plush.release-manifest/v1")
+      manifest.to.manifestSha256
   ) {
     throw new Error("rollback transport identity is invalid");
   }
@@ -232,10 +224,7 @@ export function buildRollbackManifest({
     from,
     to,
     transport: {
-      mode:
-        to.schemaVersion === "plush.release-manifest/v1"
-          ? "legacy_target_cache"
-          : "gitlab_internal_or_target_cache",
+      mode: "gitlab_internal_or_target_cache",
       targetManifestSha256: to.manifestSha256,
     },
     before: {

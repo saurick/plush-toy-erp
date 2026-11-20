@@ -13,13 +13,12 @@ import test from "node:test";
 import {
   GITLAB_DELIVERY_BASE_URL,
   GITLAB_DELIVERY_PACKAGE,
-  GITLAB_LEGACY_RELEASE_ASSETS,
   GITLAB_DELIVERY_PROJECT,
-  GITLAB_RELEASE_ASSETS,
   GITLAB_SOURCE_PACKAGE,
   createGitlabDeliveryProvider,
 } from "./gitlab-delivery-provider.mjs";
 import { buildReleaseManifest } from "./release-catalog.mjs";
+import { DELIVERY_RELEASE_ASSETS } from "./delivery-provider.mjs";
 import { buildTargetReleaseCacheIdentity } from "./target-release-cache.mjs";
 
 const SHA = "a".repeat(40);
@@ -47,7 +46,7 @@ function releaseFixture() {
 }
 
 function packageFiles() {
-  return GITLAB_RELEASE_ASSETS.map((file_name, index) => ({
+  return DELIVERY_RELEASE_ASSETS.map((file_name, index) => ({
     file_name,
     size: (index + 1) * 100,
     file_sha256: "0".repeat(64),
@@ -75,7 +74,6 @@ function releaseDetailFixture() {
     },
   };
   const manifest = {
-    schemaVersion: "plush.release-manifest/v1",
     passed: true,
     version: "2026.08.27-1",
     gitSha: SHA,
@@ -604,7 +602,7 @@ test("GitLab provider downloads only bounded control evidence for target-direct 
   digests["checksums.sha256"] = createHash("sha256")
     .update(bodies["checksums.sha256"])
     .digest("hex");
-  const formalFiles = GITLAB_RELEASE_ASSETS.map((file_name) => {
+  const formalFiles = DELIVERY_RELEASE_ASSETS.map((file_name) => {
     const body = bodies[file_name];
     const archive = detail.artifact.images.find(
       (image) => image.archive.file === file_name,
@@ -710,110 +708,43 @@ test("GitLab provider downloads only bounded control evidence for target-direct 
   }
 });
 
-test("GitLab provider reads legacy release controls without source lookup or Mac payload transfer", async () => {
-  const detail = releaseDetailFixture();
-  const legacyManifest = structuredClone(detail.manifest);
-  legacyManifest.schemaVersion = "plush.release-manifest/v1";
-  delete legacyManifest.rehearsal;
-  const bodies = {
-    "release-artifact.json": JSON.stringify(detail.artifact),
-    "release-manifest.json": JSON.stringify(legacyManifest),
-  };
-  const digests = Object.fromEntries(
-    Object.entries(bodies).map(([name, body]) => [
-      name,
-      createHash("sha256").update(body).digest("hex"),
-    ]),
-  );
-  const payloadDigests = {
-    "sbom.cdx.json": detail.artifact.sbom.sha256,
-    "server-image.tar": detail.artifact.images[0].archive.sha256,
-    "web-image.tar": detail.artifact.images[1].archive.sha256,
-  };
-  bodies["checksums.sha256"] = `${Object.entries({
-    ...digests,
-    ...payloadDigests,
-  })
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([name, digest]) => `${digest}  ${name}`)
-    .join("\n")}\n`;
-  digests["checksums.sha256"] = createHash("sha256")
-    .update(bodies["checksums.sha256"])
-    .digest("hex");
-  const formalFiles = GITLAB_LEGACY_RELEASE_ASSETS.map((file_name) => ({
-    file_name,
-    size: bodies[file_name]
-      ? Buffer.byteLength(bodies[file_name])
-      : file_name === "server-image.tar"
-        ? detail.artifact.images[0].archive.sizeBytes
-        : file_name === "web-image.tar"
-          ? detail.artifact.images[1].archive.sizeBytes
-          : 101,
-    file_sha256: digests[file_name] || payloadDigests[file_name],
-  }));
-  const requestedAssets = [];
-  let sourceQueries = 0;
+test("GitLab rejects a package without a rehearsal before downloading controls", async (t) => {
+  const formalFiles = DELIVERY_RELEASE_ASSETS
+    .filter((name) => name !== "release-rehearsal.json")
+    .map((file_name) => ({ file_name, size: 1, file_sha256: "a".repeat(64) }));
+  const requests = [];
   const provider = createGitlabDeliveryProvider({
     projectRoot: process.cwd(),
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
     request: async (url) => {
-      if (url.includes("package_name=plush-release-source")) {
-        sourceQueries += 1;
-        throw new Error("legacy release must not query the source package");
+      if (url.includes("/packages?") && url.includes("package_name=plush-release&")) {
+        requests.push("package");
+        return json([{
+          id: 41,
+          package_type: "generic",
+          name: GITLAB_DELIVERY_PACKAGE,
+          version: "artifact-" + SHA,
+        }]);
       }
-      if (url.includes("/packages?")) {
-        return json([
-          {
-            id: 41,
-            package_type: "generic",
-            name: GITLAB_DELIVERY_PACKAGE,
-            version: `artifact-${SHA}`,
-          },
-        ]);
+      if (url.includes("/packages/41/package_files")) {
+        requests.push("files");
+        return json(formalFiles);
       }
-      if (url.includes("/packages/41/package_files")) return json(formalFiles);
-      const asset = Object.keys(bodies).find((name) =>
-        url.endsWith(`/${name}`),
-      );
-      if (asset) {
-        requestedAssets.push(asset);
-        return new Response(bodies[asset], { status: 200 });
-      }
-      throw new Error(`unexpected URL: ${url}`);
+      requests.push("unexpected");
+      throw new Error("unexpected package request");
     },
   });
-  const outputRoot = path.join(
-    process.cwd(),
-    "output",
-    "dev-workbench",
-    "release-controls",
-  );
+  const outputRoot = path.join(process.cwd(), "output", "dev-workbench", "release-controls");
   mkdirSync(outputRoot, { recursive: true });
-  const temporaryRoot = mkdtempSync(path.join(outputRoot, "provider-legacy-"));
+  const temporaryRoot = mkdtempSync(path.join(outputRoot, "provider-incomplete-"));
+  t.after(() => rmSync(temporaryRoot, { recursive: true, force: true }));
   const destination = path.join(temporaryRoot, SHA);
-  try {
-    const result = await provider.downloadReleaseControl(SHA, destination);
-    assert.equal(result.transportMode, "legacy_v1_cache_only");
-    assert.equal(result.fetch, null);
-    assert.equal(sourceQueries, 0);
-    assert.deepEqual(requestedAssets.sort(), Object.keys(bodies).sort());
-    assert.deepEqual(result.assets, [
-      "checksums.sha256",
-      "release-artifact.json",
-      "release-manifest.json",
-    ]);
-    assert.equal(
-      buildTargetReleaseCacheIdentity({
-        bundleDir: destination,
-        releaseManifestPath: path.join(destination, "release-manifest.json"),
-      }).cacheMode,
-      "legacy_v1_existing_only",
-    );
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true });
-  }
+  await assert.rejects(
+    provider.downloadReleaseControl(SHA, destination),
+    /GitLab direct target release transport is incomplete/u,
+  );
+  assert.deepEqual(requests, ["package", "files"]);
 });
-
 
 test("release status follows the recorded pipeline instead of another attempt at the same SHA", async () => {
   let actualSha = SHA;

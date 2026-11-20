@@ -24,7 +24,6 @@ import {
   probeTargetReleaseCache,
   TARGET_RELEASE_CACHE_CONTRACT,
   TARGET_RELEASE_CACHE_MODES,
-  targetReleaseCacheEvidenceFingerprint,
   validateTargetCacheProbe,
 } from "./target-release-cache.mjs";
 import {
@@ -91,7 +90,7 @@ function writePortableImageArchive(root, kind) {
 
 function createExecutableCacheFixture(
   root,
-  { cacheMode, sourceKind = "formal", retainedOperation = null },
+  { sourceKind = "formal", retainedOperation = null } = {},
 ) {
   const version = "2026.08.09-1";
   const server = writePortableImageArchive(root, "server");
@@ -121,14 +120,13 @@ function createExecutableCacheFixture(
       ],
     })}\n`,
   );
+  const rehearsal = Buffer.from("{}\n");
   const releaseManifest = Buffer.from(
     `${JSON.stringify({
-      schemaVersion:
-        cacheMode === TARGET_RELEASE_CACHE_MODES.direct
-          ? "plush.release-manifest/v2"
-          : "plush.release-manifest/v1",
+      passed: true,
       gitSha: SHA,
       version,
+      rehearsal: { status: "passed", receiptSha256: sha256(rehearsal) },
       images: [
         { kind: "server", digest: server.digest },
         { kind: "web", digest: web.digest },
@@ -136,7 +134,6 @@ function createExecutableCacheFixture(
     })}\n`,
   );
   const checksums = Buffer.from("checksums control fixture\n");
-  const rehearsal = Buffer.from("{}\n");
   const payload = {
     "checksums.sha256": checksums,
     "release-manifest.json": releaseManifest,
@@ -148,27 +145,12 @@ function createExecutableCacheFixture(
     "web-image.tar": web.archive,
   };
   const releaseManifestSha256 = sha256(releaseManifest);
-  const cacheRoot =
-    cacheMode === TARGET_RELEASE_CACHE_MODES.direct
-      ? "release-cache-v2"
-      : "release-cache";
   const candidate =
     sourceKind === "retained_operation"
       ? path.join(root, "incoming", retainedOperation)
-      : path.join(root, cacheRoot, releaseManifestSha256);
+      : path.join(root, "release-cache-v2", releaseManifestSha256);
   mkdirSync(candidate, { recursive: true, mode: 0o700 });
-  const formalFiles =
-    cacheMode === TARGET_RELEASE_CACHE_MODES.direct
-      ? Object.keys(payload)
-      : [
-          "release-manifest.json",
-          "release-artifact.json",
-          "source.tar",
-          "sbom.cdx.json",
-          "server-image.tar",
-          "web-image.tar",
-        ];
-  for (const name of formalFiles) {
+  for (const name of Object.keys(payload)) {
     writeFileSync(path.join(candidate, name), payload[name], { mode: 0o600 });
   }
   if (sourceKind === "retained_operation") {
@@ -188,19 +170,16 @@ function createExecutableCacheFixture(
   }
   return {
     candidate,
-    payload: Object.fromEntries(formalFiles.map((name) => [name, payload[name]])),
+    payload,
     identity: {
       contract: TARGET_RELEASE_CACHE_CONTRACT,
-      cacheMode,
+      cacheMode: TARGET_RELEASE_CACHE_MODES.direct,
       gitSha: SHA,
       version,
       releaseManifestSha256,
       releaseArtifactSha256: sha256(releaseArtifact),
       checksumsSha256: sha256(checksums),
-      releaseRehearsalSha256:
-        cacheMode === TARGET_RELEASE_CACHE_MODES.direct
-          ? sha256(rehearsal)
-          : null,
+      releaseRehearsalSha256: sha256(rehearsal),
       sourceArchiveSha256: sha256(source),
       sbomSha256: sha256(sbom),
       serverArchiveSha256: sha256(server.archive),
@@ -358,10 +337,6 @@ test("target cache identity uses only validated control evidence", () => {
       new RegExp(`path[.]join\\(bundle, "${largeFile.replaceAll(".", "[.]")}"`, "u"),
     );
   }
-});
-
-test("target cache v2 isolates the exact eight-file formal cache from legacy v1", () => {
-  assert.equal(TARGET_RELEASE_CACHE_CONTRACT, "plush.target-release-cache/v2");
 });
 
 test("target cache probe distinguishes miss, package hit and image hit", () => {
@@ -570,147 +545,31 @@ test("both target cache paths use fixed SSH scripts and fail closed", (t) => {
   }
 });
 
-test("legacy target cache is exact, formal-only and fingerprint-bound", () => {
-  const identity = {
-    contract: TARGET_RELEASE_CACHE_CONTRACT,
-    cacheMode: TARGET_RELEASE_CACHE_MODES.legacy,
-    gitSha: SHA,
-    version: "2026.08.09-1",
-    releaseManifestSha256: HASH,
-    releaseArtifactSha256: HASH,
-    checksumsSha256: HASH,
-    releaseRehearsalSha256: null,
-    sourceArchiveSha256: HASH,
-    sbomSha256: HASH,
-    serverArchiveSha256: HASH,
-    webArchiveSha256: HASH,
-    serverContentId: IMAGE,
-    webContentId: IMAGE,
-    serverDigest: IMAGE,
-    webDigest: IMAGE,
-    serverRef: `plush-toy-erp-server:yoyoosun-${SHA}`,
-    webRef: `plush-toy-erp-web:yoyoosun-${SHA}`,
-  };
-  const hit = validateTargetCacheProbe(
-    {
-      schemaVersion: TARGET_RELEASE_CACHE_CONTRACT,
-      releaseManifestSha256: HASH,
-      packageHit: true,
-      imageHit: false,
-      cacheSource: "formal",
-      sourceToken: "formal",
-      avoidedBytes: 1,
-      basis: [
-        "release_manifest_sha256",
-        "archive_sha256",
-        "registry_digest",
-        "docker_content_id",
-        "embedded_git_sha",
-      ],
-    },
-    HASH,
+test("formal GitLab cache executes probe and prepare with the exact payloads", (t) => {
+  const operationId = "123e4567-e89b-42d3-a456-426614174002";
+  const root = realpathSync(
+    mkdtempSync(path.join(os.tmpdir(), "plush-formal-cache-")),
   );
-  const fingerprint = targetReleaseCacheEvidenceFingerprint({
-    targetKey: "demo-133",
-    identity,
-    probe: hit,
-  });
-  assert.match(fingerprint, /^[0-9a-f]{64}$/u);
-  assert.notEqual(
-    fingerprint,
-    targetReleaseCacheEvidenceFingerprint({
-      targetKey: "customer-test-133",
-      identity,
-      probe: hit,
-    }),
-  );
-
-  const calls = [];
-  const runCommand = (command, args, options) => {
-    calls.push({ command, args, input: options.input });
-    return { status: 0, stdout: `${JSON.stringify(hit)}\n` };
-  };
-  const probe = probeTargetReleaseCache(identity, {
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const fixture = createExecutableCacheFixture(root);
+  const runCommand = executableCacheRunCommand(root);
+  const probe = probeTargetReleaseCache(fixture.identity, {
     runCommand,
     targetKey: "demo-133",
   });
+  assert.equal(probe.packageHit, true);
+  assert.equal(probe.imageHit, false);
+  assert.equal(probe.cacheSource, "formal");
   prepareTargetReleaseIncoming(
-    {
-      operationId: "123e4567-e89b-42d3-a456-426614174000",
-      identity,
-      probe,
-    },
+    { operationId, identity: fixture.identity, probe },
     { runCommand, targetKey: "demo-133" },
   );
-  assert.equal(calls.length, 2);
-  assert.match(
-    calls[0].input,
-    /legacy_v1_existing_only\) cache_root=\$root\/release-cache/u,
-  );
-  assert.match(
-    calls[1].input,
-    /cache_files=\(release-manifest[.]json release-artifact[.]json source[.]tar sbom[.]cdx[.]json server-image[.]tar web-image[.]tar\)/u,
-  );
-  assert.doesNotMatch(calls[1].input, /mkdir[^\n]+release-cache/u);
-
-  assert.throws(
-    () =>
-      prepareTargetReleaseIncoming(
-        {
-          operationId: "123e4567-e89b-42d3-a456-426614174001",
-          identity,
-          probe: {
-            ...hit,
-            packageHit: false,
-            cacheSource: "none",
-            sourceToken: "none",
-            avoidedBytes: 0,
-            basis: [],
-          },
-        },
-        { runCommand, targetKey: "demo-133" },
-      ),
-    /legacy target release cache is unavailable/u,
-  );
-  assert.equal(calls.length, 2);
-});
-
-test("formal v1 and v2 caches execute probe and prepare with exact payloads", (t) => {
-  const cases = [
-    {
-      cacheMode: TARGET_RELEASE_CACHE_MODES.legacy,
-      operationId: "123e4567-e89b-42d3-a456-426614174001",
-    },
-    {
-      cacheMode: TARGET_RELEASE_CACHE_MODES.direct,
-      operationId: "123e4567-e89b-42d3-a456-426614174002",
-    },
-  ];
-  for (const item of cases) {
-    const root = realpathSync(
-      mkdtempSync(path.join(os.tmpdir(), "plush-formal-cache-")),
+  const prepared = path.join(root, "incoming", operationId);
+  for (const name of Object.keys(fixture.payload)) {
+    assert.equal(
+      statSync(path.join(prepared, name)).ino,
+      statSync(path.join(fixture.candidate, name)).ino,
     );
-    t.after(() => rmSync(root, { recursive: true, force: true }));
-    const fixture = createExecutableCacheFixture(root, item);
-    const runCommand = executableCacheRunCommand(root);
-    const probe = probeTargetReleaseCache(fixture.identity, {
-      runCommand,
-      targetKey: "demo-133",
-    });
-    assert.equal(probe.packageHit, true);
-    assert.equal(probe.imageHit, false);
-    assert.equal(probe.cacheSource, "formal");
-    prepareTargetReleaseIncoming(
-      { operationId: item.operationId, identity: fixture.identity, probe },
-      { runCommand, targetKey: "demo-133" },
-    );
-    const prepared = path.join(root, "incoming", item.operationId);
-    for (const name of Object.keys(fixture.payload)) {
-      assert.equal(
-        statSync(path.join(prepared, name)).ino,
-        statSync(path.join(fixture.candidate, name)).ino,
-      );
-    }
   }
 });
 
@@ -722,7 +581,6 @@ test("retained v2 cache reuses only its verified payload inventory", (t) => {
   const retainedOperation = "123e4567-e89b-42d3-a456-426614174000";
   const operationId = "123e4567-e89b-42d3-a456-426614174003";
   const fixture = createExecutableCacheFixture(root, {
-    cacheMode: TARGET_RELEASE_CACHE_MODES.direct,
     sourceKind: "retained_operation",
     retainedOperation,
   });

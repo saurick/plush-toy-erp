@@ -79,9 +79,7 @@ production-133)
 esac
 incoming_root=$root/incoming
 runtime_root=$root/runtime
-cache_root_v2=$root/release-cache-v2
-legacy_cache_root=$root/release-cache
-cache_root=$cache_root_v2
+cache_root=$root/release-cache-v2
 releases_root=$root/releases
 operations_root=$root/operations
 run_root=$root/run
@@ -308,8 +306,6 @@ acquisition_expected_bytes=0
 acquisition_verified=false
 credential_cleanup_proven=false
 rollback_transport_mode=""
-target_manifest_schema=""
-cache_contract_mode=""
 fetch_materializing=""
 fetch_materializing_created=0
 fetch_payloads_published=0
@@ -803,136 +799,78 @@ jq -e \
   '.schemaVersion == "plush.target-release-cache/v2" and
    .operationId == $operationId and
    .releaseManifestSha256 == $manifest and
-   (.cacheMode == "v2_direct" or
-    .cacheMode == "legacy_v1_existing_only")' \
+   .cacheMode == "v2_direct"' \
   "$incoming/.target-cache.json" >/dev/null
-cache_contract_mode="$(jq -er '.cacheMode' "$incoming/.target-cache.json")"
-case "$cache_contract_mode" in
-legacy_v1_existing_only)
-  rollback_transport_mode=legacy_target_cache
-  cache_root=$legacy_cache_root
-  ;;
-v2_direct)
-  rollback_transport_mode=gitlab_internal_or_target_cache
-  cache_root=$cache_root_v2
-  ;;
-*)
-  fail "target cache transport mode is unsupported"
-  ;;
-esac
+rollback_transport_mode=gitlab_internal_or_target_cache
 validate_bound_rollback_plan
 
-case "$cache_contract_mode" in
-legacy_v1_existing_only)
-  [[ -f "$incoming/release-manifest.json" &&
-    ! -L "$incoming/release-manifest.json" ]] ||
-    fail "legacy target release manifest is unavailable"
-  target_manifest_schema="$(jq -er '.schemaVersion' "$incoming/release-manifest.json")"
-  [[ "$target_manifest_schema" == plush.release-manifest/v1 ]] ||
-    fail "legacy target release manifest version is invalid"
-  acquisition_mode=target_cache
-  acquisition_expected_bytes=0
-  acquisition_downloaded_bytes=0
-  credential_cleanup_proven=true
-  ;;
-v2_direct)
-  owned_private_plain_file "$incoming/remote-release-acquire.sh" ||
-    fail "target release acquisition helper is invalid"
-  live_acquire_script="$(
-    readlink -f -- "$current/scripts/deploy/remote-release-acquire.sh"
-  )" || fail "live release acquisition helper is unavailable"
-  [[ "$live_acquire_script" == "$current/scripts/deploy/remote-release-acquire.sh" ]] ||
-    fail "live release acquisition helper is outside the current release root"
-  owned_private_plain_file "$live_acquire_script" ||
-    fail "live release acquisition helper is invalid"
-  cmp --silent \
-    "$incoming/remote-release-acquire.sh" \
-    "$live_acquire_script" ||
-    fail "release acquisition helper is not part of the live exact source"
-  # The dynamic path was resolved beneath the registered live release and
-  # byte-compared with the incoming control copy immediately above.
-  # shellcheck disable=SC1090
-  source "$live_acquire_script"
-  # These globals are consumed by acquire_target_release from the sourced file.
-  # shellcheck disable=SC2034
-  release_sha=$to_sha
-  # shellcheck disable=SC2034
-  release_version=$to_version
-  target_fetch_token=""
-  IFS= read -r target_fetch_token || true
-  acquire_target_release
-  target_manifest_schema="$(jq -er '.schemaVersion' "$incoming/release-manifest.json")"
-  [[ "$target_manifest_schema" == plush.release-manifest/v2 ]] ||
-    fail "target release manifest version is invalid"
-  ;;
-esac
-
+owned_private_plain_file "$incoming/remote-release-acquire.sh" ||
+  fail "target release acquisition helper is invalid"
+live_acquire_script="$(
+  readlink -f -- "$current/scripts/deploy/remote-release-acquire.sh"
+)" || fail "live release acquisition helper is unavailable"
+[[ "$live_acquire_script" == "$current/scripts/deploy/remote-release-acquire.sh" ]] ||
+  fail "live release acquisition helper is outside the current release root"
+owned_private_plain_file "$live_acquire_script" ||
+  fail "live release acquisition helper is invalid"
+cmp --silent \
+  "$incoming/remote-release-acquire.sh" \
+  "$live_acquire_script" ||
+  fail "release acquisition helper is not part of the live exact source"
+# The dynamic path was resolved beneath the registered live release and
+# byte-compared with the incoming control copy immediately above.
+# shellcheck disable=SC1090
+source "$live_acquire_script"
+# These globals are consumed by acquire_target_release from the sourced file.
+# shellcheck disable=SC2034
+release_sha=$to_sha
+# shellcheck disable=SC2034
+release_version=$to_version
+target_fetch_token=""
+IFS= read -r target_fetch_token || true
+acquire_target_release
 enter_stage package_verification
 owned_private_directory "$incoming" ||
   fail "incoming rollback package is invalid"
-if [[ "$rollback_transport_mode" == legacy_target_cache ]]; then
-  required_files=(
-    .target-cache.json
-    checksums.sha256
-    current-release-manifest.json
-    release-manifest.json
-    release-artifact.json
-    rollback-manifest.json
-    sbom.cdx.json
-    source.tar
-    server-image.tar
-    web-image.tar
-    remote-code-rollback.sh
-    transfer-checksums.sha256
-  )
-else
-  required_files=(
-    .target-cache.json
-    checksums.sha256
-    current-release-manifest.json
-    release-manifest.json
-    release-artifact.json
-    release-rehearsal.json
-    rollback-manifest.json
-    sbom.cdx.json
-    source.tar
-    server-image.tar
-    web-image.tar
-    remote-code-rollback.sh
-    remote-release-acquire.sh
-    target-release-fetch.json
-    transfer-checksums.sha256
-  )
-fi
+required_files=(
+  .target-cache.json
+  checksums.sha256
+  current-release-manifest.json
+  release-manifest.json
+  release-artifact.json
+  release-rehearsal.json
+  rollback-manifest.json
+  sbom.cdx.json
+  source.tar
+  server-image.tar
+  web-image.tar
+  remote-code-rollback.sh
+  remote-release-acquire.sh
+  target-release-fetch.json
+  transfer-checksums.sha256
+)
 for required_file in "${required_files[@]}"; do
   owned_private_plain_file "$incoming/$required_file" ||
     fail "incoming rollback package is incomplete"
 done
 jq -e \
   --arg operationId "$operation_id" \
-  --arg cacheMode "$cache_contract_mode" \
   --arg manifest "$target_manifest_sha256" \
   '.schemaVersion == "plush.target-release-cache/v2" and
    .operationId == $operationId and
-   .cacheMode == $cacheMode and
+   .cacheMode == "v2_direct" and
    .releaseManifestSha256 == $manifest and
    (.packageHit | type == "boolean") and
    (.imageHit | type == "boolean") and
    (.avoidedBytes | type == "number") and .avoidedBytes >= 0 and
    (.cacheSource == "none" or .cacheSource == "formal" or .cacheSource == "retained_operation") and
    (.basis | type == "array") and
-   (if $cacheMode == "legacy_v1_existing_only" then (
-      .packageHit == true and .avoidedBytes > 0 and
-      .cacheSource == "formal" and
-      .basis == ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]
-    ) else (
-      if .packageHit then (
-        .avoidedBytes > 0 and
-        (.cacheSource == "formal" or .cacheSource == "retained_operation") and
-        .basis == ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]
-      )
-      else (.imageHit == false and .avoidedBytes == 0 and .cacheSource == "none" and (.basis | length) == 0) end
-    ) end)' \
+   (if .packageHit then (
+    .avoidedBytes > 0 and
+    (.cacheSource == "formal" or .cacheSource == "retained_operation") and
+    .basis == ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]
+  )
+  else (.imageHit == false and .avoidedBytes == 0 and .cacheSource == "none" and (.basis | length) == 0) end)' \
   "$incoming/.target-cache.json" >/dev/null
 cache_package_hit="$(jq -r '.packageHit' "$incoming/.target-cache.json")"
 cache_image_hit="$(jq -r '.imageHit' "$incoming/.target-cache.json")"
@@ -943,23 +881,6 @@ cache_basis="$(jq -c '.basis' "$incoming/.target-cache.json")"
   cd "$incoming"
   sha256sum --check --strict transfer-checksums.sha256
 ) >>"$log_file" 2>&1
-if [[ "$rollback_transport_mode" == legacy_target_cache ]]; then
-  legacy_checksum_names="$(
-    awk 'NF == 2 { print $2 }' "$incoming/checksums.sha256" | LC_ALL=C sort
-  )"
-  expected_legacy_checksum_names="$(
-    printf '%s\n' \
-      release-artifact.json release-manifest.json sbom.cdx.json \
-      server-image.tar web-image.tar | LC_ALL=C sort
-  )"
-  [[ "$legacy_checksum_names" == "$expected_legacy_checksum_names" ]] ||
-    fail "legacy rollback checksum catalog is not exact"
-  (
-    cd "$incoming"
-    sha256sum --check --strict checksums.sha256
-  ) >>"$log_file" 2>&1
-  acquisition_verified=true
-fi
 [[ "$(sha256sum "$incoming/current-release-manifest.json" | awk '{print $1}')" == "$current_manifest_sha256" &&
 "$(sha256sum "$incoming/release-manifest.json" | awk '{print $1}')" == "$target_manifest_sha256" ]] ||
   fail "release manifest checksums do not match the rollback operation"
@@ -969,18 +890,15 @@ jq -e -s \
   --arg fromSha "$from_sha" \
   --arg toSha "$to_sha" \
   --arg toVersion "$to_version" \
-  '((.[0].schemaVersion == "plush.release-manifest/v1") or
-    (.[0].schemaVersion == "plush.release-manifest/v2")) and
-   ((.[1].schemaVersion == "plush.release-manifest/v1") or
-    (.[1].schemaVersion == "plush.release-manifest/v2")) and
-   .[0].gitSha == $fromSha and
+  '.[0].gitSha == $fromSha and
    .[1].gitSha == $toSha and
    .[1].version == $toVersion and
    .[0].migration.latest == .[1].migration.latest and
    .[0].migration.sequenceSha256 == .[1].migration.sequenceSha256 and
    .[0].customerConfig.sourceSha256 == .[1].customerConfig.sourceSha256 and
-   .[0].rollback.databaseDownMigrationAutomatic == false and
-   .[1].rollback.databaseDownMigrationAutomatic == false' \
+   all(.[]; .passed == true and
+     .strict.status == "passed" and .rehearsal.status == "passed" and
+     .rollback.databaseDownMigrationAutomatic == false)' \
   "$incoming/current-release-manifest.json" \
   "$incoming/release-manifest.json" >/dev/null
 jq -e \
@@ -1056,31 +974,18 @@ curl --fail --silent --show-error --max-time 10 \
   "$web_endpoint/healthz" >/dev/null
 
 formal_cache=$cache_root/$target_manifest_sha256
-if [[ "$rollback_transport_mode" == legacy_target_cache ]]; then
-  owned_private_directory "$cache_root" ||
-    fail "legacy rollback cache root is unavailable"
-  immutable_cache_files=(
-    release-manifest.json
-    release-artifact.json
-    sbom.cdx.json
-    source.tar
-    server-image.tar
-    web-image.tar
-  )
-else
-  ensure_owned_private_child "$root" "$cache_root" ||
-    fail "rollback cache root is invalid"
-  immutable_cache_files=(
-    checksums.sha256
-    release-manifest.json
-    release-artifact.json
-    release-rehearsal.json
-    sbom.cdx.json
-    source.tar
-    server-image.tar
-    web-image.tar
-  )
-fi
+ensure_owned_private_child "$root" "$cache_root" ||
+  fail "rollback cache root is invalid"
+immutable_cache_files=(
+  checksums.sha256
+  release-manifest.json
+  release-artifact.json
+  release-rehearsal.json
+  sbom.cdx.json
+  source.tar
+  server-image.tar
+  web-image.tar
+)
 if [[ -e "$formal_cache" ]]; then
   owned_private_directory "$formal_cache" ||
     fail "formal rollback cache is invalid"
@@ -1093,8 +998,6 @@ if [[ -e "$formal_cache" ]]; then
       fail "formal rollback cache conflicts with verified package"
   done
 else
-  [[ "$rollback_transport_mode" != legacy_target_cache ]] ||
-    fail "legacy rollback cache is unavailable"
   cache_materializing=$cache_root/.materializing-$operation_id
   [[ ! -e "$cache_materializing" ]] || fail "stale rollback cache materialization exists"
   mkdir "$cache_materializing"
@@ -1183,12 +1086,10 @@ cmp --silent \
   "$incoming/remote-code-rollback.sh" \
   "$live_rollback_script" ||
   fail "remote rollback script is not part of the live exact source"
-if [[ "$rollback_transport_mode" != legacy_target_cache ]]; then
-  cmp --silent \
-    "$incoming/remote-release-acquire.sh" \
-    "$live_acquire_script" ||
-    fail "release acquisition helper is not part of the live exact source"
-fi
+cmp --silent \
+  "$incoming/remote-release-acquire.sh" \
+  "$live_acquire_script" ||
+  fail "release acquisition helper is not part of the live exact source"
 
 enter_stage image_load_and_readback
 if [[ "$cache_image_hit" != true ]]; then

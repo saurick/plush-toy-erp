@@ -135,7 +135,7 @@ function summaryFixture() {
         gitSha: SHA,
         version: '2026.07.29-1',
         publishedAt: '2026-07-29T01:00:00.000Z',
-        url: `https://github.com/saurick/plush-toy-erp/releases/tag/artifact-${SHA}`,
+        url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/releases/artifact-${SHA}`,
         assets: [
           'checksums.sha256',
           'release-artifact.json',
@@ -153,7 +153,7 @@ function summaryFixture() {
         buildPerformance: {
           schemaVersion: 'plush.release-build-performance/v1',
           durationMs: 240_000,
-          cacheMode: 'gha',
+          cacheMode: 'builder',
           completedVertexCount: 20,
           cacheHitCount: 16,
           cacheMissCount: 4,
@@ -973,12 +973,12 @@ test('pipeline jobs and timing stages use Chinese-first presentation labels', ()
     '清理：准备 Node.js 工具链'
   )
   assert.equal(
-    deliveryPipelinePresentation('Future GitHub step').label,
+    deliveryPipelinePresentation('Future GitLab step').label,
     '其他流水线环节'
   )
   assert.match(
-    deliveryPipelinePresentation('Future GitHub step').title,
-    /Future GitHub step/u
+    deliveryPipelinePresentation('Future GitLab step').title,
+    /Future GitLab step/u
   )
 })
 

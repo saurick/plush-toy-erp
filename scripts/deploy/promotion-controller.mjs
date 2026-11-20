@@ -146,11 +146,8 @@ export async function preparePromotion(
     artifact,
     sha256File(artifactInput.absolute),
   );
-  if (
-    releaseManifest.schemaVersion !== "plush.release-manifest/v2" ||
-    rehearsalReceiptSha256 !== releaseManifest.rehearsal?.receiptSha256
-  ) {
-    throw new Error("promotion requires the exact v2 seven-asset evidence");
+  if (rehearsalReceiptSha256 !== releaseManifest.rehearsal.receiptSha256) {
+    throw new Error("promotion requires the exact release rehearsal receipt");
   }
   const precedingRollback = recoveryLineage
     ? null

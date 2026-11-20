@@ -1212,7 +1212,7 @@ publish_release:
         --version "$RELEASE_VERSION" \
         --repository "$CI_PROJECT_PATH" \
         --json
-      node scripts/deploy/github-release-asset-set.mjs finalize \
+      node scripts/deploy/release-asset-set.mjs finalize \
         --dir "$artifact_dir" \
         --sha "$RELEASE_SHA" \
         --version "$RELEASE_VERSION" \
@@ -1343,7 +1343,7 @@ publish_release:
           --arg name "$RELEASE_VERSION" \
           --arg tag "$package_version" \
           --arg ref "$RELEASE_SHA" \
-          --arg description 'Immutable exact-SHA v2 seven-asset release. The published rehearsal receipt is the same receipt bound into the manifest. Target promotion and customer UAT remain separate evidence.' \
+          --arg description 'Immutable exact-SHA seven-asset release. The published rehearsal receipt is the same receipt bound into the manifest. Target promotion and customer UAT remain separate evidence.' \
           '{name:$name,tag_name:$tag,ref:$ref,description:$description}' \
           > "$release_create_json"
         curl --config "$private_token_config" --fail --silent --show-error \

@@ -16,12 +16,12 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
-import { validateStrictReceiptEvidence } from "../qa/strict-receipt-identity.mjs";
+import {
+  STRICT_RECEIPT_SCHEMA,
+  validateStrictReceiptEvidence,
+} from "../qa/strict-receipt-identity.mjs";
 import { stableStringify } from "../lib/stable-json.mjs";
 
-export const RELEASE_MANIFEST_CONTRACT_V1 = "plush.release-manifest/v1";
-export const RELEASE_MANIFEST_CONTRACT_V2 = "plush.release-manifest/v2";
-export const RELEASE_MANIFEST_CONTRACT = RELEASE_MANIFEST_CONTRACT_V2;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
@@ -33,17 +33,15 @@ export { sha256File };
 
 function validateStrictManifestEvidence(manifest) {
   const strict = manifest?.strict;
-  if (strict?.contract === "plush.exact-sha-strict/v2") {
-    if (
-      strict?.provenance?.source !== "github-actions" ||
-      !String(strict?.provenance?.workflowRef || "").includes(
-        "/.github/workflows/release.yml@",
-      ) ||
-      strict?.provenance?.job !== "strict"
-    ) {
-      throw new Error("legacy strict release provenance is invalid");
-    }
-    return strict;
+  const provenance = strict?.provenance;
+  if (
+    strict?.contract !== STRICT_RECEIPT_SCHEMA ||
+    provenance?.source !== "gitlab-ci" ||
+    provenance?.eventName !== "push" ||
+    provenance?.job !== "quality_aggregate" ||
+    !String(provenance?.workflowRef || "").includes("/.gitlab-ci.yml@")
+  ) {
+    throw new Error("release requires canonical GitLab push CI evidence");
   }
   validateStrictReceiptEvidence({
     ...strict,
@@ -51,63 +49,23 @@ function validateStrictManifestEvidence(manifest) {
     status: "passed",
     exitCode: 0,
   });
-  const ciProvenance =
-    strict.provenance?.source === "github-actions" &&
-    strict.provenance?.eventName === "push" &&
-    strict.provenance?.job === "quality" &&
-    String(strict.provenance?.workflowRef || "").includes(
-      "/.github/workflows/ci.yml@",
-    );
-  const releaseFallbackProvenance =
-    strict.provenance?.source === "github-actions" &&
-    strict.provenance?.eventName === "workflow_dispatch" &&
-    strict.provenance?.job === "strict" &&
-    String(strict.provenance?.workflowRef || "").includes(
-      "/.github/workflows/release.yml@",
-    );
-  const gitlabCanonicalProvenance =
-    strict.provenance?.source === "gitlab-ci" &&
-    ((strict.provenance?.eventName === "push" &&
-      strict.provenance?.job === "quality_aggregate") ||
-      (["api", "push", "trigger", "web"].includes(
-        strict.provenance?.eventName,
-      ) &&
-        strict.provenance?.job === "strict")) &&
-    String(strict.provenance?.workflowRef || "").includes(
-      "/.gitlab-ci.yml@",
-    );
   if (
     strict.identity.gitSha !== manifest.gitSha ||
     strict.fingerprint !== strict.identity.policyFingerprint ||
-    strict.identity.repository !== strict.provenance?.repository ||
+    strict.identity.repository !== provenance.repository ||
     strict.identity.sourceArchiveSha256 !==
       manifest.artifact?.sourceArchiveSha256 ||
     strict.identity.migrationSequenceSha256 !==
       manifest.migration?.sequenceSha256 ||
     strict.identity.customerConfigFingerprint !==
       manifest.customerConfig?.sourceSha256 ||
-    !["github-actions", "gitlab-ci"].includes(strict.provenance?.source) ||
-    strict.provenance?.ref !== "refs/heads/main" ||
-    strict.provenance?.refName !== "main" ||
-    strict.provenance?.headRepository !== strict.provenance?.repository ||
-    strict.provenance?.conclusion !== "success" ||
-    (!ciProvenance && !releaseFallbackProvenance &&
-      !gitlabCanonicalProvenance)
+    provenance.ref !== "refs/heads/main" ||
+    provenance.refName !== "main" ||
+    provenance.headRepository !== provenance.repository ||
+    provenance.conclusion !== "success"
   ) {
     throw new Error("strict release identity or CI provenance is invalid");
   }
-  if (
-    manifest.schemaVersion === RELEASE_MANIFEST_CONTRACT_V2 &&
-    !(
-      strict.contract === "plush.exact-sha-strict/v3" &&
-      strict.provenance?.source === "gitlab-ci" &&
-      strict.provenance?.eventName === "push" &&
-      strict.provenance?.job === "quality_aggregate"
-    )
-  ) {
-    throw new Error("release v2 requires canonical GitLab push CI evidence");
-  }
-  return strict;
 }
 
 function validateRuntimeReadback(value, gitSha) {
@@ -285,13 +243,9 @@ function strictManifestEvidence(strictTerminal) {
     status: strictTerminal?.status,
     fingerprint: strictTerminal?.fingerprint,
     receiptSha256: strictTerminal?.receipt?.sha256,
-    ...(strictTerminal?.contract === "plush.exact-sha-strict/v3"
-      ? {
-          identity: strictTerminal.identity,
-          checks: strictTerminal.checks,
-          timeSensitiveChecks: strictTerminal.timeSensitiveChecks,
-        }
-      : {}),
+    identity: strictTerminal?.identity,
+    checks: strictTerminal?.checks,
+    timeSensitiveChecks: strictTerminal?.timeSensitiveChecks,
     provenance: {
       source: strictTerminal?.provenance?.source,
       repository: strictTerminal?.provenance?.repository,
@@ -299,15 +253,11 @@ function strictManifestEvidence(strictTerminal) {
       runId: strictTerminal?.provenance?.runId,
       runAttempt: strictTerminal?.provenance?.runAttempt,
       job: strictTerminal?.provenance?.job,
-      ...(strictTerminal?.contract === "plush.exact-sha-strict/v3"
-        ? {
-            eventName: strictTerminal.provenance?.eventName,
-            ref: strictTerminal.provenance?.ref,
-            refName: strictTerminal.provenance?.refName,
-            headRepository: strictTerminal.provenance?.headRepository,
-            conclusion: strictTerminal.provenance?.conclusion,
-          }
-        : {}),
+      eventName: strictTerminal?.provenance?.eventName,
+      ref: strictTerminal?.provenance?.ref,
+      refName: strictTerminal?.provenance?.refName,
+      headRepository: strictTerminal?.provenance?.headRepository,
+      conclusion: strictTerminal?.provenance?.conclusion,
     },
   };
 }
@@ -353,7 +303,6 @@ export function validateReleasePublicationEvidence({
     customer: "yoyoosun",
   });
   validateStrictManifestEvidence({
-    schemaVersion: RELEASE_MANIFEST_CONTRACT_V2,
     gitSha,
     strict: strictManifestEvidence(strictTerminal),
     artifact: {
@@ -368,21 +317,12 @@ export function validateReleasePublicationEvidence({
 
 export function validateReleaseManifest(manifest) {
   if (
-    ![RELEASE_MANIFEST_CONTRACT_V1, RELEASE_MANIFEST_CONTRACT_V2].includes(
-      manifest?.schemaVersion,
-    ) ||
     manifest?.passed !== true ||
     !VERSION_PATTERN.test(String(manifest?.version || "")) ||
     !SHA_PATTERN.test(String(manifest?.gitSha || "")) ||
-    !["plush.exact-sha-strict/v2", "plush.exact-sha-strict/v3"].includes(
-      manifest?.strict?.contract,
-    ) ||
     manifest?.strict?.status !== "passed" ||
     !SHA256_PATTERN.test(String(manifest?.strict?.fingerprint || "")) ||
     !SHA256_PATTERN.test(String(manifest?.strict?.receiptSha256 || "")) ||
-    !["github-actions", "gitlab-ci"].includes(
-      manifest?.strict?.provenance?.source,
-    ) ||
     !REGISTRY_REPOSITORY_PATTERN.test(
       `ghcr.io/${String(manifest?.strict?.provenance?.repository || "")}`,
     ) ||
@@ -426,11 +366,7 @@ export function validateReleaseManifest(manifest) {
   ) {
     throw new Error("release manifest redaction boundary is invalid");
   }
-  if (manifest.schemaVersion === RELEASE_MANIFEST_CONTRACT_V2) {
-    validateReleaseRehearsalEvidence(manifest.rehearsal, manifest);
-  } else if (manifest.rehearsal !== undefined) {
-    throw new Error("release v1 cannot claim rehearsal evidence");
-  }
+  validateReleaseRehearsalEvidence(manifest.rehearsal, manifest);
   return manifest;
 }
 
@@ -506,7 +442,6 @@ export function buildReleaseManifest({
     rehearsalReceiptSha256,
   });
   return validateReleaseManifest({
-    schemaVersion: RELEASE_MANIFEST_CONTRACT_V2,
     passed: true,
     version,
     createdAt,
@@ -557,9 +492,6 @@ export function buildReleaseManifest({
 
 export function writeReleaseManifest(file, manifest) {
   validateReleaseManifest(manifest);
-  if (manifest.schemaVersion !== RELEASE_MANIFEST_CONTRACT_V2) {
-    throw new Error("only release manifest v2 can be newly written");
-  }
   const content = `${JSON.stringify(manifest, null, 2)}\n`;
   if (existsSync(file)) {
     const stat = lstatSync(file);

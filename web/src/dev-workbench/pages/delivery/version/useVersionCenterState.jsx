@@ -77,8 +77,7 @@ export function useVersionCenterState() {
     customerReady && summarySnapshotKey === deliverySnapshotKey
   const summary = summaryInCurrentScope ? storedSummary : null
   const summaryFresh = summaryInCurrentScope && storedSummaryFresh
-  const deliveryProviderName =
-    summary?.boundaries?.provider === 'github' ? 'GitHub 历史只读' : 'GitLab'
+  const deliveryProviderName = 'GitLab'
 
   const restoreOperationDetailTriggerFocus = useCallback(() => {
     const originalTrigger = operationDetailTriggerRef.current

@@ -39,10 +39,6 @@ function formatTimestampRange(startedAt, finishedAt, { compact = false } = {}) {
   return `${formatDevTimestamp(startedAt)}–${formatDevTimestamp(finishedAt)}`
 }
 
-function isGitLabPipeline(run) {
-  return run?.url?.startsWith('https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/')
-}
-
 export function DevTimingBars({
   stages = [],
   totalDurationMs = 0,
@@ -190,7 +186,7 @@ export function DevPipelineStatusStrip({
             </Text>
             {latestFullRelease?.url ? (
               <Link href={latestFullRelease.url} target="_blank" rel="noopener noreferrer">
-                {isGitLabPipeline(latestFullRelease) ? '查看 GitLab 发布记录' : '查看历史发布记录'}
+                查看 GitLab 发布记录
               </Link>
             ) : (
               <Text type="secondary">
@@ -246,34 +242,26 @@ export function DevPipelineStatusStrip({
 
 export default function DevPipelineTimingPanel({ timings }) {
   const latestRun = timings?.runs?.[0] || null
-  if (isGitLabPipeline(latestRun)) {
-    const failed = summarizePipelineStatus(timings).failureJob
+  if (!latestRun) {
     return (
       <Card className="erp-dev-pipeline-timing" variant="borderless">
-        <Title level={2}>{latestRun.workflow === 'release' ? 'GitLab 发布流水线' : 'GitLab CI 流水线'}</Title>
-        <Space wrap>
-          <Text code>{latestRun.gitSha?.slice(0, 12)}</Text>
-          <Tag color={latestRun.conclusion === 'success' ? 'success' : 'warning'}>{latestRun.status === 'in_progress' ? '运行中' : latestRun.status === 'queued' ? '等待运行' : latestRun.conclusion === 'success' ? '通过' : '尚未通过'}</Tag>
-          <Text>总耗时 {formatDeliveryDuration(latestRun.durationMs)}</Text>
-          <Link href={latestRun.url} target="_blank" rel="noopener noreferrer">在 GitLab 查看全部任务与日志</Link>
-          {failed ? <Link href={failed.url} target="_blank" rel="noopener noreferrer">查看失败 Job：{failed.name}</Link> : null}
-        </Space>
-        <p>任务、日志和流水线耗时由 GitLab 提供。备份、迁移、部署读回及各环境历史仍在工作台的操作记录中查看。</p>
+        <Empty description="尚无 GitLab 流水线记录" />
       </Card>
     )
   }
 
+  const failed = summarizePipelineStatus(timings).failureJob
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
-      <Empty
-        description={latestRun ? '历史流水线的任务与日志在原始平台查看' : '尚无 GitLab 流水线记录'}
-      >
-        {latestRun?.url ? (
-          <Link href={latestRun.url} target="_blank" rel="noopener noreferrer">
-            查看历史流水线记录
-          </Link>
-        ) : null}
-      </Empty>
+      <Title level={2}>{latestRun.workflow === 'release' ? 'GitLab 发布流水线' : 'GitLab CI 流水线'}</Title>
+      <Space wrap>
+        <Text code>{latestRun.gitSha?.slice(0, 12)}</Text>
+        <Tag color={latestRun.conclusion === 'success' ? 'success' : 'warning'}>{latestRun.status === 'in_progress' ? '运行中' : latestRun.status === 'queued' ? '等待运行' : latestRun.conclusion === 'success' ? '通过' : '尚未通过'}</Tag>
+        <Text>总耗时 {formatDeliveryDuration(latestRun.durationMs)}</Text>
+        <Link href={latestRun.url} target="_blank" rel="noopener noreferrer">在 GitLab 查看全部任务与日志</Link>
+        {failed ? <Link href={failed.url} target="_blank" rel="noopener noreferrer">查看失败 Job：{failed.name}</Link> : null}
+      </Space>
+      <p>任务、日志和流水线耗时由 GitLab 提供。备份、迁移、部署读回及各环境历史仍在工作台的操作记录中查看。</p>
     </Card>
   )
 }

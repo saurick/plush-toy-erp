@@ -18,13 +18,11 @@ import {
   captureDevDeliveryProviderEnvironments,
   DEV_DELIVERY_ACTION_API_PATH,
   DEV_DELIVERY_SESSION_API_PATH,
-  createConfiguredDeliveryProvider,
   createDevDeliveryMiddleware,
   createDevDeliveryService,
   validateDevDeliveryAction,
 } from './devDeliveryBridgePlugin.mjs'
 import { readLatestBackupRestoreEvidence } from './devRecoveryEvidence.mjs'
-import { targetReleaseCacheEvidenceFingerprint } from '../../scripts/deploy/target-release-cache.mjs'
 
 const SHA = 'a'.repeat(40)
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
@@ -47,31 +45,6 @@ function directControlDownload(directory, manifestSha256 = 'f'.repeat(64)) {
     },
   }
 }
-
-test('delivery bridge defaults to GitLab and requires an explicit GitHub fallback', () => {
-  assert.equal(
-    createConfiguredDeliveryProvider({
-      projectRoot: process.cwd(),
-      env: {},
-    }).provider,
-    'gitlab'
-  )
-  assert.equal(
-    createConfiguredDeliveryProvider({
-      projectRoot: process.cwd(),
-      env: { PLUSH_DELIVERY_PROVIDER: 'github' },
-    }).provider,
-    'github'
-  )
-  assert.throws(
-    () =>
-      createConfiguredDeliveryProvider({
-        projectRoot: process.cwd(),
-        env: { PLUSH_DELIVERY_PROVIDER: 'other' },
-      }),
-    /gitlab or github/u
-  )
-})
 
 test('delivery bridge keeps read and write provider credentials isolated', () => {
   const environments = captureDevDeliveryProviderEnvironments({
@@ -113,15 +86,6 @@ test('delivery bridge keeps read and write provider credentials isolated', () =>
     false
   )
   assert.equal(readOnly.releaseDispatchAllowed, false)
-})
-
-test('GitHub provider remains read-only even when a GitLab write token exists', () => {
-  const environments = captureDevDeliveryProviderEnvironments({
-    PLUSH_DELIVERY_PROVIDER: 'github',
-    PLUSH_GITLAB_TOKEN: 'unrelated-write-token',
-  })
-
-  assert.equal(environments.releaseDispatchAllowed, false)
 })
 
 test('read-only GitLab evidence does not authorize release dispatch', async (t) => {
@@ -1189,7 +1153,7 @@ test('delivery summary exposes cached canonical CI timings and readable operatio
       buildPerformance: {
         schemaVersion: 'plush.release-build-performance/v1',
         durationMs: 240_000,
-        cacheMode: 'gha',
+        cacheMode: 'builder',
         completedVertexCount: 20,
         cacheHitCount: 16,
         cacheMissCount: 4,
@@ -1289,7 +1253,7 @@ test('delivery summary exposes cached canonical CI timings and readable operatio
     buildPerformance: {
       schemaVersion: 'plush.release-build-performance/v1',
       durationMs: 240_000,
-      cacheMode: 'gha',
+      cacheMode: 'builder',
       completedVertexCount: 20,
       cacheHitCount: 16,
       cacheMissCount: 4,
@@ -1928,7 +1892,6 @@ test('rollback executor uses the operation-bound current and target versions', a
       currentManifestSha256: 'f'.repeat(64),
       targetManifestSha256: 'f'.repeat(64),
       rollbackTransportMode: 'gitlab_internal_or_target_cache',
-      rollbackTargetCacheFingerprint: null,
     },
   })
   transitionDeliveryOperation(store, OPERATION_ID, {
@@ -2002,59 +1965,17 @@ test('rollback executor uses the operation-bound current and target versions', a
   assert.equal(readDeliveryOperation(store, OPERATION_ID).status, 'failed')
 })
 
-test('legacy rollback executor never inherits the target fetch credential', async (t) => {
+test('a saved rollback plan for retired transport is blocked before spawn', async (t) => {
   const { root, store } = createProject(t)
   const currentSha = 'b'.repeat(40)
   const currentManifestSha256 = 'f'.repeat(64)
   const targetManifestSha256 = 'e'.repeat(64)
-  const image = `sha256:${'c'.repeat(64)}`
-  const identity = {
-    contract: 'plush.target-release-cache/v2',
-    cacheMode: 'legacy_v1_existing_only',
-    gitSha: SHA,
-    version: '2026.07.29-1',
-    releaseManifestSha256: targetManifestSha256,
-    releaseArtifactSha256: 'd'.repeat(64),
-    checksumsSha256: '1'.repeat(64),
-    releaseRehearsalSha256: null,
-    sourceArchiveSha256: '2'.repeat(64),
-    sbomSha256: '3'.repeat(64),
-    serverArchiveSha256: '4'.repeat(64),
-    webArchiveSha256: '5'.repeat(64),
-    serverContentId: image,
-    webContentId: image,
-    serverDigest: image,
-    webDigest: image,
-    serverRef: `plush-toy-erp-server:yoyoosun-${SHA}`,
-    webRef: `plush-toy-erp-web:yoyoosun-${SHA}`,
-  }
-  const probe = {
-    schemaVersion: 'plush.target-release-cache/v2',
-    releaseManifestSha256: targetManifestSha256,
-    packageHit: true,
-    imageHit: false,
-    cacheSource: 'formal',
-    sourceToken: 'formal',
-    avoidedBytes: 1,
-    basis: [
-      'release_manifest_sha256',
-      'archive_sha256',
-      'registry_digest',
-      'docker_content_id',
-      'embedded_git_sha',
-    ],
-  }
-  const cacheFingerprint = targetReleaseCacheEvidenceFingerprint({
-    targetKey: 'customer-test-133',
-    identity,
-    probe,
-  })
   createOrReuseDeliveryOperation(store, {
     action: 'rollback',
     target: 'customer-test-133',
     gitSha: SHA,
-    version: identity.version,
-    idempotencyKey: 'version-center:legacy:0001',
+    version: '2026.07.29-1',
+    idempotencyKey: 'version-center:retired-rollback:0001',
     operationId: ROLLBACK_OPERATION_ID,
     metadata: {
       source: 'version-center',
@@ -2063,132 +1984,6 @@ test('legacy rollback executor never inherits the target fetch credential', asyn
       currentManifestSha256,
       targetManifestSha256,
       rollbackTransportMode: 'legacy_target_cache',
-      rollbackTargetCacheFingerprint: cacheFingerprint,
-    },
-  })
-  transitionDeliveryOperation(store, ROLLBACK_OPERATION_ID, {
-    status: 'running',
-    message: 'rollback qualification started',
-  })
-  transitionDeliveryOperation(store, ROLLBACK_OPERATION_ID, {
-    status: 'ready',
-    message: 'rollback ready',
-  })
-  const originalToken = process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
-  const originalProviderToken = process.env.PLUSH_GITLAB_TOKEN
-  process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN = 'must-not-reach-legacy-child'
-  process.env.PLUSH_GITLAB_TOKEN = 'must-not-reach-legacy-child'
-  t.after(() => {
-    if (originalToken === undefined) {
-      delete process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN
-    } else {
-      process.env.PLUSH_GITLAB_TARGET_FETCH_TOKEN = originalToken
-    }
-    if (originalProviderToken === undefined) {
-      delete process.env.PLUSH_GITLAB_TOKEN
-    } else {
-      process.env.PLUSH_GITLAB_TOKEN = originalProviderToken
-    }
-  })
-  const child = new EventEmitter()
-  let spawnedOptions
-  const service = createDevDeliveryService({
-    projectRoot: root,
-    operationStore: store,
-    provider: {
-      provider: 'gitlab',
-      listVersions: () => [],
-      getReleaseStatus: () => ({ status: 'missing' }),
-      dispatchRelease: () => {},
-      downloadReleaseControl(gitSha, destination) {
-        return gitSha === currentSha
-          ? directControlDownload(destination, currentManifestSha256)
-          : { directory: destination, transportMode: 'legacy_v1_cache_only' }
-      },
-    },
-    buildCacheIdentity: () => identity,
-    probeCache: () => probe,
-    spawnProcess(_command, _args, options) {
-      spawnedOptions = options
-      return child
-    },
-  })
-  const confirmation = `ROLLBACK:customer-test-133:${currentSha}:${SHA}:${ROLLBACK_OPERATION_ID}`
-  const accepted = await service.act({
-    action: 'execute-rollback',
-    payload: { operationId: ROLLBACK_OPERATION_ID, confirmation },
-  })
-  assert.equal(accepted.operation.status, 'launching')
-  assert.equal(
-    Object.hasOwn(spawnedOptions.env, 'PLUSH_GITLAB_TARGET_FETCH_TOKEN'),
-    false
-  )
-  assert.equal(Object.hasOwn(spawnedOptions.env, 'PLUSH_GITLAB_TOKEN'), false)
-  child.emit('close', 1)
-})
-
-test('legacy rollback blocks before spawn when its qualified cache disappears', async (t) => {
-  const { root, store } = createProject(t)
-  const currentSha = 'b'.repeat(40)
-  const currentManifestSha256 = 'f'.repeat(64)
-  const targetManifestSha256 = 'e'.repeat(64)
-  const image = `sha256:${'c'.repeat(64)}`
-  const identity = {
-    contract: 'plush.target-release-cache/v2',
-    cacheMode: 'legacy_v1_existing_only',
-    gitSha: SHA,
-    version: '2026.07.29-1',
-    releaseManifestSha256: targetManifestSha256,
-    releaseArtifactSha256: 'd'.repeat(64),
-    checksumsSha256: '1'.repeat(64),
-    releaseRehearsalSha256: null,
-    sourceArchiveSha256: '2'.repeat(64),
-    sbomSha256: '3'.repeat(64),
-    serverArchiveSha256: '4'.repeat(64),
-    webArchiveSha256: '5'.repeat(64),
-    serverContentId: image,
-    webContentId: image,
-    serverDigest: image,
-    webDigest: image,
-    serverRef: `plush-toy-erp-server:yoyoosun-${SHA}`,
-    webRef: `plush-toy-erp-web:yoyoosun-${SHA}`,
-  }
-  const qualifiedProbe = {
-    schemaVersion: 'plush.target-release-cache/v2',
-    releaseManifestSha256: targetManifestSha256,
-    packageHit: true,
-    imageHit: false,
-    cacheSource: 'formal',
-    sourceToken: 'formal',
-    avoidedBytes: 1,
-    basis: [
-      'release_manifest_sha256',
-      'archive_sha256',
-      'registry_digest',
-      'docker_content_id',
-      'embedded_git_sha',
-    ],
-  }
-  const cacheFingerprint = targetReleaseCacheEvidenceFingerprint({
-    targetKey: 'customer-test-133',
-    identity,
-    probe: qualifiedProbe,
-  })
-  createOrReuseDeliveryOperation(store, {
-    action: 'rollback',
-    target: 'customer-test-133',
-    gitSha: SHA,
-    version: identity.version,
-    idempotencyKey: 'version-center:legacy-cache-vanished:0001',
-    operationId: ROLLBACK_OPERATION_ID,
-    metadata: {
-      source: 'version-center',
-      currentGitSha: currentSha,
-      currentVersion: '2026.07.29-2',
-      currentManifestSha256,
-      targetManifestSha256,
-      rollbackTransportMode: 'legacy_target_cache',
-      rollbackTargetCacheFingerprint: cacheFingerprint,
     },
   })
   transitionDeliveryOperation(store, ROLLBACK_OPERATION_ID, {
@@ -2214,16 +2009,6 @@ test('legacy rollback blocks before spawn when its qualified cache disappears', 
           : { directory: destination, transportMode: 'legacy_v1_cache_only' }
       },
     },
-    buildCacheIdentity: () => identity,
-    probeCache: () => ({
-      ...qualifiedProbe,
-      packageHit: false,
-      imageHit: false,
-      cacheSource: 'none',
-      sourceToken: 'none',
-      avoidedBytes: 0,
-      basis: [],
-    }),
     spawnProcess() {
       spawnCount += 1
       return new EventEmitter()

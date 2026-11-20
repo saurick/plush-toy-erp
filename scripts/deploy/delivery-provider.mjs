@@ -5,18 +5,14 @@ export const DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT =
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
-export const LEGACY_DELIVERY_RELEASE_ASSETS = Object.freeze([
+export const DELIVERY_RELEASE_ASSETS = Object.freeze([
   "checksums.sha256",
   "release-artifact.json",
   "release-manifest.json",
+  "release-rehearsal.json",
   "sbom.cdx.json",
   "server-image.tar",
   "web-image.tar",
-]);
-export const DELIVERY_RELEASE_ASSETS = Object.freeze([
-  ...LEGACY_DELIVERY_RELEASE_ASSETS.slice(0, 3),
-  "release-rehearsal.json",
-  ...LEGACY_DELIVERY_RELEASE_ASSETS.slice(3),
 ]);
 const ALLOWED_DELIVERY_RELEASE_ASSETS = new Set(DELIVERY_RELEASE_ASSETS);
 
@@ -37,7 +33,7 @@ function validBuildPerformance(value) {
     value === null ||
     (value?.schemaVersion === "plush.release-build-performance/v1" &&
       validSize(value.durationMs) &&
-      ["builder", "gha"].includes(value.cacheMode) &&
+      value.cacheMode === "builder" &&
       validSize(value.completedVertexCount) &&
       validSize(value.cacheHitCount) &&
       validSize(value.cacheMissCount) &&
@@ -66,13 +62,10 @@ export function validateDeliveryReleaseVersion(version) {
     version.assets.some((asset) => !ALLOWED_DELIVERY_RELEASE_ASSETS.has(asset)) ||
     new Set(version.assets).size !== version.assets.length ||
     version.assets.some((asset, index) => index > 0 && version.assets[index - 1] >= asset) ||
-    (version.completeAssets !==
-      (exactAssetSet(version.assets, DELIVERY_RELEASE_ASSETS) ||
-        exactAssetSet(version.assets, LEGACY_DELIVERY_RELEASE_ASSETS))) ||
+    version.completeAssets !==
+      exactAssetSet(version.assets, DELIVERY_RELEASE_ASSETS) ||
     (version.promotionEligible &&
-      (version.status !== "published" ||
-        !version.completeAssets ||
-        !exactAssetSet(version.assets, DELIVERY_RELEASE_ASSETS))) ||
+      (version.status !== "published" || !version.completeAssets)) ||
     !version.artifactSummary ||
     !validSize(version.artifactSummary.totalBytes) ||
     !validSize(version.artifactSummary.serverImageBytes) ||
@@ -87,10 +80,9 @@ export function validateDeliveryReleaseVersion(version) {
       (!DIGEST_PATTERN.test(String(version.imageDigests?.server || "")) ||
         !DIGEST_PATTERN.test(String(version.imageDigests?.web || "")))) ||
     typeof version.url !== "string" ||
-    ![
-      /^https:\/\/github\.com\/saurick\/plush-toy-erp\/releases\/tag\/artifact-[0-9a-f]{40}$/u,
-      /^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/releases\/artifact-[0-9a-f]{40}$/u,
-    ].some((pattern) => pattern.test(version.url))
+    !/^https:\/\/gitlab\.saurick\.me\/saurick\/plush-toy-erp\/-\/releases\/artifact-[0-9a-f]{40}$/u.test(
+      version.url,
+    )
   ) {
     throw new Error("delivery release version contract is invalid");
   }
@@ -112,18 +104,4 @@ export function validateReleaseDispatchRequest(request) {
     throw new Error("release dispatch request is invalid");
   }
   return request;
-}
-
-export function validateDeliveryProvider(provider) {
-  if (
-    !provider ||
-    provider.schemaVersion !== DELIVERY_PROVIDER_CONTRACT ||
-    typeof provider.listVersions !== "function" ||
-    typeof provider.getReleaseStatus !== "function" ||
-    typeof provider.dispatchRelease !== "function" ||
-    typeof provider.downloadRelease !== "function"
-  ) {
-    throw new Error("delivery provider contract is invalid");
-  }
-  return provider;
 }

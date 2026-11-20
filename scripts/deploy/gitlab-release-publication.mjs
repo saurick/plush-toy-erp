@@ -13,7 +13,7 @@ import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
-import { RELEASE_ASSET_NAMES } from "./github-release-asset-set.mjs";
+import { DELIVERY_RELEASE_ASSETS } from "./delivery-provider.mjs";
 import { sha256File } from "../lib/file-digest.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import {
@@ -59,7 +59,7 @@ function localAssetMap(value) {
   if (
     value?.status !== "passed" ||
     !Array.isArray(value.assets) ||
-    value.assets.length !== RELEASE_ASSET_NAMES.length
+    value.assets.length !== DELIVERY_RELEASE_ASSETS.length
   ) {
     throw new Error("local release asset catalog is invalid");
   }
@@ -68,7 +68,7 @@ function localAssetMap(value) {
     const name = String(asset?.name || "");
     const digest = String(asset?.digest || "");
     if (
-      !RELEASE_ASSET_NAMES.includes(name) ||
+      !DELIVERY_RELEASE_ASSETS.includes(name) ||
       assets.has(name) ||
       !Number.isSafeInteger(asset?.size) ||
       asset.size < 1 ||
@@ -83,7 +83,7 @@ function localAssetMap(value) {
       sha256: digest.slice(7),
     });
   }
-  if (RELEASE_ASSET_NAMES.some((name) => !assets.has(name))) {
+  if (DELIVERY_RELEASE_ASSETS.some((name) => !assets.has(name))) {
     throw new Error("local release asset catalog is incomplete");
   }
   return assets;
@@ -141,7 +141,7 @@ function localSourceFile(artifactFile, sourceFile, packageVersion) {
 }
 
 function exactFormalRemoteFiles(remote) {
-  if (!Array.isArray(remote) || remote.length !== RELEASE_ASSET_NAMES.length) {
+  if (!Array.isArray(remote) || remote.length !== DELIVERY_RELEASE_ASSETS.length) {
     throw new Error("GitLab formal release package is not exact");
   }
   const files = new Map();
@@ -149,7 +149,7 @@ function exactFormalRemoteFiles(remote) {
     const name = String(file?.file_name || "");
     const sha256 = String(file?.file_sha256 || "");
     if (
-      !RELEASE_ASSET_NAMES.includes(name) ||
+      !DELIVERY_RELEASE_ASSETS.includes(name) ||
       files.has(name) ||
       !Number.isSafeInteger(file?.size) ||
       file.size < 1 ||
@@ -159,7 +159,7 @@ function exactFormalRemoteFiles(remote) {
     }
     files.set(name, { name, size: file.size, sha256 });
   }
-  if (RELEASE_ASSET_NAMES.some((name) => !files.has(name))) {
+  if (DELIVERY_RELEASE_ASSETS.some((name) => !files.has(name))) {
     throw new Error("GitLab formal release package is incomplete");
   }
   return files;
@@ -174,7 +174,7 @@ function checksumCatalog(file) {
     }
     entries.set(match[2], match[1]);
   }
-  const expected = RELEASE_ASSET_NAMES.filter(
+  const expected = DELIVERY_RELEASE_ASSETS.filter(
     (name) => name !== "checksums.sha256",
   );
   if (
@@ -220,12 +220,8 @@ export function validateGitlabReleaseSourceBackfill({
   const artifact = assertReleaseArtifactManifest(
     jsonFile(artifactFile, "release artifact"),
   );
-  if (
-    manifest.schemaVersion !== "plush.release-manifest/v2" ||
-    manifest.gitSha !== gitSha ||
-    artifact.git.commit !== gitSha
-  ) {
-    throw new Error("release source backfill requires an exact v2 release");
+  if (manifest.gitSha !== gitSha || artifact.git.commit !== gitSha) {
+    throw new Error("release source backfill requires an exact GitLab release");
   }
   validateReleaseArtifactBinding(manifest, artifact, sha256File(artifactFile));
   const rehearsalFile = path.join(directory, "release-rehearsal.json");
@@ -314,7 +310,7 @@ export function planGitlabReleasePublication({ local, remote }) {
     }
     existing.add(name);
   }
-  const missingAssets = RELEASE_ASSET_NAMES.filter(
+  const missingAssets = DELIVERY_RELEASE_ASSETS.filter(
     (name) => !existing.has(name),
   );
   return Object.freeze({

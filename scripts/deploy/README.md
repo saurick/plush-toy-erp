@@ -38,7 +38,7 @@
 | `release-artifact-verify.mjs` | 校验 manifest、SBOM、image tar 与内置 release identity | 默认只读；`--load` 会加载本地镜像 |
 | `workbench-release.mjs` / `workbench-artifact.mjs` | 独立研发工作台的制品封装校验、传输、状态保全、切换与回滚 | 默认只读；`seal --execute` 仅写本机制品清单，`deploy/rollback --execute` 才操作固定工作台目标；HTTPS 读回分别验证私网网关与公网入口，并校验正式域名证书；见[独立工作台发布](../../server/deploy/workbench/README.md#workbench-release) |
 | `local-release-rehearsal.mjs` | 用同一不可变 bytes 在一次性环境完成 migration、health/ready、登录、PDF、备份恢复与零残留 | `--execute` 才启动隔离环境 |
-| `promotion-controller.mjs` | 校验 v2 七资产、rehearsal、即时 target preflight；工作台在最终传输资格核对后才创建 ready operation | 不写目标 |
+| `promotion-controller.mjs` | 校验 GitLab 的七项制品、rehearsal、即时 target preflight；工作台在最终传输资格核对后才创建 ready operation | 不写目标 |
 | `promotion-executor.mjs` | 执行已确认的固定 target promotion 并读回公网 exact SHA | 写单一目标；失败按 operation 回滚 |
 | `rollback-controller.mjs` | 校验旧 manifest、migration 与客户配置兼容性 | 不写目标 |
 | `rollback-executor.mjs` | 回滚 Compose / 公网入口到兼容旧版本 | 不 down migration，不自动恢复数据库 |
@@ -91,17 +91,15 @@ release pipeline 只复用同一 protected main push pipeline 的完整终态，
 1. 构建或恢复该 SHA 的唯一 `candidate.tar`。
 2. 用候选包内同一 bytes 完成隔离 release rehearsal。
 3. 推送同一镜像并取得 registry digest。
-4. 登记 v2 七资产：checksums、artifact manifest、release manifest、SBOM、两个 image tar 与同一 `release-rehearsal.json`。
+4. 登记 GitLab 的七项制品：checksums、artifact manifest、release manifest、SBOM、两个 image tar 与同一 `release-rehearsal.json`。
 5. 在独立 `plush-release-source` Package 登记同 SHA 的唯一 `source.tar`，并在创建 Release 前读回 digest。
 6. 由使用者显式发起 promotion；main push 不自动部署 demo 或 test。
 
-旧 v1 六资产只读、展示和既有回滚兼容，`promotionEligible=false`。同版本异 SHA、digest、rehearsal 或资产内容一律失败关闭。
+发布、部署和回滚统一校验 GitLab 七项制品。同版本异 SHA、digest、rehearsal 或资产内容一律失败关闭。
 
-历史运行 SHA 只有在已有完整 v2 七资产时，才可通过 protected main 的 `backfill_release_source` job 补齐唯一 `source.tar`。
+历史运行 SHA 只有在已有完整 GitLab 的七项制品时，才可通过 protected main 的 `backfill_release_source` job 补齐唯一 `source.tar`。
 
 该 job 在 Runner 内证明目标 SHA 是当前 main 的 ancestor，下载并校验四个小控制文件与服务端七资产目录，再由 `git archive` 生成并核对 source digest；它只写 `plush-release-source`，不改写七资产、GitLab Release、镜像或 public asset。
-
-旧 v1 不允许借 backfill 升格为 promotion 输入。
 
 ## 命令行发起 GitLab 发布
 
@@ -214,7 +212,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 ## Promotion 与传输
 
-三个登记 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表；legacy v1 代码回滚额外传输小型 `checksums.sha256` 作为既有目标缓存的校验目录。
+三个登记 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表。
 
 Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。
 
@@ -222,7 +220,7 @@ Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/releas
 
 不存在静默回退到 Mac 大文件中转的路径。
 
-正式 target cache v2 精确包含七资产与 `source.tar` 八项；legacy cache 只允许既有 v1 代码回滚按目标精确命中，缺失即阻断，禁止用于 promotion、远端补取、迁入 v2 或新建 legacy cache。operation 私有 incoming 可以包含控制文件，但只有逐项复核过的 payload 才能被物化或提升为对应正式 cache。
+正式目标缓存精确包含 GitLab 的七项制品与 `source.tar`。operation 私有 incoming 可以包含控制文件，只有逐项复核过的制品才能写入正式目标缓存。
 
 允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。
 

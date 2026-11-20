@@ -154,9 +154,9 @@ export function VersionOverview({
           <Text type="secondary">
             {versions[0]?.completeAssets
               ? versions[0]?.promotionEligible
-                ? 'v2 七资产齐全，演练回执已绑定'
+                ? '七项制品齐全，演练回执已绑定'
                 : versions[0]?.assets.includes('release-rehearsal.json')
-                  ? 'v2 七资产存在，但演练证据未闭合'
+                  ? '七项制品已找到，演练证据待核验'
                   : 'v1 六资产齐全，仅保留读取与旧版回滚'
               : '等待完整 release assets'}
           </Text>

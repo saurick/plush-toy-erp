@@ -28,7 +28,8 @@ test("remote database rebuild accepts only the two isolated registered targets",
     source,
     /(?:--host|--path|--project|--database|--data-dir|--command|eval\s)/u,
   );
-  assert.match(source, /plush[.]release-manifest\/v2/u);
+  assert.match(source, /[.]rehearsal[.]status == "passed"/u);
+  assert.doesNotMatch(source, /plush[.]release-manifest\/v\d+/u);
   assert.match(source, /--deployment-target "\$target"/u);
 });
 

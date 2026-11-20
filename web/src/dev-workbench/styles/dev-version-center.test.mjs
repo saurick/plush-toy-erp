@@ -57,7 +57,7 @@ test('CI/CD timing keeps source timestamps and native links alongside project op
     /LegacyPipelineTimingPanel|summarizePipelineTimings|流水线关键路径|查看全部任务与步骤/u
   )
   assert.match(component, /在 GitLab 查看全部任务与日志/u)
-  assert.match(component, /查看历史流水线记录/u)
+  assert.doesNotMatch(component, /查看历史流水线记录/u)
   assert.match(component, /export function DevTimingBars/u)
   assert.match(component, /showTimeRange/u)
   assert.doesNotMatch(css, /[.]erp-dev-pipeline-timing__/u)

@@ -15,7 +15,7 @@
 | GitLab 本地备份生成、临时文件与归档 | GitLab 宿主 RAID5：`/srv/raid5/gitlab/backups/repository` | 直接在 RAID5 生成，避免 SSD 再保留一套全量备份 | config archive、checksum 与状态回执同属 `backups`；只承担快速恢复输入，RAID 不是异机备份 |
 | GitLab 加密独立副本 | Mac 外盘 PD-SSD：按 UUID 绑定的 `plush-toy-erp-backups/gitlab` | Mac 拉取服务器完整 age 包、校验后原子落盘，保留最近 7 份 | 私钥不放 GitLab 宿主；完整恢复从该实际外盘副本执行 |
 | Runner VM 系统盘与 job cache | GitLab 宿主 SSD 上的独立 KVM qcow2 | 构建 I/O 与 GitLab 数据隔离 | Runner 可重建，不保存业务真源 |
-| 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | 新 GitLab Release 保存 v2 七资产（含同一演练回执）；legacy v1 六资产只读/回滚 |
+| 发布镜像 | GHCR digest | 复用现有目标机加载和 release manifest 合同 | GitLab Release 保存 七项制品，包含同一演练回执 |
 
 GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数据目录。Runner 运行在独立 KVM VM 内，只获得 VM 内的 Docker socket；不得挂载 GitLab 宿主机 `/var/run/docker.sock`。
 
@@ -233,7 +233,7 @@ Git over SSH 默认只供 LAN 使用；确需公网 SSH 时另行评审端口、
 - GitHub 禁止直接写 `main`，主分支变化只来自 GitLab push mirror；
 - 本地 remote 固定为 `origin=GitLab`、`github=GitHub`；正式代码只推 GitLab `origin/main`，不从本地直接写 GitHub main，也不创建专用审查分支；
 - GitHub 不配置仓库 CI workflow，main 镜像不重复执行 GitLab 门禁；
-- GitHub 只保留历史 Release 读取；仓库没有 Actions workflow、publisher 或 strict 复用 writer。恢复任何发布写路径都必须重新专项评审 canonical v2 七资产、演练回执、并发 Provider 和凭据边界。
+- GitHub main 接收项目的单向代码镜像。构建、发布、目标部署和回滚由 GitLab 制品链提供证据。
 
 GPT Review 按本次 GitLab push 前后的 base/head SHA 读取 GitHub main 提交差异；审查意见回到当前任务处理，GitHub 不成为字段、发布或部署真源。
 

@@ -309,35 +309,13 @@ test("exact-SHA rejects dirty, detached candidate, and tampered terminals", () =
   }
 });
 
-test("exact-SHA terminal binds receipt content and GitHub provenance", () => {
+test("exact-SHA terminal binds receipt content and ignores retired CI variables", () => {
   const fixture = createFixture();
   try {
-    const githubEnv = {
-      GITHUB_ACTIONS: "true",
-      GITHUB_REPOSITORY: "owner/repository",
-      GITHUB_WORKFLOW_REF:
-        "owner/repository/.github/workflows/release.yml@refs/heads/main",
-      GITHUB_RUN_ID: "123",
-      GITHUB_RUN_ATTEMPT: "2",
-      GITHUB_JOB: "validate",
-      GITHUB_EVENT_NAME: "push",
-      GITHUB_REF: "refs/heads/main",
-      GITHUB_REF_NAME: "main",
-      GITHUB_HEAD_REPOSITORY: "owner/repository",
-    };
-    assert.deepEqual(buildExactShaProvenance(githubEnv), {
-      source: "github-actions",
-      repository: "owner/repository",
-      workflowRef: githubEnv.GITHUB_WORKFLOW_REF,
-      runId: "123",
-      runAttempt: "2",
-      job: "validate",
-      eventName: "push",
-      ref: "refs/heads/main",
-      refName: "main",
-      headRepository: "owner/repository",
-      conclusion: "success",
-    });
+    assert.deepEqual(
+      buildExactShaProvenance({ GITHUB_ACTIONS: "true" }),
+      { source: "local" },
+    );
     const result = runExactShaGate(
       fixture.root,
       { sha: fixture.sha },

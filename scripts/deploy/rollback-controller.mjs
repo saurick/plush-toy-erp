@@ -18,11 +18,6 @@ import { validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
-import {
-  buildTargetReleaseCacheIdentity,
-  probeTargetReleaseCache,
-  targetReleaseCacheEvidenceFingerprint,
-} from "./target-release-cache.mjs";
 import { readBoundedPlainFile } from "../lib/file-digest.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
@@ -44,7 +39,6 @@ function readReleaseManifest(file) {
     });
   }
   return {
-    absolute,
     sha256: snapshot.sha256,
     manifest: validateReleaseManifest(
       JSON.parse(snapshot.content.toString("utf8")),
@@ -67,8 +61,6 @@ function issueForBlocker(code) {
       "目标版本客户配置源指纹不同，禁止普通代码回滚",
     rollback_git_relation_not_behind:
       "目标 SHA 不是 133 当前 SHA 的祖先，禁止按发布时间猜测回滚方向",
-    rollback_target_transport_unavailable:
-      "目标旧版本没有精确命中的既有回滚缓存，禁止从控制机中转或补造制品",
   };
   return {
     code,
@@ -106,8 +98,6 @@ export async function prepareRollback(
   {
     runPreflight = runTargetPreflight,
     classifyRelation = classifyGitAncestryRelation,
-    buildCacheIdentity = buildTargetReleaseCacheIdentity,
-    probeCache = probeTargetReleaseCache,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -154,41 +144,7 @@ export async function prepareRollback(
     now: now(),
   });
   try {
-    let targetPreflight = await runPreflight(targetKey);
-    let rollbackTargetCacheFingerprint = null;
-    if (target.manifest.schemaVersion === "plush.release-manifest/v1") {
-      try {
-        const identity = buildCacheIdentity({
-          bundleDir: path.dirname(target.absolute),
-          releaseManifestPath: target.absolute,
-        });
-        const probe = await Promise.resolve(
-          probeCache(identity, { targetKey }),
-        );
-        if (
-          identity.cacheMode !== "legacy_v1_existing_only" ||
-          probe.packageHit !== true ||
-          probe.cacheSource !== "formal"
-        ) {
-          throw new Error("legacy rollback target cache is unavailable");
-        }
-        rollbackTargetCacheFingerprint = targetReleaseCacheEvidenceFingerprint({
-          targetKey,
-          identity,
-          probe,
-        });
-      } catch {
-        targetPreflight = {
-          ...targetPreflight,
-          blockers: [
-            ...new Set([
-              ...(targetPreflight.blockers || []),
-              "rollback_target_transport_unavailable",
-            ]),
-          ].sort(),
-        };
-      }
-    }
+    const targetPreflight = await runPreflight(targetKey);
     const ancestry = classifyRelation({
       repoRoot: root,
       currentGitSha: current.manifest.gitSha,
@@ -214,7 +170,6 @@ export async function prepareRollback(
           ...operation.metadata,
           rollbackFingerprint: plan.fingerprint,
           rollbackTransportMode: plan.transport.mode,
-          rollbackTargetCacheFingerprint,
         },
         now: now(),
       });
@@ -226,7 +181,6 @@ export async function prepareRollback(
           ...operation.metadata,
           rollbackFingerprint: plan.fingerprint,
           rollbackTransportMode: plan.transport.mode,
-          rollbackTargetCacheFingerprint,
           noTargetWriteRequired: true,
         },
         now: now(),
@@ -240,7 +194,6 @@ export async function prepareRollback(
           ...operation.metadata,
           rollbackFingerprint: plan.fingerprint,
           rollbackTransportMode: plan.transport.mode,
-          rollbackTargetCacheFingerprint,
         },
         now: now(),
       });

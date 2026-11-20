@@ -280,8 +280,7 @@ export function preparePromotionTransfer(
     },
   );
   if (
-    releaseManifest.schemaVersion !== "plush.release-manifest/v2" ||
-    sha256File(rehearsalFile) !== releaseManifest.rehearsal?.receiptSha256 ||
+    sha256File(rehearsalFile) !== releaseManifest.rehearsal.receiptSha256 ||
     sha256File(rehearsalFile) !== plan.release.rehearsalReceiptSha256 ||
     plan.release.rehearsalReceiptFile !== "release-rehearsal.json" ||
     rehearsalReceipt.git.commit !== plan.release.gitSha

@@ -22,7 +22,7 @@ import {
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
-import { releaseManifestV2Fixture } from "./release-catalog-test-fixtures.mjs";
+import { releaseManifestFixture } from "./release-catalog-test-fixtures.mjs";
 import { executePromotion } from "./promotion-executor.mjs";
 
 const SHA = "a".repeat(40);
@@ -58,7 +58,7 @@ function classifyRelation({ currentGitSha, candidateGitSha }) {
 }
 
 function releaseManifest({ artifactSha256, receiptSha256 }) {
-  return releaseManifestV2Fixture({
+  return releaseManifestFixture({
     gitSha: SHA,
     version: "2026.07.29-1",
     artifactSha256,

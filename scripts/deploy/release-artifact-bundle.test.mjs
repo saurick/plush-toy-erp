@@ -551,7 +551,7 @@ test("release artifact manifest rejects mismatched or incomplete image evidence"
       build: {
         schemaVersion: "plush.release-build-performance/v1",
         durationMs: 123_000,
-        cacheMode: "gha",
+        cacheMode: "builder",
         completedVertexCount: 10,
         cacheHitCount: 8,
         cacheMissCount: 2,
@@ -724,7 +724,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
           buildPerformance: {
             schemaVersion: "plush.release-build-performance/v1",
             durationMs: 45_000,
-            cacheMode: "gha",
+            cacheMode: "builder",
             completedVertexCount: 20,
             cacheHitCount: 15,
             cacheMissCount: 5,

@@ -665,9 +665,7 @@ export async function inspectPublishedRelease(options, runtime = {}) {
     artifact.releaseVersion !== releaseIdentity.version ||
     manifest.gitSha !== releaseIdentity.sha ||
     manifest.version !== releaseIdentity.version ||
-    manifest.schemaVersion !== "plush.release-manifest/v2" ||
-    manifest.rehearsal?.status !== "passed" ||
-    manifest.rehearsal?.receiptSha256 !==
+    manifest.rehearsal.receiptSha256 !==
       sha256Buffer(small["release-rehearsal.json"]) ||
     rehearsal.git.commit !== manifest.gitSha
   ) {
