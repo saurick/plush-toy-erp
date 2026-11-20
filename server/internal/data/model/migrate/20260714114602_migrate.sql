@@ -1,0 +1,16 @@
+-- Create index "financefact_fact_type_source_type_source_id" to table: "finance_facts"
+CREATE UNIQUE INDEX "financefact_fact_type_source_type_source_id" ON "finance_facts" ("fact_type", "source_type", "source_id") WHERE ((source_type IS NOT NULL) AND (source_id IS NOT NULL) AND ((status)::text <> 'CANCELLED'::text));
+-- Modify "purchase_receipt_adjustments" table
+ALTER TABLE "purchase_receipt_adjustments" ADD CONSTRAINT "purchase_receipt_adjustments_idempotency_bundle_complete" CHECK (((idempotency_key IS NULL) AND (idempotency_payload_hash IS NULL) AND (idempotency_item_count IS NULL)) OR ((idempotency_key IS NOT NULL) AND ((length(TRIM(BOTH FROM idempotency_key)) >= 1) AND (length(TRIM(BOTH FROM idempotency_key)) <= 128)) AND (idempotency_payload_hash IS NOT NULL) AND (length((idempotency_payload_hash)::text) = 64) AND (idempotency_item_count IS NOT NULL) AND (idempotency_item_count > 0))), ADD COLUMN "idempotency_key" character varying NULL, ADD COLUMN "idempotency_payload_hash" character varying NULL, ADD COLUMN "idempotency_item_count" bigint NULL;
+-- Create index "purchasereceiptadjustment_idempotency_key" to table: "purchase_receipt_adjustments"
+CREATE UNIQUE INDEX "purchasereceiptadjustment_idempotency_key" ON "purchase_receipt_adjustments" ("idempotency_key");
+-- Modify "purchase_returns" table
+ALTER TABLE "purchase_returns" ADD CONSTRAINT "purchase_returns_idempotency_bundle_complete" CHECK (((idempotency_key IS NULL) AND (idempotency_payload_hash IS NULL) AND (idempotency_item_count IS NULL)) OR ((idempotency_key IS NOT NULL) AND ((length(TRIM(BOTH FROM idempotency_key)) >= 1) AND (length(TRIM(BOTH FROM idempotency_key)) <= 128)) AND (idempotency_payload_hash IS NOT NULL) AND (length((idempotency_payload_hash)::text) = 64) AND (idempotency_item_count IS NOT NULL) AND (idempotency_item_count > 0))), ADD COLUMN "idempotency_key" character varying NULL, ADD COLUMN "idempotency_payload_hash" character varying NULL, ADD COLUMN "idempotency_item_count" bigint NULL;
+-- Create index "purchasereturn_idempotency_key" to table: "purchase_returns"
+CREATE UNIQUE INDEX "purchasereturn_idempotency_key" ON "purchase_returns" ("idempotency_key");
+-- Modify "shipment_items" table
+ALTER TABLE "shipment_items" ADD CONSTRAINT "shipment_items_amount_snapshot_nonnegative" CHECK ((amount_snapshot IS NULL) OR (amount_snapshot >= (0)::numeric)), ADD CONSTRAINT "shipment_items_currency_snapshot_allowed" CHECK ((currency_snapshot)::text = ANY ((ARRAY['USD'::character varying, 'CNY'::character varying, 'HKD'::character varying])::text[])), ADD CONSTRAINT "shipment_items_unit_price_snapshot_nonnegative" CHECK ((unit_price_snapshot IS NULL) OR (unit_price_snapshot >= (0)::numeric)), ADD COLUMN "unit_price_snapshot" numeric(20,6) NULL, ADD COLUMN "amount_snapshot" numeric(20,6) NULL, ADD COLUMN "currency_snapshot" character varying NOT NULL DEFAULT 'CNY';
+-- Modify "purchase_receipts" table
+ALTER TABLE "purchase_receipts" ADD COLUMN "supplier_id" bigint NULL, ADD CONSTRAINT "purchase_receipts_suppliers_purchase_receipts" FOREIGN KEY ("supplier_id") REFERENCES "suppliers" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
+-- Create index "purchasereceipt_supplier_id" to table: "purchase_receipts"
+CREATE INDEX "purchasereceipt_supplier_id" ON "purchase_receipts" ("supplier_id");

@@ -1,0 +1,4 @@
+-- Modify "outsourcing_order_items" table
+ALTER TABLE "outsourcing_order_items" ADD CONSTRAINT "outsourcing_order_items_product_sku_id_positive" CHECK ((product_sku_id IS NULL) OR (product_sku_id > 0)), ADD CONSTRAINT "outsourcing_order_items_product_sku_product_only" CHECK ((product_sku_id IS NULL) OR ((subject_type)::text = 'PRODUCT'::text)), ADD COLUMN "sku_code_snapshot" character varying NULL, ADD COLUMN "product_sku_id" bigint NULL, ADD CONSTRAINT "outsourcing_order_items_product_skus_product_sku" FOREIGN KEY ("product_sku_id") REFERENCES "product_skus" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION;
+-- Create index "outsourcingorderitem_product_sku_id" to table: "outsourcing_order_items"
+CREATE INDEX "outsourcingorderitem_product_sku_id" ON "outsourcing_order_items" ("product_sku_id");
