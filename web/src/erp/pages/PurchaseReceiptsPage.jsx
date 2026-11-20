@@ -1,0 +1,1662 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  DownOutlined,
+  EyeOutlined,
+  LinkOutlined,
+} from '@ant-design/icons'
+import { Button, Dropdown, Popconfirm, Tag } from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
+import { canReadReference } from '../utils/remoteReferences.mjs'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
+import { purchaseFactActionPresentation } from '../utils/businessFactActionPresentation.mjs'
+import { PurchaseReceiptAdjustmentStatus, PurchaseReceiptStatus, PurchaseReturnStatus } from '../../common/consts/statuses.generated.mjs'
+import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { formatUnitQuantitySummary } from '../utils/sourceOrderAmounts.mjs'
+import useBusinessPageState from '../hooks/useBusinessPageState'
+import { arrivalDifference } from '../utils/incomingAcceptance.mjs'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import {
+  cancelPurchaseReceipt,
+  cancelPurchaseReceiptDraft,
+  createPurchaseReceiptAdjustmentFromReceipt,
+  createPurchaseReturnFromReceipt,
+  getPurchaseReceipt,
+  listAllPurchaseReceipts,
+  listPurchaseReceipts,
+  postPurchaseReceipt,
+} from '../api/purchaseApi.mjs'
+import { createPayableFromPurchaseReceipt } from '../api/operationalFactApi.mjs'
+import {
+  listAllUnits,
+  listAllWarehouses,
+} from '../api/masterDataOrderApi.mjs'
+import {
+  BusinessActionTooltip,
+  BusinessOperationPanel,
+  BusinessDataTable,
+  BusinessPageLayout,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+  SelectionActionBar,
+  SelectionClearAction,
+} from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import { purchaseMaterialLineGroupKey } from '../utils/sourceDocumentLineGroupKeys.mjs'
+import PurchaseReceiptExceptionModal from '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
+import PurchaseReceiptExceptionRecordsModal from '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx'
+import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
+import {
+  formatUnixDate,
+  formatUnixDateTime,
+  hasActionPermission,
+  BUSINESS_ROUTE_PATHS,
+} from '../utils/masterDataOrderView.mjs'
+import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
+import { formatQuantity } from '../utils/businessLineItems.mjs'
+import {
+  comparePurchaseReceiptQuantityTotals,
+  sumPurchaseReceiptQuantities,
+} from '../utils/purchaseReceiptDecimal.mjs'
+import {
+  buildPurchaseReceiptAdjustmentPayload,
+  buildPurchaseReturnFromReceiptPayload,
+} from '../utils/purchaseReceiptExceptionAction.mjs'
+import {
+  requireSourceActionRecord,
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+  sourceBusinessActionNo,
+} from '../utils/sourceBusinessAction.mjs'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
+import { sourceActionAccess, isSourceActionPermissionDenied, SOURCE_ACCESS_REVOKED_MESSAGE } from '../utils/sourceActionAccess.mjs'
+import SourceActionAccessNotice from '../components/SourceActionAccessNotice.jsx'
+import {
+  FINANCE_BUSINESS_SOURCE_ACTIONS,
+  buildPurchaseReceiptPayablePayload,
+  financeBusinessSourceFormValuesFromRequest,
+} from '../utils/financeBusinessSourceAction.mjs'
+import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
+  createBusinessTablePagination,
+  getBusinessPaginationParams,
+  resetBusinessPaginationCurrent,
+  resolveExactRecordPage,
+} from '../utils/businessPagination.mjs'
+import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
+import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
+import {
+  inventoryLotOption,
+  materialOption,
+  referenceLabel,
+  uniqueReferenceOptions,
+  unitOption,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
+import {
+  searchParamPositiveInt,
+  searchParamText,
+} from '../utils/routeQuery.mjs'
+import {
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
+
+const STATUS_OPTIONS = [
+  { label: '全部状态', value: '' },
+  { label: '草稿', value: PurchaseReceiptStatus.DRAFT },
+  { label: '已过账', value: PurchaseReceiptStatus.POSTED },
+  { label: '已取消', value: PurchaseReceiptStatus.CANCELLED },
+]
+
+const STATUS_LABELS = Object.freeze({
+  [PurchaseReceiptStatus.DRAFT]: '草稿',
+  [PurchaseReceiptStatus.POSTED]: '已过账',
+  [PurchaseReceiptStatus.CANCELLED]: '已取消',
+})
+
+const STATUS_COLORS = Object.freeze({
+  [PurchaseReceiptStatus.DRAFT]: 'default',
+  [PurchaseReceiptStatus.POSTED]: 'blue',
+  [PurchaseReceiptStatus.CANCELLED]: 'red',
+})
+const DATE_FILTER_OPTIONS = [{ label: '入库日期', value: 'received_at' }]
+
+function receiptStatusLabel(status, record, { emptyText = '-' } = {}) {
+  const key = String(status || '').trim()
+  if (key === PurchaseReceiptStatus.POSTED && Number(record?.pending_inbound_lines) > 0) {
+    return '部分入库'
+  }
+  return STATUS_LABELS[key] || (key ? '入库状态' : emptyText)
+}
+
+function statusTag(status, record) {
+  const key = String(status || '').trim()
+  return (
+    <Tag color={STATUS_COLORS[key] || 'default'}>
+      {receiptStatusLabel(status, record)}
+    </Tag>
+  )
+}
+
+function optionalText(value) {
+  const text = String(value ?? '').trim()
+  return text || '-'
+}
+
+function receiptItemCount(receipt = {}) {
+  return Array.isArray(receipt.items) ? receipt.items.length : 0
+}
+
+function receiptQuantityTotal(receipt = {}) {
+  return sumPurchaseReceiptQuantities(receipt.items)
+}
+
+export default function PurchaseReceiptsPage() {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const outletContext = useBusinessPageContext()
+  const navigate = useBusinessNavigate()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
+  const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
+  const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [keyword, setKeyword] = useBusinessPageState('keyword', '')
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [statusFilter, setStatusFilter] = useBusinessPageState(
+    'statusFilter',
+    ''
+  )
+  const [dateFilterField, setDateFilterField] = useBusinessPageState(
+    'dateFilterField',
+    'received_at'
+  )
+  const [dateFilterStart, setDateFilterStart] = useBusinessPageState(
+    'dateFilterStart',
+    ''
+  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState(
+    'dateFilterEnd',
+    ''
+  )
+  const [supplierFilter, setSupplierFilter] = useBusinessPageState(
+    'supplierFilter',
+    ''
+  )
+  const [materialFilter, setMaterialFilter] = useBusinessPageState(
+    'materialFilter',
+    ''
+  )
+  const [warehouseFilter, setWarehouseFilter] = useBusinessPageState(
+    'warehouseFilter',
+    ''
+  )
+  const [lotFilter, setLotFilter] = useBusinessPageState('lotFilter', '')
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: DEFAULT_BUSINESS_PAGE_SIZE,
+  })
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  useWorkflowTaskBusinessBusy(saving)
+  const [selectedRow, setSelectedRow] = useState(null)
+  const [detailReceipt, setDetailReceipt] = useState(null)
+  const [receiptExceptionMode, setReceiptExceptionMode] = useState(null)
+  const [receiptExceptionSource, setReceiptExceptionSource] = useState(null)
+  const beginExceptionRequest = useLatestRequestCoordinator()
+  const exceptionInFlightRef = useRef(false)
+  const exceptionAccessRef = useRef(null)
+  const [receiptExceptionRecordsOpen, setReceiptExceptionRecordsOpen] =
+    useState(false)
+  const [financeSourceReceipt, setFinanceSourceReceipt] = useState(null)
+  const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
+  const [materials, , mergeMaterials] = useReferenceRecords(adminProfile)
+  const [suppliers, , mergeSuppliers] = useReferenceRecords(adminProfile)
+  const [units, setUnits] = useState([])
+  const [warehouses, setWarehouses] = useState([])
+  const [inventoryLots, , mergeInventoryLots] = useReferenceRecords(adminProfile)
+  const exceptionAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
+  const financeSourceAttemptsRef = useRef(
+    createSourceBusinessActionAttemptStore()
+  )
+  const financeSourceInFlightRef = useRef(false)
+  const routePurchaseOrderID = searchParamPositiveInt(
+    searchParams,
+    'purchase_order_id'
+  )
+  const routeReceiptID =
+    searchParamPositiveInt(searchParams, 'receipt_id') ||
+    (searchParamText(searchParams, 'source_type').toUpperCase() ===
+    'PURCHASE_RECEIPT'
+      ? searchParamPositiveInt(searchParams, 'source_id')
+      : '')
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const resolvedRouteKeyword =
+    routeReceiptID && Number(selectedRow?.id || 0) === Number(routeReceiptID)
+      ? String(selectedRow?.receipt_no || '').trim()
+      : ''
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
+  )
+
+  const beginLatestRequest = useLatestRequestCoordinator()
+
+  const canCreate = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RECEIPT_CREATE
+  )
+  const canPost = hasActionPermission(
+    adminProfile,
+    PermissionCode.WAREHOUSE_INBOUND_CONFIRM
+  )
+  const canCancelDraft = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RECEIPT_CANCEL_DRAFT
+  )
+  const returnSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receiptReturn)
+  const adjustmentSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receiptAdjustment)
+  const canCreateReturn = returnSourceAccess.allowed
+  const canPostReturn = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RETURN_POST
+  )
+  const canCancelReturn = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RETURN_CANCEL
+  )
+  const canReadReturn = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RETURN_READ
+  )
+  const canReadAdjustment = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_READ
+  )
+  const canCreateAdjustment = adjustmentSourceAccess.allowed
+  exceptionAccessRef.current = { return: returnSourceAccess, adjustment: adjustmentSourceAccess }
+  const canPostAdjustment = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_POST
+  )
+  const canCancelAdjustment = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_CANCEL
+  )
+  const receiptSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receipt)
+  const payableSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.payable)
+  const canCreatePayable = payableSourceAccess.allowed
+  const canViewPayable =
+    (canCreatePayable ||
+      hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ)) &&
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
+  const canOpenPurchaseOrders = canOpenRelatedPath(
+    BUSINESS_ROUTE_PATHS.purchaseOrders
+  )
+  const canOpenQualityInspections = canOpenRelatedPath(
+    BUSINESS_ROUTE_PATHS.qualityInspections
+  )
+  const canOpenInventory = canOpenRelatedPath(BUSINESS_ROUTE_PATHS.inventory)
+  const relatedMenuItems = useMemo(() => {
+    const items = []
+    if (selectedRow?.purchase_order_id && canOpenPurchaseOrders) {
+      items.push({ key: 'purchase-orders', label: '采购订单' })
+    }
+    if (canOpenQualityInspections) {
+      items.push({ key: 'quality-inspections', label: '来料质检' })
+    }
+    if (canOpenInventory) {
+      items.push({ key: 'inventory', label: '库存台账' })
+    }
+    if (canReadReturn || canReadAdjustment) {
+      items.push({
+        key: 'exception-records',
+        label: <span title={saving ? '当前操作完成后可查看记录' : undefined}>退货与调整记录</span>,
+        disabled: saving,
+      })
+    }
+    return items
+  }, [
+    canOpenInventory,
+    canOpenPurchaseOrders,
+    canOpenQualityInspections,
+    canReadReturn,
+    canReadAdjustment,
+    saving,
+    selectedRow?.purchase_order_id,
+  ])
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: relatedMenuItems.length > 0,
+    record: selectedRow,
+    itemCount: relatedMenuItems.length,
+  })
+  const payableViewAvailability = resolveContextualBusinessActionAvailability({
+    authorized: canViewPayable,
+    selected: Boolean(selectedRow),
+    relevant: selectedRow?.status === PurchaseReceiptStatus.POSTED,
+    busy: saving || financeSourceLoading,
+    busyReason: '当前操作完成后可查看应付',
+  })
+  const materialOptions = useMemo(
+    () => uniqueReferenceOptions(materials, materialOption),
+    [materials]
+  )
+  const supplierOptions = useMemo(() => {
+    const seen = new Set()
+    return suppliers
+      .map((supplier) => {
+        const value = String(supplier?.name || '').trim()
+        if (!value || seen.has(value)) return null
+        seen.add(value)
+        return {
+          label: [supplier.code, value].filter(Boolean).join(' '),
+          identity: { name: value, code: supplier.code || '' },
+          value,
+        }
+      })
+      .filter(Boolean)
+  }, [suppliers])
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
+  )
+  const inventoryLotOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
+    [inventoryLots]
+  )
+  const warehouseOptions = useMemo(
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
+  )
+  const getPurchaseReceiptItemFields = useCallback(
+    (item) => [
+      {
+        key: 'material',
+        label: '材料',
+        value: referenceLabel(materialOptions, item?.material_id, '材料'),
+        wide: true,
+        strong: true,
+      },
+      {
+        key: 'warehouse',
+        label: '仓库',
+        value: referenceLabel(warehouseOptions, item?.warehouse_id, '仓库'),
+      },
+      {
+        key: 'lot',
+        label: '批次',
+        value: referenceLabel(inventoryLotOptions, item?.lot_id, '批次'),
+        wide: true,
+      },
+      { key: 'lot_no', label: '批次号', value: optionalText(item?.lot_no) },
+      {
+        key: 'quantity',
+        label: '本次实点数量',
+        value: formatQuantity(item?.quantity),
+        rowStart: true,
+      },
+      {
+        key: 'declared_quantity',
+        label: '送货标示数量',
+        value:
+          item?.declared_quantity == null
+            ? '未提供'
+            : formatQuantity(item.declared_quantity),
+      },
+      {
+        key: 'arrival_difference',
+        label: '实点与标示差异',
+        value: arrivalDifference(item?.quantity, item?.declared_quantity),
+      },
+      {
+        key: 'unit',
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      {
+        key: 'unit_price',
+        label: '单价',
+        value: optionalText(item?.unit_price),
+      },
+      { key: 'amount', label: '金额', value: optionalText(item?.amount) },
+      { key: 'inbound_result', label: '入库结果', value: item?.posted ? '已入库' : item?.rejection_disposed ? '已拒收处置' : '尚未入库' },
+      ...(item?.price_confirmed_later ? [{ key: 'price_source', label: '价格来源', value: '采购单补价确认' }] : []),
+      {
+        key: 'purchase_order_item',
+        label: '采购订单行',
+        value: item?.purchase_order_item_id
+          ? item?.source_line_no
+            ? `来源第 ${item.source_line_no} 行`
+            : '已关联采购订单行'
+          : '-',
+      },
+      {
+        key: 'source_line_no',
+        label: '来源行号',
+        value: optionalText(item?.source_line_no),
+      },
+      {
+        key: 'note',
+        label: '备注',
+        value: optionalText(item?.note),
+        fullWidth: true,
+      },
+    ],
+    [inventoryLotOptions, materialOptions, unitOptions, warehouseOptions]
+  )
+  const openRelatedTable = ({ key }) => {
+    if (!selectedRow) return
+    if (key === 'exception-records') {
+      if ((canReadReturn || canReadAdjustment) && !saving) {
+        setReceiptExceptionRecordsOpen(true)
+      }
+      return
+    }
+    const pathByKey = {
+      'purchase-orders': relatedDocumentRoute(
+        BUSINESS_ROUTE_PATHS.purchaseOrders,
+        { purchase_order_id: selectedRow.purchase_order_id },
+        {
+          keyword: selectedRow.purchase_order_no,
+          source: 'purchase-receipt',
+          fields: ['purchase_order_no'],
+        }
+      ),
+      'quality-inspections': relatedDocumentRoute(
+        BUSINESS_ROUTE_PATHS.qualityInspections,
+        { purchase_receipt_id: selectedRow.id },
+        {
+          keyword: selectedRow.receipt_no,
+          source: 'purchase-receipt',
+          fields: ['source_no'],
+        }
+      ),
+      inventory: relatedDocumentRoute(
+        BUSINESS_ROUTE_PATHS.inventory,
+        {
+          source_type: 'PURCHASE_RECEIPT',
+          source_id: selectedRow.id,
+          view: 'txns',
+        },
+        {
+          keyword: selectedRow.receipt_no,
+          source: 'purchase-receipt',
+          fields: ['source_no'],
+        }
+      ),
+    }
+    const targetPath = pathByKey[key]
+    if (targetPath) {
+      navigate(targetPath)
+    }
+  }
+
+  const receiptListParams = useMemo(
+    () =>
+      compactParams({
+        status: statusFilter,
+        keyword: trimOptional(
+          linkedDocumentRequestKeyword({
+            localKeyword: keyword,
+            linkedKeyword,
+            hasExactContext: Boolean(routeReceiptID || routePurchaseOrderID),
+          })
+        ),
+        supplier_name: supplierFilter || undefined,
+        date_field: dateFilterField,
+        date_from: dateFilterStart || undefined,
+        date_to: dateFilterEnd || undefined,
+        material_id: materialFilter || undefined,
+        warehouse_id: warehouseFilter || undefined,
+        lot_id: lotFilter || undefined,
+        purchase_order_id: routePurchaseOrderID || undefined,
+      }),
+    [
+      dateFilterEnd,
+      dateFilterField,
+      dateFilterStart,
+      keyword,
+      linkedKeyword,
+      lotFilter,
+      materialFilter,
+      routePurchaseOrderID,
+      routeReceiptID,
+      statusFilter,
+      supplierFilter,
+      warehouseFilter,
+    ]
+  )
+
+  const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
+    setStatusCounts(null)
+    setLoading(true)
+    try {
+      const routeSelectedID = Number(routeReceiptID || 0)
+      const [data, routeReceipt] = await Promise.all([
+        listPurchaseReceipts(
+          {
+            ...receiptListParams,
+            include_status_counts: true,
+            ...getBusinessPaginationParams(pagination),
+          },
+          { signal: request.signal }
+        ),
+        routeSelectedID > 0
+          ? getPurchaseReceipt(
+              { id: routeSelectedID },
+              { signal: request.signal }
+            )
+          : Promise.resolve(null),
+      ])
+      if (!request.isCurrent()) {
+        return
+      }
+      const listedRows = Array.isArray(data?.purchase_receipts)
+        ? data.purchase_receipts
+        : []
+      const exactPage = resolveExactRecordPage({
+        records: listedRows,
+        exactRecord: routeReceipt,
+        hasExactContext: routeSelectedID > 0,
+        total: Number(data?.total || 0),
+      })
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeReceipt,
+      }))
+      const nextRows = exactPage.records
+      setRows(nextRows)
+      setSelectedRow((current) => {
+        if (routeSelectedID > 0) {
+          return routeReceipt
+        }
+        return current?.id
+          ? nextRows.find((item) => item.id === current.id) || null
+          : null
+      })
+      setTotal(exactPage.total)
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return
+      }
+      showPageLoadError(error, '加载采购入库单')
+    } finally {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+    }
+  }, [beginLatestRequest, pagination, receiptListParams, routeReceiptID])
+
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = clearLinkedDocumentParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : ['purchase_order_id', 'receipt_id', 'source_type', 'source_id']
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetBusinessPaginationCurrent(setPagination)
+    },
+    [searchParams, setPagination, setSearchParams]
+  )
+
+  useEffect(() => {
+    loadRows()
+  }, [loadRows])
+
+  const loadReferenceOptions = useCallback(async () => {
+    const request = beginLatestRequest('receipt-references')
+    try {
+      const [unitResult, warehouseResult] = await Promise.all([
+        listAllUnits({}, { signal: request.signal }),
+        listAllWarehouses({ active_only: true }, { signal: request.signal }),
+      ])
+      if (!request.isCurrent()) return
+      setUnits(unitResult.units || [])
+      setWarehouses(warehouseResult.warehouses || [])
+    } catch (error) {
+      if (!isRpcAbortError(error) && request.isCurrent()) showPageLoadError(error, '加载收货单位和仓库')
+    } finally { request.finish() }
+  }, [beginLatestRequest])
+
+  useEffect(() => {
+    loadReferenceOptions()
+  }, [loadReferenceOptions])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(() => Promise.all([loadRows(), loadReferenceOptions()]))
+  }, [loadRows, loadReferenceOptions, outletContext])
+
+  const runReceiptAction = useCallback(
+    async (receipt, action) => {
+      if (!receipt?.id) return
+      const actionKey = action === postPurchaseReceipt ? 'post' : 'cancel'
+      const presentation = purchaseFactActionPresentation('receipt', receipt, actionKey)
+      setSaving(true)
+      try {
+        const nextReceipt = requireSourceActionRecord(await action({ id: receipt.id }), receipt.id)
+        setSelectedRow(nextReceipt)
+        const successText = actionKey === 'post'
+          ? purchaseFactActionPresentation('receipt', nextReceipt).success
+          : presentation.success
+        reportBusinessResult(successText, nextReceipt)
+        message.success(successText)
+        await loadRows()
+      } catch (error) {
+        message.error(getActionErrorMessage(error, presentation.label))
+      } finally {
+        setSaving(false)
+      }
+    },
+    [loadRows, reportBusinessResult]
+  )
+
+  const closeReceiptException = useCallback(() => {
+    beginExceptionRequest('exception').finish()
+    setReceiptExceptionMode(null)
+    setReceiptExceptionSource(null)
+    setSaving(false)
+  }, [beginExceptionRequest])
+
+  const openReceiptException = useCallback((mode) => {
+    const access = exceptionAccessRef.current[mode]
+    if (!access?.allowed) {
+      message.warning(access?.reason)
+      return
+    }
+    if (!selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED) return
+    setReceiptExceptionSource(selectedRow)
+    setReceiptExceptionMode(mode)
+  }, [selectedRow])
+
+  useEffect(() => {
+    if (receiptExceptionMode && !exceptionAccessRef.current[receiptExceptionMode].allowed) {
+      closeReceiptException()
+      message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [canCreateReturn, canCreateAdjustment, receiptExceptionMode, closeReceiptException])
+
+  const submitReceiptException = useCallback(
+    async (values) => {
+      const receipt = receiptExceptionSource
+      const mode = receiptExceptionMode
+      if (!receipt?.id || !['return', 'adjustment'].includes(mode) || exceptionInFlightRef.current) return
+      if (!exceptionAccessRef.current[mode].allowed) {
+        closeReceiptException()
+        message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+        return
+      }
+      const request = beginExceptionRequest('exception')
+      exceptionInFlightRef.current = true
+      const scope = `${mode}:${receipt.id}`
+      let attempt
+      setSaving(true)
+      try {
+        const sourcePayload =
+          mode === 'return'
+            ? buildPurchaseReturnFromReceiptPayload(values, receipt)
+            : buildPurchaseReceiptAdjustmentPayload(values, receipt)
+        const payload = {
+          ...sourcePayload,
+          customer_key: activeCustomerKey || undefined,
+        }
+        attempt = exceptionAttemptsRef.current.prepare(scope, payload)
+        const businessNo = sourceBusinessActionNo(
+          mode === 'return' ? 'PRT' : 'PRA',
+          receipt.receipt_no,
+          attempt.params.idempotency_key
+        )
+        let createdRecord
+        if (mode === 'return') {
+          createdRecord = await createPurchaseReturnFromReceipt({
+            ...attempt.params,
+            return_no: businessNo,
+          })
+        } else {
+          createdRecord = await createPurchaseReceiptAdjustmentFromReceipt({
+            ...attempt.params,
+            adjustment_no: businessNo,
+          })
+        }
+        if (
+          Number(createdRecord?.id || 0) <= 0 ||
+          Number(createdRecord?.purchase_receipt_id || 0) !==
+            Number(receipt.id) ||
+          String(createdRecord?.status || '').toUpperCase() !==
+            (mode === 'return' ? PurchaseReturnStatus.DRAFT : PurchaseReceiptAdjustmentStatus.DRAFT)
+        ) {
+          const error = new Error('采购异常记录返回结果无法确认')
+          error.isInvalidResponse = true
+          throw error
+        }
+        exceptionAttemptsRef.current.settle(scope, attempt)
+        if (!request.isCurrent() || !exceptionAccessRef.current[mode].allowed) return
+        reportBusinessResult(mode === 'return' ? '采购退货草稿已生成' : '入库调整草稿已生成', createdRecord)
+        message.success(
+          mode === 'return' ? '采购退货草稿已生成' : '入库调整草稿已生成'
+        )
+        closeReceiptException()
+        if (
+          (mode === 'return' && canReadReturn) ||
+          (mode === 'adjustment' && canReadAdjustment)
+        ) {
+          setReceiptExceptionRecordsOpen(true)
+        }
+        await loadRows()
+      } catch (error) {
+        const retained = attempt
+          ? exceptionAttemptsRef.current.settle(scope, attempt, error)
+          : isSourceBusinessActionResultUnknown(error)
+        if (!request.isCurrent()) return
+        if (isSourceActionPermissionDenied(error)) {
+          closeReceiptException()
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+          return
+        }
+        if (retained) {
+          message.warning(
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
+          )
+        } else {
+          message.error(
+            getActionErrorMessage(
+              error,
+              mode === 'return' ? '生成采购退货' : '生成入库调整'
+            )
+          )
+        }
+      } finally {
+        exceptionInFlightRef.current = false
+        if (request.isCurrent()) {
+          setSaving(false)
+          request.finish()
+        }
+      }
+    },
+    [
+      activeCustomerKey,
+      canReadAdjustment,
+      canReadReturn,
+      loadRows,
+      receiptExceptionMode,
+      receiptExceptionSource,
+      beginExceptionRequest,
+      closeReceiptException,
+      reportBusinessResult,
+    ]
+  )
+
+  const purchasePayableScope = financeSourceReceipt?.id
+    ? `purchase-receipt-payable:${financeSourceReceipt.id}`
+    : ''
+  useEffect(() => {
+    if (financeSourceReceipt && !canCreatePayable) {
+      setFinanceSourceReceipt(null)
+      message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [canCreatePayable, financeSourceReceipt])
+  const financeSourceInitialValues = useMemo(() => {
+    if (!purchasePayableScope) return undefined
+    const retained = financeSourceAttemptsRef.current.peek(purchasePayableScope)
+    return retained
+      ? financeBusinessSourceFormValuesFromRequest(retained.params)
+      : undefined
+  }, [purchasePayableScope])
+
+  const openPurchaseReceiptPayable = useCallback(
+    (receipt) => {
+      if (!canCreatePayable) {
+        message.warning(payableSourceAccess.reason)
+        return
+      }
+      if (
+        !receipt?.id ||
+        (String(receipt.status || '').toUpperCase() !== PurchaseReceiptStatus.POSTED || Number(receipt.pending_inbound_lines) > 0)
+      ) {
+        message.warning('请先完成本收货单的入库或拒收处置，再生成应付')
+        return
+      }
+      setFinanceSourceReceipt(receipt)
+    },
+    [canCreatePayable, payableSourceAccess.reason]
+  )
+
+  const closePurchaseReceiptPayable = useCallback(() => {
+    if (financeSourceInFlightRef.current) return
+    setFinanceSourceReceipt(null)
+  }, [])
+
+  const submitPurchaseReceiptPayable = useCallback(
+    async (values) => {
+      const receipt = financeSourceReceipt
+      if (
+        financeSourceInFlightRef.current ||
+        !canCreatePayable ||
+        !receipt?.id
+      ) {
+        return
+      }
+      const scope = `purchase-receipt-payable:${receipt.id}`
+      let attempt
+      try {
+        const payload = {
+          ...buildPurchaseReceiptPayablePayload(values, receipt),
+          customer_key: activeCustomerKey || undefined,
+        }
+        attempt = financeSourceAttemptsRef.current.prepare(scope, payload)
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '准备应付草稿'))
+        return
+      }
+
+      financeSourceInFlightRef.current = true
+      setFinanceSourceLoading(true)
+      try {
+        await createPayableFromPurchaseReceipt(attempt.params)
+        financeSourceAttemptsRef.current.settle(scope, attempt, null)
+        setFinanceSourceReceipt(null)
+        message.success('应付草稿已生成，请到应付管理核对并确认')
+        await loadRows()
+      } catch (error) {
+        const retained = financeSourceAttemptsRef.current.settle(
+          scope,
+          attempt,
+          error
+        )
+        if (isSourceActionPermissionDenied(error)) {
+          setFinanceSourceReceipt(null)
+          message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+        } else if (retained) {
+          message.warning(
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
+          )
+        } else {
+          message.error(getActionErrorMessage(error, '生成应付'))
+        }
+      } finally {
+        financeSourceInFlightRef.current = false
+        setFinanceSourceLoading(false)
+      }
+    },
+    [activeCustomerKey, canCreatePayable, financeSourceReceipt, loadRows]
+  )
+
+  const viewPurchaseReceiptPayable = useCallback(
+    (receipt) => {
+      if (!receipt?.id) return
+      navigate(
+        relatedDocumentRoute(
+          BUSINESS_ROUTE_PATHS.payables,
+          { source_type: 'PURCHASE_RECEIPT', source_id: receipt.id },
+          {
+            keyword: receipt.receipt_no,
+            source: 'purchase-receipt',
+            fields: ['source_no'],
+          }
+        )
+      )
+    },
+    [navigate]
+  )
+
+  const selectedRowLabel = selectedRow
+    ? `${selectedRow.receipt_no || '采购入库单已关联'} / ${
+        selectedRow.supplier_name || '未填写供应商'
+      }`
+    : '请先选择一张采购入库单'
+
+  const openPurchaseReceiptDetails = useCallback((receipt) => {
+    if (!receipt?.id) return
+    setSelectedRow(receipt)
+    setDetailReceipt(receipt)
+  }, [])
+
+  const columns = useMemo(
+    () =>
+      applyBusinessColumnSorters([
+        {
+          defaultPriority: 10,
+          title: '入库单号',
+          exportTitle: '入库单号',
+          dataIndex: 'receipt_no',
+          copyable: true,
+          detailCopyable: true,
+          width: 160,
+          sortType: 'text',
+        },
+        {
+          defaultPriority: 20,
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'status',
+          width: 110,
+          sortType: 'text',
+          render: statusTag,
+          exportValue: (record) => receiptStatusLabel(record?.status, record, { emptyText: '' }),
+        },
+        {
+          align: 'left',
+          defaultPriority: 30,
+          title: '供应商',
+          exportTitle: '供应商',
+          dataIndex: 'supplier_name',
+          copyable: true,
+          width: 180,
+          sortType: 'text',
+        },
+        {
+          defaultPriority: 40,
+          title: '收货日期',
+          exportTitle: '收货日期',
+          dataIndex: 'received_at',
+          width: 130,
+          sortType: 'date',
+          render: formatUnixDate,
+          exportValue: (record) => formatUnixDate(record?.received_at, { emptyText: '' }),
+        },
+        {
+          defaultPriority: 70,
+          title: '过账时间',
+          exportTitle: '过账时间',
+          dataIndex: 'posted_at',
+          width: 170,
+          sortType: 'date',
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.posted_at, { emptyText: '' }),
+        },
+        {
+          align: 'right',
+          defaultPriority: 60,
+          title: '明细行数',
+          exportTitle: '明细行数',
+          key: 'item_count',
+          hidden: true,
+          width: 100,
+          sortValue: receiptItemCount,
+          render: (_, record) => receiptItemCount(record),
+          exportValue: receiptItemCount,
+        },
+        {
+          align: 'right',
+          defaultPriority: 50,
+          title: '收货数量',
+          exportTitle: '收货数量',
+          key: 'quantity_total',
+          width: 120,
+          sortValue: receiptQuantityTotal,
+          sorter: (left, right) =>
+            comparePurchaseReceiptQuantityTotals(left?.items, right?.items),
+          render: (_, record) =>
+            formatUnitQuantitySummary(record.items, 'quantity', unitOptions),
+          exportValue: (record) =>
+            formatUnitQuantitySummary(record.items, 'quantity', unitOptions, { emptyText: '' }),
+        },
+        {
+          align: 'left',
+          title: '备注',
+          exportTitle: '备注',
+          dataIndex: 'note',
+          width: 300,
+          sortable: false,
+        },
+      ]),
+    [unitOptions]
+  )
+  const {
+    tableColumns,
+    exportColumns,
+    visibleColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: 'inbound',
+    moduleTitle: '采购入库',
+    columns,
+  })
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      const routeSelectedID = Number(routeReceiptID || 0)
+      if (routeSelectedID > 0) {
+        const receipt = await getPurchaseReceipt(
+          { id: routeSelectedID },
+          { signal }
+        )
+        return receipt ? [receipt] : []
+      }
+      const result = await listAllPurchaseReceipts(receiptListParams, {
+        signal,
+      })
+      return result?.purchase_receipts
+    },
+    [receiptListParams, routeReceiptID]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: 'purchase-receipts-export',
+    loadRows: loadExportRows,
+    filename: `采购入库-${currentBusinessDate()}.csv`,
+    columns: exportColumns,
+    recordLabel: '采购入库单',
+  })
+  const activeFilterCount = [
+    supplierFilter,
+    materialFilter,
+    warehouseFilter,
+    lotFilter,
+    dateFilterStart || dateFilterEnd,
+    routePurchaseOrderID,
+    routeReceiptID,
+  ].filter(Boolean).length
+  const clearFilters = useCallback(() => {
+    setSupplierFilter('')
+    setMaterialFilter('')
+    setWarehouseFilter('')
+    setLotFilter('')
+    setDateFilterField('received_at')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    setKeyword(resolvedRouteKeyword || linkedKeyword || keyword)
+    clearRouteContext()
+  }, [
+    clearRouteContext,
+    setKeyword,
+    keyword,
+    linkedKeyword,
+    resolvedRouteKeyword,
+    setDateFilterEnd,
+    setDateFilterField,
+    setDateFilterStart,
+    setLotFilter,
+    setMaterialFilter,
+    setSupplierFilter,
+    setWarehouseFilter,
+  ])
+
+  const referenceReceipts = [...rows, selectedRow, detailReceipt, receiptExceptionSource, financeSourceReceipt].filter(Boolean)
+  const referenceItems = referenceReceipts.flatMap((row) => row.items || [])
+  useReferenceHydration({
+    suppliers: { ids: [...referenceReceipts.map((row) => row.supplier_id), supplierFilter], records: suppliers, onRecords: mergeSuppliers, enabled: canReadReference(adminProfile, 'suppliers') },
+    materials: { ids: [...referenceItems.map((row) => row.material_id), materialFilter], records: materials, onRecords: mergeMaterials, enabled: canReadReference(adminProfile, 'materials') },
+    inventory_lots: { ids: [...referenceItems.map((row) => row.lot_id), lotFilter], records: inventoryLots, onRecords: mergeInventoryLots, enabled: canReadReference(adminProfile, 'inventory_lots') },
+  }, adminProfile, rows)
+
+  return (
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ suppliers: mergeSuppliers, materials: mergeMaterials, inventory_lots: mergeInventoryLots }} inWorkspace className="erp-purchase-receipts-page">
+      <PageHeaderCard compact helpKey="inbound" title={getBusinessDocumentTitle('purchase_receipt')} />
+      <SourceActionAccessNotice access={receiptSourceAccess} />
+      <SourceActionAccessNotice access={payableSourceAccess} />
+      <SourceActionAccessNotice access={returnSourceAccess} />
+      <SourceActionAccessNotice access={adjustmentSourceAccess} />
+
+      <BusinessOperationPanel
+        inWorkspace
+        compact
+        onClearFilters={clearFilters}
+        activeFilterCount={activeFilterCount}
+        filters={
+          <>
+            <SearchInput
+              value={resolvedRouteKeyword || linkedKeyword || keyword}
+              {...BUSINESS_SEARCH_SCOPES.receipt}
+              onSearch={(value) => {
+                if (
+                  resolvedRouteKeyword ||
+                  linkedKeyword ||
+                  routeReceiptID ||
+                  routePurchaseOrderID
+                ) {
+                  clearRouteContext()
+                }
+                setKeyword(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <BusinessStatusFilter
+              inline
+              counts={statusCounts}
+              loading={loading}
+              exact={Boolean(routeReceiptID)}
+              aria-label="单据状态"
+              value={statusFilter}
+              options={STATUS_OPTIONS}
+              onChange={(nextStatus) => {
+                setStatusFilter(nextStatus)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="suppliers"
+              aria-label="供应商"
+              className="erp-business-filter-control--status"
+              value={supplierFilter}
+              options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
+              placeholder="供应商"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextSupplier) => {
+                setSupplierFilter(nextSupplier || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="materials"
+              aria-label="材料"
+              className="erp-business-filter-control--status"
+              value={materialFilter}
+              options={[{ label: '全部材料', value: '' }, ...materialOptions]}
+              placeholder="材料"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextMaterial) => {
+                setMaterialFilter(nextMaterial || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="仓库"
+              className="erp-business-filter-control--status"
+              value={warehouseFilter}
+              options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
+              placeholder="仓库"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextWarehouse) => {
+                setWarehouseFilter(nextWarehouse || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="inventory_lots"
+              aria-label="批次"
+              className="erp-business-filter-control--status"
+              value={lotFilter}
+              options={[
+                { label: '全部批次', value: '' },
+                ...inventoryLotOptions,
+              ]}
+              placeholder="批次"
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextLot) => {
+                setLotFilter(nextLot || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <DateRangeFilter
+              options={DATE_FILTER_OPTIONS}
+              value={dateFilterField}
+              startValue={dateFilterStart}
+              endValue={dateFilterEnd}
+              onRangeChange={(from, to, field) => {
+                setDateFilterField(field)
+                setDateFilterStart(from)
+                setDateFilterEnd(to)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            {routePurchaseOrderID ? (
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['purchase_order_id'])}
+              >
+                已按采购订单筛选
+              </Tag>
+            ) : null}
+            {routeReceiptID ? (
+              <Tag
+                closable
+                color="blue"
+                onClose={() =>
+                  clearRouteContext(['receipt_id', 'source_type', 'source_id'])
+                }
+              >
+                已按采购入库筛选
+              </Tag>
+            ) : null}
+          </>
+        }
+        actions={
+          <BusinessListToolbarActions
+            moduleTitle="采购入库"
+            onExport={exportRows}
+            exportDisabled={loading || exporting || total === 0}
+            exportDisabledReason={
+              exporting
+                ? '正在准备导出，请稍候'
+                : loading
+                  ? '采购入库单加载完成后可导出'
+                  : total === 0
+                    ? '当前筛选没有可导出的采购入库单'
+                    : ''
+            }
+            onOpenColumnOrder={openColumnOrder}
+          />
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRow ? 1 : 0}
+          selectedLabel={selectedRowLabel}
+          boundaryText="草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存。页面不会绕过这些规则直接修改库存。"
+        >
+          <SelectionClearAction
+            selectedCount={selectedRow ? 1 : 0}
+            selectionLabel="入库记录"
+            onClear={() => setSelectedRow(null)}
+          />
+          <BusinessTaskActions
+            sourceType="purchase_receipt"
+            record={selectedRow}
+            adminProfile={adminProfile}
+          />
+          {relatedActionAvailability.visible ? (
+            <BusinessActionTooltip
+              disabled={relatedActionAvailability.disabled}
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : relatedActionAvailability.disabledReason
+              }
+            >
+              <Dropdown
+                trigger={['click']}
+                destroyOnHidden
+                disabled={relatedActionAvailability.disabled}
+                menu={{
+                  items: relatedMenuItems,
+                  onClick: openRelatedTable,
+                }}
+              >
+                <Button
+                  size="small"
+                  icon={<LinkOutlined />}
+                  data-business-action-key="related-records"
+                  data-business-action-role="related"
+                  disabled={relatedActionAvailability.disabled}
+                >
+                  相关单据 <DownOutlined />
+                </Button>
+              </Dropdown>
+            </BusinessActionTooltip>
+          ) : null}
+          <BusinessActionTooltip
+            disabled={!selectedRow}
+            disabledReason="请先选择一条入库记录"
+          >
+            <Button
+              data-business-action-key="view-details"
+              data-business-action-role="view"
+              size="small"
+              icon={<EyeOutlined />}
+              disabled={!selectedRow}
+              onClick={() => openPurchaseReceiptDetails(selectedRow)}
+            >
+              查看详情
+            </Button>
+          </BusinessActionTooltip>
+          <BusinessAttachmentModalButton
+            ownerType="purchase_receipt"
+            ownerId={selectedRow?.id}
+            modalTitle="入库附件"
+            panelTitle="入库附件"
+            description="上传送货单、物流单、仓库收货照片或异常说明；附件不能代替入库确认。"
+            canUpload={canCreate || canPost}
+            canWithdraw={canPost}
+            disabled={!selectedRow}
+            disabledReason="请先选择一条入库记录"
+            buttonProps={{ 'data-business-action-key': 'attachments' }}
+          />
+          {canCreateReturn ? (
+            <BusinessActionTooltip
+              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.POSTED}
+              disabled={
+                !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== PurchaseReceiptStatus.POSTED
+                    ? '入库记录过账后可生成采购退货'
+                    : saving
+                      ? '当前操作完成后可生成采购退货'
+                      : ''
+              }
+            >
+              <Button
+                data-business-action-key="create-return"
+                data-business-action-placement="more"
+                data-business-action-role="secondary"
+                data-business-action-group="business"
+                size="small"
+                disabled={
+                  !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
+                }
+                onClick={() => openReceiptException('return')}
+              >
+                生成采购退货
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCreateAdjustment ? (
+            <BusinessActionTooltip
+              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.POSTED}
+              disabled={
+                !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== PurchaseReceiptStatus.POSTED
+                    ? '入库记录过账后可登记入库调整'
+                    : saving
+                      ? '当前操作完成后可登记入库调整'
+                      : ''
+              }
+            >
+              <Button
+                data-business-action-key="create-adjustment"
+                data-business-action-role="secondary"
+                data-business-action-group="business"
+                size="small"
+                disabled={
+                  !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
+                }
+                onClick={() => openReceiptException('adjustment')}
+              >
+                登记入库调整
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {payableViewAvailability.visible ? (
+            <BusinessActionTooltip
+              disabled={payableViewAvailability.disabled}
+              disabledReason={payableViewAvailability.disabledReason}
+            >
+              <Button
+                data-business-action-key="view-payable"
+                data-business-action-role="related"
+                size="small"
+                disabled={payableViewAvailability.disabled}
+                onClick={() => viewPurchaseReceiptPayable(selectedRow)}
+              >
+                查看应付
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCreatePayable ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedRow || [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED].includes(selectedRow.status)
+              }
+              disabled={
+                !selectedRow ||
+                selectedRow.status !== PurchaseReceiptStatus.POSTED || Number(selectedRow.pending_inbound_lines) > 0 ||
+                saving ||
+                financeSourceLoading
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== PurchaseReceiptStatus.POSTED
+                    ? '入库记录过账后可生成应付'
+                    : Number(selectedRow.pending_inbound_lines) > 0 ? '仍有未入库或未处置的明细' : '当前操作完成后可生成应付'
+              }
+            >
+              <Button
+                data-business-action-key="create-payable"
+                data-business-action-role="action"
+                size="small"
+                disabled={
+                  !selectedRow ||
+                  selectedRow.status !== PurchaseReceiptStatus.POSTED || Number(selectedRow.pending_inbound_lines) > 0 ||
+                  saving ||
+                  financeSourceLoading
+                }
+                onClick={() => openPurchaseReceiptPayable(selectedRow)}
+              >
+                生成应付
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canPost ? (
+            <BusinessActionTooltip
+              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.DRAFT || (selectedRow.status === PurchaseReceiptStatus.POSTED && Number(selectedRow.pending_inbound_lines) > 0)}
+              disabled={
+                !selectedRow || selectedRow.can_post !== true || saving
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.can_post !== true
+                    ? '当前没有可入库的合格行，请先完成检验或拒收处置'
+                    : saving
+                      ? '当前操作完成后可确认材料入库'
+                      : ''
+              }
+            >
+              <Popconfirm
+                title={purchaseFactActionPresentation('receipt', selectedRow).title}
+                onConfirm={() =>
+                  runReceiptAction(
+                    selectedRow,
+                    postPurchaseReceipt
+                  )
+                }
+                okText={purchaseFactActionPresentation('receipt', selectedRow).label}
+                cancelText="返回"
+              >
+                <Button
+                  data-business-action-key="post"
+                  data-business-action-role="primary"
+                  size="small"
+                  type="primary"
+                  className="erp-business-module-status-action"
+                  icon={<CheckCircleOutlined />}
+                  disabled={
+                    !selectedRow || selectedRow.can_post !== true || saving
+                  }
+                >
+                  {purchaseFactActionPresentation('receipt', selectedRow).label}
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canPost || canCancelDraft ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedRow ||
+                (canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
+                  selectedRow.status
+                )
+              }
+              disabled={
+                !selectedRow ||
+                !(canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
+                  selectedRow.status
+                ) ||
+                saving
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : !(canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
+                        selectedRow.status
+                      )
+                    ? '已取消入库记录不能再次取消'
+                    : saving
+                      ? '当前操作完成后可继续'
+                      : ''
+              }
+            >
+              <Popconfirm
+                title={purchaseFactActionPresentation('receipt', selectedRow, 'cancel').title}
+                description={purchaseFactActionPresentation('receipt', selectedRow, 'cancel').description}
+                onConfirm={() =>
+                  runReceiptAction(
+                    selectedRow,
+                    selectedRow?.status === PurchaseReceiptStatus.DRAFT && canCancelDraft
+                      ? cancelPurchaseReceiptDraft
+                      : cancelPurchaseReceipt
+                  )
+                }
+                okText={purchaseFactActionPresentation('receipt', selectedRow, 'cancel').label}
+                cancelText="返回"
+              >
+                <Button
+                  data-business-action-key="cancel"
+                  data-business-action-role="danger"
+                  size="small"
+                  danger
+                  className="erp-business-module-status-action"
+                  icon={<CloseCircleOutlined />}
+                  disabled={
+                    !selectedRow ||
+                    !(canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
+                      selectedRow.status
+                    ) ||
+                    saving
+                  }
+                >
+                  {purchaseFactActionPresentation('receipt', selectedRow, 'cancel').label}
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+        </SelectionActionBar>
+      </BusinessOperationPanel>
+
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        dataSource={rows}
+        columns={tableColumns}
+        taskDetailColumns={visibleColumns}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        })}
+        scroll={{ x: 1320 }}
+        rowSelection={{
+          type: 'radio',
+          selectedRowKeys: selectedRow ? [selectedRow.id] : [],
+          onChange: (_keys, selectedRows) =>
+            setSelectedRow(selectedRows[0] || null),
+        }}
+        rowClassName={(record) =>
+          record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedRow(record),
+        })}
+        onOpenRecord={openPurchaseReceiptDetails}
+        emptyDescription="暂无采购入库单"
+      />
+      <BusinessDetailsModal
+        descriptionInHelp
+        columns={visibleColumns}
+        description="查看采购入库单头、状态、数量汇总和完整材料明细。"
+        lineItems={{
+          emptyDescription: '当前采购入库单暂无明细',
+          getItemFields: getPurchaseReceiptItemFields,
+          getItemGroup: (item) => ({
+            key: purchaseMaterialLineGroupKey(item),
+            label: referenceLabel(materialOptions, item?.material_id, '材料'),
+          }),
+          getItemKey: (item) => item?.id,
+          getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
+          items: detailReceipt?.items,
+          title: '采购入库明细',
+        }}
+        open={Boolean(detailReceipt)}
+        record={detailReceipt}
+        title={`${getBusinessDocumentTitle('purchase_receipt')}详情`}
+        onClose={() => setDetailReceipt(null)}
+      />
+
+      {receiptExceptionMode && <PurchaseReceiptExceptionModal
+        open={Boolean(receiptExceptionMode)}
+        mode={receiptExceptionMode}
+        receipt={receiptExceptionSource}
+        materialOptions={materialOptions}
+        warehouseOptions={warehouseOptions}
+        lotOptions={inventoryLotOptions}
+        loading={saving}
+        onCancel={() => {
+          if (!saving) closeReceiptException()
+        }}
+        onSubmit={submitReceiptException}
+      />}
+      <FinanceBusinessSourceModal
+        action={FINANCE_BUSINESS_SOURCE_ACTIONS.PURCHASE_RECEIPT_PAYABLE}
+        open={Boolean(financeSourceReceipt)}
+        source={financeSourceReceipt}
+        initialValues={financeSourceInitialValues}
+        loading={financeSourceLoading}
+        onCancel={closePurchaseReceiptPayable}
+        onSubmit={submitPurchaseReceiptPayable}
+      />
+      <PurchaseReceiptExceptionRecordsModal
+        open={receiptExceptionRecordsOpen}
+        receipt={selectedRow}
+        customerKey={activeCustomerKey}
+        canReadReturns={canReadReturn}
+        canReadAdjustments={canReadAdjustment}
+        canPostReturns={canPostReturn}
+        canCancelReturns={canCancelReturn}
+        canPostAdjustments={canPostAdjustment}
+        canCancelAdjustments={canCancelAdjustment}
+        onCancel={() => setReceiptExceptionRecordsOpen(false)}
+        onChanged={loadRows}
+      />
+      {columnOrderModal}
+    </ReferenceRecordsProvider>
+  )
+}

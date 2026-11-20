@@ -1,0 +1,1879 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  DownOutlined,
+  EyeOutlined,
+  FileDoneOutlined,
+  LinkOutlined,
+  PlusOutlined,
+  RollbackOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Dropdown,
+  Form,
+  Popconfirm,
+  Space,
+  Tag,
+  Typography,
+} from 'antd'
+import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
+import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
+import useWorkflowTaskBusinessBusy from '../hooks/useWorkflowTaskBusinessBusy.js'
+
+import { useReferenceHydration } from '../hooks/useReferenceRecords.js'
+import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
+import { canReadReference } from '../utils/remoteReferences.mjs'
+import Select from '@/common/components/select/AppSelect'
+import useBusinessSearchParams from '../hooks/useBusinessSearchParams.js'
+import { PurchaseReceiptStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
+import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import QualityInspectionCorrectionModal from '../components/quality-inspections/QualityInspectionCorrectionModal.jsx'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
+import { IncomingCheckItemsDetails } from '../components/quality-inspections/IncomingCheckItems.jsx'
+import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
+import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
+import useQualityInspectionReferences from '../components/quality-inspections/useQualityInspectionReferences.js'
+import { message } from '@/common/utils/antdApp'
+import { QUALITY_STATUS_OPTIONS } from '../utils/qualityInspectionLabels.mjs'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import {
+  getQualityInspection,
+  submitQualityInspection,
+} from '../api/qualityApi.mjs'
+import {
+  BusinessActionTooltip,
+  BusinessDataTable,
+  BusinessOperationPanel,
+  BusinessPageLayout,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+  SelectionActionBar,
+  SelectionClearAction,
+  ToolbarButton,
+} from '../components/business-list/BusinessListLayout.jsx'
+import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
+import { BusinessListToolbarActions, useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessModal from '../components/business-list/BusinessModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import QualityInspectionPurchaseReturnModal from '../components/quality-inspections/QualityInspectionPurchaseReturnModal.jsx'
+import PurchaseRejectionDispositionModal from '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
+import OutsourcingReturnDispositionModal from '../components/quality-inspections/OutsourcingReturnDispositionModal.jsx'
+import ProductionExceptionRequestModal from '../components/quality-inspections/ProductionExceptionRequestModal.jsx'
+import {
+  QualityInspectionCreateForm,
+  QualityInspectionDecisionForm,
+  positiveInt,
+} from '../components/quality-inspections/QualityInspectionForms.jsx'
+import {
+  buildQualityInspectionDataColumns,
+  buildQualityInspectionExportColumns,
+  isProductionStageQualityInspection,
+  QUALITY_DATE_FILTER_OPTIONS,
+  QUALITY_INSPECTION_TYPE_FILTER_OPTIONS,
+  QUALITY_INSPECTIONS_MODULE_KEY,
+  QUALITY_RESULT_FILTER_OPTIONS,
+} from '../components/quality-inspections/qualityInspectionColumns.jsx'
+import { formatQuantity } from '../utils/businessLineItems.mjs'
+import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
+import {
+  hasActionPermission,
+  statusText,
+  BUSINESS_ROUTE_PATHS,
+} from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
+import {
+  DEFAULT_BUSINESS_PAGE_SIZE,
+  createBusinessTablePagination,
+  resetBusinessPaginationCurrent,
+  resolveExactRecordPage,
+} from '../utils/businessPagination.mjs'
+import { applyEffectiveFieldPolicyFlags } from '../utils/adminProfileSync.mjs'
+import {
+  inventoryLotOption,
+  materialOption,
+  productOption,
+  purchaseReceiptItemOption,
+  purchaseReceiptOption,
+  referenceLabel,
+  uniqueReferenceOptions,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
+import {
+  searchParamPositiveInt,
+  searchParamText,
+} from '../utils/routeQuery.mjs'
+import {
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
+import {
+  canCreatePurchaseReturnFromRejectedInspection,
+  canCreatePurchaseRejectionDispositionFromInspection,
+  isQualityInspectionRouteSourceCompatible,
+  qualityInspectionTypeForRouteSource,
+} from '../utils/qualityInspectionSourceAction.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import { loadQualityInspectionList as queryQualityInspections, loadQualityInspectionExport } from '../components/quality-inspections/qualityInspectionQueries.mjs'
+import useQualityInspectionEditor from '../components/quality-inspections/useQualityInspectionEditor.js'
+import useQualityInspectionActions from '../components/quality-inspections/useQualityInspectionActions.js'
+import useQualityInspectionPurchaseReturn from '../components/quality-inspections/useQualityInspectionPurchaseReturn.mjs'
+import {
+  buildQualityInspectionDecisionSourceSummary,
+  findByPositiveID,
+} from '../components/quality-inspections/qualityInspectionPageModel.mjs'
+import { PurchaseSourceActions } from '../../common/consts/purchaseSourceActions.mjs'
+import { SourceActionReadPermissions } from '../../common/consts/sourceActionPermissions.generated.mjs'
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
+import { sourceActionAccess, isSourceActionPermissionDenied, SOURCE_ACCESS_REVOKED_MESSAGE } from '../utils/sourceActionAccess.mjs'
+import SourceActionAccessNotice from '../components/SourceActionAccessNotice.jsx'
+
+const EMPTY_ADMIN_PROFILE = Object.freeze({})
+const PURCHASE_RECEIPT_STATUS_LABELS = Object.freeze({
+  [PurchaseReceiptStatus.DRAFT]: '草稿',
+  [PurchaseReceiptStatus.POSTED]: '已过账',
+  [PurchaseReceiptStatus.CANCELLED]: '已取消',
+})
+const { Text } = Typography
+
+export default function QualityInspectionsPage() {
+  const outletContext = useBusinessPageContext()
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskHandling = useMemo(() => outletContext?.taskBusiness?.task
+    ? { taskID: outletContext.taskBusiness.task.id, group: outletContext.taskBusiness.task.task_group }
+    : outletContext?.workflowTaskNavigation?.productionHandling, [outletContext?.taskBusiness?.task, outletContext?.workflowTaskNavigation?.productionHandling])
+  const taskEntryRef = useRef(0)
+  const [qualityTaskFocusOpen, setQualityTaskFocusOpen] = useState(false)
+  const navigate = useBusinessNavigate()
+  const [searchParams, setSearchParams] = useBusinessSearchParams()
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || EMPTY_ADMIN_PROFILE,
+    [outletContext?.adminProfile]
+  )
+  const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [statusCounts, setStatusCounts] = useState(null)
+  const [keyword, setKeyword] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [resultFilter, setResultFilter] = useState('')
+  const [selectedTypeFilter, setInspectionTypeFilter] = useState('INCOMING')
+  const [includeSuperseded, setIncludeSuperseded] = useState(false)
+  const [dateFilterField, setDateFilterField] = useState('inspected_at')
+  const [dateFilterStart, setDateFilterStart] = useState('')
+  const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [purchaseReceiptFilter, setPurchaseReceiptFilter] = useState('')
+  const [materialFilter, setMaterialFilter] = useState('')
+  const [warehouseFilter, setWarehouseFilter] = useState('')
+  const [lotFilter, setLotFilter] = useState('')
+  const [pagination, setPagination] = useState({ current: 1, pageSize: DEFAULT_BUSINESS_PAGE_SIZE })
+  const [loading, setLoading] = useState(false)
+  const [selectedRow, setSelectedRow] = useState(null)
+  const [detailInspection, setDetailInspection] = useState(null)
+  const [correctionInspection, setCorrectionInspection] = useState(null)
+  const [rejectionDispositionOpen, setRejectionDispositionOpen] =
+    useState(false)
+  const [outsourcingDispositionOpen, setOutsourcingDispositionOpen] =
+    useState(false)
+  const [productionExceptionOpen, setProductionExceptionOpen] = useState(false)
+  const {
+    purchaseReceipts,
+    inventoryLots,
+    materials,
+    products,
+    warehouses,
+    referenceDataState,
+    loadReferenceOptions,
+    referenceRecords,
+  } = useQualityInspectionReferences({ adminProfile })
+
+  const inspectionEditor = useQualityInspectionEditor({ rows, referenceDataState })
+  const {
+    saving, inspectionModal, inspectionForm, decisionForm, inspectionAttachmentRef,
+    openCreate, openDecision, closeModal, handleReceiptChange,
+  } = inspectionEditor
+  useWorkflowTaskBusinessBusy(saving)
+  const correctionDisabled = saving || !selectedRow || Boolean(selectedRow?.superseded_at || selectedRow?.production_wip_batch_id) || ![QualityInspectionStatus.PASSED, QualityInspectionStatus.REJECTED].includes(selectedRow?.status)
+  const detailRequestRef = useRef(0)
+  useEffect(
+    () => () => {
+      detailRequestRef.current += 1
+    },
+    []
+  )
+  const routePurchaseOrderID = searchParamPositiveInt(
+    searchParams,
+    'purchase_order_id'
+  )
+  const routePurchaseReceiptID = searchParamPositiveInt(
+    searchParams,
+    'purchase_receipt_id'
+  )
+  const routeQualityInspectionID = searchParamPositiveInt(
+    searchParams,
+    'quality_inspection_id'
+  )
+  const routeSourceType = searchParamText(searchParams, 'source_type')
+  const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
+  const inspectionTypeFilter = qualityInspectionTypeForRouteSource(routeSourceType) || selectedTypeFilter
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const resolvedRouteKeyword =
+    routeQualityInspectionID &&
+    Number(selectedRow?.id || 0) === Number(routeQualityInspectionID)
+      ? String(selectedRow?.inspection_no || '').trim()
+      : ''
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
+  )
+
+  const beginLatestRequest = useLatestRequestCoordinator()
+  const selectedPurchaseReceiptID = Form.useWatch(
+    'purchase_receipt_id',
+    inspectionForm
+  )
+  const selectedPurchaseReceiptItemID = Form.useWatch(
+    'purchase_receipt_item_id',
+    inspectionForm
+  )
+  const decisionResult = Form.useWatch('result', decisionForm)
+
+  const qualitySourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.quality)
+  const canReadInspectionList = hasActionPermission(adminProfile, PermissionCode.QUALITY_INSPECTION_READ) && (
+    routeQualityInspectionID > 0 ||
+    ['OUTSOURCING_RETURN', 'FINISHED_GOODS', 'PRODUCTION_STAGE'].includes(inspectionTypeFilter) ||
+    SourceActionReadPermissions[`${RpcDomain.QUALITY}.${RpcMethod.quality.LIST_QUALITY_INSPECTIONS}`].every(({ permission }) => hasActionPermission(adminProfile, permission))
+  )
+  const canCreate = qualitySourceAccess.allowed
+  useEffect(() => {
+    if (inspectionModal?.mode === 'create' && !canCreate) {
+      inspectionForm.resetFields()
+      closeModal()
+      message.warning(SOURCE_ACCESS_REVOKED_MESSAGE)
+    }
+  }, [canCreate, closeModal, inspectionForm, inspectionModal?.mode])
+  const canUpdate = hasActionPermission(
+    adminProfile,
+    PermissionCode.QUALITY_INSPECTION_UPDATE
+  )
+  const qualityReturnAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.qualityReturn)
+  const rejectionSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.rejectionDisposition)
+  const canCreatePurchaseReturn = qualityReturnAccess.allowed
+  const canCreateRejectionDisposition = rejectionSourceAccess.allowed
+  const canReadPurchaseReturn = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RETURN_READ
+  )
+  const canPostPurchaseReturn = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RETURN_POST
+  )
+  const canCancelPurchaseReturn = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RETURN_CANCEL
+  )
+  const canPostOutsourcingDisposition = hasActionPermission(
+    adminProfile,
+    PermissionCode.OUTSOURCING_FACT_POST
+  )
+  const canCancelOutsourcingDisposition = hasActionPermission(
+    adminProfile,
+    PermissionCode.OUTSOURCING_FACT_CANCEL
+  )
+  const canReadOutsourcingDisposition = hasActionPermission(
+    adminProfile,
+    PermissionCode.OUTSOURCING_FACT_READ
+  )
+  const canHandleQualityException = hasActionPermission(
+    adminProfile,
+    PermissionCode.QUALITY_EXCEPTION_HANDLE
+  )
+  const canSubmitProductionException = hasActionPermission(
+    adminProfile,
+    PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
+  )
+  const canManageOutsourcingDisposition =
+    canHandleQualityException ||
+    canPostOutsourcingDisposition ||
+    canCancelOutsourcingDisposition
+  const canReadPurchaseReceipt = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RECEIPT_READ
+  )
+  const canReadInventory = hasActionPermission(
+    adminProfile,
+    PermissionCode.WAREHOUSE_INVENTORY_READ
+  )
+  const canReadShipment = hasActionPermission(
+    adminProfile,
+    PermissionCode.SHIPMENT_READ
+  )
+  const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
+  const selectedSourceType = String(
+    selectedRow?.source_type || ''
+  ).toUpperCase()
+  const canOpenInventory =
+    canReadInventory && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.inventory)
+  const canOpenPurchaseReceipts =
+    canReadPurchaseReceipt &&
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.purchaseReceipts)
+  const canOpenShipments =
+    canReadShipment && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.shipments)
+  const hasRelatedCapability =
+    canOpenInventory || canOpenPurchaseReceipts || canOpenShipments
+  const relatedMenuItems = useMemo(() => {
+    if (selectedSourceType === 'PURCHASE_RECEIPT') {
+      return [
+        canOpenPurchaseReceipts
+          ? { key: 'purchase-receipts', label: '采购入库' }
+          : null,
+        canOpenInventory ? { key: 'inventory', label: '库存台账' } : null,
+      ].filter(Boolean)
+    }
+    if (selectedSourceType === 'SHIPMENT') {
+      return [
+        canOpenShipments ? { key: 'shipments', label: '出货单' } : null,
+        canOpenInventory ? { key: 'inventory', label: '库存台账' } : null,
+      ].filter(Boolean)
+    }
+    if (selectedSourceType === 'PRODUCTION_WIP') return []
+    return canOpenInventory ? [{ key: 'inventory', label: '库存台账' }] : []
+  }, [
+    canOpenInventory,
+    canOpenPurchaseReceipts,
+    canOpenShipments,
+    selectedSourceType,
+  ])
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: hasRelatedCapability,
+    record: selectedRow,
+    itemCount: relatedMenuItems.length,
+  })
+
+  const purchaseReceiptOptions = useMemo(
+    () => uniqueReferenceOptions(purchaseReceipts, purchaseReceiptOption),
+    [purchaseReceipts]
+  )
+  const purchaseReceiptItemOptions = useMemo(
+    () =>
+      uniqueReferenceOptions(
+        purchaseReceipts
+          .filter((receipt) => {
+            const selectedReceiptID = positiveInt(selectedPurchaseReceiptID)
+            return (
+              !selectedReceiptID ||
+              Number(receipt.id || 0) === selectedReceiptID
+            )
+          })
+          .flatMap((receipt) =>
+            Array.isArray(receipt?.items) ? receipt.items : []
+          ),
+        purchaseReceiptItemOption
+      ),
+    [purchaseReceipts, selectedPurchaseReceiptID]
+  )
+  const purchaseReceiptItems = useMemo(
+    () =>
+      purchaseReceipts.flatMap((receipt) =>
+        Array.isArray(receipt?.items) ? receipt.items : []
+      ),
+    [purchaseReceipts]
+  )
+  const allPurchaseReceiptItemOptions = useMemo(
+    () =>
+      uniqueReferenceOptions(purchaseReceiptItems, purchaseReceiptItemOption),
+    [purchaseReceiptItems]
+  )
+  const inventoryLotOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
+    [inventoryLots]
+  )
+  const materialOptions = useMemo(
+    () => uniqueReferenceOptions(materials, materialOption),
+    [materials]
+  )
+  const productOptions = useMemo(
+    () => uniqueReferenceOptions(products, productOption),
+    [products]
+  )
+  const warehouseOptions = useMemo(
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
+  )
+  const selectedPurchaseReceipt = useMemo(
+    () => findByPositiveID(selectedPurchaseReceiptID, purchaseReceipts) || null,
+    [purchaseReceipts, selectedPurchaseReceiptID]
+  )
+  const {
+    closePurchaseReturn,
+    openPurchaseReturn,
+    purchaseReturnLoading,
+    purchaseReturnModal,
+    purchaseReturnSourceSummary,
+    returnedInspectionIDs,
+    selectedRowPurchaseReceipt,
+    selectedRowPurchaseReceiptLoading,
+    submitPurchaseReturn: submitPurchaseReturnSource,
+  } = useQualityInspectionPurchaseReturn({
+    activeCustomerKey,
+    canCreatePurchaseReturn,
+    canCreateRejectionDisposition,
+    canReadPurchaseReturn,
+    inventoryLotOptions,
+    materialOptions,
+    purchaseReceiptItems,
+    purchaseReceipts,
+    qualityReturnAccess,
+    referenceDataState,
+    selectedRow,
+    setRejectionDispositionOpen,
+    warehouseOptions,
+  })
+  const selectedRowCanCreatePurchaseReturn =
+    canCreatePurchaseReturnFromRejectedInspection(
+      selectedRow,
+      selectedRowPurchaseReceipt
+    )
+  const selectedRowCanCreateRejectionDisposition = canCreatePurchaseRejectionDispositionFromInspection(selectedRow, selectedRowPurchaseReceipt)
+  const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()
+  const selectedIsCorrectionInspection = Boolean(selectedRow?.correction_of_inspection_id)
+  const selectedInspectionType = String(
+    selectedRow?.inspection_type || ''
+  ).toUpperCase()
+  const selectedIsIncomingInspection =
+    selectedSourceType === 'PURCHASE_RECEIPT' &&
+    selectedInspectionType === 'INCOMING'
+  const selectedIsOutsourcingInspection =
+    selectedSourceType === 'OUTSOURCING_FACT' &&
+    selectedInspectionType === 'OUTSOURCING_RETURN'
+  const selectedIsProductionInspection =
+    Number(selectedRow?.production_wip_batch_id || 0) > 0
+  const selectedDispositionSourceSupported =
+    selectedIsIncomingInspection ||
+    selectedIsOutsourcingInspection ||
+    selectedIsProductionInspection
+  const selectedDispositionAuthorized = selectedIsIncomingInspection
+    ? selectedRowCanCreateRejectionDisposition ? canCreateRejectionDisposition : canCreatePurchaseReturn
+    : selectedIsOutsourcingInspection
+      ? canManageOutsourcingDisposition
+      : selectedIsProductionInspection
+        ? canSubmitProductionException
+        : false
+  const selectedDispositionCompleted =
+    [QualityInspectionStatus.PASSED, QualityInspectionStatus.CANCELLED].includes(selectedQualityStatus) ||
+    (selectedIsIncomingInspection &&
+      Boolean(selectedRow?.id) &&
+      returnedInspectionIDs.has(selectedRow.id))
+  const hasAnyDispositionCapability =
+    canCreatePurchaseReturn ||
+    canCreateRejectionDisposition ||
+    canManageOutsourcingDisposition ||
+    canSubmitProductionException
+  const showQualityDispositionAction =
+    hasAnyDispositionCapability &&
+    (!selectedRow ||
+      (selectedQualityStatus === QualityInspectionStatus.REJECTED &&
+        selectedDispositionSourceSupported &&
+        selectedDispositionAuthorized &&
+        !selectedDispositionCompleted))
+  const selectedDispositionKind = selectedIsIncomingInspection
+    ? selectedRowCanCreateRejectionDisposition
+      ? 'incoming-rejection'
+      : selectedRowCanCreatePurchaseReturn
+        ? 'incoming-return'
+        : ''
+    : selectedIsOutsourcingInspection
+      ? 'outsourcing'
+      : selectedIsProductionInspection
+        ? 'production'
+        : ''
+  const qualityDispositionDisabled =
+    !selectedRow ||
+    !selectedDispositionSourceSupported ||
+    !selectedDispositionAuthorized ||
+    selectedDispositionCompleted ||
+    selectedQualityStatus !== QualityInspectionStatus.REJECTED ||
+    (selectedIsIncomingInspection && selectedRowPurchaseReceiptLoading) ||
+    !selectedDispositionKind ||
+    (selectedDispositionKind === 'incoming-rejection' &&
+      !selectedRowCanCreateRejectionDisposition) ||
+    (selectedDispositionKind === 'incoming-return' &&
+      (!selectedRowCanCreatePurchaseReturn ||
+        referenceDataState !== 'ready' ||
+        purchaseReturnLoading)) ||
+    saving
+  const qualityDispositionDisabledReason = !selectedRow
+    ? '请先选择一条质检记录'
+    : !selectedDispositionSourceSupported
+      ? '当前质检来源不支持在此办理不合格处置'
+      : !selectedDispositionAuthorized
+        ? '当前账号不能办理该来源的不合格处置'
+        : selectedDispositionCompleted
+          ? '当前质检的不合格处置已完成'
+          : selectedQualityStatus !== QualityInspectionStatus.REJECTED
+            ? '质检判定不合格后可办理处置'
+            : selectedIsIncomingInspection && selectedRowPurchaseReceiptLoading
+              ? '正在核对来源单据状态'
+              : !selectedDispositionKind
+                ? '当前来源单据状态暂不能办理不合格处置'
+                : selectedDispositionKind === 'incoming-rejection' &&
+                    !selectedRowCanCreateRejectionDisposition
+                  ? '首次来料不合格处置条件尚未满足'
+                  : selectedDispositionKind === 'incoming-return' &&
+                      referenceDataState !== 'ready'
+                    ? referenceDataState === 'loading'
+                      ? '正在加载质检来源资料'
+                      : '质检来源资料加载失败，请刷新当前页后重试'
+                    : selectedDispositionKind === 'incoming-return' &&
+                        !selectedRowCanCreatePurchaseReturn
+                      ? '未能确认来源收货已入库，暂不能生成采购退货'
+                      : purchaseReturnLoading || saving
+                        ? '当前操作完成后可继续处置'
+                        : ''
+  const showReadOnlyOutsourcingDisposition =
+    canReadOutsourcingDisposition && !canManageOutsourcingDisposition
+  const outsourcingDispositionViewAvailability =
+    resolveContextualBusinessActionAvailability({
+      authorized: showReadOnlyOutsourcingDisposition,
+      selected: Boolean(selectedRow),
+      relevant:
+        selectedIsOutsourcingInspection && selectedQualityStatus === QualityInspectionStatus.REJECTED,
+      busy: saving,
+      busyReason: '当前操作完成后可查看委外处置',
+    })
+  const selectedPurchaseReceiptItem = useMemo(
+    () =>
+      findByPositiveID(selectedPurchaseReceiptItemID, purchaseReceiptItems) ||
+      null,
+    [purchaseReceiptItems, selectedPurchaseReceiptItemID]
+  )
+
+  const openRelatedTable = ({ key }) => {
+    if (!selectedRow) return
+    const pathByKey = {
+      'purchase-receipts': relatedDocumentRoute(
+        BUSINESS_ROUTE_PATHS.purchaseReceipts,
+        { receipt_id: selectedRow.purchase_receipt_id },
+        {
+          keyword: selectedRow.source_no,
+          source: 'quality-inspection',
+          fields: ['receipt_no'],
+        }
+      ),
+      shipments: relatedDocumentRoute(
+        BUSINESS_ROUTE_PATHS.shipments,
+        { shipment_id: selectedRow.source_id },
+        {
+          keyword: selectedRow.source_no,
+          source: 'quality-inspection',
+          fields: ['shipment_no'],
+        }
+      ),
+      inventory: relatedDocumentRoute(
+        BUSINESS_ROUTE_PATHS.inventory,
+        {
+          source_type: selectedRow.source_type,
+          source_id: selectedRow.source_id,
+          lot_id: selectedRow.inventory_lot_id,
+          view: 'txns',
+        },
+        {
+          keyword: selectedRow.source_no,
+          source: 'quality-inspection',
+          fields: ['source_no'],
+        }
+      ),
+    }
+    const targetPath = pathByKey[key]
+    if (targetPath) {
+      navigate(targetPath)
+    }
+  }
+
+  const qualityQuery = useMemo(
+    () => ({
+      filters: { dateFilterEnd, dateFilterField, dateFilterStart, inspectionTypeFilter, includeSuperseded, keyword, lotFilter, materialFilter, purchaseReceiptFilter, resultFilter, statusFilter, warehouseFilter },
+      context: { linkedKeyword, routePurchaseOrderID, routePurchaseReceiptID, routeQualityInspectionID, routeSourceID, routeSourceType },
+      pagination,
+      customerKey: activeCustomerKey,
+    }),
+    [
+      activeCustomerKey,
+      dateFilterEnd,
+      dateFilterField,
+      dateFilterStart,
+      inspectionTypeFilter,
+      includeSuperseded,
+      keyword,
+      linkedKeyword,
+      lotFilter,
+      materialFilter,
+      pagination,
+      purchaseReceiptFilter,
+      resultFilter,
+      routePurchaseOrderID,
+      routePurchaseReceiptID,
+      routeQualityInspectionID,
+      routeSourceID,
+      routeSourceType,
+      statusFilter,
+      warehouseFilter,
+    ]
+  )
+  const loadQualityInspectionList = useCallback(
+    (options) => queryQualityInspections({ ...qualityQuery, ...options }),
+    [qualityQuery]
+  )
+
+  const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
+    setLoading(true)
+    setStatusCounts(null)
+    if (!canReadInspectionList) {
+      setRows([])
+      setSelectedRow(null)
+      setTotal(0)
+      setDetailInspection(null)
+      setCorrectionInspection(null)
+      detailRequestRef.current += 1
+      setLoading(false)
+      request.finish()
+      return false
+    }
+    try {
+      const routeSelectedID = Number(routeQualityInspectionID || 0)
+      const data = await loadQualityInspectionList({ signal: request.signal })
+      if (!request.isCurrent()) {
+        return false
+      }
+      const listedRows = Array.isArray(data?.quality_inspections)
+        ? data.quality_inspections
+        : []
+      const listedRouteInspection =
+        routeSelectedID > 0
+          ? listedRows.find((item) => Number(item?.id) === routeSelectedID) ||
+            null
+          : null
+      const selectedRouteInspection = listedRouteInspection
+      const exactPage = resolveExactRecordPage({
+        records: listedRows,
+        exactRecord: selectedRouteInspection,
+        hasExactContext:
+          routeSelectedID > 0,
+        total: Number(data?.total || 0),
+      })
+      const nextRows = exactPage.records
+      setRows(nextRows)
+      setSelectedRow((current) => {
+        if (routeSelectedID > 0) return selectedRouteInspection
+        return current?.id
+          ? nextRows.find((item) => item.id === current.id) || null
+          : null
+      })
+      setTotal(exactPage.total)
+      setStatusCounts(
+        resolveBusinessStatusCounts(data, {
+          hasExactContext:
+            routeSelectedID > 0,
+          exactRecord: selectedRouteInspection,
+          statusField: 'status',
+        })
+      )
+      return true
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
+      if (isSourceActionPermissionDenied(error)) {
+        setRows([])
+        setSelectedRow(null)
+        setTotal(0)
+        setDetailInspection(null)
+        setCorrectionInspection(null)
+        detailRequestRef.current += 1
+      }
+      showPageLoadError(error, '加载质量检验单')
+      return false
+    } finally {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+    }
+  }, [
+    beginLatestRequest,
+    canReadInspectionList,
+    loadQualityInspectionList,
+    routeQualityInspectionID,
+  ])
+
+  useEffect(() => {
+    loadRows()
+  }, [loadRows])
+
+  const clearRouteContext = useCallback(
+    (keys) => {
+      const nextParams = clearLinkedDocumentParams(searchParams)
+      const keysToDelete =
+        Array.isArray(keys) && keys.length > 0
+          ? keys
+          : [
+              'purchase_order_id',
+              'purchase_receipt_id',
+              'quality_inspection_id',
+              'source_type',
+              'source_id',
+            ]
+      keysToDelete.forEach((key) => nextParams.delete(key))
+      setSearchParams(nextParams, { replace: true })
+      resetBusinessPaginationCurrent(setPagination)
+    },
+    [searchParams, setSearchParams]
+  )
+
+  const refreshPageData = useCallback(async () => {
+    const [rowsOK, referencesOK] = await Promise.all([
+      loadRows(),
+      loadReferenceOptions(),
+    ])
+    return rowsOK !== false && referencesOK !== false
+  }, [loadReferenceOptions, loadRows])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(refreshPageData)
+  }, [outletContext, refreshPageData])
+
+  const openQualityInspectionDetails = useCallback(async (inspection) => {
+    if (!inspection?.id) return
+    const requestID = detailRequestRef.current + 1
+    detailRequestRef.current = requestID
+    setSelectedRow(inspection)
+    setDetailInspection(inspection)
+    try {
+      const detail = await getQualityInspection({ id: inspection.id })
+      if (detailRequestRef.current === requestID && detail?.id) {
+        setDetailInspection(detail)
+      }
+    } catch (error) {
+      if (detailRequestRef.current === requestID) {
+        message.warning(getActionErrorMessage(error, '刷新质量检验详情'))
+      }
+    }
+  }, [])
+
+  const closeQualityInspectionDetails = useCallback(() => {
+    detailRequestRef.current += 1
+    setDetailInspection(null)
+  }, [])
+
+  const { handleCreateInspection, runInspectionAction, handleDecision } =
+    useQualityInspectionActions({
+      editor: inspectionEditor,
+      sourceAccess: qualitySourceAccess,
+      activeCustomerKey,
+      loadRows,
+      reportBusinessResult,
+      setSelectedRow,
+      setPagination,
+    })
+
+  const submitPurchaseReturn = useCallback(
+    async (values) => {
+      if (await submitPurchaseReturnSource(values)) await loadRows()
+    },
+    [loadRows, submitPurchaseReturnSource]
+  )
+
+  const openSelectedQualityDisposition = useCallback(() => {
+    if (qualityDispositionDisabled || !selectedRow) return
+    if (selectedDispositionKind === 'incoming-rejection') {
+      setRejectionDispositionOpen(true)
+      return
+    }
+    if (selectedDispositionKind === 'incoming-return') {
+      openPurchaseReturn(selectedRow)
+      return
+    }
+    if (selectedDispositionKind === 'outsourcing') {
+      setOutsourcingDispositionOpen(true)
+      return
+    }
+    if (selectedDispositionKind === 'production') {
+      setProductionExceptionOpen(true)
+    }
+  }, [
+    openPurchaseReturn,
+    qualityDispositionDisabled,
+    selectedDispositionKind,
+    selectedRow,
+  ])
+
+  useEffect(() => {
+    if (!taskHandling || taskEntryRef.current === taskHandling.taskID || !selectedRow ||
+      Number(selectedRow.id) !== routeQualityInspectionID || outletContext?.workflowTaskNavigation?.businessReceipt) return
+    if (['handoff_production_quality', 'handoff_receipt_quality', 'handoff_outsourcing_quality', 'handoff_shipment_quality'].includes(taskHandling.group) &&
+        !outletContext?.taskBusiness?.readOnly && canUpdate && [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status)) {
+      taskEntryRef.current = taskHandling.taskID
+      setQualityTaskFocusOpen(true)
+    } else if (taskHandling.group === 'handoff_production_exception' && !qualityDispositionDisabled && selectedDispositionKind === 'production') {
+      taskEntryRef.current = taskHandling.taskID
+      openSelectedQualityDisposition()
+    }
+  }, [taskHandling, selectedRow, routeQualityInspectionID, canUpdate, openDecision,
+    qualityDispositionDisabled, selectedDispositionKind, openSelectedQualityDisposition, outletContext?.workflowTaskNavigation?.businessReceipt, outletContext?.taskBusiness?.readOnly])
+
+  const selectedRowLabel = selectedRow
+    ? `${selectedRow.inspection_no || '质量检验单已关联'} / ${
+        isProductionStageQualityInspection(selectedRow)
+          ? String(selectedRow.wip_batch_no || '').trim() || '—'
+          : referenceLabel(
+              inventoryLotOptions,
+              selectedRow.inventory_lot_id,
+              '批次'
+            )
+      }`
+    : '请先选择一张质量检验单'
+
+  const isCreatingInspection =
+    !inspectionModal || inspectionModal.mode === 'create'
+  const InspectionEditor = isCreatingInspection
+    ? BusinessFormPage
+    : BusinessFormModal
+  const modalTitle = {
+    create: '生成来料质检草稿',
+    pass: '判定合格',
+    reject: '判定不合格',
+    cancel: '取消质检',
+  }[inspectionModal?.mode || 'create']
+
+  const decisionIsProductionStage = isProductionStageQualityInspection(
+    inspectionModal?.inspection
+  )
+
+  const modalDescription = {
+    pass: decisionIsProductionStage
+      ? '生产阶段检验只办理合格或不合格；不合格后的让步须提交生产异常审批。批准仅放行本次关口，后续关口仍需检验。'
+      : '选择合格或让步接收，并按来源记录估算不良比例；这里只登记质量结论，后续由对应来源规则处理。',
+    reject:
+      '记录不合格及来源的估算不良比例；后续返工、退货或阻断仍由对应来源业务办理。',
+    cancel: '取消只关闭当前质检流程，不会直接改写库存数量或生产事实。',
+  }[inspectionModal?.mode]
+
+  const decisionSourceSummary = buildQualityInspectionDecisionSourceSummary({
+    inspection: inspectionModal?.inspection,
+    allPurchaseReceiptItemOptions,
+    inventoryLotOptions,
+    materialOptions,
+    productOptions,
+    purchaseReceiptOptions,
+  })
+
+  const modalOkText = {
+    create: '生成草稿',
+    pass: decisionResult === 'CONCESSION' ? '确认让步接收' : '确认合格',
+    reject: '确认不合格',
+    cancel: '确认取消',
+  }[inspectionModal?.mode || 'create']
+
+  const exportColumns = useMemo(() => {
+    const columns = buildQualityInspectionExportColumns({
+      allPurchaseReceiptItemOptions,
+      inventoryLotOptions,
+      materialOptions,
+      productOptions,
+      purchaseReceiptOptions,
+      warehouseOptions,
+    })
+    return applyEffectiveFieldPolicyFlags({
+      adminProfile,
+      moduleKey: QUALITY_INSPECTIONS_MODULE_KEY,
+      columns,
+    })
+  }, [
+    allPurchaseReceiptItemOptions,
+    adminProfile,
+    inventoryLotOptions,
+    materialOptions,
+    productOptions,
+    purchaseReceiptOptions,
+    warehouseOptions,
+  ])
+
+  const dataColumns = useMemo(
+    () =>
+      buildQualityInspectionDataColumns({
+        allPurchaseReceiptItemOptions,
+        inventoryLotOptions,
+        materialOptions,
+        productOptions,
+        purchaseReceiptOptions,
+        warehouseOptions,
+      }),
+    [
+      allPurchaseReceiptItemOptions,
+      inventoryLotOptions,
+      materialOptions,
+      productOptions,
+      purchaseReceiptOptions,
+      warehouseOptions,
+    ]
+  )
+
+  const {
+    tableColumns: columns,
+    exportColumns: visibleDataColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: QUALITY_INSPECTIONS_MODULE_KEY,
+    moduleTitle: '质量检验列表',
+    columns: dataColumns,
+  })
+
+  const loadExportQualityInspections = useCallback(
+    (options) => loadQualityInspectionExport(qualityQuery, options),
+    [qualityQuery]
+  )
+
+  const { exporting, exportRows: exportQualityInspections } =
+    useBusinessListExport({
+      requestKey: 'quality-inspections-export',
+      loadRows: loadExportQualityInspections,
+      filename: `质量检验-${currentBusinessDate()}.csv`,
+      columns: exportColumns,
+      recordLabel: '质检单',
+    })
+
+  const activeFilterCount = [
+    resultFilter,
+    inspectionTypeFilter !== 'INCOMING' && inspectionTypeFilter,
+    includeSuperseded,
+    purchaseReceiptFilter,
+    materialFilter,
+    warehouseFilter,
+    lotFilter,
+    dateFilterStart || dateFilterEnd,
+    routePurchaseOrderID,
+    routePurchaseReceiptID,
+    routeQualityInspectionID,
+    routeSourceType && routeSourceID,
+  ].filter(Boolean).length
+  const clearFilters = useCallback(() => {
+    setResultFilter('')
+    setInspectionTypeFilter('INCOMING')
+    setIncludeSuperseded(false)
+    setPurchaseReceiptFilter('')
+    setMaterialFilter('')
+    setWarehouseFilter('')
+    setLotFilter('')
+    setDateFilterField('inspected_at')
+    setDateFilterStart('')
+    setDateFilterEnd('')
+    setKeyword(resolvedRouteKeyword || linkedKeyword || keyword)
+    clearRouteContext()
+  }, [clearRouteContext, setKeyword, keyword, linkedKeyword, resolvedRouteKeyword])
+
+  const referenceInspections = [...rows, selectedRow, correctionInspection, purchaseReturnModal?.inspection].filter(Boolean)
+  const referenceReceiptItems = purchaseReceipts.flatMap((receipt) => receipt.items || [])
+  useReferenceHydration({
+    purchase_receipts: { ids: [...referenceInspections.map((row) => row.purchase_receipt_id), selectedPurchaseReceiptID, purchaseReceiptFilter], records: purchaseReceipts, onRecords: referenceRecords.purchase_receipts, enabled: canReadReference(adminProfile, 'purchase_receipts') },
+    inventory_lots: { ids: [...referenceInspections.map((row) => row.inventory_lot_id), ...referenceReceiptItems.map((row) => row.lot_id)], records: inventoryLots, onRecords: referenceRecords.inventory_lots, enabled: canReadReference(adminProfile, 'inventory_lots') },
+    materials: { ids: [...referenceInspections.map((row) => row.material_id), ...referenceReceiptItems.map((row) => row.material_id)], records: materials, onRecords: referenceRecords.materials, enabled: canReadReference(adminProfile, 'materials') },
+    products: { ids: referenceInspections.filter((row) => row.subject_type === 'PRODUCT').map((row) => row.subject_id), records: products, onRecords: referenceRecords.products, enabled: canReadReference(adminProfile, 'products') },
+  }, adminProfile, rows)
+
+  return (
+    <ReferenceRecordsProvider component={BusinessPageLayout} adminProfile={adminProfile} handlers={{ ...referenceRecords }} className="erp-quality-inspections-page">
+      <PageHeaderCard compact helpKey="quality-inspections" title={getBusinessDocumentTitle('quality_inspection')} />
+      {((!routeQualityInspectionID && inspectionTypeFilter === 'INCOMING') || selectedIsIncomingInspection) && (
+        <>
+          <SourceActionAccessNotice access={qualitySourceAccess} />
+          <SourceActionAccessNotice access={selectedRowCanCreatePurchaseReturn ? qualityReturnAccess : selectedRowCanCreateRejectionDisposition ? rejectionSourceAccess : qualityReturnAccess.blocked ? qualityReturnAccess : rejectionSourceAccess} />
+        </>
+      )}
+
+      <BusinessOperationPanel
+        compact
+        onClearFilters={clearFilters}
+        activeFilterCount={activeFilterCount}
+        filters={
+          <>
+            <SearchInput
+              value={resolvedRouteKeyword || linkedKeyword || keyword}
+              {...BUSINESS_SEARCH_SCOPES.quality}
+              onSearch={(value) => {
+                if (
+                  resolvedRouteKeyword ||
+                  linkedKeyword ||
+                  routeQualityInspectionID ||
+                  routePurchaseOrderID ||
+                  routePurchaseReceiptID ||
+                  (routeSourceType && routeSourceID)
+                ) {
+                  clearRouteContext()
+                }
+                setKeyword(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <BusinessStatusFilter
+              inline
+              aria-label="质检状态"
+              counts={statusCounts}
+              loading={loading}
+              exact={
+                Boolean(routeQualityInspectionID) &&
+                inspectionTypeFilter !== 'PRODUCTION_STAGE'
+              }
+              value={statusFilter}
+              options={QUALITY_STATUS_OPTIONS}
+              onChange={(nextStatus) => {
+                setStatusFilter(nextStatus)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="检验结果"
+              className="erp-business-filter-control--status"
+              value={resultFilter}
+              options={QUALITY_RESULT_FILTER_OPTIONS}
+              onChange={(nextResult) => {
+                setResultFilter(nextResult)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="记录范围"
+              className="erp-business-filter-control--status"
+              value={includeSuperseded ? 'history' : 'current'}
+              options={[
+                { label: '当前记录', value: 'current' },
+                { label: '含已替代记录', value: 'history' },
+              ]}
+              onChange={(value) => {
+                setIncludeSuperseded(value === 'history')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="检验类型"
+              className="erp-business-filter-control--status"
+              value={inspectionTypeFilter}
+              options={QUALITY_INSPECTION_TYPE_FILTER_OPTIONS}
+              onChange={(nextType) => {
+                const normalizedType = nextType || 'INCOMING'
+                const routeKeysToClear = []
+                setInspectionTypeFilter(normalizedType)
+                if (normalizedType && normalizedType !== 'INCOMING') {
+                  setPurchaseReceiptFilter('')
+                  setMaterialFilter('')
+                  routeKeysToClear.push(
+                    'purchase_order_id',
+                    'purchase_receipt_id'
+                  )
+                }
+                if (
+                  (routeSourceType || routeSourceID) &&
+                  !isQualityInspectionRouteSourceCompatible(
+                    normalizedType,
+                    routeSourceType
+                  )
+                ) {
+                  routeKeysToClear.push('source_type', 'source_id')
+                }
+                if (routeKeysToClear.length > 0) {
+                  clearRouteContext(routeKeysToClear)
+                }
+                if (normalizedType === 'PRODUCTION_STAGE') {
+                  setWarehouseFilter('')
+                  setLotFilter('')
+                }
+                setSelectedRow(null)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="purchase_receipts"
+              aria-label="入库单"
+              className="erp-business-filter-control--status"
+              value={purchaseReceiptFilter}
+              options={[
+                { label: '全部入库单', value: '' },
+                ...purchaseReceiptOptions,
+              ]}
+              placeholder="入库单"
+              disabled={Boolean(
+                inspectionTypeFilter && inspectionTypeFilter !== 'INCOMING'
+              )}
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextReceipt) => {
+                setPurchaseReceiptFilter(nextReceipt || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="materials"
+              aria-label="材料"
+              className="erp-business-filter-control--status"
+              value={materialFilter}
+              options={[{ label: '全部材料', value: '' }, ...materialOptions]}
+              placeholder="材料"
+              disabled={Boolean(
+                inspectionTypeFilter && inspectionTypeFilter !== 'INCOMING'
+              )}
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextMaterial) => {
+                setMaterialFilter(nextMaterial || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="仓库"
+              className="erp-business-filter-control--status"
+              value={warehouseFilter}
+              options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
+              placeholder="仓库"
+              disabled={inspectionTypeFilter === 'PRODUCTION_STAGE'}
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextWarehouse) => {
+                setWarehouseFilter(nextWarehouse || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <RemoteReferenceSelect
+              component={SelectFilter}
+              referenceType="inventory_lots"
+              aria-label="批次"
+              className="erp-business-filter-control--status"
+              value={lotFilter}
+              options={[
+                { label: '全部批次', value: '' },
+                ...inventoryLotOptions,
+              ]}
+              placeholder="批次"
+              disabled={inspectionTypeFilter === 'PRODUCTION_STAGE'}
+              showSearch
+              optionFilterProp="label"
+              onChange={(nextLot) => {
+                setLotFilter(nextLot || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <DateRangeFilter
+              options={QUALITY_DATE_FILTER_OPTIONS}
+              value={dateFilterField}
+              startValue={dateFilterStart}
+              endValue={dateFilterEnd}
+              onRangeChange={(from, to, field) => {
+                setDateFilterField(field)
+                setDateFilterStart(from)
+                setDateFilterEnd(to)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            {routePurchaseOrderID ? (
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['purchase_order_id'])}
+              >
+                已按采购订单筛选
+              </Tag>
+            ) : null}
+            {routePurchaseReceiptID ? (
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['purchase_receipt_id'])}
+              >
+                已按采购入库筛选
+              </Tag>
+            ) : null}
+            {routeQualityInspectionID ? (
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['quality_inspection_id'])}
+              >
+                已定位质检单
+              </Tag>
+            ) : null}
+            {routeSourceType && routeSourceID ? (
+              <Tag
+                closable
+                color="blue"
+                onClose={() => clearRouteContext(['source_type', 'source_id'])}
+              >
+                已按来源单据筛选
+              </Tag>
+            ) : null}
+          </>
+        }
+        actions={
+          <BusinessListToolbarActions
+            onExport={exportQualityInspections}
+            exportDisabled={loading || exporting || total === 0}
+            exportDisabledReason={exporting ? '正在准备导出，请稍候' : ''}
+            onOpenColumnOrder={openColumnOrder}
+          />
+        }
+        primaryAction={
+          canCreate ? (
+            <BusinessActionTooltip
+              disabled={referenceDataState !== 'ready'}
+              disabledReason="质检来源资料加载完成后可补建"
+            >
+              <ToolbarButton
+                type="primary"
+                className="erp-business-list-toolbar__primary-action"
+                icon={<PlusOutlined />}
+                disabled={referenceDataState !== 'ready'}
+                onClick={openCreate}
+              >
+                补建来料质检
+              </ToolbarButton>
+            </BusinessActionTooltip>
+          ) : null
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRow ? 1 : 0}
+          selectedLabel={selectedRowLabel}
+          boundaryText="提交、判定和取消均由系统按质检规则处理；不会绕过来源规则直接改写库存数量或生产事实。"
+        >
+          <SelectionClearAction
+            selectedCount={selectedRow ? 1 : 0}
+            selectionLabel="质检记录"
+            onClear={() => setSelectedRow(null)}
+          />
+          <BusinessTaskActions
+            sourceType="quality_inspection"
+            record={selectedRow}
+            adminProfile={adminProfile}
+          />
+          {relatedActionAvailability.visible ? (
+            <BusinessActionTooltip
+              disabled={relatedActionAvailability.disabled}
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条质检记录'
+                  : relatedActionAvailability.disabledReason
+              }
+            >
+              <Dropdown
+                trigger={['click']}
+                destroyOnHidden
+                disabled={relatedActionAvailability.disabled}
+                menu={{
+                  items: relatedMenuItems,
+                  onClick: openRelatedTable,
+                }}
+              >
+                <Button
+                  size="small"
+                  icon={<LinkOutlined />}
+                  data-business-action-key="related-records"
+                  data-business-action-role="related"
+                  disabled={relatedActionAvailability.disabled}
+                >
+                  相关单据 <DownOutlined />
+                </Button>
+              </Dropdown>
+            </BusinessActionTooltip>
+          ) : null}
+          <BusinessActionTooltip
+            disabled={!selectedRow}
+            disabledReason="请先选择一条质检记录"
+          >
+            <Button
+              data-business-action-key="view-details"
+              data-business-action-role="view"
+              size="small"
+              icon={<EyeOutlined />}
+              disabled={!selectedRow}
+              onClick={() => openQualityInspectionDetails(selectedRow)}
+            >
+              查看详情
+            </Button>
+          </BusinessActionTooltip>
+          {canUpdate ? (
+            <BusinessActionTooltip
+              visible={!selectedRow || selectedQualityStatus === QualityInspectionStatus.DRAFT}
+              disabled={
+                !selectedRow || selectedRow.status !== QualityInspectionStatus.DRAFT || saving
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条质检记录'
+                  : selectedRow.status !== QualityInspectionStatus.DRAFT
+                    ? '只有质检草稿可以提交'
+                    : saving
+                      ? '当前操作完成后可提交'
+                      : ''
+              }
+            >
+              <Popconfirm
+                title="确认提交质检并进入待判定状态？"
+                onConfirm={() =>
+                  runInspectionAction(
+                    selectedRow,
+                    submitQualityInspection,
+                    '质检已提交'
+                  )
+                }
+                okText="确认"
+                cancelText="取消"
+              >
+                <Button
+                  data-business-action-key="submit"
+                  data-business-action-role="primary"
+                  type="primary"
+                  size="small"
+                  className="erp-business-module-status-action"
+                  icon={<FileDoneOutlined />}
+                  disabled={
+                    !selectedRow || selectedRow.status !== QualityInspectionStatus.DRAFT || saving
+                  }
+                >
+                  提交质检
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdate && selectedQualityStatus === QualityInspectionStatus.SUBMITTED ? (
+            <Space data-business-action-role="primary">
+              <BusinessActionTooltip
+                visible={
+                  !selectedRow ||
+                  [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedQualityStatus)
+                }
+                disabled={
+                  !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
+                }
+                disabledReason={
+                  !selectedRow
+                    ? '请先选择一条质检记录'
+                    : selectedRow.status !== QualityInspectionStatus.SUBMITTED
+                      ? '质检提交后可判定'
+                      : saving
+                        ? '当前操作完成后可判定'
+                        : ''
+                }
+              >
+                <Button
+                  data-business-action-key="pass"
+                  data-business-action-role="primary"
+                  size="small"
+                  type={
+                    selectedQualityStatus === QualityInspectionStatus.SUBMITTED
+                      ? 'primary'
+                      : 'default'
+                  }
+                  className="erp-business-module-status-action"
+                  icon={<CheckCircleOutlined />}
+                  disabled={
+                    !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
+                  }
+                  onClick={() => openDecision('pass', selectedRow)}
+                >
+                  判定合格
+                </Button>
+              </BusinessActionTooltip>
+              <BusinessActionTooltip
+                visible={
+                  !selectedRow ||
+                  [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedQualityStatus)
+                }
+                disabled={
+                  !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
+                }
+                disabledReason={
+                  !selectedRow
+                    ? '请先选择一条质检记录'
+                    : selectedRow.status !== QualityInspectionStatus.SUBMITTED
+                      ? '质检提交后可判定'
+                      : saving
+                        ? '当前操作完成后可判定'
+                        : ''
+                }
+              >
+                <Button
+                  data-business-action-key="reject"
+                  data-business-action-role="primary"
+                  size="small"
+                  danger
+                  className="erp-business-module-status-action"
+                  icon={<StopOutlined />}
+                  disabled={
+                    !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
+                  }
+                  onClick={() => openDecision('reject', selectedRow)}
+                >
+                  判定不合格
+                </Button>
+              </BusinessActionTooltip>
+            </Space>
+          ) : null}
+          {canHandleQualityException && [QualityInspectionStatus.PASSED, QualityInspectionStatus.REJECTED].includes(selectedQualityStatus) ? (
+            <BusinessActionTooltip disabled={correctionDisabled} disabledReason="仅未被替代且无生效下游业务的已判定质检可发起纠正；工序质量按原异常处理流程办理。">
+              <Button data-business-action-key="quality-correction" data-business-action-role="secondary" data-business-action-group="business" disabled={correctionDisabled} onClick={() => setCorrectionInspection(selectedRow)}>发起纠正复检</Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {showQualityDispositionAction ? (
+            <BusinessActionTooltip
+              disabled={qualityDispositionDisabled}
+              disabledReason={qualityDispositionDisabledReason}
+            >
+              <Button
+                data-business-action-key="quality-disposition"
+                data-business-action-role="primary"
+                size="small"
+                danger
+                className="erp-business-module-status-action"
+                icon={<RollbackOutlined />}
+                disabled={qualityDispositionDisabled}
+                onClick={openSelectedQualityDisposition}
+              >
+                不合格处置
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {outsourcingDispositionViewAvailability.visible ? (
+            <BusinessActionTooltip
+              disabled={outsourcingDispositionViewAvailability.disabled}
+              disabledReason={
+                outsourcingDispositionViewAvailability.disabledReason
+              }
+            >
+              <Button
+                data-business-action-key="outsourcing-disposition-view"
+                data-business-action-role="related"
+                size="small"
+                disabled={outsourcingDispositionViewAvailability.disabled}
+                onClick={() => setOutsourcingDispositionOpen(true)}
+              >
+                查看委外处置
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdate ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedRow ||
+                (!selectedIsCorrectionInspection && [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedQualityStatus))
+              }
+              disabled={
+                !selectedRow ||
+                selectedIsCorrectionInspection ||
+                ![QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status) ||
+                saving
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条质检记录'
+                  : selectedIsCorrectionInspection
+                    ? '纠正后的复检须完成判定，不能取消'
+                    : ![QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status)
+                    ? '当前质检状态不能取消'
+                    : saving
+                      ? '当前操作完成后可取消'
+                      : ''
+              }
+            >
+              <Button
+                data-business-action-key="cancel"
+                data-business-action-role="danger"
+                size="small"
+                className="erp-business-module-status-action"
+                icon={<CloseCircleOutlined />}
+                disabled={
+                  !selectedRow ||
+                  selectedIsCorrectionInspection ||
+                  ![QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status) ||
+                  saving
+                }
+                onClick={() => openDecision('cancel', selectedRow)}
+              >
+                取消质检
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+        </SelectionActionBar>
+      </BusinessOperationPanel>
+
+      {outletContext?.taskBusiness?.task?.source_type === 'purchase_receipt' &&
+      routePurchaseReceiptID === outletContext.taskBusiness.task.source_id ? (
+        <label className="mobile-detail-section">
+          选择本次收货的质检单
+          <Select
+            placeholder="选择收货质检单"
+            aria-label="选择本次收货的质检单"
+            value={selectedRow?.id}
+            disabled={loading || saving}
+            options={rows.filter((row) => row.purchase_receipt_id === routePurchaseReceiptID).map((row) => ({ value: row.id, label: row.inspection_no }))}
+            onChange={(id) => setSelectedRow(rows.find((row) => row.id === id && row.purchase_receipt_id === routePurchaseReceiptID) || null)}
+          />
+        </label>
+      ) : null}
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        dataSource={rows}
+        columns={columns}
+        taskDetailColumns={visibleDataColumns}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        })}
+        scroll={{ x: 1600 }}
+        rowSelection={{
+          type: 'radio',
+          selectedRowKeys: selectedRow ? [selectedRow.id] : [],
+          onChange: (_keys, selectedRows) =>
+            setSelectedRow(selectedRows[0] || null),
+        }}
+        rowClassName={(record) =>
+          record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedRow(record),
+        })}
+        onOpenRecord={openQualityInspectionDetails}
+        emptyDescription="暂无质量检验单"
+      />
+
+      <QualityInspectionCorrectionModal
+        inspection={correctionInspection}
+        customerKey={activeCustomerKey}
+        onClose={() => setCorrectionInspection(null)}
+        onCreated={async (record) => {
+        setCorrectionInspection(null)
+        reportBusinessResult('纠正复检结果已确认，原判定和证据保留', record)
+        await loadRows()
+        navigate(relatedDocumentRoute(BUSINESS_ROUTE_PATHS.qualityInspections, { quality_inspection_id: record.id }))
+      }}
+      />
+      <BusinessModal
+        taskInline
+        title="办理本次质检"
+        size="confirm"
+        open={qualityTaskFocusOpen}
+        onCancel={saving ? undefined : () => setQualityTaskFocusOpen(false)}
+        footer={
+          <Space>
+            <Button disabled={saving} onClick={() => setQualityTaskFocusOpen(false)}>关闭</Button>
+            {selectedRow?.status === QualityInspectionStatus.DRAFT ? (
+              <Button key="submit" type="primary" loading={saving} onClick={() => runInspectionAction(selectedRow, submitQualityInspection, '质量检验已提交')}>
+                提交质检
+              </Button>
+            ) : selectedRow?.status === QualityInspectionStatus.SUBMITTED ? (
+              <>
+                <Button key="reject" onClick={() => { setQualityTaskFocusOpen(false); openDecision('reject', selectedRow) }}>判定不合格</Button>
+                <Button key="pass" type="primary" onClick={() => { setQualityTaskFocusOpen(false); openDecision('pass', selectedRow) }}>判定合格</Button>
+              </>
+            ) : null}
+          </Space>
+        }
+      >
+        <Descriptions
+          column={1}
+          size="small"
+          items={[
+          { key: 'inspection', label: '质检单', children: selectedRow?.inspection_no },
+          ...(isProductionStageQualityInspection(selectedRow)
+            ? [{ key: 'batch', label: '在制批次', children: selectedRow?.wip_batch_no || selectedRow?.batch_no }]
+            : [
+                { key: 'source', label: selectedRow?.source_type === 'SHIPMENT' ? '出货单' : '来源单号', children: selectedRow?.source_no || '单号未提供' },
+                { key: 'lot', label: '库存批次', children: referenceLabel(inventoryLotOptions, selectedRow?.inventory_lot_id, '批次', { emptyText: '未关联' }) },
+              ]),
+          { key: 'state', label: '当前状态', children: selectedRow?.status === QualityInspectionStatus.DRAFT ? '待提交检验' : '待质量判定' },
+        ]}
+        />
+        <p>核对当前来源和检验关口后选择本次结论，后续库存及异常仍按对应业务办理。</p>
+      </BusinessModal>
+
+      {columnOrderModal}
+
+      {purchaseReturnModal && <QualityInspectionPurchaseReturnModal
+        open={Boolean(purchaseReturnModal)}
+        inspection={purchaseReturnModal?.inspection}
+        sourceSummary={purchaseReturnSourceSummary}
+        loading={purchaseReturnLoading}
+        referenceDataReady={referenceDataState === 'ready'}
+        onCancel={closePurchaseReturn}
+        onSubmit={submitPurchaseReturn}
+      />}
+
+      <PurchaseRejectionDispositionModal
+        open={rejectionDispositionOpen}
+        inspection={selectedRow}
+        sourceAccess={rejectionSourceAccess}
+        canPost={canPostPurchaseReturn}
+        canReceiveReplacement={hasActionPermission(
+          adminProfile,
+          PermissionCode.PURCHASE_RECEIPT_CREATE
+        )}
+        canCancel={canCancelPurchaseReturn}
+        onClose={() => setRejectionDispositionOpen(false)}
+        onChanged={() => loadRows()}
+      />
+
+      <OutsourcingReturnDispositionModal
+        open={outsourcingDispositionOpen}
+        inspection={selectedRow}
+        canCreate={canHandleQualityException}
+        canPost={canPostOutsourcingDisposition}
+        canCancel={canCancelOutsourcingDisposition}
+        onClose={() => setOutsourcingDispositionOpen(false)}
+        onChanged={() => loadRows()}
+      />
+
+      <ProductionExceptionRequestModal
+        open={productionExceptionOpen}
+        inspection={selectedRow}
+        customerKey={activeCustomerKey}
+        onClose={() => setProductionExceptionOpen(false)}
+        onChanged={(record) => {
+          reportBusinessResult('异常申请已提交，等待审批', record)
+          loadRows()
+        }}
+      />
+
+      <BusinessDetailsModal
+        descriptionInHelp
+        columns={visibleDataColumns}
+        description="查看当前质检单的来源、批次、检验状态和判定结果；如需提交、判定或取消，请使用列表上方的当前操作区。"
+        open={Boolean(detailInspection)}
+        record={detailInspection}
+        title={`${getBusinessDocumentTitle('quality_inspection')}详情`}
+        onClose={closeQualityInspectionDetails}
+      >
+        {detailInspection?.superseded_at || detailInspection?.correction_of_inspection_id ? (
+          <Alert
+            showIcon
+            type={detailInspection?.superseded_at ? 'warning' : 'info'}
+            message={detailInspection?.superseded_at ? '本单已被更正替代，原判定仅供追溯' : '本单为更正后的复检记录'}
+            description={
+              <Space direction="vertical" size={4}>
+                {detailInspection?.superseded_reason ? <span>更正原因：{detailInspection.superseded_reason}</span> : null}
+                {detailInspection?.correction_of_inspection_id ? (
+                  <Button type="link" onClick={() => openQualityInspectionDetails({ id: detailInspection.correction_of_inspection_id })}>
+                    查看原单 {detailInspection.correction_of_inspection_no || ''}
+                  </Button>
+                ) : null}
+                {detailInspection?.corrected_inspection_id ? (
+                  <Button type="link" onClick={() => openQualityInspectionDetails({ id: detailInspection.corrected_inspection_id })}>
+                    查看替代单 {detailInspection.corrected_inspection_no || ''}
+                  </Button>
+                ) : null}
+              </Space>
+            }
+          />
+        ) : null}
+        <IncomingCheckItemsDetails items={detailInspection?.check_items} />
+        <BusinessAttachmentPanel
+          ownerType="quality_inspection"
+          ownerId={detailInspection?.id}
+          title="质检附件"
+          description="查看不良照片、检验报告、让步说明或批次异常证据。"
+          canUpload={false}
+          canWithdraw={false}
+          variant="inline"
+        />
+      </BusinessDetailsModal>
+
+      <InspectionEditor
+        taskInline={!isCreatingInspection}
+        {...(isCreatingInspection
+          ? { form: inspectionForm, loading: referenceDataState === 'loading' }
+          : {
+              form: decisionForm,
+              destroyOnHidden: true,
+              cancelText: '关闭',
+              description: modalDescription,
+            })}
+        title={modalTitle}
+        open={Boolean(inspectionModal)}
+        onCancel={closeModal}
+        onOk={
+          inspectionModal?.mode === 'create'
+            ? handleCreateInspection
+            : handleDecision
+        }
+        confirmLoading={saving}
+        okButtonProps={{
+          disabled:
+            inspectionModal?.mode === 'create' &&
+            referenceDataState !== 'ready',
+        }}
+        okText={modalOkText}
+      >
+        {isCreatingInspection ? (
+          <>
+            {selectedPurchaseReceipt ? (
+              <Alert
+                className="erp-business-source-summary"
+                showIcon
+                type={selectedPurchaseReceiptItem ? 'info' : 'warning'}
+                message={`来源采购入库：${
+                  selectedPurchaseReceipt.receipt_no || '采购入库已关联'
+                }`}
+                description={
+                  <Space direction="vertical" size={2}>
+                    <Text>
+                      {[
+                        `供应商：${selectedPurchaseReceipt.supplier_name || '-'}`,
+                        `状态：${statusText(
+                          selectedPurchaseReceipt.status,
+                          PURCHASE_RECEIPT_STATUS_LABELS,
+                          '状态待确认'
+                        )}`,
+                        selectedPurchaseReceiptItem
+                          ? `来源行：${
+                              selectedPurchaseReceiptItem.source_line_no ||
+                              '入库明细已关联'
+                            }`
+                          : '来源行：未选择',
+                      ].join('；')}
+                    </Text>
+                    {selectedPurchaseReceiptItem ? (
+                      <Text type="secondary">
+                        {[
+                          `到货数量：${formatQuantity(
+                            selectedPurchaseReceiptItem.quantity
+                          )}`,
+                          `材料：${referenceLabel(
+                            materialOptions,
+                            selectedPurchaseReceiptItem.material_id,
+                            '材料'
+                          )}`,
+                          `仓库：${referenceLabel(
+                            warehouseOptions,
+                            selectedPurchaseReceiptItem.warehouse_id,
+                            '仓库'
+                          )}`,
+                          selectedPurchaseReceiptItem.lot_id
+                            ? `批次：${referenceLabel(
+                                inventoryLotOptions,
+                                selectedPurchaseReceiptItem.lot_id,
+                                '批次'
+                              )}`
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join('；')}
+                      </Text>
+                    ) : (
+                      <Text type="secondary">
+                        请选择采购入库行后再生成质检草稿，材料、仓库和批次会按来源行带出。
+                      </Text>
+                    )}
+                    <Text type="secondary">
+                      当前质检单按采购入库行建单；本次送检数量和已检数量暂未记录，页面不会自行补造。
+                    </Text>
+                  </Space>
+                }
+              />
+            ) : null}
+            <QualityInspectionCreateForm
+              form={inspectionForm}
+              purchaseReceiptOptions={purchaseReceiptOptions}
+              purchaseReceiptItemOptions={purchaseReceiptItemOptions}
+              disabled={referenceDataState !== 'ready'}
+              onReceiptChange={handleReceiptChange}
+            />
+          </>
+        ) : (
+          <>
+            <Alert
+              className="erp-business-source-summary"
+              showIcon
+              type="info"
+              message={`来源单据：${decisionSourceSummary.sourceNo}`}
+              description={
+                <Space direction="vertical" size={2}>
+                  <Text>{decisionSourceSummary.primary}</Text>
+                  {decisionSourceSummary.secondary ? (
+                    <Text type="secondary">
+                      {decisionSourceSummary.secondary}
+                    </Text>
+                  ) : null}
+                </Space>
+              }
+            />
+            {(
+              decisionIsProductionStage
+                ? inspectionModal?.inspection?.product_id
+                : inspectionModal?.inspection?.subject_type === 'PRODUCT'
+                  ? inspectionModal?.inspection?.subject_id
+                  : 0
+            ) ? (
+              <div className="erp-business-inline-note">
+                <ProductIdentity
+                  productId={
+                    decisionIsProductionStage
+                      ? inspectionModal.inspection.product_id
+                      : inspectionModal.inspection.subject_id
+                  }
+                  name="产品参考图"
+                >
+                  {decisionSourceSummary.primary}
+                </ProductIdentity>
+              </div>
+            ) : null}
+            <QualityInspectionDecisionForm
+              form={decisionForm}
+              mode={inspectionModal?.mode}
+              disabled={saving}
+              allowConcession={!decisionIsProductionStage}
+            />
+          </>
+        )}
+        <BusinessAttachmentPanel
+          ref={inspectionAttachmentRef}
+          ownerType="quality_inspection"
+          ownerId={inspectionModal?.inspection?.id}
+          title="质检附件"
+          description="上传不良照片、检验报告、让步说明或批次异常证据；附件不能代替质检处理。"
+          canUpload={canCreate || canUpdate}
+          canWithdraw={canUpdate || canHandleQualityException}
+          variant="inline"
+        />
+      </InspectionEditor>
+    </ReferenceRecordsProvider>
+  )
+}
