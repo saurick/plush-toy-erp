@@ -1,0 +1,635 @@
+import assert from 'node:assert/strict'
+import { readFileSync, readdirSync } from 'node:fs'
+import path from 'node:path'
+import test from 'node:test'
+import { runInNewContext, Script } from 'node:vm'
+import standardUnits from '../../../../server/internal/unitpolicy/units.json' with { type: 'json' }
+import { BusinessTextPolicy } from '../../common/consts/policies.generated.mjs'
+import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCatalog.mjs'
+import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
+import { ROLE_HELP_GUIDES } from '../../erp/config/roleHelpContent.mjs'
+import { HELP_REFERENCE_PAGES } from '../../erp/config/helpManualCatalog.mjs'
+import { printTemplateCatalog } from '../../erp/config/printTemplates.mjs'
+import { BOM_IMPORT_FORMAT_GUIDE } from '../../erp/data/bomImportFormat.mjs'
+import {
+  getBusinessHandbookIntroductions,
+  getBusinessPageHandbookSections,
+} from '../../erp/config/businessHandbook.mjs'
+import {
+  DEV_UI_DESIGN_ROUTE,
+  UI_DESIGN_ASSET,
+  UI_DESIGN_DIRECTORY,
+  UI_DESIGN_PREVIEW_MODES,
+  prepareUIDesignSandboxSource,
+  resolveUIDesignPreviewMode,
+  resolveUIDesignPreviewPage,
+} from './devUIDesign.mjs'
+import { DEV_WORKSPACE_NAV_ITEMS, getDevSecondaryNavItems } from './devRoutes.mjs'
+import {
+  filterUIDesignTopics,
+  findUIDesignChapter,
+  findUIDesignRule,
+  getUIDesignTopics,
+  readUIDesignChapters,
+  resolveUIDesignReading,
+} from './devUIDesignReading.mjs'
+
+const root = path.resolve(import.meta.dirname, '../../../..')
+const read = (file) => readFileSync(path.join(root, file), 'utf8')
+
+test('compact prototype note fields render multiline textareas with two initial rows', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const control = html.match(/function compactActionControl\([\s\S]*?\n {4}\}/u)?.[0]
+  assert.ok(control)
+  const note = '核对说明\n分批交付'
+  const output = runInNewContext(`(${control})(0, 'note', '明细备注')`, {
+    compactAction: { rows: [{ note }] },
+    escapeHTML: (value) => value,
+  })
+  assert.match(output, /^<textarea\b/u)
+  assert.match(output, /rows="2"/u)
+  assert.ok(output.includes(note))
+  assert.doesNotMatch(html, /<textarea[^>]*aria-label="明细备注[^>]*rows="1"|<textarea rows="1"[^>]*aria-label="明细备注/u)
+  assert.doesNotMatch(html, /<input\b[^>]*data-form-field="(?:note-|price-note)/u)
+})
+
+test('boundary preview uses legal field extremes and every standalone script parses', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const definition = html.match(/const UI_BOUNDARY_LIMITS = Object\.freeze\((\{[\s\S]*?\})\);/u)
+  assert(definition, '压力档位必须有明确上限')
+  const limits = runInNewContext(`(${definition[1]})`)
+  const fields = [
+    ['orderNo', 'sales_order', 'order_no'],
+    ['customerOrderNo', 'sales_order', 'customer_order_no'],
+    ['owner', 'sales_order', 'sales_owner'],
+    ['note', 'sales_order', 'note'],
+    ['party', 'customer', 'name'],
+    ['item', 'product', 'name'],
+  ]
+  for (const [key, schema, field] of fields) {
+    const source = read(`server/internal/data/model/schema/${schema}.go`)
+    if (key === 'note') {
+      const noteField = source.split('field.String("note")')[1]?.split('field.')[0] || ''
+      assert.match(noteField, /Validate\(corevalue\.ValidateBusinessNote\)/u)
+      assert.equal(limits.note, BusinessTextPolicy.noteMaxCharacters, '备注压力档位使用正式字符上限')
+      continue
+    }
+    const constraint = source.match(new RegExp(`field\\.String\\("${field}"\\)[\\s\\S]*?MaxLen\\((\\d+)\\)`))
+    assert(constraint, `${schema}.${field} 缺少正式长度约束`)
+    assert.equal(limits[key], Number(constraint[1]), `${key} 使用正式字段上限`)
+  }
+  assert.match(read('server/internal/data/model/schema/decimal.go'), /numeric\(20,6\)/u)
+  assert(BigInt(limits.amount.replace('.', '')) * 10000n < 10n ** 20n, '大金额仍在正式精度范围内')
+  const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gu)]
+  assert(scripts.length > 0)
+  for (const [, source] of scripts) assert.doesNotThrow(() => new Script(source))
+})
+const helpDefinition = (name) => {
+  const match = read(UI_DESIGN_ASSET.path).match(
+    new RegExp(`const ${name} = ([\\s\\S]*?);\\n`)
+  )
+  assert.ok(match, `岗位帮助缺少 ${name} 定义`)
+  return JSON.parse(match[1])
+}
+
+test('design chapters retain full content and resolve aliases without splitting fenced headings', () => {
+  const source = [
+    '# 设计说明',
+    '',
+    '阅读入口。',
+    '',
+    '<a id="layout"></a>',
+    '## 布局 / Layout',
+    '',
+    '布局说明。',
+    '```text',
+    '## 代码里的标题',
+    '```',
+    '',
+    '<a id="alignment"></a>',
+    '### 对齐',
+    '',
+    '子章节说明。',
+    '',
+    '#### 数量对齐',
+    '',
+    '金额右对齐。',
+    '',
+    '### 其他规则',
+    '',
+    '不属于对齐。',
+    '',
+    '## 恢复 / Recovery',
+    '',
+    '```mermaid',
+    'flowchart LR',
+    '  A[失败] --> B[重试]',
+    '```',
+  ].join('\n')
+  const chapters = readUIDesignChapters(source)
+  assert.deepEqual(
+    chapters.map(({ title }) => title),
+    ['阅读入口', '布局', '恢复']
+  )
+  assert.equal(chapters.map(({ content }) => content).join('\n\n'), source)
+  for (const anchor of ['layout', 'alignment', '对齐']) {
+    assert.equal(findUIDesignChapter(chapters, anchor), chapters[1])
+  }
+  assert.equal(findUIDesignChapter(chapters, '代码里的标题'), undefined)
+  assert.equal(findUIDesignRule(chapters, 'alignment').content, [
+    '<a id="alignment"></a>', '### 对齐', '', '子章节说明。', '', '#### 数量对齐', '', '金额右对齐。',
+  ].join('\n'))
+  assert.equal(findUIDesignRule(chapters, '数量对齐').content, '#### 数量对齐\n\n金额右对齐。')
+  assert.deepEqual(chapters[2].diagrams, [
+    'flowchart LR\n  A[失败] --> B[重试]',
+  ])
+  assert.deepEqual(readUIDesignChapters(''), [])
+})
+
+test('every design topic reads a focused source rule and mechanisms keep their formal diagrams', () => {
+  const specification = readUIDesignChapters(
+    read(UI_DESIGN_ASSET.specificationPath)
+  )
+  const rationale = readUIDesignChapters(read(UI_DESIGN_ASSET.rationalePath))
+  for (const [view, chapters] of [
+    ['specification', specification],
+    ['rationale', rationale],
+  ]) {
+    const topics = getUIDesignTopics(view, chapters)
+    assert.equal(new Set(topics.map(({ key }) => key)).size, topics.length)
+    for (const { title, rule } of topics) {
+      assert(rule?.content, `${view} / ${title} 必须能查阅原规则`)
+      assert(findUIDesignChapter(chapters, rule.id)?.content.includes(rule.content))
+    }
+  }
+  for (const [title, count] of [
+    ['页面结构', 2],
+    ['状态与恢复', 1],
+    ['业务汇总口径', 1],
+    ['响应式与动效', 1],
+  ]) {
+    assert.equal(
+      specification.find((chapter) => chapter.title === title)?.diagrams.length,
+      count,
+      title
+    )
+  }
+})
+
+test('design links keep exact anchors and old topic bookmarks open the focused rule', () => {
+  const chapters = readUIDesignChapters(read(UI_DESIGN_ASSET.specificationPath))
+  const topics = getUIDesignTopics('specification', chapters)
+  const resolve = (query, hash = '') => resolveUIDesignReading(chapters, topics, new URLSearchParams(query), hash)
+  const layout = resolve('topic=layout&read=reference&chapter=高保真视觉合同--visual-contract')
+  assert.equal(layout.topic.key, 'layout')
+  assert.match(layout.rule.content, /桌面侧栏[\s\S]*侧栏品牌区[\s\S]*页面边距/u)
+  assert.doesNotMatch(layout.rule.content, /颜色、内容面|日期、弹层|桌面输入框/u)
+  assert.equal(resolve('topic=layout&chapter=侧栏页头与间距').rule, layout.rule)
+  assert.equal(resolve('read=reference&topic=layout').rule, layout.rule)
+  assert.equal(resolve('topic=layout&read=guide&chapter=高保真视觉合同--visual-contract').rule, undefined)
+  const toolbar = resolve('read=reference', 'business-toolbar-composition')
+  assert.match(toolbar.rule.content, /业务工具栏的组合与差异/u)
+  assert.doesNotMatch(toolbar.rule.content, /先核对布局尺寸|高保真视觉合同/u)
+})
+
+test('design directory searches titles, explanations and formal rules with all query terms', () => {
+  const entries = [
+    {
+      key: 'layout',
+      title: '页面骨架',
+      description: '区域与对齐',
+      rule: { content: 'CSS 像素 · 12px 留白' },
+    },
+    { key: 'state', title: '状态与恢复', rule: { content: '失败后保留输入，再重试' } },
+  ]
+  assert.deepEqual(filterUIDesignTopics(entries, '   '), entries)
+  assert.deepEqual(filterUIDesignTopics(entries, 'css 留白'), [entries[0]])
+  assert.deepEqual(filterUIDesignTopics(entries, '失败 输入'), [entries[1]])
+  assert.deepEqual(filterUIDesignTopics(entries, '状态 对齐'), [])
+})
+
+test('quantity design snapshot follows the canonical unit labels and precision', () => {
+  const saved = helpDefinition('quantityUnits')
+  assert.deepEqual(
+    saved,
+    standardUnits.map(({ code, name, precision }) => ({
+      code,
+      name,
+      precision,
+    }))
+  )
+})
+
+test('print center design descriptions follow the formal template catalog', () => {
+  const definition = read(UI_DESIGN_ASSET.path).match(
+    /const printTemplates = ([\s\S]*?);\n/u
+  )
+  assert(definition, '打印交互稿必须保留模板目录内容快照')
+  assert.deepEqual(
+    JSON.parse(definition[1]),
+    printTemplateCatalog.map(({ key, title, summary, guide }) => ({
+      key,
+      title,
+      summary,
+      guide: guide.map(({ title, description }) => ({ title, description })),
+    })),
+    '模板或分区说明变化后须同步独立交互稿'
+  )
+})
+
+test('numbered region prototypes use the shared geometry and Excel region definitions', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const geometry = html.match(/\/\/ BEGIN SHARED DOCUMENT GUIDE GEOMETRY\n([\s\S]*?)\n {6}\/\/ END SHARED DOCUMENT GUIDE GEOMETRY/u)
+  assert.ok(geometry)
+  const actual = geometry[1].replace(/^ {6}/gmu, '').trimEnd()
+  const expected = read('web/src/erp/components/documentGuideGeometry.mjs').replace(/export function /gu, 'function ').trimEnd()
+  assert.equal(actual, expected, '图示范围与编号避让算法须与共享组件同步')
+  const parts = html.match(/function renderBOMImportFormat\(\) \{\n {6}const parts = (\[[^\n]+\])/u)
+  assert.ok(parts)
+  assert.deepEqual(JSON.parse(parts[1]), BOM_IMPORT_FORMAT_GUIDE)
+})
+
+test('help design snapshot follows the current formal role and scenario content', () => {
+  const { roles } = helpDefinition('catalog')
+  assert.deepEqual(
+    roles.map((role) => role.key).sort(),
+    ROLE_HELP_GUIDES.map((role) => role.key).sort()
+  )
+  const fields = [
+    'key',
+    'title',
+    'description',
+    'path',
+    'actionLabel',
+    'steps',
+    'completion',
+    'handoff',
+    'exception',
+  ]
+  const content = (scenario) =>
+    Object.fromEntries(fields.map((field) => [field, scenario[field]]))
+  for (const guide of ROLE_HELP_GUIDES) {
+    const saved = roles.find((role) => role.key === guide.key)
+    assert.equal(saved.label, guide.label)
+    assert.deepEqual(
+      saved.scenes.map(content),
+      getRoleHelpScenarios(guide, { isSuperAdmin: true }).map(content),
+      `${guide.label}的正式帮助已变化，请同步交互稿并核对概览、异常与完成条件`
+    )
+  }
+})
+
+test('payment example follows its formal page help', () => {
+  const { roles } = helpDefinition('catalog')
+  const saved = roles
+    .find((role) => role.key === 'finance')
+    .scenes.find((scene) => scene.key === 'finance-payments')
+  const current = getBusinessUsabilityEntry('finance-payments')
+  assert.deepEqual(
+    saved.steps.map((step) => step.description),
+    current.flowSteps
+  )
+  assert.equal(saved.completion, current.completion)
+  assert.equal(saved.handoff, current.handoff)
+  assert.equal(
+    saved.exception.trigger,
+    current.items.find((item) => item.type === 'disabled').explanation
+  )
+  assert.equal(saved.exception.action, current.handoff)
+})
+
+test('reference design snapshot shares the formal chapters, items and engineering rules', () => {
+  const fields = [
+    'key',
+    'title',
+    'sectionTitle',
+    'task',
+    'path',
+    'flowSteps',
+    'roleHelpKeys',
+    'completion',
+    'handoff',
+    'boundary',
+    'items',
+  ]
+  assert.deepEqual(
+    helpDefinition('helpReferencePages'),
+    HELP_REFERENCE_PAGES.map((page) =>
+      Object.fromEntries(fields.map((field) => [field, page[field]]))
+    )
+  )
+})
+
+test('help design uses the same complete handbook introductions and role responsibilities', () => {
+  assert.deepEqual(
+    helpDefinition('handbookIntroductions'),
+    getBusinessHandbookIntroductions()
+  )
+  assert.deepEqual(
+    helpDefinition('handbookPageAdditions'),
+    Object.fromEntries(
+      HELP_REFERENCE_PAGES.map((page) => [
+        page.key,
+        getBusinessPageHandbookSections(page),
+      ])
+    )
+  )
+})
+
+test('help directory coalesces size notifications and redraws outside observer delivery', () => {
+  const source = read(UI_DESIGN_ASSET.path).match(/function scheduleDirectoryLayout\(\) \{[\s\S]*?\n {4}\}/u)?.[0]
+  assert.ok(source)
+  const frames = []
+  const rendered = []
+  let element = { clientWidth: 800 }
+  const context = {
+    directoryLayoutFrame: 0,
+    directoryLayoutWidth: 1000,
+    root: () => element,
+    renderManual: () => rendered.push(element.clientWidth),
+    requestAnimationFrame: (callback) => { frames.push(callback); return frames.length },
+  }
+  const schedule = runInNewContext(`(${source})`, context)
+  schedule()
+  schedule()
+  assert.equal(rendered.length, 0, '尺寸通知中不改写手册 DOM')
+  assert.equal(frames.length, 1, '同一帧只安排一次读取')
+  element.clientWidth = 600
+  frames.shift()()
+  assert.deepEqual(rendered, [600], '重绘使用当帧最新可见宽度')
+  schedule()
+  frames.shift()()
+  assert.equal(rendered.length, 1, '只有高度变化时不重复重绘')
+  element.clientWidth = 0
+  schedule()
+  frames.shift()()
+  assert.equal(context.directoryLayoutWidth, 600, '隐藏期间保留阅读布局基线')
+  element = null
+  schedule()
+  assert.doesNotThrow(() => frames.shift()())
+})
+
+test('every help scenario has an overview and valid exception return steps', () => {
+  const { roles } = helpDefinition('catalog')
+  const layouts = helpDefinition('overviewLayouts')
+  const sceneKeys = [
+    ...new Set(roles.flatMap((role) => role.scenes.map((s) => s.key))),
+  ]
+  assert.deepEqual(Object.keys(layouts).sort(), sceneKeys.sort())
+  for (const role of roles) {
+    for (const scene of role.scenes) {
+      const layout = layouts[scene.key]
+      const context = `${role.label} / ${scene.title}`
+      assert.ok(['chain', 'steps', 'path'].includes(layout.kind), context)
+      const steps = layout.steps || scene.steps
+      assert.ok(steps.length > 0, context)
+      for (const step of steps) {
+        assert.ok(
+          step.title && step.owner && (step.detail || step.description),
+          context
+        )
+        assert.ok(Array.isArray(step.roles), context)
+      }
+      if (layout.kind === 'chain') {
+        const ids = steps.map((_, index) => `s${index + 1}`)
+        assert.ok(ids.includes(layout.exception?.from), `${context}异常起点`)
+        assert.ok(ids.includes(layout.exception?.back), `${context}恢复去向`)
+        assert.ok(
+          layout.exception.title &&
+            layout.exception.owner &&
+            layout.exception.label,
+          context
+        )
+      }
+      if (layout.resultStep !== undefined) {
+        assert.ok(
+          Number.isInteger(layout.resultStep) &&
+            layout.resultStep >= 0 &&
+            layout.resultStep < steps.length,
+          context
+        )
+      }
+      if (layout.pointMap) {
+        assert.equal(layout.pointMap.length, steps.length, context)
+      }
+      for (const index of layout.supplementSourceSteps || []) {
+        assert.ok(scene.steps[index], `${context}补充说明`)
+      }
+    }
+  }
+})
+
+test('UI design has exactly one self-contained HTML and the current written contract', () => {
+  assert.equal(DEV_UI_DESIGN_ROUTE, '/__dev/ui-design')
+  assert.deepEqual(
+    readdirSync(path.join(root, UI_DESIGN_DIRECTORY)).sort(),
+    ['README.md', 'index.html', '交互设计说明.md', '设计依据.md'].sort()
+  )
+  const html = read(UI_DESIGN_ASSET.path)
+  assert.match(html, /<!doctype html>/i)
+  assert.doesNotMatch(
+    html,
+    /<(?:script|img|link)[^>]+(?:src|href)=["']https?:/i
+  )
+  for (const file of [
+    UI_DESIGN_ASSET.specificationPath,
+    UI_DESIGN_ASSET.rationalePath,
+  ]) {
+    assert.ok(read(file).length > 300)
+  }
+})
+
+test('mobile progress design groups business details without desktop source jumps', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  const detail = html.match(
+    /function renderMobileProgressDetail\(\) \{([\s\S]*?)\n[ ]{4}\}\n\n[ ]{4}function renderMobileTaskPreview/u
+  )
+
+  assert.ok(detail)
+  assert.match(detail[1], /renderUnifiedProgressDetail/u)
+  const panel = html.match(/function renderProgressDesignPanel\([\s\S]*?(?=function renderUnifiedProgressDetail)/u)?.[0]
+  assert.match(html, /\['overview','总览'\],\['lines','产品'\],\['execution','生产'\],\['tasks','任务'\]/u)
+  assert.match(panel, /name="progress-production-/u)
+  assert.match(panel, /mobile-open-production-progress/u)
+  assert.doesNotMatch(detail[1], /打开原单|查看业务明细/u)
+  assert.match(specification, /总览、产品、生产、任务/u)
+  assert.match(rationale, /固定分类与独立滚动/u)
+})
+
+test('UI design keeps persistent page headings concise like the formal ERP', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const formHeaders = [
+    ...html.matchAll(/<header class="form-head">([\s\S]*?)<\/header>/gu),
+  ]
+  const workbenchHeading = html.match(
+    /<header class="dev-design-heading">([\s\S]*?)<\/header>/u
+  )
+  const viewer = read('web/src/dev-workbench/pages/DevUIDesignPage.jsx')
+  const viewerHeading = viewer.match(
+    /<DevPageHeader\b([\s\S]*?)\n {6}\/>/u
+  )
+
+  assert.ok(formHeaders.length >= 9)
+  assert.deepEqual(
+    formHeaders.filter(([, content]) => /<p\b/u.test(content)),
+    []
+  )
+  assert.ok(workbenchHeading)
+  assert.doesNotMatch(workbenchHeading[1], /<p\b/u)
+  assert.match(workbenchHeading[1], /<h1>\$\{area[.]label\}<\/h1>/u)
+  assert.ok(viewerHeading)
+  assert.doesNotMatch(viewerHeading[1], /<Typography[.]Paragraph\b/u)
+  assert.match(html, /if\(!setup\)return inModule \? '' :/u)
+  assert.match(html, /<div class="module-tabs-row"><h1>\$\{hub.title\}<\/h1>/u)
+  assert.match(html, /view-mode-row--secondary/u)
+  assert.match(viewerHeading[1], /navigation=\{\s*<Tabs/u)
+  assert.doesNotMatch(viewer, /erp-dev-workbench-toolbar/u)
+  assert.match(workbenchHeading[1], /dev-design-tabs/u)
+  assert.match(workbenchHeading[1], /dev-design-heading-actions/u)
+  assert.match(
+    html,
+    /function renderTopbarPageTitle\(\)[\s\S]*contentOwnsPageHeading\(\)[\s\S]*class="crumb"/u
+  )
+  assert.doesNotMatch(html, /hub[.]note/u)
+  assert.doesNotMatch(
+    html,
+    /统一界面(?:交互)?评审稿 V[1-9]\d*|V[1-9]\d* · 本地交互样例|固定样例 · 不连接真实环境/u
+  )
+})
+
+test('UI design modal backdrops follow the shared dismissal contract', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  const overlays = html.match(/<div class="overlay"[^>]*>/gu) || []
+
+  assert.ok(overlays.length >= 19)
+  assert.deepEqual(
+    overlays.filter(
+      (opening) =>
+        !/data-action="(?:overlay-bg|detail-bg)"/u.test(opening) &&
+        !/data-backdrop-static="true"/u.test(opening)
+    ),
+    []
+  )
+  assert.match(html, /event[.]target===entryDialog/u)
+  assert.match(html, /state[.]overlay === 'task-create-confirm'/u)
+  assert.match(html, /附件正在上传，请等待完成后关闭/u)
+  assert.match(specification, /普通弹窗点击遮罩/u)
+  assert.match(specification, /法务确认、断连恢复/u)
+  assert.match(rationale, /点击确认层遮罩只返回继续编辑/u)
+})
+
+test('workbench design mirrors the Git index lock recovery decision flow', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  assert.match(html, /查看 Git 索引锁流程/u)
+  assert.match(html, /data-action="dev-lock-flow"/u)
+  assert.match(html, /Git index[.]lock 检查与恢复流程/u)
+  assert.match(html, /owner 已结束且现场稳定/u)
+  assert.match(html, /同盘隔离旧锁与旁车/u)
+  assert.match(specification, /Git `index[.]lock` Mermaid 判定图/u)
+  assert.match(specification, /沿用已有授权继续/u)
+  assert.match(rationale, /Mermaid 判定图/u)
+  assert.match(rationale, /非空候选先保全再复核/u)
+})
+
+test('workbench design mirrors the waiting heartbeat handoff rule', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const specification = read(UI_DESIGN_ASSET.specificationPath)
+  const rationale = read(UI_DESIGN_ASSET.rationalePath)
+  assert.match(html, /查看自动续办交接流程/u)
+  assert.match(html, /data-action="dev-automation-flow"/u)
+  assert.match(html, /等待心跳移除与执行阶段交接流程/u)
+  assert.match(html, /先删除本次等待心跳/u)
+  assert.match(html, /同一次续办进入实现、验证、造数、Git 与部署/u)
+  assert.match(specification, /自动续办交接图/u)
+  assert.match(specification, /删除失败保持执行阶段未开始/u)
+  assert.match(rationale, /先删除并读回当前等待心跳/u)
+  assert.match(rationale, /不让工作台成为新的任务调度真源/u)
+})
+
+test('preview isolates storage, disallows network and permits local exported downloads', () => {
+  const html = prepareUIDesignSandboxSource(
+    '<html><head><title>Design</title></head><body></body></html>'
+  )
+  assert.match(html, /connect-src 'none'/)
+  const page = read('web/src/dev-workbench/pages/DevUIDesignPreview.jsx')
+  assert.match(page, /sandbox="allow-scripts allow-downloads"/)
+  assert.doesNotMatch(page, /allow-same-origin/)
+  assert.match(page, /event\.source === frameRef\.current\?\.contentWindow/)
+})
+
+test('empty or headless design inputs keep sandbox initialization deterministic', () => {
+  assert.equal(prepareUIDesignSandboxSource(''), '')
+  assert.match(prepareUIDesignSandboxSource('<body>Design</body>'), /^<meta /)
+  const html = prepareUIDesignSandboxSource(
+    '<HEAD lang="zh"><title>Design</title></HEAD>'
+  )
+  assert.ok(html.indexOf('createMemoryStorage') < html.indexOf('<title>'))
+})
+
+test('every documented preview entry uses the same isolated design asset', () => {
+  const source = '<html><head></head><body></body></html>'
+  const documented = [...read(`${UI_DESIGN_DIRECTORY}/README.md`).matchAll(/\/__dev\/ui-design\?page=([\w-]+)/gu)]
+    .map((match) => match[1]).filter((entry) => entry !== 'controls')
+  for (const entry of new Set([...documented, ...UI_DESIGN_PREVIEW_MODES.map(({ value }) => value)])) {
+    assert.equal(resolveUIDesignPreviewPage(entry), entry)
+    const prepared = prepareUIDesignSandboxSource(source, { page: entry })
+    assert.ok(prepared.includes(`window.__ERP_UI_DESIGN_ENTRY__ = "${entry}"`))
+    assert.match(prepared, /connect-src 'none'/)
+  }
+  const prepared = prepareUIDesignSandboxSource(source, {
+    page: '</script><script>unexpected()</script>',
+  })
+  assert.ok(prepared.includes('window.__ERP_UI_DESIGN_ENTRY__ = "workspace"'))
+  assert.doesNotMatch(prepared, /unexpected/)
+})
+
+test('production preview opens the same module as the ERP design navigation', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const initialPage = html.match(/page: (.*?), status: 'all'/u)?.[1]
+  assert.ok(initialPage)
+  assert.equal(runInNewContext(initialPage, {
+    window: { __ERP_UI_DESIGN_ENTRY__: 'production-hub' },
+    taskHandlingPreview: false,
+  }), 'production-hub')
+  assert.equal(resolveUIDesignPreviewPage('controls'), 'workspace')
+  assert.equal(resolveUIDesignPreviewPage(undefined), 'workspace')
+  for (const entry of ['production-hub', 'task-handling', 'workbench', 'help', '']) {
+    assert.equal(resolveUIDesignPreviewMode(entry), 'workspace')
+  }
+})
+
+test('workbench design navigation matches the formal area and visible tool order', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const definitions = html.slice(html.indexOf('    const devDesignAreas ='), html.indexOf('    let devInlineObserved='))
+  const actual = JSON.parse(runInNewContext(`${definitions}\nJSON.stringify(Object.keys(devDesignAreas).map(key => ({label: devDesignAreas[key].label, tools: devDesignNavigationRows(key).map(row => row.title)})))`))
+  assert.deepEqual(actual, DEV_WORKSPACE_NAV_ITEMS.map((area) => ({
+    label: area.label,
+    tools: getDevSecondaryNavItems(area.key).map((item) => item.label),
+  })))
+})
+
+test('preview document identity follows its entry and reset without accepting injected revisions', () => {
+  const source = '<html><head></head><body></body></html>'
+  const identity = (options) => prepareUIDesignSandboxSource(source, options)
+    .match(/window\.__ERP_UI_DESIGN_PREVIEW_ID__ = ("[^"]+")/u)?.[1]
+  assert.equal(identity({ page: 'help' }), '"help-0"')
+  assert.equal(identity({ page: 'help', revision: 1 }), '"help-1"')
+  assert.equal(identity({ page: 'login', revision: 1 }), '"login-1"')
+  for (const revision of [-1, NaN, Infinity, '</script>', 0.5]) {
+    assert.equal(identity({ page: 'help', revision }), '"help-0"')
+  }
+})
+
+test('design does not reach the formal ERP routes or production import graph', () => {
+  const routes = read('web/src/dev-workbench/DevWorkbenchRoutes.jsx')
+  assert.match(routes, /path="ui-design"/)
+  assert.match(routes, /DevUIDesignPage/)
+  assert.doesNotMatch(routes, /path="prototypes"/)
+  assert.match(read('web/src/dev-workbench/config/devHub.mjs'), /交互设计/)
+})
