@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "plush.backup-replica/v1",
+  "source": {
+    "id": "gitlab-r740xd",
+    "kind": "gitlab",
+    "transport": "ssh-directory",
+    "host": "gitlab-control",
+    "directory": "/srv/raid5/gitlab/backups/export"
+  },
+  "destination": {
+    "id": "gitlab-mac-external",
+    "volumeUUID": "00000000-0000-0000-0000-000000000000",
+    "relativeDirectory": "plush-toy-erp-backups/gitlab"
+  },
+  "stateDirectory": "/absolute/private/gitlab-backup-replica/state",
+  "retentionCount": 7,
+  "minimumFreeBytes": 68719476736,
+  "maxSourceAgeHours": 36,
+  "transferTimeoutSeconds": 14400,
+  "restore": {
+    "identityFile": "/absolute/private/gitlab-backup/identity.txt",
+    "host": "gitlab-control",
+    "directory": "/srv/raid5/gitlab/restore-drills",
+    "everyDays": 30,
+    "timeoutSeconds": 14400
+  },
+  "schedule": { "hour": 14, "minute": 15 }
+}
