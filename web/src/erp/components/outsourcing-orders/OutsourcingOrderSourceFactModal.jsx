@@ -1,0 +1,383 @@
+import React, { useEffect, useMemo, useRef } from 'react'
+import { Alert, Descriptions, Form, Input, Radio } from 'antd'
+import { submitValidatedForm } from '../../utils/submitValidatedForm.mjs'
+import { BusinessTextPolicy } from '../../../common/consts/policies.generated.mjs'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import Select from '@/common/components/select/AppSelect'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+import { formatLocalDateTimeInputValue } from '../../utils/dateRange.mjs'
+
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
+import {
+  businessSubjectLabel,
+  inventoryLotOption,
+  warehouseOptionFromRecord,
+} from '../../utils/referenceSelectOptions.mjs'
+import {
+  OUTSOURCING_SOURCE_ACTIONS,
+  outsourcingSourceActionQuantitySummary,
+} from '../../utils/outsourcingOrderFactAction.mjs'
+import {
+  SOURCE_INBOUND_LOT_SELECTION,
+  sourceInboundLotSelectionForOptions,
+} from '../../utils/sourceInboundLotSelection.mjs'
+import {
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
+
+function readableText(values = [], fallback = '-') {
+  const text = values
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ')
+  return text || fallback
+}
+
+function actionCopy(actionType) {
+  return actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+    ? {
+        title: '委外发料',
+        alert: '发料记录创建为草稿，使用“确认委外发料”后才会更新库存出库记录。',
+      }
+    : {
+        title: '登记回货',
+        alert:
+          '选择已有产品批次或填写本次回货的新批次号；记录创建为草稿，使用“确认回货入库”后才会更新库存入库记录。',
+      }
+}
+
+export default function OutsourcingOrderSourceFactModal({
+  open,
+  mode = 'create',
+  initialValues = null,
+  record = null,
+  actionType,
+  order,
+  item,
+  warehouses = [],
+  lots = [],
+  facts = [],
+  loading = false,
+  onCancel,
+  onSubmit,
+}) {
+  const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
+  const editing = mode === 'edit'
+  const lotSelection = Form.useWatch('lot_selection', form)
+  const copy = actionCopy(actionType)
+  const returnReceipt = actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+  const subjectType = String(item?.subject_type || '').trim().toUpperCase()
+  const subjectLabel = businessSubjectLabel(subjectType, '加工对象')
+  const sourceContextKey = `${mode}:${actionType}:${record?.id || item?.id || 0}`
+  const warehouseOptions = useMemo(
+    () =>
+      (Array.isArray(warehouses) ? warehouses : [])
+        .map(warehouseOptionFromRecord)
+        .filter(Boolean),
+    [warehouses]
+  )
+  const lotOptions = useMemo(
+    () =>
+      (Array.isArray(lots) ? lots : []).map(inventoryLotOption).filter(Boolean),
+    [lots]
+  )
+  const quantitySummary = outsourcingSourceActionQuantitySummary(
+    actionType,
+    order,
+    item,
+    editing
+      ? (Array.isArray(facts) ? facts : []).filter(
+          (fact) => Number(fact?.id || 0) !== Number(record?.id || 0)
+        )
+      : facts
+  )
+  const sourceObject =
+    subjectType === 'MATERIAL'
+      ? readableText(
+          [item?.material_code_snapshot, item?.material_name_snapshot],
+          '材料已关联'
+        )
+      : subjectType === 'PRODUCT'
+        ? readableText(
+            [
+              item?.product_no_snapshot,
+              item?.sku_code_snapshot,
+              item?.product_name_snapshot,
+            ],
+            '产品已关联'
+          )
+        : '—'
+  const supplierText = readableText(
+    [order?.supplier_snapshot?.code, order?.supplier_snapshot?.name],
+    '加工厂已关联'
+  )
+
+  const initialLotSelection = returnReceipt
+    ? sourceInboundLotSelectionForOptions(lotOptions)
+    : SOURCE_INBOUND_LOT_SELECTION.EXISTING
+  const openDefaultsRef = useRef(null)
+  openDefaultsRef.current = {
+    warehouse_id: initialValues?.warehouse_id || warehouseOptions[0]?.value,
+    lot_selection: initialValues?.lot_selection || initialLotSelection,
+    lot_id:
+      initialValues?.lot_id ||
+      (initialLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+        ? lotOptions[0]?.value
+        : undefined),
+    new_lot_no: initialValues?.new_lot_no,
+    quantity:
+      initialValues?.quantity ||
+      (isPositiveNumeric20Scale6Units(
+        numeric20Scale6Units(quantitySummary.remaining)
+      )
+        ? quantitySummary.remaining
+        : ''),
+    occurred_at: initialValues?.occurred_at || formatLocalDateTimeInputValue(),
+    note: initialValues?.note || '',
+  }
+  useEffect(() => {
+    if (!open) return
+    // Lookup refreshes must not replace input in an already opened source context.
+    form.resetFields()
+    form.setFieldsValue(openDefaultsRef.current)
+  }, [form, open, sourceContextKey])
+
+  const submit = () => submitValidatedForm(form, onSubmit)
+
+  return (
+    <BusinessFormPage
+      form={form}
+      baselineKey={sourceContextKey}
+      className="erp-outsourcing-source-fact-modal"
+      title={editing ? (returnReceipt ? '编辑委外回货草稿' : '编辑委外发料草稿') : copy.title}
+      open={open}
+      okText={editing ? '保存草稿' : `确认${copy.title}`}
+      confirmLoading={loading}
+      onCancel={onCancel}
+      onOk={submit}
+    >
+      <Alert
+        type="info"
+        showIcon
+        message={
+          editing
+            ? `来源订单、明细、加工厂、${subjectLabel}和单位保持不变；保存后仍是草稿。`
+            : copy.alert
+        }
+      />
+      {lotOptions.length === 0 ? (
+        <Alert
+          type="warning"
+          showIcon
+          message={
+            returnReceipt ? '暂无匹配的已有产品批次' : '暂无可用材料批次'
+          }
+          description={
+            returnReceipt
+              ? '可以填写本次委外回货的新批次号，系统将在创建回货草稿时一并准备该批次。'
+              : '委外发料只能选择与来源材料匹配的可用批次，请先核对库存与批次状态。'
+          }
+        />
+      ) : null}
+      <Descriptions
+        size="small"
+        column={{ xs: 1, sm: 2 }}
+        items={[
+          {
+            key: 'order',
+            label: '委外订单',
+            children: order?.outsourcing_order_no || '-',
+          },
+          { key: 'supplier', label: '加工厂', children: supplierText },
+          {
+            key: 'subject',
+            label: subjectLabel,
+            children:
+              subjectType === 'PRODUCT' ? (
+                <ProductIdentity
+                  productId={item?.product_id}
+                  name={item?.product_name_snapshot || '委外产品'}
+                >
+                  {sourceObject}
+                </ProductIdentity>
+              ) : (
+                sourceObject
+              ),
+          },
+          {
+            key: 'process',
+            label: '工序',
+            children: readableText(
+              [item?.process_name_snapshot, item?.process_category_snapshot],
+              '工序已关联'
+            ),
+          },
+          {
+            key: 'unit',
+            label: '单位',
+            children: item?.unit_name_snapshot || '单位已关联',
+          },
+          {
+            key: 'planned',
+            label: '计划数量',
+            children: quantitySummary.planned,
+          },
+          {
+            key: 'processed',
+            label: '已登记量',
+            children: quantitySummary.processed,
+          },
+          {
+            key: 'remaining',
+            label: '剩余可登记',
+            children: quantitySummary.remaining,
+          },
+        ]}
+      />
+      <BusinessForm
+        name="outsourcing-source-fact"
+        form={form}
+        className="erp-business-action-form"
+        layout="vertical"
+        preserve={false}
+        disabled={loading}
+      >
+        <BusinessFormSection title="仓库与批次">
+          <Form.Item
+            name="warehouse_id"
+            label="仓库"
+            rules={[{ required: true, message: '请选择办理仓库' }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={warehouseOptions}
+              placeholder="仓库"
+            />
+          </Form.Item>
+          {returnReceipt ? (
+            <Form.Item
+              name="lot_selection"
+              label="回货批次方式"
+              rules={[{ required: true, message: '请选择回货批次方式' }]}
+            >
+              <Radio.Group
+                options={[
+                  {
+                    label: '选择已有批次',
+                    value: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
+                  },
+                  {
+                    label: '填写新批次号',
+                    value: SOURCE_INBOUND_LOT_SELECTION.NEW,
+                  },
+                ]}
+                onChange={(event) => {
+                  const nextSelection = event.target.value
+                  form.setFieldsValue({
+                    lot_id:
+                      nextSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+                        ? lotOptions[0]?.value
+                        : undefined,
+                    new_lot_no: undefined,
+                  })
+                }}
+              />
+            </Form.Item>
+          ) : null}
+          {!returnReceipt ||
+          lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
+            <Form.Item
+              name="lot_id"
+              label={returnReceipt ? '已有产品批次' : '材料批次'}
+              rules={[
+                {
+                  required: true,
+                  message: returnReceipt
+                    ? '请选择已有产品批次'
+                    : '请选择已有材料批次',
+                },
+              ]}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={lotOptions}
+                notFoundContent={
+                  returnReceipt ? '暂无匹配的已有产品批次' : '暂无可用材料批次'
+                }
+                placeholder={returnReceipt ? '选择已有产品批次' : '选择材料批次'}
+              />
+            </Form.Item>
+          ) : null}
+          {returnReceipt && lotSelection === SOURCE_INBOUND_LOT_SELECTION.NEW ? (
+            <Form.Item
+              name="new_lot_no"
+              label="新批次号"
+              rules={[
+                { required: true, message: '请填写本次回货的新批次号' },
+                { max: 64, message: '新批次号不能超过 64 个字符' },
+              ]}
+            >
+              <Input maxLength={64} placeholder="填写新批次号" />
+            </Form.Item>
+          ) : null}
+        </BusinessFormSection>
+        <BusinessFormSection title="数量与时间">
+          <Form.Item
+            name="quantity"
+            label="本次办理数量"
+            rules={[
+              unitQuantityRuleFromOptions(quantityUnitOptions, item?.unit_id),
+              { required: true, message: '请填写办理数量' },
+              {
+                validator: (_, value) => {
+                  const quantity = numeric20Scale6Units(value)
+                  const remaining = numeric20Scale6Units(
+                    quantitySummary.remaining
+                  )
+                  if (!isPositiveNumeric20Scale6Units(quantity)) {
+                    return Promise.reject(new Error('办理数量必须大于 0'))
+                  }
+                  if (
+                    remaining === null ||
+                    compareNumeric20Scale6Units(quantity, remaining) > 0
+                  ) {
+                    return Promise.reject(
+                      new Error('办理数量不能超过当前剩余数量')
+                    )
+                  }
+                  return Promise.resolve()
+                },
+              },
+            ]}
+          >
+            <Input inputMode="decimal" placeholder="填写本次办理数量" />
+          </Form.Item>
+          <Form.Item
+            name="occurred_at"
+            label="发生时间"
+            rules={[{ required: true, message: '请选择发生时间' }]}
+          >
+            <DateTimeInput />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field--full"
+            name="note"
+            label="备注"
+          >
+            <BusinessTextArea minRows={2} maxLength={BusinessTextPolicy.noteMaxCharacters} showCount />
+          </Form.Item>
+        </BusinessFormSection>
+      </BusinessForm>
+    </BusinessFormPage>
+  )
+}

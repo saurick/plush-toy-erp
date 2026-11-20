@@ -1,0 +1,25 @@
+.erp-role-policy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  gap: 16px;
+}
+.erp-role-policy .erp-permission-checklist {
+  flex: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+.erp-role-policy .erp-permission-row .ant-checkbox-wrapper-disabled {
+  color: var(--erp-text);
+}
+@media (max-width: 800px) {
+  .erp-role-center-detail:not(.erp-role-center-detail--fullscreen) .erp-role-policy {
+    flex: none;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+}
