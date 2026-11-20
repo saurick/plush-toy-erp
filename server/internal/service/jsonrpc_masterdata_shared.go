@@ -1,0 +1,214 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
+	"server/internal/errcode"
+)
+
+func masterDataActiveMutationFromParams(pm map[string]any) (int, bool, bool) {
+	targetID, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
+	active, activeOK := getOptionalJSONRPCBool(pm, "active")
+	return targetID, active == nil || *active, idOK && activeOK
+}
+
+func (d *jsonrpcDispatcher) handleMasterDataReference(
+	ctx context.Context,
+	method, id string,
+	pm map[string]any,
+) (string, *v1.JsonrpcResult, error) {
+	switch method {
+	case "list_units":
+		if res := d.RequireAdminAnyPermission(ctx,
+			biz.PermissionMaterialRead, biz.PermissionProductRead,
+			biz.PermissionBOMRead, biz.PermissionSalesOrderItemRead, biz.PermissionWarehouseInboundRead,
+			biz.PermissionSalesOrderRead, biz.PermissionPurchaseOrderRead,
+			biz.PermissionOutsourcingOrderRead, biz.PermissionPMCPlanRead,
+			biz.PermissionProductionWIPRead, biz.PermissionWarehouseInventoryRead,
+			biz.PermissionShipmentRead, biz.PermissionQualityInspectionRead,
+			biz.PermissionProductionFactRead, biz.PermissionOutsourcingFactRead,
+			biz.PermissionPurchaseReceiptRead,
+		); res != nil {
+			return id, res, nil
+		}
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListUnits(ctx, filter)
+		if err != nil {
+			return id, d.mapMasterDataError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"units":  unitsToAny(items),
+			"total":  total,
+			"limit":  normalizedBusinessListLimit(pm),
+			"offset": normalizedOffset(pm),
+		})}, nil
+	case "list_warehouses":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
+			return id, res, nil
+		}
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		filter, valid := masterDataFilterFromParams(pm)
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.masterDataUC.ListWarehousesForAccess(ctx, filter, scope)
+		if err != nil {
+			return id, d.mapMasterDataError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"warehouses": warehousesToAny(items),
+			"total":      total,
+			"limit":      normalizedBusinessListLimit(pm),
+			"offset":     normalizedOffset(pm),
+		})}, nil
+	default:
+		return id, unknownMasterDataResult(method), nil
+	}
+}
+
+func masterDataFilterFromParams(pm map[string]any) (biz.MasterDataFilter, bool) {
+	ids, valid := optionalReferenceIDs(pm, "ids")
+	if !valid {
+		return biz.MasterDataFilter{}, false
+	}
+	supplierTypes := getStringSlice(pm, "supplier_types")
+	if supplierType := getString(pm, "supplier_type"); supplierType != "" {
+		supplierTypes = append(supplierTypes, supplierType)
+	}
+	return biz.MasterDataFilter{
+		IDs: ids, StockCategory: getString(pm, "stock_category"),
+		WarehouseTypes: getStringSlice(pm, "warehouse_types"),
+		Keyword:        getString(pm, "keyword"),
+		ActiveOnly:     getBool(pm, "active_only", false),
+		LifecycleScope: getString(pm, "lifecycle_scope"),
+		SupplierTypes:  supplierTypes,
+		Limit:          getInt(pm, "limit", 50),
+		Offset:         getInt(pm, "offset", 0),
+	}, true
+}
+
+func paymentMethodSelectionErrorResult(err error) *v1.JsonrpcResult {
+	if errors.Is(err, biz.ErrPaymentMethodUnavailable) {
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "请选择已启用的公司共用付款方式；新增方式请先在付款方式管理中建档"}
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
+	if result := warehouseClassificationError(err); result != nil {
+		return result
+	}
+	if result := paymentMethodSelectionErrorResult(err); result != nil {
+		return result
+	}
+	l := d.log.WithContext(ctx)
+	switch {
+	case errors.Is(err, biz.ErrPaymentMethodExists):
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "已有同名付款方式，请选用已有项目"}
+	case errors.Is(err, biz.ErrPaymentMethodInUse):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "该付款方式已被使用，可以停用，不能删除"}
+	case errors.Is(err, biz.ErrPaymentMethodVersionConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "付款方式已被其他操作更新，请刷新后重试"}
+	case errors.Is(err, biz.ErrPaymentMethodNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "付款方式候选不存在，请刷新后重试"}
+	case errors.Is(err, biz.ErrDataScopeForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	case errors.Is(err, biz.ErrBadParam):
+		l.Warnf("[masterdata] invalid param err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	case errors.Is(err, biz.ErrCustomerNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "客户不存在"}
+	case errors.Is(err, biz.ErrSupplierNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "供应商不存在"}
+	case errors.Is(err, biz.ErrMaterialNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "材料不存在"}
+	case errors.Is(err, biz.ErrMaterialIdentityConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceConflict.Code, Message: "物料编号或厂商、料号、色号组合已存在，请选择已有物料"}
+	case errors.Is(err, biz.ErrProcessNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "工序不存在"}
+	case errors.Is(err, biz.ErrProductSKUNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "SKU 不存在"}
+	case errors.Is(err, biz.ErrProductNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选产品不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrProductInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "产品已停用"}
+	case errors.Is(err, biz.ErrContactNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "联系人不存在"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "默认单位已停用"}
+	default:
+		l.Errorf("[masterdata] internal err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+}
+
+func unknownMasterDataResult(method string) *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code:    errcode.UnknownMethod.Code,
+		Message: fmt.Sprintf("未知 masterdata 接口 method=%s", method),
+	}
+}
+
+func unitToMap(item *biz.Unit) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":         item.ID,
+		"code":       item.Code,
+		"name":       item.Name,
+		"precision":  item.Precision,
+		"is_active":  item.IsActive,
+		"created_at": item.CreatedAt.Unix(),
+		"updated_at": item.UpdatedAt.Unix(),
+	}
+}
+
+func unitsToAny(items []*biz.Unit) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, unitToMap(item))
+	}
+	return out
+}
+
+func warehouseToMap(item *biz.Warehouse) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":         item.ID,
+		"code":       item.Code,
+		"name":       item.Name,
+		"type":       item.Type,
+		"is_active":  item.IsActive,
+		"created_at": item.CreatedAt.Unix(),
+		"updated_at": item.UpdatedAt.Unix(),
+	}
+}
+
+func warehousesToAny(items []*biz.Warehouse) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, warehouseToMap(item))
+	}
+	return out
+}
