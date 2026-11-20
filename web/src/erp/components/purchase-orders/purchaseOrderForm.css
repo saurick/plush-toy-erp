@@ -1,0 +1,37 @@
+.erp-purchase-order-lines {
+  container-type: inline-size;
+}
+
+.erp-purchase-order-lines .erp-purchase-line-material {
+  display: grid;
+  gap: 4px;
+}
+
+.erp-purchase-order-lines .erp-purchase-line-summary {
+  min-width: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
+.erp-purchase-order-lines .erp-line-item-details__fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.erp-purchase-order-lines .erp-purchase-line-source-label {
+  grid-column: 1 / -1;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+@container (max-width: 640px) {
+  .erp-purchase-order-lines .erp-line-item-details__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 400px) {
+  .erp-purchase-order-lines .erp-line-item-details__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
