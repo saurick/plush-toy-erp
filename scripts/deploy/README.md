@@ -72,6 +72,8 @@
 
 `backup-set/cli.mjs restore-check --business-smoke` 在同一隔离恢复环境追加原应用镜像的登录、配置、业务与附件读取，凭据仅从受控环境传入；完成并精确清理后才产生绑定备份与版本的业务回执。账号、覆盖范围及恢复页报告入口见[恢复步骤](../../deployments/yoyoosun/runbooks/04-backup-restore.md#恢复步骤)。
 
+附件回执分别记录全部恢复件数、活动件数和抽样件数。全是撤销件时抽样数为零。有活动件时按原件大小读取，逐件核对字节数和 SHA-256。
+
 恢复演练的 `command-summary.txt` 绑定同一 `backupId / releaseId / sourceAlias / restoreTarget`；dump 留在受控本地输出。`image-digests-evidence.mjs` 只写脱敏镜像证据，不构建镜像、不访问 registry、不读取 `.env`。
 
 额外副本的接入、目标迁移、Mac 定时任务和恢复范围见[备份恢复中的 Mac 外接盘副本](../../deployments/yoyoosun/runbooks/04-backup-restore.md#mac-外接盘副本--mac-backup-replica)。
@@ -214,7 +216,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 三个登记 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表。
 
-Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。
+Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、发布清单、演练回执、source binding 和 image content ID。
 
 专用 `read_package_registry` deploy token 只保存在工作台进程内存，并且只注入确实可能冷取件的唯一 executor 子进程；子进程在任何预检前立即从环境移除，再仅通过唯一 SSH 标准输入进入已加锁的远端执行器。它不进入其他子进程、参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。
 

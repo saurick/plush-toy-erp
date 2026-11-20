@@ -181,6 +181,11 @@ export function useVersionCenter() {
         const operation = await client.operation(pollingOperationId, { signal: controller.signal })
         if (cancelled) return
         setOperationPollError('')
+        setOperationDetail((current) =>
+          current?.id === operation.id
+            ? { ...current, ...operation, evidence: operation.evidence ?? current.evidence }
+            : current
+        )
         updateSummary((current) =>
           current
             ? {
@@ -216,6 +221,7 @@ export function useVersionCenter() {
     pollingOperationId,
     refresh,
     updateSummary,
+    setOperationDetail,
     setOperationPollError,
   ])
 

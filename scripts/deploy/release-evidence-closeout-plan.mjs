@@ -588,32 +588,12 @@ function buildChecksForAction({
       }
       break;
     case "rollback-forward-fix":
-      if (!commandText.includes("rollback-rehearsal-report.mjs")) {
-        checks.push({
-          id: "current-rollback-plan",
-          ok: false,
-          kind: "manual",
-          message: "Review the fixed rollback version and recovery path.",
-        });
-        break;
-      }
-      checks.push(
-        checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ID" }),
-        checkEnvOrEvidence({
-          env,
-          evidenceInputs,
-          key: "RELEASE_ENVIRONMENT",
-          validate: (value) => value === deploymentTarget,
-        }),
-        checkEnv({ env, key: "ROLLBACK_TARGET_RELEASE" }),
-        checkEnv({ env, key: "ROLLBACK_TRIGGER_SCENARIO" }),
-        checkFile({
-          repoRoot,
-          filePath: path.join(evidenceDir, "smoke-test-report.json"),
-          id: "post-smoke-report",
-          label: "post-smoke report",
-        }),
-      );
+      checks.push({
+        id: "current-rollback-plan",
+        ok: false,
+        kind: "manual",
+        message: "Record the actual rollback rehearsal steps and its post-rehearsal smoke.",
+      });
       break;
     case "release-signoff":
       checks.push({
@@ -664,25 +644,6 @@ function buildChecksForAction({
             }),
           );
         }
-      }
-      if (commandText.includes("rollback-rehearsal-report.mjs")) {
-        checks.push(
-          checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ID" }),
-          checkEnvOrEvidence({
-            env,
-            evidenceInputs,
-            key: "RELEASE_ENVIRONMENT",
-            validate: (value) => value === deploymentTarget,
-          }),
-          checkEnv({ env, key: "ROLLBACK_TARGET_RELEASE" }),
-          checkEnv({ env, key: "ROLLBACK_TRIGGER_SCENARIO" }),
-          checkFile({
-            repoRoot,
-            filePath: path.join(evidenceDir, "smoke-test-report.json"),
-            id: "post-smoke-report",
-            label: "post-smoke report",
-          }),
-        );
       }
       break;
     default:

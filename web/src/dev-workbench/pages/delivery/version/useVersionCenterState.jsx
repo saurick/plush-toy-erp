@@ -242,7 +242,7 @@ export function useVersionCenterState() {
       })
       setOperationDetail((current) => {
         const next = snapshot.summary.operations.find((operation) => operation.id === current?.id)
-        return current && next ? { ...current, ...next, evidence: current.evidence } : current
+        return current && next ? { ...current, ...next, evidence: next.evidence ?? current.evidence } : current
       })
       setCheckedAt(snapshot.checkedAt)
       setStoredSummaryFresh(true)

@@ -1272,7 +1272,7 @@ Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定�
 
 - 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。
 
-  版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider。创建新发布通过 GitLab 写 Provider 使用专用 `PLUSH_GITLAB_TOKEN`。缺少发布凭据时页面保持可读并停用该动作。
+  版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider。目录保留制品不完整的版本并显示缺项。七项制品齐全后仍须校验发布证据和同一提交的源码包；已查明源码包缺失时，页面显示对应原因。创建新发布通过 GitLab 写 Provider 使用专用 `PLUSH_GITLAB_TOKEN`。缺少发布凭据时页面保持可读并停用该动作。
 - 命令行发布入口为 `scripts/deploy/gitlab-release-cli.mjs`，复用同一 Delivery Service 与 operation store；默认计划不读凭据、不触网，显式执行才按当前 clean SHA、完整 CI 与版本目录发起流水线。
 
   CLI 从独立 Keychain / 受控文件读取带到期日的项目发布身份，不把只读 token 当作写凭据，不调整既有 CI 机器人的权限；命令及凭据来源见 [部署脚本](../../scripts/deploy/README.md#命令行发起-gitlab-发布)。此入口只发布制品，目标提升仍独立执行。

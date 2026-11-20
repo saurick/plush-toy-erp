@@ -43,6 +43,11 @@ const SPECIALIZED_DESKTOP_CONTRACTS = Object.freeze([
   }),
   Object.freeze({
     route: "/__dev/version-center",
+    scenarioFile: "web/scripts/style-l1/devVersionCenterReleaseEvidenceScenarios.mjs",
+    scenarioName: "dev-version-center-release-evidence-desktop",
+  }),
+  Object.freeze({
+    route: "/__dev/version-center",
     scenarioFile: "web/scripts/style-l1/devVersionCenterScenarios.mjs",
     scenarioName: "dev-version-center-tabs-pagination-desktop",
   }),

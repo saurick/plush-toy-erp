@@ -530,6 +530,7 @@ case "$target" in
 esac
 marker=$root/.initialization-owner.json
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+[[ -e "$root" || -L "$root" ]] || exit 0
 [[ -d "$root" && ! -L "$root" && -f "$marker" && ! -L "$marker" ]]
 [[ "$(stat -c '%u' "$root")" == "$(id -u)" && "$(stat -c '%u' "$marker")" == "$(id -u)" ]]
 jq -e --arg operationId "$operation_id" --arg target "$target" \
@@ -805,7 +806,7 @@ function executeTargetInitialization(
   const target = getDeploymentTarget(plan.target.key);
   const sshArgs = fixedSshArgs(target);
   let accessFile = null;
-  let remoteRootPrepared = false;
+  let remoteRootPreparationAttempted = false;
   let remoteExecutionInvoked = false;
   let validatedReceipt = null;
   let controlTransferDurationMs = 0;
@@ -853,6 +854,7 @@ function executeTargetInitialization(
       },
       now: now(),
     });
+    remoteRootPreparationAttempted = true;
     runChecked(
       runCommand,
       "ssh",
@@ -860,7 +862,6 @@ function executeTargetInitialization(
       { input: PREPARE_TARGET_INITIALIZATION_ROOT, timeout: 30_000 },
       "prepare pristine target initialization root",
     );
-    remoteRootPrepared = true;
     const controlTransferStartedAt = Date.now();
     try {
       runChecked(
@@ -988,8 +989,8 @@ function executeTargetInitialization(
       receipt: validatedReceipt,
     };
   } catch (error) {
-    let cleanupProven = !remoteRootPrepared;
-    if (remoteRootPrepared && !remoteExecutionInvoked) {
+    let cleanupProven = !remoteRootPreparationAttempted;
+    if (remoteRootPreparationAttempted && !remoteExecutionInvoked) {
       try {
         runChecked(
           runCommand,

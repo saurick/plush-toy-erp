@@ -79,7 +79,7 @@ export function atomicJSON(file, value) {
 // Arguments, output and stderr can contain credentials; diagnostics expose only a stage.
 export async function command(
   args,
-  { input, inputFile, outputFile, signal, timeout = 120_000 } = {},
+  { input, inputFile, outputFile, signal, timeout = 120_000, maxStdoutBytes = 16 * 1024 * 1024 } = {},
 ) {
   const inputFD = inputFile ? fs.openSync(inputFile, "r") : null;
   const outputFD = outputFile ? fs.openSync(outputFile, "wx", 0o600) : null;
@@ -89,7 +89,8 @@ export async function command(
       stdio: [inputFD ?? "pipe", outputFD ?? "pipe", "pipe"],
       env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", COPYFILE_DISABLE: "1" },
     });
-    let stdout = Buffer.alloc(0);
+    const stdout = [];
+    let stdoutBytes = 0;
     let overflow = false;
     let forcedStop;
     const stop = () => {
@@ -99,10 +100,12 @@ export async function command(
     signal?.addEventListener("abort", stop, { once: true });
     if (signal?.aborted) stop();
     child.stdout?.on("data", (part) => {
-      stdout = Buffer.concat([stdout, part]);
-      if (stdout.length > 16 * 1024 * 1024) {
+      stdoutBytes += part.length;
+      if (stdoutBytes > maxStdoutBytes) {
         overflow = true;
         stop();
+      } else {
+        stdout.push(part);
       }
     });
     child.stderr.resume();
@@ -124,7 +127,7 @@ export async function command(
         ? "interrupted"
         : `command_failed:${args[0]}:${args[1] ?? ""}`,
     );
-    return stdout.toString("utf8").trim();
+    return Buffer.concat(stdout, stdoutBytes).toString("utf8").trim();
   } finally {
     if (inputFD !== null) fs.closeSync(inputFD);
     if (outputFD !== null) fs.closeSync(outputFD);

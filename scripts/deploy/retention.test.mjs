@@ -295,13 +295,13 @@ test("an interrupted cleanup resumes only after replacement verification and rec
   );
 });
 
-test("GitLab deletes only payload files; releases, tags, CI and deployment evidence remain", async (t) => {
+test("GitLab retention counts complete bundles and preserves release evidence", async (t) => {
   const state = temporary(t),
     releases = [],
     packages = [],
     files = new Map(),
     calls = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     const sha = i.toString(16).repeat(40),
       tag = `artifact-${sha}`;
     releases.push({
@@ -326,13 +326,26 @@ test("GitLab deletes only payload files; releases, tags, CI and deployment evide
         "sbom.cdx.json",
         "server-image.tar",
         "web-image.tar",
-      ].map((name, j) => ({
+      ].filter((name) => i !== 10 || name !== "release-rehearsal.json").map((name, j) => ({
         id: i * 10 + j + 1,
         file_name: name,
         size: 100,
         file_sha256: "a".repeat(64),
       })),
     );
+    if (i === 11) continue;
+    packages.push({
+      id: i + 21,
+      name: "plush-release-source",
+      version: tag,
+      status: "default",
+    });
+    files.set(i + 21, [{
+      id: 200 + i,
+      file_name: "source.tar",
+      size: 100,
+      file_sha256: "b".repeat(64),
+    }]);
   }
   const request = async (url, options) => {
     const u = new URL(url),
@@ -358,14 +371,18 @@ test("GitLab deletes only payload files; releases, tags, CI and deployment evide
     { state, execute: true, request, token: "test" },
   );
   assert.equal(result.filter((x) => x.state === "cleaned").length, 2);
-  assert.equal(calls.filter(([m]) => m === "DELETE").length, 4);
-  assert.equal(releases.length, 10);
+  assert.equal(result.filter((x) => x.state === "unverified").length, 2);
+  assert.equal(calls.filter(([m]) => m === "DELETE").length, 6);
+  assert.equal(releases.length, 12);
   assert.equal(files.get(2).length, 5);
+  assert.equal(files.get(22).length, 0);
   assert.equal(files.get(1).length, 7);
+  assert.equal(files.get(4).length, 7);
+  assert.equal(files.get(24).length, 1);
   const repeated = await rotateGitlabArtifacts(
     new Map([["0".repeat(40), ["当前运行"]]]),
     { state, execute: true, request, token: "test" },
   );
-  assert.equal(repeated.length, 10);
-  assert.equal(calls.filter(([m]) => m === "DELETE").length, 4);
+  assert.equal(repeated.length, 12);
+  assert.equal(calls.filter(([m]) => m === "DELETE").length, 6);
 });

@@ -33,6 +33,21 @@ test("collect evidence help is runnable", () => {
   assert.match(result.stdout, /不采集 secret/);
 });
 
+test("restarting evidence collection preserves completed receipts", (t) => {
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), "collect-evidence-existing-"));
+  t.after(() => fs.rmSync(output, { recursive: true, force: true }));
+  const receipt = path.join(output, "backup-restore-report.json");
+  fs.writeFileSync(receipt, '{"restoreCompleted":true}\n');
+  const result = runScript([
+    "--deployment-target", "demo-133", "--release-id", "20260629T1200-existing",
+    "--output", output,
+  ]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /输出目录已有文件/u);
+  assert.deepEqual(fs.readdirSync(output), ["backup-restore-report.json"]);
+  assert.equal(fs.readFileSync(receipt, "utf8"), '{"restoreCompleted":true}\n');
+});
+
 test("base release draft does not create credential rotation or customer signoff evidence", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "collect-evidence-base-"));
   const output = path.join(root, "release");

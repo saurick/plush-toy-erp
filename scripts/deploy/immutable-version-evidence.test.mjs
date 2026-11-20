@@ -374,7 +374,7 @@ test("immutable version CLI prints input template without writing evidence", () 
   assert.match(result.stdout, /SERVER_IMAGE_DIGEST='sha256:<64-hex>'/);
   assert.match(
     result.stdout,
-    /--evidence-dir deployments\/yoyoosun\/evidence\/releases\/2026-06-29/,
+    /--evidence-dir 'deployments\/yoyoosun\/evidence\/releases\/2026-06-29'/,
   );
   assert.doesNotMatch(result.stdout, /RELEASE_CLOSEOUT_CONFIRM/);
   assert.doesNotMatch(result.stdout, /SOURCE_POSTGRES_DSN/);

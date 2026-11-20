@@ -2,6 +2,7 @@ import { Card, Space, Tag, Typography } from 'antd'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
 import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
 import {
+  deliveryReleaseEvidenceDescription,
   formatDeliveryBytes,
   shortGitSha,
 } from '../../../config/devDelivery.mjs'
@@ -81,9 +82,9 @@ export function VersionOverview({
                     <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
                     <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
                   </div>
-                  {!versions[0]?.completeAssets || !versions[0]?.promotionEligible ? (
+                  {versions[0] && !versions[0].promotionEligible ? (
                     <Text type="secondary">
-                      {versions[0]?.completeAssets ? '仅可回滚或演练证据待补齐' : '完整制品未证明'}
+                      {deliveryReleaseEvidenceDescription(versions[0])}
                     </Text>
                   ) : null}
                 </td>
@@ -152,13 +153,7 @@ export function VersionOverview({
             className="erp-dev-latest-version-published-at"
           />
           <Text type="secondary">
-            {versions[0]?.completeAssets
-              ? versions[0]?.promotionEligible
-                ? '七项制品齐全，演练回执已绑定'
-                : versions[0]?.assets.includes('release-rehearsal.json')
-                  ? '七项制品已找到，演练证据待核验'
-                  : 'v1 六资产齐全，仅保留读取与旧版回滚'
-              : '等待完整 release assets'}
+            {deliveryReleaseEvidenceDescription(versions[0])}
           </Text>
           {targetPassed ? (
             <>

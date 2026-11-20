@@ -383,31 +383,6 @@ function materializeCommandFromText({
       displayCommand: buildDisplayCommand(cmd, args, secretEnvKeys),
     };
   }
-  if (commandText.includes("rollback-rehearsal-report.mjs")) {
-    const cmd = process.execPath;
-    const args = [
-      "scripts/deploy/rollback-rehearsal-report.mjs",
-      "--environment",
-      deploymentTarget,
-      "--release-id",
-      requireInput({ env, action, key: "RELEASE_ID" }),
-      "--rehearsal-type",
-      "rollback-forward-fix",
-      "--trigger-scenario",
-      requireEnv(env, "ROLLBACK_TRIGGER_SCENARIO"),
-      "--rollback-target-release",
-      requireEnv(env, "ROLLBACK_TARGET_RELEASE"),
-      "--step",
-      "identify rollback target=pass",
-      "--post-smoke-report",
-      "smoke-test-report.json",
-    ];
-    if (revision) {
-      args.push("--customer-config-revision", revision);
-    }
-    args.push("--evidence-dir", evidenceDir);
-    return { cmd, args, displayCommand: buildDisplayCommand("node", args) };
-  }
   if (commandText.includes("customer-config-manifest-evidence.mjs")) {
     const cmd = process.execPath;
     const args = [
@@ -432,7 +407,10 @@ function materializeAction({
   envFile,
   env,
 }) {
-  return action.commands.map((commandText) =>
+  const commands = action.commands.filter(
+    (commandText) => !commandText.includes("rollback-rehearsal-report.mjs"),
+  );
+  return commands.map((commandText) =>
     sanitizeDisplayCommand(
       materializeCommandFromText({
         commandText,

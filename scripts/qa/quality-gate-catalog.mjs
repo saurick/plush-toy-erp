@@ -523,7 +523,9 @@ export function buildQualityGateGovernance({
       .toLowerCase()
       .includes(keyword);
   }).map((gate) => {
-    const profile = gate.profiles.includes("strict") ? "strict" : "full";
+    const profile = gate.profiles.find((profile) =>
+      receiptCurrent(receipts[profile], repository, operations),
+    ) || gate.profiles.find((profile) => receipts[profile]) || gate.profiles[0];
     const stats = buildQualityGateStatistics(operations, {
       profile,
       repository,

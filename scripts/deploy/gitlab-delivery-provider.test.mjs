@@ -354,6 +354,7 @@ test("GitLab provider enriches the newest release with build and digest evidence
       ? createHash("sha256").update(bodies[file.file_name]).digest("hex")
       : file.file_sha256,
   }));
+  let sourceAvailable = false;
   const provider = createGitlabDeliveryProvider({
     projectRoot: process.cwd(),
     env: { PLUSH_GITLAB_TOKEN: TOKEN },
@@ -363,6 +364,8 @@ test("GitLab provider enriches the newest release with build and digest evidence
         url.includes("/packages?") &&
         url.includes("package_name=plush-release-source")
       ) {
+        assert.equal(new URL(url).searchParams.get("package_version"), `artifact-${SHA}`);
+        if (!sourceAvailable) return json([]);
         return json([
           {
             id: 42,
@@ -399,12 +402,18 @@ test("GitLab provider enriches the newest release with build and digest evidence
       throw new Error(`unexpected URL: ${url}`);
     },
   });
+  const [missingSource] = await provider.listVersions();
+  assert.equal(missingSource.completeAssets, true);
+  assert.equal(missingSource.promotionEligible, false);
+  assert.equal(missingSource.promotionBlocker, "source_package_missing");
+  sourceAvailable = true;
   const [version] = await provider.listVersions();
   assert.equal(version.buildPerformance.cacheHitRateBasisPoints, 8_000);
   assert.deepEqual(version.imageDigests, {
     server: detail.serverDigest,
     web: detail.webDigest,
   });
+  assert.equal(version.promotionBlocker, undefined);
   assert.equal(version.promotionEligible, true);
 });
 

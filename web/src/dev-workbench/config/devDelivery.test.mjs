@@ -140,6 +140,7 @@ function summaryFixture() {
           'checksums.sha256',
           'release-artifact.json',
           'release-manifest.json',
+          'release-rehearsal.json',
           'sbom.cdx.json',
           'server-image.tar',
           'web-image.tar',
@@ -352,6 +353,30 @@ test('target cache metrics require exact identity evidence and use Chinese prese
       }),
     /operation/u
   )
+})
+
+test('delivery summary keeps incomplete releases alongside complete versions and rejects false eligibility', async () => {
+  const summary = summaryFixture()
+  const complete = summary.versions[0]
+  const sha = 'b'.repeat(40)
+  const incomplete = {
+    ...complete,
+    version: '2026.07.29-2',
+    gitSha: sha,
+    tag: `artifact-${sha}`,
+    url: complete.url.replace(SHA, sha),
+    assets: complete.assets.filter((name) => name !== 'release-rehearsal.json'),
+    completeAssets: false,
+  }
+  summary.versions.push(incomplete)
+  const client = createDevDeliveryClient({ fetchImpl: async () => response(summary) })
+  assert.deepEqual((await client.summary()).versions.map((v) => v.completeAssets), [true, false])
+  for (const invalid of [{ completeAssets: true }, { promotionEligible: true }]) {
+    assert.throws(() => validateDevDeliverySummary({
+      ...summary,
+      versions: [complete, { ...incomplete, ...invalid }],
+    }), /version/u)
+  }
 })
 
 test('delivery summary requires both target contracts and no-shell boundaries', () => {

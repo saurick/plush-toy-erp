@@ -69,6 +69,7 @@ function writeFile(outputDir, name, content) {
     {
       encoding: "utf8",
       mode: 0o600,
+      flag: "wx",
     },
   );
 }
@@ -108,6 +109,10 @@ if (options.deploymentTarget === "production-133" && options.profile !== RELEASE
 
 const outputDir = path.resolve(process.cwd(), options.outputDir);
 fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 });
+if (fs.readdirSync(outputDir).length > 0) {
+  process.stderr.write("[collect-evidence] 输出目录已有文件，请为新草稿使用空目录\n");
+  process.exit(1);
+}
 
 const gitResult = spawnSync("git", ["rev-parse", "HEAD"], {
   cwd: repoRoot,

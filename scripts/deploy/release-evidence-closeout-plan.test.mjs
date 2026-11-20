@@ -209,7 +209,7 @@ test("closeout plan reports missing local prerequisites for draft evidence", () 
   assert.equal(plan.status.status, "draft");
   assert.equal(plan.status.ready, false);
   assert.equal(plan.scope.readOnly, true);
-  assert(plan.summary.blocked >= 5);
+  assert(plan.summary.blocked >= 4);
   const immutable = plan.actions.find(
     (action) => action.id === "immutable-version",
   );
@@ -318,8 +318,8 @@ test("closeout plan marks machine actions runnable when prerequisites are presen
 
   assert.equal(plan.status.status, "draft");
   assert.equal(plan.summary.blocked, 0);
-  assert.equal(plan.summary.runnable, 5);
-  assert.equal(plan.summary.manualOnly, 2);
+  assert.equal(plan.summary.runnable, 4);
+  assert.equal(plan.summary.manualOnly, 3);
   assert.equal(
     plan.actions.find((action) => action.id === "production-preflight").canRun,
     true,
@@ -421,7 +421,7 @@ test("closeout plan deduplicates missing prerequisites for composite actions", (
     missingIds.filter((id) => id === "RELEASE_ENVIRONMENT").length,
     0,
   );
-  assert.equal(action.resolvedInputs.RELEASE_ID.value, "20260629T1200-draft");
+  assert.equal(action.resolvedInputs.RELEASE_ID, undefined);
 });
 
 test("closeout plan reuses release batch fields from evidence across machine actions", () => {
@@ -479,11 +479,10 @@ test("closeout plan reuses release batch fields from evidence across machine act
   const rollback = plan.actions.find(
     (action) => action.id === "rollback-forward-fix",
   );
-  assert.equal(rollback.canRun, true);
-  assert.equal(
-    rollback.resolvedInputs.RELEASE_ENVIRONMENT.source,
-    "release-evidence.md",
-  );
+  assert.equal(rollback.canRun, false);
+  assert.equal(rollback.prerequisiteChecks.find(
+    (check) => check.id === "current-rollback-plan",
+  ).kind, "manual");
 });
 
 test("closeout plan blocks smoke URLs that contain credentials", () => {

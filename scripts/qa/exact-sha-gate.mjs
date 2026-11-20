@@ -559,7 +559,7 @@ export function refreshExactShaTimeSensitiveCheck(
     runCheck = () =>
       spawnSync("bash", ["scripts/qa/govulncheck.sh"], {
         cwd: root,
-        env: { ...process.env, GOVULNCHECK_STRICT: "1" },
+        env: { ...process.env, SKIP_GOVULNCHECK: "0", GOVULNCHECK_STRICT: "1" },
         stdio: "inherit",
       }),
     now = () => new Date(),
@@ -568,6 +568,9 @@ export function refreshExactShaTimeSensitiveCheck(
 ) {
   if (key !== "vulnerabilityDatabase") {
     throw new Error("unsupported time-sensitive strict check");
+  }
+  if (env.SKIP_GOVULNCHECK === "1") {
+    throw new Error("SKIP_GOVULNCHECK cannot refresh strict vulnerability evidence");
   }
   const plan = buildExactShaPlan(root, { sha, mainRef, env });
   const terminal = readExactShaTerminal(plan);

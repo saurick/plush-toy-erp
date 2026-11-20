@@ -189,5 +189,7 @@ test("governance defaults to gates related to the current change", () => {
   assert.deepEqual(normalizeDevQualityGateGovernance(governance), governance);
   assert(governance.rows.some((row) => row.key === "browser-experience"));
   assert(governance.rows.some((row) => row.key === "full"));
+  assert(governance.rows.filter((row) => ["full", "browser-experience"].includes(row.key))
+    .every((row) => row.current && row.recentResult === "passed"));
   assert(governance.rows.every((row) => row.sources.length > 0));
 });

@@ -108,6 +108,7 @@ function discoverIdentity(entry, receiptName) {
   }
   const candidates = [
     receipt?.gitSha,
+    receipt?.commit,
     receipt?.git?.commit,
     receipt?.git?.sha,
     receipt?.release?.gitSha,

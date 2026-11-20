@@ -290,6 +290,14 @@ function normalizeRelease(release, files) {
   });
 }
 
+function latestJobAttempts(jobs) {
+  const latest = new Map();
+  for (const job of jobs) {
+    if (!latest.has(job.name) || latest.get(job.name).id < job.id) latest.set(job.name, job);
+  }
+  return [...latest.values()];
+}
+
 function normalizeJob(job) {
   if (!Number.isSafeInteger(job?.id) || job.id < 1) {
     throw new Error("GitLab job identity is invalid");
@@ -459,14 +467,17 @@ export function createGitlabDeliveryProvider({
   async function listPackages(
     limit = 100,
     packageName = GITLAB_DELIVERY_PACKAGE,
+    version = "",
   ) {
-    const packages = await requestJson(
-      request,
-      env,
-      `/projects/${PROJECT_ID}/packages?package_type=generic&package_name=${encodeURIComponent(
-        packageName,
-      )}&order_by=created_at&sort=desc&per_page=${String(limit)}`,
-    );
+    const query = new URLSearchParams({
+      package_type: "generic",
+      package_name: packageName,
+      order_by: "created_at",
+      sort: "desc",
+      per_page: String(limit),
+    });
+    if (version) query.set("package_version", version);
+    const packages = await requestJson(request, env, `/projects/${PROJECT_ID}/packages?${query}`);
     if (!Array.isArray(packages) || packages.length > limit) {
       throw new Error("GitLab package list response is invalid");
     }
@@ -492,7 +503,7 @@ export function createGitlabDeliveryProvider({
 
   async function packageForSha(gitSha) {
     const tag = packageVersion(`artifact-${gitSha}`);
-    const matches = (await listPackages()).filter(
+    const matches = (await listPackages(100, GITLAB_DELIVERY_PACKAGE, tag)).filter(
       (candidate) => candidate.version === tag,
     );
     if (matches.length > 1) {
@@ -505,7 +516,7 @@ export function createGitlabDeliveryProvider({
 
   async function sourceForSha(gitSha) {
     const tag = packageVersion(`artifact-${gitSha}`);
-    const matches = (await listPackages(100, GITLAB_SOURCE_PACKAGE)).filter(
+    const matches = (await listPackages(100, GITLAB_SOURCE_PACKAGE, tag)).filter(
       (candidate) => candidate.version === tag,
     );
     if (matches.length === 0) return null;
@@ -745,8 +756,11 @@ export function createGitlabDeliveryProvider({
       buildPerformance: artifact?.performance?.build || null,
       imageDigests,
       promotionEligible: source !== null,
+      ...(!source && { promotionBlocker: "source_package_missing" }),
     });
-    releaseDetailCache.set(version.gitSha, detail);
+    if (detail.promotionEligible) {
+      releaseDetailCache.set(version.gitSha, detail);
+    }
     return detail;
   }
 
@@ -927,10 +941,6 @@ export function createGitlabDeliveryProvider({
           total.success + total.failed + total.skipped + total.error
       )
         throw new Error("invalid GitLab test report counts");
-      const latestJobs = new Map();
-      for (const job of pipeline.jobs)
-        if (!latestJobs.has(job.name) || latestJobs.get(job.name).id < job.id)
-          latestJobs.set(job.name, job);
       return {
         status:
           total.count > 0 && !total.suite_error
@@ -942,7 +952,7 @@ export function createGitlabDeliveryProvider({
         pipelineId,
         tests: Object.fromEntries(keys.map((key) => [key, total[key]])),
         testsUrl: total.count > 0 ? `${pipeline.url}/test_report` : null,
-        coverage: [...latestJobs.values()]
+        coverage: latestJobAttempts(pipeline.jobs)
           .filter((job) => job.coverage !== null && job.coverage !== undefined)
           .map((job) => ({
             job: job.name,
@@ -989,7 +999,7 @@ export function createGitlabDeliveryProvider({
         ) {
           throw new Error("release pipeline does not match the operation");
         }
-        const releaseJobs = pipelineValue.jobs.filter((job) =>
+        const releaseJobs = latestJobAttempts(pipelineValue.jobs).filter((job) =>
           ["publish_release", "strict"].includes(job.name),
         );
         if (releaseJobs.length === 0) continue;

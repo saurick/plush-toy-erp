@@ -1,19 +1,10 @@
+import { DELIVERY_RELEASE_ASSETS } from '../../../scripts/deploy/delivery-provider.mjs'
 import { DEV_DELIVERY_TARGETS, deliveryOperationRetryPolicy, filterDevOperationHistory, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
 import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
 import { DEV_VERSION_GUIDE_ROUTE } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { assertMermaidFits, assertMermaidZoomMode, switchMermaidLayout, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
-
-const ASSETS = [
-  'checksums.sha256',
-  'release-artifact.json',
-  'release-manifest.json',
-  'release-rehearsal.json',
-  'sbom.cdx.json',
-  'server-image.tar',
-  'web-image.tar',
-]
 
 function deliverySha(index) {
   return index.toString(16).padStart(40, '0')
@@ -85,7 +76,7 @@ export function createVersionCenterSummary() {
       version: `2026.08.08-${String(sequence)}`,
       publishedAt: new Date(Date.UTC(2026, 7, 8, sequence, 0, 0)).toISOString(),
       url: `https://gitlab.saurick.me/saurick/plush-toy-erp/-/releases/artifact-${gitSha}`,
-      assets: ASSETS,
+      assets: DELIVERY_RELEASE_ASSETS,
       artifactSummary: {
         totalBytes: 1_300_000_000 + sequence,
         serverImageBytes: 1_000_000_000,
@@ -799,7 +790,7 @@ export function createDevVersionCenterScenarios({
         assert.equal(await artifactDetails.evaluate((element) => element.open), false)
         await artifactDetails.getByText('保留与可用性说明', { exact: true }).click()
         assert.doesNotMatch(await artifactDetails.innerText(), /BuildKit|总大小|Server.*Web/u)
-        await artifactDetails.getByText(/制品齐全/u).waitFor({ state: 'visible' })
+        await artifactDetails.getByText('七项制品、演练回执和同一提交的源码包已核验', { exact: true }).waitFor({ state: 'visible' })
         await artifactDetails.getByText('保留与可用性说明', { exact: true }).click()
         assert.equal(
           await page.locator('.erp-dev-environment-evidence').count(),
@@ -1072,14 +1063,17 @@ export function createDevVersionCenterScenarios({
           const lockDiagram = lockSection.locator('[data-mermaid-status="rendered"]')
           await lockDiagram.waitFor({ state: 'visible', timeout: 10_000 })
           const lockCanvas = lockSection.locator('.erp-markdown-mermaid__canvas')
+          await lockCanvas.scrollIntoViewIfNeeded()
+          await waitForMermaidFit(guidePage, lockDiagram)
           const previewZoom = Number(await lockCanvas.getAttribute('data-mermaid-zoom'))
           await lockSection
             .getByRole('button', {
               name: '放大Git index.lock 检查与恢复流程',
             })
             .click()
-          assert(
-            Number(await lockCanvas.getAttribute('data-mermaid-zoom')) > previewZoom
+          await guidePage.waitForFunction(
+            ({ canvas, previous }) => Number(canvas.dataset.mermaidZoom) > previous,
+            { canvas: await lockCanvas.elementHandle(), previous: previewZoom }
           )
           await lockSection
             .getByRole('button', {

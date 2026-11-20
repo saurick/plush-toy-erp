@@ -8,6 +8,11 @@ import {
   SUPPORTED_DEPLOYMENT_TARGET_KEYS,
 } from "./deployment-targets.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { DELIVERY_RELEASE_ASSETS } from "./delivery-provider.mjs";
+import {
+  TARGET_RELEASE_SOURCE_FILE,
+  TARGET_RELEASE_SOURCE_PACKAGE,
+} from "./target-release-fetch.mjs";
 import {
   plainFile,
   rotateFiles,
@@ -24,6 +29,7 @@ import { requireValue } from "./backup-replica/config.mjs";
 import {
   planRetention,
   readRetentionLedger,
+  RETENTION_COUNT,
   saveRetentionLedger,
 } from "./backup-replica/retention.mjs";
 import { pruneSets } from "./backup-set/archive.mjs";
@@ -335,7 +341,7 @@ export async function rotateGitlabArtifacts(
     packages = (await pages("/packages?package_type=generic")).filter((x) =>
       [
         "plush-release",
-        "plush-release-source",
+        TARGET_RELEASE_SOURCE_PACKAGE,
         "plush-release-candidate",
       ].includes(x.name),
     );
@@ -361,6 +367,7 @@ export async function rotateGitlabArtifacts(
     groups.set(item.version, group);
   }
   const items = [];
+  const interrupted = [];
   for (const release of releases) {
     const sha = String(release.tag_name).replace(/^artifact-/u, "");
     if (!SHA.test(sha)) continue;
@@ -368,22 +375,25 @@ export async function rotateGitlabArtifacts(
       release.commit?.id === sha,
       "gitlab_release_identity_mismatch",
     );
-    const group = groups.get(release.tag_name) ?? [],
-      formal = group.filter((x) => x.name === "plush-release");
+    const group = groups.get(release.tag_name) ?? [];
+    const formal = group.filter((x) => x.name === "plush-release");
+    const source = group.filter((x) => x.name === TARGET_RELEASE_SOURCE_PACKAGE);
     requireValue(formal.length <= 1, "duplicate_gitlab_release_package");
-    const fileNames = new Set(
-      formal.flatMap((x) => x.files.map((f) => f.file_name)),
-    );
-    const valid = [
-      "checksums.sha256",
-      "release-artifact.json",
-      "release-manifest.json",
-      "sbom.cdx.json",
-      "server-image.tar",
-      "web-image.tar",
-    ].every((n) => fileNames.has(n));
-    if (!valid && ["cleaned", "cleaning"].includes(ledger.records[sha]?.state))
+    const formalFiles = formal[0]?.files ?? [];
+    const formalNames = new Set(formalFiles.map((file) => file.file_name));
+    const valid =
+      formalFiles.length === DELIVERY_RELEASE_ASSETS.length &&
+      DELIVERY_RELEASE_ASSETS.every((name) => formalNames.has(name)) &&
+      source.length === 1 &&
+      source[0].files.length === 1 &&
+      source[0].files[0].file_name === TARGET_RELEASE_SOURCE_FILE;
+    const previous = ledger.records[sha];
+    if (!valid && previous?.state === "cleaned" && !protectedShas.has(sha))
       continue;
+    if (!valid && previous?.state === "cleaning" && !protectedShas.has(sha)) {
+      interrupted.push(previous);
+      continue;
+    }
     items.push({
       id: sha,
       version: release.name,
@@ -406,9 +416,11 @@ export async function rotateGitlabArtifacts(
   for (const item of plan) ledger.records[item.id] = item;
   if (execute) {
     saveRetentionLedger(root, ledger);
-    for (const item of Object.values(ledger.records).filter((x) =>
-      ["eligible", "cleaning"].includes(x.state),
-    )) {
+    const eligible = plan.filter((item) => item.state === "eligible");
+    if (plan.filter((item) => item.valid).length >= RETENTION_COUNT) {
+      eligible.push(...interrupted);
+    }
+    for (const item of eligible) {
       requireValue(!protectedShas.has(item.id), "protected_release_cleanup");
       ledger.records[item.id] = {
         ...item,

@@ -331,7 +331,7 @@ function buildRollbackRehearsalCommand({
   const customerConfigArg = customerConfigRevision
     ? ` --customer-config-revision ${customerConfigRevision}`
     : "";
-  return `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-id <release-id> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json${customerConfigArg} --evidence-dir ${evidenceDir}`;
+  return `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-id <release-id> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "<actual-step>=<pass|fail>" --post-smoke-report <post-rehearsal-smoke-report.json>${customerConfigArg} --evidence-dir ${evidenceDir}`;
 }
 
 function buildNextCommands({
@@ -430,7 +430,7 @@ function buildNextCommands({
   }
   if (missing.has(REQUIRED_FILES.rollbackRehearsal)) {
     commands.push(
-      `node scripts/deploy/rollback-rehearsal-report.mjs --environment ${deploymentTarget} --release-id <release-id> --rehearsal-type rollback-forward-fix --trigger-scenario "<trigger>" --rollback-target-release <previous-release> --step "identify rollback target=pass" --post-smoke-report smoke-test-report.json --evidence-dir ${evidenceDir}`,
+      buildRollbackRehearsalCommand({ deploymentTarget, evidenceDir }),
     );
   }
   commands.push(

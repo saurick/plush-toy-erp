@@ -49,13 +49,7 @@ function evidenceDimension(key, label, status, detail) {
 function localEnvironmentCard(dataSummary, error) {
   const contract = dataSummary?.datasetContract
   const scenarioTarget = dataSummary?.target?.scenarioDemo
-  const coreOperation = currentOperation(
-    dataSummary,
-    'core-demo',
-    (operation) =>
-      operation.readback?.core?.units === contract?.unitCount &&
-      operation.readback?.core?.warehouses === contract?.warehouseCount
-  )
+  const scenarioDigest = contract?.profileSemanticDigests?.['scenario-demo']
   const scenarioOperation = currentOperation(
     dataSummary,
     'scenario-demo',
@@ -63,11 +57,13 @@ function localEnvironmentCard(dataSummary, error) {
       operation.targetSummary?.targetKey === 'local-development' &&
       operation.readback?.dataVersion === contract?.dataVersion &&
       operation.readback?.runId === contract?.runId &&
+      HASH_PATTERN.test(String(scenarioDigest || '')) &&
+      operation.readback?.semanticDigest === scenarioDigest &&
       operation.readback?.targetFingerprint ===
         scenarioTarget?.targetFingerprint
   )
   const targetAvailable = scenarioTarget?.status === 'available'
-  const datasetReadBack = Boolean(coreOperation && scenarioOperation)
+  const datasetReadBack = Boolean(scenarioOperation)
   const status = error
     ? 'failed'
     : !dataSummary || !targetAvailable
@@ -91,12 +87,12 @@ function localEnvironmentCard(dataSummary, error) {
     ),
     datasetVersion: safeText(contract?.dataVersion),
     datasetRunId: safeText(contract?.runId),
-    semanticDigest: HASH_PATTERN.test(String(contract?.semanticDigest || ''))
-      ? contract.semanticDigest
+    semanticDigest: HASH_PATTERN.test(String(scenarioDigest || ''))
+      ? scenarioDigest
       : '未证明',
     datasetEvidence: datasetReadBack
-      ? 'Core 与 Scenario 已按当前提交读回'
-      : '当前提交的 Core / Scenario 持久读回未齐',
+      ? '本地演练数据已按当前提交读回'
+      : '当前提交的本地演练数据读回未齐',
     health: targetAvailable ? '本地固定目标预检已读取' : '本地固定目标未通过',
     evidenceDimensions: Object.freeze([
       evidenceDimension(
@@ -117,7 +113,7 @@ function localEnvironmentCard(dataSummary, error) {
         'dataset',
         '数据合同',
         datasetReadBack ? 'success' : 'not_proven',
-        datasetReadBack ? 'Core 与 Scenario 当前合同已读回' : '当前合同读回未齐'
+        datasetReadBack ? '本地演练数据合同已读回' : '当前合同读回未齐'
       ),
       evidenceDimension(
         'acceptance',
@@ -127,15 +123,12 @@ function localEnvironmentCard(dataSummary, error) {
       ),
     ]),
     rollbackBoundary: '长期数据只向前补齐；通过正式生命周期退出',
-    readbackAt: latestTimestamp([
-      coreOperation?.updatedAt,
-      scenarioOperation?.updatedAt,
-    ]),
+    readbackAt: latestTimestamp([scenarioOperation?.updatedAt]),
     nextAction: error
       ? '重新读取本地数据证据'
       : datasetReadBack
         ? '保持固定编码；业务变化后生成新批次'
-        : '先精确读回 Core，再补齐并读回 Scenario',
+        : '准备并读回本地演练数据',
     error: safeText(error, ''),
   }
 }
@@ -321,6 +314,7 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
     runtime?.serverReady === 'passed' &&
     runtime?.webHealth === 'passed' &&
     target?.remote?.publicEntry?.status === 'passed'
+  const scenarioDigest = contract?.profileSemanticDigests?.['scenario-demo']
   const trialOperation = currentOperation(
     dataSummary,
     'scenario-demo',
@@ -334,7 +328,8 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
         runtime?.activeCustomerConfig?.revision &&
       operation.readback?.dataVersion === contract?.dataVersion &&
       operation.readback?.runId === contract?.runId &&
-      operation.readback?.semanticDigest === contract?.semanticDigest
+      HASH_PATTERN.test(String(scenarioDigest || '')) &&
+      operation.readback?.semanticDigest === scenarioDigest
   )
   const datasetReadBack = Boolean(trialOperation)
   const dataBackup = trialOperation?.readback?.backupReceipt
@@ -379,8 +374,8 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
     ),
     datasetVersion: safeText(contract?.dataVersion),
     datasetRunId: safeText(contract?.runId),
-    semanticDigest: HASH_PATTERN.test(String(contract?.semanticDigest || ''))
-      ? contract.semanticDigest
+    semanticDigest: HASH_PATTERN.test(String(scenarioDigest || ''))
+      ? scenarioDigest
       : '未证明',
     datasetEvidence: datasetReadBack
       ? 'demo 项目演练造数已独立持久读回'

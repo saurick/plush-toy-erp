@@ -148,7 +148,7 @@ export function buildImmutableVersionInputTemplate(options = {}) {
     "node",
     "scripts/deploy/immutable-version-evidence.mjs",
     "--evidence-dir",
-    evidenceDir,
+    shellQuote(evidenceDir),
   ];
   for (const [envKey, cliKey] of IMMUTABLE_VERSION_INPUTS) {
     commandParts.push(`--${cliKey}`, `"$${envKey}"`);
@@ -156,7 +156,7 @@ export function buildImmutableVersionInputTemplate(options = {}) {
   const command = [
     ...env.map((item) => item.assignment),
     commandParts.join(" "),
-  ].join(" \\\n  ");
+  ].join("\n");
   return {
     evidenceDir,
     purpose:

@@ -6,10 +6,10 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { verifyRestoredBusiness } from "./backup-set/business-smoke.mjs";
 
-function fixture(t, { corrupt = false, revision = "active" } = {}) {
+function fixture(t, { corrupt = false, revision = "active", withdrawn = false, size = 0 } = {}) {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "restore-business-"));
   t.after(() => fs.rmSync(work, { recursive: true, force: true }));
-  const content = Buffer.from("synthetic attachment"),
+  const content = size > 0 ? Buffer.alloc(size, 29) : Buffer.from("synthetic attachment"),
     methods = [],
     invocations = [];
   const responses = {
@@ -57,13 +57,14 @@ function fixture(t, { corrupt = false, revision = "active" } = {}) {
       scalar: async (sql) =>
         sql.includes("sales_orders")
           ? "1"
-          : JSON.stringify([
-              {
-                id: 1,
-                file_size: content.length,
-                sha256: createHash("sha256").update(content).digest("hex"),
-              },
-            ]),
+          : JSON.stringify({
+            activeCount: withdrawn ? 0 : 1,
+            rows: withdrawn ? [] : [{
+              id: 1,
+              file_size: content.length,
+              sha256: createHash("sha256").update(content).digest("hex"),
+            }],
+          }),
       run: async (args, options = {}) => {
         invocations.push(args);
         if (args[1] === "network") return JSON.stringify([{ Internal: true }]);
@@ -73,9 +74,11 @@ function fixture(t, { corrupt = false, revision = "active" } = {}) {
         if (!data) return "{}";
         const request = JSON.parse(JSON.parse(data.slice(7)));
         methods.push(request.method);
-        return JSON.stringify({
+        const response = JSON.stringify({
           result: { code: 0, data: responses[request.method] },
         });
+        assert.ok(Buffer.byteLength(response) <= (options.maxStdoutBytes ?? 16 * 1024 * 1024));
+        return response;
       },
     },
   };
@@ -105,6 +108,21 @@ test("restored business proof uses isolated services, authenticated reads and ke
     dockerRun[dockerRun.indexOf("--network") + 1],
     "isolated-network",
   );
+});
+test("restored business reports zero downloadable samples for withdrawn-only evidence", async (t) => {
+  const f = fixture(t, { withdrawn: true });
+  const receipt = await verifyRestoredBusiness(f.options);
+  assert.deepEqual(
+    receipt.checks.find((check) => check.key === "attachment-download"),
+    { key: "attachment-download", status: "passed", sampled: 0, activeCount: 0, totalRestored: 1 },
+  );
+  assert.ok(!f.methods.includes("download_attachment"));
+});
+
+test("restored business validates a downloadable attachment above the default command cap", async (t) => {
+  const f = fixture(t, { size: 13 * 1024 * 1024 });
+  const receipt = await verifyRestoredBusiness(f.options);
+  assert.equal(receipt.checks.find((check) => check.key === "attachment-download").sampled, 1);
 });
 for (const [name, options, error] of [
   ["corrupt attachment", { corrupt: true }, /download_mismatch/],

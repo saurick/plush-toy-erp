@@ -66,6 +66,9 @@ export function validateDeliveryReleaseVersion(version) {
       exactAssetSet(version.assets, DELIVERY_RELEASE_ASSETS) ||
     (version.promotionEligible &&
       (version.status !== "published" || !version.completeAssets)) ||
+    (version.promotionBlocker !== undefined &&
+      (version.promotionBlocker !== "source_package_missing" ||
+        !version.completeAssets || version.promotionEligible)) ||
     !version.artifactSummary ||
     !validSize(version.artifactSummary.totalBytes) ||
     !validSize(version.artifactSummary.serverImageBytes) ||

@@ -9,7 +9,7 @@ const VERSION_PATTERN =
   /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
 const FORMAL_PACKAGE = "plush-release";
 export const TARGET_RELEASE_SOURCE_PACKAGE = "plush-release-source";
-const SOURCE_FILE = "source.tar";
+export const TARGET_RELEASE_SOURCE_FILE = "source.tar";
 const FIXED_PROJECT = "saurick/plush-toy-erp";
 const FIXED_HOST = "gitlab.saurick.me";
 const FIXED_ADDRESS = "192.168.0.133";
@@ -98,7 +98,7 @@ export function validateTargetReleaseFetch(value) {
   const formalFiles = DELIVERY_RELEASE_ASSETS.map((name) =>
     validateFile(files.get(name), name),
   );
-  const sourceFile = validateFile(value.source.file, SOURCE_FILE, 8 * 1024 ** 3);
+  const sourceFile = validateFile(value.source.file, TARGET_RELEASE_SOURCE_FILE, 8 * 1024 ** 3);
   return Object.freeze({
     ...value,
     formal: Object.freeze({

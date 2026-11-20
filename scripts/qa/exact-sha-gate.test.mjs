@@ -375,6 +375,12 @@ test("time-sensitive refresh reruns only govulncheck and preserves deterministic
       },
     );
     let runs = 0;
+    assert.throws(() => refreshExactShaTimeSensitiveCheck(
+      fixture.root,
+      { sha: fixture.sha, key: "vulnerabilityDatabase" },
+      { env: { ...process.env, SKIP_GOVULNCHECK: "1" }, runCheck() { runs += 1; } },
+    ), /SKIP_GOVULNCHECK cannot refresh/u);
+    assert.equal(runs, 0);
     const refreshed = refreshExactShaTimeSensitiveCheck(
       fixture.root,
       {

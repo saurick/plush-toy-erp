@@ -1,3 +1,4 @@
+import { DELIVERY_RELEASE_ASSETS, validateDeliveryReleaseVersion } from '../../../../scripts/deploy/delivery-provider.mjs'
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
 import { requestWorkbenchJson } from './devWorkbenchRequest.mjs'
 import { DEV_VERSION_CENTER_ROUTE } from './devRoutes.mjs'
@@ -123,19 +124,6 @@ const PIPELINE_STATUSES = new Set([
   'pending',
 ])
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u
-const LEGACY_RELEASE_ASSETS = Object.freeze([
-  'checksums.sha256',
-  'release-artifact.json',
-  'release-manifest.json',
-  'sbom.cdx.json',
-  'server-image.tar',
-  'web-image.tar',
-])
-const CURRENT_RELEASE_ASSETS = Object.freeze([
-  ...LEGACY_RELEASE_ASSETS.slice(0, 3),
-  'release-rehearsal.json',
-  ...LEGACY_RELEASE_ASSETS.slice(3),
-])
 const DELIVERY_VERSION_ACTION_REASONS = Object.freeze({
   current: new Set(['exact_sha_current']),
   initialize: new Set(['pristine_target_initialization_available']),
@@ -940,24 +928,10 @@ export function validatePipelineTimings(timings) {
 }
 
 function validateVersion(version) {
-  assertObject(version, 'delivery version')
-  const assets = Array.isArray(version.assets) ? version.assets : []
-  const exactAssets = (expected) =>
-    assets.length === expected.length &&
-    [...expected].sort().every((asset, index) => assets[index] === asset)
-  const completeAssets =
-    exactAssets(LEGACY_RELEASE_ASSETS) || exactAssets(CURRENT_RELEASE_ASSETS)
+  validateDeliveryReleaseVersion(version)
   const { actionsByTarget } = version
   if (
-    !SHA_PATTERN.test(String(version.gitSha || '')) ||
-    !VERSION_PATTERN.test(String(version.version || '')) ||
-    version.tag !== `artifact-${version.gitSha}` ||
-    !['published', 'draft', 'prerelease'].includes(version.status) ||
-    typeof version.publishedAt !== 'string' ||
     !TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(version.publishedAt) ||
-    !Number.isFinite(Date.parse(version.publishedAt)) ||
-    typeof version.completeAssets !== 'boolean' ||
-    typeof version.promotionEligible !== 'boolean' ||
     !DELIVERY_VERSION_ACTION_REASONS[version.actionClass]?.has(
       version.actionReason
     ) ||
@@ -971,31 +945,24 @@ function validateVersion(version) {
         ]?.has(actionsByTarget[targetKey]?.actionReason)
     ) ||
     version.actionClass !== actionsByTarget['demo-133'].actionClass ||
-    version.actionReason !== actionsByTarget['demo-133'].actionReason ||
-    !Array.isArray(version.assets) ||
-    assets.some((asset, index) => index > 0 && assets[index - 1] >= asset) ||
-    version.completeAssets !== completeAssets ||
-    (version.promotionEligible &&
-      (version.status !== 'published' ||
-        !exactAssets(CURRENT_RELEASE_ASSETS))) ||
-    !version.artifactSummary ||
-    ['totalBytes', 'serverImageBytes', 'webImageBytes', 'sbomBytes'].some(
-      (key) =>
-        !Number.isSafeInteger(version.artifactSummary[key]) ||
-        version.artifactSummary[key] < 0
-    ) ||
-    version.artifactSummary.serverImageBytes +
-      version.artifactSummary.webImageBytes +
-      version.artifactSummary.sbomBytes >
-      version.artifactSummary.totalBytes ||
-    (version.imageDigests !== null &&
-      (!DIGEST_PATTERN.test(String(version.imageDigests?.server || '')) ||
-        !DIGEST_PATTERN.test(String(version.imageDigests?.web || '')))) ||
-    !validBuildPerformance(version.buildPerformance)
+    version.actionReason !== actionsByTarget['demo-133'].actionReason
   ) {
     throw new Error('delivery version is invalid')
   }
   return version
+}
+
+export function deliveryReleaseEvidenceDescription(version) {
+  if (!version) return '尚无发布制品'
+  if (!version.completeAssets) {
+    const missing = DELIVERY_RELEASE_ASSETS.filter((name) => !version.assets.includes(name))
+    return `缺少发布制品：${missing.join('、')}`
+  }
+  if (version.promotionBlocker === 'source_package_missing') {
+    return '缺少同一提交的源码包'
+  }
+  if (!version.promotionEligible) return '七项制品齐全，发布证据待核验'
+  return '七项制品、演练回执和同一提交的源码包已核验'
 }
 
 function validateReleaseVersionPolicy(value) {

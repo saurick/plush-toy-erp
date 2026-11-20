@@ -15,6 +15,7 @@ import {
 
 const COMMIT = 'a'.repeat(40)
 const DIGEST = 'b'.repeat(64)
+const SCENARIO_DIGEST = '1'.repeat(64)
 const TARGET_FINGERPRINT = 'c'.repeat(64)
 const GENERATED_AT = '2026-08-15T02:00:00.000Z'
 
@@ -47,6 +48,7 @@ function dataSummaryFixture() {
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
       semanticDigest: DIGEST,
+      profileSemanticDigests: { 'scenario-demo': SCENARIO_DIGEST },
       unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
       warehouseCount: 4,
       customerTrial133: {
@@ -77,16 +79,11 @@ function dataSummaryFixture() {
       chainVerificationDigest: 'f'.repeat(64),
     },
     currentOperations: [
-      operation('core-demo', {
-        core: {
-          units: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
-          warehouses: 4,
-        },
-      }),
       operation('scenario-demo', {
         dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
         targetFingerprint: TARGET_FINGERPRINT,
+        semanticDigest: SCENARIO_DIGEST,
       }),
       operation('full-acceptance', {
         dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
@@ -113,7 +110,7 @@ function addTrialReadback(summary) {
         customerConfigRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
         dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-        semanticDigest: DIGEST,
+        semanticDigest: SCENARIO_DIGEST,
         backupReceipt: {
           status: 'passed',
           backupAlias: 'pre-data-aaaaaaaaaaaa-d260815020304_01020304',
@@ -315,7 +312,7 @@ test('stale release, config or dataset evidence never becomes green', () => {
   assert.match(evidence.cards[1].nextAction, /Exact-SHA/u)
 
   const staleData = dataSummaryFixture()
-  staleData.currentOperations[1].readback.dataVersion = '2026.07.16-v5'
+  staleData.currentOperations[0].readback.semanticDigest = DIGEST
   assert.equal(
     buildDevEnvironmentEvidence({ dataSummary: staleData }).cards[0].status,
     'not_proven'

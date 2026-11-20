@@ -112,9 +112,6 @@ test('version decisions and target evidence remain source-backed', () => {
   )
   assert.match(component, /构建缓存/u)
   assert.match(component, /制品总计/u)
-  assert.match(versionPage, /制品齐全；部署仍需通过目标预检与演练核验/u)
-  assert.match(versionPage, /历史制品仅用于回滚/u)
-  assert.match(versionPage, /record\.completeAssets\s*\? record\.promotionEligible\s*\? '保留中 · 制品齐全'\s*: record\.assets\.includes\('release-rehearsal\.json'\)\s*\? '演练证据待补齐'\s*: '仅可回滚'/u)
   assert.match(versionPage, /RETENTION_STATES\[record\.retention\.state\]\.label/u)
   assert.match(versionPage, /制品文件已清理，版本和部署记录保留/u)
   assert.match(

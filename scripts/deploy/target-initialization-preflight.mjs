@@ -143,7 +143,7 @@ for port in "\${tcp_ports[@]}"; do
 done
 [[ "$tcp_conflict_count" == 0 ]] || block initialization_tcp_port_conflict
 
-listening_udp_ports="$({ ss -H -lnu 2>/dev/null || true; } | awk '{address=$5; if (address == "") address=$4; sub(/.*:/, "", address); if (address ~ /^[0-9]+$/) print address}' | sort -u)"
+listening_udp_ports="$({ ss -H -lnu 2>/dev/null || true; } | awk '{address=$4; sub(/.*:/, "", address); if (address ~ /^[0-9]+$/) print address}' | sort -u)"
 for port in "\${udp_ports[@]}"; do
   if printf '%s\n' "$listening_udp_ports" | grep -Fxq "$port"; then
     udp_conflict_count=$((udp_conflict_count + 1))

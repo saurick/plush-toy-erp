@@ -5,6 +5,7 @@ import DevTimestamp from '../../../components/DevTimestamp.jsx'
 import { RETENTION_STATES } from '../../../config/devRetention.mjs'
 import {
   createDeliveryIdempotencyKey,
+  deliveryReleaseEvidenceDescription,
   deliveryVersionActionKind,
   isDevInitialCustomerConfigActivationReady,
   shortGitSha,
@@ -41,11 +42,7 @@ export function buildVersionColumns({
           <details className="erp-dev-disclosure erp-dev-delivery-inline-details">
             <summary>保留与可用性说明</summary>
             <Text type="secondary">
-              {record.retention?.state === 'cleaned' ? '制品文件已清理，版本和部署记录保留' : record.completeAssets
-                ? record.assets.includes('release-rehearsal.json')
-                  ? '制品齐全；部署仍需通过目标预检与演练核验'
-                  : '历史制品仅用于回滚'
-                : '制品不完整'}
+              {record.retention?.state === 'cleaned' ? '制品文件已清理，版本和部署记录保留' : deliveryReleaseEvidenceDescription(record)}
             </Text>
             {record.retention?.reasons?.map((reason) => <Text key={reason}>{reason}</Text>)}
             {record.retention?.cleanedAt ? <DevTimestamp value={record.retention.cleanedAt} action="清理于" /> : null}
@@ -61,13 +58,9 @@ export function buildVersionColumns({
         <Tag color={RETENTION_STATES[record.retention.state].color}>{RETENTION_STATES[record.retention.state].label}</Tag>
       ) : value !== 'published' ? <StatusTag status={value} /> : (
         <Tag color={record.promotionEligible ? 'success' : 'warning'}>
-          {record.completeAssets
-            ? record.promotionEligible
-              ? '保留中 · 制品齐全'
-              : record.assets.includes('release-rehearsal.json')
-                ? '演练证据待补齐'
-                : '仅可回滚'
-            : '制品不完整'}
+          {record.promotionEligible
+            ? '保留中 · 制品齐全'
+            : record.completeAssets ? deliveryReleaseEvidenceDescription(record) : '制品不完整'}
         </Tag>
       ),
     },
@@ -110,11 +103,15 @@ export function buildVersionColumns({
           baseEligible &&
           ['initialize', 'promote'].includes(actionKind) &&
           record.promotionEligible === true
+        const rollbackBlocker = !currentTargetRelease || currentTargetRelease.status !== 'published'
+          ? '当前运行版本缺少正式发布记录'
+          : !currentTargetRelease.completeAssets || currentTargetRelease.promotionBlocker
+            ? `当前运行版本：${deliveryReleaseEvidenceDescription(currentTargetRelease)}`
+            : record.promotionBlocker ? deliveryReleaseEvidenceDescription(record) : ''
         const rollbackEligible =
           baseEligible &&
           actionKind === 'rollback' &&
-          currentTargetRelease?.status === 'published' &&
-          currentTargetRelease?.completeAssets === true
+          !rollbackBlocker
         const promotionExplanation = isMutationRunning
           ? '已有写操作正在提交，请等待当前请求完成'
           : !summaryFresh
@@ -125,23 +122,18 @@ export function buildVersionColumns({
                 ? actionKind === 'initialize'
                   ? `${selectedTargetDefinition.shortLabel}首次部署预检未通过，先处理容量、基础镜像或资源冲突`
                   : `${selectedTargetDefinition.shortLabel}只读预检未通过，先处理容量或运行态阻断`
-                : !record.completeAssets
-                  ? '不可变发布制品不完整'
-                  : !record.promotionEligible &&
-                      ['initialize', 'promote'].includes(actionKind)
-                    ? '旧 v1 六资产版本仅可读取和回滚，不能用于新部署'
-                    : record.gitSha === currentTargetSha
-                      ? `该 exact SHA 已在${selectedTargetDefinition.shortLabel}运行`
-                      : actionKind === 'rollback'
-                        ? `该版本是${selectedTargetDefinition.shortLabel}当前版本的 Git 祖先，应先检查回滚资格`
-                        : actionKind === 'blocked'
-                          ? record.actionReason === 'git_histories_diverged'
-                            ? `该版本与${selectedTargetDefinition.shortLabel}当前版本的 Git 历史已分叉，禁止部署或回滚`
-                            : record.actionReason ===
-                                'target_identity_unavailable'
-                              ? `${selectedTargetDefinition.shortLabel}当前 exact SHA 不可用，无法判断部署方向`
-                              : 'Git 祖先关系不可证明，禁止猜测部署或回滚'
-                          : ''
+                : !record.completeAssets || (!record.promotionEligible && ['initialize', 'promote'].includes(actionKind))
+                  ? deliveryReleaseEvidenceDescription(record)
+                  : actionKind === 'rollback'
+                    ? `该版本是${selectedTargetDefinition.shortLabel}当前版本的 Git 祖先，应先检查回滚资格`
+                    : actionKind === 'blocked'
+                      ? record.actionReason === 'git_histories_diverged'
+                        ? `该版本与${selectedTargetDefinition.shortLabel}当前版本的 Git 历史已分叉，禁止部署或回滚`
+                        : record.actionReason ===
+                            'target_identity_unavailable'
+                          ? `${selectedTargetDefinition.shortLabel}当前 exact SHA 不可用，无法判断部署方向`
+                          : 'Git 祖先关系不可证明，禁止猜测部署或回滚'
+                      : ''
         return (
           <Space wrap>
             {actionKind !== 'rollback' ? (
@@ -171,11 +163,7 @@ export function buildVersionColumns({
                 title={
                 rollbackEligible
                   ? '只准备资格检查；migration 或客户配置指纹不一致会阻断'
-                  : currentTargetRelease
-                    ? actionKind === 'promote'
-                      ? `该版本不早于${selectedTargetDefinition.shortLabel}当前版本，应走部署流程`
-                      : promotionExplanation
-                    : `${selectedTargetDefinition.shortLabel}当前 SHA 没有完整不可变 manifest，不能普通回滚`
+                  : rollbackBlocker || promotionExplanation
               }
               >
                 <Button

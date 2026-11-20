@@ -517,6 +517,7 @@ export function executeDatabaseRebuild(
     "transfers",
     `${operation.id}-${operation.requestFingerprint.slice(0, 12)}-database-rebuild`,
   );
+  assertLocalRsync(runCommand);
   const transfer = prepareDatabaseRebuildTransfer(
     {
       repoRoot: root,
@@ -528,7 +529,6 @@ export function executeDatabaseRebuild(
   );
   const target = getDeploymentTarget(plan.target.key);
   const sshArgs = fixedSshArgs(target);
-  assertLocalRsync(runCommand);
   const rsyncTransfer = buildFixedTargetRsyncTransfer({
     target,
     operationId: operation.id,

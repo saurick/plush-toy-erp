@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { AttachmentPolicy } from "../../../web/src/common/consts/attachments.generated.mjs";
 import { requireValue, waitFor } from "./common.mjs";
 
 // All requests stay inside the disposable network. Credentials and response
@@ -146,7 +147,7 @@ export async function verifyRestoredBusiness({
     ],
     { signal },
   );
-  const curl = (route, { body, token } = {}) => {
+  const curl = (route, { body, token, maxStdoutBytes } = {}) => {
     const config = [
       `url = "http://127.0.0.1:8300${route}"`,
       "fail",
@@ -167,6 +168,7 @@ export async function verifyRestoredBusiness({
       input: config.join("\n") + "\n",
       signal,
       timeout: 35_000,
+      maxStdoutBytes,
     });
   };
   const checks = [];
@@ -209,11 +211,12 @@ export async function verifyRestoredBusiness({
   record("health");
   await curl("/readyz");
   record("ready");
-  const rpc = async (domain, method, params, token) => {
+  const rpc = async (domain, method, params, token, maxStdoutBytes) => {
     const response = JSON.parse(
       await curl(`/rpc/${domain}`, {
         body: { jsonrpc: "2.0", id: `restore-${method}`, method, params },
         token,
+        maxStdoutBytes,
       }),
     );
     requireValue(
@@ -276,22 +279,33 @@ export async function verifyRestoredBusiness({
       recordsRead: orders.sales_orders.length,
       sourceCount: orderCount,
     });
-    const rows = JSON.parse(
+    const { activeCount, rows } = JSON.parse(
       await scalar(
-        "SELECT COALESCE(json_agg(t),'[]') FROM (SELECT id,sha256,file_size FROM business_attachments WHERE withdrawn_at IS NULL ORDER BY id LIMIT 3) t",
+        `SELECT json_build_object(
+          'activeCount', (SELECT count(*) FROM business_attachments WHERE withdrawn_at IS NULL),
+          'rows', (SELECT COALESCE(json_agg(t), '[]') FROM
+            (SELECT id, sha256, file_size FROM business_attachments
+             WHERE withdrawn_at IS NULL ORDER BY id LIMIT 3) t))`,
       ),
     );
     requireValue(
-      Array.isArray(rows) &&
-        (manifest.attachmentCount === 0 || rows.length > 0),
+      Number.isSafeInteger(activeCount) && activeCount >= 0 &&
+        activeCount <= manifest.attachmentCount &&
+        Array.isArray(rows) && rows.length === Math.min(activeCount, 3),
       "restore_attachment_sample_missing",
     );
     for (const row of rows) {
+      requireValue(
+        Number.isSafeInteger(row.file_size) && row.file_size > 0 &&
+          row.file_size <= AttachmentPolicy.maxBytes,
+        "restore_attachment_size_invalid",
+      );
       const data = await rpc(
         "attachment",
         "download_attachment",
         { id: row.id },
         token,
+        4 * Math.ceil(row.file_size / 3) + 64 * 1024,
       );
       const content = Buffer.from(
         data?.attachment?.content_base64 || "",
@@ -305,6 +319,7 @@ export async function verifyRestoredBusiness({
     }
     record("attachment-download", {
       sampled: rows.length,
+      activeCount,
       totalRestored: manifest.attachmentCount,
     });
   } finally {

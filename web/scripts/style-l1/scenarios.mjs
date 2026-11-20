@@ -98,6 +98,7 @@ import { createDevProjectSkillsScenarios } from './devProjectSkillsScenarios.mjs
 import { createDevVisualizationScenarios } from './devVisualizationScenarios.mjs'
 import { createDevPressureScenarios } from './devPressureScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
+import { createDevVersionCenterReleaseEvidenceScenarios } from './devVersionCenterReleaseEvidenceScenarios.mjs'
 import { createDevVersionCenterPlanLifecycleScenarios } from './devVersionCenterPlanLifecycleScenarios.mjs'
 import { createDevDataPreparationScenarios } from './devDataPreparationScenarios.mjs'
 import { createDevDeliveryWorkspaceScenarios } from './devDeliveryWorkspaceScenarios.mjs'
@@ -550,6 +551,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
+    ...createDevVersionCenterReleaseEvidenceScenarios({ assert }),
     ...createDevVersionCenterPlanLifecycleScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevDataPreparationScenarios({
       assert,

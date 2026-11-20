@@ -2567,7 +2567,10 @@ export function createDevDeliveryMiddleware({
         })
         return deliveryService
       }
-    )
+    ).catch((error) => {
+      servicePromise = undefined
+      throw error
+    })
     return servicePromise
   }
 
