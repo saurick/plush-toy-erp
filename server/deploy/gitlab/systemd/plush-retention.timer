@@ -1,0 +1,11 @@
+[Unit]
+Description=Rotate Plush artifacts and backups every hour
+
+[Timer]
+OnCalendar=*-*-* *:45:00
+RandomizedDelaySec=300
+Persistent=true
+Unit=plush-retention.service
+
+[Install]
+WantedBy=timers.target
