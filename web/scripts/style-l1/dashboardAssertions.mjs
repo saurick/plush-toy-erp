@@ -1,0 +1,832 @@
+import assert from 'node:assert/strict'
+import path from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
+import { pullToRefresh } from './mobileGestureAssertions.mjs'
+import {
+  assertThemeReadable,
+  assertDarkThemeContrast,
+} from './themeAssertions.mjs'
+import { expectText } from './pageAssertions.mjs'
+import {
+  assertReadableOnBackground,
+  isDarkNeutralBorderColor,
+  isLightSurfaceColor,
+  isTransparentColor,
+  isWarningBorderColor,
+} from './colorAssertions.mjs'
+import { createMobileTaskAssertions } from './mobileTaskAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
+export function createDashboardAssertions({ outputDir, baseURL }) {
+  async function gotoScenarioPath(page, scenarioPath, options = {}) {
+    const url = new URL(scenarioPath, `${baseURL}/`).toString()
+    const maxAttempts = 3
+    let lastError = null
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await page.goto(url, options)
+        return
+      } catch (error) {
+        lastError = error
+        if (
+          !isRetryableLocalNavigationError(error) ||
+          attempt === maxAttempts
+        ) {
+          throw error
+        }
+        await delay(250 * attempt)
+      }
+    }
+
+    throw lastError
+  }
+
+  function isRetryableLocalNavigationError(error) {
+    const message = String(error?.message || '')
+    return (
+      message.includes('net::ERR_ADDRESS_INVALID') ||
+      message.includes('net::ERR_CONNECTION_REFUSED')
+    )
+  }
+
+  async function assertNoDashboardCenterLocalRefreshButton(
+    page,
+    { scenarioName, expectRefresh = true }
+  ) {
+    const metrics = await page.evaluate(() => {
+      const forbiddenLabels = new Set(['刷新', '刷新任务', '刷新业务数据'])
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return false
+        const rect = node.getBoundingClientRect()
+        const style = window.getComputedStyle(node)
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0
+        )
+      }
+      const visibleButtons = Array.from(
+        document.querySelectorAll('.erp-admin-content button')
+      ).filter(isVisible)
+      const pageRefreshButtons = visibleButtons.filter((button) =>
+        button.closest('.erp-page-actions') &&
+        button.getAttribute('aria-label') === '刷新当前页'
+      )
+      const buttons = visibleButtons
+        .filter((button) => !pageRefreshButtons.includes(button))
+        .map((button) => ({
+          text: String(button.textContent || '').trim(),
+          className: String(button.className || ''),
+        }))
+        .filter((button) => forbiddenLabels.has(button.text))
+
+      return {
+        pageRefreshButtonCount: pageRefreshButtons.length,
+        forbiddenButtonCount: buttons.length,
+        forbiddenButtons: buttons,
+      }
+    })
+
+    assert.equal(metrics.pageRefreshButtonCount, expectRefresh ? 1 : 0, `${scenarioName} 只在当前页面有数据查询时保留一个共享刷新入口`)
+    assert.equal(
+      metrics.forbiddenButtonCount,
+      0,
+      `${scenarioName} 看板中心内容区不应重复显示局部刷新按钮: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  async function assertDashboardMetricInteractionSemantics(
+    page,
+    {
+      scenarioName,
+      expectTaskCategories = false,
+      expectBusinessAttention = false,
+    } = {}
+  ) {
+    const metrics = await page.evaluate(
+      ({ expectTaskCategories, expectBusinessAttention }) => {
+        const isVisible = (node) => {
+          if (!(node instanceof HTMLElement)) return false
+          const rect = node.getBoundingClientRect()
+          const style = window.getComputedStyle(node)
+          return (
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            rect.width > 0 &&
+            rect.height > 0
+          )
+        }
+        const describeNode = (node) => {
+          const rect = node.getBoundingClientRect()
+          const style = window.getComputedStyle(node)
+          return {
+            tagName: node.tagName,
+            role: node.getAttribute('role') || '',
+            ariaPressed: node.getAttribute('aria-pressed') || '',
+            disabled: Boolean(node.disabled),
+            cursor: style.cursor,
+            width: rect.width,
+            height: rect.height,
+            contentFits: node.scrollWidth <= node.clientWidth + 1,
+            text: String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim(),
+          }
+        }
+        const taskMetrics = expectTaskCategories
+          ? Array.from(document.querySelectorAll('.erp-task-progress-rail__item[data-lane]'))
+              .filter(isVisible)
+              .map((node) => ({
+                repeatedCount: document.querySelectorAll('.erp-task-board-lane-count').length,
+                count: Number(node.querySelector('.erp-task-progress-rail__value')?.textContent),
+                entries: [{ ...describeNode(node), accessibleName: node.getAttribute('aria-label') || node.textContent }],
+                oldMetrics: document.querySelectorAll('.erp-task-center-metric').length,
+              }))
+          : []
+        const businessAttention = expectBusinessAttention
+          ? {
+              items: [
+                ...document.querySelectorAll('.erp-business-board-alert-item'),
+              ]
+                .filter(isVisible)
+                .map(describeNode),
+              summaryCount: document.querySelectorAll(
+                '.erp-business-board-summary-card'
+              ).length,
+              attention: document
+                .querySelector('.erp-business-board-attention-card')
+                ?.getBoundingClientRect()
+                .toJSON(),
+              table: document
+                .querySelector('.erp-dashboard-table-card')
+                ?.getBoundingClientRect()
+                .toJSON(),
+              explanationOpen: document.querySelector(
+                '.erp-business-board-boundary-summary'
+              )?.open,
+            }
+          : null
+
+        return {
+          taskMetrics,
+          businessAttention,
+        }
+      },
+      { expectTaskCategories, expectBusinessAttention }
+    )
+
+    if (expectTaskCategories) {
+      assert.equal(
+        metrics.taskMetrics.length,
+        4,
+        `${scenarioName} 应展示四类任务`
+      )
+      for (const lane of metrics.taskMetrics) {
+        assert.equal(lane.oldMetrics, 0, '概览不应重复渲染四个大指标')
+        assert.equal(lane.repeatedCount, 0, '分类标题不重复筛选数量')
+        assert(
+          Number.isInteger(lane.count) && lane.count >= 0,
+          '分类筛选应显示真实数量'
+        )
+        assert.equal(lane.entries.length, 1)
+        for (const entry of lane.entries) {
+          assert.equal(entry.tagName, 'BUTTON')
+          assert(
+            entry.contentFits && Boolean(entry.accessibleName?.trim())
+          )
+        }
+      }
+    }
+
+    if (expectBusinessAttention) {
+      const attention = metrics.businessAttention
+      assert.equal(
+        attention.items.length,
+        2,
+        `${scenarioName} 应直接展示阻塞和到期事项`
+      )
+      assert.equal(
+        attention.summaryCount,
+        0,
+        `${scenarioName} 不应保留重复汇总卡`
+      )
+      assert.equal(
+        attention.explanationOpen,
+        false,
+        `${scenarioName} 统计说明默认按需展开`
+      )
+      assert(
+        attention.attention &&
+          attention.table &&
+          attention.attention.bottom <= attention.table.top &&
+          Math.abs(attention.attention.width - attention.table.width) < 2,
+        `${scenarioName} 关注事项应在业务数据之前并使用内容全宽: ${JSON.stringify(attention)}`
+      )
+      for (const item of attention.items) {
+        assert(
+          item.width > 0 && item.height > 0 && item.role === 'group',
+          `${scenarioName} 关注项应可见并有分组语义`
+        )
+      }
+    }
+  }
+
+  async function assertDarkDashboardLinkButtonsUnboxed(page, { scenarioName }) {
+    const metrics = await page.evaluate(() => {
+      const buttons = Array.from(
+        document.querySelectorAll(
+          '.erp-business-dashboard-page .erp-dashboard-table-card .erp-business-board-source-entry.ant-btn'
+        )
+      )
+        .slice(0, 24)
+        .map((button) => {
+          const style = window.getComputedStyle(button)
+          const rect = button.getBoundingClientRect()
+          return {
+            text: String(button.textContent || '').trim(),
+            ariaLabel: String(button.getAttribute('aria-label') || ''),
+            disabled: button.disabled,
+            backgroundColor: style.backgroundColor,
+            borderColor: style.borderColor,
+            borderStyle: style.borderStyle,
+            borderWidth: style.borderWidth,
+            className: String(button.className || ''),
+            cursor: style.cursor,
+            height: rect.height,
+            width: rect.width,
+          }
+        })
+
+      return {
+        effectiveTheme: document.documentElement.dataset.erpTheme || '',
+        buttons,
+      }
+    })
+
+    assert.equal(
+      metrics.effectiveTheme,
+      'dark',
+      `${scenarioName} link 按钮无框断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.buttons.some((button) => button.ariaLabel === '查看客户') &&
+        metrics.buttons.some((button) => button.ariaLabel === '查看发票记录'),
+      `${scenarioName} 缺少业务看板对象入口按钮样本: ${JSON.stringify(metrics)}`
+    )
+
+    for (const button of metrics.buttons) {
+      assert(
+        button.width > 0 && button.height > 0,
+        `${scenarioName} link 按钮尺寸异常: ${JSON.stringify(button)}`
+      )
+      assert(
+        isTransparentColor(button.backgroundColor),
+        `${scenarioName} link 按钮默认态不应有暗色底框: ${JSON.stringify(button)}`
+      )
+      assert(
+        button.borderStyle === 'none' ||
+          Number.parseFloat(button.borderWidth) === 0 ||
+          isTransparentColor(button.borderColor),
+        `${scenarioName} link 按钮默认态不应有可见边框: ${JSON.stringify(button)}`
+      )
+    }
+  }
+
+  async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
+    const refreshRequestPromise = page.waitForRequest(
+      (request) => {
+        if (!request.url().includes('/rpc/workflow')) return false
+        try {
+          const body = request.postDataJSON()
+          return body?.method === 'list_role_tasks' && body.params.limit > 1
+        } catch {
+          return false
+        }
+      },
+      { timeout: 10_000 }
+    )
+    const [refreshRequest] = await Promise.all([
+      refreshRequestPromise,
+      pullToRefresh(page, page.getByTestId('mobile-role-scroll')),
+    ])
+    const refreshRequestBody = refreshRequest.postDataJSON() || {}
+    assert(
+      !String(refreshRequestBody?.params?.cursor || '').trim(),
+      `${scenarioName} 任务刷新应重新获取最新快照，不应携带续页游标: ${JSON.stringify(refreshRequestBody)}`
+    )
+    await expectText(page, '数据已刷新')
+    const beforeFailureMetrics = await readMobileTaskVisibleListMetrics(
+      page,
+      '.erp-mobile-list-item'
+    )
+
+    let failedOnce = false
+    await page.route('**/rpc/workflow', async (route) => {
+      const body = route.request().postDataJSON() || {}
+      if (
+        !failedOnce &&
+        body.method === 'list_role_tasks' &&
+        body.params.limit > 1
+      ) {
+        failedOnce = true
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: body.id || 'mobile-refresh-failed',
+            result: {
+              code: 500123,
+              message: 'refresh failed',
+              data: null,
+            },
+          }),
+        })
+        return
+      }
+      await route.fallback()
+    })
+
+    await pullToRefresh(page, page.getByTestId('mobile-role-scroll'))
+    await expectText(page, '刷新任务失败，已保留上次数据')
+    const afterFailureMetrics = await readMobileTaskVisibleListMetrics(
+      page,
+      '.erp-mobile-list-item'
+    )
+    assert.equal(
+      afterFailureMetrics.itemCount,
+      beforeFailureMetrics.itemCount,
+      `${scenarioName} 刷新失败后没有保留上次任务列表: ${JSON.stringify({ beforeFailureMetrics, afterFailureMetrics })}`
+    )
+  }
+
+  async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
+    await page.locator('.erp-dashboard-task-board-card').waitFor({
+      timeout: 10_000,
+    })
+
+    const metrics = await page.evaluate(() => {
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return false
+        const rect = node.getBoundingClientRect()
+        const style = window.getComputedStyle(node)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      }
+      const rectOf = (selectorOrNode) => {
+        const element =
+          typeof selectorOrNode === 'string'
+            ? document.querySelector(selectorOrNode)
+            : selectorOrNode
+        if (!(element instanceof HTMLElement)) return null
+        const rect = element.getBoundingClientRect()
+        const style = window.getComputedStyle(element)
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+          overflowX: style.overflowX,
+          overflowY: style.overflowY,
+          position: style.position,
+          gridTemplateColumns: style.gridTemplateColumns,
+        }
+      }
+      const boardCard = rectOf('.erp-dashboard-task-board-card')
+      const boardContent = rectOf(
+        '.erp-dashboard-task-board-card .erp-dashboard-block'
+      )
+      const lanes = rectOf('.erp-task-board-lanes')
+      const currentTaskPanelCount = document.querySelectorAll(
+        '.erp-task-center-current'
+      ).length
+      const filters = rectOf('.erp-task-board-filters')
+      const tableCard = rectOf('.erp-dashboard-table-card')
+      const visiblePageHeads = Array.from(
+        document.querySelectorAll('.erp-admin-page-head')
+      ).filter(isVisible).length
+      const laneRects = Array.from(
+        document.querySelectorAll('.erp-task-board-lane')
+      )
+        .map((node) => rectOf(node))
+        .filter(Boolean)
+      const nestedCards = document.querySelectorAll('.erp-task-board-lane.ant-card').length
+      const tableCount = document.querySelectorAll('.erp-task-board-lane .ant-table').length
+      const rowKeys = Array.from(document.querySelectorAll('.erp-task-board-lane tr[data-row-key]')).map((row) => row.dataset.rowKey)
+      const laneContentGaps = Array.from(document.querySelectorAll('.erp-task-board-lane')).map((lane) => ({
+        tableGap: lane.querySelector('.ant-table-wrapper').getBoundingClientRect().top - lane.getBoundingClientRect().top,
+        tableFirst: lane.firstElementChild.classList.contains('ant-table-wrapper'),
+      }))
+      const overlappingLanePairs = []
+      for (let i = 0; i < laneRects.length; i += 1) {
+        for (let j = i + 1; j < laneRects.length; j += 1) {
+          const left = laneRects[i]
+          const right = laneRects[j]
+          const xOverlap =
+            left.left < right.right - 1 && left.right > right.left + 1
+          const yOverlap =
+            left.top < right.bottom - 1 && left.bottom > right.top + 1
+          if (xOverlap && yOverlap) {
+            overlappingLanePairs.push([i, j])
+          }
+        }
+      }
+
+      return {
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          documentScrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        },
+        boardCard,
+        boardContent,
+        lanes,
+        currentTaskPanelCount,
+        filters,
+        laneRects,
+        nestedCards,
+        tableCount,
+        rowKeys,
+        laneContentGaps,
+        overlappingLanePairs,
+        tableCard,
+        visiblePageHeads,
+      }
+    })
+
+    assert(
+      metrics.boardCard && metrics.lanes && metrics.filters,
+      `${scenarioName} 缺少任务管理布局关键节点: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.currentTaskPanelCount,
+      0,
+      `${scenarioName} 任务管理不应保留重复的当前选中任务侧栏`
+    )
+    assert(
+      metrics.boardContent &&
+        Math.abs(metrics.lanes.width - metrics.boardContent.width) <= 2,
+      `${scenarioName} 分类区域应使用全部内容宽度: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.laneRects.length === 1,
+      `${scenarioName} 任务管理应展示一张完整分页任务表: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.laneRects.every((lane) => lane.width >= 180 && lane.height > 0),
+      `${scenarioName} 任务管理泳道尺寸异常: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(metrics.tableCount, 1, `${scenarioName} 全部与分类复用同一任务表格`)
+    assert.ok(metrics.laneContentGaps.every((lane) => lane.tableFirst && Math.abs(lane.tableGap) <= 1), `${scenarioName} 分类与搜索后直接显示任务表，不保留重复说明或空行: ${JSON.stringify(metrics.laneContentGaps)}`)
+    assert.equal(metrics.nestedCards, 0, `${scenarioName} 任务表内不叠加分类卡片`)
+    assert.equal(new Set(metrics.rowKeys).size, metrics.rowKeys.length, `${scenarioName} 全部列表不重复任务`)
+    assert(
+      metrics.lanes.top - metrics.boardContent.top <=
+        (metrics.viewport.width < 768 ? 280 : 140),
+      `${scenarioName} 默认顶部不应占满首屏: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.overlappingLanePairs.length === 0,
+      `${scenarioName} 任务管理泳道之间发生重叠: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.filters.right <= metrics.boardCard.right + 2,
+      `${scenarioName} 任务管理筛选区溢出卡片: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.visiblePageHeads,
+      0,
+      `${scenarioName} 任务管理不应再渲染独立页面说明卡: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.tableCard,
+      null,
+      `${scenarioName} 任务管理不应再重复渲染明细表: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
+      `${scenarioName} 任务管理产生页面级横向滚动: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  async function assertTaskActionDrawerLayout(
+    page,
+    {
+      scenarioName,
+      expectedTaskText,
+      expectedActionText = '',
+      expectReasonInput = false,
+    }
+  ) {
+    const drawer = page.locator('.erp-task-action-drawer').filter({
+      hasText: expectedTaskText,
+    })
+    await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+    if (expectedActionText) {
+      await expectText(page, expectedActionText)
+    }
+    await page.waitForFunction(
+      ({ expectedTaskText: taskText }) => {
+        const drawerElement = Array.from(
+          document.querySelectorAll('.erp-task-action-drawer')
+        ).find((node) => {
+          const rect = node.getBoundingClientRect()
+          const style = getComputedStyle(node)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            String(node.textContent || '').includes(taskText)
+          )
+        })
+        return (
+          drawerElement?.querySelectorAll(
+            '.erp-task-action-drawer__footer button'
+          ).length >= 1
+        )
+      },
+      { expectedTaskText },
+      { timeout: 10_000 }
+    )
+    await waitForFiniteAnimations(page)
+
+    const metrics = await page.evaluate(
+      ({ expectedTaskText: taskText }) => {
+        const isVisible = (node) => {
+          if (!(node instanceof HTMLElement)) return false
+          const rect = node.getBoundingClientRect()
+          const style = window.getComputedStyle(node)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          )
+        }
+        const rectOf = (selectorOrNode) => {
+          const element =
+            typeof selectorOrNode === 'string'
+              ? document.querySelector(selectorOrNode)
+              : selectorOrNode
+          if (!(element instanceof HTMLElement)) return null
+          const rect = element.getBoundingClientRect()
+          const style = window.getComputedStyle(element)
+          return {
+            top: rect.top,
+            bottom: rect.bottom,
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            height: rect.height,
+            overflowX: style.overflowX,
+            overflowY: style.overflowY,
+            display: style.display,
+            gridTemplateColumns: style.gridTemplateColumns,
+          }
+        }
+        const drawerElement = Array.from(
+          document.querySelectorAll('.erp-task-action-drawer')
+        )
+          .filter(isVisible)
+          .find((node) => String(node.textContent || '').includes(taskText))
+        const scopeRect = rectOf(drawerElement)
+        const rectInDrawer = (selector) =>
+          drawerElement instanceof HTMLElement
+            ? rectOf(drawerElement.querySelector(selector))
+            : null
+        const activeStepPanel =
+          drawerElement instanceof HTMLElement
+            ? Array.from(
+                drawerElement.querySelectorAll(
+                  '.erp-task-action-drawer__step-panel'
+                )
+              ).find(isVisible)
+            : null
+        const rectInActiveStepPanel = (selector) =>
+          activeStepPanel instanceof HTMLElement
+            ? rectOf(activeStepPanel.querySelector(selector))
+            : null
+        const summary = rectInDrawer('.workflow-task-info-card[aria-label="任务信息"], .erp-task-action-drawer__summary--task')
+        const metaGrid = rectInDrawer('.workflow-task-current, .erp-task-action-drawer__receipt-context')
+        const guide = rectInDrawer('.erp-task-action-drawer__guide')
+        const guideSteps = rectInDrawer('.erp-task-action-drawer__guide-steps')
+        const guideNoteCount =
+          drawerElement?.querySelectorAll('.erp-task-action-drawer__guide-note')
+            .length || 0
+        const actionPanel =
+          rectInActiveStepPanel('.erp-task-action-drawer__action-panel') ||
+          rectInActiveStepPanel('.erp-task-action-drawer__action-prompt') ||
+          rectInActiveStepPanel('.erp-task-action-drawer__confirm-panel') ||
+          rectOf(activeStepPanel)
+        const footer = rectInDrawer('.ant-drawer-footer')
+        const body = rectInDrawer('.ant-drawer-body')
+        const textArea = rectInActiveStepPanel('textarea')
+        const metaItems =
+          drawerElement?.querySelectorAll(
+            '.workflow-task-current--facts .workflow-task-info-facts > div:first-child dd, .erp-task-action-drawer__receipt-context > span'
+          ).length || 0
+        const stepItems =
+          drawerElement?.querySelectorAll('.erp-task-action-drawer__step')
+            .length || 0
+        const footerButtons =
+          drawerElement?.querySelectorAll(
+            '.erp-task-action-drawer__footer button'
+          ).length || 0
+        const selectedTabs =
+          drawerElement?.querySelectorAll(
+            '.erp-task-action-drawer__step[role="tab"][aria-selected="true"]'
+          ).length || 0
+        const tabList = rectInDrawer(
+          '.erp-task-action-drawer__guide-steps[role="tablist"]'
+        )
+        return {
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          },
+          scopeRect,
+          summary,
+          metaGrid,
+          guide,
+          guideSteps,
+          guideNoteCount,
+          actionPanel,
+          footer,
+          body,
+          textArea,
+          metaItems,
+          activeStep: drawerElement
+            ?.querySelector(
+              '.erp-task-action-drawer__step[role="tab"][aria-selected="true"]'
+            )
+            ?.getAttribute('aria-controls'),
+          hasActionReceipt: Boolean(
+            drawerElement?.querySelector(
+              '[data-testid="workflow-task-action-receipt"]'
+            )
+          ),
+          viewButtons: Array.from(
+            drawerElement?.querySelectorAll(
+              '.erp-task-action-drawer__footer button'
+            ) || []
+          ).filter((button) => /查看/.test(button.textContent || '')).length,
+          visibleChains: Array.from(
+            drawerElement?.querySelectorAll('[aria-label="任务处理链"]') || []
+          ).filter(isVisible).length,
+          timingKeys: Array.from(
+            drawerElement?.querySelectorAll(
+              '[data-task-time]'
+            ) || []
+          ).map((row) => row.dataset.taskTime),
+          stepItems,
+          selectedTabs,
+          tabList,
+          footerButtons,
+        }
+      },
+      { expectedTaskText }
+    )
+
+    assert(
+      metrics.scopeRect?.width > 0 && metrics.scopeRect?.height > 0 &&
+        metrics.scopeRect.left >= 0 && metrics.scopeRect.right <= metrics.viewport.width + 2,
+      `${scenarioName} 任务处理抽屉不可见: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.scopeRect.width <= Math.min(650, metrics.viewport.width) + 2,
+      `${scenarioName} 任务处理抽屉宽度超出预期: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.summary?.height > 0 &&
+        metrics.actionPanel?.height > 0 &&
+        metrics.footer?.height > 0,
+      `${scenarioName} 任务处理抽屉缺少关键分区: ${JSON.stringify(metrics)}`
+    )
+    const isContext = metrics.activeStep === 'erp-task-action-step-context'
+    for (const [name, box] of [['guide', metrics.guide], ['guideSteps', metrics.guideSteps], ['tabList', metrics.tabList]]) {
+      assert.equal(Boolean(box?.height), true, `${scenarioName} ${name} 从详情首屏起持续展示三步导航: ${JSON.stringify(metrics)}`)
+    }
+    if (isContext || metrics.hasActionReceipt) {
+      assert(
+        metrics.metaGrid?.height > 0 && metrics.metaItems >= 1,
+        `${scenarioName} 核对任务和办理回执应直接显示责任岗位与当前处理信息: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        metrics.timingKeys.includes('arrived') &&
+          metrics.timingKeys.includes('due'),
+        `${scenarioName} 核对任务和办理回执应保留入岗与截止时间，入岗可从任务信息展开: ${JSON.stringify(metrics)}`
+      )
+    } else {
+      assert.equal(
+        metrics.metaItems,
+        0,
+        `${scenarioName} 办理步骤不应重复任务详情`
+      )
+      assert.equal(
+        metrics.timingKeys.length,
+        0,
+        `${scenarioName} 办理步骤不应重复任务日期`
+      )
+    }
+    assert.equal(
+      metrics.visibleChains,
+      isContext ? 1 : 0,
+      `${scenarioName} 任务处理链只在核对任务步骤展示`
+    )
+    if (!isContext) {
+      assert.equal(
+        metrics.viewButtons,
+        0,
+        `${scenarioName} 办理与结果步骤不应提供查看入口`
+      )
+    }
+    assert.equal(
+      metrics.guideNoteCount,
+      0,
+      `${scenarioName} 任务详情不应重复展示通用处理范围说明: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.stepItems,
+      3,
+      `${scenarioName} 任务处理抽屉应展示 3 个处理步骤: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.selectedTabs,
+      1,
+      `${scenarioName} 任务处理步骤应只有一个当前步骤: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.footerButtons >= 1,
+      `${scenarioName} 任务详情底部缺少当前步骤操作: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      Boolean(metrics.textArea),
+      expectReasonInput,
+      `${scenarioName} 原因输入显示状态不符合当前动作: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.summary.right <= metrics.scopeRect.right + 2 &&
+        (!metrics.metaGrid ||
+          metrics.metaGrid.right <= metrics.scopeRect.right + 2) &&
+        metrics.guide.right <= metrics.scopeRect.right + 2 &&
+        metrics.guideSteps.right <= metrics.scopeRect.right + 2 &&
+        metrics.actionPanel.right <= metrics.scopeRect.right + 2,
+      `${scenarioName} 任务处理抽屉内容横向溢出: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.footer.top >= metrics.body.top &&
+        metrics.footer.bottom <= metrics.scopeRect.bottom + 2,
+      `${scenarioName} 任务处理抽屉底部动作区位置异常: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
+      `${scenarioName} 打开任务处理抽屉后页面产生横向滚动: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const {
+    assertMobileTaskMainNavigation,
+    assertMobileTaskInitialSkeleton,
+    assertMobileTaskBossDoneList,
+    assertMobileTaskDarkDetailReadable,
+    readMobileTaskVisibleListMetrics,
+  } = createMobileTaskAssertions({
+    assert,
+    assertDarkThemeContrast,
+    assertReadableOnBackground,
+    assertThemeReadable,
+    expectText,
+    gotoScenarioPath,
+    isDarkNeutralBorderColor,
+    isLightSurfaceColor,
+    isTransparentColor,
+    isWarningBorderColor,
+    outputDir,
+    path,
+  })
+  return {
+    gotoScenarioPath,
+    assertNoDashboardCenterLocalRefreshButton,
+    assertDashboardMetricInteractionSemantics,
+    assertDarkDashboardLinkButtonsUnboxed,
+    assertMobileTaskRefreshFeedback,
+    assertDashboardTaskBoardLayout,
+    assertTaskActionDrawerLayout,
+    assertMobileTaskMainNavigation,
+    assertMobileTaskInitialSkeleton,
+    assertMobileTaskBossDoneList,
+    assertMobileTaskDarkDetailReadable,
+  }
+}
