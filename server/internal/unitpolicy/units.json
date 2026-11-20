@@ -1,0 +1,60 @@
+[
+  {
+    "code": "EA",
+    "name": "个",
+    "precision": 0,
+    "aliases": [
+      "PCS",
+      "PC",
+      "件"
+    ]
+  },
+  {
+    "code": "SET",
+    "name": "套",
+    "precision": 0,
+    "aliases": []
+  },
+  {
+    "code": "PAIR",
+    "name": "对",
+    "precision": 0,
+    "aliases": []
+  },
+  {
+    "code": "SHEET",
+    "name": "片",
+    "precision": 0,
+    "aliases": []
+  },
+  {
+    "code": "STRIP",
+    "name": "条",
+    "precision": 0,
+    "aliases": []
+  },
+  {
+    "code": "BLOCK",
+    "name": "块",
+    "precision": 0,
+    "aliases": []
+  },
+  {
+    "code": "YD",
+    "name": "码",
+    "precision": 6,
+    "aliases": [
+      "Y",
+      "YD"
+    ]
+  },
+  {
+    "code": "KG",
+    "name": "千克",
+    "precision": 3,
+    "aliases": [
+      "kg",
+      "公斤"
+    ]
+  }
+]
