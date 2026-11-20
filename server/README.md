@@ -148,6 +148,8 @@ CI、SSH 和非 macOS 的非交互入口只输出查看指引；需要明确返�
 3. 核对同一候选后，追加 `--apply --confirm-backup-sha256 <原dump的SHA256>`。工具只推进任务版本 / 更新时间并追加既有完整快照合同的维护回执；状态、办理人、岗位、业务载荷和事实保持原值。同一快照重复执行不重复写入。
 4. 立即按正式 promotion 完成新鲜备份、恢复升级预演、Atlas apply、运行与公网读回，再核对终态任务的原办理人和原未分配状态。升级完成后该维护入口会拒绝再次运行；保留原备份、维护回执和发布回执，精确清理本次临时恢复集群。
 
+历史恢复副本若在 `20260927100348` 单位归一化中报 `production_order_material_requirements.planned_quantity`，先保存原备份，把恢复副本停在 `20260927095806`。在 `server/` 下将 `POSTGRES_DSN` 指向本机独立、无其他连接的 `plush_erp_ci_*` 恢复库，运行 `go run ./cmd/repair-legacy-production-materials --database <库名>` 查看修正明细。核对冻结用量后加 `--apply`，再继续原 Atlas 迁移并验证余量及库存事实。修复仅接受可与历史回填规则相互印证、且无领料、委外分配或生产异常引用的快照。存在这些引用的记录须人工核对来源与下游事实。
+
 工作台的权限关系只读入口复用上述审计账号，通过 `cmd/dev-permission-relationships` 调用正式 repository 和权限解释，并额外开启数据库只读模式；不执行 `NewData` 的账号 / RBAC 初始化。它仅接受开发服务注入的登记数据库和本地客户配置，不开 HTTP 端口，不调用 ERP 登录，也不提供写命令。入口、访问模式和验证边界见 [开发服务 Bridge](../web/dev-server/README.md)。
 
 主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。前后端共用有超时的进程检查；macOS 通过系统端口表定位 PID，再逐个读取 cwd，避免全机 `lsof` 扫描阻塞启动。检查失败或超时时保留服务并退出。
