@@ -1,0 +1,25 @@
+.erp-dev-runtime-recovery {
+  display: flex;
+  min-height: 100dvh;
+  justify-content: center;
+  background: var(--erp-page-bg);
+  padding: 24px 16px;
+}
+
+.erp-dev-runtime-recovery > .ant-alert {
+  width: 100%;
+  max-width: 680px;
+  height: fit-content;
+}
+
+.erp-dev-runtime-recovery__actions,
+.erp-dev-runtime-recovery__waiting {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.erp-dev-runtime-recovery__waiting {
+  gap: 8px;
+}
