@@ -1,0 +1,528 @@
+package data
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
+	"fmt"
+	"github.com/shopspring/decimal"
+	"server/internal/biz"
+	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/bomheader"
+	"server/internal/data/model/ent/bomitem"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
+	"server/internal/data/model/ent/engineeringmaterialrequestitem"
+	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/supplier"
+	"server/internal/data/model/ent/unit"
+	"sort"
+	"time"
+)
+
+var _ biz.EngineeringMaterialRequestRepo = (*salesOrderRepo)(nil)
+
+func (r *salesOrderRepo) GetEngineeringMaterialRequest(ctx context.Context, orderID int, preview bool) (*biz.EngineeringMaterialRequest, error) {
+	snapshot, err := beginClientReadSnapshot(ctx, r.data)
+	if err != nil {
+		return nil, err
+	}
+	defer snapshot.Rollback()
+	result, err := r.getEngineeringMaterialRequest(ctx, snapshot.client, orderID, preview)
+	if err != nil {
+		return nil, err
+	}
+	if err := snapshot.Commit(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *salesOrderRepo) getEngineeringMaterialRequest(ctx context.Context, client *ent.Client, orderID int, preview bool) (*biz.EngineeringMaterialRequest, error) {
+	if !preview {
+		row, err := client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(orderID)).Order(ent.Desc(engineeringmaterialrequest.FieldID)).First(ctx)
+		if err == nil {
+			return loadEngineeringMaterialRequest(ctx, client, row)
+		}
+		if !ent.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	order, err := client.SalesOrder.Get(ctx, orderID)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrSalesOrderNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.buildEngineeringMaterialPreview(ctx, client, order, false)
+}
+
+func (r *salesOrderRepo) lockEngineeringOrder(ctx context.Context, client *ent.Client, orderID int) (*ent.SalesOrder, error) {
+	query := client.SalesOrder.Query().Where(salesorder.ID(orderID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query.Where(func(s *sql.Selector) { s.ForUpdate() })
+	}
+	row, err := query.Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrSalesOrderNotFound
+	}
+	return row, err
+}
+
+func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, client *ent.Client, order *ent.SalesOrder, lock bool) (*biz.EngineeringMaterialRequest, error) {
+	result, err := r.buildEngineeringMaterialSources(ctx, client, order, lock)
+	if err != nil {
+		return nil, err
+	}
+	if order.LifecycleStatus != biz.SalesOrderStatusActive {
+		result.Issues = append(result.Issues, "订单生效后才能提交采购用料审批")
+	}
+	return result, nil
+}
+
+func (r *salesOrderRepo) buildEngineeringMaterialSources(ctx context.Context, client *ent.Client, order *ent.SalesOrder, lock bool) (*biz.EngineeringMaterialRequest, error) {
+	result := &biz.EngineeringMaterialRequest{SalesOrderID: order.ID, OrderNo: order.OrderNo, OrderStatus: order.LifecycleStatus, SourceOrderVersion: order.Version, Status: "PREVIEW", Items: []*biz.EngineeringMaterialRequestItem{}, Sources: []map[string]any{}, Issues: []string{}, PurchaseOrders: []biz.EngineeringMaterialPurchaseOrder{}}
+	lines, err := client.SalesOrderItem.Query().Where(salesorderitem.SalesOrderID(order.ID), salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen)).Order(ent.Asc(salesorderitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(lines) == 0 {
+		result.Issues = append(result.Issues, "订单没有待生产的需求明细")
+	}
+	unitIDs := make([]int, 0, len(lines))
+	for _, line := range lines {
+		unitIDs = append(unitIDs, line.UnitID)
+	}
+	units := map[int]*ent.Unit{}
+	if len(unitIDs) > 0 {
+		rows, err := client.Unit.Query().Where(unit.IDIn(unitIDs...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			units[row.ID] = row
+		}
+	}
+	byKey := map[[2]int]*biz.EngineeringMaterialRequestItem{}
+	for _, line := range lines {
+		if line.ProductID == 0 || line.BomID == nil {
+			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行尚未关联工程产品和 BOM", line.LineNo))
+			continue
+		}
+		q := client.BOMHeader.Query().Where(bomheader.ID(*line.BomID), bomheader.ProductID(line.ProductID)).WithItems(func(q *ent.BOMItemQuery) {
+			q.Order(ent.Asc(bomitem.FieldID)).WithUnit().WithMaterial(func(q *ent.MaterialQuery) {
+				q.WithSupplier()
+				if lock {
+					q.Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, r.data.sqlDialect) })
+				}
+			})
+		})
+		if lock {
+			q.Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, r.data.sqlDialect) })
+		}
+		header, err := q.Only(ctx)
+		if ent.IsNotFound(err) {
+			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行 BOM 与产品不符", line.LineNo))
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		fingerprint, err := salesOrderBOMFingerprintFromParts(header, header.Edges.Items)
+		if err != nil {
+			return nil, err
+		}
+		if header.Status != biz.BOMStatusActive || line.BomFingerprint == nil || *line.BomFingerprint != fingerprint {
+			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行工程 BOM 尚未完成或已修改，请完成工程资料", line.LineNo))
+		}
+		if len(header.Edges.Items) == 0 {
+			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行 BOM 没有材料明细", line.LineNo))
+		}
+		productUnit := units[line.UnitID]
+		if productUnit == nil {
+			return nil, biz.ErrUnitNotFound
+		}
+		productionQuantity := biz.SalesOrderProductionQuantity(line.OrderedQuantity, line.PreShipmentSampleQuantity)
+		for _, part := range header.Edges.Items {
+			m, err := part.Edges.MaterialOrErr()
+			if err != nil {
+				return nil, err
+			}
+			u, err := part.Edges.UnitOrErr()
+			if err != nil {
+				return nil, err
+			}
+			units[u.ID] = u
+			if !m.IsActive || !u.IsActive || m.DefaultUnitID != part.UnitID {
+				result.Issues = append(result.Issues, fmt.Sprintf("材料 %s 的状态或计量单位需要核对", m.Name))
+			}
+			supplierID, supplierName := 0, ""
+			if m.SupplierID != nil && m.Edges.Supplier != nil {
+				supplierID, supplierName = *m.SupplierID, m.Edges.Supplier.Name
+			}
+			if supplierID == 0 || !m.Edges.Supplier.IsActive {
+				result.Issues = append(result.Issues, fmt.Sprintf("材料 %s 尚未选择有效厂商", m.Name))
+			}
+			usage := biz.MaterialPartUsage(productionQuantity, part.Quantity, part.LossRate)
+			if !usage.IsPositive() || usage.GreaterThanOrEqual(decimal.New(1, 14)) {
+				result.Issues = append(result.Issues, fmt.Sprintf("材料 %s 的用量不在有效范围", m.Name))
+			}
+			key := [2]int{m.ID, part.UnitID}
+			group := byKey[key]
+			if group == nil {
+				group = &biz.EngineeringMaterialRequestItem{MaterialID: m.ID, UnitID: part.UnitID, SupplierID: supplierID, MaterialCode: m.Code, MaterialName: m.Name, SupplierName: supplierName, SupplierItemNo: m.SupplierItemNo, Color: m.Color, Spec: m.Spec, UnitName: u.Name}
+				byKey[key] = group
+				result.Items = append(result.Items, group)
+			}
+			group.RequiredQuantity = group.RequiredQuantity.Add(usage)
+			result.Sources = append(result.Sources, map[string]any{"sales_order_item_id": line.ID, "line_no": line.LineNo, "product_id": line.ProductID, "product_name": line.ProductNameSnapshot, "product_code": line.ProductCodeSnapshot, "customer_product_no": line.CustomerProductNo, "order_date": order.OrderDate.Format("2006-01-02"), "ordered_quantity": line.OrderedQuantity.String(), "pre_shipment_sample_quantity": line.PreShipmentSampleQuantity.String(), "product_unit_name": productUnit.Name, "process_requirement": line.ProcessRequirement, "product_sku_id": line.ProductSkuID, "bom_id": header.ID, "bom_version": header.Version, "bom_edit_version": header.UpdatedAt.UnixMicro(), "bom_item_id": part.ID, "material_id": m.ID, "unit_id": u.ID, "position": part.Position, "piece_count": part.PieceCount, "unit_usage": part.Quantity.String(), "unit_usage_format": part.SourceSnapshot["quantity_format"], "total_usage_format": part.SourceSnapshot["total_format"], "loss_rate": part.LossRate.String(), "production_quantity": productionQuantity.String(), "total_usage": usage.String(), "process_base": part.ProcessBase, "process_method": part.ProcessMethod, "material_note": part.Note})
+		}
+	}
+	if len(result.Items) > 2000 {
+		return nil, biz.ErrMaterialRequestNotReady
+	}
+	for _, item := range result.Items {
+		unit := units[item.UnitID]
+		if unit == nil {
+			return nil, biz.ErrUnitNotFound
+		}
+		rounded, err := biz.RoundRequiredUnitQuantity(item.RequiredQuantity, unit.Precision)
+		if err != nil {
+			return nil, err
+		}
+		item.RequiredQuantity = rounded
+		if item.RequiredQuantity.GreaterThanOrEqual(decimal.New(1, 14)) {
+			result.Issues = append(result.Issues, "汇总数量超出有效范围")
+		}
+	}
+	result.SourceHash = engineeringMaterialSourceHash(result)
+	return result, nil
+}
+
+func engineeringMaterialSourceHash(in *biz.EngineeringMaterialRequest) string {
+	items := make([]biz.EngineeringMaterialRequestItem, len(in.Items))
+	for i, item := range in.Items {
+		items[i] = *item
+		items[i].ID = 0
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].MaterialID != items[j].MaterialID {
+			return items[i].MaterialID < items[j].MaterialID
+		}
+		return items[i].UnitID < items[j].UnitID
+	})
+	// Header annotations do not add procurement inputs. Their source changes are
+	// guarded by the order version and the completed engineering BOM version/fingerprint.
+	// Calculated display totals do not change manufacturing inputs. This also
+	// keeps an existing approval valid when decimal presentation gains precision.
+	sources := make([]map[string]any, len(in.Sources))
+	for index, source := range in.Sources {
+		entry := make(map[string]any, len(source))
+		for key, value := range source {
+			switch key {
+			case "sample_image_attachment_id", "product_code", "customer_product_no", "order_date", "ordered_quantity", "pre_shipment_sample_quantity", "product_unit_name", "process_requirement", "material_note", "total_usage", "unit_usage_format", "total_usage_format":
+				continue
+			}
+			entry[key] = value
+		}
+		sources[index] = entry
+	}
+	payload, _ := json.Marshal([]any{in.SalesOrderID, in.SourceOrderVersion, sources, items})
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:])
+}
+
+func (r *salesOrderRepo) SubmitEngineeringMaterialRequest(ctx context.Context, in *biz.EngineeringMaterialSubmit) (_ *biz.EngineeringMaterialRequest, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrMaterialRequestConflict) }()
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	order, err := r.lockEngineeringOrder(ctx, tx.Client(), in.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := tx.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(in.SalesOrderID), engineeringmaterialrequest.StatusNEQ(biz.MaterialRequestRejected)).Only(ctx)
+	if err == nil {
+		result, err := loadEngineeringMaterialRequest(ctx, tx.Client(), existing)
+		if err != nil {
+			return nil, err
+		}
+		if result.SourceOrderVersion != in.ExpectedVersion || result.SourceHash != in.ExpectedSourceHash {
+			return nil, biz.ErrMaterialRequestConflict
+		}
+		if order.LifecycleStatus != biz.SalesOrderStatusActive {
+			return nil, biz.ErrMaterialRequestNotReady
+		}
+		if result.Status != biz.MaterialRequestApproved {
+			if _, err := r.getEngineeringMaterialTask(ctx, tx.Client(), result); err != nil {
+				return nil, err
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return result, nil
+	}
+	if !ent.IsNotFound(err) {
+		return nil, err
+	}
+	if order.Version != in.ExpectedVersion {
+		return nil, biz.ErrMaterialRequestConflict
+	}
+	preview, err := r.buildEngineeringMaterialPreview(ctx, tx.Client(), order, true)
+	if err != nil {
+		return nil, err
+	}
+	if preview.SourceHash != in.ExpectedSourceHash {
+		return nil, biz.ErrMaterialRequestConflict
+	}
+	if len(preview.Issues) > 0 || len(preview.Items) == 0 {
+		return nil, biz.ErrMaterialRequestNotReady
+	}
+	if err := r.settleMaterialRevisionForResubmit(ctx, tx.Client(), order.ID, in.ActorID, in.WorkflowTaskID, in.ExpectedTaskVersion); err != nil {
+		return nil, err
+	}
+	result, err := createEngineeringMaterialRequest(ctx, tx.Client(), preview, in.ActorID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return result, nil
+}
+
+// Engineering saves own the automatic handoff. Incomplete sources remain
+// editable; freezing the source and creating the review task commit together.
+func (r *salesOrderRepo) submitReadyEngineeringMaterials(ctx context.Context, client *ent.Client, order *ent.SalesOrder, actorID int) error {
+	if order.LifecycleStatus != biz.SalesOrderStatusActive {
+		return nil
+	}
+	exists, err := client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.SalesOrderID(order.ID), engineeringmaterialrequest.StatusNEQ(biz.MaterialRequestRejected)).Exist(ctx)
+	if err != nil || exists {
+		return err
+	}
+	incomplete, err := client.SalesOrderItem.Query().Where(salesorderitem.SalesOrderID(order.ID), salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen), salesorderitem.BomFingerprintIsNil()).Exist(ctx)
+	if err != nil || incomplete {
+		return err
+	}
+	preview, err := r.buildEngineeringMaterialPreview(ctx, client, order, true)
+	if err != nil {
+		return err
+	}
+	if len(preview.Issues) > 0 || len(preview.Items) == 0 {
+		return nil
+	}
+	if err := r.settleMaterialRevisionForResubmit(ctx, client, order.ID, actorID, 0, 0); err != nil {
+		return err
+	}
+	_, err = createEngineeringMaterialRequest(ctx, client, preview, actorID)
+	return err
+}
+
+func createEngineeringMaterialRequest(ctx context.Context, client *ent.Client, preview *biz.EngineeringMaterialRequest, actorID int) (*biz.EngineeringMaterialRequest, error) {
+	row, err := client.EngineeringMaterialRequest.Create().SetSalesOrderID(preview.SalesOrderID).SetSourceOrderVersion(preview.SourceOrderVersion).SetOrderNoSnapshot(preview.OrderNo).SetSourceSnapshot(preview.Sources).SetSubmittedBy(actorID).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range preview.Items {
+		_, err = client.EngineeringMaterialRequestItem.Create().SetRequestID(row.ID).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetSupplierID(item.SupplierID).SetMaterialCode(item.MaterialCode).SetMaterialName(item.MaterialName).SetSupplierName(item.SupplierName).SetNillableSupplierItemNo(item.SupplierItemNo).SetNillableColor(item.Color).SetNillableSpec(item.Spec).SetUnitName(item.UnitName).SetRequiredQuantity(item.RequiredQuantity).Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	result, err := loadEngineeringMaterialRequest(ctx, client, row)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := ensureEngineeringMaterialTask(ctx, client, result, actorID); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *salesOrderRepo) ReviewEngineeringMaterialRequest(ctx context.Context, in *biz.EngineeringMaterialReview) (_ *biz.EngineeringMaterialRequest, resultErr error) {
+	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrMaterialRequestConflict) }()
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	row, err := tx.EngineeringMaterialRequest.Get(ctx, in.ID)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrMaterialRequestNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	order, err := r.lockEngineeringOrder(ctx, tx.Client(), row.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	row, err = tx.EngineeringMaterialRequest.Get(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := loadEngineeringMaterialRequest(ctx, tx.Client(), row)
+	if err != nil {
+		return nil, err
+	}
+	if in.Action == "FINANCE_APPROVE" && row.Status == biz.MaterialRequestApproved && row.FinanceReviewedBy != nil && *row.FinanceReviewedBy == in.ActorID && sameOptionalString(current.FinanceReviewNote, in.Note) {
+		return current, nil
+	}
+	if row.Version != in.ExpectedVersion {
+		return nil, biz.ErrMaterialRequestConflict
+	}
+	if order.LifecycleStatus != biz.SalesOrderStatusActive {
+		return nil, biz.ErrMaterialRequestNotReady
+	}
+	if row.Status != biz.MaterialRequestSubmitted && row.Status != biz.MaterialRequestBossApproved {
+		return nil, biz.ErrMaterialRequestReviewInvalid
+	}
+	task, err := r.requireEngineeringMaterialTask(ctx, tx.Client(), current, in.ActorID, in.WorkflowTaskID, in.ExpectedTaskVersion)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	update := tx.EngineeringMaterialRequest.UpdateOneID(row.ID).AddVersion(1)
+	if in.Note == nil {
+		update.ClearReviewNote()
+	} else {
+		update.SetReviewNote(*in.Note)
+	}
+	if in.Action == "REJECT" {
+		if (in.ReviewStage == "BOSS" && row.Status != biz.MaterialRequestSubmitted) || (in.ReviewStage == "FINANCE" && row.Status != biz.MaterialRequestBossApproved) || (in.ReviewStage != "BOSS" && in.ReviewStage != "FINANCE") {
+			return nil, biz.ErrMaterialRequestReviewInvalid
+		}
+		update.SetStatus(biz.MaterialRequestRejected).SetRejectedBy(in.ActorID).SetRejectedAt(now)
+	} else {
+		preview, err := r.buildEngineeringMaterialPreview(ctx, tx.Client(), order, true)
+		if err != nil {
+			return nil, err
+		}
+		if preview.SourceHash != current.SourceHash {
+			return nil, biz.ErrMaterialRequestConflict
+		}
+		if len(preview.Issues) > 0 {
+			return nil, biz.ErrMaterialRequestNotReady
+		}
+		switch in.Action {
+		case "BOSS_APPROVE":
+			if row.Status != biz.MaterialRequestSubmitted {
+				return nil, biz.ErrMaterialRequestReviewInvalid
+			}
+			update.SetStatus(biz.MaterialRequestBossApproved).SetBossReviewedBy(in.ActorID).SetBossReviewedAt(now).SetNillableBossReviewNote(in.Note)
+		case "FINANCE_APPROVE":
+			if row.Status != biz.MaterialRequestBossApproved || row.BossReviewedBy == nil || *row.BossReviewedBy == in.ActorID {
+				return nil, biz.ErrMaterialRequestReviewInvalid
+			}
+			if err := r.generateMaterialPurchaseOrders(ctx, tx.Client(), current); err != nil {
+				return nil, err
+			}
+			update.SetStatus(biz.MaterialRequestApproved).SetFinanceReviewedBy(in.ActorID).SetFinanceReviewedAt(now).SetNillableFinanceReviewNote(in.Note)
+		default:
+			return nil, biz.ErrBadParam
+		}
+	}
+	row, err = update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	taskStatus := "done"
+	if in.Action == "REJECT" {
+		taskStatus = "rejected"
+	}
+	if err := settleEngineeringMaterialTask(ctx, tx.Client(), task, taskStatus, in.ActorID, in.Note); err != nil {
+		return nil, err
+	}
+	result, err := loadEngineeringMaterialRequest(ctx, tx.Client(), row)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := ensureEngineeringMaterialTask(ctx, tx.Client(), result, in.ActorID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return result, nil
+}
+
+func (r *salesOrderRepo) generateMaterialPurchaseOrders(ctx context.Context, client *ent.Client, request *biz.EngineeringMaterialRequest) error {
+	groups := map[int][]*biz.EngineeringMaterialRequestItem{}
+	for _, item := range request.Items {
+		groups[item.SupplierID] = append(groups[item.SupplierID], item)
+	}
+	supplierIDs := make([]int, 0, len(groups))
+	for id := range groups {
+		supplierIDs = append(supplierIDs, id)
+	}
+	sort.Ints(supplierIDs)
+	for _, supplierID := range supplierIDs {
+		s, err := client.Supplier.Query().Where(supplier.ID(supplierID), supplier.IsActive(true)).Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, r.data.sqlDialect) }).Only(ctx)
+		if ent.IsNotFound(err) {
+			return biz.ErrMaterialRequestNotReady
+		}
+		if err != nil {
+			return err
+		}
+		lines := groups[supplierID]
+		if err := recordPaymentMethodUse(ctx, client, r.data.sqlDialect, s.DefaultPaymentMethod, nil); err != nil {
+			return err
+		}
+		po, err := client.PurchaseOrder.Create().SetEngineeringMaterialRequestID(request.ID).SetPurchaseOrderNo(fmt.Sprintf("PO-MR-%d-%d", request.ID, supplierID)).SetSupplierID(supplierID).SetCurrency("CNY").SetPaymentTermDays(s.DefaultPaymentTermDays).SetNillablePaymentMethod(s.DefaultPaymentMethod).SetNillableInvoiceRequired(s.DefaultInvoiceRequired).SetNillableInvoiceCategory(s.DefaultInvoiceCategory).SetSupplierSnapshot(map[string]any{"name": s.Name, "code": s.Code}).SetPurchaseDate(time.Now()).SetLifecycleStatus(biz.PurchaseOrderStatusApproved).SetNote("工程用料审批：" + request.OrderNo).Save(ctx)
+		if err != nil {
+			return err
+		}
+		for i, item := range lines {
+			printSnapshot := &biz.PurchaseOrderItemMutation{PurchaseOrderID: po.ID, MaterialID: item.MaterialID, UnitID: item.UnitID}
+			if err := preparePurchaseItemPrintSnapshots(ctx, client, printSnapshot, nil); err != nil {
+				return err
+			}
+			_, err := client.PurchaseOrderItem.Create().SetNillableMaterialSpecSnapshot(printSnapshot.MaterialSpecSnapshot).SetNillableSupplierItemNoSnapshot(printSnapshot.SupplierItemNoSnapshot).SetNillableUnitNameSnapshot(printSnapshot.UnitNameSnapshot).SetPurchaseOrderID(po.ID).SetLineNo(i + 1).SetDisplayOrder(i + 1).SetMaterialID(item.MaterialID).SetUnitID(item.UnitID).SetMaterialCodeSnapshot(item.MaterialCode).SetMaterialNameSnapshot(item.MaterialName).SetNillableColorSnapshot(item.Color).SetProductOrderNoSnapshot(request.OrderNo).SetPurchasedQuantity(item.RequiredQuantity).Save(ctx)
+			if err != nil {
+				return err
+			}
+		}
+		if err := syncPurchaseOrderHandoffs(ctx, client, po.ID, 0); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func loadEngineeringMaterialRequest(ctx context.Context, client *ent.Client, row *ent.EngineeringMaterialRequest) (*biz.EngineeringMaterialRequest, error) {
+	order, err := client.SalesOrder.Get(ctx, row.SalesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	result := &biz.EngineeringMaterialRequest{ID: row.ID, SalesOrderID: row.SalesOrderID, OrderNo: row.OrderNoSnapshot, SourceOrderVersion: row.SourceOrderVersion, Status: row.Status, Version: row.Version, Sources: row.SourceSnapshot, Items: []*biz.EngineeringMaterialRequestItem{}, Issues: []string{}, SubmittedBy: row.SubmittedBy, SubmittedAt: &row.SubmittedAt, BossReviewedBy: row.BossReviewedBy, BossReviewedAt: row.BossReviewedAt, FinanceReviewedBy: row.FinanceReviewedBy, FinanceReviewedAt: row.FinanceReviewedAt, RejectedBy: row.RejectedBy, RejectedAt: row.RejectedAt, ReviewNote: row.ReviewNote, BossReviewNote: row.BossReviewNote, FinanceReviewNote: row.FinanceReviewNote, PurchaseOrders: []biz.EngineeringMaterialPurchaseOrder{}}
+	result.OrderStatus = order.LifecycleStatus
+	items, err := client.EngineeringMaterialRequestItem.Query().Where(engineeringmaterialrequestitem.RequestID(row.ID)).Order(ent.Asc(engineeringmaterialrequestitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range items {
+		result.Items = append(result.Items, &biz.EngineeringMaterialRequestItem{ID: v.ID, MaterialID: v.MaterialID, UnitID: v.UnitID, SupplierID: v.SupplierID, MaterialCode: v.MaterialCode, MaterialName: v.MaterialName, SupplierName: v.SupplierName, SupplierItemNo: v.SupplierItemNo, Color: v.Color, Spec: v.Spec, UnitName: v.UnitName, RequiredQuantity: v.RequiredQuantity})
+	}
+	orders, err := client.PurchaseOrder.Query().Where(purchaseorder.EngineeringMaterialRequestID(row.ID)).Order(ent.Asc(purchaseorder.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range orders {
+		supplierName, _ := v.SupplierSnapshot["name"].(string)
+		result.PurchaseOrders = append(result.PurchaseOrders, biz.EngineeringMaterialPurchaseOrder{ID: v.ID, PurchaseOrderNo: v.PurchaseOrderNo, SupplierID: v.SupplierID, SupplierName: supplierName})
+	}
+	result.SourceHash = engineeringMaterialSourceHash(result)
+	return result, nil
+}
