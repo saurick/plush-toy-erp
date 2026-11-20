@@ -1,0 +1,1146 @@
+import { ExportOutlined, ImportOutlined } from '@ant-design/icons'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
+import { Button, Input, Space } from 'antd'
+import { operationalFactActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
+import { outsourcingTaskFactMatches, outsourcingTaskScope } from '../../utils/outsourcingTaskScope.mjs'
+import { OperationalFactStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
+import { message, useModal } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import {
+  listAllOutsourcingOrderItems,
+  getOutsourcingOrder,
+  listAllWarehouses,
+} from '../../api/masterDataOrderApi.mjs'
+import {
+  createOutsourcingMaterialIssueFromOrder,
+  createOutsourcingReturnReceiptFromOrder,
+  cancelOutsourcingFact,
+  listAllOutsourcingFacts,
+  postOutsourcingFact,
+  saveOutsourcingMaterialIssueDraft,
+  saveOutsourcingReturnReceiptDraft,
+} from '../../api/operationalFactApi.mjs'
+import { listAllInventoryLots } from '../../api/inventoryApi.mjs'
+import {
+  createQualityInspectionFromOutsourcingReturn,
+  listAllOutsourcingReturnQualityInspections,
+  listOutsourcingReturnQualityInspectionsForFacts,
+} from '../../api/qualityApi.mjs'
+import {
+  OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
+  SOURCE_DOCUMENT_ITEM_STATUS_TONES,
+  formatUnixDate,
+  BUSINESS_ROUTE_PATHS,
+  statusText,
+} from '../../utils/masterDataOrderView.mjs'
+import { OUTSOURCING_ORDER_SUBJECT_TYPES } from '../../utils/sourceOrderLineValues.mjs'
+import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import {
+  OUTSOURCING_SOURCE_ACTIONS,
+  buildOutsourcingSourceFactPayload,
+  filterOutsourcingSourceActionLots,
+  findOutsourcingSourceFactResult,
+  isOutsourcingSourceActionEligible,
+  validateOutsourcingSourceFactResult,
+} from '../../utils/outsourcingOrderFactAction.mjs'
+import {
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+  sourceBusinessActionNo,
+} from '../../utils/sourceBusinessAction.mjs'
+import { matchesOperationalFactLifecycleResult } from '../../utils/operationalFactLifecycle.mjs'
+
+import {
+  buildOutsourcingReturnQualityInspectionPayload,
+  groupOutsourcingReturnQualityInspections,
+  isMatchingOutsourcingReturnQualityInspection,
+  isPostedOutsourcingReturn,
+} from '../../utils/qualityInspectionSourceAction.mjs'
+import { relatedDocumentRoute } from '../../utils/relatedDocumentNavigation.mjs'
+import { PRODUCTION_WIP_ACTION } from '../../utils/productionWipModel.mjs'
+import { routeWithQuery } from '../../utils/routeQuery.mjs'
+import {
+  OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS,
+  buildOperationalFactDraftSavePayload,
+  findOperationalFactDraftSaveResult,
+  operationalFactDraftFormValues,
+} from '../../utils/operationalFactDraftEdit.mjs'
+
+const EMPTY_SOURCE_FACT_CONTEXT = Object.freeze({
+  mode: 'create',
+  actionType: '',
+  record: null,
+  initialValues: null,
+  order: null,
+  item: null,
+  lots: [],
+  facts: [],
+})
+
+const SOURCE_FACT_SUCCESS_TEXT = Object.freeze({
+  [OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE]: {
+    created: '委外发料草稿已生成，可在委外记录中继续办理',
+    recovered: '已重新读取并确认委外发料草稿，可在委外记录中继续办理',
+  },
+  [OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT]: {
+    created: '委外回货草稿已生成，可在委外记录中继续办理',
+    recovered: '已重新读取并确认委外回货草稿，可在委外记录中继续办理',
+  },
+})
+
+export function useOutsourcingSourceFacts({
+  canReadOutsourcingFacts,
+  canReadQualityInspection,
+  activeCustomerKey,
+  canPostOutsourcingFact,
+  canCancelOutsourcingFact,
+  canCreateQualityInspection,
+  canOpenQualityInspection,
+  navigate,
+  canCreateStagePayable,
+  canReadWIP,
+  taskBusiness,
+  canCreatePayable,
+  canViewPayable,
+  setWarehouses,
+  canCreateMaterialIssue,
+  canCreateReturnReceipt,
+  unitOptions,
+}) {
+  const modal = useModal()
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskScope = useMemo(() => outsourcingTaskScope(taskBusiness), [taskBusiness])
+  const [sourceFactOpen, setSourceFactOpen] = useState(false)
+
+  const [sourceFactLoading, setSourceFactLoading] = useState(false)
+
+  const [sourceFactContext, setSourceFactContext] = useState(
+    EMPTY_SOURCE_FACT_CONTEXT
+  )
+
+  const [returnRecordsOpen, setReturnRecordsOpen] = useState(false)
+
+  const [returnRecordsLoading, setReturnRecordsLoading] = useState(false)
+
+  const [returnRecordsOrder, setReturnRecordsOrder] = useState(null)
+
+  const [relatedReturnFacts, setRelatedReturnFacts] = useState([])
+
+  const [returnRecordActionLoading, setReturnRecordActionLoading] = useState('')
+
+  const [qualityInspectionByFactID, setQualityInspectionByFactID] = useState({})
+
+  const [qualitySourceFact, setQualitySourceFact] = useState(null)
+
+  const [qualitySourceLoading, setQualitySourceLoading] = useState(false)
+
+  const [dispositionSourceFact, setDispositionSourceFact] = useState(null)
+
+  const sourceFactRequestRef = useRef(0)
+
+  const sourceFactInFlightRef = useRef(false)
+
+  const sourceFactAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
+
+  const qualitySourceInFlightRef = useRef(false)
+
+  const returnRecordActionInFlightRef = useRef(false)
+
+  const {
+    financeSourceAction,
+    financeSourceFact,
+    financeSourceLoading,
+    financeSourceInFlightRef,
+    financeSourceInitialValues,
+    openOutsourcingOrderPayable,
+    openOutsourcingReturnPayable,
+    closeOutsourcingReturnPayable,
+    submitOutsourcingReturnPayable,
+    viewOutsourcingReturnPayable,
+  } = useOutsourcingReturnPayable({
+    canCreatePayable,
+    canCreateStagePayable,
+    qualityInspectionByFactID,
+    setReturnRecordsOpen,
+    setReturnRecordsOrder,
+    setRelatedReturnFacts,
+    activeCustomerKey,
+    canViewPayable,
+    navigate,
+  })
+
+  const loadRelatedOutsourcingFacts = useCallback(
+    async (orderID) => {
+      if (!canReadOutsourcingFacts || Number(orderID || 0) <= 0) {
+        return []
+      }
+      const data = await listAllOutsourcingFacts({
+        source_type: 'OUTSOURCING_ORDER',
+        source_id: Number(orderID),
+      })
+      return Array.isArray(data?.outsourcing_facts)
+        ? data.outsourcing_facts
+        : []
+    },
+    [canReadOutsourcingFacts]
+  )
+
+  const loadRelatedOutsourcingQualityInspections = useCallback(
+    async (facts, options) => {
+      if (
+        !canReadQualityInspection ||
+        !facts?.some(isPostedOutsourcingReturn)
+      ) {
+        return {}
+      }
+      const postedFacts = facts.filter(isPostedOutsourcingReturn)
+      const data = await listOutsourcingReturnQualityInspectionsForFacts(
+        postedFacts.map((fact) => fact.id),
+        { customer_key: activeCustomerKey || undefined },
+        options
+      )
+      const inspections = data.quality_inspections
+      return groupOutsourcingReturnQualityInspections(inspections, facts)
+    },
+    [activeCustomerKey, canReadQualityInspection]
+  )
+
+  const openRelatedReturnRecords = useCallback(
+    async (order) => {
+      if (!canReadOutsourcingFacts || !order?.id) return
+      setReturnRecordsOrder(order)
+      setRelatedReturnFacts([])
+      setQualityInspectionByFactID({})
+      setReturnRecordsOpen(true)
+      setReturnRecordsLoading(true)
+      try {
+        const facts = await loadRelatedOutsourcingFacts(order.id)
+        setRelatedReturnFacts(facts)
+        try {
+          setQualityInspectionByFactID(
+            await loadRelatedOutsourcingQualityInspections(facts)
+          )
+        } catch (error) {
+          message.warning(getActionErrorMessage(error, '读取关联质检记录'))
+        }
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '读取委外记录'))
+      } finally {
+        setReturnRecordsLoading(false)
+      }
+    },
+    [
+      canReadOutsourcingFacts,
+      loadRelatedOutsourcingFacts,
+      loadRelatedOutsourcingQualityInspections,
+    ]
+  )
+
+  const closeRelatedReturnRecords = useCallback(() => {
+    if (
+      returnRecordsLoading ||
+      returnRecordActionInFlightRef.current ||
+      financeSourceInFlightRef.current ||
+      qualitySourceInFlightRef.current
+    ) {
+      return
+    }
+    setReturnRecordsOpen(false)
+    setReturnRecordsOrder(null)
+    setRelatedReturnFacts([])
+    setQualityInspectionByFactID({})
+  }, [returnRecordsLoading, financeSourceInFlightRef])
+
+  const mutateOutsourcingFact = useCallback(
+    async (action, fact, reason = '') => {
+      const factID = Number(fact?.id || 0)
+      const currentStatus = String(fact?.status || '').toUpperCase()
+      const isPost = action === 'post'
+      const allowed = (!taskScope || (taskScope.writable && taskScope.post && isPost && outsourcingTaskFactMatches(taskScope, fact))) && (isPost
+        ? canPostOutsourcingFact && currentStatus === OperationalFactStatus.DRAFT
+        : action === 'cancel' &&
+          canCancelOutsourcingFact &&
+          [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(currentStatus))
+      if (
+        returnRecordActionInFlightRef.current ||
+        !allowed ||
+        !factID ||
+        !returnRecordsOrder?.id
+      ) {
+        if (!returnRecordActionInFlightRef.current && !allowed) {
+          message.warning('当前委外记录状态或账号权限不允许该操作')
+        }
+        return
+      }
+
+      const expectedStatus = isPost ? OperationalFactStatus.POSTED : OperationalFactStatus.CANCELLED
+      const command = isPost ? postOutsourcingFact : cancelOutsourcingFact
+      const presentation = operationalFactActionPresentation('outsourcing', fact, action)
+      const actionLabel = presentation.label
+      const attempt = Object.freeze({
+        id: factID,
+        expected_version: fact?.version,
+        customer_key: activeCustomerKey || undefined,
+        ...(!isPost ? { reason: String(reason || '').trim() } : {}),
+      })
+      let resultWasUnknown = false
+
+      returnRecordActionInFlightRef.current = true
+      setReturnRecordActionLoading(`${action}:${factID}`)
+      try {
+        try {
+          const result = await command(attempt)
+          if (
+            !matchesOperationalFactLifecycleResult(
+              result,
+              attempt,
+              expectedStatus
+            )
+          ) {
+            const error = new Error('委外记录操作结果不完整')
+            error.isInvalidResponse = true
+            throw error
+          }
+        } catch (error) {
+          if (!isSourceBusinessActionResultUnknown(error)) {
+            message.error(getActionErrorMessage(error, actionLabel))
+            return
+          }
+          resultWasUnknown = true
+        }
+
+        let currentFacts
+        try {
+          currentFacts = await loadRelatedOutsourcingFacts(
+            returnRecordsOrder.id
+          )
+          setRelatedReturnFacts(currentFacts)
+        } catch (error) {
+          message.warning(
+            resultWasUnknown
+              ? '操作结果仍无法确认，请勿重复操作，稍后重新打开委外记录核对'
+              : getActionErrorMessage(
+                  error,
+                  '操作已提交，但重新读取委外记录失败，请稍后核对'
+                )
+          )
+          return
+        }
+
+        const confirmed = currentFacts.find((item) =>
+          matchesOperationalFactLifecycleResult(item, attempt, expectedStatus)
+        )
+        if (!confirmed) {
+          message.warning(
+            '写入后重新读取仍未确认目标状态，请勿重复操作，稍后重新打开委外记录核对'
+          )
+          return
+        }
+
+        if (canReadQualityInspection) {
+          try {
+            setQualityInspectionByFactID(
+              await loadRelatedOutsourcingQualityInspections(currentFacts)
+            )
+          } catch (error) {
+            message.warning(getActionErrorMessage(error, '刷新关联质检记录'))
+          }
+        } else {
+          setQualityInspectionByFactID({})
+        }
+
+        const successText = presentation.success
+        reportBusinessResult(successText, confirmed)
+        message.success(successText)
+      } finally {
+        returnRecordActionInFlightRef.current = false
+        setReturnRecordActionLoading('')
+      }
+    },
+    [
+      activeCustomerKey,
+      canCancelOutsourcingFact,
+      canPostOutsourcingFact,
+      canReadQualityInspection,
+      loadRelatedOutsourcingFacts,
+      loadRelatedOutsourcingQualityInspections,
+      returnRecordsOrder,
+      reportBusinessResult,
+      taskScope,
+    ]
+  )
+
+  const postSelectedOutsourcingFact = useCallback(
+    (fact) => mutateOutsourcingFact('post', fact),
+    [mutateOutsourcingFact]
+  )
+
+  const cancelSelectedOutsourcingFact = useCallback(
+    (fact) => {
+      const status = String(fact?.status || '').toUpperCase()
+      if (!canCancelOutsourcingFact || ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(status)) {
+        message.warning('当前委外记录状态或账号权限不允许取消')
+        return
+      }
+      const presentation = operationalFactActionPresentation('outsourcing', fact, 'cancel')
+      let cancelReason = ''
+      modal.confirm({
+        maskClosable: true,
+        title: presentation.title,
+        content: (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <span>
+              {presentation.description}
+            </span>
+            <label htmlFor="outsourcing-fact-cancel-reason">业务原因</label>
+            <Input.TextArea
+              id="outsourcing-fact-cancel-reason"
+              rows={3}
+              maxLength={255}
+              showCount
+              placeholder="填写业务原因"
+              onChange={(event) => {
+                cancelReason = event.target.value
+              }}
+            />
+          </Space>
+        ),
+        okText: presentation.label,
+        cancelText: '返回',
+        okButtonProps: { danger: true },
+        onOk: (_close) => {
+          const reason = cancelReason.trim()
+          if (!reason || [...reason].length > 255) {
+            message.warning('请填写不超过 255 个字的业务原因')
+            return
+          }
+          return mutateOutsourcingFact('cancel', fact, reason)
+        },
+      })
+    },
+    [canCancelOutsourcingFact, modal, mutateOutsourcingFact]
+  )
+
+  const openOutsourcingReturnQualityInspection = useCallback(
+    (fact) => {
+      const activeInspection = (
+        qualityInspectionByFactID?.[fact?.id] || []
+      ).some(
+        (inspection) =>
+          String(inspection?.status || '').toUpperCase() !== OperationalFactStatus.CANCELLED
+      )
+      if ((taskScope && (!taskScope.writable || !taskScope.quality || !outsourcingTaskFactMatches(taskScope, fact))) || !canCreateQualityInspection || !isPostedOutsourcingReturn(fact)) {
+        message.warning('请先选择已过账的委外回货记录')
+        return
+      }
+      if (activeInspection) {
+        message.info('该委外回货已发起质检')
+        return
+      }
+      setReturnRecordsOpen(false)
+      setQualitySourceFact(fact)
+    },
+    [canCreateQualityInspection, qualityInspectionByFactID, taskScope]
+  )
+
+  const closeOutsourcingReturnQualityInspection = useCallback(() => {
+    if (qualitySourceInFlightRef.current) return
+    setQualitySourceFact(null)
+    if (returnRecordsOrder?.id) setReturnRecordsOpen(true)
+  }, [returnRecordsOrder?.id])
+
+  const submitOutsourcingReturnQualityInspection = useCallback(
+    async (values) => {
+      const fact = qualitySourceFact
+      if (
+        qualitySourceInFlightRef.current ||
+        !canCreateQualityInspection ||
+        !isPostedOutsourcingReturn(fact)
+      ) {
+        return
+      }
+      let params
+      try {
+        params = buildOutsourcingReturnQualityInspectionPayload(
+          values,
+          fact,
+          activeCustomerKey
+        )
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '准备委外回货质检'))
+        return
+      }
+
+      qualitySourceInFlightRef.current = true
+      setQualitySourceLoading(true)
+      try {
+        let created
+        let confirmedByReread = false
+        try {
+          created = await createQualityInspectionFromOutsourcingReturn(params)
+          if (!isMatchingOutsourcingReturnQualityInspection(created, fact)) {
+            const invalidResponse = new Error('质检创建结果缺少来源信息')
+            invalidResponse.isInvalidResponse = true
+            throw invalidResponse
+          }
+        } catch (error) {
+          if (!isSourceBusinessActionResultUnknown(error)) {
+            message.error(getActionErrorMessage(error, '发起委外回货质检'))
+            return
+          }
+          try {
+            const reread = await listAllOutsourcingReturnQualityInspections({
+              customer_key: activeCustomerKey || undefined,
+              fact_id: fact.id,
+            })
+            created = (reread?.quality_inspections || []).find(
+              (inspection) =>
+                inspection?.inspection_no === params.inspection_no &&
+                isMatchingOutsourcingReturnQualityInspection(inspection, fact)
+            )
+          } catch {
+            created = null
+          }
+          if (!created) {
+            message.warning('质检生成结果仍无法确认，请保留当前质检单号并重试')
+            return
+          }
+          confirmedByReread = true
+        }
+
+        setQualityInspectionByFactID((current) => ({
+          ...current,
+          [fact.id]: [created, ...(current?.[fact.id] || [])],
+        }))
+        setQualitySourceFact(null)
+        reportBusinessResult(confirmedByReread ? '已重新读取并确认质检草稿' : '质检草稿已生成，尚待提交和判定', created)
+        setReturnRecordsOpen(Boolean(returnRecordsOrder?.id))
+        message.success(
+          confirmedByReread
+            ? '已重新读取并确认质检草稿'
+            : '质检草稿已生成，请在委外记录中继续办理'
+        )
+
+        if (returnRecordsOrder?.id) {
+          try {
+            const facts = await loadRelatedOutsourcingFacts(
+              returnRecordsOrder.id
+            )
+            setRelatedReturnFacts(facts)
+            if (canReadQualityInspection) {
+              setQualityInspectionByFactID(
+                await loadRelatedOutsourcingQualityInspections(facts)
+              )
+            }
+          } catch (error) {
+            message.warning(getActionErrorMessage(error, '刷新关联业务记录'))
+          }
+        }
+      } finally {
+        qualitySourceInFlightRef.current = false
+        setQualitySourceLoading(false)
+      }
+    },
+    [
+      activeCustomerKey,
+      canCreateQualityInspection,
+      canReadQualityInspection,
+      loadRelatedOutsourcingFacts,
+      loadRelatedOutsourcingQualityInspections,
+      qualitySourceFact,
+      returnRecordsOrder,
+      reportBusinessResult,
+    ]
+  )
+
+  const viewOutsourcingReturnQualityInspection = useCallback(
+    (inspection) => {
+      if (!inspection?.id || !canOpenQualityInspection) return
+      navigate(
+        relatedDocumentRoute(
+          BUSINESS_ROUTE_PATHS.qualityInspections,
+          { quality_inspection_id: inspection.id },
+          {
+            keyword: inspection.inspection_no,
+            source: 'outsourcing-order',
+            fields: ['inspection_no'],
+          }
+        )
+      )
+    },
+    [canOpenQualityInspection, navigate]
+  )
+
+  const openOutsourcingReturnDisposition = useCallback((fact) => {
+    if (!isPostedOutsourcingReturn(fact)) {
+      message.warning('请先选择已过账的委外回货记录')
+      return
+    }
+    setReturnRecordsOpen(false)
+    setDispositionSourceFact(fact)
+  }, [])
+
+  const closeOutsourcingReturnDisposition = useCallback(() => {
+    setDispositionSourceFact(null)
+    if (returnRecordsOrder?.id) setReturnRecordsOpen(true)
+  }, [returnRecordsOrder?.id])
+
+  const openOutsourcingSourceFact = useCallback(
+    async (actionType, order, item) => {
+      if ((taskScope && (!taskScope.writable || !taskScope.create || taskScope.factType !== actionType)) || !isOutsourcingSourceActionEligible(actionType, order, item)) {
+        message.warning('当前委外明细状态已变化，请刷新后重试')
+        return
+      }
+
+      const requestID = sourceFactRequestRef.current + 1
+      sourceFactRequestRef.current = requestID
+      setSourceFactLoading(true)
+      try {
+        const subjectType = String(item.subject_type || '').toUpperCase()
+        const subjectID =
+          subjectType === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+            ? Number(item.material_id || 0)
+            : Number(item.product_id || 0)
+        const [lotData, facts, warehouseData] = await Promise.all([
+          listAllInventoryLots({
+            subject_type: subjectType,
+            subject_id: subjectID,
+            ...(Number(item.product_sku_id || 0) > 0
+              ? { product_sku_id: Number(item.product_sku_id) }
+              : {}),
+            status: 'ACTIVE',
+          }),
+          loadRelatedOutsourcingFacts(order.id),
+          listAllWarehouses({ active_only: true }),
+        ])
+        if (sourceFactRequestRef.current !== requestID) {
+          return
+        }
+        setSourceFactContext({
+          mode: 'create',
+          actionType,
+          record: null,
+          initialValues: null,
+          order,
+          item,
+          lots: filterOutsourcingSourceActionLots(
+            actionType,
+            item,
+            lotData?.inventory_lots
+          ),
+          facts,
+        })
+        setWarehouses(
+          Array.isArray(warehouseData?.warehouses)
+            ? warehouseData.warehouses
+            : []
+        )
+        setSourceFactOpen(true)
+      } catch (error) {
+        if (sourceFactRequestRef.current === requestID) {
+          message.error(getActionErrorMessage(error, '加载委外办理详情'))
+        }
+      } finally {
+        if (sourceFactRequestRef.current === requestID) {
+          setSourceFactLoading(false)
+        }
+      }
+    },
+    [loadRelatedOutsourcingFacts, setWarehouses, taskScope]
+  )
+
+  const openOutsourcingFactDraftEditor = useCallback(
+    async (fact) => {
+      const factType = String(fact?.fact_type || '').toUpperCase()
+      const actionType =
+        factType === 'MATERIAL_ISSUE'
+          ? OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          : factType === 'RETURN_RECEIPT'
+            ? OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+            : ''
+      const allowed =
+        actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          ? canCreateMaterialIssue
+          : actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+            ? canCreateReturnReceipt
+            : false
+      if ((taskScope && (!taskScope.writable || !taskScope.create || !outsourcingTaskFactMatches(taskScope, fact))) || !allowed || fact?.status !== OperationalFactStatus.DRAFT || !returnRecordsOrder?.id) {
+        message.warning('当前委外草稿状态或权限已变化，请刷新后重试')
+        return
+      }
+      const requestID = sourceFactRequestRef.current + 1
+      sourceFactRequestRef.current = requestID
+      setSourceFactLoading(true)
+      try {
+        const exactData = await listAllOutsourcingFacts({
+          keyword: String(fact.id),
+        })
+        if (sourceFactRequestRef.current !== requestID) return
+        const fresh = (exactData?.outsourcing_facts || []).find(
+          (item) => Number(item?.id || 0) === Number(fact.id)
+        )
+        if (
+          !fresh ||
+          fresh.status !== OperationalFactStatus.DRAFT ||
+          String(fresh.source_type || '').toUpperCase() !==
+            'OUTSOURCING_ORDER' ||
+          Number(fresh.source_id || 0) !== Number(returnRecordsOrder.id)
+        ) {
+          message.warning('委外草稿状态或来源已变化，请刷新后重试')
+          return
+        }
+        const [order, itemData, lotData, facts, warehouseData] =
+          await Promise.all([
+            getOutsourcingOrder({ id: Number(fresh.source_id) }),
+            listAllOutsourcingOrderItems({
+              outsourcing_order_id: Number(fresh.source_id),
+              expected_version: Number(returnRecordsOrder.version),
+            }),
+            listAllInventoryLots({
+              subject_type: fresh.subject_type,
+              subject_id: fresh.subject_id,
+              ...(Number(fresh.product_sku_id || 0) > 0
+                ? { product_sku_id: Number(fresh.product_sku_id) }
+                : {}),
+              status: 'ACTIVE',
+            }),
+            loadRelatedOutsourcingFacts(fresh.source_id),
+            listAllWarehouses({ active_only: true }),
+          ])
+        if (sourceFactRequestRef.current !== requestID) return
+        const itemRows = Array.isArray(itemData?.outsourcing_order_items)
+          ? itemData.outsourcing_order_items
+          : Array.isArray(itemData)
+            ? itemData
+            : []
+        const item = itemRows.find(
+          (entry) => Number(entry?.id || 0) === Number(fresh.source_line_id)
+        )
+        if (!order || !item) throw new Error('委外来源明细已变化')
+        setSourceFactContext({
+          mode: 'edit',
+          actionType,
+          record: fresh,
+          initialValues: operationalFactDraftFormValues(fresh),
+          order,
+          item,
+          lots: filterOutsourcingSourceActionLots(
+            actionType,
+            item,
+            lotData?.inventory_lots
+          ),
+          facts,
+        })
+        setWarehouses(warehouseData?.warehouses || [])
+        setReturnRecordsOpen(false)
+        setSourceFactOpen(true)
+      } catch (error) {
+        if (sourceFactRequestRef.current === requestID) {
+          message.error(getActionErrorMessage(error, '加载委外草稿'))
+        }
+      } finally {
+        if (sourceFactRequestRef.current === requestID) {
+          setSourceFactLoading(false)
+        }
+      }
+    },
+    [
+      canCreateMaterialIssue,
+      canCreateReturnReceipt,
+      loadRelatedOutsourcingFacts,
+      returnRecordsOrder,
+      setWarehouses,
+      taskScope,
+    ]
+  )
+
+  const closeOutsourcingSourceFact = useCallback(() => {
+    if (sourceFactInFlightRef.current) return
+    sourceFactRequestRef.current += 1
+    setSourceFactOpen(false)
+    setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
+  }, [])
+
+  const renderOutsourcingSourceFactAction = useCallback((order, item) => {
+    const action = item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+      ? { type: OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE, label: '委外发料', allowed: canCreateMaterialIssue }
+      : { type: OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT, label: '登记回货', allowed: canCreateReturnReceipt }
+    const stage = Number(item?.production_wip_batch_id) > 0 && Number(item?.production_order_id) > 0
+    const canHandleStageReturn = !taskBusiness && canCreateReturnReceipt && item?.production_wip_status === ProductionWIPStatus.OUTSOURCED
+    const canCreateFact = (!taskScope || (taskScope.writable && taskScope.create && taskScope.factType === action.type)) && action.allowed && isOutsourcingSourceActionEligible(action.type, order, item)
+    const canBill = !taskScope && stage && canCreateStagePayable && item.production_wip_status === 'ACCEPTED' && ['confirmed', 'closed'].includes(order.lifecycle_status)
+    if (!canCreateFact && (taskScope || (!(stage && canReadWIP) && !canBill && !(stage && canViewPayable)))) return null
+    return (
+      <Space wrap onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+        {canCreateFact && (
+          <Button
+            icon={action.type === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE ? <ExportOutlined aria-hidden="true" /> : <ImportOutlined aria-hidden="true" />}
+            className="erp-action-button"
+            size="small"
+            loading={sourceFactLoading}
+            onClick={() => openOutsourcingSourceFact(action.type, order, item)}
+          >
+            {action.label}
+          </Button>
+        )}
+        {!taskScope && stage && canReadWIP && (
+          <Button
+            size="small"
+            onClick={() => navigate(routeWithQuery(BUSINESS_ROUTE_PATHS.productionOrders, {
+              production_order_id: item.production_order_id,
+              wip_batch_id: item.production_wip_batch_id,
+              wip_action: canHandleStageReturn ? PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN : undefined,
+            }))}
+          >
+            {taskBusiness ? '查看工序任务' : canHandleStageReturn ? '办理工序回货' : '查看工序'}
+          </Button>
+        )}
+        {canBill && <Button size="small" onClick={() => openOutsourcingOrderPayable(order)}>生成合同应付</Button>}
+        {!taskScope && stage && canViewPayable && <Button size="small" onClick={() => navigate(relatedDocumentRoute(BUSINESS_ROUTE_PATHS.payables, { source_type: 'OUTSOURCING_ORDER', source_id: order.id }, { source: 'outsourcing-order', keyword: order.outsourcing_order_no, fields: ['source_no'] }))}>查看合同应付</Button>}
+      </Space>
+    )
+  }, [canCreateMaterialIssue, canCreateReturnReceipt, canCreateStagePayable, canReadWIP, canViewPayable, taskBusiness, taskScope, navigate, openOutsourcingOrderPayable, openOutsourcingSourceFact, sourceFactLoading])
+
+  const getOutsourcingOrderItemFields = useCallback(
+    (item) => {
+      const isMaterial =
+        item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+      return [
+        {
+          label: '加工品类',
+          value: isMaterial ? '材料' : '产品 / 半成品',
+        },
+        {
+          label: '来源产品订单编号',
+          value: item?.product_order_no_snapshot,
+        },
+        ...(isMaterial
+          ? [
+              {
+                label: '材料名称',
+                value: item?.material_name_snapshot,
+                taskSummary: true,
+                strong: true,
+              },
+              { label: '材料编码', value: item?.material_code_snapshot, taskSummary: true },
+            ]
+          : [
+              { label: '产品编号', value: item?.product_no_snapshot, taskSummary: true },
+              { label: '产品规格', value: item?.sku_code_snapshot, taskSummary: true },
+              {
+                label: '产品名称',
+                strong: true,
+                taskSummary: true,
+                value: (
+                  <ProductIdentity
+                    productId={item?.product_id}
+                    name={item?.product_name_snapshot}
+                  />
+                ),
+              },
+            ]),
+        { label: '加工项目', value: item?.processing_item },
+        { label: '工序', value: item?.process_name_snapshot },
+        { label: '工序分类', value: item?.process_category_snapshot },
+        {
+          label: '加工数量',
+          taskSummary: true,
+          value: item?.outsourcing_quantity,
+          rowStart: true,
+        },
+        {
+          label: '单位',
+          taskSummary: true,
+          value:
+            item?.unit_name_snapshot ||
+            referenceLabel(unitOptions, item?.unit_id, '单位'),
+        },
+        { label: '单价', value: item?.unit_price },
+        { label: '金额', value: item?.amount },
+        {
+          label: '预计回货日期',
+          value: formatUnixDate(item?.expected_return_date),
+        },
+        {
+          label: '行状态',
+          taskSummary: true,
+          tone: SOURCE_DOCUMENT_ITEM_STATUS_TONES[item?.line_status],
+          value: statusText(
+            item?.line_status,
+            OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
+            '明细状态待核对'
+          ),
+        },
+        { label: '备注', value: item?.note, fullWidth: true },
+      ]
+    },
+    [unitOptions]
+  )
+
+  const getOutsourcingHandlingItemFields = useCallback(
+    (item, { record }) => {
+      const sourceAction = renderOutsourcingSourceFactAction(record, item)
+      return [
+        ...getOutsourcingOrderItemFields(item),
+        ...(sourceAction
+          ? [{ label: '业务操作', value: sourceAction, fullWidth: true, taskSummary: true }]
+          : []),
+      ]
+    },
+    [getOutsourcingOrderItemFields, renderOutsourcingSourceFactAction]
+  )
+
+  const loadOutsourcingOrderDetailsItems = useCallback(
+    async (order, { signal }) => {
+      const data = await listAllOutsourcingOrderItems(
+        {
+          outsourcing_order_id: order.id,
+          expected_version: order.version,
+        },
+        { signal }
+      )
+      return {
+        items: data?.outsourcing_order_items,
+        total: data?.total,
+      }
+    },
+    []
+  )
+
+  const saveOutsourcingSourceFactDraft = useCallback(
+    async (values) => {
+      const { actionType, order, record } = sourceFactContext
+      const action =
+        actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          ? OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_MATERIAL_ISSUE
+          : OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_RETURN_RECEIPT
+      let request
+      try {
+        request = {
+          ...buildOperationalFactDraftSavePayload(action, values, record),
+          ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
+        }
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '准备委外草稿'))
+        return
+      }
+      const save =
+        actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          ? saveOutsourcingMaterialIssueDraft
+          : saveOutsourcingReturnReceiptDraft
+      sourceFactInFlightRef.current = true
+      setSourceFactLoading(true)
+      try {
+        let confirmedRecord
+        let refreshed
+        try {
+          confirmedRecord = await save(request, record)
+        } catch (error) {
+          if (!isSourceBusinessActionResultUnknown(error)) throw error
+          refreshed = await loadRelatedOutsourcingFacts(order.id)
+          confirmedRecord = findOperationalFactDraftSaveResult(refreshed, request, record, action)
+          if (!confirmedRecord) throw error
+        }
+        setSourceFactOpen(false)
+        setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
+        reportBusinessResult('委外草稿已保存，尚未确认出入库', confirmedRecord)
+        try {
+          setRelatedReturnFacts(refreshed ?? await loadRelatedOutsourcingFacts(order.id))
+        } catch {
+          setRelatedReturnFacts((previous) => previous.map((fact) => fact.id === confirmedRecord.id ? confirmedRecord : fact))
+          message.warning('委外草稿已保存，列表暂未刷新，请重新读取')
+          return
+        }
+        message.success('委外草稿已保存，请核对后确认发料或回货入库')
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '保存委外草稿'))
+      } finally {
+        sourceFactInFlightRef.current = false
+        setSourceFactLoading(false)
+      }
+    },
+    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext, reportBusinessResult]
+  )
+
+  const createOutsourcingSourceFact = useCallback(
+    async (values) => {
+      const { actionType, order, item, facts } = sourceFactContext
+      let scope
+      let attempt
+      let params
+      try {
+        const payload = {
+          ...buildOutsourcingSourceFactPayload(
+            actionType,
+            values,
+            order,
+            item,
+            facts
+          ),
+          customer_key: activeCustomerKey || undefined,
+        }
+        scope = `outsourcing-source-fact:${actionType}:${order.id}:${item.id}`
+        attempt = sourceFactAttemptsRef.current.prepare(scope, payload)
+        params = {
+          ...attempt.params,
+          fact_no: sourceBusinessActionNo(
+            actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+              ? 'OUT-MI'
+              : 'OUT-RR',
+            order.outsourcing_order_no,
+            attempt.params.idempotency_key
+          ),
+        }
+      } catch (error) {
+        if (scope && attempt) {
+          sourceFactAttemptsRef.current.settle(scope, attempt, error)
+        }
+        message.error(getActionErrorMessage(error, '准备委外业务记录'))
+        return
+      }
+
+      const execute =
+        actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          ? createOutsourcingMaterialIssueFromOrder
+          : createOutsourcingReturnReceiptFromOrder
+      sourceFactInFlightRef.current = true
+      setSourceFactLoading(true)
+      try {
+        let result
+        let confirmedByReread = false
+        try {
+          result = await execute(params)
+          validateOutsourcingSourceFactResult(
+            result,
+            actionType,
+            order,
+            item,
+            params
+          )
+        } catch (error) {
+          if (!isSourceBusinessActionResultUnknown(error)) {
+            sourceFactAttemptsRef.current.settle(scope, attempt, error)
+            message.error(getActionErrorMessage(error, '生成委外业务草稿'))
+            return
+          }
+          try {
+            const currentFacts = await loadRelatedOutsourcingFacts(order.id)
+            result = findOutsourcingSourceFactResult(
+              currentFacts,
+              params,
+              actionType,
+              order,
+              item
+            )
+          } catch {
+            result = null
+          }
+          if (!result) {
+            sourceFactAttemptsRef.current.settle(scope, attempt, error)
+            message.warning(
+              '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
+            )
+            return
+          }
+          confirmedByReread = true
+        }
+        sourceFactAttemptsRef.current.settle(scope, attempt, null)
+        try {
+          await loadRelatedOutsourcingFacts(order.id)
+        } catch (refreshError) {
+          message.warning(
+            getActionErrorMessage(refreshError, '刷新委外关联记录')
+          )
+        }
+        setSourceFactOpen(false)
+        setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
+        message.success(
+          SOURCE_FACT_SUCCESS_TEXT[actionType][
+            confirmedByReread ? 'recovered' : 'created'
+          ]
+        )
+        reportBusinessResult(SOURCE_FACT_SUCCESS_TEXT[actionType][confirmedByReread ? 'recovered' : 'created'], result)
+      } finally {
+        sourceFactInFlightRef.current = false
+        setSourceFactLoading(false)
+      }
+    },
+    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext, reportBusinessResult]
+  )
+
+  const submitOutsourcingSourceFact = useCallback(
+    async (values) => {
+      if (
+        sourceFactInFlightRef.current ||
+        !sourceFactContext.order ||
+        !sourceFactContext.item
+      ) {
+        return
+      }
+      const { actionType, mode } = sourceFactContext
+      const permissions = {
+        [OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE]: canCreateMaterialIssue,
+        [OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT]: canCreateReturnReceipt,
+      }
+      if (!permissions[actionType]) {
+        message.warning('当前账号没有办理该委外业务的权限')
+        return
+      }
+      if (mode === 'edit') {
+        await saveOutsourcingSourceFactDraft(values)
+      } else {
+        await createOutsourcingSourceFact(values)
+      }
+    },
+    [
+      canCreateMaterialIssue,
+      canCreateReturnReceipt,
+      createOutsourcingSourceFact,
+      saveOutsourcingSourceFactDraft,
+      sourceFactContext,
+    ]
+  )
+  return {
+    sourceFactOpen,
+    sourceFactLoading,
+    sourceFactContext,
+    returnRecordsOpen,
+    returnRecordsLoading,
+    returnRecordsOrder,
+    relatedReturnFacts,
+    returnRecordActionLoading,
+    qualityInspectionByFactID,
+    qualitySourceFact,
+    qualitySourceLoading,
+    dispositionSourceFact,
+    financeSourceAction,
+    financeSourceFact,
+    financeSourceLoading,
+    financeSourceInitialValues,
+    openRelatedReturnRecords,
+    closeRelatedReturnRecords,
+    postSelectedOutsourcingFact,
+    cancelSelectedOutsourcingFact,
+    openOutsourcingReturnQualityInspection,
+    closeOutsourcingReturnQualityInspection,
+    submitOutsourcingReturnQualityInspection,
+    viewOutsourcingReturnQualityInspection,
+    openOutsourcingReturnDisposition,
+    closeOutsourcingReturnDisposition,
+    openOutsourcingOrderPayable,
+    openOutsourcingReturnPayable,
+    closeOutsourcingReturnPayable,
+    submitOutsourcingReturnPayable,
+    viewOutsourcingReturnPayable,
+    openOutsourcingFactDraftEditor,
+    closeOutsourcingSourceFact,
+    getOutsourcingOrderItemFields,
+    getOutsourcingHandlingItemFields,
+    loadOutsourcingOrderDetailsItems,
+    loadRelatedOutsourcingQualityInspections,
+    submitOutsourcingSourceFact,
+  }
+}

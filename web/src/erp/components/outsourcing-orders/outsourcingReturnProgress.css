@@ -1,0 +1,46 @@
+.erp-outsourcing-return-progress__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-outsourcing-return-progress__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 8px 16px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-outsourcing-return-progress__metrics dt,
+.erp-outsourcing-return-progress__note {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-outsourcing-return-progress__metrics dd {
+  margin: 2px 0 0;
+  font-size: var(--erp-font-emphasis);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.erp-outsourcing-return-progress__note {
+  margin: 0;
+}
+
+.erp-outsourcing-return-progress__loading,
+.erp-outsourcing-return-progress__batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-outsourcing-return-progress__batch-actions {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
