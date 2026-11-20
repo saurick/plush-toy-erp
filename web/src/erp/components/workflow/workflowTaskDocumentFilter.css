@@ -1,0 +1,10 @@
+.workflow-task-document-filter__modules,
+.workflow-task-document-filter__types {
+  margin-inline-start: 12px;
+}
+
+.workflow-task-document-filter__modules {
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  overflow: visible;
+}
