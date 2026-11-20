@@ -1,0 +1,157 @@
+// web/src/App.jsx
+import React, { Suspense, useEffect } from 'react'
+import { App as AntdApp, ConfigProvider, Empty, Grid } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
+import { authBus } from '@/common/auth/authBus'
+import { appAlert } from '@/common/components/modal/alertBridge'
+import AntdAppBridge from '@/common/components/AntdAppBridge'
+import ScrollEdges from '@/common/components/scroll/ScrollEdges'
+import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
+import '@/common/components/feedback/feedback.css'
+import { getActiveERPBrand } from '@/common/consts/brand'
+import { applyERPFavicon } from '@/common/consts/favicon.mjs'
+import { getUserFacingErrorMessage } from '@/common/utils/errorMessage'
+import {
+  ERPWorkspaceProvider,
+  useERPWorkspace,
+} from '@/erp/context/ERPWorkspaceProvider'
+import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
+import { WORKBENCH_APPEARANCE_STORAGE_KEY } from '@/common/theme/erpAppearance.mjs'
+import { createERPAntdTheme } from '@/common/theme/erpAntdTheme.mjs'
+import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
+import '@/common/components/empty/empty-state.css'
+
+dayjs.locale('zh-cn')
+
+const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
+
+function AppContent() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { isMobileExperience } = useERPWorkspace()
+  const activeBrand = getActiveERPBrand()
+  const isDevWorkbenchRoute =
+    import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
+
+  useEffect(() => {
+    return authBus.onUnauthorized(({ from, message, loginPath }) => {
+      // 如果 payload 没带，就 fallback 为当前 location
+      const safeFrom = from || {
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      }
+      const targetLoginPath = loginPath || '/admin-login'
+      const userMessage = getUserFacingErrorMessage(
+        message,
+        '登录已过期，请重新登录'
+      )
+
+      if (isMobileExperience) {
+        navigate(targetLoginPath, {
+          replace: true,
+          state: { from: safeFrom },
+        })
+        return
+      }
+
+      appAlert({
+        title: '登录状态已失效',
+        message: userMessage,
+        confirmText: '重新登录',
+        onConfirm: () => {
+          navigate(targetLoginPath, {
+            replace: true,
+            state: { from: safeFrom },
+          })
+        },
+      })
+    })
+  }, [isMobileExperience, navigate])
+
+  useEffect(() => {
+    if (isDevWorkbenchRoute) return
+    // 登录页按当前选择的工作方式更新图标。
+    if (/^\/admin-login\/?$/.test(location.pathname)) return
+    applyERPFavicon(document, location.pathname, {
+      customerFaviconHref: activeBrand.faviconHref,
+      customerMobileFaviconHref: activeBrand.mobileFaviconHref,
+      fromPathname: location.state?.from?.pathname,
+      isMobileExperience,
+    })
+  }, [
+    activeBrand.faviconHref,
+    activeBrand.mobileFaviconHref,
+    isDevWorkbenchRoute,
+    isMobileExperience,
+    location.pathname,
+    location.state,
+  ])
+
+  return (
+    <>
+      {!isDevWorkbenchRoute ? (
+        <Helmet>
+          <title>{activeBrand.companyName}</title>
+        </Helmet>
+      ) : null}
+      <Suspense fallback={null}>
+        <ERPRouter />
+      </Suspense>
+    </>
+  )
+}
+
+function ThemedApp() {
+  const { isDark, accent, appearance } = useERPTheme()
+  const location = useLocation()
+  const isDevWorkbenchRoute =
+    import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
+  const screens = Grid.useBreakpoint()
+  const isPhoneViewport = !isDevWorkbenchRoute && screens.md === false
+
+  return (
+    <ConfigProvider
+      locale={zhCN}
+      empty={{ className: 'erp-empty', image: Empty.PRESENTED_IMAGE_SIMPLE }}
+      button={{ autoInsertSpace: false }}
+      modal={{
+        centered: true,
+      }}
+      theme={createERPAntdTheme({
+        isDark,
+        accent,
+        density: appearance.density,
+        mobile: isPhoneViewport,
+        workbench: isDevWorkbenchRoute,
+      })}
+    >
+      <AntdApp message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
+        <AntdAppBridge />
+        <ScrollEdges />
+        <AppContent />
+      </AntdApp>
+    </ConfigProvider>
+  )
+}
+
+const App = () => {
+  const { pathname } = useLocation()
+  const browserStorageKey =
+    import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(pathname)
+      ? WORKBENCH_APPEARANCE_STORAGE_KEY
+      : ''
+  return (
+    <ERPWorkspaceProvider>
+      <ERPThemeProvider browserStorageKey={browserStorageKey}>
+        <ThemedApp />
+      </ERPThemeProvider>
+    </ERPWorkspaceProvider>
+  )
+}
+
+export default App

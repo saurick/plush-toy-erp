@@ -1,0 +1,7 @@
+.app-alert-dialog [data-app-alert-title] {
+  color: var(--erp-text);
+}
+
+.app-alert-dialog [data-app-alert-message] {
+  color: var(--erp-text-muted);
+}

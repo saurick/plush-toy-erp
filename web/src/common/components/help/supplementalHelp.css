@@ -1,0 +1,48 @@
+.erp-supplemental-help-trigger.ant-btn,
+.erp-supplemental-help-dismiss.ant-btn {
+  flex: none;
+  width: max(28px, var(--erp-touch-target, 0px));
+  min-width: max(28px, var(--erp-touch-target, 0px));
+  height: max(28px, var(--erp-touch-target, 0px));
+  padding: 0;
+  background: var(--erp-supplemental-help-bg, transparent);
+  color: var(--erp-supplemental-help-color, var(--erp-text-muted));
+}
+
+.erp-supplemental-help-trigger.ant-btn:not(.ant-btn-icon-only) {
+  width: auto;
+  padding-inline: 6px;
+}
+
+.erp-supplemental-help-trigger.ant-btn:hover,
+.erp-supplemental-help-trigger.ant-btn:focus-visible,
+.erp-supplemental-help-dismiss.ant-btn:hover,
+.erp-supplemental-help-dismiss.ant-btn:focus-visible {
+  color: var(--erp-supplemental-help-hover-color, var(--erp-primary));
+  background: var(--erp-supplemental-help-hover-bg, var(--erp-interactive-bg-hover));
+}
+
+.erp-supplemental-help-popover {
+  width: max-content;
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.erp-supplemental-help-content {
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: var(--erp-text);
+  font-size: var(--erp-font-small);
+  line-height: 1.6;
+}
+
+.erp-supplemental-help-content > p:last-child {
+  margin-bottom: 0;
+}
+
+@media (pointer: coarse) {
+  .erp-supplemental-help-trigger.ant-btn,
+  .erp-supplemental-help-dismiss.ant-btn {
+    min-width: 44px;
+    height: 44px;
+  }
+}
