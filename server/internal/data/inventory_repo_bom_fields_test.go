@@ -1,0 +1,74 @@
+package data
+
+import (
+	"io"
+	"reflect"
+	"testing"
+	"time"
+
+	"server/internal/biz"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
+)
+
+func TestBOMHeaderOptionalFieldsReplaceAndClearThroughAggregateSave(t *testing.T) {
+	ctx := t.Context()
+	data, client := openInventoryRepoTestData(t, "bom_optional_fields_aggregate")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	created, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{
+		ProductID:       fixtures.productID,
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{},
+	}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: biz.BOMItemUpdate{
+		MaterialID: fixtures.materialID,
+		UnitID:     fixtures.unitID,
+		Quantity:   decimal.NewFromInt(1),
+		LossRate:   decimal.Zero,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := created.Header
+	printed := time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)
+	filled := biz.BOMHeaderUpdate{
+		PrintDate:     &printed,
+		SourceOrderNo: stringPtr("source"),
+		QuantityText:  stringPtr("100"),
+		SpareText:     stringPtr("5"),
+		Designer:      stringPtr("designer"),
+		Maker:         stringPtr("maker"),
+		Auditor:       stringPtr("auditor"),
+		HairDirection: stringPtr("direction"),
+		Note:          stringPtr("note"),
+	}
+	fields := []string{"PrintDate", "SourceOrderNo", "QuantityText", "SpareText", "Designer", "Maker", "Auditor", "HairDirection", "Note"}
+	for _, input := range []biz.BOMHeaderUpdate{filled, {}} {
+		detail, saveErr := uc.SaveBOMWithItems(ctx, header.ID, &biz.BOMVersionMutation{
+			ExpectedVersion: header.EditVersion,
+			ProductID:       fixtures.productID,
+			BOMHeaderUpdate: input,
+		}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: biz.BOMItemUpdate{
+			MaterialID: fixtures.materialID,
+			UnitID:     fixtures.unitID,
+			Quantity:   decimal.NewFromInt(1),
+			LossRate:   decimal.Zero,
+		}}})
+		if saveErr != nil {
+			t.Fatal(saveErr)
+		}
+		header = detail.Header
+		storedDetail, err := uc.GetBOMVersion(ctx, header.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		header = storedDetail.Header
+		for _, field := range fields {
+			got := reflect.ValueOf(storedDetail.Header).Elem().FieldByName(field).Interface()
+			want := reflect.ValueOf(input).FieldByName(field).Interface()
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("%s: got %v, want %v", field, got, want)
+			}
+		}
+	}
+}
