@@ -1,0 +1,24 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "待填写",
+  "releaseVersion": "20260629T0802-draft",
+  "rehearsedAt": "待填写",
+  "rehearsalType": "待填写，可选 rollback / forward-fix / rollback-forward-fix",
+  "triggerScenario": "待填写",
+  "rollbackTargetRelease": "待填写",
+  "rollbackRunbook": "deployments/yoyoosun/runbooks/03-rollback.md",
+  "steps": [],
+  "postCheck": {
+    "smokeStatus": "待填写",
+    "evidenceReviewStatus": "待填写"
+  },
+  "summary": {
+    "rehearsalCompleted": false,
+    "rollbackPathStatus": "待填写"
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsFullDsn": false
+  }
+}

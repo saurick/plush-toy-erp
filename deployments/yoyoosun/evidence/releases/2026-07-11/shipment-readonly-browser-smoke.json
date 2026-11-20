@@ -1,0 +1,13 @@
+{
+  "scope": "shipment-existing-draft-readonly-browser-smoke",
+  "status": "pass",
+  "customerKey": "yoyoosun",
+  "shipmentReference": "DRAFT-21",
+  "assertions": {
+    "viewDetailsOnlyEnabledForSelectedRecord": true,
+    "headerItemsAttachmentsReadonly": true,
+    "maintenanceSaveAppendEntriesAbsent": true,
+    "runtimeErrors": 0
+  },
+  "responseBodyStored": false
+}

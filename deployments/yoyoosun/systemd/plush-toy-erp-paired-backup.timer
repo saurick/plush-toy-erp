@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Plush Toy ERP paired backup in the Shanghai maintenance window
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 Asia/Shanghai
+AccuracySec=1s
+Persistent=false
+Unit=plush-toy-erp-paired-backup.service
+
+[Install]
+WantedBy=timers.target
