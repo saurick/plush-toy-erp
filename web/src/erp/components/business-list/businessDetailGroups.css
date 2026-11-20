@@ -1,0 +1,58 @@
+.erp-business-detail-groups {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.erp-business-detail-group {
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-business-detail-group__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.erp-business-detail-group__toggle:hover {
+  background: var(--erp-primary-softer);
+}
+
+.erp-business-detail-group__toggle:focus-visible {
+  outline: 2px solid var(--erp-interactive-border-focus);
+  outline-offset: -2px;
+}
+
+.erp-business-detail-group__toggle strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-business-detail-group__toggle > span:last-child {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--erp-text-muted);
+}
+
+.erp-business-detail-group__items[hidden] {
+  display: none;
+}
+
+@media screen and (max-width: 760px) {
+  .erp-business-detail-group__toggle {
+    min-height: 44px;
+  }
+}

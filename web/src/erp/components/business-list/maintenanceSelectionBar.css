@@ -1,0 +1,22 @@
+.erp-maintenance-selection-bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px;
+}
+
+.erp-maintenance-selection-bar__identity {
+  display: flex;
+  flex: 1 1 180px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-maintenance-selection-bar__actions {
+  margin-inline-start: auto;
+}

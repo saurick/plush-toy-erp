@@ -1,0 +1,102 @@
+.erp-product-gallery {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+.erp-product-gallery__trigger {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--erp-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.erp-product-gallery__trigger:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 4px;
+}
+
+.erp-product-gallery__trigger:disabled {
+  cursor: wait;
+}
+
+.erp-product-gallery__stack,
+.erp-product-gallery__thumbnail {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  isolation: isolate;
+}
+
+.erp-product-gallery__stack {
+  margin-right: 8px;
+}
+
+.erp-product-gallery__stack::before,
+.erp-product-gallery__stack::after {
+  position: absolute;
+  z-index: -1;
+  inset: 4px -4px -2px 5px;
+  border: 1px solid var(--erp-border);
+  border-radius: 7px;
+  background: var(--erp-surface-bg-muted);
+  content: '';
+  transform: rotate(5deg);
+}
+
+.erp-product-gallery__stack::before {
+  inset: 7px -8px -4px 9px;
+  transform: rotate(9deg);
+}
+
+.erp-product-gallery__summary {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.erp-product-gallery__summary small,
+.erp-document-product-gallery__empty {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-product-gallery__error {
+  max-width: 220px;
+  color: var(--erp-visual-danger-text);
+  font-size: var(--erp-font-caption);
+  white-space: normal;
+}
+
+.erp-product-gallery__retry {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.erp-document-product-gallery {
+  display: inline-flex;
+  align-items: center;
+  min-height: 64px;
+}
