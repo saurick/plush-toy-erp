@@ -33,7 +33,6 @@ import WorkInstructionImageAnnotationEditor from '../components/print/WorkInstru
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import {
   COLOR_CARD_TEMPLATE_KEY,
-  MATERIAL_DETAIL_COLUMNS,
   MATERIAL_DETAIL_TEMPLATE_KEY,
   WORK_INSTRUCTION_TEMPLATE_KEY,
   WORK_INSTRUCTION_ROW_TYPES,
@@ -896,16 +895,6 @@ export default function EngineeringPrintWorkspacePage() {
       return nextDraft
     })
     return !draftStorageKey || persisted
-  }
-
-  const updateMaterialColumnLabel = (columnIndex, value) => {
-    setDraft((current) => {
-      const labels = MATERIAL_DETAIL_COLUMNS.map(
-        (column, index) => current.columnLabels?.[index] || column.label
-      )
-      labels[columnIndex] = toText(value)
-      return { ...current, columnLabels: labels }
-    })
   }
 
   const uploadImage = async (slotKey, file) => {
@@ -2064,7 +2053,6 @@ export default function EngineeringPrintWorkspacePage() {
         onSelectLine={selectMaterialLine}
         onSelectCell={selectMaterialCell}
         onFieldChange={updateField}
-        onColumnLabelChange={updateMaterialColumnLabel}
         onLineChange={updateMaterialLine}
       />
     )

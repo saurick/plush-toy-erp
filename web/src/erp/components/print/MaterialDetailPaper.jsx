@@ -29,7 +29,6 @@ function MaterialDetailPaper({
   onSelectLine,
   onSelectCell,
   onFieldChange,
-  onColumnLabelChange,
   onLineChange,
   paperRef,
 }) {
@@ -147,7 +146,7 @@ function MaterialDetailPaper({
                   multiline
                   rich
                   className="erp-material-detail-table__editable erp-material-detail-table__header"
-                  onCommit={(value) => onColumnLabelChange(columnIndex, value)}
+                  onCommit={(value) => onFieldChange(`columnLabels.${columnIndex}`, value)}
                 />
               </th>
             ))}
