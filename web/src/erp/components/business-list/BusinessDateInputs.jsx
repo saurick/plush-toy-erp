@@ -1,0 +1,308 @@
+import React from 'react'
+import { CalendarOutlined } from '@ant-design/icons'
+import { Button, DatePicker, Form } from 'antd'
+import {
+  DATE_INPUT_DISPLAY_FORMAT,
+  DATE_INPUT_VALUE_FORMAT,
+  DATE_TIME_INPUT_DISPLAY_FORMAT,
+  DATE_TIME_INPUT_VALUE_FORMAT,
+  parseDateInputValue,
+  parseDateTimeInputValue,
+} from '../../utils/dateRange.mjs'
+
+export { default as DateRangeFilter } from './DateRangeFilter.jsx'
+
+function joinClassNames(...items) {
+  return items.filter(Boolean).join(' ')
+}
+
+const BusinessDatePicker = React.forwardRef(
+  (
+    {
+      value,
+      onChange,
+      parseValue,
+      valueFormat,
+      displayFormat,
+      className = '',
+      disabled,
+      placeholder,
+      allowClear = true,
+      inputReadOnly = true,
+      defaultOpen = false,
+      onClick,
+      onMouseDown,
+      onOpenChange,
+      onCalendarChange,
+      showTime,
+      quickOptions = [],
+      quickOptionsLabel = '快捷选择',
+      renderExtraFooter,
+      popupAlign,
+      ...restProps
+    },
+    ref
+  ) => {
+    const [open, setOpen] = React.useState(defaultOpen)
+    const pickerValue = parseValue(value)
+    const handleChange = React.useCallback(
+      (nextValue) => {
+        const formattedValue = nextValue ? nextValue.format(valueFormat) : ''
+        onChange?.(formattedValue)
+      },
+      [onChange, valueFormat]
+    )
+    const handlePointerOpen = React.useCallback(
+      (event) => {
+        if (
+          disabled === true ||
+          event.currentTarget?.classList?.contains('ant-picker-disabled')
+        ) {
+          return
+        }
+        if (event.target?.closest?.('.ant-picker-clear')) return
+        setOpen(true)
+      },
+      [disabled]
+    )
+    const handleClick = React.useCallback(
+      (event) => {
+        handlePointerOpen(event)
+        onClick?.(event)
+      },
+      [handlePointerOpen, onClick]
+    )
+    const handleMouseDown = React.useCallback(
+      (event) => {
+        handlePointerOpen(event)
+        onMouseDown?.(event)
+      },
+      [handlePointerOpen, onMouseDown]
+    )
+    const handleOpenChange = React.useCallback(
+      (nextOpen) => {
+        setOpen(nextOpen)
+        onOpenChange?.(nextOpen)
+      },
+      [onOpenChange]
+    )
+    const handleQuickOption = React.useCallback(
+      (option) => {
+        const optionDisabled =
+          typeof option?.disabled === 'function'
+            ? option.disabled()
+            : option?.disabled
+        if (optionDisabled) return
+        const rawValue =
+          typeof option?.value === 'function' ? option.value() : option?.value
+        const nextValue = parseValue(rawValue)
+        if (!nextValue) return
+        handleOpenChange(false)
+        // rc-picker emits its pending empty input once while a custom footer
+        // closes. Apply the shortcut after that close cycle so it remains the
+        // controlled Form value.
+        setTimeout(() => handleChange(nextValue), 0)
+      },
+      [handleChange, handleOpenChange, parseValue]
+    )
+    const mergedRenderExtraFooter = React.useCallback(
+      (mode) => {
+        const extraFooter = renderExtraFooter?.(mode)
+        if (!quickOptions.length) return extraFooter
+        return (
+          <>
+            <div
+              className="erp-business-date-picker-quick-options"
+              role="group"
+              aria-label={quickOptionsLabel}
+            >
+              <span className="erp-business-date-picker-quick-options__label">
+                {quickOptionsLabel}
+              </span>
+              {quickOptions.map((option) => {
+                const optionDisabled =
+                  typeof option.disabled === 'function'
+                    ? option.disabled()
+                    : option.disabled
+                return (
+                  <Button
+                    key={option.key || option.label}
+                    size="small"
+                    htmlType="button"
+                    disabled={optionDisabled}
+                    data-business-date-quick-option={
+                      option.key || option.label
+                    }
+                    title={option.title}
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleQuickOption(option)
+                    }}
+                  >
+                    {option.label}
+                  </Button>
+                )
+              })}
+            </div>
+            {extraFooter}
+          </>
+        )
+      },
+      [handleQuickOption, quickOptions, quickOptionsLabel, renderExtraFooter]
+    )
+
+    return (
+      <DatePicker
+        {...restProps}
+        popupAlign={{
+          offset: [0, 0],
+          ...popupAlign,
+          overflow: {
+            adjustX: true,
+            adjustY: true,
+            shiftX: true,
+            shiftY: true,
+            ...popupAlign?.overflow,
+          },
+        }}
+        ref={ref}
+        needConfirm={false}
+        showTime={showTime}
+        allowClear={allowClear}
+        className={joinClassNames('erp-business-date-input', className)}
+        disabled={disabled}
+        format={displayFormat}
+        inputReadOnly={inputReadOnly}
+        open={open}
+        placeholder={placeholder}
+        suffixIcon={<CalendarOutlined />}
+        value={pickerValue}
+        onChange={handleChange}
+        onCalendarChange={(nextValue, ...args) => {
+          // Date-time pickers otherwise defer onChange until the panel closes.
+          if (showTime && nextValue?.isValid()) handleChange(nextValue)
+          onCalendarChange?.(nextValue, ...args)
+        }}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onOpenChange={handleOpenChange}
+        renderExtraFooter={mergedRenderExtraFooter}
+      />
+    )
+  }
+)
+
+export const DateInput = React.forwardRef((props, ref) => (
+  <BusinessDatePicker
+    {...props}
+    ref={ref}
+    classNames={{
+      ...props.classNames,
+      popup: {
+        ...props.classNames?.popup,
+        root: joinClassNames(
+          'erp-business-date-picker-dropdown',
+          props.classNames?.popup?.root || ''
+        ),
+      },
+    }}
+    displayFormat={DATE_INPUT_DISPLAY_FORMAT}
+    parseValue={parseDateInputValue}
+    placeholder={props.placeholder || '选择日期'}
+    valueFormat={DATE_INPUT_VALUE_FORMAT}
+  />
+))
+
+export const InheritedDateInput = React.forwardRef(
+  ({ value, onChange, inheritedValue, label = '行交期', disabled, onOpenChange, ...props }, ref) => {
+    const [editing, setEditing] = React.useState(false)
+    const pickerRef = React.useRef(null)
+    const buttonRef = React.useRef(null)
+    const restoreFocus = React.useRef(false)
+    const { status } = Form.Item.useStatus()
+    const showPicker = Boolean(value) || editing || status === 'error'
+    const inheritedDate = parseDateInputValue(inheritedValue)?.format(DATE_INPUT_DISPLAY_FORMAT)
+    const summary = inheritedDate ? `${inheritedDate} · 沿用` : '沿用整单交期'
+
+    React.useImperativeHandle(ref, () => ({
+      focus: () => (pickerRef.current || buttonRef.current)?.focus(),
+    }), [])
+    React.useEffect(() => {
+      if (!showPicker && restoreFocus.current) {
+        buttonRef.current?.focus()
+        restoreFocus.current = false
+      }
+    }, [showPicker])
+
+    if (!showPicker) {
+      return (
+        <Button
+          ref={buttonRef}
+          id={props.id}
+          type="link"
+          size="small"
+          htmlType="button"
+          disabled={disabled}
+          aria-label={`${label}：${summary}，单独修改`}
+          onClick={() => setEditing(true)}
+        >
+          {summary}
+        </Button>
+      )
+    }
+    return (
+      <DateInput
+        {...props}
+        ref={pickerRef}
+        disabled={disabled}
+        value={value}
+        placeholder={inheritedDate || '沿用整单交期'}
+        defaultOpen={editing && !value}
+        autoFocus={editing}
+        onChange={(next) => {
+          if (!next) restoreFocus.current = true
+          onChange?.(next)
+          if (!next) setEditing(false)
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            restoreFocus.current = true
+            setEditing(false)
+          }
+          onOpenChange?.(open)
+        }}
+      />
+    )
+  }
+)
+
+export const DateTimeInput = React.forwardRef((props, ref) => (
+  <BusinessDatePicker
+    {...props}
+    ref={ref}
+    className={joinClassNames(
+      'erp-business-date-time-input',
+      props.className || ''
+    )}
+    classNames={{
+      ...props.classNames,
+      popup: {
+        ...props.classNames?.popup,
+        root: joinClassNames(
+          'erp-business-date-time-picker-dropdown',
+          props.classNames?.popup?.root || ''
+        ),
+      },
+    }}
+    displayFormat={DATE_TIME_INPUT_DISPLAY_FORMAT}
+    inputReadOnly={props.inputReadOnly ?? false}
+    parseValue={parseDateTimeInputValue}
+    placeholder={props.placeholder || '选择日期和时间'}
+    showTime={{ format: 'HH:mm', ...(props.showTime || {}) }}
+    valueFormat={DATE_TIME_INPUT_VALUE_FORMAT}
+  />
+))
