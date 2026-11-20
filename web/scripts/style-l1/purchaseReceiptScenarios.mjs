@@ -1,0 +1,709 @@
+import { dateFilterButton, manualDateInputs, openDateFilter } from './dateFilterActions.mjs'
+import { clickLineItemAction, revealLineItemDetails } from './lineEditorActions.mjs'
+import { assertCompactLineNoteDisclosure } from './businessLineItemDisclosureAssertions.mjs'
+import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
+import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertBusinessSectionInteractions } from './businessFormSectionAssertions.mjs'
+import { assertBusinessFormPage, assertBusinessNoteTextAreas, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
+import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
+import { assertAlertSiblingSpacing } from './alertSpacingAssertions.mjs'
+
+export function createPurchaseReceiptScenarios(deps) {
+  const {
+    assert,
+    assertAntdModalCentered,
+    assertBusinessMainTableInitialSelectionEmpty,
+    assertERPThemeMode,
+    assertNoHorizontalOverflow,
+    assertPurchaseReceiptRowItemCount,
+    assertTextAbsent,
+    expectHeading,
+    expectText,
+    selectPurchaseReceiptRow,
+    verifyBusinessModuleColumnOrderDialog,
+    customerRuntimeEffectiveSession,
+  } = deps
+  const { assertPageAttachmentModalEntrypoint } =
+    createBusinessAttachmentAssertions({
+      assert,
+      assertAntdModalCentered,
+    })
+
+  const getSelectionActionButton = async (page, name) => {
+    const buttons = page.getByRole('button', { name, exact: true })
+    for (let index = 0; index < (await buttons.count()); index += 1) {
+      const button = buttons.nth(index)
+      if (await button.isVisible()) return button
+    }
+    const moreButtons = page.getByRole('button', { name: /^更多操作，共/u })
+    for (let index = 0; index < (await moreButtons.count()); index += 1) {
+      const moreButton = moreButtons.nth(index)
+      if (await moreButton.isVisible()) {
+        await moreButton.click()
+        break
+      }
+    }
+    const menu = page.locator('.erp-business-selection-action-menu:visible')
+    await menu.waitFor({ state: 'visible', timeout: 10_000 })
+    const button = menu.getByRole('button', { name, exact: true }).first()
+    await button.waitFor({ state: 'visible', timeout: 10_000 })
+    return button
+  }
+
+  const clickSelectionAction = async (page, name) => {
+    const button = await getSelectionActionButton(page, name)
+    await button.click()
+  }
+
+  const assertPurchaseReceiptToolbarShell = async (page, scenarioName) => {
+    assert.equal(
+      await page.getByRole('button', { name: '批量删除' }).count(),
+      0,
+      `${scenarioName} 入库列表没有批量删除主路径时不应展示占位按钮`
+    )
+    assert.equal(
+      await page.getByRole('button', { name: '回收站' }).count(),
+      0,
+      `${scenarioName} 入库列表没有回收站主路径时不应展示占位按钮`
+    )
+    assert.equal(
+      await page.getByRole('button', { name: '新建入库单' }).count(),
+      0,
+      `${scenarioName} 入库草稿应从采购订单生成，入库列表不应展示页面级新建按钮`
+    )
+    const tools = page.getByRole('button', { name: '表格工具', exact: true })
+    await tools.click()
+    const exportButton = page
+      .getByRole('menuitem', { name: /导出筛选结果/u })
+      .first()
+    const columnOrderButton = page
+      .getByRole('menuitem', { name: /列设置/u })
+      .first()
+    assert.equal(
+      await exportButton.isDisabled(),
+      false,
+      `${scenarioName} 入库本页有数据时应允许真实导出`
+    )
+    assert.equal(
+      await columnOrderButton.isDisabled(),
+      false,
+      `${scenarioName} 入库数据列应允许安全调整列顺序`
+    )
+    await tools.press('Escape')
+  }
+
+  const assertPurchaseReceiptDateRange = async (page, scenarioName) => {
+    const overview = page.getByRole('dialog', { name: '筛选条件' })
+    if (!(await overview.isVisible())) await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
+    const trigger = overview.getByRole('button', { name: /^入库日期：/u })
+    const entry = await trigger.boundingBox()
+    assert(entry?.width > 0 && entry.height >= 34, `${scenarioName} 入库日期有可见边界`)
+    const dates = await openDateFilter(page, overview)
+    await waitForFiniteAnimations(page)
+    const { from, to } = await manualDateInputs(dates)
+    const inputs = await Promise.all([from, to].map((input) => input.evaluate((node) => ({
+      width: node.getBoundingClientRect().width, border: getComputedStyle(node).borderColor,
+    }))))
+    assert(inputs.every(({ width, border }) => width >= 120 && border !== 'rgba(0, 0, 0, 0)'), `${scenarioName} 起止输入应有独立边界`)
+    assert.equal(await dates.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true)
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0)
+    await dateFilterButton(dates, '取消').click()
+    await overview.getByRole('button', { name: '收起', exact: true }).click()
+  }
+
+  const assertPurchaseReceiptDetailsReadable = async (
+    page,
+    { receiptNo, scenarioName }
+  ) => {
+    const row = page
+      .getByRole('row')
+      .filter({ has: page.getByText(receiptNo, { exact: true }) })
+      .first()
+    await row.scrollIntoViewIfNeeded()
+    await openBusinessRecordDetails(page, receiptNo)
+    const details = page.getByRole('dialog', { name: /^采购收货单详情/u })
+    await details.locator('.erp-business-row-item-card').first().waitFor()
+    const metrics = await page.evaluate(() => {
+      const list = document.querySelector('.erp-business-details-modal')
+      const cards = list
+        ? Array.from(list.querySelectorAll('.erp-business-row-item-card'))
+        : []
+      const fields = list
+        ? Array.from(
+            list.querySelectorAll('.erp-business-row-item-card__field')
+          ).map((node) => {
+            const valueNode = node.querySelector('dd')
+            const valueStyle = valueNode
+              ? window.getComputedStyle(valueNode)
+              : null
+            return {
+              label:
+                node
+                  .querySelector('dt')
+                  ?.textContent?.replace(/\s+/g, ' ')
+                  .trim() || '',
+              value: valueNode?.textContent?.replace(/\s+/g, ' ').trim() || '',
+              valueScrollWidth: valueNode?.scrollWidth || 0,
+              valueClientWidth: valueNode?.clientWidth || 0,
+              whiteSpace: valueStyle?.whiteSpace || '',
+              overflowWrap: valueStyle?.overflowWrap || '',
+            }
+          })
+        : []
+      return {
+        hasList: Boolean(list),
+        nestedTableCount: list ? list.querySelectorAll('.ant-table').length : 0,
+        cardCount: cards.length,
+        fields,
+        listOverflow: list ? list.scrollWidth - list.clientWidth : 0,
+        cardOverflows: cards
+          .map((card) => card.scrollWidth - card.clientWidth)
+          .filter((overflow) => overflow > 1),
+        documentOverflow:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      }
+    })
+    const expectedHeaders = [
+      '材料',
+      '仓库',
+      '批次',
+      '批次号',
+      '本次实点数量',
+      '送货标示数量',
+      '实点与标示差异',
+      '单位',
+      '单价',
+      '金额',
+      '入库结果',
+      '采购订单行',
+      '来源行号',
+      '备注',
+    ]
+    assert(metrics.hasList, `${scenarioName} 完整详情应显示入库明细`)
+    assert.equal(
+      metrics.nestedTableCount,
+      0,
+      `${scenarioName} 明细区不应继续嵌套一张横向表格: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.cardCount > 0,
+      `${scenarioName} 完整详情应显示至少一条入库明细卡片: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.fields.map((field) => field.label),
+      expectedHeaders,
+      `${scenarioName} 入库明细字段不完整: ${JSON.stringify(metrics)}`
+    )
+    const noteField = metrics.fields.find((field) => field.label === '备注')
+    const materialField = metrics.fields.find((field) => field.label === '材料')
+    assert(
+      noteField?.value.includes('样式入库明细'),
+      `${scenarioName} 备注内容应直接可见，不应依赖横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      materialField?.value.includes('MAT-STYLE-L1'),
+      `${scenarioName} 材料业务编号应直接可见: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.fields.every(
+        (field) =>
+          field.whiteSpace === 'pre-wrap' &&
+          ['anywhere', 'break-word'].includes(field.overflowWrap) &&
+          field.valueScrollWidth <= field.valueClientWidth + 1
+      ),
+      `${scenarioName} 入库明细长文本应在字段内换行且不裁切: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.listOverflow <= 1 && metrics.cardOverflows.length === 0,
+      `${scenarioName} 完整明细卡片不应产生内部水平溢出: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.documentOverflow,
+      0,
+      `${scenarioName} 完整明细不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
+    )
+    await details.getByRole('button', { name: /关\s*闭/u }).click()
+    await details.waitFor({ state: 'hidden' })
+  }
+
+  return [
+    ...[
+      ['return', '生成采购退货', '从入库单生成采购退货'],
+      ['adjustment', '登记入库调整', '登记采购入库调整'],
+    ].map(([mode, triggerName, title]) => ({
+      name: `purchase-receipt-${mode}-rapid-add`,
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const addButtonName = mode === 'return' ? '添加退货明细' : '添加调整明细'
+        await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+        await clickSelectionAction(page, triggerName)
+        const modal = page.locator(`.erp-business-form-page[aria-label=${JSON.stringify(title)}]:not([hidden])`)
+        await modal.waitFor({ state: 'visible' })
+        await assertBusinessFormPage(page, modal)
+        await assertAlertSiblingSpacing(modal.locator('.erp-business-form-page__body > .ant-spin-nested-loading > .ant-spin-container'), `${mode} 表单`)
+        await assertCompactLineNoteDisclosure(page, modal)
+        const firstNote = modal.locator('.erp-purchase-receipt-exception-row').first().getByLabel('明细备注', { exact: true })
+        const firstNoteNode = await firstNote.elementHandle()
+        for (const viewport of [
+          { width: 1440, height: 900 },
+          { width: 390, height: 844 },
+        ]) {
+          await page.setViewportSize(viewport)
+          await waitForFiniteAnimations(page)
+          await assertAlertSiblingSpacing(modal.locator('.erp-business-form-page__body > .ant-spin-nested-loading > .ant-spin-container'), `${mode}-${viewport.width} 表单`)
+          await page.waitForFunction(({ node, compact }) => node.dataset.lineEditorCompact === String(compact), {
+            node: await modal.locator('.erp-line-editor').elementHandle(), compact: viewport.width === 390,
+          })
+          assert.equal(await firstNote.evaluate((node, previous) => node === previous, firstNoteNode), true, '切换宽窄布局不重建原明细备注')
+          await assertBusinessSectionInteractions(page, modal)
+          await assertBusinessNoteTextAreas(modal)
+          for (let count = 0; count < 3; count += 1) {
+            const rows = modal.locator('.erp-purchase-receipt-exception-row')
+            const before = await rows.count()
+            assert.equal(
+              await modal
+                .getByRole('button', { name: addButtonName, exact: true })
+                .count(),
+              1,
+              `${mode}-${viewport.width}-${count}: ${await modal.innerText()}`
+            )
+            await modal
+              .getByRole('button', { name: addButtonName, exact: true })
+              .click()
+            const added = rows.nth(before).locator('input:focus')
+            await added.waitFor({ state: 'visible' })
+            assert.equal(await rows.count(), before + 1)
+            assert.equal(await added.getAttribute('role'), 'combobox')
+            const rect = await added.boundingBox()
+            assert(
+              rect.y >= 0 && rect.y + rect.height <= viewport.height,
+              '追加后来源明细输入应可见并获得焦点'
+            )
+          }
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await page.waitForFunction((node) => node.dataset.lineEditorCompact === 'false', await modal.locator('.erp-line-editor').elementHandle())
+        await waitForFiniteAnimations(page)
+        assert.equal(await firstNote.evaluate((node, previous) => node === previous, firstNoteNode), true)
+        const noteRows = modal.locator('.erp-purchase-receipt-exception-row')
+        for (const [index, note] of ['待移除说明', '保留的明细说明'].entries()) {
+          await revealLineItemDetails(noteRows.nth(index))
+          await waitForFiniteAnimations(page)
+          await noteRows.nth(index).getByLabel('明细备注', { exact: true }).fill(note)
+        }
+        const survivingNote = await noteRows.nth(1).getByLabel('明细备注', { exact: true }).elementHandle()
+        await clickLineItemAction(noteRows.first(), '移除明细 1')
+        assert.ok(await noteRows.first().getByLabel('明细备注', { exact: true }).isVisible(), '移除前行后备注仍直接可填')
+        assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).evaluate((node, previous) => node === previous, survivingNote), true, '移除前行不重建保留的备注字段')
+        assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '保留的明细说明')
+        await noteRows.first().getByLabel('明细备注', { exact: true }).fill('')
+        assert.equal(await noteRows.first().getByLabel('明细备注', { exact: true }).inputValue(), '')
+        await firstNoteNode.dispose()
+        await survivingNote.dispose()
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await waitForFiniteAnimations(page)
+        await page.screenshot({ path: `${deps.outputDir}/purchase-receipt-${mode}-form-page-4k.png`, fullPage: true })
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await closeBusinessFormPage(page, modal)
+        await modal.waitFor({ state: 'hidden' })
+        await waitForFiniteAnimations(page)
+        await clickSelectionAction(page, triggerName)
+        await modal.waitFor({ state: 'visible' })
+        assert.equal(
+          await modal
+            .locator('.erp-purchase-receipt-exception-row')
+            .count(),
+          1
+        )
+        await closeBusinessFormPage(page, modal)
+      },
+    })),
+    {
+      name: 'purchase-receipts-table-control-columns-desktop',
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '入库办理')
+        await page.getByRole('tab', { name: '采购收货单', exact: true, selected: true }).waitFor()
+        await expectText(page, 'PR-STYLE-L1')
+        await assertPurchaseReceiptToolbarShell(
+          page,
+          'purchase-receipts-table-control-columns-desktop'
+        )
+        await assertPurchaseReceiptDateRange(
+          page,
+          'purchase-receipts-table-control-columns-desktop'
+        )
+        await assertBusinessMainTableInitialSelectionEmpty(page, {
+          scenarioName: 'purchase-receipts-table-control-columns-desktop',
+        })
+        const metrics = await page.evaluate(() => {
+          const headers = Array.from(
+            document.querySelectorAll(
+              '.erp-business-module-table-card .ant-table-thead th'
+            )
+          )
+            .slice(0, 3)
+            .map((header) => {
+              const style = window.getComputedStyle(header)
+              const rect = header.getBoundingClientRect()
+              return {
+                text: header.textContent?.replace(/\s+/g, ' ').trim() || '',
+                width: rect.width,
+                scrollWidth: header.scrollWidth,
+                clientWidth: header.clientWidth,
+                paddingLeft: style.paddingLeft,
+                paddingRight: style.paddingRight,
+                textAlign: style.textAlign,
+              }
+            })
+          const scrollContainer = document.querySelector(
+            '.erp-business-module-table-card .ant-table-content, .erp-business-module-table-card .ant-table-body'
+          )
+          const selectionInputTypes = Array.from(
+            document.querySelectorAll(
+              '.erp-business-module-table-card .ant-table-selection-column input'
+            )
+          ).map((input) => input.getAttribute('type') || '')
+          const dataHeaderTexts = Array.from(
+            document.querySelectorAll(
+              '.erp-business-module-table-card .ant-table-thead th .erp-module-column-header-text'
+            )
+          ).map((node) => ({
+            text: String(node.textContent || '').trim(),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+          }))
+          return {
+            headers,
+            clippedDataHeaderTexts: dataHeaderTexts.filter((node) =>
+              [
+                '入库单号',
+                '状态',
+                '供应商',
+                '收货日期',
+                '过账时间',
+                '明细行数',
+                '收货数量',
+              ].includes(node.text)
+                ? node.scrollWidth > node.clientWidth + 1
+                : false
+            ),
+            tableOverflowX: scrollContainer
+              ? window.getComputedStyle(scrollContainer).overflowX
+              : '',
+            selectionInputTypes,
+            documentOverflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+
+        assert.deepEqual(
+          metrics.headers.map((header) => header.text),
+          ['', '入库单号', '状态'],
+          `入库表格前置选择列不应显示“选择”二字: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.headers[0].width <= 56 + 1 &&
+            metrics.headers[0].scrollWidth <= metrics.headers[0].clientWidth &&
+            metrics.headers[0].textAlign === 'center',
+          `入库表格选择列应保持窄列、居中且不裁字: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.selectionInputTypes.length > 0 &&
+            metrics.selectionInputTypes.every((type) => type === 'radio'),
+          `入库当前操作只支持单张单据，选择控件应为 radio: ${JSON.stringify(metrics)}`
+        )
+        assert.deepEqual(
+          metrics.clippedDataHeaderTexts,
+          [],
+          `入库表格短数据表头不应被列设置和排序控件挤成省略号: ${JSON.stringify(metrics)}`
+        )
+        assert.equal(
+          metrics.tableOverflowX,
+          'auto',
+          `入库表格横向滚动应保留在表格容器内: ${JSON.stringify(metrics)}`
+        )
+        assert.equal(
+          metrics.documentOverflow,
+          0,
+          `入库表格不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
+        )
+        await assertPurchaseReceiptDetailsReadable(page, {
+          receiptNo: 'PR-STYLE-L1',
+          scenarioName: 'purchase-receipts-details-readable-desktop',
+        })
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+        await assertPageAttachmentModalEntrypoint(page, {
+          scenarioName: 'purchase-receipts-attachment-modal-desktop',
+          modalTitle: '入库附件',
+          panelTitle: '入库附件',
+        })
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'inbound',
+          heading: '入库办理',
+        })
+      },
+    },
+    {
+      name: 'purchase-receipt-source-generated-boundary-desktop',
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '采购入库')
+        await expectText(page, 'PR-STYLE-L1-DRAFT')
+        await assertTextAbsent(page, '入库单：正式入库记录')
+        await assertTextAbsent(page, '过账后更新库存记录')
+        await assertTextAbsent(page, '维护明细')
+        await assertTextAbsent(page, '添加明细')
+        await assertTextAbsent(page, '添加入库明细')
+
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
+        await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
+        await clickSelectionAction(page, /相关单据/u)
+        const purchaseOrderMenuItem = page.getByRole('menuitem', {
+          name: '采购订单',
+          exact: true,
+        })
+        await purchaseOrderMenuItem.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await page.keyboard.press('Escape')
+        await purchaseOrderMenuItem.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        const moreActions = page.getByRole('button', { name: /^更多操作，共/u })
+        assert.equal(await moreActions.getAttribute('aria-expanded'), 'false')
+        assert.equal(
+          await moreActions.evaluate((element) => element === document.activeElement),
+          true,
+          '关闭嵌套单据菜单后应恢复到更多操作入口'
+        )
+        const actionBarText = await page
+          .locator('.erp-business-module-current-action')
+          .innerText()
+        const discardDraftButton = await getSelectionActionButton(
+          page,
+          /作废草稿/u
+        )
+        assert.equal(
+          await discardDraftButton.isDisabled(),
+          false,
+          `采购入库草稿作废入口不应被禁用: ${actionBarText}`
+        )
+        await discardDraftButton.dispatchEvent('click')
+        const visiblePopover = page
+          .locator('.ant-popover:visible')
+          .filter({ hasText: '确认作废采购入库草稿' })
+          .last()
+        await visiblePopover.waitFor({ state: 'visible', timeout: 10_000 })
+        const confirmDiscardButton = visiblePopover
+          .locator('button')
+          .filter({ hasText: /确\s*认/u })
+          .last()
+        await confirmDiscardButton.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        assert.equal(await confirmDiscardButton.isDisabled(), false)
+        await confirmDiscardButton.click()
+        await expectText(page, '采购入库草稿已作废，未更新库存')
+        await assertTextAbsent(page, '添加明细')
+        await assertNoHorizontalOverflow(
+          page,
+          'purchase-receipt-source-generated-boundary-desktop'
+        )
+      },
+    },
+    {
+      name: 'purchase-receipt-exception-records-desktop',
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await page.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+        assert.equal(await page.getByRole('button', { name: '退货与调整记录', exact: true }).count(), 0, '退货与调整记录不再占用独立按钮或更多操作入口')
+        await clickSelectionAction(page, /相关单据/u)
+        await page.getByRole('menuitem', { name: '退货与调整记录', exact: true }).click()
+
+        const modal = page
+          .getByRole('dialog', {
+            name: /退货与调整记录 · PR-STYLE-L1/u,
+          })
+          .last()
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '确认草稿后库存会同步更新')
+        await expectText(page, 'PRT-STYLE-L1')
+        await assertBusinessModalViewport(page, modal, {
+          label: 'purchase-return-adjustment-records',
+          minWidthRatio: 0.9,
+          maxWidth: 1800,
+        })
+        await page.setViewportSize({ width: 720, height: 568 })
+        await assertBusinessModalViewport(page, modal, {
+          label: 'purchase-return-adjustment-records-narrow',
+          minWidthRatio: 0.9,
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
+
+        const returnPostButton = modal.getByRole('button', { name: '确认采购退货', exact: true })
+        assert.equal(
+          await returnPostButton.count(),
+          1,
+          `草稿采购退货应展示独立过账权限动作: ${await modal.innerText()}`
+        )
+        await returnPostButton.click()
+        await page
+          .locator('.ant-popover:visible')
+          .getByRole('button', { name: '确认采购退货', exact: true })
+          .click()
+        await expectText(page, '采购退货已确认')
+        await modal.getByRole('tab', { name: /入库调整/u }).click()
+        await expectText(page, 'PRA-STYLE-L1')
+        await modal.getByText('草稿可直接作废且不更新库存；确认草稿后库存会同步更新；撤销已确认记录只撤销该笔记录对库存的影响，原记录仍保留。').waitFor()
+        await modal.getByRole('button', { name: '撤销入库调整', exact: true }).click()
+        await page
+          .locator('.ant-popover:visible')
+          .last()
+          .getByRole('button', { name: '撤销入库调整', exact: true })
+          .click()
+        await expectText(page, '入库调整已撤销，本次库存影响已恢复')
+
+        const metrics = await modal.evaluate((node) => {
+          const box = node.getBoundingClientRect()
+          return {
+            width: box.width,
+            right: box.right,
+            viewportWidth: window.innerWidth,
+            modalOverflow: node.scrollWidth - node.clientWidth,
+            documentOverflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+            text: String(node.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim(),
+          }
+        })
+        assert(
+          metrics.width > 900 &&
+            metrics.right <= metrics.viewportWidth + 1 &&
+            metrics.modalOverflow <= 1 &&
+            metrics.documentOverflow === 0,
+          `退货与调整记录弹窗应在桌面视口内完整显示: ${JSON.stringify(metrics)}`
+        )
+        for (const forbiddenText of [
+          'purchase_receipt_id',
+          'idempotency_key',
+          'correction_group',
+        ]) {
+          assert.equal(
+            metrics.text.includes(forbiddenText),
+            false,
+            `退货与调整记录不应显示技术字段 ${forbiddenText}`
+          )
+        }
+      },
+    },
+    ...[
+      { key: 'return', permission: PermissionCode.PURCHASE_RETURN_READ, tab: /采购退货/u },
+      { key: 'adjustment', permission: PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_READ, tab: /入库调整/u },
+      { key: 'no-records' },
+    ].map(({ key, permission, tab }) => {
+      const permissions = [PermissionCode.PURCHASE_RECEIPT_READ, permission].filter(Boolean)
+      return {
+        name: `purchase-receipt-related-${key}-readonly`,
+        path: '/erp/warehouse/inbound?warehouse_view=purchase',
+        auth: 'admin',
+        adminProfile: { username: 'style-l1-receipt-reader', is_super_admin: false, permissions },
+        effectiveSession: { ...customerRuntimeEffectiveSession, pages: ['inbound'], actions: permissions },
+        viewport: { width: 1440, height: 900 },
+        verify: async (page) => {
+          await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+          const related = page.getByRole('button', { name: /相关单据/u })
+          if (!permission) {
+            assert.equal(await related.count(), 0, '没有可读关联时隐藏空入口')
+            return
+          }
+          await clickSelectionAction(page, /相关单据/u)
+          const records = page.getByRole('menuitem', { name: '退货与调整记录', exact: true })
+          assert.equal(await records.count(), 1, '仅有记录读取权限时保留唯一关联入口')
+          for (const label of ['采购订单', '来料质检', '库存台账']) {
+            assert.equal(await page.getByRole('menuitem', { name: label, exact: true }).count(), 0, `未开放关联页面：${label}`)
+          }
+          await records.click()
+          const modal = page.getByRole('dialog', { name: /退货与调整记录/u })
+          await modal.waitFor({ state: 'visible' })
+          assert.equal(await modal.getByRole('tab').count(), 1, '只展示授权的记录类别')
+          assert.equal(await modal.getByRole('tab', { name: tab }).count(), 1)
+          assert.equal(await modal.getByRole('button', { name: /^(?:确认|撤销)(?:采购退货|入库调整)$|^作废(?:采购退货|入库调整)草稿$/u }).count(), 0, '记录读取权限不开放办理动作')
+          await modal.getByRole('button', { name: '关闭', exact: true }).click()
+          await modal.waitFor({ state: 'hidden' })
+          await clickSelectionAction(page, /相关单据/u)
+          assert.equal(await records.isVisible(), true, '关闭后可以从原关联入口再次打开')
+        },
+      }
+    }),
+    {
+      name: 'purchase-receipt-source-generated-boundary-dark-desktop',
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '采购入库')
+        await assertERPThemeMode(page, {
+          scenarioName:
+            'purchase-receipt-source-generated-boundary-dark-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertTextAbsent(page, '入库单：正式入库记录')
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
+        await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
+        await assertTextAbsent(page, '添加明细')
+        await assertTextAbsent(page, '添加入库明细')
+        await assertNoHorizontalOverflow(
+          page,
+          'purchase-receipt-source-generated-boundary-dark-desktop'
+        )
+      },
+    },
+    {
+      name: 'purchase-receipt-source-generated-boundary-mobile',
+      path: '/erp/warehouse/inbound',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '采购入库')
+        await assertTextAbsent(page, '入库单：正式入库记录')
+        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
+        await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
+        await assertTextAbsent(page, '添加明细')
+        await assertTextAbsent(page, '添加入库明细')
+        await assertNoHorizontalOverflow(
+          page,
+          'purchase-receipt-source-generated-boundary-mobile'
+        )
+      },
+    },
+  ]
+}
