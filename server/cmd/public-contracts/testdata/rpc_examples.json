@@ -16998,3 +16998,6570 @@
       "status": "POSTED"
     },
     "test": "TestOperationalFactFinancePaymentCreateAndListContract"
+  },
+  "operational_fact.list_finance_facts": {
+    "basis": "handler-fixture",
+    "data": {
+      "finance_facts": [],
+      "limit": 20,
+      "offset": 0,
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "limit": 20
+    },
+    "test": "TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule"
+  },
+  "operational_fact.list_finance_payment_allocation_candidates": {
+    "basis": "handler-fixture",
+    "data": {
+      "facts": []
+    },
+    "message": "OK",
+    "params": {
+      "id": 31
+    },
+    "test": "TestFinanceAdvanceAllocationRPCExactPermissions"
+  },
+  "operational_fact.list_finance_payments": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "limit": 1,
+      "offset": 20,
+      "payments": [],
+      "status_counts": {
+        "DRAFT": 42,
+        "POSTED": 3
+      },
+      "total": 0,
+      "totals": []
+    },
+    "message": "OK",
+    "params": {
+      "include_status_counts": true,
+      "include_totals": true,
+      "limit": 1,
+      "offset": 20,
+      "sort_by": "amount",
+      "sort_direction": "desc",
+      "status": "DRAFT"
+    }
+  },
+  "operational_fact.list_finance_source_adjustments": {
+    "basis": "handler-fixture",
+    "data": {
+      "adjustments": [
+        {
+          "amount": "10",
+          "balance_direction": "DECREASE",
+          "counterparty_id": 2,
+          "counterparty_name": "模拟供应商",
+          "currency": "CNY",
+          "finance_fact_id": 9,
+          "finance_fact_no": "AP-SIM-9",
+          "occurred_at": "2026-09-01T00:00:00Z",
+          "outstanding_amount": "50",
+          "source_id": 4,
+          "source_no": "RET-SIM-4",
+          "source_type": "PURCHASE_RETURN"
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "limit": 20,
+      "offset": 0
+    },
+    "test": "TestFinanceSourceAdjustmentPermissionsAndContract"
+  },
+  "operational_fact.list_outsourcing_facts": {
+    "basis": "handler-fixture",
+    "data": {
+      "full_warehouse_scope": true,
+      "limit": 20,
+      "offset": 0,
+      "outsourcing_facts": [],
+      "total": 2
+    },
+    "message": "OK",
+    "params": {
+      "limit": 20
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule"
+  },
+  "operational_fact.list_outsourcing_return_dispositions": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "outsourcing_return_dispositions": [],
+      "total": 1
+    },
+    "params": {}
+  },
+  "operational_fact.list_production_exceptions": {
+    "basis": "handler-fixture",
+    "data": {
+      "production_exceptions": [],
+      "status_counts": {},
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "handling_status": "APPROVED",
+      "include_status_counts": true,
+      "keyword": "PE-DEMO",
+      "limit": 20
+    },
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "case": "operational_fact.list_production_exceptions",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
+    }
+  },
+  "operational_fact.list_production_facts": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "production_facts": [],
+      "status_counts": {},
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "include_status_counts": true,
+      "limit": 20
+    },
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "case": "operational_fact.list_production_facts",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
+    }
+  },
+  "operational_fact.list_production_order_material_requirements": {
+    "basis": "handler-fixture",
+    "data": {
+      "material_requirements": [
+        {
+          "approved_over_issue_quantity": "0",
+          "bom_header_id": 204,
+          "bom_item_id": 205,
+          "created_at": 1792394184,
+          "effective_limit_quantity": "0",
+          "id": 203,
+          "issued_quantity": "6",
+          "loss_rate_snapshot": "0.1",
+          "material_code_snapshot": "MAT-201",
+          "material_id": 201,
+          "material_name_snapshot": "短毛绒",
+          "planned_quantity": "22",
+          "production_order_id": 21,
+          "production_order_item_id": 22,
+          "remaining_quantity": "16",
+          "unit_code_snapshot": "M",
+          "unit_id": 202,
+          "unit_name_snapshot": "米",
+          "unit_quantity_snapshot": "2",
+          "updated_at": 1792394184
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "production_order_id": 21
+    },
+    "test": "TestJsonrpcDispatcher_ProductionMaterialIssueUsesExactPermissionAndStrictSourceContract"
+  },
+  "operational_fact.list_shipment_source_candidates": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "shipment_source_candidates": [
+        {
+          "color_snapshot": "棕",
+          "currency": "USD",
+          "customer_id": 2,
+          "customer_name": "当前客户",
+          "customer_snapshot": {
+            "name": "订单客户"
+          },
+          "delivery_snapshot": {
+            "address": "上海仓",
+            "recipient": "王女士"
+          },
+          "disabled_reason": "",
+          "line_no": 1,
+          "line_status": "open",
+          "order_no": "SO-001",
+          "order_status": "active",
+          "order_version": 3,
+          "ordered_quantity": "10",
+          "product_code": "P-CURRENT",
+          "product_code_snapshot": "P-001",
+          "product_id": 3,
+          "product_name": "当前毛绒熊",
+          "product_name_snapshot": "毛绒熊",
+          "product_sku_id": 5,
+          "remaining_quantity": "8",
+          "sales_order_id": 1,
+          "sales_order_item_id": 4,
+          "selectable": true,
+          "shipped_quantity": "2",
+          "sku_code": "SKU-001",
+          "sku_name": "棕色款",
+          "unit_code": "PCS",
+          "unit_id": 6,
+          "unit_name": "只"
+        }
+      ],
+      "source_orders": [
+        {
+          "customer_code": "CUS-002",
+          "customer_id": 2,
+          "customer_name": "当前客户",
+          "customer_name_snapshot": "订单客户",
+          "order_no": "SO-001",
+          "sales_order_id": 1
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "customer_id": 2,
+      "selectable": true
+    },
+    "test": "TestJSONRPCListShipmentSourceCandidatesAllowsUpdateWithoutCreate"
+  },
+  "operational_fact.list_shipments": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "shipments": [],
+      "total": 3
+    },
+    "message": "OK",
+    "params": {
+      "limit": 20,
+      "sort_by": "total_net_weight_g",
+      "sort_direction": "desc"
+    },
+    "test": "TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions"
+  },
+  "operational_fact.list_stock_reservations": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "status_counts": {},
+      "stock_reservations": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "include_status_counts": true,
+      "limit": 20
+    },
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "case": "operational_fact.list_stock_reservations",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
+    }
+  },
+  "operational_fact.post_finance_fact": {
+    "basis": "handler-fixture",
+    "data": {
+      "finance_fact": {
+        "amount": "128.5",
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "cancelled_by_name": null,
+        "collection_type": null,
+        "counterparty_id": null,
+        "counterparty_type": "CUSTOMER",
+        "created_at": 1792394184,
+        "currency": "CNY",
+        "due_at": null,
+        "fact_no": "FIN-MODULE-GATE",
+        "fact_type": "RECEIVABLE",
+        "fee_amount": "0",
+        "id": 300,
+        "idempotency_key": "",
+        "invoice_category": null,
+        "note": null,
+        "occurred_at": 1792394184,
+        "outstanding_amount": "0",
+        "payment_term": null,
+        "payment_term_days": null,
+        "posted_at": 1792394184,
+        "posted_by": 7,
+        "posted_by_name": null,
+        "settled_at": null,
+        "settled_by": null,
+        "settled_by_name": null,
+        "source_id": null,
+        "source_line_id": null,
+        "source_no": null,
+        "source_type": null,
+        "status": "POSTED",
+        "updated_at": 1792394184,
+        "version": 2
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 300
+    },
+    "test": "TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule"
+  },
+  "operational_fact.post_outsourcing_fact": {
+    "basis": "handler-fixture",
+    "data": {
+      "outsourcing_fact": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "cancelled_by_name": null,
+        "created_at": 1792394184,
+        "fact_no": "OUT-MODULE-GATE",
+        "fact_type": "MATERIAL_ISSUE",
+        "id": 600,
+        "idempotency_key": "",
+        "lot_id": null,
+        "note": null,
+        "occurred_at": 1792394184,
+        "posted_at": 1792394184,
+        "posted_by": 7,
+        "posted_by_name": null,
+        "product_sku_id": null,
+        "quantity": "6",
+        "sku_code_snapshot": null,
+        "source_id": null,
+        "source_line_id": null,
+        "source_no": null,
+        "source_type": null,
+        "status": "POSTED",
+        "subject_code": "",
+        "subject_id": 1,
+        "subject_name": "",
+        "subject_type": "MATERIAL",
+        "supplier_id": null,
+        "supplier_name": null,
+        "unit_id": 1,
+        "updated_at": 1792394184,
+        "version": 2,
+        "warehouse_id": 1
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 600
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule"
+  },
+  "operational_fact.post_outsourcing_return_disposition": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "outsourcing_return_disposition": {
+        "cancel_reason": "DEMO",
+        "cancelled_at": 1,
+        "cancelled_by": 1,
+        "created_by": 1,
+        "disposition_no": "DEMO",
+        "disposition_type": "DEMO",
+        "id": 1,
+        "outsourcing_return_fact_id": 1,
+        "posted_at": 1,
+        "posted_by": 1,
+        "production_wip_batch_id": 1,
+        "quality_inspection_id": 1,
+        "quantity": "DEMO",
+        "reason": "DEMO",
+        "result_wip_batch_id": 1,
+        "status": "DEMO",
+        "version": 1
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2
+    }
+  },
+  "operational_fact.post_production_fact": {
+    "basis": "handler-fixture",
+    "data": {
+      "production_fact": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "cancelled_by_name": null,
+        "created_at": 1792394184,
+        "fact_no": "PROD-MODULE-GATE",
+        "fact_type": "FINISHED_GOODS_RECEIPT",
+        "id": 500,
+        "idempotency_key": "",
+        "lot_id": null,
+        "lot_no": "",
+        "note": null,
+        "occurred_at": 1792394184,
+        "posted_at": 1792394184,
+        "posted_by": 7,
+        "posted_by_name": null,
+        "product_sku_id": null,
+        "production_order_id": null,
+        "production_order_item_id": null,
+        "production_wip_batch_id": null,
+        "quantity": "12",
+        "sku_code_snapshot": "",
+        "source_id": null,
+        "source_line_id": null,
+        "source_no": null,
+        "source_type": null,
+        "status": "POSTED",
+        "subject_code": "",
+        "subject_id": 1,
+        "subject_name": "",
+        "subject_type": "PRODUCT",
+        "unit_id": 1,
+        "unit_name": "",
+        "updated_at": 1792394184,
+        "version": 2,
+        "warehouse_code": "",
+        "warehouse_id": 1,
+        "warehouse_name": ""
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 500
+    },
+    "test": "TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule"
+  },
+  "operational_fact.release_stock_reservation": {
+    "basis": "handler-fixture",
+    "data": {
+      "stock_reservation": {
+        "consumed_at": null,
+        "created_at": 1792394184,
+        "id": 400,
+        "idempotency_key": "",
+        "lot_id": null,
+        "note": null,
+        "product_id": 0,
+        "product_sku_id": null,
+        "quantity": "8",
+        "released_at": 1792394184,
+        "reservation_no": "",
+        "reserved_at": 1792394184,
+        "sales_order_id": null,
+        "sales_order_item_id": null,
+        "status": "RELEASED",
+        "unit_id": 0,
+        "updated_at": 1792394184,
+        "warehouse_id": 0
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 400
+    },
+    "test": "TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule"
+  },
+  "operational_fact.reverse_finance_allocation": {
+    "basis": "handler-fixture",
+    "data": {
+      "payment": {
+        "account_ref": "",
+        "allocated_amount": "0",
+        "allocations": [],
+        "amount": "0",
+        "approved_at": null,
+        "approved_by": null,
+        "available_amount": "0",
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "counterparty_id": 0,
+        "counterparty_type": "CUSTOMER",
+        "created_at": -62135596800,
+        "created_by": 0,
+        "currency": "",
+        "direction": "",
+        "evidence_ref": "",
+        "id": 31,
+        "kind": "ADVANCE",
+        "occurred_at": -62135596800,
+        "payment_no": "",
+        "posted_at": null,
+        "posted_by": null,
+        "purpose_note": null,
+        "refund_of_payment_id": null,
+        "refund_of_payment_no": "",
+        "refunded_amount": "0",
+        "reject_reason": null,
+        "rejected_at": null,
+        "rejected_by": null,
+        "reverse_reason": null,
+        "reversed_at": null,
+        "reversed_by": null,
+        "source_id": null,
+        "source_no": "",
+        "source_type": null,
+        "status": "POSTED",
+        "updated_at": -62135596800,
+        "version": 1
+      }
+    },
+    "message": "OK",
+    "params": {
+      "allocation_id": 9,
+      "expected_version": 1,
+      "id": 31,
+      "reason": "分配纠错"
+    },
+    "test": "TestFinanceAdvanceAllocationRPCExactPermissions"
+  },
+  "operational_fact.reverse_finance_credit_note": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "credit_note": {
+        "amount": "0",
+        "balance_direction": "DECREASE",
+        "credit_note_no": "",
+        "currency": "",
+        "finance_fact_id": 0,
+        "finance_fact_no": "",
+        "finance_fact_original_amount": "0",
+        "finance_fact_outstanding_amount": "0",
+        "finance_fact_type": "",
+        "id": 1,
+        "reason": "",
+        "reversal_of_credit_note_id": 1,
+        "source_id": null,
+        "source_type": null,
+        "status": ""
+      }
+    },
+    "params": {
+      "idempotency_key": "demo-operational_fact-reverse_finance_credit_note-001",
+      "reason": "接口调用示例"
+    }
+  },
+  "operational_fact.reverse_finance_payment": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "payment": {
+        "account_ref": "",
+        "allocated_amount": "0",
+        "allocations": [],
+        "amount": "0",
+        "approved_at": 1,
+        "approved_by": 1,
+        "available_amount": "0",
+        "cancel_reason": "原付款信息有误",
+        "cancelled_at": 1792394184,
+        "cancelled_by": 7,
+        "counterparty_id": 0,
+        "counterparty_type": "CUSTOMER",
+        "created_at": -62135596800,
+        "created_by": 0,
+        "currency": "",
+        "direction": "",
+        "evidence_ref": "",
+        "id": 31,
+        "kind": "ADVANCE",
+        "occurred_at": -62135596800,
+        "payment_no": "",
+        "posted_at": 1,
+        "posted_by": 1,
+        "purpose_note": "DEMO",
+        "refund_of_payment_id": 1,
+        "refund_of_payment_no": "",
+        "refunded_amount": "0",
+        "reject_reason": "DEMO",
+        "rejected_at": 1,
+        "rejected_by": 1,
+        "reverse_reason": "DEMO",
+        "reversed_at": 1,
+        "reversed_by": 1,
+        "source_id": 1,
+        "source_no": "",
+        "source_type": "DEMO",
+        "status": "POSTED",
+        "updated_at": -62135596800,
+        "version": 1
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "reason": "接口调用示例"
+    }
+  },
+  "operational_fact.reverse_production_exception": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "production_exception": {
+        "approved_quantity": "DEMO",
+        "decided_at": 1,
+        "decided_by": 1,
+        "decision_no": "DEMO",
+        "decision_reason": "DEMO",
+        "decision_type": "DEMO",
+        "executed_at": 1,
+        "executed_by": 1,
+        "execution_reason": "DEMO",
+        "execution_status": "DEMO",
+        "id": 1,
+        "production_material_requirement_id": 1,
+        "production_order_id": 1,
+        "production_order_item_id": 1,
+        "production_wip_batch_id": 1,
+        "quality_inspection_id": 1,
+        "reason": "DEMO",
+        "requested_at": 1,
+        "requested_by": 1,
+        "requested_quantity": "DEMO",
+        "reverse_reason": "DEMO",
+        "reversed_at": 1,
+        "reversed_by": 1,
+        "status": "DEMO",
+        "stock_disposition_required": false,
+        "target_operation_id": 1,
+        "target_supplier_id": 1,
+        "version": 1
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "reason": "接口调用示例"
+    }
+  },
+  "operational_fact.save_outsourcing_material_issue_draft": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "outsourcing_fact": {
+        "cancel_reason": "委外事实登记有误",
+        "cancelled_at": 1792394184,
+        "cancelled_by": 7,
+        "cancelled_by_name": "DEMO",
+        "created_at": 1792394184,
+        "fact_no": "OUT-MODULE-GATE",
+        "fact_type": "MATERIAL_ISSUE",
+        "id": 600,
+        "idempotency_key": "OUT-MODULE-GATE",
+        "lot_id": 1,
+        "note": "DEMO",
+        "occurred_at": 1792394184,
+        "posted_at": 1792394184,
+        "posted_by": 7,
+        "posted_by_name": "DEMO",
+        "product_sku_id": 1,
+        "quantity": "6",
+        "sku_code_snapshot": "DEMO",
+        "source_id": 10,
+        "source_line_id": 11,
+        "source_no": "DEMO",
+        "source_type": "OUTSOURCING_ORDER",
+        "status": "DRAFT",
+        "subject_code": "",
+        "subject_id": 1,
+        "subject_name": "",
+        "subject_type": "MATERIAL",
+        "supplier_id": 1,
+        "supplier_name": "DEMO",
+        "unit_id": 1,
+        "updated_at": 1792394184,
+        "version": 0,
+        "warehouse_id": 1
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "quantity": "6"
+    }
+  },
+  "operational_fact.save_outsourcing_return_receipt_draft": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "outsourcing_fact": {
+        "cancel_reason": "委外事实登记有误",
+        "cancelled_at": 1792394184,
+        "cancelled_by": 7,
+        "cancelled_by_name": "DEMO",
+        "created_at": 1792394184,
+        "fact_no": "OUT-MODULE-GATE",
+        "fact_type": "MATERIAL_ISSUE",
+        "id": 600,
+        "idempotency_key": "OUT-MODULE-GATE",
+        "lot_id": 1,
+        "note": "DEMO",
+        "occurred_at": 1792394184,
+        "posted_at": 1792394184,
+        "posted_by": 7,
+        "posted_by_name": "DEMO",
+        "product_sku_id": 1,
+        "quantity": "6",
+        "sku_code_snapshot": "DEMO",
+        "source_id": 10,
+        "source_line_id": 11,
+        "source_no": "DEMO",
+        "source_type": "OUTSOURCING_ORDER",
+        "status": "DRAFT",
+        "subject_code": "",
+        "subject_id": 1,
+        "subject_name": "",
+        "subject_type": "MATERIAL",
+        "supplier_id": 1,
+        "supplier_name": "DEMO",
+        "unit_id": 1,
+        "updated_at": 1792394184,
+        "version": 0,
+        "warehouse_id": 1
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "quantity": "6"
+    }
+  },
+  "operational_fact.save_production_completion_draft": {
+    "basis": "handler-fixture",
+    "data": {
+      "production_fact": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "cancelled_by_name": null,
+        "created_at": 1792394184,
+        "fact_no": "PROD-MODULE-GATE",
+        "fact_type": "FINISHED_GOODS_RECEIPT",
+        "id": 601,
+        "idempotency_key": "",
+        "lot_id": null,
+        "lot_no": "",
+        "note": null,
+        "occurred_at": 1786442400,
+        "posted_at": null,
+        "posted_by": null,
+        "posted_by_name": null,
+        "product_sku_id": null,
+        "production_order_id": null,
+        "production_order_item_id": null,
+        "production_wip_batch_id": null,
+        "quantity": "8",
+        "sku_code_snapshot": "",
+        "source_id": null,
+        "source_line_id": null,
+        "source_no": null,
+        "source_type": null,
+        "status": "DRAFT",
+        "subject_code": "",
+        "subject_id": 1,
+        "subject_name": "",
+        "subject_type": "PRODUCT",
+        "unit_id": 1,
+        "unit_name": "",
+        "updated_at": 1792394184,
+        "version": 2,
+        "warehouse_code": "",
+        "warehouse_id": 2,
+        "warehouse_name": ""
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 601,
+      "new_lot_no": "FG-20260811-001",
+      "note": "仓库实收核对",
+      "occurred_at": "2026-08-11T10:00:00Z",
+      "quantity": "8",
+      "warehouse_id": 2
+    },
+    "test": "TestJsonrpcDispatcher_ProductionCompletionSeparatesReportingFromWarehouseInbound"
+  },
+  "operational_fact.save_production_material_issue_draft": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "production_fact": {
+        "cancel_reason": "完工入库登记有误",
+        "cancelled_at": 1792394184,
+        "cancelled_by": 7,
+        "cancelled_by_name": "DEMO",
+        "created_at": 1792394184,
+        "fact_no": "PF-REWORK-RPC-001",
+        "fact_type": "REWORK",
+        "id": 701,
+        "idempotency_key": "pf-rework-rpc-001",
+        "lot_id": 1,
+        "lot_no": "",
+        "note": "成品抽检不合格",
+        "occurred_at": 1792394184,
+        "posted_at": 1792394184,
+        "posted_by": 7,
+        "posted_by_name": "DEMO",
+        "product_sku_id": 12,
+        "production_order_id": 1,
+        "production_order_item_id": 1,
+        "production_wip_batch_id": 23,
+        "quantity": "2",
+        "sku_code_snapshot": "",
+        "source_id": 600,
+        "source_line_id": 22,
+        "source_no": "DEMO",
+        "source_type": "PRODUCTION_FACT",
+        "status": "DRAFT",
+        "subject_code": "",
+        "subject_id": 11,
+        "subject_name": "",
+        "subject_type": "PRODUCT",
+        "unit_id": 13,
+        "unit_name": "",
+        "updated_at": 1792394184,
+        "version": 0,
+        "warehouse_code": "",
+        "warehouse_id": 12,
+        "warehouse_name": ""
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "quantity": "6"
+    }
+  },
+  "operational_fact.save_production_rework_from_completion_draft": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "production_fact": {
+        "cancel_reason": "完工入库登记有误",
+        "cancelled_at": 1792394184,
+        "cancelled_by": 7,
+        "cancelled_by_name": "DEMO",
+        "created_at": 1792394184,
+        "fact_no": "PF-REWORK-RPC-001",
+        "fact_type": "REWORK",
+        "id": 701,
+        "idempotency_key": "pf-rework-rpc-001",
+        "lot_id": 1,
+        "lot_no": "",
+        "note": "成品抽检不合格",
+        "occurred_at": 1792394184,
+        "posted_at": 1792394184,
+        "posted_by": 7,
+        "posted_by_name": "DEMO",
+        "product_sku_id": 12,
+        "production_order_id": 1,
+        "production_order_item_id": 1,
+        "production_wip_batch_id": 23,
+        "quantity": "2",
+        "sku_code_snapshot": "",
+        "source_id": 600,
+        "source_line_id": 22,
+        "source_no": "DEMO",
+        "source_type": "PRODUCTION_FACT",
+        "status": "DRAFT",
+        "subject_code": "",
+        "subject_id": 11,
+        "subject_name": "",
+        "subject_type": "PRODUCT",
+        "unit_id": 13,
+        "unit_name": "",
+        "updated_at": 1792394184,
+        "version": 0,
+        "warehouse_code": "",
+        "warehouse_id": 12,
+        "warehouse_name": ""
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "quantity": "6",
+      "reason": "接口调用示例"
+    }
+  },
+  "operational_fact.save_shipment_draft": {
+    "basis": "handler-fixture",
+    "data": {
+      "shipment": {
+        "carrier_name": null,
+        "created_at": 1786233600,
+        "customer_id": null,
+        "customer_snapshot": null,
+        "delivery_snapshot": {},
+        "finance_release_note": null,
+        "finance_release_process_instance_id": null,
+        "finance_release_process_node_id": null,
+        "finance_release_status": "",
+        "finance_release_version": 0,
+        "finance_released_at": null,
+        "finance_released_by": null,
+        "freight_amount": null,
+        "freight_currency": null,
+        "gross_weight_kg": null,
+        "id": 41,
+        "idempotency_key": "unchanged-create-key",
+        "items": [],
+        "note": null,
+        "package_count": null,
+        "planned_ship_at": null,
+        "sales_order_id": null,
+        "shipment_no": "SHIP-EDIT-041",
+        "shipped_at": null,
+        "shipping_mark": null,
+        "status": "DRAFT",
+        "total_net_weight_g": null,
+        "tracking_no": null,
+        "transport_method": null,
+        "updated_at": 1786233600,
+        "version": 4,
+        "volume_m3": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 3,
+      "id": 41,
+      "items": [
+        {
+          "note": "更新行",
+          "product_id": 21,
+          "quantity": "2.500000",
+          "unit_id": 23,
+          "warehouse_id": 22
+        }
+      ],
+      "note": "调整批次和数量",
+      "planned_ship_at": "2026-08-10",
+      "shipment_no": "SHIP-EDIT-041",
+      "total_net_weight_g": "18.500000"
+    },
+    "test": "TestJSONRPCSaveShipmentDraftRequiresUpdateAndConditionalSourceReadPermissions"
+  },
+  "operational_fact.settle_finance_fact": {
+    "basis": "handler-fixture",
+    "data": {
+      "finance_fact": {
+        "amount": "128.5",
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "cancelled_by_name": null,
+        "collection_type": null,
+        "counterparty_id": null,
+        "counterparty_type": "CUSTOMER",
+        "created_at": 1792394184,
+        "currency": "CNY",
+        "due_at": null,
+        "fact_no": "FIN-MODULE-GATE",
+        "fact_type": "RECEIVABLE",
+        "fee_amount": "0",
+        "id": 300,
+        "idempotency_key": "",
+        "invoice_category": null,
+        "note": null,
+        "occurred_at": 1792394184,
+        "outstanding_amount": "0",
+        "payment_term": null,
+        "payment_term_days": null,
+        "posted_at": null,
+        "posted_by": null,
+        "posted_by_name": null,
+        "settled_at": 1792394184,
+        "settled_by": 7,
+        "settled_by_name": null,
+        "source_id": null,
+        "source_line_id": null,
+        "source_no": null,
+        "source_type": null,
+        "status": "SETTLED",
+        "updated_at": 1792394184,
+        "version": 2
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 300
+    },
+    "test": "TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule"
+  },
+  "operational_fact.ship_shipment": {
+    "basis": "handler-fixture",
+    "data": {
+      "shipment": {
+        "carrier_name": null,
+        "created_at": 1792394184,
+        "customer_id": null,
+        "customer_snapshot": null,
+        "delivery_snapshot": {},
+        "finance_release_note": null,
+        "finance_release_process_instance_id": null,
+        "finance_release_process_node_id": null,
+        "finance_release_status": "",
+        "finance_release_version": 0,
+        "finance_released_at": null,
+        "finance_released_by": null,
+        "freight_amount": null,
+        "freight_currency": null,
+        "gross_weight_kg": null,
+        "id": 100,
+        "idempotency_key": "",
+        "items": [],
+        "note": null,
+        "package_count": null,
+        "planned_ship_at": null,
+        "sales_order_id": null,
+        "shipment_no": "",
+        "shipped_at": 1792394184,
+        "shipping_mark": null,
+        "status": "SHIPPED",
+        "total_net_weight_g": null,
+        "tracking_no": null,
+        "transport_method": null,
+        "updated_at": 1792394184,
+        "version": 0,
+        "volume_m3": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 100
+    },
+    "test": "TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules"
+  },
+  "operational_fact.submit_production_exception": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "production_exception": {
+        "approved_quantity": "DEMO",
+        "decided_at": 1,
+        "decided_by": 1,
+        "decision_no": "DEMO",
+        "decision_reason": "DEMO",
+        "decision_type": "DEMO",
+        "executed_at": 1,
+        "executed_by": 1,
+        "execution_reason": "DEMO",
+        "execution_status": "DEMO",
+        "id": 1,
+        "production_material_requirement_id": 1,
+        "production_order_id": 1,
+        "production_order_item_id": 1,
+        "production_wip_batch_id": 1,
+        "quality_inspection_id": 1,
+        "reason": "DEMO",
+        "requested_at": 1,
+        "requested_by": 1,
+        "requested_quantity": "DEMO",
+        "reverse_reason": "DEMO",
+        "reversed_at": 1,
+        "reversed_by": 1,
+        "status": "DEMO",
+        "stock_disposition_required": false,
+        "target_operation_id": 1,
+        "target_supplier_id": 1,
+        "version": 1
+      }
+    },
+    "params": {
+      "idempotency_key": "demo-operational_fact-submit_production_exception-001",
+      "reason": "接口调用示例",
+      "requested_quantity": "1"
+    }
+  },
+  "outsourcing_order.cancel_outsourcing_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "outsourcing_order": {
+        "contract_party_snapshot": {},
+        "created_at": 1,
+        "currency": "HKD",
+        "expected_return_date": 1782259200,
+        "id": 1,
+        "lifecycle_status": "draft",
+        "note": "DEMO",
+        "order_date": 1781654400,
+        "outsourcing_order_no": "OUT-JSONRPC-001",
+        "payment_term_days": 45,
+        "settled_at": 1,
+        "settled_by": 7,
+        "settlement_action": "submit",
+        "settlement_mode": "normal",
+        "settlement_reason": "DEMO",
+        "source_order_no": "SO-JSONRPC-001",
+        "source_wip_batch_id": 1,
+        "supplier_id": 1,
+        "supplier_snapshot": {},
+        "updated_at": 1,
+        "version": 1
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "idempotency_key": "demo-outsourcing_order-cancel_outsourcing_order-001",
+      "reason": "接口调用示例"
+    }
+  },
+  "outsourcing_order.close_outsourcing_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "outsourcing_order": {
+        "contract_party_snapshot": {
+          "buyerAddress": "东莞茶山",
+          "buyerCompany": "永绅",
+          "buyerContact": "委外负责人",
+          "buyerPhone": "13600000000"
+        },
+        "created_at": 1,
+        "currency": "HKD",
+        "expected_return_date": 1782259200,
+        "id": 1,
+        "lifecycle_status": "closed",
+        "note": null,
+        "order_date": 1781654400,
+        "outsourcing_order_no": "OUT-JSONRPC-001",
+        "payment_term_days": 45,
+        "settled_at": null,
+        "settled_by": 7,
+        "settlement_action": "close",
+        "settlement_mode": "normal",
+        "settlement_reason": null,
+        "source_order_no": "SO-JSONRPC-001",
+        "source_wip_batch_id": null,
+        "supplier_id": 1,
+        "supplier_snapshot": {
+          "address": "加工园 1 号",
+          "contact_name": "李厂长",
+          "contact_phone": "13900000000",
+          "name": "加工厂"
+        },
+        "updated_at": 2,
+        "version": 4
+      }
+    },
+    "message": "OK",
+    "params": {
+      "close_mode": "normal",
+      "expected_version": 3,
+      "id": 1,
+      "idempotency_key": "test/close/1/v3"
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions"
+  },
+  "outsourcing_order.confirm_outsourcing_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "outsourcing_order": {
+        "contract_party_snapshot": {
+          "buyerAddress": "东莞茶山",
+          "buyerCompany": "永绅",
+          "buyerContact": "委外负责人",
+          "buyerPhone": "13600000000"
+        },
+        "created_at": 1,
+        "currency": "HKD",
+        "expected_return_date": 1782259200,
+        "id": 1,
+        "lifecycle_status": "confirmed",
+        "note": null,
+        "order_date": 1781654400,
+        "outsourcing_order_no": "OUT-JSONRPC-001",
+        "payment_term_days": 45,
+        "settled_at": null,
+        "settled_by": 7,
+        "settlement_action": "confirm",
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "source_order_no": "SO-JSONRPC-001",
+        "source_wip_batch_id": null,
+        "supplier_id": 1,
+        "supplier_snapshot": {
+          "address": "加工园 1 号",
+          "contact_name": "李厂长",
+          "contact_phone": "13900000000",
+          "name": "加工厂"
+        },
+        "updated_at": 2,
+        "version": 3
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 2,
+      "id": 1,
+      "idempotency_key": "test/confirm/1/v2"
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions"
+  },
+  "outsourcing_order.get_outsourcing_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "outsourcing_order": {
+        "contract_party_snapshot": {},
+        "created_at": 1,
+        "currency": "HKD",
+        "expected_return_date": 1782259200,
+        "id": 1,
+        "lifecycle_status": "draft",
+        "note": "DEMO",
+        "order_date": 1781654400,
+        "outsourcing_order_no": "OUT-JSONRPC-001",
+        "payment_term_days": 45,
+        "settled_at": 1,
+        "settled_by": 7,
+        "settlement_action": "submit",
+        "settlement_mode": "normal",
+        "settlement_reason": "DEMO",
+        "source_order_no": "SO-JSONRPC-001",
+        "source_wip_batch_id": 1,
+        "supplier_id": 1,
+        "supplier_snapshot": {},
+        "updated_at": 1,
+        "version": 1
+      }
+    },
+    "params": {
+      "id": 2
+    }
+  },
+  "outsourcing_order.list_outsourcing_order_items": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "outsourcing_order_items": [
+        {
+          "amount": null,
+          "created_at": 1,
+          "expected_return_date": null,
+          "id": 1,
+          "line_no": 1,
+          "line_status": "open",
+          "material_code_snapshot": null,
+          "material_id": null,
+          "material_name_snapshot": null,
+          "note": null,
+          "outsourcing_order_id": 1,
+          "outsourcing_quantity": "12.5",
+          "process_category_snapshot": null,
+          "process_id": 1,
+          "process_name_snapshot": "车缝",
+          "processing_item": "脸*1",
+          "product_id": 1,
+          "product_name_snapshot": "半成品",
+          "product_no_snapshot": "PROD-MODULE-GATE",
+          "product_order_no_snapshot": null,
+          "product_sku_id": null,
+          "sku_code_snapshot": null,
+          "subject_type": "PRODUCT",
+          "unit_id": 1,
+          "unit_name_snapshot": "只",
+          "unit_price": null,
+          "updated_at": 1
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "outsourcing_order_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule"
+  },
+  "outsourcing_order.list_outsourcing_order_summary": {
+    "basis": "handler-fixture",
+    "data": {
+      "items": [
+        {
+          "amount": "3",
+          "buyer_contact": "模拟委托人",
+          "buyer_phone": "private phone",
+          "created_at": -62135596800,
+          "currency": "CNY",
+          "expected_return_date": null,
+          "id": 2,
+          "lifecycle_status": "",
+          "line_no": 0,
+          "line_status": "",
+          "material_code_snapshot": null,
+          "material_id": null,
+          "material_name_snapshot": null,
+          "note": null,
+          "order_date": 1792394185,
+          "outsourcing_order_id": 1,
+          "outsourcing_order_no": "OUT-SUM",
+          "outsourcing_quantity": "1",
+          "process_category_snapshot": null,
+          "process_id": 0,
+          "process_name_snapshot": null,
+          "processing_item": null,
+          "product_id": null,
+          "product_name_snapshot": null,
+          "product_no_snapshot": null,
+          "product_order_no_snapshot": null,
+          "product_sku_id": null,
+          "sku_code_snapshot": null,
+          "source_order_no": null,
+          "subject_type": "",
+          "supplier_id": 5,
+          "supplier_name": "模拟加工厂",
+          "supplier_short_name": null,
+          "unit_id": 0,
+          "unit_name_snapshot": null,
+          "unit_price": "3",
+          "updated_at": -62135596800
+        }
+      ],
+      "limit": 20,
+      "offset": 0,
+      "total": 1
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestOutsourcingOrderSummaryJSONRPCPermissionsFiltersAndRedaction"
+  },
+  "outsourcing_order.list_outsourcing_orders": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "outsourcing_orders": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "limit": 20
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule"
+  },
+  "outsourcing_order.save_outsourcing_order_with_items": {
+    "basis": "handler-fixture",
+    "data": {
+      "outsourcing_order": {
+        "contract_party_snapshot": {},
+        "created_at": 1,
+        "currency": "USD",
+        "expected_return_date": null,
+        "id": 1,
+        "lifecycle_status": "draft",
+        "note": null,
+        "order_date": 1783987200,
+        "outsourcing_order_no": "OUT-VERSION-CONTRACT",
+        "payment_term_days": 30,
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "source_order_no": null,
+        "source_wip_batch_id": null,
+        "supplier_id": 1,
+        "supplier_snapshot": {},
+        "updated_at": 1,
+        "version": 2
+      },
+      "outsourcing_order_items": [
+        {
+          "amount": null,
+          "created_at": 1,
+          "expected_return_date": null,
+          "id": 1,
+          "line_no": 1,
+          "line_status": "open",
+          "material_code_snapshot": null,
+          "material_id": null,
+          "material_name_snapshot": null,
+          "note": null,
+          "outsourcing_order_id": 1,
+          "outsourcing_quantity": "1",
+          "process_category_snapshot": null,
+          "process_id": 3,
+          "process_name_snapshot": null,
+          "processing_item": null,
+          "product_id": 2,
+          "product_name_snapshot": null,
+          "product_no_snapshot": null,
+          "product_order_no_snapshot": null,
+          "product_sku_id": null,
+          "sku_code_snapshot": null,
+          "subject_type": "PRODUCT",
+          "unit_id": 4,
+          "unit_name_snapshot": null,
+          "unit_price": null,
+          "updated_at": 1
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "currency": "USD",
+      "expected_version": 1,
+      "id": 1,
+      "items": [
+        {
+          "id": 1,
+          "line_no": 1,
+          "outsourcing_quantity": "1",
+          "process_id": 3,
+          "product_id": 2,
+          "subject_type": "PRODUCT",
+          "unit_id": 4
+        }
+      ],
+      "order_date": "2026-07-14",
+      "outsourcing_order_no": "OUT-VERSION-CONTRACT",
+      "payment_term_days": 30,
+      "supplier_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingOrderDraftVersionContract"
+  },
+  "outsourcing_order.submit_outsourcing_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "outsourcing_order": {
+        "contract_party_snapshot": {
+          "buyerAddress": "东莞茶山",
+          "buyerCompany": "永绅",
+          "buyerContact": "委外负责人",
+          "buyerPhone": "13600000000"
+        },
+        "created_at": 1,
+        "currency": "HKD",
+        "expected_return_date": 1782259200,
+        "id": 1,
+        "lifecycle_status": "submitted",
+        "note": null,
+        "order_date": 1781654400,
+        "outsourcing_order_no": "OUT-JSONRPC-001",
+        "payment_term_days": 45,
+        "settled_at": null,
+        "settled_by": 7,
+        "settlement_action": "submit",
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "source_order_no": "SO-JSONRPC-001",
+        "source_wip_batch_id": null,
+        "supplier_id": 1,
+        "supplier_snapshot": {
+          "address": "加工园 1 号",
+          "contact_name": "李厂长",
+          "contact_phone": "13900000000",
+          "name": "加工厂"
+        },
+        "updated_at": 2,
+        "version": 2
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 1,
+      "idempotency_key": "test/submit/1/v1"
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions"
+  },
+  "partner.get_purchase_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "items": [
+        {
+          "amount": "3.75",
+          "color": null,
+          "expected_arrival_date": null,
+          "id": 61,
+          "line_no": 1,
+          "material_code": "SIM-MAT",
+          "material_name": "模拟面料",
+          "quantity": "3",
+          "unit_id": 21,
+          "unit_price": "1.25"
+        }
+      ],
+      "purchase_order": {
+        "currency": "CNY",
+        "expected_arrival_date": null,
+        "id": 41,
+        "lifecycle_status": "approved",
+        "order_no": "SIM-PO-A",
+        "purchase_date": 1792396800,
+        "supplier_purchase_order_no": null
+      }
+    },
+    "params": {
+      "id": 41
+    }
+  },
+  "partner.get_sales_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "items": [
+        {
+          "amount": "3.75",
+          "color": null,
+          "customer_product_no": null,
+          "id": 71,
+          "line_no": 1,
+          "planned_delivery_date": null,
+          "product_name": null,
+          "quantity": "3",
+          "requested_product_name": "模拟毛绒兔",
+          "unit_id": 21,
+          "unit_price": "1.25"
+        }
+      ],
+      "sales_order": {
+        "currency": "CNY",
+        "customer_order_no": null,
+        "id": 51,
+        "lifecycle_status": "active",
+        "order_date": 1792396800,
+        "order_no": "SIM-SO-A",
+        "planned_delivery_date": null
+      }
+    },
+    "params": {
+      "id": 51
+    }
+  },
+  "partner.list_purchase_orders": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_orders": [
+        {
+          "currency": "CNY",
+          "expected_arrival_date": null,
+          "id": 41,
+          "lifecycle_status": "approved",
+          "order_no": "SIM-PO-A",
+          "purchase_date": 1792396800,
+          "supplier_purchase_order_no": null
+        }
+      ],
+      "total": 1
+    },
+    "params": {
+      "limit": 20,
+      "offset": 0
+    }
+  },
+  "partner.list_sales_orders": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "sales_orders": [
+        {
+          "currency": "CNY",
+          "customer_order_no": null,
+          "id": 51,
+          "lifecycle_status": "active",
+          "order_date": 1792396800,
+          "order_no": "SIM-SO-A",
+          "planned_delivery_date": null
+        }
+      ],
+      "total": 1
+    },
+    "params": {
+      "limit": 20,
+      "offset": 0
+    }
+  },
+  "partner.me": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "partner": {
+        "account_kind": "supplier",
+        "customer_id": null,
+        "display_name": "模拟供应商A",
+        "id": 31,
+        "supplier_id": 11,
+        "username": "sim_supplier_a"
+      }
+    },
+    "params": {}
+  },
+  "production_order.cancel_production_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "material_requirements_state": "NEEDS_REVIEW",
+      "production_material_requirements": [],
+      "production_order": {
+        "cancel_reason": "模拟计划调整，按当前数量结束",
+        "cancelled_at": 1792394185,
+        "cancelled_by": 7,
+        "close_reason": null,
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": 1792394185,
+        "created_by": 7,
+        "id": 2,
+        "note": null,
+        "order_no": "MO-DEMO-CANCEL",
+        "planned_end_at": null,
+        "planned_start_at": 1783785600,
+        "released_at": null,
+        "released_by": null,
+        "status": "CANCELLED",
+        "updated_at": 1792394185,
+        "version": 2
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": 1,
+          "bom_version_snapshot": "API-ACTIVE",
+          "created_at": 1792394185,
+          "customer_inspection_required": false,
+          "id": 3,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": "PO-PRODUCT",
+          "product_id": 1,
+          "product_name_snapshot": "PO-PRODUCT成品",
+          "product_sku_id": null,
+          "production_order_id": 2,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "updated_at": 1792394185
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "idempotency_key": "example-cancel_production_order",
+      "production_order_id": 2,
+      "reason": "模拟计划调整，按当前数量结束"
+    },
+    "test": "TestProductionOrderDocumentedRequestsAndResponseProjections"
+  },
+  "production_order.close_production_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "material_requirements_state": "READY",
+      "production_material_requirements": [
+        {
+          "approved_over_issue_quantity": "0",
+          "bom_header_id": 1,
+          "bom_item_id": 1,
+          "created_at": 1792394185,
+          "effective_limit_quantity": "10.5",
+          "id": 1,
+          "issued_quantity": "0",
+          "loss_rate_snapshot": "0",
+          "material_code_snapshot": "PO-MATERIAL",
+          "material_id": 1,
+          "material_name_snapshot": "PO-MATERIAL材料",
+          "planned_quantity": "10.5",
+          "production_order_id": 1,
+          "production_order_item_id": 2,
+          "remaining_quantity": "10.5",
+          "unit_code_snapshot": "PO-UNIT",
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "unit_quantity_snapshot": "1",
+          "updated_at": 1792394185
+        }
+      ],
+      "production_order": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "close_reason": "试产结束，按当前数量短关闭",
+        "closed_at": 1792394185,
+        "closed_by": 7,
+        "created_at": 1792394185,
+        "created_by": 7,
+        "id": 1,
+        "note": "排产备注",
+        "order_no": "MO-API-001",
+        "planned_end_at": null,
+        "planned_start_at": 1783785600,
+        "released_at": 1792394185,
+        "released_by": 7,
+        "status": "CLOSED",
+        "updated_at": 1792394185,
+        "version": 4
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": 1,
+          "bom_version_snapshot": "API-ACTIVE",
+          "created_at": 1792394185,
+          "customer_inspection_required": false,
+          "id": 2,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": "PO-PRODUCT",
+          "product_id": 1,
+          "product_name_snapshot": "PO-PRODUCT成品",
+          "product_sku_id": null,
+          "production_order_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "updated_at": 1792394185
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 3,
+      "idempotency_key": "api-close-1",
+      "production_order_id": 1,
+      "reason": "试产结束，按当前数量短关闭"
+    },
+    "test": "TestProductionOrderJSONRPCCanonicalLifecycleReadAndReplay"
+  },
+  "production_order.create_production_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "material_requirements_state": "NEEDS_REVIEW",
+      "production_material_requirements": [],
+      "production_order": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "close_reason": null,
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": 1792394185,
+        "created_by": 7,
+        "id": 1,
+        "note": null,
+        "order_no": "MO-DEMO-001",
+        "planned_end_at": null,
+        "planned_start_at": null,
+        "released_at": null,
+        "released_by": null,
+        "status": "DRAFT",
+        "updated_at": 1792394185,
+        "version": 1
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": 1,
+          "bom_version_snapshot": "API-ACTIVE",
+          "created_at": 1792394185,
+          "customer_inspection_required": false,
+          "id": 1,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": "PO-PRODUCT",
+          "product_id": 1,
+          "product_name_snapshot": "PO-PRODUCT成品",
+          "product_sku_id": null,
+          "production_order_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "updated_at": 1792394185
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "idempotency_key": "example-create-001",
+      "items": [
+        {
+          "bom_header_id": 1,
+          "line_no": 1,
+          "planned_quantity": "10.5",
+          "product_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "unit_id": 1
+        }
+      ],
+      "order_no": "MO-DEMO-001"
+    },
+    "test": "TestProductionOrderDocumentedRequestsAndResponseProjections"
+  },
+  "production_order.get_production_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "material_requirements_state": "NEEDS_REVIEW",
+      "production_material_requirements": [],
+      "production_order": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "close_reason": null,
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": 1792394185,
+        "created_by": 7,
+        "id": 1,
+        "note": null,
+        "order_no": "MO-DEMO-001",
+        "planned_end_at": null,
+        "planned_start_at": null,
+        "released_at": null,
+        "released_by": null,
+        "status": "DRAFT",
+        "updated_at": 1792394185,
+        "version": 1
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": 1,
+          "bom_version_snapshot": "API-ACTIVE",
+          "created_at": 1792394185,
+          "customer_inspection_required": false,
+          "id": 1,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": "PO-PRODUCT",
+          "product_id": 1,
+          "product_name_snapshot": "PO-PRODUCT成品",
+          "product_sku_id": null,
+          "production_order_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "updated_at": 1792394185
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "production_order_id": 1
+    },
+    "test": "TestProductionOrderDocumentedRequestsAndResponseProjections"
+  },
+  "production_order.list_production_order_reference_options": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "options": [],
+      "reference_type": "sales_order_item",
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "keyword": "SO",
+      "limit": 20,
+      "offset": 0,
+      "reference_type": "sales_order_item"
+    },
+    "test": "TestProductionOrderJSONRPCStrictCanonicalParams"
+  },
+  "production_order.list_production_orders": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "production_orders": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestProductionOrderJSONRPCAuthAndPermissions"
+  },
+  "production_order.release_production_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "material_requirements_state": "READY",
+      "production_material_requirements": [
+        {
+          "approved_over_issue_quantity": "0",
+          "bom_header_id": 1,
+          "bom_item_id": 1,
+          "created_at": 1792394185,
+          "effective_limit_quantity": "10.5",
+          "id": 1,
+          "issued_quantity": "0",
+          "loss_rate_snapshot": "0",
+          "material_code_snapshot": "PO-MATERIAL",
+          "material_id": 1,
+          "material_name_snapshot": "PO-MATERIAL材料",
+          "planned_quantity": "10.5",
+          "production_order_id": 1,
+          "production_order_item_id": 2,
+          "remaining_quantity": "10.5",
+          "unit_code_snapshot": "PO-UNIT",
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "unit_quantity_snapshot": "1",
+          "updated_at": 1792394185
+        }
+      ],
+      "production_order": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "close_reason": null,
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": 1792394185,
+        "created_by": 7,
+        "id": 1,
+        "note": null,
+        "order_no": "MO-DEMO-001",
+        "planned_end_at": null,
+        "planned_start_at": null,
+        "released_at": 1792394185,
+        "released_by": 7,
+        "status": "RELEASED",
+        "updated_at": 1792394185,
+        "version": 3
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": 1,
+          "bom_version_snapshot": "API-ACTIVE",
+          "created_at": 1792394185,
+          "customer_inspection_required": false,
+          "id": 2,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": "PO-PRODUCT",
+          "product_id": 1,
+          "product_name_snapshot": "PO-PRODUCT成品",
+          "product_sku_id": null,
+          "production_order_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "updated_at": 1792394185
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 2,
+      "idempotency_key": "example-release_production_order",
+      "production_order_id": 1
+    },
+    "test": "TestProductionOrderDocumentedRequestsAndResponseProjections"
+  },
+  "production_order.save_production_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "material_requirements_state": "NEEDS_REVIEW",
+      "production_material_requirements": [],
+      "production_order": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "close_reason": null,
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": 1792394185,
+        "created_by": 7,
+        "id": 1,
+        "note": null,
+        "order_no": "MO-DEMO-001",
+        "planned_end_at": null,
+        "planned_start_at": null,
+        "released_at": null,
+        "released_by": null,
+        "status": "DRAFT",
+        "updated_at": 1792394185,
+        "version": 2
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": 1,
+          "bom_version_snapshot": "API-ACTIVE",
+          "created_at": 1792394185,
+          "customer_inspection_required": false,
+          "id": 2,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": "PO-PRODUCT",
+          "product_id": 1,
+          "product_name_snapshot": "PO-PRODUCT成品",
+          "product_sku_id": null,
+          "production_order_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 1,
+          "unit_name_snapshot": "PO-UNIT单位",
+          "updated_at": 1792394185
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "idempotency_key": "example-save-001",
+      "items": [
+        {
+          "bom_header_id": 1,
+          "line_no": 1,
+          "planned_quantity": "10.5",
+          "product_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "unit_id": 1
+        }
+      ],
+      "order_no": "MO-DEMO-001",
+      "production_order_id": 1
+    },
+    "test": "TestProductionOrderDocumentedRequestsAndResponseProjections"
+  },
+  "production_wip.execute_production_wip_action": {
+    "basis": "handler-fixture",
+    "data": {
+      "finished_goods_receipts": [],
+      "material_requirements": [
+        {
+          "approved_over_issue_quantity": "0",
+          "bom_header_id": 61,
+          "bom_item_id": 71,
+          "created_at": 1784246400,
+          "effective_limit_quantity": "0",
+          "id": 51,
+          "issued_quantity": "0",
+          "loss_rate_snapshot": "0",
+          "material_code_snapshot": "FAB-01",
+          "material_id": 81,
+          "material_name_snapshot": "短毛绒",
+          "planned_quantity": "12",
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "remaining_quantity": "0",
+          "unit_code_snapshot": "",
+          "unit_id": 31,
+          "unit_name_snapshot": "米",
+          "unit_quantity_snapshot": "0",
+          "updated_at": 1784246400
+        }
+      ],
+      "outsourcing_allocations": [],
+      "packaging_confirmations": [
+        {
+          "confirmed_at": 1784246400,
+          "confirmed_by": 7,
+          "created_at": 1784246400,
+          "id": 301,
+          "note": null,
+          "packaging_version_snapshot": "PKG-V3",
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "status": "CONFIRMED",
+          "updated_at": 1784246400,
+          "version": 2
+        }
+      ],
+      "production_order": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "close_reason": null,
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": 1784246400,
+        "created_by": 7,
+        "id": 1,
+        "note": null,
+        "order_no": "MO-WIP-001",
+        "planned_end_at": null,
+        "planned_start_at": null,
+        "released_at": null,
+        "released_by": null,
+        "status": "RELEASED",
+        "updated_at": 1784246400,
+        "version": 2
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": null,
+          "bom_version_snapshot": null,
+          "created_at": 1784246400,
+          "customer_inspection_required": true,
+          "id": 11,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": null,
+          "product_id": 21,
+          "product_name_snapshot": null,
+          "product_sku_id": null,
+          "production_order_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 31,
+          "unit_name_snapshot": null,
+          "updated_at": 1784246400
+        }
+      ],
+      "production_order_operations": [
+        {
+          "business_confirmation_code": null,
+          "created_at": 1784246400,
+          "id": 101,
+          "inhouse_allowed": true,
+          "operation_code": "SEWING",
+          "output_code": "SHELL",
+          "outsourcing_allowed": true,
+          "planned_quantity": "10.5",
+          "process_code_snapshot": "SEWING",
+          "process_id": 41,
+          "process_name_snapshot": "车缝",
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "required_quality_gates": [
+            "SHELL"
+          ],
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "route_version": 1,
+          "step_no": 20
+        }
+      ],
+      "production_wip_batches": [
+        {
+          "batch_no": "WIP-1-11-20-001",
+          "completed_at": null,
+          "created_at": 1784246400,
+          "created_by": 7,
+          "execution_mode": "IN_HOUSE",
+          "finished_goods_receipt_id": null,
+          "flow_type": "NORMAL",
+          "id": 201,
+          "origin_exception_decision_id": null,
+          "origin_rework_fact_id": 901,
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "production_order_operation_id": 101,
+          "quantity": "10.5",
+          "rework_reason": null,
+          "source_batch_id": null,
+          "started_at": null,
+          "status": "IN_PROGRESS",
+          "updated_at": 1784246400,
+          "version": 3
+        }
+      ],
+      "quality_inspections": [
+        {
+          "gate_code": "SHELL",
+          "id": 401,
+          "production_wip_batch_id": 201,
+          "result": null,
+          "status": "PASSED"
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "action": "RECEIVE_OUTSOURCING_RETURN",
+      "expected_version": 3,
+      "idempotency_key": "warehouse-return",
+      "production_order_id": 1,
+      "production_wip_batch_id": 201,
+      "quantity": "10"
+    },
+    "test": "TestFulfillmentWIPReturnBelongsToWarehouse"
+  },
+  "production_wip.get_production_wip": {
+    "basis": "handler-fixture",
+    "data": {
+      "finished_goods_receipts": [],
+      "material_requirements": [
+        {
+          "approved_over_issue_quantity": "0",
+          "bom_header_id": 61,
+          "bom_item_id": 71,
+          "created_at": 1784246400,
+          "effective_limit_quantity": "0",
+          "id": 51,
+          "issued_quantity": "0",
+          "loss_rate_snapshot": "0",
+          "material_code_snapshot": "FAB-01",
+          "material_id": 81,
+          "material_name_snapshot": "短毛绒",
+          "planned_quantity": "12",
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "remaining_quantity": "0",
+          "unit_code_snapshot": "",
+          "unit_id": 31,
+          "unit_name_snapshot": "米",
+          "unit_quantity_snapshot": "0",
+          "updated_at": 1784246400
+        }
+      ],
+      "outsourcing_allocations": [],
+      "packaging_confirmations": [
+        {
+          "confirmed_at": 1784246400,
+          "confirmed_by": 7,
+          "created_at": 1784246400,
+          "id": 301,
+          "note": null,
+          "packaging_version_snapshot": "PKG-V3",
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "status": "CONFIRMED",
+          "updated_at": 1784246400,
+          "version": 2
+        }
+      ],
+      "production_order": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "close_reason": null,
+        "closed_at": null,
+        "closed_by": null,
+        "created_at": 1784246400,
+        "created_by": 7,
+        "id": 1,
+        "note": null,
+        "order_no": "MO-WIP-001",
+        "planned_end_at": null,
+        "planned_start_at": null,
+        "released_at": null,
+        "released_by": null,
+        "status": "RELEASED",
+        "updated_at": 1784246400,
+        "version": 2
+      },
+      "production_order_items": [
+        {
+          "bom_header_id": null,
+          "bom_version_snapshot": null,
+          "created_at": 1784246400,
+          "customer_inspection_required": true,
+          "id": 11,
+          "line_no": 1,
+          "note": null,
+          "planned_quantity": "10.5",
+          "product_code_snapshot": null,
+          "product_id": 21,
+          "product_name_snapshot": null,
+          "product_sku_id": null,
+          "production_order_id": 1,
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "sales_order_item_id": null,
+          "sku_code_snapshot": null,
+          "unit_id": 31,
+          "unit_name_snapshot": null,
+          "updated_at": 1784246400
+        }
+      ],
+      "production_order_operations": [
+        {
+          "business_confirmation_code": null,
+          "created_at": 1784246400,
+          "id": 101,
+          "inhouse_allowed": true,
+          "operation_code": "SEWING",
+          "output_code": "SHELL",
+          "outsourcing_allowed": true,
+          "planned_quantity": "10.5",
+          "process_code_snapshot": "SEWING",
+          "process_id": 41,
+          "process_name_snapshot": "车缝",
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "required_quality_gates": [
+            "SHELL"
+          ],
+          "route_code": "PLUSH_SEW_HAND_V1",
+          "route_version": 1,
+          "step_no": 20
+        }
+      ],
+      "production_wip_batches": [
+        {
+          "batch_no": "WIP-1-11-20-001",
+          "completed_at": null,
+          "created_at": 1784246400,
+          "created_by": 7,
+          "execution_mode": "IN_HOUSE",
+          "finished_goods_receipt_id": null,
+          "flow_type": "NORMAL",
+          "id": 201,
+          "origin_exception_decision_id": null,
+          "origin_rework_fact_id": 901,
+          "production_order_id": 1,
+          "production_order_item_id": 11,
+          "production_order_operation_id": 101,
+          "quantity": "10.5",
+          "rework_reason": null,
+          "source_batch_id": null,
+          "started_at": null,
+          "status": "IN_PROGRESS",
+          "updated_at": 1784246400,
+          "version": 3
+        }
+      ],
+      "quality_inspections": [
+        {
+          "gate_code": "SHELL",
+          "id": 401,
+          "production_wip_batch_id": 201,
+          "result": null,
+          "status": "PASSED"
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {
+      "production_order_id": 1
+    },
+    "test": "TestProductionWIPJSONRPCCanonicalReadCancelAndSplit"
+  },
+  "production_wip.list_warehouse_production_work": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "counts": {
+        "": 1,
+        "AWAITING_INBOUND": 1
+      },
+      "items": [
+        {
+          "action": "",
+          "action_batch_id": 91003,
+          "batch_no": "WIP-PHOTO-DEMO",
+          "fact_id": 901,
+          "fact_no": "FG-PHOTO-DEMO",
+          "fact_status": "DRAFT",
+          "fact_version": 1,
+          "id": 901,
+          "kind": "RECEIPT",
+          "lot_no": "FG-LOT-DEMO",
+          "operation_name": "手工制作",
+          "order_no": "MO-PHOTO-DEMO",
+          "packaging_confirmed": false,
+          "pending_inspection_quantity": "0",
+          "pending_packaging_quantity": "0",
+          "product_code": "PRODUCT-7",
+          "product_id": 7,
+          "product_name": "模拟小熊",
+          "production_order_id": 71,
+          "production_order_item_id": 7100,
+          "production_wip_batch_id": 91003,
+          "quantity": "30",
+          "sku_code": "SKU-7",
+          "stage": "AWAITING_INBOUND",
+          "unit_name": "只",
+          "warehouse_id": 1,
+          "warehouse_name": "模拟成品仓"
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "keyword": "",
+      "kind": "RECEIPT",
+      "limit": 20,
+      "offset": 0,
+      "sort_by": "quantity",
+      "sort_direction": "desc",
+      "stage": ""
+    }
+  },
+  "production_wip.prepare_production_outsourcing_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "finished_goods_receipts": [],
+      "material_requirements": [],
+      "outsourcing_allocations": [],
+      "outsourcing_order_id": 1,
+      "outsourcing_order_no": "DEMO",
+      "packaging_confirmations": [],
+      "production_order": {
+        "cancel_reason": "模拟计划调整，按当前数量结束",
+        "cancelled_at": 1792394185,
+        "cancelled_by": 7,
+        "close_reason": "模拟计划调整，按当前数量结束",
+        "closed_at": 1792394185,
+        "closed_by": 7,
+        "created_at": 1792394185,
+        "created_by": 7,
+        "id": 1,
+        "item_count": 1,
+        "note": "排产备注",
+        "order_no": "MO-DEMO-001",
+        "planned_end_at": 1,
+        "planned_start_at": 1783785600,
+        "released_at": 1792394185,
+        "released_by": 7,
+        "status": "DRAFT",
+        "updated_at": 1792394185,
+        "version": 1
+      },
+      "production_order_items": [],
+      "production_order_operations": [],
+      "production_wip_batches": [],
+      "quality_inspections": []
+    },
+    "params": {
+      "expected_version": 1,
+      "production_wip_batch_id": 23,
+      "supplier_id": 5
+    }
+  },
+  "purchase.add_purchase_receipt_item": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt_item": {
+        "amount": null,
+        "created_at": 1792394185,
+        "declared_quantity": null,
+        "id": 5,
+        "lot_id": 5,
+        "lot_no": "PR-1-LINE-2",
+        "material_id": 1,
+        "note": null,
+        "posted": false,
+        "price_confirmed_later": false,
+        "purchase_order_item_id": 1,
+        "quantity": "1",
+        "receipt_id": 1,
+        "rejection_disposed": false,
+        "source_line_no": "1",
+        "unit_id": 1,
+        "unit_price": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 1
+      }
+    },
+    "message": "OK",
+    "params": {
+      "idempotency_key": "api-scope-append",
+      "material_id": 1,
+      "purchase_order_item_id": 1,
+      "quantity": "1",
+      "receipt_id": 1,
+      "unit_id": 1,
+      "warehouse_id": 1
+    },
+    "test": "TestPurchaseReceiptJSONRPCWarehouseScopeAndIdempotentReadback"
+  },
+  "purchase.cancel_purchase_receipt": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt": {
+        "can_post": false,
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394185,
+            "declared_quantity": null,
+            "id": 1,
+            "lot_id": 1,
+            "lot_no": "JSONRPC-LOT-001",
+            "material_id": 1,
+            "note": null,
+            "posted": true,
+            "price_confirmed_later": false,
+            "purchase_order_item_id": 1,
+            "quantity": "8.5",
+            "receipt_id": 1,
+            "rejection_disposed": false,
+            "source_line_no": "1",
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "pending_inbound_lines": 0,
+        "posted_at": 1792394185,
+        "posted_lines": 1,
+        "purchase_order_id": 1,
+        "purchase_order_no": "PO-RECEIPT-APPEND-JSONRPC-API",
+        "quality_inspections": [],
+        "receipt_no": "PR-RECEIPT-APPEND-JSONRPC-API",
+        "received_at": 1781136000,
+        "status": "CANCELLED",
+        "supplier_id": 1,
+        "supplier_name": "追加来源供应商-JSONRPC-API",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact"
+  },
+  "purchase.cancel_purchase_receipt_adjustment": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt_adjustment": {
+        "adjusted_at": 1783987200,
+        "adjustment_no": "ADJ-JSONRPC-CORRECTION",
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "adjust_type": "QUANTITY_INCREASE",
+            "adjustment_id": 1,
+            "correction_group": null,
+            "created_at": 1792394185,
+            "id": 1,
+            "lot_id": 1,
+            "material_id": 1,
+            "note": null,
+            "purchase_receipt_item_id": 1,
+            "quantity": "3",
+            "source_line_no": "1:QUANTITY_INCREASE",
+            "unit_id": 1,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "posted_at": 1792394185,
+        "purchase_receipt_id": 2,
+        "reason": "补记实收数量",
+        "status": "CANCELLED",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseCorrectionAPILifecycle"
+  },
+  "purchase.cancel_purchase_receipt_draft": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt": {
+        "can_post": false,
+        "created_at": 1792394183,
+        "id": 2,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394183,
+            "declared_quantity": "4",
+            "id": 1,
+            "lot_id": 1,
+            "lot_no": "PR-2-LINE-1",
+            "material_id": 1,
+            "note": null,
+            "posted": false,
+            "price_confirmed_later": false,
+            "purchase_order_item_id": 1,
+            "quantity": "3.25",
+            "receipt_id": 2,
+            "rejection_disposed": false,
+            "source_line_no": "1",
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394183,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "pending_inbound_lines": 0,
+        "posted_at": null,
+        "posted_lines": 0,
+        "purchase_order_id": 1,
+        "purchase_order_no": "PO-RECEIPT-APPEND-IQC-ROLE",
+        "quality_inspections": [],
+        "receipt_no": "IQC-ROLE-ARRIVAL",
+        "received_at": 1792394183,
+        "status": "CANCELLED",
+        "supplier_id": 1,
+        "supplier_name": "追加来源供应商-IQC-ROLE",
+        "updated_at": 1792394183
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 2
+    },
+    "test": "TestJsonrpcIncomingAcceptanceRoleBoundary"
+  },
+  "purchase.cancel_purchase_rejection_disposition": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_rejection_disposition": {
+        "cancel_reason": "DEMO",
+        "cancelled_at": 1,
+        "cancelled_by": 1,
+        "disposition_no": "RPL-HANDOFF",
+        "disposition_type": "REPLACE",
+        "id": 1,
+        "posted_at": 1792394183,
+        "posted_by": 7,
+        "purchase_receipt_id": 1,
+        "purchase_receipt_item_id": 1,
+        "quality_inspection_id": 1,
+        "quantity": "3",
+        "reason": "供应商补换",
+        "replacement_receipt_id": 2,
+        "status": "POSTED",
+        "supplier_id": 1,
+        "supplier_name": "模拟补换供应商",
+        "version": 2
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "reason": "接口调用示例"
+    }
+  },
+  "purchase.cancel_purchase_return": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_return": {
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394185,
+            "id": 1,
+            "lot_id": 1,
+            "material_id": 1,
+            "note": null,
+            "purchase_receipt_item_id": 1,
+            "quantity": "2",
+            "return_id": 1,
+            "source_line_no": null,
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": "供应商退货",
+        "posted_at": 1792394185,
+        "purchase_receipt_id": 2,
+        "quality_inspection_id": null,
+        "return_no": "RET-JSONRPC-CORRECTION",
+        "return_reason": null,
+        "returned_at": 1783987200,
+        "status": "CANCELLED",
+        "supplier_name": "质检供应商",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseCorrectionAPILifecycle"
+  },
+  "purchase.create_purchase_receipt_adjustment_from_receipt": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt_adjustment": {
+        "adjusted_at": 1783987200,
+        "adjustment_no": "ADJ-JSONRPC-CORRECTION",
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "adjust_type": "QUANTITY_INCREASE",
+            "adjustment_id": 1,
+            "correction_group": null,
+            "created_at": 1792394185,
+            "id": 1,
+            "lot_id": 1,
+            "material_id": 1,
+            "note": null,
+            "purchase_receipt_item_id": 1,
+            "quantity": "3",
+            "source_line_no": "1:QUANTITY_INCREASE",
+            "unit_id": 1,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "posted_at": null,
+        "purchase_receipt_id": 2,
+        "reason": "补记实收数量",
+        "status": "DRAFT",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "adjusted_at": "2026-07-14",
+      "adjustment_no": "ADJ-JSONRPC-CORRECTION",
+      "idempotency_key": "adjustment-jsonrpc-correction",
+      "items": [
+        {
+          "adjust_type": "QUANTITY_INCREASE",
+          "purchase_receipt_item_id": 1,
+          "quantity": "3"
+        }
+      ],
+      "purchase_receipt_id": 2,
+      "reason": "补记实收数量"
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseCorrectionAPILifecycle"
+  },
+  "purchase.create_purchase_receipt_from_purchase_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt": {
+        "can_post": false,
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": "30",
+            "created_at": 1792394185,
+            "declared_quantity": null,
+            "id": 1,
+            "lot_id": 1,
+            "lot_no": "PR-1-LINE-1",
+            "material_id": 1,
+            "note": null,
+            "posted": false,
+            "price_confirmed_later": false,
+            "purchase_order_item_id": 1,
+            "quantity": "12",
+            "receipt_id": 1,
+            "rejection_disposed": false,
+            "source_line_no": "1",
+            "unit_id": 1,
+            "unit_price": "2.5",
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "pending_inbound_lines": 1,
+        "posted_at": null,
+        "posted_lines": 0,
+        "purchase_order_id": 1,
+        "purchase_order_no": "PO-JSONRPC-RECEIPT",
+        "quality_inspections": [
+          {
+            "batch_quantity": null,
+            "check_items": [],
+            "corrected_inspection_id": null,
+            "corrected_inspection_no": null,
+            "correction_of_inspection_id": null,
+            "correction_of_inspection_no": null,
+            "created_at": 1792394185,
+            "decision_note": null,
+            "defect_rate_operator": null,
+            "defect_rate_percent": null,
+            "gate_code": null,
+            "id": 1,
+            "inspected_at": null,
+            "inspection_no": "IQC-PR-1-ITEM-1",
+            "inspection_type": "INCOMING",
+            "inspector_id": null,
+            "inspector_name": null,
+            "inventory_lot_id": 1,
+            "material_id": 1,
+            "operation_code": null,
+            "operation_name": null,
+            "original_lot_status": "HOLD",
+            "product_code": null,
+            "product_name": null,
+            "production_order_item_id": null,
+            "production_order_no": null,
+            "production_wip_batch_id": null,
+            "purchase_receipt_id": 1,
+            "purchase_receipt_item_id": 1,
+            "result": null,
+            "source_id": 1,
+            "source_no": null,
+            "source_type": "PURCHASE_RECEIPT",
+            "status": "SUBMITTED",
+            "subject_id": 1,
+            "subject_type": "MATERIAL",
+            "superseded_at": null,
+            "superseded_by": null,
+            "superseded_reason": null,
+            "unit_id": null,
+            "unit_name": null,
+            "unit_precision": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1,
+            "wip_batch_no": null
+          }
+        ],
+        "receipt_no": "PR-FROM-PO-001",
+        "received_at": 1781654400,
+        "status": "DRAFT",
+        "supplier_id": 1,
+        "supplier_name": "采购供应商",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "all_remaining": true,
+      "idempotency_key": "jsonrpc-create-receipt-from-po-attempt-1",
+      "purchase_order_id": 1,
+      "receipt_no": "PR-FROM-PO-001",
+      "received_at": "2026-06-17",
+      "warehouse_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnly"
+  },
+  "purchase.create_purchase_rejection_disposition": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_rejection_disposition": {
+        "cancel_reason": "DEMO",
+        "cancelled_at": 1,
+        "cancelled_by": 1,
+        "disposition_no": "RPL-HANDOFF",
+        "disposition_type": "REPLACE",
+        "id": 1,
+        "posted_at": 1792394183,
+        "posted_by": 7,
+        "purchase_receipt_id": 1,
+        "purchase_receipt_item_id": 1,
+        "quality_inspection_id": 1,
+        "quantity": "3",
+        "reason": "供应商补换",
+        "replacement_receipt_id": 2,
+        "status": "POSTED",
+        "supplier_id": 1,
+        "supplier_name": "模拟补换供应商",
+        "version": 2
+      }
+    },
+    "params": {
+      "idempotency_key": "demo-purchase-create_purchase_rejection_disposition-001",
+      "quantity": "6",
+      "reason": "接口调用示例"
+    }
+  },
+  "purchase.create_purchase_return_from_quality_inspection": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_return": {
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394185,
+            "id": 1,
+            "lot_id": 1,
+            "material_id": 1,
+            "note": "供应商复核",
+            "purchase_receipt_item_id": 1,
+            "quantity": "2",
+            "return_id": 1,
+            "source_line_no": null,
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": "供应商复核",
+        "posted_at": null,
+        "purchase_receipt_id": 1,
+        "quality_inspection_id": 2,
+        "return_no": "RET-JSONRPC-QI-SOURCE",
+        "return_reason": "尺寸不合格退供应商",
+        "returned_at": 1783987200,
+        "status": "DRAFT",
+        "supplier_name": "质检供应商",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "idempotency_key": "return-jsonrpc-quality-source",
+      "note": "供应商复核",
+      "quality_inspection_id": 2,
+      "quantity": "2",
+      "reason": "尺寸不合格退供应商",
+      "return_no": "RET-JSONRPC-QI-SOURCE",
+      "returned_at": "2026-07-14"
+    },
+    "test": "TestJsonrpcDispatcher_RejectedQualityInspectionCreatesTraceablePurchaseReturn"
+  },
+  "purchase.create_purchase_return_from_receipt": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_return": {
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394185,
+            "id": 1,
+            "lot_id": 1,
+            "material_id": 1,
+            "note": null,
+            "purchase_receipt_item_id": 1,
+            "quantity": "2",
+            "return_id": 1,
+            "source_line_no": null,
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": "供应商退货",
+        "posted_at": null,
+        "purchase_receipt_id": 2,
+        "quality_inspection_id": null,
+        "return_no": "RET-JSONRPC-CORRECTION",
+        "return_reason": null,
+        "returned_at": 1783987200,
+        "status": "DRAFT",
+        "supplier_name": "质检供应商",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "idempotency_key": "return-jsonrpc-correction",
+      "items": [
+        {
+          "purchase_receipt_item_id": 1,
+          "quantity": "2"
+        }
+      ],
+      "note": "供应商退货",
+      "purchase_receipt_id": 2,
+      "return_no": "RET-JSONRPC-CORRECTION",
+      "returned_at": "2026-07-14"
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseCorrectionAPILifecycle"
+  },
+  "purchase.get_purchase_receipt": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt": {
+        "can_post": false,
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394185,
+            "declared_quantity": null,
+            "id": 1,
+            "lot_id": 1,
+            "lot_no": "JSONRPC-LOT-001",
+            "material_id": 1,
+            "note": null,
+            "posted": true,
+            "price_confirmed_later": false,
+            "purchase_order_item_id": 1,
+            "quantity": "8.5",
+            "receipt_id": 1,
+            "rejection_disposed": false,
+            "source_line_no": "1",
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "pending_inbound_lines": 0,
+        "posted_at": 1792394185,
+        "posted_lines": 1,
+        "purchase_order_id": 1,
+        "purchase_order_no": "PO-RECEIPT-APPEND-JSONRPC-API",
+        "quality_inspections": [],
+        "receipt_no": "PR-RECEIPT-APPEND-JSONRPC-API",
+        "received_at": 1781136000,
+        "status": "POSTED",
+        "supplier_id": 1,
+        "supplier_name": "追加来源供应商-JSONRPC-API",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact"
+  },
+  "purchase.get_purchase_receipt_adjustment": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_receipt_adjustment": {
+        "adjusted_at": 1783987200,
+        "adjustment_no": "ADJ-JSONRPC-CORRECTION",
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [],
+        "note": "DEMO",
+        "posted_at": 1792394185,
+        "purchase_receipt_id": 2,
+        "reason": "补记实收数量",
+        "status": "DRAFT",
+        "updated_at": 1792394185
+      }
+    },
+    "params": {
+      "id": 2
+    }
+  },
+  "purchase.get_purchase_rejection_disposition": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_rejection_disposition": {
+        "cancel_reason": "DEMO",
+        "cancelled_at": 1,
+        "cancelled_by": 1,
+        "disposition_no": "RPL-HANDOFF",
+        "disposition_type": "REPLACE",
+        "id": 1,
+        "posted_at": 1792394183,
+        "posted_by": 7,
+        "purchase_receipt_id": 1,
+        "purchase_receipt_item_id": 1,
+        "quality_inspection_id": 1,
+        "quantity": "3",
+        "reason": "供应商补换",
+        "replacement_receipt_id": 2,
+        "status": "POSTED",
+        "supplier_id": 1,
+        "supplier_name": "模拟补换供应商",
+        "version": 2
+      }
+    },
+    "params": {
+      "id": 2
+    }
+  },
+  "purchase.get_purchase_return": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_return": {
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [],
+        "note": "供应商复核",
+        "posted_at": 1792394185,
+        "purchase_receipt_id": 1,
+        "quality_inspection_id": 2,
+        "return_no": "RET-JSONRPC-QI-SOURCE",
+        "return_reason": "尺寸不合格退供应商",
+        "returned_at": 1783987200,
+        "status": "DRAFT",
+        "supplier_name": "质检供应商",
+        "updated_at": 1792394185
+      }
+    },
+    "params": {
+      "id": 2
+    }
+  },
+  "purchase.list_purchase_receipt_adjustments": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "purchase_receipt_adjustments": [
+        {
+          "adjusted_at": 1783987200,
+          "adjustment_no": "ADJ-JSONRPC-CORRECTION",
+          "created_at": 1792394185,
+          "id": 1,
+          "items": [
+            {
+              "adjust_type": "QUANTITY_INCREASE",
+              "adjustment_id": 1,
+              "correction_group": null,
+              "created_at": 1792394185,
+              "id": 1,
+              "lot_id": 1,
+              "material_id": 1,
+              "note": null,
+              "purchase_receipt_item_id": 1,
+              "quantity": "3",
+              "source_line_no": "1:QUANTITY_INCREASE",
+              "unit_id": 1,
+              "updated_at": 1792394185,
+              "warehouse_id": 1
+            }
+          ],
+          "note": null,
+          "posted_at": null,
+          "purchase_receipt_id": 2,
+          "reason": "补记实收数量",
+          "status": "DRAFT",
+          "updated_at": 1792394185
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "adjust_type": "QUANTITY_INCREASE",
+      "lot_id": 1,
+      "material_id": 1,
+      "purchase_receipt_id": 2,
+      "status": "DRAFT"
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseCorrectionAPILifecycle"
+  },
+  "purchase.list_purchase_receipts": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "purchase_receipts": [],
+      "status_counts": {},
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "include_status_counts": true,
+      "limit": 20
+    },
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "case": "purchase.list_purchase_receipts",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
+    }
+  },
+  "purchase.list_purchase_rejection_dispositions": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_rejection_dispositions": [],
+      "total": 1
+    },
+    "params": {}
+  },
+  "purchase.list_purchase_returns": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "purchase_returns": [
+        {
+          "created_at": 1792394185,
+          "id": 1,
+          "items": [
+            {
+              "amount": null,
+              "created_at": 1792394185,
+              "id": 1,
+              "lot_id": 1,
+              "material_id": 1,
+              "note": "供应商复核",
+              "purchase_receipt_item_id": 1,
+              "quantity": "2",
+              "return_id": 1,
+              "source_line_no": null,
+              "unit_id": 1,
+              "unit_price": null,
+              "updated_at": 1792394185,
+              "warehouse_id": 1
+            }
+          ],
+          "note": "供应商复核",
+          "posted_at": null,
+          "purchase_receipt_id": 1,
+          "quality_inspection_id": 2,
+          "return_no": "RET-JSONRPC-QI-SOURCE",
+          "return_reason": "尺寸不合格退供应商",
+          "returned_at": 1783987200,
+          "status": "DRAFT",
+          "supplier_name": "质检供应商",
+          "updated_at": 1792394185
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "quality_inspection_id": 2
+    },
+    "test": "TestJsonrpcDispatcher_RejectedQualityInspectionCreatesTraceablePurchaseReturn"
+  },
+  "purchase.post_purchase_receipt": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt": {
+        "can_post": false,
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394185,
+            "declared_quantity": null,
+            "id": 1,
+            "lot_id": 1,
+            "lot_no": "JSONRPC-LOT-001",
+            "material_id": 1,
+            "note": null,
+            "posted": true,
+            "price_confirmed_later": false,
+            "purchase_order_item_id": 1,
+            "quantity": "8.5",
+            "receipt_id": 1,
+            "rejection_disposed": false,
+            "source_line_no": "1",
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "pending_inbound_lines": 0,
+        "posted_at": 1792394185,
+        "posted_lines": 1,
+        "purchase_order_id": 1,
+        "purchase_order_no": "PO-RECEIPT-APPEND-JSONRPC-API",
+        "quality_inspections": [],
+        "receipt_no": "PR-RECEIPT-APPEND-JSONRPC-API",
+        "received_at": 1781136000,
+        "status": "POSTED",
+        "supplier_id": 1,
+        "supplier_name": "追加来源供应商-JSONRPC-API",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact"
+  },
+  "purchase.post_purchase_receipt_adjustment": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_receipt_adjustment": {
+        "adjusted_at": 1783987200,
+        "adjustment_no": "ADJ-JSONRPC-CORRECTION",
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "adjust_type": "QUANTITY_INCREASE",
+            "adjustment_id": 1,
+            "correction_group": null,
+            "created_at": 1792394185,
+            "id": 1,
+            "lot_id": 1,
+            "material_id": 1,
+            "note": null,
+            "purchase_receipt_item_id": 1,
+            "quantity": "3",
+            "source_line_no": "1:QUANTITY_INCREASE",
+            "unit_id": 1,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": null,
+        "posted_at": 1792394185,
+        "purchase_receipt_id": 2,
+        "reason": "补记实收数量",
+        "status": "POSTED",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseCorrectionAPILifecycle"
+  },
+  "purchase.post_purchase_rejection_disposition": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_rejection_disposition": {
+        "cancel_reason": null,
+        "cancelled_at": null,
+        "cancelled_by": null,
+        "disposition_no": "RPL-HANDOFF",
+        "disposition_type": "REPLACE",
+        "id": 1,
+        "posted_at": 1792394183,
+        "posted_by": 7,
+        "purchase_receipt_id": 1,
+        "purchase_receipt_item_id": 1,
+        "quality_inspection_id": 1,
+        "quantity": "3",
+        "reason": "供应商补换",
+        "replacement_receipt_id": 2,
+        "status": "POSTED",
+        "supplier_id": null,
+        "supplier_name": "模拟补换供应商",
+        "version": 2
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 1,
+      "id": 1
+    },
+    "test": "TestJsonrpcReplacementRequiresWarehouseCountAndStartsFreshInspection"
+  },
+  "purchase.post_purchase_return": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_return": {
+        "created_at": 1792394185,
+        "id": 1,
+        "items": [
+          {
+            "amount": null,
+            "created_at": 1792394185,
+            "id": 1,
+            "lot_id": 1,
+            "material_id": 1,
+            "note": null,
+            "purchase_receipt_item_id": 1,
+            "quantity": "2",
+            "return_id": 1,
+            "source_line_no": null,
+            "unit_id": 1,
+            "unit_price": null,
+            "updated_at": 1792394185,
+            "warehouse_id": 1
+          }
+        ],
+        "note": "供应商退货",
+        "posted_at": 1792394185,
+        "purchase_receipt_id": 2,
+        "quality_inspection_id": null,
+        "return_no": "RET-JSONRPC-CORRECTION",
+        "return_reason": null,
+        "returned_at": 1783987200,
+        "status": "POSTED",
+        "supplier_name": "质检供应商",
+        "updated_at": 1792394185
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseCorrectionAPILifecycle"
+  },
+  "purchase_order.cancel_purchase_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_order": {
+        "contract_party_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "delivery_address": "DEMO",
+        "expected_arrival_date": 1,
+        "id": 1,
+        "invoice_category": "DEMO",
+        "invoice_required": false,
+        "lifecycle_status": "approved",
+        "note": "DEMO",
+        "payment_method": "DEMO",
+        "payment_term_days": 45,
+        "purchase_date": -62135596800,
+        "purchase_order_no": "",
+        "settled_at": 1,
+        "settled_by": 1,
+        "settlement_action": "DEMO",
+        "settlement_mode": "DEMO",
+        "settlement_reason": "DEMO",
+        "supplier_confirmed_arrival_date": 1,
+        "supplier_id": 0,
+        "supplier_purchase_order_no": "DEMO",
+        "supplier_snapshot": {},
+        "updated_at": -62135596800,
+        "version": 3
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "idempotency_key": "demo-purchase_order-cancel_purchase_order-001",
+      "reason": "接口调用示例"
+    }
+  },
+  "purchase_order.close_purchase_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_order": {
+        "contract_party_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "delivery_address": "DEMO",
+        "expected_arrival_date": 1,
+        "id": 1,
+        "invoice_category": "DEMO",
+        "invoice_required": false,
+        "lifecycle_status": "approved",
+        "note": "DEMO",
+        "payment_method": "DEMO",
+        "payment_term_days": 45,
+        "purchase_date": -62135596800,
+        "purchase_order_no": "",
+        "settled_at": 1,
+        "settled_by": 1,
+        "settlement_action": "DEMO",
+        "settlement_mode": "DEMO",
+        "settlement_reason": "DEMO",
+        "supplier_confirmed_arrival_date": 1,
+        "supplier_id": 0,
+        "supplier_purchase_order_no": "DEMO",
+        "supplier_snapshot": {},
+        "updated_at": -62135596800,
+        "version": 3
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "idempotency_key": "demo-purchase_order-close_purchase_order-001",
+      "reason": "接口调用示例"
+    }
+  },
+  "purchase_order.complete_purchase_order_terms": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_order": {
+        "contract_party_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "delivery_address": null,
+        "expected_arrival_date": null,
+        "id": 1,
+        "invoice_category": null,
+        "invoice_required": null,
+        "lifecycle_status": "approved",
+        "note": null,
+        "payment_method": null,
+        "payment_term_days": null,
+        "purchase_date": -62135596800,
+        "purchase_order_no": "",
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "supplier_confirmed_arrival_date": null,
+        "supplier_id": 0,
+        "supplier_purchase_order_no": null,
+        "supplier_snapshot": {},
+        "updated_at": -62135596800,
+        "version": 3
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_arrival_date": null,
+      "expected_version": 2,
+      "id": 1,
+      "idempotency_key": "purchase-terms-rpc",
+      "items": [
+        {
+          "expected_arrival_date": null,
+          "id": 3,
+          "unit_price": "2.50"
+        }
+      ],
+      "supplier_confirmed_arrival_date": null
+    },
+    "test": "TestPurchaseOrderTermsRPCRequiresReadUpdateAndCommercialPermissions"
+  },
+  "purchase_order.get_purchase_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "purchase_order": {
+        "contract_party_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "delivery_address": "DEMO",
+        "expected_arrival_date": 1,
+        "id": 1,
+        "invoice_category": "DEMO",
+        "invoice_required": false,
+        "lifecycle_status": "approved",
+        "note": "DEMO",
+        "payment_method": "DEMO",
+        "payment_term_days": 45,
+        "purchase_date": -62135596800,
+        "purchase_order_no": "",
+        "settled_at": 1,
+        "settled_by": 1,
+        "settlement_action": "DEMO",
+        "settlement_mode": "DEMO",
+        "settlement_reason": "DEMO",
+        "supplier_confirmed_arrival_date": 1,
+        "supplier_id": 0,
+        "supplier_purchase_order_no": "DEMO",
+        "supplier_snapshot": {},
+        "updated_at": -62135596800,
+        "version": 3
+      }
+    },
+    "params": {
+      "id": 2
+    }
+  },
+  "purchase_order.get_purchase_order_receipt_progress": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_order_receipt_progress": {
+        "items": [
+          {
+            "can_generate": true,
+            "disabled_reason": "",
+            "draft_reserved_quantity": "2.000002",
+            "effective_received_quantity": "5.000001",
+            "line_no": 3,
+            "line_status": "open",
+            "material_code": "MAT-PROGRESS-RPC",
+            "material_id": 81,
+            "material_name": "短毛绒",
+            "purchase_order_item_id": 71,
+            "purchased_quantity": "10.000006",
+            "remaining_generatable_quantity": "3.000003",
+            "remaining_receivable_quantity": "5.000005",
+            "unit_code": "KG",
+            "unit_id": 91,
+            "unit_name": "千克"
+          }
+        ],
+        "lifecycle_status": "approved",
+        "purchase_order_id": 7,
+        "purchase_order_no": "PO-PROGRESS-RPC"
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 7
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseOrderReceiptProgressRequiresIntersectionAndSerializesExactProjection"
+  },
+  "purchase_order.list_purchase_followups": {
+    "basis": "handler-fixture",
+    "data": {
+      "access": {
+        "commercial": false,
+        "finance": false,
+        "quality": false
+      },
+      "as_of_date": "2026-10-26",
+      "counts": {},
+      "days": {},
+      "limit": 25,
+      "offset": 0,
+      "rows": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "kind": "all"
+    },
+    "test": "TestPurchaseFollowupsRPCEnforcesSourceAndCategoryPermissions"
+  },
+  "purchase_order.list_purchase_order_items": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "purchase_order_items": [
+        {
+          "amount": null,
+          "color_snapshot": null,
+          "created_at": 1,
+          "expected_arrival_date": null,
+          "id": 1,
+          "line_no": 1,
+          "line_status": "open",
+          "material_code_snapshot": null,
+          "material_id": 1,
+          "material_name_snapshot": null,
+          "material_spec_snapshot": null,
+          "note": null,
+          "product_name_snapshot": null,
+          "product_no_snapshot": null,
+          "product_order_no_snapshot": null,
+          "purchase_order_id": 1,
+          "purchased_quantity": "12.5",
+          "supplier_item_no_snapshot": null,
+          "unit_id": 1,
+          "unit_name_snapshot": null,
+          "unit_price": null,
+          "updated_at": 1
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "purchase_order_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule"
+  },
+  "purchase_order.list_purchase_orders": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "purchase_orders": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "limit": 20
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule"
+  },
+  "purchase_order.save_purchase_order_with_items": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_order": {
+        "contract_party_snapshot": {},
+        "created_at": 1,
+        "currency": "CNY",
+        "delivery_address": null,
+        "expected_arrival_date": null,
+        "id": 1,
+        "invoice_category": null,
+        "invoice_required": null,
+        "lifecycle_status": "draft",
+        "note": null,
+        "payment_method": null,
+        "payment_term_days": 30,
+        "purchase_date": 1781481600,
+        "purchase_order_no": "PO-JSONRPC-PERM",
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "supplier_confirmed_arrival_date": null,
+        "supplier_id": 1,
+        "supplier_purchase_order_no": null,
+        "supplier_snapshot": {},
+        "updated_at": 1,
+        "version": 1
+      },
+      "purchase_order_items": []
+    },
+    "message": "OK",
+    "params": {
+      "purchase_date": "2026-06-15",
+      "purchase_order_no": "PO-JSONRPC-PERM",
+      "supplier_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions"
+  },
+  "purchase_order.update_purchase_order_delivery": {
+    "basis": "handler-fixture",
+    "data": {
+      "purchase_order": {
+        "contract_party_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "delivery_address": null,
+        "expected_arrival_date": null,
+        "id": 1,
+        "invoice_category": null,
+        "invoice_required": null,
+        "lifecycle_status": "approved",
+        "note": null,
+        "payment_method": null,
+        "payment_term_days": null,
+        "purchase_date": -62135596800,
+        "purchase_order_no": "",
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "supplier_confirmed_arrival_date": null,
+        "supplier_id": 0,
+        "supplier_purchase_order_no": null,
+        "supplier_snapshot": {},
+        "updated_at": -62135596800,
+        "version": 3
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_arrival_date": null,
+      "expected_version": 2,
+      "id": 1,
+      "idempotency_key": "purchase-delivery-rpc",
+      "items": [
+        {
+          "expected_arrival_date": null,
+          "id": 3
+        }
+      ],
+      "supplier_confirmed_arrival_date": null
+    },
+    "test": "TestPurchaseOrderDeliveryRPCDoesNotRequireOrAcceptPrices"
+  },
+  "quality.cancel_quality_inspection": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": "来料批次撤检",
+        "defect_rate_operator": null,
+        "defect_rate_percent": null,
+        "gate_code": null,
+        "id": 6,
+        "inspected_at": null,
+        "inspection_no": "QI-JSONRPC-CANCEL",
+        "inspection_type": "INCOMING",
+        "inspector_id": null,
+        "inspector_name": null,
+        "inventory_lot_id": 3,
+        "material_id": 1,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": 3,
+        "purchase_receipt_item_id": 3,
+        "result": null,
+        "source_id": 3,
+        "source_no": null,
+        "source_type": "PURCHASE_RECEIPT",
+        "status": "CANCELLED",
+        "subject_id": 1,
+        "subject_type": "MATERIAL",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 1,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "decision_note": "来料批次撤检",
+      "id": 6
+    },
+    "test": "TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryTxn"
+  },
+  "quality.correct_quality_inspection_result": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": 1,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": "仪器校准复核失败",
+        "defect_rate_operator": null,
+        "defect_rate_percent": null,
+        "gate_code": null,
+        "id": 2,
+        "inspected_at": null,
+        "inspection_no": "QI-RPC-CORR-R2",
+        "inspection_type": "INCOMING",
+        "inspector_id": null,
+        "inspector_name": null,
+        "inventory_lot_id": 1,
+        "material_id": 1,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "REJECTED",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": 1,
+        "purchase_receipt_item_id": 1,
+        "result": null,
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "PURCHASE_RECEIPT",
+        "status": "SUBMITTED",
+        "subject_id": 1,
+        "subject_type": "MATERIAL",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 1,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "correction_inspection_no": "QI-RPC-CORR-R2",
+      "id": 1,
+      "reason": "仪器校准复核失败"
+    },
+    "test": "TestJsonrpcDispatcher_CorrectQualityInspectionResultContract"
+  },
+  "quality.create_finished_goods_quality_inspection_draft": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": "成品质检待判定",
+        "defect_rate_operator": null,
+        "defect_rate_percent": null,
+        "gate_code": null,
+        "id": 1,
+        "inspected_at": null,
+        "inspection_no": "QI-JSONRPC-FG",
+        "inspection_type": "FINISHED_GOODS",
+        "inspector_id": null,
+        "inspector_name": null,
+        "inventory_lot_id": 1,
+        "material_id": null,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": null,
+        "purchase_receipt_item_id": null,
+        "result": null,
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "SHIPMENT",
+        "status": "DRAFT",
+        "subject_id": 1,
+        "subject_type": "PRODUCT",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 2,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "decision_note": "成品质检待判定",
+      "finished_goods_lot_id": 1,
+      "inspection_no": "QI-JSONRPC-FG",
+      "product_id": 1,
+      "shipment_id": 1,
+      "warehouse_id": 2
+    },
+    "test": "TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact"
+  },
+  "quality.create_quality_inspection_draft": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": null,
+        "defect_rate_operator": null,
+        "defect_rate_percent": null,
+        "gate_code": null,
+        "id": 4,
+        "inspected_at": null,
+        "inspection_no": "QI-JSONRPC-REJECT",
+        "inspection_type": "INCOMING",
+        "inspector_id": null,
+        "inspector_name": null,
+        "inventory_lot_id": 2,
+        "material_id": 1,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": 2,
+        "purchase_receipt_item_id": 2,
+        "result": null,
+        "source_id": 2,
+        "source_no": null,
+        "source_type": "PURCHASE_RECEIPT",
+        "status": "DRAFT",
+        "subject_id": 1,
+        "subject_type": "MATERIAL",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 1,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "inspection_no": "QI-JSONRPC-REJECT",
+      "purchase_receipt_id": 2,
+      "purchase_receipt_item_id": 2
+    },
+    "test": "TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryTxn"
+  },
+  "quality.create_quality_inspection_from_outsourcing_return": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": "委外回货抽检",
+        "defect_rate_operator": null,
+        "defect_rate_percent": null,
+        "gate_code": null,
+        "id": 1,
+        "inspected_at": null,
+        "inspection_no": "QI-RPC-OUT-INSPECTION",
+        "inspection_type": "OUTSOURCING_RETURN",
+        "inspector_id": null,
+        "inspector_name": null,
+        "inventory_lot_id": 1,
+        "material_id": null,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": null,
+        "purchase_receipt_item_id": null,
+        "result": null,
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "OUTSOURCING_FACT",
+        "status": "DRAFT",
+        "subject_id": 1,
+        "subject_type": "PRODUCT",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 2,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "customer_key": "demo",
+      "fact_id": 1,
+      "inspection_no": "QI-RPC-OUT-INSPECTION",
+      "note": "委外回货抽检"
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven"
+  },
+  "quality.get_quality_inspection": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": null,
+        "defect_rate_operator": null,
+        "defect_rate_percent": null,
+        "gate_code": null,
+        "id": 2,
+        "inspected_at": null,
+        "inspection_no": "QI-MODULE-ENABLED",
+        "inspection_type": "INCOMING",
+        "inspector_id": null,
+        "inspector_name": null,
+        "inventory_lot_id": 1,
+        "material_id": 1,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": 1,
+        "purchase_receipt_item_id": 1,
+        "result": null,
+        "source_id": 1,
+        "source_no": "QI-MODULE-IN-READONLY",
+        "source_type": "PURCHASE_RECEIPT",
+        "status": "DRAFT",
+        "subject_id": 1,
+        "subject_type": "MATERIAL",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": 1,
+        "unit_name": "PCS单位",
+        "unit_precision": 2,
+        "updated_at": 1792394185,
+        "warehouse_id": 1,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 2
+    },
+    "test": "TestJsonrpcDispatcher_QualityInspectionAPIRequiresEnabledModules"
+  },
+  "quality.list_finished_goods_quality_inspections": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "quality_inspections": [
+        {
+          "batch_quantity": null,
+          "check_items": [],
+          "corrected_inspection_id": null,
+          "corrected_inspection_no": null,
+          "correction_of_inspection_id": null,
+          "correction_of_inspection_no": null,
+          "created_at": 1792394185,
+          "decision_note": "成品质检待判定",
+          "defect_rate_operator": null,
+          "defect_rate_percent": null,
+          "gate_code": null,
+          "id": 1,
+          "inspected_at": null,
+          "inspection_no": "QI-JSONRPC-FG",
+          "inspection_type": "FINISHED_GOODS",
+          "inspector_id": null,
+          "inspector_name": null,
+          "inventory_lot_id": 1,
+          "material_id": null,
+          "operation_code": null,
+          "operation_name": null,
+          "original_lot_status": "ACTIVE",
+          "product_code": null,
+          "product_name": null,
+          "production_order_item_id": null,
+          "production_order_no": null,
+          "production_wip_batch_id": null,
+          "purchase_receipt_id": null,
+          "purchase_receipt_item_id": null,
+          "result": null,
+          "source_id": 1,
+          "source_no": "QI-JSONRPC-FG-SHIP",
+          "source_type": "SHIPMENT",
+          "status": "SUBMITTED",
+          "subject_id": 1,
+          "subject_type": "PRODUCT",
+          "superseded_at": null,
+          "superseded_by": null,
+          "superseded_reason": null,
+          "unit_id": null,
+          "unit_name": null,
+          "unit_precision": null,
+          "updated_at": 1792394185,
+          "warehouse_id": 2,
+          "wip_batch_no": null
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "include_superseded": false,
+      "product_id": 1,
+      "shipment_id": 1,
+      "status": "SUBMITTED"
+    },
+    "test": "TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact"
+  },
+  "quality.list_outsourcing_return_quality_inspections": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "quality_inspections": [
+        {
+          "batch_quantity": null,
+          "check_items": [],
+          "corrected_inspection_id": null,
+          "corrected_inspection_no": null,
+          "correction_of_inspection_id": null,
+          "correction_of_inspection_no": null,
+          "created_at": 1792394185,
+          "decision_note": "尺寸不符",
+          "defect_rate_operator": "APPROX",
+          "defect_rate_percent": "20",
+          "gate_code": null,
+          "id": 1,
+          "inspected_at": 1792394185,
+          "inspection_no": "QI-RPC-OUT-INSPECTION",
+          "inspection_type": "OUTSOURCING_RETURN",
+          "inspector_id": null,
+          "inspector_name": null,
+          "inventory_lot_id": 1,
+          "material_id": null,
+          "operation_code": null,
+          "operation_name": null,
+          "original_lot_status": "ACTIVE",
+          "product_code": null,
+          "product_name": null,
+          "production_order_item_id": null,
+          "production_order_no": null,
+          "production_wip_batch_id": null,
+          "purchase_receipt_id": null,
+          "purchase_receipt_item_id": null,
+          "result": "REJECT",
+          "source_id": 1,
+          "source_no": "QI-RPC-OUT-RETURN",
+          "source_type": "OUTSOURCING_FACT",
+          "status": "REJECTED",
+          "subject_id": 1,
+          "subject_type": "PRODUCT",
+          "superseded_at": null,
+          "superseded_by": null,
+          "superseded_reason": null,
+          "unit_id": 1,
+          "unit_name": "PCS单位",
+          "unit_precision": 2,
+          "updated_at": 1792394185,
+          "warehouse_id": 2,
+          "wip_batch_no": null
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "fact_id": 1,
+      "fact_ids": [
+        1
+      ],
+      "include_superseded": false,
+      "status": "REJECTED"
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven"
+  },
+  "quality.list_production_stage_quality_inspections": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "limit": 10,
+      "offset": 0,
+      "quality_inspections": [],
+      "status_counts": {},
+      "total": 1
+    },
+    "params": {
+      "include_superseded": false
+    }
+  },
+  "quality.list_quality_inspections": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "quality_inspections": [
+        {
+          "batch_quantity": null,
+          "check_items": [
+            {
+              "name": "外观",
+              "note": "",
+              "observation": "已核对模拟样品",
+              "requirement": "符合样品",
+              "result": "FAIL",
+              "scope": "FULL"
+            }
+          ],
+          "corrected_inspection_id": null,
+          "corrected_inspection_no": null,
+          "correction_of_inspection_id": null,
+          "correction_of_inspection_no": null,
+          "created_at": 1792394185,
+          "decision_note": "让步接收",
+          "defect_rate_operator": "APPROX",
+          "defect_rate_percent": "5",
+          "gate_code": null,
+          "id": 2,
+          "inspected_at": 1781654400,
+          "inspection_no": "QI-JSONRPC-PASS",
+          "inspection_type": "INCOMING",
+          "inspector_id": null,
+          "inspector_name": null,
+          "inventory_lot_id": 1,
+          "material_id": 1,
+          "operation_code": null,
+          "operation_name": null,
+          "original_lot_status": "ACTIVE",
+          "product_code": null,
+          "product_name": null,
+          "production_order_item_id": null,
+          "production_order_no": null,
+          "production_wip_batch_id": null,
+          "purchase_receipt_id": 1,
+          "purchase_receipt_item_id": 1,
+          "result": "CONCESSION",
+          "source_id": 1,
+          "source_no": "QI-JSONRPC-IN-PASS",
+          "source_type": "PURCHASE_RECEIPT",
+          "status": "PASSED",
+          "subject_id": 1,
+          "subject_type": "MATERIAL",
+          "superseded_at": null,
+          "superseded_by": null,
+          "superseded_reason": null,
+          "unit_id": 1,
+          "unit_name": "PCS单位",
+          "unit_precision": 2,
+          "updated_at": 1792394185,
+          "warehouse_id": 1,
+          "wip_batch_no": null
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "date_from": "2026-06-17",
+      "date_to": "2026-06-17",
+      "include_superseded": false,
+      "inventory_lot_id": 1,
+      "material_id": 1,
+      "purchase_receipt_id": 1,
+      "result": "CONCESSION",
+      "status": "PASSED",
+      "warehouse_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryTxn"
+  },
+  "quality.pass_quality_inspection": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [
+          {
+            "name": "外观",
+            "note": "",
+            "observation": "已核对模拟样品",
+            "requirement": "符合样品",
+            "result": "FAIL",
+            "scope": "FULL"
+          }
+        ],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": "让步接收",
+        "defect_rate_operator": "APPROX",
+        "defect_rate_percent": "5",
+        "gate_code": null,
+        "id": 2,
+        "inspected_at": 1781654400,
+        "inspection_no": "QI-JSONRPC-PASS",
+        "inspection_type": "INCOMING",
+        "inspector_id": 1,
+        "inspector_name": "质检员陈",
+        "inventory_lot_id": 1,
+        "material_id": 1,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "ACTIVE",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": 1,
+        "purchase_receipt_item_id": 1,
+        "result": "CONCESSION",
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "PURCHASE_RECEIPT",
+        "status": "PASSED",
+        "subject_id": 1,
+        "subject_type": "MATERIAL",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 1,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "check_items": [
+        {
+          "name": "外观",
+          "note": "",
+          "observation": "已核对模拟样品",
+          "requirement": "符合样品",
+          "result": "FAIL",
+          "scope": "FULL"
+        }
+      ],
+      "decision_note": "让步接收",
+      "defect_rate_operator": "approx",
+      "defect_rate_percent": "5.0",
+      "id": 2,
+      "inspected_at": "2026-06-17",
+      "result": "CONCESSION"
+    },
+    "test": "TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryTxn"
+  },
+  "quality.reject_quality_inspection": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [
+          {
+            "name": "外观",
+            "note": "",
+            "observation": "已核对模拟样品",
+            "requirement": "符合样品",
+            "result": "FAIL",
+            "scope": "FULL"
+          }
+        ],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": "尺寸不符",
+        "defect_rate_operator": "APPROX",
+        "defect_rate_percent": "20",
+        "gate_code": null,
+        "id": 1,
+        "inspected_at": 1792394185,
+        "inspection_no": "QI-RPC-OUT-INSPECTION",
+        "inspection_type": "OUTSOURCING_RETURN",
+        "inspector_id": 7,
+        "inspector_name": null,
+        "inventory_lot_id": 1,
+        "material_id": null,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "ACTIVE",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": null,
+        "purchase_receipt_item_id": null,
+        "result": "REJECT",
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "OUTSOURCING_FACT",
+        "status": "REJECTED",
+        "subject_id": 1,
+        "subject_type": "PRODUCT",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 2,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "check_items": [
+        {
+          "name": "外观",
+          "note": "",
+          "observation": "已核对模拟样品",
+          "requirement": "符合样品",
+          "result": "FAIL",
+          "scope": "FULL"
+        }
+      ],
+      "decision_note": "尺寸不符",
+      "defect_rate_operator": "APPROX",
+      "defect_rate_percent": "20",
+      "id": 1
+    },
+    "test": "TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven"
+  },
+  "quality.submit_quality_inspection": {
+    "basis": "handler-fixture",
+    "data": {
+      "quality_inspection": {
+        "batch_quantity": null,
+        "check_items": [],
+        "corrected_inspection_id": null,
+        "corrected_inspection_no": null,
+        "correction_of_inspection_id": null,
+        "correction_of_inspection_no": null,
+        "created_at": 1792394185,
+        "decision_note": null,
+        "defect_rate_operator": null,
+        "defect_rate_percent": null,
+        "gate_code": null,
+        "id": 4,
+        "inspected_at": null,
+        "inspection_no": "QI-JSONRPC-REJECT",
+        "inspection_type": "INCOMING",
+        "inspector_id": null,
+        "inspector_name": null,
+        "inventory_lot_id": 2,
+        "material_id": 1,
+        "operation_code": null,
+        "operation_name": null,
+        "original_lot_status": "ACTIVE",
+        "product_code": null,
+        "product_name": null,
+        "production_order_item_id": null,
+        "production_order_no": null,
+        "production_wip_batch_id": null,
+        "purchase_receipt_id": 2,
+        "purchase_receipt_item_id": 2,
+        "result": null,
+        "source_id": 2,
+        "source_no": null,
+        "source_type": "PURCHASE_RECEIPT",
+        "status": "SUBMITTED",
+        "subject_id": 1,
+        "subject_type": "MATERIAL",
+        "superseded_at": null,
+        "superseded_by": null,
+        "superseded_reason": null,
+        "unit_id": null,
+        "unit_name": null,
+        "unit_precision": null,
+        "updated_at": 1792394185,
+        "warehouse_id": 1,
+        "wip_batch_no": null
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 4
+    },
+    "test": "TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryTxn"
+  },
+  "sales_order.boss_review_engineering_material_request": {
+    "basis": "handler-fixture",
+    "data": {
+      "boss_review_note": null,
+      "boss_reviewed_at": null,
+      "boss_reviewed_by": null,
+      "finance_review_note": null,
+      "finance_reviewed_at": null,
+      "finance_reviewed_by": null,
+      "id": 1,
+      "issues": null,
+      "items": null,
+      "order_no": "",
+      "order_status": "",
+      "purchase_orders": null,
+      "rejected_at": null,
+      "rejected_by": null,
+      "review_note": null,
+      "sales_order_id": 0,
+      "source_hash": "",
+      "source_order_version": 0,
+      "sources": null,
+      "status": "APPROVED",
+      "submitted_at": null,
+      "submitted_by": 0,
+      "version": 0
+    },
+    "message": "OK",
+    "params": {
+      "action": "BOSS_APPROVE",
+      "expected_version": 1,
+      "id": 1
+    },
+    "test": "TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides"
+  },
+  "sales_order.cancel_sales_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "sales_order": {
+        "contact_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "customer_id": 0,
+        "customer_order_no": null,
+        "customer_snapshot": {},
+        "delivery_snapshot": {},
+        "engineering_material_status": null,
+        "freight_terms": null,
+        "goods_amount": null,
+        "id": 19,
+        "lifecycle_status": "canceled",
+        "note": null,
+        "order_date": -62135596800,
+        "order_no": "SO-CONTRACT",
+        "order_total": null,
+        "payment_method": null,
+        "payment_term_days": null,
+        "planned_delivery_date": null,
+        "price_condition_note": null,
+        "quoted_freight_amount": null,
+        "sales_owner": null,
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "tax_amount": null,
+        "tax_mode": null,
+        "tax_rate": null,
+        "updated_at": -62135596800,
+        "version": 4
+      }
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 3,
+      "id": 19,
+      "idempotency_key": "cancel-contract",
+      "reason": "客户取消"
+    },
+    "test": "TestIntegrationSourceOrderActionUsesAuthenticatedActor"
+  },
+  "sales_order.close_sales_order": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "sales_order": {
+        "contact_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "customer_id": 0,
+        "customer_order_no": "DEMO",
+        "customer_snapshot": {},
+        "delivery_snapshot": {},
+        "engineering_material_status": "DEMO",
+        "freight_terms": "INCLUDED",
+        "goods_amount": "DEMO",
+        "id": 19,
+        "lifecycle_status": "active",
+        "note": "DEMO",
+        "order_date": -62135596800,
+        "order_no": "SO-CONTRACT",
+        "order_total": "DEMO",
+        "payment_method": "30天月结",
+        "payment_term_days": 30,
+        "planned_delivery_date": 1,
+        "price_condition_note": "已按30天重新报价",
+        "quoted_freight_amount": "88.5",
+        "sales_owner": "张三",
+        "settled_at": 1,
+        "settled_by": 7,
+        "settlement_action": "cancel",
+        "settlement_mode": "DEMO",
+        "settlement_reason": "测试取消原因",
+        "tax_amount": "DEMO",
+        "tax_mode": "NONE",
+        "tax_rate": "DEMO",
+        "updated_at": -62135596800,
+        "version": 1
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "id": 2,
+      "idempotency_key": "demo-sales_order-close_sales_order-001",
+      "reason": "接口调用示例"
+    }
+  },
+  "sales_order.export_sales_orders": {
+    "basis": "handler-fixture",
+    "data": {
+      "sales_orders": [
+        {
+          "customer_id": 1,
+          "id": 1,
+          "lifecycle_status": "draft",
+          "order_no": "SO-EXPORT-001"
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestRPCDocumentedExamples",
+    "verification": {
+      "case": "sales_order.export_sales_orders",
+      "test": "TestRPCDocumentedExamples"
+    }
+  },
+  "sales_order.finance_review_engineering_material_request": {
+    "basis": "handler-fixture",
+    "data": {
+      "boss_review_note": null,
+      "boss_reviewed_at": null,
+      "boss_reviewed_by": null,
+      "finance_review_note": null,
+      "finance_reviewed_at": null,
+      "finance_reviewed_by": null,
+      "id": 1,
+      "issues": null,
+      "items": null,
+      "order_no": "",
+      "order_status": "",
+      "purchase_orders": null,
+      "rejected_at": null,
+      "rejected_by": null,
+      "review_note": null,
+      "sales_order_id": 0,
+      "source_hash": "",
+      "source_order_version": 0,
+      "sources": null,
+      "status": "APPROVED",
+      "submitted_at": null,
+      "submitted_by": 0,
+      "version": 0
+    },
+    "message": "OK",
+    "params": {
+      "action": "FINANCE_APPROVE",
+      "expected_version": 1,
+      "id": 1
+    },
+    "test": "TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides"
+  },
+  "sales_order.get_delivery_progress": {
+    "basis": "handler-fixture",
+    "code": 0,
+    "data": {
+      "current": null,
+      "customer": "",
+      "label": "SO-DEMO-7",
+      "lines": [],
+      "order_id": 7,
+      "owner": "",
+      "recent": [],
+      "snapshot_at": "2026-11-19T09:00:00Z",
+      "status": "active",
+      "tasks_available": false,
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "id": 7,
+      "limit": 20,
+      "offset": 0
+    },
+    "test": "TestSalesDeliveryProgressRequiresOrderAndLineReadsWithoutDashboard"
+  },
+  "sales_order.get_engineering_material_request": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "boss_review_note": "DEMO",
+      "boss_reviewed_at": "DEMO",
+      "boss_reviewed_by": 1,
+      "finance_review_note": "DEMO",
+      "finance_reviewed_at": "DEMO",
+      "finance_reviewed_by": 1,
+      "id": 1,
+      "inventory_reference": {
+        "as_of": "DEMO",
+        "items": [],
+        "scope": "NONE",
+        "status": "DEMO"
+      },
+      "issues": [],
+      "items": [],
+      "order_no": "",
+      "order_status": "",
+      "purchase_orders": [],
+      "rejected_at": "DEMO",
+      "rejected_by": 1,
+      "review_note": "DEMO",
+      "sales_order_id": 0,
+      "source_hash": "",
+      "source_order_version": 0,
+      "sources": [],
+      "status": "SUBMITTED",
+      "submitted_at": "DEMO",
+      "submitted_by": 0,
+      "version": 0
+    },
+    "params": {
+      "sales_order_id": 1001
+    }
+  },
+  "sales_order.get_sales_order": {
+    "basis": "handler-fixture",
+    "data": {
+      "sales_order": {
+        "contact_snapshot": {},
+        "created_at": -62135596800,
+        "currency": "",
+        "customer_id": 0,
+        "customer_order_no": null,
+        "customer_snapshot": {},
+        "delivery_snapshot": {},
+        "engineering_material_status": null,
+        "freight_terms": null,
+        "goods_amount": null,
+        "id": 19,
+        "lifecycle_status": "active",
+        "note": null,
+        "order_date": -62135596800,
+        "order_no": "SO-CONTRACT",
+        "order_total": null,
+        "payment_method": null,
+        "payment_term_days": null,
+        "planned_delivery_date": null,
+        "price_condition_note": null,
+        "quoted_freight_amount": null,
+        "sales_owner": null,
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "tax_amount": null,
+        "tax_mode": null,
+        "tax_rate": null,
+        "updated_at": -62135596800,
+        "version": 1
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 19
+    },
+    "test": "TestIntegrationSalesOrderReadPreservesAuthenticationAndPermissionBoundary"
+  },
+  "sales_order.list_engineering_material_requests": {
+    "basis": "handler-fixture",
+    "data": {
+      "items": [
+        {
+          "id": 3,
+          "sales_order_id": 7,
+          "order_no": "ORDER-7",
+          "order_status": "active",
+          "products": ["模拟小熊"],
+          "product_refs": [
+            {
+              "product_id": 9,
+              "product_name": "模拟小熊",
+              "product_code": "BEAR-9"
+            }
+          ],
+          "status": "APPROVED",
+          "submitted_at": "2026-09-15T08:00:00Z"
+        }
+      ],
+      "total": 11
+    },
+    "message": "OK",
+    "params": {
+      "keyword": "order",
+      "limit": 10,
+      "page": 2,
+      "status": "APPROVED",
+      "sort_by": "submitted_at",
+      "sort_direction": "asc"
+    },
+    "test": "TestEngineeringMaterialListJSONRPCRequiresSourceReadAndValidFilters"
+  },
+  "sales_order.list_sales_order_items": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "sales_order_items": [
+        {
+          "amount": null,
+          "bom_id": null,
+          "color_snapshot": null,
+          "created_at": -62135596800,
+          "customer_product_no": null,
+          "designer": null,
+          "id": 1,
+          "import_source": {},
+          "line_no": 1,
+          "line_status": "open",
+          "note": null,
+          "order_category": "",
+          "ordered_quantity": "10",
+          "planned_delivery_date": null,
+          "pre_shipment_sample_quantity": "0",
+          "process_requirement": null,
+          "product_code_snapshot": null,
+          "product_id": 1,
+          "product_image_attachment_id": null,
+          "product_name_snapshot": null,
+          "product_sku_id": null,
+          "production_quantity": "10",
+          "requested_product_name": null,
+          "sales_order_id": 1,
+          "shipped_quantity": null,
+          "unit_id": 1,
+          "unit_price": null,
+          "unshipped_quantity": null,
+          "updated_at": -62135596800
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "sales_order_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule"
+  },
+  "sales_order.list_sales_order_summary": {
+    "basis": "handler-fixture",
+    "data": {
+      "items": [
+        {
+          "amount": null,
+          "bom_id": null,
+          "color_snapshot": null,
+          "created_at": -62135596800,
+          "currency": "USD",
+          "customer_name": "模拟客户",
+          "customer_order_no": null,
+          "customer_product_no": null,
+          "designer": null,
+          "id": 2,
+          "lifecycle_status": "",
+          "line_no": 0,
+          "line_status": "",
+          "note": null,
+          "order_category": "",
+          "order_date": 1788220800,
+          "order_no": "SO-SUM",
+          "ordered_quantity": "10",
+          "planned_delivery_date": null,
+          "pre_shipment_sample_quantity": "2",
+          "process_requirement": null,
+          "product_code_snapshot": null,
+          "product_id": null,
+          "product_image_attachment_id": null,
+          "product_name_snapshot": null,
+          "product_sku_id": null,
+          "production_quantity": "12",
+          "requested_product_name": null,
+          "sales_order_id": 1,
+          "sales_owner": null,
+          "shipped_quantity": null,
+          "unit_id": 0,
+          "unit_name": "只",
+          "unit_price": "3",
+          "unshipped_quantity": null,
+          "updated_at": -62135596800
+        }
+      ],
+      "limit": 20,
+      "offset": 0,
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "customer_id": 42,
+      "sales_owner_name": "模拟跟单员",
+      "sort_by": "customer_name",
+      "sort_direction": "asc"
+    },
+    "test": "TestSalesOrderSummaryJSONRPCPermissionsFiltersAndRedaction"
+  },
+  "sales_order.list_sales_order_summary_filter_options": {
+    "basis": "handler-fixture",
+    "data": {
+      "customers": [
+        {
+          "code": "C-42",
+          "id": 42,
+          "name": "模拟客户",
+          "previous_names": ["模拟旧名"]
+        }
+      ],
+      "sales_owners": ["模拟跟单员"]
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestSalesOrderSummaryFilterOptionsJSONRPC"
+  },
+  "sales_order.list_sales_orders": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 50,
+      "offset": 0,
+      "sales_orders": [
+        {
+          "contact_snapshot": {
+            "name": "李四"
+          },
+          "created_at": -62135596800,
+          "currency": "",
+          "customer_id": 1,
+          "customer_order_no": null,
+          "customer_snapshot": {},
+          "delivery_snapshot": {},
+          "engineering_material_status": null,
+          "freight_terms": null,
+          "goods_amount": null,
+          "id": 1,
+          "lifecycle_status": "draft",
+          "note": null,
+          "order_date": 1,
+          "order_no": "SO001",
+          "order_total": null,
+          "payment_method": "30天月结",
+          "payment_term_days": 30,
+          "planned_delivery_date": null,
+          "price_condition_note": null,
+          "quoted_freight_amount": null,
+          "sales_owner": "张三",
+          "settled_at": null,
+          "settled_by": null,
+          "settlement_action": null,
+          "settlement_mode": null,
+          "settlement_reason": null,
+          "tax_amount": null,
+          "tax_mode": null,
+          "tax_rate": null,
+          "updated_at": -62135596800,
+          "version": 0
+        }
+      ],
+      "total": 1
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestSalesOrderBOMTaskSourceFilterContract"
+  },
+  "sales_order.save_sales_order_engineering": {
+    "basis": "handler-fixture",
+    "data": {
+      "sales_order_id": 1,
+      "version": 3
+    },
+    "message": "OK",
+    "params": {
+      "expected_version": 2,
+      "id": 1,
+      "items": [
+        {
+          "id": 3,
+          "product_id": null
+        }
+      ]
+    },
+    "test": "TestSalesOrderEngineeringRequiresOwnPermissionAndRejectsCommercialFields"
+  },
+  "sales_order.save_sales_order_with_items": {
+    "basis": "handler-fixture",
+    "data": {
+      "sales_order": {
+        "contact_snapshot": {
+          "name": "李四",
+          "phone": "0574-123456"
+        },
+        "created_at": -62135596800,
+        "currency": "USD",
+        "customer_id": 1,
+        "customer_order_no": null,
+        "customer_snapshot": {},
+        "delivery_snapshot": {},
+        "engineering_material_status": null,
+        "freight_terms": "INCLUDED",
+        "goods_amount": null,
+        "id": 1,
+        "lifecycle_status": "draft",
+        "note": null,
+        "order_date": 1780185600,
+        "order_no": "SO001",
+        "order_total": null,
+        "payment_method": "30天月结",
+        "payment_term_days": 30,
+        "planned_delivery_date": null,
+        "price_condition_note": "已按30天重新报价",
+        "quoted_freight_amount": null,
+        "sales_owner": "张三",
+        "settled_at": null,
+        "settled_by": null,
+        "settlement_action": null,
+        "settlement_mode": null,
+        "settlement_reason": null,
+        "tax_amount": null,
+        "tax_mode": "NONE",
+        "tax_rate": null,
+        "updated_at": -62135596800,
+        "version": 1
+      },
+      "sales_order_items": []
+    },
+    "message": "OK",
+    "params": {
+      "contact_snapshot": {
+        "name": "李四",
+        "phone": "0574-123456"
+      },
+      "currency": "USD",
+      "customer_id": 1,
+      "freight_terms": "INCLUDED",
+      "idempotency_key": "sales-order-example-create",
+      "order_date": "2026-05-31",
+      "order_no": "SO001",
+      "payment_method": "30天月结",
+      "payment_term_days": 30,
+      "price_condition_note": "已按30天重新报价",
+      "sales_owner": "张三",
+      "tax_mode": "NONE"
+    },
+    "test": "TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb"
+  },
+  "sales_order.submit_engineering_material_request": {
+    "basis": "handler-fixture",
+    "data": {
+      "boss_review_note": null,
+      "boss_reviewed_at": null,
+      "boss_reviewed_by": null,
+      "finance_review_note": null,
+      "finance_reviewed_at": null,
+      "finance_reviewed_by": null,
+      "id": 1,
+      "issues": null,
+      "items": null,
+      "order_no": "",
+      "order_status": "",
+      "purchase_orders": null,
+      "rejected_at": null,
+      "rejected_by": null,
+      "review_note": null,
+      "sales_order_id": 0,
+      "source_hash": "",
+      "source_order_version": 0,
+      "sources": null,
+      "status": "SUBMITTED",
+      "submitted_at": null,
+      "submitted_by": 0,
+      "version": 0
+    },
+    "message": "OK",
+    "params": {
+      "expected_source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_version": 1,
+      "sales_order_id": 1
+    },
+    "test": "TestEngineeringMaterialJSONRPCSeparatesReviewersAndRejectsSourceOverrides"
+  },
+  "system.ping": {
+    "basis": "handler-fixture",
+    "data": {
+      "pong": "pong"
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestJSONRPCInternalLogsExcludeParamsEvenInDebug"
+  },
+  "system.version": {
+    "basis": "handler-fixture",
+    "data": {
+      "formal": true,
+      "git_sha": "20c96d3819429361a35d2551b63b211f055de37e",
+      "git_sha_short": "20c96d38",
+      "release_version": "yoyoosun-20260810.1",
+      "version": "yoyoosun-20260810.1"
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestHandleSystemVersionReturnsBuildIdentity"
+  },
+  "workflow.block_task_action": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": null,
+        "blocked_reason": "等待资料确认",
+        "business_status_key": null,
+        "completed_at": null,
+        "config_revision": null,
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": null,
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 43,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "quality",
+        "payload": {
+          "blocked_reason": "等待资料确认",
+          "entry_path": "/erp/mobile/tasks",
+          "surface_key": "mobile_role_tasks"
+        },
+        "priority": 0,
+        "process_instance_id": null,
+        "process_node_instance_id": null,
+        "required_capability_key": null,
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "generic-source",
+        "task_code": "",
+        "task_group": "generic",
+        "task_name": "",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "blocked",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 2
+      }
+    },
+    "message": "任务阻塞已记录",
+    "params": {
+      "action_key": "block",
+      "expected_version": 1,
+      "idempotency_key": "workflow-controlled-block",
+      "payload": {
+        "entry_path": "/erp/mobile/tasks",
+        "surface_key": "mobile_role_tasks"
+      },
+      "reason": " 等待资料确认 ",
+      "task_id": 43
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowControlledTaskActionsUseServerStatusAndActorRole"
+  },
+  "workflow.complete_task_action": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": null,
+        "blocked_reason": null,
+        "business_status_key": null,
+        "completed_at": null,
+        "config_revision": "2026.06.30.workflow-tasks-enabled",
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": null,
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 42,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "engineering",
+        "payload": {
+          "feedback": "工程资料已齐套"
+        },
+        "priority": 0,
+        "process_instance_id": 10,
+        "process_node_instance_id": 20,
+        "required_capability_key": null,
+        "source_id": 1001,
+        "source_no": null,
+        "source_type": "sales_order",
+        "task_code": "",
+        "task_group": "engineering_data",
+        "task_name": "",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "done",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 2
+      }
+    },
+    "message": "任务动作已完成",
+    "params": {
+      "action_key": "complete",
+      "expected_version": 1,
+      "idempotency_key": "workflow-linked-complete-42",
+      "payload": {
+        "feedback": "工程资料已齐套"
+      },
+      "task_id": 42
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode"
+  },
+  "workflow.create_followup_task": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": null,
+        "blocked_reason": null,
+        "business_status_key": null,
+        "completed_at": null,
+        "config_revision": null,
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": null,
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 99,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "",
+        "payload": {},
+        "priority": 0,
+        "process_instance_id": null,
+        "process_node_instance_id": null,
+        "required_capability_key": null,
+        "source_id": 0,
+        "source_no": null,
+        "source_type": "",
+        "task_code": "",
+        "task_group": "",
+        "task_name": "",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "ready",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 0
+      }
+    },
+    "message": "跟进任务已创建",
+    "params": {
+      "assignee_id": 8,
+      "description": "请反馈最终尺寸",
+      "due_at": 1792397786,
+      "idempotency_key": "service-followup",
+      "owner_role_key": "quality",
+      "priority": 0,
+      "source_id": 10,
+      "source_type": "sales_order",
+      "task_name": "确认包装尺寸"
+    },
+    "test": "TestWorkflowFollowupPublicCreateAuthorizationAndReplay"
+  },
+  "workflow.create_task": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": null,
+        "blocked_reason": null,
+        "business_status_key": null,
+        "completed_at": null,
+        "config_revision": null,
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": null,
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 1,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "",
+        "payload": {},
+        "priority": 0,
+        "process_instance_id": null,
+        "process_node_instance_id": null,
+        "required_capability_key": null,
+        "source_id": 0,
+        "source_no": null,
+        "source_type": "",
+        "task_code": "",
+        "task_group": "",
+        "task_name": "",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "ready",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 0
+      }
+    },
+    "message": "任务已创建",
+    "params": {
+      "idempotency_key": "workflow-public-create-001",
+      "owner_role_key": "sales",
+      "payload": {},
+      "priority": 1,
+      "source_id": 1,
+      "source_type": "generic-source",
+      "task_code": "WF-PUBLIC-CREATE-001",
+      "task_group": "generic",
+      "task_name": "普通协同任务",
+      "task_status_key": "ready"
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors"
+  },
+  "workflow.explain_action_access": {
+    "basis": "handler-fixture",
+    "data": {
+      "action": {
+        "action_key": "urge",
+        "actor_role_key": "pmc",
+        "admin_role_keys": [
+          "pmc"
+        ],
+        "allowed": true,
+        "candidate_owner_role_keys": [
+          "pmc"
+        ],
+        "config_revision": null,
+        "configured_candidate_config_revision": "2026.06.30.workflow-tasks-enabled",
+        "configured_candidate_owner_pool_key": "warehouse",
+        "configured_candidate_owner_role_keys": [
+          "warehouse"
+        ],
+        "configured_candidate_source": "active_customer_config",
+        "configured_entitled_role_keys": [
+          "warehouse"
+        ],
+        "configured_membership_role_keys": [
+          "warehouse"
+        ],
+        "configured_required_capability_key": "workflow.task.update",
+        "domain_command_entry": {
+          "blocked_reasons": [
+            "domain_command_contract_not_configured"
+          ],
+          "command_key": null,
+          "enabled": false,
+          "required_contract": [
+            "domain_command_key"
+          ],
+          "source": "workflow_action_only",
+          "will_write_fact": false
+        },
+        "owner_pool_key": null,
+        "owner_role_key": "warehouse",
+        "owner_role_matched": false,
+        "reason": "当前账号可催办该任务。",
+        "reason_code": "allowed",
+        "required_capability_key": null,
+        "required_permission": "workflow.task.update",
+        "status_key": "",
+        "task_id": 75,
+        "visible_owner_role_keys": [
+          "pmc"
+        ],
+        "work_pool_entitlement_matched": false,
+        "work_pool_entitlement_scope_matched": false,
+        "work_pool_role_matched": false
+      },
+      "source_access": {
+        "allowed": true,
+        "applicable": false,
+        "reason": "当前任务没有需要核对的相关单据。",
+        "reason_code": "source_access_not_applicable",
+        "resolved": true
+      }
+    },
+    "message": "OK",
+    "params": {
+      "action_key": "urge",
+      "task_id": 75
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowExplainActionAccess"
+  },
+  "workflow.explain_task_assignment": {
+    "basis": "handler-fixture",
+    "data": {
+      "assignment": {
+        "action_candidate_owner_role_keys": {
+          "block": [
+            "sales"
+          ],
+          "complete": [
+            "sales"
+          ],
+          "reject": [],
+          "resume": [
+            "sales"
+          ],
+          "urge": [
+            "sales"
+          ]
+        },
+        "action_configured_candidate_owner_role_keys": {
+          "block": [
+            "warehouse"
+          ],
+          "complete": [],
+          "reject": [],
+          "resume": [
+            "warehouse"
+          ],
+          "urge": [
+            "warehouse"
+          ]
+        },
+        "action_configured_candidate_sources": {
+          "block": "active_customer_config",
+          "complete": "active_customer_config",
+          "reject": "active_customer_config",
+          "resume": "active_customer_config",
+          "urge": "active_customer_config"
+        },
+        "action_domain_command_entries": {
+          "block": {
+            "blocked_reasons": [
+              "domain_command_contract_not_configured"
+            ],
+            "command_key": null,
+            "enabled": false,
+            "required_contract": [
+              "domain_command_key"
+            ],
+            "source": "workflow_action_only",
+            "will_write_fact": false
+          },
+          "complete": {
+            "blocked_reasons": [
+              "domain_command_contract_not_configured"
+            ],
+            "command_key": null,
+            "enabled": false,
+            "required_contract": [
+              "domain_command_key"
+            ],
+            "source": "guarded_no_domain_command_contract",
+            "will_write_fact": false
+          },
+          "reject": {
+            "blocked_reasons": [
+              "domain_command_contract_not_configured"
+            ],
+            "command_key": null,
+            "enabled": false,
+            "required_contract": [
+              "domain_command_key"
+            ],
+            "source": "workflow_action_only",
+            "will_write_fact": false
+          },
+          "resume": {
+            "blocked_reasons": [
+              "domain_command_contract_not_configured"
+            ],
+            "command_key": null,
+            "enabled": false,
+            "required_contract": [
+              "domain_command_key"
+            ],
+            "source": "workflow_action_only",
+            "will_write_fact": false
+          },
+          "urge": {
+            "blocked_reasons": [
+              "domain_command_contract_not_configured"
+            ],
+            "command_key": null,
+            "enabled": false,
+            "required_contract": [
+              "domain_command_key"
+            ],
+            "source": "workflow_action_only",
+            "will_write_fact": false
+          }
+        },
+        "action_required_permissions": {
+          "block": "workflow.task.update",
+          "complete": "workflow.task.complete",
+          "reject": "workflow.task.reject",
+          "resume": "workflow.task.update",
+          "urge": "workflow.task.update"
+        },
+        "action_work_pool_scope_matches": {
+          "block": true,
+          "complete": false,
+          "reject": false,
+          "resume": true,
+          "urge": true
+        },
+        "actor_role_key": "warehouse",
+        "admin_role_keys": [
+          "sales"
+        ],
+        "assigned_to_current_admin": false,
+        "can_handle": true,
+        "can_urge": true,
+        "config_revision": null,
+        "configured_candidate_config_revision": "workflow-visible-rev",
+        "configured_candidate_owner_pool_key": "warehouse",
+        "configured_read_candidate_owner_role_keys": [
+          "warehouse"
+        ],
+        "owner_pool_key": null,
+        "owner_role_key": "warehouse",
+        "owner_role_matched": false,
+        "read_candidate_owner_role_keys": [
+          "sales"
+        ],
+        "reason": "当前账号属于该任务责任池。",
+        "reason_code": "work_pool_role_matched",
+        "required_capability_key": null,
+        "source_access": {
+          "allowed": true,
+          "applicable": false,
+          "reason": "当前任务没有需要核对的相关单据。",
+          "reason_code": "source_access_not_applicable",
+          "resolved": true
+        },
+        "task_id": 95,
+        "visible": true,
+        "visible_owner_role_keys": [
+          "sales"
+        ],
+        "work_pool_entitlement_matched": true,
+        "work_pool_entitlement_scope_matched": true,
+        "work_pool_role_matched": true
+      }
+    },
+    "message": "OK",
+    "params": {
+      "task_id": 95
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowExplainTaskAssignmentReportsActionScopeMatches"
+  },
+  "workflow.get_task": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": 9,
+        "blocked_reason": null,
+        "business_status_key": null,
+        "completed_at": null,
+        "config_revision": null,
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": {
+          "available": true,
+          "items": [
+            {
+              "code": "PRODUCT-7",
+              "has_product_images": true,
+              "image_attachment_id": 0,
+              "kind": "product",
+              "name": "模拟小鹿",
+              "order_no": "",
+              "product_id": 7,
+              "style_no": "",
+              "supplier_item_no": ""
+            }
+          ],
+          "source_line_count": null,
+          "source_no": "SO-PHOTO-DEMO"
+        },
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 11,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "engineering",
+        "payload": {},
+        "priority": 0,
+        "process_instance_id": null,
+        "process_node_instance_id": null,
+        "required_capability_key": null,
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "sales_order",
+        "task_code": "",
+        "task_group": "",
+        "task_name": "工程资料",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "ready",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 1
+      }
+    },
+    "message": "OK",
+    "params": {
+      "task_id": 11
+    },
+    "test": "TestWorkflowTrackingCurrentTaskAccessMatchesTaskEndpoints"
+  },
+  "workflow.get_task_assignment_options": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "assignment": {
+        "assignment_boundary": "only_assignee_changes",
+        "can_reassign": false,
+        "can_return_to_pool": false,
+        "candidates": [],
+        "current_assignee": {
+          "admin_id": 1,
+          "display_name": "DEMO",
+          "username": "DEMO"
+        },
+        "owner_role_key": "quality",
+        "owner_role_label": "DEMO",
+        "reason": "当前账号属于该任务责任角色。",
+        "reason_code": "owner_role_matched",
+        "task_id": 42,
+        "task_status_key": "DEMO",
+        "task_version": 1
+      }
+    },
+    "params": {
+      "task_id": 7
+    }
+  },
+  "workflow.get_task_board": {
+    "basis": "handler-fixture",
+    "data": {
+      "assignees": [],
+      "counts": {
+        "actionable": 0,
+        "due": 0,
+        "exception": 0,
+        "finished": 0
+      },
+      "lanes": [
+        {
+          "key": "all",
+          "limit": 20,
+          "offset": 20,
+          "tasks": [],
+          "total": 0
+        }
+      ],
+      "owner_role_keys": [],
+      "snapshot_at": 1792670400,
+      "source_types": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "keyword": "包装",
+      "lane_key": "all",
+      "limit": 20,
+      "offset": 20,
+      "sort": "time_asc",
+      "todo_only": true,
+      "source_section": "production",
+      "due_date_from": "2026-10-16",
+      "due_date_to": "2026-10-18"
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage"
+  },
+  "workflow.get_task_create_options": {
+    "basis": "handler-fixture",
+    "data": {
+      "can_create": true,
+      "reason": "",
+      "roles": [
+        {
+          "assignees": [
+            {
+              "admin_id": 8,
+              "display_name": "admin"
+            }
+          ],
+          "label": "品质",
+          "role_key": "quality"
+        }
+      ],
+      "source_id": 10,
+      "source_label": "销售订单",
+      "source_no": "SO-FOLLOWUP",
+      "source_status": "active",
+      "source_type": "sales_order"
+    },
+    "message": "OK",
+    "params": {
+      "source_id": 10,
+      "source_type": "sales_order"
+    },
+    "test": "TestWorkflowFollowupPublicCreateAuthorizationAndReplay"
+  },
+  "workflow.get_task_handling_chain": {
+    "basis": "handler-fixture",
+    "data": {
+      "items": [
+        {
+          "assignee_id": 0,
+          "batch_no": "",
+          "discovery": null,
+          "exception_id": 9,
+          "exception_no": "EX-9",
+          "exception_operation_code": "FABRIC_PROCESSING",
+          "id": 41,
+          "operation_code": "",
+          "owner_role_key": "sales",
+          "process_instance_id": 0,
+          "source_no": "",
+          "source_type": "",
+          "task_group": "",
+          "task_name": "检查裁片",
+          "task_status_key": "ready"
+        }
+      ],
+      "truncated": false
+    },
+    "message": "OK",
+    "params": {
+      "task_id": 41
+    },
+    "test": "TestWorkflowHandlingChainEnforcesReadPermissionAndStrictIdentity"
+  },
+  "workflow.get_task_link": {
+    "basis": "handler-fixture",
+    "data": {
+      "items": [
+        {
+          "assignee_id": 0,
+          "batch_no": "",
+          "can_handle": true,
+          "discovery": null,
+          "exception_id": 0,
+          "exception_no": "",
+          "exception_operation_code": "",
+          "id": 42,
+          "operation_code": "",
+          "owner_role_key": "engineering",
+          "process_instance_id": 0,
+          "source_no": "",
+          "source_type": "",
+          "task_group": "",
+          "task_name": "",
+          "task_status_key": "ready"
+        }
+      ],
+      "truncated": false
+    },
+    "message": "OK",
+    "params": {
+      "task_id": 41
+    },
+    "test": "TestWorkflowTaskLinkFormalTaskRequiresSourceAccess"
+  },
+  "workflow.get_task_process_context": {
+    "basis": "handler-fixture",
+    "data": {
+      "process_context": {
+        "approval_form": null,
+        "completed_nodes": [
+          {
+            "action_set_key": null,
+            "attempt": 1,
+            "completed_at": null,
+            "form_profile_key": null,
+            "id": 19,
+            "node_key": "submit_sales_order",
+            "node_type": "domain_command",
+            "outcome": null,
+            "owner_pool_key": null,
+            "process_instance_id": 10,
+            "required_capability_key": null,
+            "started_at": null,
+            "status": "completed",
+            "version": 2
+          }
+        ],
+        "current_nodes": [],
+        "current_responsibilities": [],
+        "linked_node": {
+          "action_set_key": null,
+          "attempt": 1,
+          "completed_at": null,
+          "form_profile_key": null,
+          "id": 20,
+          "node_key": "order_approval",
+          "node_type": "approval",
+          "outcome": null,
+          "owner_pool_key": null,
+          "process_instance_id": 10,
+          "required_capability_key": null,
+          "started_at": null,
+          "status": "withdrawn",
+          "version": 2
+        },
+        "nodes": [
+          {
+            "action_set_key": null,
+            "attempt": 1,
+            "completed_at": null,
+            "form_profile_key": null,
+            "id": 19,
+            "node_key": "submit_sales_order",
+            "node_type": "domain_command",
+            "outcome": null,
+            "owner_pool_key": null,
+            "process_instance_id": 10,
+            "required_capability_key": null,
+            "started_at": null,
+            "status": "completed",
+            "version": 2
+          }
+        ],
+        "process_instance": {
+          "completed_at": 1800000100,
+          "id": 10,
+          "process_key": "sales_order_acceptance",
+          "process_version": "v1",
+          "resolution_kind": "cancelled",
+          "resolution_reason": "终止来源流程并撤回后续任务",
+          "resolved_at": 1800000100,
+          "started_at": 1799996500,
+          "status": "completed"
+        },
+        "source": {
+          "id": 1001,
+          "no": null,
+          "type": "sales_order"
+        }
+      }
+    },
+    "message": "OK",
+    "params": {
+      "task_id": 42
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowGetWithdrawnTaskProcessContextUsesTaskVisibility"
+  },
+  "workflow.get_tracking": {
+    "basis": "handler-fixture",
+    "data": {
+      "tracking": {
+        "current_task_access": [
+          {
+            "can_handle": true,
+            "can_read": true,
+            "task_id": 11
+          }
+        ],
+        "events": [],
+        "events_truncated": false,
+        "next_event_id": 0,
+        "nodes": [],
+        "summary": {
+          "completed_at": null,
+          "current_tasks": [
+            {
+              "assignee_name": "",
+              "completed_at": null,
+              "created_at": -62135596800,
+              "due_at": null,
+              "node_instance_id": null,
+              "owner_role_key": "engineering",
+              "required_capability_key": null,
+              "status": "ready",
+              "task_id": 11,
+              "task_name": "工程资料"
+            }
+          ],
+          "display_context": null,
+          "id": 11,
+          "initiator_name": "",
+          "initiator_role_key": "",
+          "kind": "task",
+          "process_key": "",
+          "resolution_kind": null,
+          "source_id": 1,
+          "source_no": null,
+          "source_type": "sales_order",
+          "started_at": -62135596800,
+          "status": "ready",
+          "title": "工程资料",
+          "updated_at": -62135596800
+        },
+        "tasks": [
+          {
+            "assignee_name": "",
+            "completed_at": null,
+            "created_at": -62135596800,
+            "due_at": null,
+            "node_instance_id": null,
+            "owner_role_key": "engineering",
+            "required_capability_key": null,
+            "status": "ready",
+            "task_id": 11,
+            "task_name": "工程资料"
+          }
+        ]
+      }
+    },
+    "message": "OK",
+    "params": {
+      "id": 11,
+      "kind": "task"
+    },
+    "test": "TestWorkflowTrackingCurrentTaskAccessMatchesTaskEndpoints"
+  },
+  "workflow.get_workbench": {
+    "basis": "handler-fixture",
+    "data": {
+      "counts": {
+        "actionable": 1,
+        "approval": 0,
+        "risk": 0
+      },
+      "items": [
+        {
+          "assignee_id": null,
+          "blocked_reason": null,
+          "business_status_key": null,
+          "completed_at": null,
+          "config_revision": null,
+          "created_at": -62135596800,
+          "created_by": null,
+          "critical_path": false,
+          "discovery": null,
+          "display_context": null,
+          "due_at": null,
+          "escalate_target_role_key": null,
+          "escalated_at": null,
+          "id": 1,
+          "last_urged_at": null,
+          "last_urged_by": null,
+          "last_urged_by_role_key": null,
+          "owner_pool_key": null,
+          "owner_role_key": "",
+          "payload": {},
+          "priority": 0,
+          "process_instance_id": null,
+          "process_node_instance_id": null,
+          "required_capability_key": null,
+          "source_id": 0,
+          "source_no": null,
+          "source_type": "",
+          "task_code": "",
+          "task_group": "",
+          "task_name": "",
+          "task_no": "RW20261018-0029",
+          "task_status_key": "ready",
+          "updated_at": -62135596800,
+          "updated_by": null,
+          "urge_count": 0,
+          "version": 1
+        }
+      ],
+      "limit": 8,
+      "offset": 0,
+      "queue_key": "actionable",
+      "snapshot_at": 1792394186,
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "limit": 8,
+      "offset": 0,
+      "queue_key": "actionable",
+      "sort": "time_desc"
+    },
+    "test": "TestWorkflowWorkbenchReturnsOneBoundedSnapshotForProjectedRoles"
+  },
+  "workflow.list_business_states": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "business_states": [],
+      "limit": 10,
+      "offset": 0,
+      "total": 1
+    },
+    "params": {}
+  },
+  "workflow.list_exceptions": {
+    "basis": "handler-fixture",
+    "data": {
+      "affected_orders": 1,
+      "closed": 0,
+      "items": [
+        {
+          "batch_no": "",
+          "disposition": "",
+          "key": "quality:1",
+          "number": "QI-1",
+          "occurred_at": "",
+          "orders": [
+            {
+              "id": 2,
+              "number": "SO-2"
+            }
+          ],
+          "reason": "",
+          "state": "open",
+          "task_ids": [
+            8
+          ],
+          "tasks": [
+            {
+              "assignee_id": null,
+              "discovery": {
+                "assignee_name": "检验员",
+                "chain_key": "fulfillment",
+                "module_key": "quality",
+                "path": "订单履约 / 裁片 / 颜色与尺寸检验",
+                "stage_key": "cutting_quality"
+              },
+              "id": 8,
+              "owner_role_key": "quality",
+              "source_no": null,
+              "source_type": "",
+              "task_group": "",
+              "task_name": "裁片质检",
+              "task_status_key": "ready"
+            }
+          ]
+        }
+      ],
+      "limit": 20,
+      "offset": 0,
+      "open": 1,
+      "orders": [],
+      "pending_tasks": 1,
+      "tasks": [],
+      "total": 1,
+      "view_total": 0
+    },
+    "message": "OK",
+    "params": {
+      "tracking_id": 8,
+      "tracking_kind": "task"
+    },
+    "test": "TestWorkflowExceptionQueryPermissionValidationAndSerialization"
+  },
+  "workflow.list_role_tasks": {
+    "basis": "handler-fixture",
+    "data": {
+      "calendar": {
+        "days": {},
+        "items": [],
+        "limit": 30,
+        "month": "2026-10",
+        "offset": 0,
+        "overdue": 0,
+        "revision": "",
+        "selection": "undated",
+        "snapshot_at": 1792394186,
+        "total": 0,
+        "undated": 0
+      }
+    },
+    "message": "OK",
+    "params": {
+      "calendar_month": "2026-10",
+      "calendar_selection": "undated",
+      "limit": 30,
+      "role_key": "sales",
+      "view_key": "todo"
+    },
+    "test": "TestWorkflowCalendarRPCMobileAccess"
+  },
+  "workflow.list_task_events": {
+    "basis": "handler-fixture",
+    "data": {
+      "items": [
+        {
+          "actor_display_name": "张仓管",
+          "actor_role_key": "warehouse",
+          "actor_username": "warehouse01",
+          "created_at": 1720000000,
+          "event_type": "status_changed",
+          "from_status_key": "ready",
+          "id": 7,
+          "payload": {},
+          "reason": "等待库位确认",
+          "task": {
+            "id": 42,
+            "owner_role_key": "warehouse",
+            "required_capability_key": null,
+            "source_id": 6,
+            "source_type": "purchase_receipt",
+            "task_group": "warehouse_receiving",
+            "task_name": "核对收货库位"
+          },
+          "task_id": 42,
+          "task_version": 3,
+          "to_status_key": "blocked"
+        }
+      ],
+      "truncated": false
+    },
+    "message": "OK",
+    "params": {
+      "before_event_id": 0,
+      "limit": 100,
+      "scope": "flow",
+      "task_id": 42
+    },
+    "test": "TestWorkflowTaskFlowEventsRequirePermissionAndBoundedScope"
+  },
+  "workflow.list_tasks": {
+    "basis": "handler-fixture",
+    "data": {
+      "limit": 20,
+      "offset": 0,
+      "status_counts": {},
+      "tasks": [],
+      "total": 0
+    },
+    "message": "OK",
+    "params": {
+      "include_status_counts": true,
+      "limit": 20
+    },
+    "test": "TestRPCDocumentedBusinessQuickCounts",
+    "verification": {
+      "case": "workflow.list_tasks",
+      "test": "TestRPCDocumentedBusinessQuickCounts"
+    }
+  },
+  "workflow.list_tracking": {
+    "basis": "handler-fixture",
+    "data": {
+      "items": [
+        {
+          "completed_at": null,
+          "current_tasks": [],
+          "display_context": null,
+          "id": 1,
+          "initiator_name": "",
+          "initiator_role_key": "",
+          "kind": "process",
+          "process_key": "",
+          "resolution_kind": null,
+          "source_id": 0,
+          "source_no": null,
+          "source_type": "",
+          "started_at": 1792394186,
+          "status": "active",
+          "title": "",
+          "updated_at": -62135596800
+        }
+      ],
+      "limit": 8,
+      "offset": 24,
+      "status_counts": {
+        "active": 1,
+        "completed": 0
+      },
+      "total": 1
+    },
+    "message": "OK",
+    "params": {
+      "attention": "overdue",
+      "date_from": "2026-10-08",
+      "date_to": "2026-10-08",
+      "limit": 8,
+      "offset": 24,
+      "owner_role_key": "engineering",
+      "scope": "participated",
+      "sort_direction": "asc",
+      "source_type": "sales_order",
+      "status": "active"
+    },
+    "test": "TestWorkflowTrackingFilterContract"
+  },
+  "workflow.list_workbench_role_tasks": {
+    "basis": "handler-fixture",
+    "data": {
+      "has_more": false,
+      "items": [
+        {
+          "assignee_id": null,
+          "blocked_reason": null,
+          "business_status_key": null,
+          "completed_at": null,
+          "config_revision": null,
+          "created_at": -62135596800,
+          "created_by": null,
+          "critical_path": false,
+          "discovery": null,
+          "display_context": null,
+          "due_at": null,
+          "escalate_target_role_key": null,
+          "escalated_at": null,
+          "id": 3,
+          "last_urged_at": null,
+          "last_urged_by": null,
+          "last_urged_by_role_key": null,
+          "owner_pool_key": null,
+          "owner_role_key": "",
+          "payload": {},
+          "priority": 0,
+          "process_instance_id": null,
+          "process_node_instance_id": null,
+          "required_capability_key": null,
+          "source_id": 0,
+          "source_no": null,
+          "source_type": "",
+          "task_code": "",
+          "task_group": "",
+          "task_name": "",
+          "task_no": "RW20261018-0029",
+          "task_status_key": "ready",
+          "updated_at": -62135596800,
+          "updated_by": null,
+          "urge_count": 0,
+          "version": 1
+        }
+      ],
+      "next_cursor": "",
+      "server_time": 1792394186
+    },
+    "message": "OK",
+    "params": {
+      "limit": 20,
+      "role_key": "finance",
+      "view_key": "approval"
+    },
+    "test": "TestWorkflowApprovalRoleViewsUseSpecializedCapabilityScope"
+  },
+  "workflow.metadata": {
+    "basis": "handler-fixture",
+    "data": {
+      "business_states": [
+        {
+          "key": "project_pending",
+          "label": "立项待确认",
+          "summary": "客户、编号、交期和资料前置条件正在收口。"
+        }
+      ],
+      "task_states": [
+        {
+          "key": "ready",
+          "label": "可执行",
+          "summary": "上游单据、资料或齐套条件已满足，可以正式开始。"
+        }
+      ]
+    },
+    "message": "OK",
+    "params": {},
+    "test": "TestJsonrpcDispatcher_WorkflowMetadataRequiresAdminAndReturnsStates"
+  },
+  "workflow.reassign_task": {
+    "basis": "backend-wire-shape",
+    "data": {
+      "task": {
+        "assignee_id": 9,
+        "blocked_reason": "客户交期尚未确认",
+        "business_status_key": "production_processing",
+        "completed_at": 1792394185,
+        "config_revision": "2026.06.30.workflow-tasks-enabled",
+        "created_at": 1792394185,
+        "created_by": 7,
+        "critical_path": true,
+        "discovery": {
+          "assignee_name": "DEMO",
+          "chain_key": "DEMO",
+          "module_key": "DEMO",
+          "path": "DEMO",
+          "stage_key": "DEMO"
+        },
+        "display_context": {
+          "available": false,
+          "items": [],
+          "source_line_count": 1,
+          "source_no": "DEMO"
+        },
+        "due_at": 1783785600,
+        "escalate_target_role_key": "DEMO",
+        "escalated_at": 1,
+        "id": 3,
+        "last_urged_at": 1,
+        "last_urged_by": 1,
+        "last_urged_by_role_key": "DEMO",
+        "owner_pool_key": "pmc",
+        "owner_role_key": "pmc",
+        "payload": {},
+        "priority": 2,
+        "process_instance_id": 10,
+        "process_node_instance_id": 20,
+        "required_capability_key": "workflow.task.complete",
+        "source_id": 1,
+        "source_no": "MO-DEMO-001",
+        "source_type": "production-orders",
+        "task_code": "source-production-scheduling-1",
+        "task_group": "production_scheduling",
+        "task_name": "安排生产订单 MO-DEMO-001",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "done",
+        "updated_at": 1792394185,
+        "updated_by": 7,
+        "urge_count": 0,
+        "version": 2
+      }
+    },
+    "params": {
+      "expected_version": 1,
+      "idempotency_key": "demo-workflow-reassign_task-001",
+      "reason": "接口调用示例",
+      "task_id": 7
+    }
+  },
+  "workflow.reject_task_action": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": null,
+        "blocked_reason": "客户交期尚未确认",
+        "business_status_key": null,
+        "completed_at": null,
+        "config_revision": "2026.06.30.workflow-tasks-enabled",
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": null,
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 42,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "boss",
+        "payload": {
+          "rejected_reason": "客户交期尚未确认"
+        },
+        "priority": 0,
+        "process_instance_id": 10,
+        "process_node_instance_id": 20,
+        "required_capability_key": null,
+        "source_id": 1001,
+        "source_no": null,
+        "source_type": "sales_order",
+        "task_code": "",
+        "task_group": "order_approval",
+        "task_name": "",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "rejected",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 2
+      }
+    },
+    "message": "任务退回已记录",
+    "params": {
+      "action_key": "reject",
+      "expected_version": 1,
+      "idempotency_key": "workflow-linked-reject-42",
+      "payload": {},
+      "reason": "客户交期尚未确认",
+      "task_id": 42
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowRejectTaskActionSettlesLinkedProcessNode"
+  },
+  "workflow.resume_task_action": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": null,
+        "blocked_reason": null,
+        "business_status_key": "blocked",
+        "completed_at": null,
+        "config_revision": null,
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": null,
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 44,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "quality",
+        "payload": {
+          "surface_key": "mobile_role_tasks"
+        },
+        "priority": 0,
+        "process_instance_id": null,
+        "process_node_instance_id": null,
+        "required_capability_key": null,
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "generic-source",
+        "task_code": "",
+        "task_group": "generic",
+        "task_name": "",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "ready",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 2
+      }
+    },
+    "message": "任务已解除阻塞，可继续处理",
+    "params": {
+      "action_key": "resume",
+      "expected_version": 1,
+      "idempotency_key": "workflow-resume-receipt-44",
+      "payload": {
+        "surface_key": "mobile_role_tasks"
+      },
+      "task_id": 44
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowResumeTaskActionReplaysReceiptAndRejectsNewAttempt"
+  },
+  "workflow.urge_task": {
+    "basis": "handler-fixture",
+    "data": {
+      "task": {
+        "assignee_id": null,
+        "blocked_reason": null,
+        "business_status_key": null,
+        "completed_at": null,
+        "config_revision": null,
+        "created_at": -62135596800,
+        "created_by": null,
+        "critical_path": false,
+        "discovery": null,
+        "display_context": null,
+        "due_at": null,
+        "escalate_target_role_key": null,
+        "escalated_at": null,
+        "id": 1,
+        "last_urged_at": null,
+        "last_urged_by": null,
+        "last_urged_by_role_key": null,
+        "owner_pool_key": null,
+        "owner_role_key": "warehouse",
+        "payload": {
+          "last_urge_reason": "请今天确认",
+          "urge_count": 1,
+          "urged": true
+        },
+        "priority": 0,
+        "process_instance_id": null,
+        "process_node_instance_id": null,
+        "required_capability_key": null,
+        "source_id": 1,
+        "source_no": null,
+        "source_type": "shipping-release",
+        "task_code": "TASK-001",
+        "task_group": "shipment_release",
+        "task_name": "出货放行",
+        "task_no": "RW20261018-0029",
+        "task_status_key": "ready",
+        "updated_at": -62135596800,
+        "updated_by": null,
+        "urge_count": 0,
+        "version": 2
+      }
+    },
+    "message": "任务催办已记录",
+    "params": {
+      "action": "urge_task",
+      "expected_version": 1,
+      "idempotency_key": "workflow-urge-intent-1",
+      "payload": {
+        "entry_path": " /erp/mobile/tasks ",
+        "evidence_refs": [
+          " proof-b ",
+          "proof-a",
+          "proof-a",
+          " "
+        ],
+        "surface_key": " mobile_role_tasks "
+      },
+      "task_id": 1
+    },
+    "test": "TestJsonrpcDispatcher_WorkflowUrgeTaskRecordsEventIntent"
+  }
+}

@@ -1,0 +1,240 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"server/internal/biz"
+	"server/internal/errcode"
+)
+
+type progressAPIRepo struct {
+	query biz.BusinessProgressQuery
+	calls int
+	err   error
+}
+
+func (r *progressAPIRepo) GetSalesDeliveryProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.SalesDeliveryProgress, error) {
+	r.query, r.calls = q, r.calls+1
+	return nil, biz.ErrSalesOrderNotFound
+}
+
+func (r *progressAPIRepo) ListBusinessProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressBoard, error) {
+	r.query, r.calls = q, r.calls+1
+	return &biz.BusinessProgressBoard{Rows: []*biz.BusinessProgressRow{}, SnapshotAt: q.SnapshotAt, Access: q.Access}, r.err
+}
+func (r *progressAPIRepo) ListBusinessProgressOwners(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressOwnerOptions, error) {
+	r.query, r.calls = q, r.calls+1
+	return &biz.BusinessProgressOwnerOptions{Names: []string{"模拟业务员"}}, r.err
+}
+
+func TestBusinessProgressOwnerOptionsRPC(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		view string
+		keys []string
+		want int32
+	}{
+		{"order reader", "orders", []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}, errcode.OK.Code},
+		{"production reader", "production", []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionPMCPlanRead}, errcode.OK.Code},
+		{"unreadable source", "orders", []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionPMCPlanRead}, errcode.PermissionDenied.Code},
+		{"missing dashboard", "orders", []string{biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}, errcode.PermissionDenied.Code},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, tc.keys...)
+			r := &progressAPIRepo{}
+			d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
+			_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress_owner_options", "owners", newDataStruct(map[string]any{"view": tc.view}))
+			if err != nil || res.Code != tc.want || (r.calls == 1) != (tc.want == errcode.OK.Code) {
+				t.Fatalf("view=%s: %v %v", tc.view, res, err)
+			}
+			if r.calls == 1 && (r.query.View != tc.view || res.Data.AsMap()["names"].([]any)[0] != "模拟业务员") {
+				t.Fatal(res, r.query)
+			}
+		})
+	}
+}
+
+func (r *progressAPIRepo) ListBusinessProgressTasks(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressTaskPage, error) {
+	r.query, r.calls = q, r.calls+1
+	return &biz.BusinessProgressTaskPage{Rows: []biz.BusinessProgressRecord{}}, r.err
+}
+func (r *progressAPIRepo) GetBusinessProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressDetail, error) {
+	r.query, r.calls = q, r.calls+1
+	return nil, biz.ErrSalesOrderNotFound
+}
+
+func TestBusinessProgressTaskPageRPC(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	params := map[string]any{"view": "orders", "id": 2, "task_status": "open", "owner_role_key": "quality", "limit": 20, "offset": 0}
+	for label, withTasks := range map[string]bool{"visible": true, "forbidden": false} {
+		t.Run(label, func(t *testing.T) {
+			keys := []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}
+			if withTasks {
+				keys = append(keys, biz.PermissionWorkflowTaskRead)
+			}
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, keys...)
+			repo := &progressAPIRepo{}
+			d.businessProgressUC = biz.NewBusinessProgressUsecase(repo)
+			_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress_tasks", "tasks", newDataStruct(params))
+			if withTasks {
+				if err != nil || res.Code != errcode.OK.Code || repo.query.ID != 2 || repo.query.TaskRole != "quality" || repo.query.TaskVisibility == nil ||
+					repo.query.TaskStatus != "open" || res.Data.AsMap()["total"] != float64(0) {
+					t.Fatalf("task page: result=%+v query=%+v err=%v", res, repo.query, err)
+				}
+			} else if err != nil || res.Code != errcode.PermissionDenied.Code || repo.calls != 0 {
+				t.Fatalf("task visibility required: result=%+v calls=%d err=%v", res, repo.calls, err)
+			}
+		})
+	}
+}
+
+func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	d, _, _, _ := newProductionOrderJSONRPCTestData(t, biz.PermissionERPBusinessDashboardRead, biz.PermissionPMCPlanRead)
+	r := &progressAPIRepo{}
+	d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
+	ctx := workflowJSONRPCAdminContext()
+	_, res, err := d.handleBusiness(ctx, "list_progress", "1", nil)
+	if err != nil || res.Code != errcode.OK.Code || r.calls != 1 || r.query.View != "production" || !r.query.Access.Production || r.query.Access.Sales || r.query.Access.WIP || r.query.Access.Tasks {
+		t.Fatalf("default production result=%+v query=%+v err=%v", res, r.query, err)
+	}
+	for _, input := range []struct {
+		params map[string]any
+		code   int32
+	}{
+		{map[string]any{"view": "orders"}, errcode.PermissionDenied.Code},
+		{map[string]any{"display": "lines", "id": 7}, errcode.PermissionDenied.Code},
+		{map[string]any{"view": "production", "display": "lines"}, errcode.InvalidParam.Code},
+		{map[string]any{"display": "lines", "delivery_status": "blocked"}, errcode.InvalidParam.Code},
+		{map[string]any{"display": "lines", "delivery_status": "undated", "date_from": "2026-11-15"}, errcode.InvalidParam.Code},
+		{map[string]any{"customer_id": -1}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_by": "unknown", "sort_direction": "asc"}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_by": "due_date", "sort_direction": "sideways"}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_by": "product", "sort_direction": "asc"}, errcode.InvalidParam.Code},
+		{map[string]any{"sort_direction": "asc"}, errcode.InvalidParam.Code},
+		{map[string]any{"limit": 101}, errcode.InvalidParam.Code},
+		{map[string]any{"offset": -1}, errcode.InvalidParam.Code},
+		{map[string]any{"scope": "finished"}, errcode.InvalidParam.Code},
+		{map[string]any{"risk": "blocked"}, errcode.InvalidParam.Code},
+		{map[string]any{"due_status": "blocked"}, errcode.InvalidParam.Code},
+		{map[string]any{"blocked_only": "true"}, errcode.InvalidParam.Code},
+		{map[string]any{"unlinked_only": 1}, errcode.InvalidParam.Code},
+		{map[string]any{"blocked_only": true}, errcode.PermissionDenied.Code},
+		{map[string]any{"scope": "ended", "due_status": "due_soon"}, errcode.InvalidParam.Code},
+		{map[string]any{"due_status": "undated", "date_to": "2026-10-15"}, errcode.InvalidParam.Code},
+		{map[string]any{"date_from": "2026-02-30"}, errcode.InvalidParam.Code},
+		{map[string]any{"access": map[string]any{"sales": true}}, errcode.InvalidParam.Code},
+	} {
+		_, res, err = d.handleBusiness(ctx, "list_progress", "invalid", newDataStruct(input.params))
+		if err != nil || res.Code != input.code || r.calls != 1 {
+			t.Fatalf("input=%v result=%+v calls=%d err=%v", input.params, res, r.calls, err)
+		}
+	}
+	r.err = errors.New("private connection details")
+	_, res, err = d.handleBusiness(ctx, "list_progress", "failed", nil)
+	if err != nil || res.Code != errcode.Internal.Code || res.Message != errcode.Internal.Message {
+		t.Fatalf("internal=%+v %v", res, err)
+	}
+	_, res, err = d.handleBusiness(ctx, "get_progress", "missing", newDataStruct(map[string]any{"id": 19}))
+	if err != nil || res.Code != errcode.ResourceNotFound.Code {
+		t.Fatalf("missing=%+v %v", res, err)
+	}
+	for _, state := range []string{"anonymous", "disabled", "denied"} {
+		admin := workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionPMCPlanRead)
+		callContext, want := ctx, errcode.PermissionDenied.Code
+		if state == "anonymous" {
+			callContext, want = context.Background(), errcode.AuthRequired.Code
+		}
+		if state == "disabled" {
+			admin.Disabled, want = true, errcode.AdminDisabled.Code
+		}
+		d.adminReader = stubAdminAccountReader{admin: admin}
+		calls := r.calls
+		_, res, err = d.handleBusiness(callContext, "list_progress", state, nil)
+		if err != nil || res.Code != want || r.calls != calls {
+			t.Fatalf("%s result=%+v calls=%d err=%v", state, res, r.calls, err)
+		}
+	}
+}
+
+func TestBusinessProgressSalesDeliveryScoped(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	for _, tc := range []struct {
+		name      string
+		withItems bool
+	}{{"order and items", true}, {"order only", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			withItems := tc.withItems
+			keys := []string{biz.PermissionSalesOrderRead, biz.PermissionPMCPlanRead, biz.PermissionWorkflowTaskRead}
+			if withItems {
+				keys = append(keys, biz.PermissionSalesOrderItemRead)
+			}
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, keys...)
+			repo := &progressAPIRepo{}
+			d.businessProgressUC = biz.NewBusinessProgressUsecase(repo)
+			params := map[string]any{"view": "orders", "display": "lines", "delivery_status": "overdue"}
+			_, res, err := d.handleBusiness(ctx, "list_progress", "sales", newDataStruct(params))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !withItems {
+				if res.Code != errcode.PermissionDenied.Code || repo.calls != 0 {
+					t.Fatalf("source permission missing: result=%v calls=%d", res, repo.calls)
+				}
+				return
+			}
+			if res.Code != 0 || repo.calls != 1 || !repo.query.Access.Sales || repo.query.Access.Production ||
+				repo.query.Access.Tasks || repo.query.TaskVisibility != nil || repo.query.Display != "lines" {
+				t.Fatalf("non-global delivery widened its scope: result=%v query=%+v", res, repo.query)
+			}
+			for _, method := range []string{"get_progress", "list_progress_owner_options", "list_progress_tasks"} {
+				_, result, err := d.handleBusiness(ctx, method, "global", newDataStruct(map[string]any{"view": "orders", "id": 1}))
+				if err != nil || result.Code != errcode.PermissionDenied.Code {
+					t.Fatalf("%s should require global access: %v %v", method, result, err)
+				}
+			}
+			params["owner_name"] = "其他岗位"
+			_, result, err := d.handleBusiness(ctx, "list_progress", "owner", newDataStruct(params))
+			if err != nil || result.Code != errcode.InvalidParam.Code || repo.calls != 1 {
+				t.Fatalf("non-global owner query: %v %v", result, err)
+			}
+		})
+	}
+}
+
+func TestBusinessProgressJSONRPCDeliveryLineQueryKeepsOrderIdentity(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	d, _, _, _ := newProductionOrderJSONRPCTestData(t, biz.PermissionERPBusinessDashboardRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead)
+	r := &progressAPIRepo{}
+	d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
+	_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress", "delivery", newDataStruct(map[string]any{
+		"view": "orders", "display": "lines", "delivery_status": "overdue", "scope": "all", "id": 31, "customer_id": 7, "owner_name": "模拟业务员", "offset": 20, "sort_by": "due_date", "sort_direction": "asc",
+	}))
+	if err != nil || res.Code != errcode.OK.Code || !r.query.Access.Sales || r.query.ID != 31 || r.query.CustomerID != 7 || r.query.OwnerName != "模拟业务员" ||
+		r.query.Display != "lines" || r.query.DeliveryStatus != "overdue" || r.query.SortBy != biz.BusinessProgressSortDueDate || r.query.SortDirection != "asc" || r.query.Scope != "all" || r.query.Offset != 20 {
+		t.Fatalf("line query=%+v result=%+v error=%v", r.query, res, err)
+	}
+}
+
+func TestBusinessProgressManagementReadPermissions(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	for _, role := range biz.BuiltinRoles() {
+		if role.Key != biz.BossRoleKey && role.Key != biz.PMCRoleKey {
+			continue
+		}
+		t.Run(role.Key, func(t *testing.T) {
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, role.Permissions...)
+			d.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{role.Key}, role.Permissions...)}
+			r := &progressAPIRepo{}
+			d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
+			for _, view := range []string{"orders", "production"} {
+				_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress", view, newDataStruct(map[string]any{"view": view, "due_status": "overdue", "blocked_only": true, "unlinked_only": view == "production"}))
+				if err != nil || res.Code != errcode.OK.Code || !r.query.Access.Sales || !r.query.Access.Production || !r.query.Access.WIP || !r.query.Access.Tasks || r.query.TaskVisibility == nil || r.query.DueStatus != "overdue" || !r.query.BlockedOnly || r.query.UnlinkedOnly != (view == "production") {
+					t.Fatalf("%s result=%+v query=%+v err=%v", role.Key, res, r.query, err)
+				}
+			}
+		})
+	}
+}
