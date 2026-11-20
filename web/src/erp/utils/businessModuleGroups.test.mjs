@@ -1,0 +1,394 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { getNavigationSections, getUtilityNavigationSections } from '../config/seedData.mjs'
+import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
+import {
+  businessNavigationSections,
+  getBusinessModule,
+} from '../config/businessModules.mjs'
+import { resolveWarehouseView, warehouseViewPath } from './warehouseViews.mjs'
+import {
+  getBusinessModuleGroup,
+  groupSidebarNavigationSections,
+  getBusinessModuleSidebarKey,
+  getBusinessModuleTabs,
+  projectBusinessModuleSections,
+  projectRoleGuidedModuleNavigation,
+  rememberBusinessModuleLocation,
+  restoreBusinessModuleTabPath,
+  resolveBusinessModuleMenuTarget,
+} from './businessModuleGroups.mjs'
+
+const section = (...keys) => ({
+  title: '业务',
+  items: keys.map(getBusinessModule),
+})
+
+test('仓储页头分类与内容共用权限及 URL，切换不扩大可见来源', () => {
+  const actions = ['production.fact.read', 'warehouse.outbound.read']
+  const profile = { permissions: actions, effective_session: { actions } }
+  const inbound = resolveWarehouseView('/erp/warehouse/inbound', '?warehouse_view=purchase&receipt_id=31', profile)
+  assert.deepEqual(inbound.items.map(({ key }) => key), ['completion'])
+  assert.equal(inbound.activeKey, 'completion')
+  assert.equal(warehouseViewPath(inbound, 'purchase'), null)
+  assert.equal(warehouseViewPath(inbound, 'completion'), null)
+  const outbound = resolveWarehouseView('/erp/warehouse/outbound', '', profile)
+  assert.deepEqual(outbound.items.map(({ key }) => key), ['material-issue', 'reservations'])
+  assert.equal(warehouseViewPath(outbound, 'reservations'), '/erp/warehouse/outbound?warehouse_view=reservations')
+  assert.equal(resolveWarehouseView('/erp/warehouse/inbound', '', {}).items.length, 0)
+  const workspace = getBusinessModuleTabs('/erp/warehouse/outbound', [section('outbound')], { adminProfile: profile })
+  assert.deepEqual(workspace.secondaryNavigation, outbound)
+})
+
+test('库存分类保留来源上下文，库存作业没有重复的查询分类', () => {
+  const navigation = resolveWarehouseView('/erp/warehouse/inventory', '?view=balances&lot_id=81&source_id=4', {})
+  assert.equal(warehouseViewPath(navigation, 'lots'), '/erp/warehouse/inventory?view=lots&lot_id=81&source_id=4')
+  assert.equal(warehouseViewPath(navigation, 'unknown'), null)
+  assert.equal(resolveWarehouseView('/erp/warehouse/inventory', '?workspace=operations', {}), null)
+  assert.equal(resolveWarehouseView('/erp/warehouse/inventory', '?view=unknown', {}).activeKey, 'balances')
+})
+
+test('委外以独立模块直达订单，只有一个页面时不增加页签', () => {
+  const item = getBusinessModule('processing-contracts')
+  const projected = projectBusinessModuleSections(businessNavigationSections)
+  const outsourcing = projected.find((entry) => entry.key === 'outsourcing')
+  assert.equal(outsourcing.items.length, 1)
+  assert.equal(outsourcing.items[0].label, '委外管理')
+  assert.equal(outsourcing.items[0].path, item.path)
+  assert.equal(outsourcing.items[0].sidebarKey, 'module:outsourcing')
+  assert.equal(getBusinessModuleTabs(item.path, businessNavigationSections), null)
+  const restricted = projectBusinessModuleSections([section('production-orders')])
+  assert.deepEqual(restricted[0].items.map((entry) => entry.label), ['生产管理'])
+})
+
+test('仓储集中查询和办理，销售出货与财务仍保留独立业务入口', () => {
+  const sections = projectBusinessModuleSections(businessNavigationSections)
+  assert.equal(sections.find((item) => item.key === 'warehouse').items[0].path, '/erp/warehouse/inventory')
+  assert.equal(sections.find((item) => item.key === 'shipment').items[0].path, '/erp/warehouse/shipments')
+  const workspace = getBusinessModuleTabs('/erp/warehouse/inventory', businessNavigationSections, { adminProfile: { is_super_admin: true, effective_session: { actions: ['warehouse.adjustment.create'] } } })
+  assert.deepEqual(workspace.tabs.map((tab) => tab.label), ['库存查询', '入库办理', '出库办理', '库存作业'])
+  assert.equal(getBusinessModuleTabs('/erp/warehouse/shipments', businessNavigationSections), null)
+})
+
+test('仓储页签只投影获准入口，查询岗位不显示库存作业', () => {
+  const visible = [section('inventory', 'outbound')]
+  const workspace = getBusinessModuleTabs('/erp/warehouse/inventory', visible, { adminProfile: { permissions: ['warehouse.inventory.read'] } })
+  assert.deepEqual(workspace.tabs.map((tab) => tab.key), ['inventory', 'outbound'])
+  const onlyOutbound = projectBusinessModuleSections([section('outbound')])[0].items
+  assert.equal(onlyOutbound[0].path, '/erp/warehouse/outbound')
+  assert.equal(onlyOutbound[0].sidebarKey, 'module:warehouse')
+})
+
+test('仓储与销售出货的最近入口互不覆盖，库存作业与查询分别恢复', () => {
+  const cache = new Map()
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/warehouse/inventory', search: '?view=txns', hash: '' })
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/warehouse/inventory', search: '?workspace=operations&inventory_operation_id=12', hash: '' })
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/warehouse/shipments', search: '?shipment_id=81', hash: '' })
+  assert.equal(restoreBusinessModuleTabPath({ path: '/erp/warehouse/inventory' }, cache), '/erp/warehouse/inventory?view=txns')
+  assert.equal(restoreBusinessModuleTabPath({ path: '/erp/warehouse/inventory', search: '?workspace=operations' }, cache), '/erp/warehouse/inventory?workspace=operations&inventory_operation_id=12')
+  assert.equal(resolveBusinessModuleMenuTarget(getBusinessModule('shipments'), { pathname: '/erp/finance/receivables' }, cache, ['/erp/warehouse/shipments', '/erp/warehouse/outbound']), '/erp/warehouse/shipments?shipment_id=81')
+})
+
+test('模块入口只归并已有可访问页面，默认路径仍是已授权页面', () => {
+  const visible = [
+    section(
+      'payables',
+      'invoices',
+      'production-orders',
+      'production-progress',
+      'quality-inspections'
+    ),
+  ]
+  const { items } = projectBusinessModuleSections(visible)[0]
+  assert.deepEqual(
+    items.map((item) => item.label),
+    ['财务管理', '生产管理', '质检管理']
+  )
+  assert.equal(items[0].path, '/erp/finance/payables')
+  assert.equal(items[1].path, '/erp/production/orders')
+  assert.equal(
+    getBusinessModuleGroup('/erp/production/quality-inspections')?.key,
+    'quality'
+  )
+  assert.deepEqual(
+    visible[0].items.map((item) => item.key),
+    [
+      'payables',
+      'invoices',
+      'production-orders',
+      'production-progress',
+      'quality-inspections',
+    ]
+  )
+})
+
+test('岗位常用入口优先，其他入口中不重复同一模块，保留其他入口', () => {
+  const navigation = projectRoleGuidedModuleNavigation({
+    dashboardItems: [],
+    primaryItems: section('payables', 'receivables').items,
+    secondarySections: [
+      section(
+        'invoices',
+        'production-orders',
+        'production-progress',
+        'quality-inspections'
+      ),
+    ],
+  })
+  assert.deepEqual(
+    navigation.primaryItems.map((item) => item.label),
+    ['财务管理']
+  )
+  assert.equal(navigation.primaryItems[0].path, '/erp/finance/payables')
+  assert.deepEqual(
+    navigation.secondaryItems.map((item) => item.label),
+    ['生产管理', '质检管理']
+  )
+  assert.equal(navigation.secondaryItemCount, 2)
+})
+
+test('页签顺序遵循设计且只显示获准的类别', () => {
+  const workspace = getBusinessModuleTabs('/erp/finance/payables', [
+    section('invoices', 'payables'),
+  ])
+  assert.equal(workspace.activeKey, 'payables')
+  assert.deepEqual(
+    workspace.tabs.map((tab) => tab.label),
+    ['应付', '发票']
+  )
+  assert.deepEqual(getBusinessModuleTabs('/erp/master/materials', []).tabs, [])
+  assert.deepEqual(getBusinessModuleTabs('/erp/finance/payables', []).tabs, [])
+})
+
+test('排产与异常深链分别选中所属生产页签，不扩大页面权限', () => {
+  const visible = [
+    section(
+      'production-orders',
+      'production-progress',
+      'production-scheduling',
+      'production-exceptions'
+    ),
+  ]
+  assert.equal(
+    getBusinessModuleTabs('/erp/production/scheduling', visible).activeKey,
+    'production-orders'
+  )
+  assert.equal(
+    getBusinessModuleTabs('/erp/production/exceptions', visible, { adminProfile: { permissions: ['production.fact.read', 'production.wip.read'], effective_session: { actions: ['production.fact.read', 'production.wip.read'] } } }).activeKey,
+    'production-exceptions'
+  )
+  const limited = getBusinessModuleTabs('/erp/production/exceptions', [
+    section('production-exceptions'),
+  ], { adminProfile: { permissions: ['production.fact.read', 'production.wip.read'], effective_session: { actions: ['production.fact.read', 'production.wip.read'] } } })
+  assert.deepEqual(
+    limited.tabs.map((tab) => tab.path),
+    ['/erp/production/exceptions']
+  )
+  assert.equal(
+    getBusinessModuleSidebarKey('/erp/production/exceptions'),
+    'module:production'
+  )
+})
+
+test('页签分别恢复地址查询，直接单据链接仍保持原地址', () => {
+  const cache = new Map()
+  rememberBusinessModuleLocation(cache, {
+    pathname: '/erp/production/orders',
+    search: '?keyword=订单&page=3',
+    hash: '',
+  })
+  rememberBusinessModuleLocation(cache, {
+    pathname: '/erp/production/progress',
+    search: '?fact_id=28&display=process',
+    hash: '#details',
+  })
+  assert.equal(
+    restoreBusinessModuleTabPath('/erp/production/orders', cache),
+    '/erp/production/orders?keyword=订单&page=3'
+  )
+  assert.equal(
+    restoreBusinessModuleTabPath('/erp/production/progress', cache),
+    '/erp/production/progress?fact_id=28&display=process#details'
+  )
+  assert.equal(
+    restoreBusinessModuleTabPath('/erp/finance/payables', cache),
+    '/erp/finance/payables'
+  )
+})
+
+test('重复点击当前模块不切回首页；重新进入只恢复仍有权限的页面', () => {
+  const cache = new Map()
+  const item = getBusinessModule('receivables')
+  const current = { pathname: '/erp/finance/invoices', search: '?fact_id=42', hash: '#details' }
+  rememberBusinessModuleLocation(cache, current)
+  assert.equal(
+    resolveBusinessModuleMenuTarget(item, current, cache, [
+      item.path,
+      current.pathname,
+    ]),
+    `${current.pathname}${current.search}${current.hash}`
+  )
+  assert.equal(
+    resolveBusinessModuleMenuTarget(
+      item,
+      { pathname: '/erp/production/orders' },
+      cache,
+      [item.path, current.pathname]
+    ),
+    '/erp/finance/invoices?fact_id=42#details'
+  )
+  assert.equal(
+    resolveBusinessModuleMenuTarget(
+      item,
+      { pathname: '/erp/production/orders' },
+      cache,
+      [item.path]
+    ),
+    item.path
+  )
+})
+
+test('direct production execution preserves the active menu URL while records use their own bare path', () => {
+  const pathname = '/erp/production/progress'
+  const location = { pathname, search: '?display=process', hash: '' }
+  const cache = new Map()
+  rememberBusinessModuleLocation(cache, location)
+  assert.equal(
+    resolveBusinessModuleMenuTarget(getBusinessModule('production-orders'), location, cache, [pathname]),
+    `${pathname}?display=process`
+  )
+  assert.equal(restoreBusinessModuleTabPath({ path: pathname }, cache), pathname)
+  assert.equal(
+    resolveBusinessModuleMenuTarget({ path: '/erp/dashboard' }, { pathname: '/erp/dashboard', search: '?scope=todo', hash: '#tasks' }, cache, []),
+    '/erp/dashboard?scope=todo#tasks'
+  )
+})
+
+test('完整侧栏只有四个导航区，十个业务模块统一为单入口', () => {
+  const visible = [
+    ...getNavigationSections(),
+    ...getUtilityNavigationSections(),
+  ]
+  const sections = groupSidebarNavigationSections(
+    projectBusinessModuleSections(visible)
+  )
+  assert.deepEqual(
+    sections.map((entry) => entry.title),
+    ['工作中心', '业务模块', '工具与查询', '系统与帮助']
+  )
+  assert.deepEqual(
+    sections[1].items.map((entry) => entry.label),
+    [
+      '基础资料',
+      '销售管理',
+      '产品工程',
+      '采购管理',
+      '委外管理',
+      '生产管理',
+      '仓储管理',
+      '质检管理',
+      '出货管理',
+      '财务管理',
+    ]
+  )
+  assert.equal(
+    new Set(sections[1].items.map((entry) => entry.sidebarKey)).size,
+    10
+  )
+  assert.deepEqual(
+    sections[2].items.map((entry) => entry.key),
+    ['print-center', 'history-records']
+  )
+  assert.deepEqual(
+    sections[3].items.map((entry) => entry.key),
+    ['permission-center', 'system-audit-logs', 'help-center']
+  )
+})
+
+test('客户菜单顺序与产品分类一致，默认入口从获准页面按模块顺序选择', () => {
+  const sections = projectBusinessModuleSections(
+    getNavigationSections(yoyoosunMenuConfig)
+  )
+  const core = projectBusinessModuleSections(getNavigationSections())
+  assert.deepEqual(
+    sections.map((entry) => entry.items.map((item) => [item.label, item.path])),
+    core.map((entry) => entry.items.map((item) => [item.label, item.path]))
+  )
+  const reordered = projectBusinessModuleSections([
+    section(
+      'outbound',
+      'shipments',
+      'invoices',
+      'payables',
+      'receivables'
+    ),
+  ])[0].items
+  assert.deepEqual(
+    reordered.map((entry) => entry.path),
+    ['/erp/warehouse/outbound', '/erp/warehouse/shipments', '/erp/finance/receivables']
+  )
+  const limited = projectBusinessModuleSections([
+    section('materials', 'suppliers'),
+  ])[0].items
+  assert.deepEqual(
+    limited.map((entry) => entry.path),
+    ['/erp/master/partners/suppliers']
+  )
+})
+
+test('岗位指定的材料和库存台账入口继续优先，模块不会在其他入口重复', () => {
+  const result = projectRoleGuidedModuleNavigation({
+    dashboardItems: [],
+    primaryItems: section('materials', 'inventory').items,
+    secondarySections: [
+      section('customers', 'suppliers', 'inbound', 'material-bom', 'processes'),
+    ],
+  })
+  assert.deepEqual(
+    result.primaryItems.map((entry) => [entry.label, entry.path]),
+    [
+      ['基础资料', '/erp/master/materials'],
+      ['仓储管理', '/erp/warehouse/inventory'],
+    ]
+  )
+  assert.deepEqual(
+    result.secondaryItems.map((entry) => entry.label),
+    ['产品工程']
+  )
+})
+
+test('目录保留每个获准页面，跨模块客户显示分组不会改变正式业务归属', () => {
+  const visible = [
+    section('invoices', 'quality-inspections', 'materials', 'receivables'),
+  ]
+  const catalog = groupSidebarNavigationSections(visible, { pageCatalog: true })
+  assert.deepEqual(
+    catalog.map((entry) => entry.title),
+    ['基础资料', '质检管理', '财务管理']
+  )
+  assert.deepEqual(
+    catalog.flatMap((entry) => entry.items.map((item) => item.key)).sort(),
+    ['invoices', 'materials', 'quality-inspections', 'receivables']
+  )
+  const tabs = getBusinessModuleTabs('/erp/master/materials', visible)
+  assert.deepEqual(
+    tabs.tabs.map((entry) => entry.key),
+    ['materials']
+  )
+})
+
+test('production has four authorized business entries and execution and records restore independent queries', () => {
+  const sections = [section('production-orders', 'production-progress', 'production-exceptions')]
+  const options = { adminProfile: { permissions: ['production.fact.read', 'production.wip.read'], effective_session: { actions: ['production.fact.read', 'production.wip.read'] } }, search: '?display=process' }
+  const workspace = getBusinessModuleTabs('/erp/production/progress', sections, options)
+  assert.deepEqual(workspace.tabs.map((tab) => tab.label), ['生产订单', '生产执行', '生产记录', '异常处理'])
+  assert.equal(workspace.activeKey, 'production-execution')
+  const cache = new Map()
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/production/progress', search: '?fact_id=8' })
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/production/progress', search: '?display=process&source_type=PRODUCTION_ORDER&source_id=7' })
+  assert.equal(restoreBusinessModuleTabPath(workspace.tabs[1], cache), '/erp/production/progress?display=process&source_type=PRODUCTION_ORDER&source_id=7')
+  assert.equal(restoreBusinessModuleTabPath(workspace.tabs[2], cache), '/erp/production/progress?fact_id=8')
+  const denied = getBusinessModuleTabs('/erp/production/progress', sections, { adminProfile: { permissions: ['production.fact.read'] } })
+  assert.equal(denied.tabs.some((tab) => tab.key === 'production-execution'), false)
+  assert.equal(getBusinessModuleTabs('/erp/production/orders', [section('production-orders')], options).tabs.length, 1)
+})
