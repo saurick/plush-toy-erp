@@ -1,0 +1,74 @@
+import { useEffect, useState } from 'react'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
+
+import { WorkflowTaskEventEntries } from '../../components/workflow/WorkflowTaskEventTrail.jsx'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
+import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
+import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
+
+export default function MobileProgressRecentRecords({ task, canRead }) {
+  const taskID = canRead ? task?.id : null
+  const [result, setResult] = useState(null)
+  const [reload, setReload] = useState(0)
+  useEffect(() => {
+    setResult(null)
+    if (!taskID) return undefined
+    const controller = new AbortController()
+    listWorkflowTaskEvents(taskID, { limit: 3, signal: controller.signal })
+      .then(({ items, truncated }) => {
+        if (!controller.signal.aborted) setResult({ task, items, truncated })
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setResult({
+            task,
+            error: getActionErrorMessage(error, '读取关联任务记录'),
+          })
+        }
+      })
+    return () => controller.abort()
+  }, [taskID, task, reload])
+  const current = result?.task === task ? result : null
+  const { items } = buildWorkflowTaskEventTrailModel({
+    task: { id: taskID },
+    events: current?.items || [],
+  })
+
+  return (
+    <section
+      className="mobile-detail-section mobile-progress-recent"
+      aria-label="最近记录"
+    >
+      <h3>最近记录</h3>
+      {taskID ? (
+        <p className="mobile-progress-recent-source">
+          {getWorkflowTaskDisplayName({ task_name: task.label })} · 关联任务记录
+        </p>
+      ) : null}
+      {!canRead ? (
+        <p className="mobile-detail-muted">暂无查看权限</p>
+      ) : !taskID ? (
+        <Empty description="暂无关联任务记录" />
+      ) : !current ? (
+        <p className="mobile-detail-muted" role="status">
+          正在读取记录…
+        </p>
+      ) : current.error ? (
+        <div role="alert" className="mobile-progress-recent-error">
+          <p>{current.error}</p>
+          <button type="button" onClick={() => setReload((value) => value + 1)}>
+            重新读取记录
+          </button>
+        </div>
+      ) : items.length ? (
+        <>
+          <WorkflowTaskEventEntries items={items} variant="mobile" />
+          {current.truncated ? <p className="mobile-detail-muted">仅显示最近 {items.length} 条，完整记录可在关联任务中查看。</p> : null}
+        </>
+      ) : (
+        <Empty description="暂无处理记录" />
+      )}
+    </section>
+  )
+}
