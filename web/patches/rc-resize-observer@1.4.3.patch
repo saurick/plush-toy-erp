@@ -1,0 +1,26 @@
+diff --git a/es/SingleObserver/index.js b/es/SingleObserver/index.js
+index a02bd73f4928028cdd17e28bc433c949bcd49dad..84b608a08d2a4ad38c11b1ad3ffec830ca65b006 100644
+--- a/es/SingleObserver/index.js
++++ b/es/SingleObserver/index.js
+@@ -30,6 +30,8 @@ function SingleObserver(props, ref) {
+   var originRef = canRef ? getNodeRef(mergedChildren) : null;
+   var mergedRef = useComposeRef(originRef, elementRef);
+   var getDom = function getDom() {
++    // A render prop owns its DOM ref, including the period with no mounted child.
++    if (isRenderProps) return findDOMNode(elementRef.current);
+     var _elementRef$current;
+     return findDOMNode(elementRef.current) || (
+     // Support `nativeElement` format
+diff --git a/lib/SingleObserver/index.js b/lib/SingleObserver/index.js
+index cc66660ae50e77f0225dc217a6b089cf8e9c93e1..28a9e6d104791099132db7041a534f238d04a9bc 100644
+--- a/lib/SingleObserver/index.js
++++ b/lib/SingleObserver/index.js
+@@ -38,6 +38,8 @@ function SingleObserver(props, ref) {
+   var originRef = canRef ? (0, _ref.getNodeRef)(mergedChildren) : null;
+   var mergedRef = (0, _ref.useComposeRef)(originRef, elementRef);
+   var getDom = function getDom() {
++    // A render prop owns its DOM ref, including the period with no mounted child.
++    if (isRenderProps) return (0, _findDOMNode.default)(elementRef.current);
+     var _elementRef$current;
+     return (0, _findDOMNode.default)(elementRef.current) || (
+     // Support `nativeElement` format
