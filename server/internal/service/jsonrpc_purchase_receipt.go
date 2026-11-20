@@ -1,0 +1,172 @@
+package service
+
+import (
+	"context"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
+	"server/internal/errcode"
+	pkglogger "server/pkg/logger"
+)
+
+func (d *jsonrpcDispatcher) handlePurchaseReceipt(
+	ctx context.Context,
+	method, id string,
+	pm map[string]any,
+	actorID int,
+) (string, *v1.JsonrpcResult, error) {
+	switch method {
+	case "create_purchase_receipt_from_purchase_order":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "purchase", method); res != nil {
+			return id, res, nil
+		}
+		in, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders", "purchase_receipts", "quality_inspections", "inventory"); res != nil {
+			return id, res, nil
+		}
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		if in.WarehouseID > 0 && !scope.Allows(in.WarehouseID) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
+		for _, line := range in.Lines {
+			if !scope.Allows(line.WarehouseID) {
+				return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+			}
+		}
+		for _, warehouseID := range in.ItemWarehouses {
+			if !scope.Allows(warehouseID) {
+				return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+			}
+		}
+		in.WarehouseScope = &scope
+		item, err := d.inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "add_purchase_receipt_item":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "purchase", method); res != nil {
+			return id, res, nil
+		}
+		in, ok := purchaseReceiptItemCreateFromParams(pm)
+		if !ok || in.PurchaseOrderItemID == nil || *in.PurchaseOrderItemID <= 0 || in.IdempotencyKey == "" {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders", "purchase_receipts", "quality_inspections", "inventory"); res != nil {
+			return id, res, nil
+		}
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		in.WarehouseScope = &scope
+		item, err := d.inventoryUC.AddPurchaseReceiptItem(ctx, in)
+		return id, purchaseReceiptItemResult(ctx, d, item, err), nil
+	case "post_purchase_receipt":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {
+			return id, res, nil
+		}
+		receiptID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
+			return id, res, nil
+		}
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		pkglogger.SetRequestObject(ctx, "purchase_receipt", receiptID)
+		item, err := d.inventoryUC.PostPurchaseReceiptForAccess(ctx, receiptID, scope)
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "cancel_purchase_receipt_draft":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCancelDraft); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
+			return id, res, nil
+		}
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CancelPurchaseReceiptDraft(ctx, targetID, actorID, scope)
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "cancel_purchase_receipt":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
+			return id, res, nil
+		}
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		targetID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CancelPostedPurchaseReceiptForAccess(ctx, targetID, actorID, scope)
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "get_purchase_receipt":
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
+			return id, res, nil
+		}
+		receiptID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		item, err := d.inventoryUC.GetPurchaseReceiptForAccess(ctx, receiptID, scope)
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "list_purchase_receipts":
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
+			return id, res, nil
+		}
+		filter, ok := purchaseReceiptFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		filter.WarehouseScope = &scope
+		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
+			return d.inventoryUC.CountPurchaseReceiptsByStatus(ctx, filter)
+		})
+		if err != nil {
+			return id, d.mapPurchaseError(ctx, err), nil
+		}
+		items, total, err := d.inventoryUC.ListPurchaseReceipts(ctx, filter)
+		if err != nil {
+			return id, d.mapPurchaseError(ctx, err), nil
+		}
+		return id, okData(withBusinessStatusCounts(map[string]any{
+			"purchase_receipts": purchaseReceiptsToAny(items),
+			"total":             total,
+			"limit":             normalizedBusinessListLimit(pm),
+			"offset":            normalizedOffset(pm),
+		}, statusCounts)), nil
+	default:
+		return id, unknownPurchaseResult(method), nil
+	}
+}
