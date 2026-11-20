@@ -1,0 +1,169 @@
+import React, { useEffect, useState } from 'react'
+import { Alert, Button } from 'antd'
+import { SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
+import { getActionErrorMessage } from '../../../common/utils/errorMessage.js'
+import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
+
+import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
+import {
+  SalesOrderFormFields,
+  SalesOrderItemsFormSection,
+} from './SalesOrderForm.jsx'
+import BusinessForm from '../business-list/BusinessForm.jsx'
+
+export default function SalesOrderEditor({
+  open,
+  form,
+  editingOrder,
+  createResultUnknown = false,
+  saving,
+  itemLoading,
+  referencesLoading,
+  orderAttachmentRef,
+  customers,
+  customerContacts,
+  salesOwnerOptions,
+  unitOptions,
+  productSKUs,
+  canCreateOrder,
+  canUpdateOrder,
+  canCreateItem,
+  canUpdateItem,
+  canCancelItem,
+  onOk,
+  onCancel,
+  onCustomerChange,
+  onContactSelect,
+  onPaymentConditionBlur,
+}) {
+  const [attachments, setAttachments] = useState([])
+  const [attachmentLoadState, setAttachmentLoadState] = useState('ready')
+  const [attachmentLoadError, setAttachmentLoadError] = useState('')
+  const [attachmentRetry, setAttachmentRetry] = useState(0)
+  useEffect(() => {
+    let active = true
+    setAttachments([])
+    setAttachmentLoadError('')
+    if (open && editingOrder?.id) {
+      setAttachmentLoadState('loading')
+      listBusinessAttachments({
+        owner_type: 'sales_order',
+        owner_id: editingOrder.id,
+      })
+        .then((items) => {
+          if (!active) return
+          setAttachments(items)
+          setAttachmentLoadState('ready')
+        })
+        .catch((error) => {
+          if (!active) return
+          setAttachmentLoadError(getActionErrorMessage(error, '加载订单附件'))
+          setAttachmentLoadState('error')
+        })
+    } else {
+      setAttachmentLoadState('ready')
+    }
+    return () => {
+      active = false
+    }
+  }, [open, editingOrder?.id, attachmentRetry])
+  return (
+    <BusinessFormPage
+      form={form}
+      title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
+      okText={
+        createResultUnknown
+          ? '核对保存结果'
+          : !editingOrder ||
+              editingOrder.lifecycle_status === SalesOrderStatus.DRAFT
+            ? '保存草稿'
+            : '保存'
+      }
+      open={open}
+      onOk={onOk}
+      validateOnSave={!createResultUnknown}
+      onCancel={onCancel}
+      confirmLoading={saving}
+      loading={itemLoading || referencesLoading}
+    >
+      {createResultUnknown ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="上次保存结果待确认"
+          description="请点击“核对保存结果”，系统会按原内容重试，不会重复创建订单。确认后可继续编辑。"
+        />
+      ) : null}
+      <BusinessForm
+        form={form}
+        disabled={createResultUnknown}
+        layout="vertical"
+        className="erp-business-action-form"
+      >
+        <SalesOrderFormFields
+          orderID={editingOrder?.id}
+          disabled={createResultUnknown}
+          itemsSection={
+            <BusinessFormSection
+              title="订货明细"
+              showHeading={false}
+              layout="content"
+            >
+              {attachmentLoadState === 'error' ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message="订单附件加载失败"
+                  description={attachmentLoadError}
+                  action={
+                    <Button
+                      onClick={() => setAttachmentRetry((retry) => retry + 1)}
+                    >
+                      重试读取附件
+                    </Button>
+                  }
+                />
+              ) : null}
+              <SalesOrderItemsFormSection
+                form={form}
+                canCreateItem={!createResultUnknown && canCreateItem}
+                canUpdateItem={!createResultUnknown && canUpdateItem}
+                canCancelItem={!createResultUnknown && canCancelItem}
+                productSKUs={productSKUs}
+                unitOptions={unitOptions}
+                orderID={editingOrder?.id}
+                orderAttachments={attachments}
+                orderAttachmentLoadState={attachmentLoadState}
+              />
+            </BusinessFormSection>
+          }
+          attachmentPanel={
+            <BusinessAttachmentPanel
+              ref={orderAttachmentRef}
+              ownerType="sales_order"
+              ownerId={editingOrder?.id}
+              title="订单附件"
+              description="上传客户 PO、合同、样品图或确认截图；附件不改变订单状态。"
+              canUpload={
+                !createResultUnknown && (canUpdateOrder || canCreateOrder)
+              }
+              canWithdraw={!createResultUnknown && canUpdateOrder}
+              variant="inline"
+              compact
+            />
+          }
+          form={form}
+          customers={customers}
+          contactOptions={customerContacts}
+          salesOwnerOptions={salesOwnerOptions}
+          onCustomerChange={onCustomerChange}
+          onContactSelect={onContactSelect}
+          onPaymentConditionBlur={onPaymentConditionBlur}
+        />
+      </BusinessForm>
+    </BusinessFormPage>
+  )
+}

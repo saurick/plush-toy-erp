@@ -1,0 +1,585 @@
+import React from 'react'
+import { Space, Tag, Typography } from 'antd'
+import { QualityInspectionStatus } from '../../../common/consts/statuses.generated.mjs'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { QUALITY_RESULT_OPTIONS } from './qualityInspectionResultOptions.mjs'
+import { QUALITY_STATUS_LABELS, QUALITY_RESULT_LABELS } from '../../utils/qualityInspectionLabels.mjs'
+
+import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
+import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
+import { formatQualityDefectRate } from '../../utils/qualityDefectRate.mjs'
+import { businessSubjectLabel, referenceLabel, inventoryLotStatusLabel } from '../../utils/referenceSelectOptions.mjs'
+
+const { Text } = Typography
+
+export const QUALITY_INSPECTIONS_MODULE_KEY = 'quality-inspections'
+
+export const QUALITY_RESULT_FILTER_OPTIONS = [
+  { label: '全部结果', value: '' },
+  ...QUALITY_RESULT_OPTIONS,
+]
+
+export const QUALITY_INSPECTION_TYPE_FILTER_OPTIONS = [
+  { label: '采购来料', value: 'INCOMING' },
+  { label: '委外回货', value: 'OUTSOURCING_RETURN' },
+  { label: '成品检验', value: 'FINISHED_GOODS' },
+  { label: '生产分段质检', value: 'PRODUCTION_STAGE' },
+]
+
+export const QUALITY_INSPECTION_TYPE_LABELS = Object.freeze({
+  INCOMING: '采购来料',
+  OUTSOURCING_RETURN: '委外回货',
+  FINISHED_GOODS: '成品检验',
+  PRODUCTION_STAGE: '生产分段质检',
+})
+
+export const QUALITY_PRODUCTION_GATE_LABELS = Object.freeze({
+  CUT_PIECE: '裁片检验',
+  SHELL: '皮套检验',
+  FINISHED_GOODS: '成品检验',
+  NEEDLE: '针检',
+  SAMPLING: '抽检',
+  CUSTOMER_ACCEPTANCE: '客户验货',
+})
+
+export const QUALITY_DATE_FILTER_OPTIONS = [
+  { label: '质检日期', value: 'inspected_at' },
+]
+
+const QUALITY_STATUS_COLORS = Object.freeze({
+  [QualityInspectionStatus.DRAFT]: 'default',
+  [QualityInspectionStatus.SUBMITTED]: 'gold',
+  [QualityInspectionStatus.PASSED]: 'green',
+  [QualityInspectionStatus.REJECTED]: 'red',
+  [QualityInspectionStatus.CANCELLED]: 'default',
+})
+
+const QUALITY_RESULT_COLORS = Object.freeze({
+  PASS: 'green',
+  CONCESSION: 'blue',
+  REJECT: 'red',
+})
+
+function lotStatusText(status) {
+  return inventoryLotStatusLabel(status)
+}
+
+function qualityStatusTag(status) {
+  const key = String(status || '').trim()
+  return (
+    <Tag color={QUALITY_STATUS_COLORS[key] || 'default'}>
+      {QUALITY_STATUS_LABELS[key] || (key ? '质检状态' : '-')}
+    </Tag>
+  )
+}
+
+function qualityResultTag(result) {
+  const key = String(result || '').trim()
+  if (!key) return '-'
+  return (
+    <Tag color={QUALITY_RESULT_COLORS[key] || 'default'}>
+      {QUALITY_RESULT_LABELS[key] || '质检结果'}
+    </Tag>
+  )
+}
+
+export function qualityInspectionListStatusText(record, { emptyText = '-' } = {}) {
+  if (record?.superseded_at) return `已替代 · ${QUALITY_RESULT_LABELS[record?.result] || QUALITY_STATUS_LABELS[record?.status] || '原记录'}`
+  if (record?.status === QualityInspectionStatus.PASSED) {
+    return QUALITY_RESULT_LABELS[record?.result] || '判定待核对'
+  }
+  return QUALITY_STATUS_LABELS[record?.status] || (record?.status ? '质检状态' : emptyText)
+}
+
+function qualityInspectionListStatusTag(_value, record) {
+  const color = record?.superseded_at ? 'default' : record?.status === QualityInspectionStatus.PASSED
+    ? QUALITY_RESULT_COLORS[record?.result]
+    : QUALITY_STATUS_COLORS[record?.status]
+  return <Tag color={color || 'default'}>{qualityInspectionListStatusText(record)}</Tag>
+}
+
+function renderStackCell(primary, secondaryItems = []) {
+  const secondary = secondaryItems
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+  return (
+    <Space direction="vertical" size={0}>
+      <span>{primary || '-'}</span>
+      {secondary.map((item, index) => (
+        <Text type="secondary" key={`${item}-${index}`}>
+          {item}
+        </Text>
+      ))}
+    </Space>
+  )
+}
+
+function inspectorLabel(record, { emptyText = '—' } = {}) {
+  return record?.inspector_name || (record?.inspector_id ? '姓名待核对' : emptyText)
+}
+
+function inspectionTypeLabel(record) {
+  const key = String(record?.inspection_type || '').toUpperCase()
+  return QUALITY_INSPECTION_TYPE_LABELS[key] || '质量检验'
+}
+
+function visibleBusinessText(value, { emptyText = '—' } = {}) {
+  if (value === undefined || value === null) return emptyText
+  return String(value).trim() || emptyText
+}
+
+export function productionQualityGateLabel(gateCode, { emptyText = '—' } = {}) {
+  const key = String(gateCode || '')
+    .trim()
+    .toUpperCase()
+  return QUALITY_PRODUCTION_GATE_LABELS[key] || emptyText
+}
+
+export function isProductionStageQualityInspection(record) {
+  return (
+    String(record?.inspection_type || '').toUpperCase() ===
+      'PRODUCTION_STAGE' ||
+    String(record?.source_type || '').toUpperCase() === 'PRODUCTION_WIP'
+  )
+}
+
+function productionWipProductLabel(record, options) {
+  return [
+    visibleBusinessText(record?.product_code, options),
+    visibleBusinessText(record?.product_name, options),
+  ].filter(Boolean).join(' / ')
+}
+
+function productionWipSourceParts(record, options) {
+  return [
+    ['生产订单', visibleBusinessText(record?.production_order_no, options)],
+    ['生产工序', visibleBusinessText(record?.operation_name, options)],
+    ['质量关口', productionQualityGateLabel(record?.gate_code, options)],
+  ].filter(([, value]) => value).map(([label, value]) => `${label}：${value}`)
+}
+
+function productionWipSubjectParts(record, options) {
+  const quantity = visibleBusinessText(record?.batch_quantity, options)
+  return [
+    productionWipProductLabel(record, options),
+    quantity && `批次数量：${quantity}`,
+  ]
+}
+
+function productionWipBatchLabel(record, options) {
+  return visibleBusinessText(record?.wip_batch_no, options)
+}
+
+function qualityDefectRateText(record, options) {
+  return formatQualityDefectRate(record, options)
+}
+
+function qualityInspectorText(record, options) {
+  return inspectorLabel(record, options)
+}
+
+function qualityRemarkText(record, options) {
+  return visibleBusinessText(record?.decision_note, options)
+}
+
+function sourceParts(
+  record,
+  purchaseReceiptOptions,
+  allPurchaseReceiptItemOptions,
+  options
+) {
+  const sourceType = String(record?.source_type || '').toUpperCase()
+  const sourceNo = String(record?.source_no || '').trim()
+  if (isProductionStageQualityInspection(record)) {
+    return productionWipSourceParts(record, options)
+  }
+  if (sourceType === 'PURCHASE_RECEIPT') {
+    return [
+      sourceNo ||
+        referenceLabel(
+          purchaseReceiptOptions,
+          record?.purchase_receipt_id,
+          '采购入库',
+          options
+        ),
+      referenceLabel(
+        allPurchaseReceiptItemOptions,
+        record?.purchase_receipt_item_id,
+        '入库行',
+        options
+      ),
+    ]
+  }
+  if (sourceNo) return [sourceNo]
+  if (sourceType === 'OUTSOURCING_FACT') {
+    return ['委外回货记录已关联']
+  }
+  if (sourceType === 'SHIPMENT') {
+    return ['出货记录已关联']
+  }
+  return !sourceType && options?.emptyText === '' ? [] : ['业务来源已关联']
+}
+
+export function qualityInspectionSubjectType(record) {
+  return String(record?.subject_type || '').trim().toUpperCase() ||
+    (Number(record?.material_id) > 0 ? 'MATERIAL' : '')
+}
+
+function subjectLabel(record, materialOptions, productOptions, options) {
+  if (isProductionStageQualityInspection(record)) {
+    return productionWipProductLabel(record, options)
+  }
+  const subjectType = qualityInspectionSubjectType(record)
+  if (subjectType === 'PRODUCT') {
+    return referenceLabel(productOptions, record?.subject_id, '产品', options)
+  }
+  if (subjectType === 'MATERIAL') {
+    return referenceLabel(materialOptions, record?.material_id || record?.subject_id, '材料', options)
+  }
+  return options?.emptyText ?? '-'
+}
+
+function subjectParts(
+  record,
+  materialOptions,
+  productOptions,
+  warehouseOptions,
+  options
+) {
+  if (isProductionStageQualityInspection(record)) {
+    return productionWipSubjectParts(record, options)
+  }
+  return [
+    subjectLabel(record, materialOptions, productOptions, options),
+    referenceLabel(warehouseOptions, record?.warehouse_id, '仓库', options),
+    record?.original_lot_status
+      ? `原批次状态 ${lotStatusText(record.original_lot_status)}`
+      : '',
+  ]
+}
+
+export function buildQualityInspectionExportColumns({
+  allPurchaseReceiptItemOptions = [],
+  inventoryLotOptions = [],
+  materialOptions = [],
+  productOptions = [],
+  purchaseReceiptOptions = [],
+  warehouseOptions = [],
+}) {
+  return [
+    {
+      title: '质检单号',
+      exportTitle: '质检单号',
+      dataIndex: 'inspection_no',
+      width: 170,
+    },
+    {
+      title: '状态',
+      exportTitle: '状态',
+      dataIndex: 'status',
+      width: 110,
+      exportValue: (record) =>
+        QUALITY_STATUS_LABELS[record?.status] ||
+        (record?.status ? '质检状态' : ''),
+      render: qualityStatusTag,
+    },
+    {
+      title: '判定',
+      exportTitle: '判定',
+      dataIndex: 'result',
+      width: 120,
+      exportValue: (record) =>
+        QUALITY_RESULT_LABELS[record?.result] ||
+        (record?.result ? '质检结果' : ''),
+      render: qualityResultTag,
+    },
+    {
+      align: 'right',
+      title: '估算不良比例',
+      exportTitle: '估算不良比例',
+      dataIndex: 'defect_rate_percent',
+      width: 140,
+      sortable: false,
+      exportValue: (record) => qualityDefectRateText(record, { emptyText: '' }),
+      render: (_value, record) => qualityDefectRateText(record),
+    },
+    {
+      align: 'left',
+      title: '检验来源',
+      exportTitle: '检验来源',
+      dataIndex: 'inspection_type',
+      width: 240,
+      exportValue: (record) =>
+        [
+          inspectionTypeLabel(record),
+          ...sourceParts(record, purchaseReceiptOptions, allPurchaseReceiptItemOptions, { emptyText: '' }),
+        ].filter(Boolean).join(' '),
+    },
+    {
+      align: 'left',
+      title: '产品 / 材料 / 在制品',
+      exportTitle: '产品 / 材料 / 在制品',
+      dataIndex: 'subject_type',
+      width: 220,
+      exportValue: (record) =>
+        subjectLabel(record, materialOptions, productOptions, { emptyText: '' }),
+    },
+    {
+      title: '仓库',
+      exportTitle: '仓库',
+      dataIndex: 'warehouse_id',
+      width: 110,
+      sortType: 'number',
+      render: (value, record) =>
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : referenceLabel(warehouseOptions, value, '仓库'),
+      exportValue: (record) =>
+        isProductionStageQualityInspection(record)
+          ? ''
+          : referenceLabel(warehouseOptions, record?.warehouse_id, '仓库', { emptyText: '' }),
+    },
+    {
+      title: '批次',
+      exportTitle: '批次',
+      dataIndex: 'inventory_lot_id',
+      width: 150,
+      sortType: 'number',
+      render: (value, record) =>
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : referenceLabel(inventoryLotOptions, value, '批次'),
+      exportValue: (record) =>
+        isProductionStageQualityInspection(record)
+          ? ''
+          : referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次', { emptyText: '' }),
+    },
+    {
+      title: '原批次状态',
+      exportTitle: '原批次状态',
+      dataIndex: 'original_lot_status',
+      width: 120,
+      render: (value, record) =>
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : lotStatusText(value) || '-',
+      exportValue: (record) =>
+        isProductionStageQualityInspection(record)
+          ? ''
+          : lotStatusText(record?.original_lot_status),
+    },
+    {
+      title: '检验时间',
+      exportTitle: '检验时间',
+      dataIndex: 'inspected_at',
+      width: 150,
+      sortType: 'date',
+      render: formatUnixDate,
+      exportValue: (record) => formatUnixDate(record?.inspected_at, { emptyText: '' }),
+    },
+    {
+      title: '检验人',
+      exportTitle: '检验人',
+      dataIndex: 'inspector_id',
+      width: 100,
+      sortType: 'number',
+      render: (_value, record) => qualityInspectorText(record),
+      exportValue: (record) => qualityInspectorText(record, { emptyText: '' }),
+    },
+    {
+      title: '记录效力',
+      exportTitle: '记录效力',
+      dataIndex: 'superseded_at',
+      exportValue: (record) => record?.superseded_at ? '已替代' : '当前记录',
+      render: (_value, record) => record?.superseded_at ? '已替代' : '当前记录',
+    },
+    { title: '更正原单', exportTitle: '更正原单', dataIndex: 'correction_of_inspection_no' },
+    { title: '替代本单', exportTitle: '替代本单', dataIndex: 'corrected_inspection_no' },
+    { title: '更正原因', exportTitle: '更正原因', dataIndex: 'superseded_reason' },
+    {
+      align: 'left',
+      title: '判定备注',
+      exportTitle: '判定备注',
+      dataIndex: 'decision_note',
+      width: 220,
+      render: (_value, record) => qualityRemarkText(record),
+      exportValue: (record) => qualityRemarkText(record, { emptyText: '' }),
+    },
+  ]
+}
+
+export function buildQualityInspectionDataColumns({
+  allPurchaseReceiptItemOptions = [],
+  inventoryLotOptions = [],
+  materialOptions = [],
+  productOptions = [],
+  purchaseReceiptOptions = [],
+  warehouseOptions = [],
+}) {
+  const renderSubject = (record) => {
+    const [subject, ...secondary] = subjectParts(
+      record,
+      materialOptions,
+      productOptions,
+      warehouseOptions
+    )
+    const productID = isProductionStageQualityInspection(record)
+      ? record.product_id
+      : record.subject_type === 'PRODUCT'
+        ? record.subject_id
+        : 0
+    return productID ? (
+      <ProductIdentity productId={productID} name={subject}>
+        {renderStackCell(subject, secondary)}
+      </ProductIdentity>
+    ) : (
+      renderStackCell(subject, secondary)
+    )
+  }
+  return applyBusinessColumnSorters([
+    {
+      defaultPriority: 10,
+      title: '质检单号',
+      exportTitle: '质检单号',
+      dataIndex: 'inspection_no',
+      copyable: true,
+      detailCopyable: true,
+      width: 170,
+    },
+    {
+      defaultPriority: 20,
+      title: '状态 / 判定',
+      exportTitle: '状态 / 判定',
+      dataIndex: 'status',
+      width: 130,
+      sortValue: qualityInspectionListStatusText,
+      exportValue: (record) => qualityInspectionListStatusText(record, { emptyText: '' }),
+      render: qualityInspectionListStatusTag,
+    },
+    {
+      defaultPriority: 30,
+      defaultHidden: true,
+      title: '判定',
+      exportTitle: '判定',
+      dataIndex: 'result',
+      width: 120,
+      exportValue: (record) =>
+        QUALITY_RESULT_LABELS[record?.result] ||
+        (record?.result ? '质检结果' : ''),
+      render: qualityResultTag,
+    },
+    {
+      align: 'right',
+      defaultPriority: 60,
+      title: '估算不良比例',
+      exportTitle: '估算不良比例',
+      dataIndex: 'defect_rate_percent',
+      width: 140,
+      sortable: false,
+      exportValue: (record) => qualityDefectRateText(record, { emptyText: '' }),
+      render: (_value, record) => qualityDefectRateText(record),
+    },
+    {
+      align: 'left',
+      defaultPriority: 50,
+      title: '检验来源',
+      exportTitle: '检验来源',
+      dataIndex: 'inspection_type',
+      width: 240,
+      widthGrow: 1,
+      render: (_value, record) =>
+        renderStackCell(
+          inspectionTypeLabel(record),
+          sourceParts(
+            record,
+            purchaseReceiptOptions,
+            allPurchaseReceiptItemOptions
+          )
+        ),
+      exportValue: (record) =>
+        [
+          inspectionTypeLabel(record),
+          ...sourceParts(record, purchaseReceiptOptions, allPurchaseReceiptItemOptions, { emptyText: '' }),
+        ].filter(Boolean).join(' '),
+    },
+    {
+      align: 'left',
+      defaultPriority: 40,
+      title: '产品 / 材料 / 在制品',
+      exportTitle: '产品 / 材料 / 在制品',
+      dataIndex: 'subject_type',
+      width: 260,
+      widthGrow: 2,
+      className: 'erp-product-identity-cell',
+      render: (_value, record) => renderSubject(record),
+      detailLabel: (record) => businessSubjectLabel(qualityInspectionSubjectType(record), '检验对象'),
+      detailValue: renderSubject,
+      exportValue: (record) =>
+        subjectParts(record, materialOptions, productOptions, warehouseOptions, { emptyText: '' })
+          .filter(Boolean)
+          .join(' '),
+    },
+    {
+      align: 'left',
+      defaultPriority: 70,
+      title: '检验日期',
+      dataIndex: 'inspected_at',
+      width: 128,
+      sortType: 'date',
+      render: (value) => formatUnixDate(value, { emptyText: '—' }),
+      exportValue: (record) => formatUnixDate(record?.inspected_at, { emptyText: '' }),
+    },
+    {
+      align: 'left',
+      title: '判定备注',
+      exportTitle: '判定备注',
+      dataIndex: 'decision_note',
+      width: 220,
+      render: (_value, record) => qualityRemarkText(record),
+      exportValue: (record) => qualityRemarkText(record, { emptyText: '' }),
+    },
+    ...buildQualityInspectionExportColumns({
+      allPurchaseReceiptItemOptions,
+      inventoryLotOptions,
+      materialOptions,
+      productOptions,
+      purchaseReceiptOptions,
+      warehouseOptions,
+    })
+      .filter((column) =>
+        [
+          'warehouse_id',
+          'inventory_lot_id',
+          'original_lot_status',
+          'inspector_id',
+        ].includes(column.dataIndex)
+      )
+      .map((column) => {
+        if (column.dataIndex === 'inventory_lot_id') {
+          const batchLabel = (record, options) =>
+            isProductionStageQualityInspection(record)
+              ? productionWipBatchLabel(record, options)
+              : referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次', options)
+          return {
+            ...column,
+            defaultPriority: 45,
+            width: 170,
+            sortType: 'text',
+            sortValue: (record) => batchLabel(record, { emptyText: '' }),
+            render: (_value, record) => batchLabel(record, { emptyText: '—' }),
+            exportValue: (record) => batchLabel(record, { emptyText: '' }),
+          }
+        }
+        if (column.dataIndex === 'inspector_id') {
+          return {
+            ...column,
+            defaultPriority: 80,
+            width: 120,
+            sortType: 'text',
+            sortValue: (record) => qualityInspectorText(record, { emptyText: '' }),
+          }
+        }
+        return { ...column, defaultHidden: true, detailHidden: true }
+      }),
+  ])
+}

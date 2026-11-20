@@ -1,0 +1,230 @@
+import React, { useEffect, useRef, useState } from 'react'
+import { Form, InputNumber, Spin } from 'antd'
+import BusinessGroupedLineItems from '../business-list/BusinessGroupedLineItems.jsx'
+import BusinessCompactFieldTable, { BusinessCompactFieldRow } from '../business-list/BusinessCompactFieldTable.jsx'
+import { DateInput } from '../business-list/BusinessDateInputs.jsx'
+import BusinessModal from '../business-list/BusinessModal.jsx'
+import {
+  completePurchaseOrderTerms,
+  updatePurchaseOrderDelivery,
+  getPurchaseOrder,
+  listAllPurchaseOrderItems,
+} from '../../api/masterDataOrderApi.mjs'
+import { unixToDateInputValue } from '../../utils/masterDataOrderView.mjs'
+import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import { createSourceBusinessActionAttemptStore } from '../../utils/sourceBusinessAction.mjs'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { message } from '@/common/utils/antdApp'
+import BusinessForm from '../business-list/BusinessForm.jsx'
+
+const dateParam = (value) =>
+  value ? Date.parse(`${value}T00:00:00Z`) / 1000 : null
+
+export default function PurchaseOrderTermsModal({
+  order,
+  deliveryOnly = false,
+  customerKey,
+  unitOptions = [],
+  onClose,
+  onChanged,
+}) {
+  const [form] = Form.useForm()
+  const [context, setContext] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const attempts = useRef(createSourceBusinessActionAttemptStore())
+  const actionLabel = deliveryOnly ? '维护采购交期' : '补齐采购价格与交期'
+  const orderID = Number(order?.id || 0)
+
+  useEffect(() => {
+    if (!orderID) return undefined
+    const controller = new AbortController()
+    setContext(null)
+    setLoading(true)
+    const load = async () => {
+      const options = { signal: controller.signal }
+      const current = await getPurchaseOrder({ id: orderID }, options)
+      if (
+        !current?.id ||
+        !['approved', 'closed'].includes(current.lifecycle_status)
+      ) {
+        throw new Error('当前采购单状态已变化，请刷新后重试')
+      }
+      const result = await listAllPurchaseOrderItems(
+        {
+          purchase_order_id: orderID,
+          expected_version: current.version,
+        },
+        options
+      )
+      return { current, items: result.purchase_order_items }
+    }
+    load()
+      .then(({ current, items }) => {
+        if (controller.signal.aborted) return
+        const lines = items.filter((item) => item.line_status !== 'canceled')
+        if (!lines.length) throw new Error('当前采购单没有可补齐的明细')
+        setContext({ order: current, items: lines })
+        form.setFieldsValue({
+          expected_arrival_date: unixToDateInputValue(
+            current.expected_arrival_date
+          ),
+          supplier_confirmed_arrival_date: unixToDateInputValue(
+            current.supplier_confirmed_arrival_date
+          ),
+          items: lines.map((item) => ({
+            unit_price: item.unit_price ?? '',
+            expected_arrival_date: unixToDateInputValue(
+              item.expected_arrival_date
+            ),
+          })),
+        })
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted && !isRpcAbortError(error)) {
+          message.error(getActionErrorMessage(error, '读取采购条款'))
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+    return () => controller.abort()
+  }, [form, orderID])
+
+  const submit = async () => {
+    const values = await form.validateFields()
+    if (!context || saving) return
+    const payload = {
+      customer_key: customerKey || undefined,
+      id: context.order.id,
+      expected_version: context.order.version,
+      expected_arrival_date: dateParam(values.expected_arrival_date),
+      supplier_confirmed_arrival_date: dateParam(
+        values.supplier_confirmed_arrival_date
+      ),
+      items: context.items.map((item, index) => ({
+        id: item.id,
+        ...(deliveryOnly ? {} : { unit_price: String(values.items[index].unit_price) }),
+        expected_arrival_date: dateParam(
+          values.items[index].expected_arrival_date
+        ),
+      })),
+    }
+    const scope = `${deliveryOnly ? 'purchase-delivery' : 'purchase-terms'}:${orderID}`
+    let attempt
+    setSaving(true)
+    try {
+      attempt = attempts.current.prepare(scope, payload)
+      const updated = await (deliveryOnly ? updatePurchaseOrderDelivery : completePurchaseOrderTerms)(attempt.params)
+      if (
+        updated?.id !== context.order.id ||
+        Number(updated.version) <= Number(context.order.version)
+      ) {
+        throw Object.assign(new Error('采购补价结果暂时无法确认'), {
+          isInvalidResponse: true,
+        })
+      }
+      attempts.current.settle(scope, attempt, null)
+      message.success(deliveryOnly ? '采购交期已保存' : '采购价格与交期已保存')
+      onClose?.()
+      try {
+        await onChanged?.()
+      } catch {
+        message.warning('保存已完成，请刷新采购订单查看最新资料')
+      }
+    } catch (error) {
+      const retained = attempt && attempts.current.settle(scope, attempt, error)
+      message[retained ? 'warning' : 'error'](
+        retained
+          ? '结果暂时无法确认，请保持内容不变后重试'
+          : getActionErrorMessage(error, actionLabel)
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const closed = context?.order.lifecycle_status === 'closed'
+  return (
+    <BusinessModal
+      open={Boolean(orderID)}
+      title={`${deliveryOnly ? '维护交期' : '补齐价格与交期'}${order?.purchase_order_no ? ` · ${order.purchase_order_no}` : ''}`}
+      size="localAction"
+      form={form}
+      okText="保存"
+      onOk={submit}
+      onCancel={onClose}
+      confirmLoading={saving}
+      okButtonProps={{ disabled: loading || !context }}
+    >
+      <Spin spinning={loading}>
+        <BusinessForm form={form} layout="vertical" disabled={saving}>
+          <p>
+            {deliveryOnly ? '交期可独立维护或清空，无需填写价格。明细交期优先于整单交期，采购数量沿用批准结果。' : '采购数量沿用批准结果。已确认价格保持锁定，晚补价用于缺价收货的结算。'}
+          </p>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+              gap: 16,
+            }}
+          >
+            <Form.Item name="expected_arrival_date" label="预计到货日期">
+              <DateInput disabled={closed} />
+            </Form.Item>
+            <Form.Item
+              name="supplier_confirmed_arrival_date"
+              label="供应商确认到货日期"
+            >
+              <DateInput disabled={closed} />
+            </Form.Item>
+          </div>
+          <BusinessGroupedLineItems
+            fields={(context?.items || []).map((item, index) => ({ key: item.id, name: index }))}
+            form={form}
+            table={BusinessCompactFieldTable}
+            getGroup={(value, field) => {
+              const item = context.items[field.name]
+              const label = [item.material_code_snapshot, item.material_name_snapshot].filter(Boolean).join(' ') || '采购物料'
+              return { key: item.material_id && item.unit_id ? `${item.material_id}:${item.unit_id}` : undefined, label }
+            }}
+            tableProps={{
+              label: '采购价格与交期明细',
+              showSequence: true,
+              columns: [
+                { label: '物料' },
+                { label: '采购数量', width: 130 },
+                ...(!deliveryOnly ? [{ label: context?.order.currency ? `单价（${context.order.currency}）` : '单价', width: 170 }] : []),
+                { label: '明细预计到货', width: 170 },
+              ],
+            }}
+          >
+            {(field) => {
+              const item = context.items[field.name]
+              const index = field.name
+              return (
+                <BusinessCompactFieldRow
+                  sequence={index + 1}
+                  label={`采购明细 ${index + 1}`}
+                  cells={[
+                    [item.material_code_snapshot, item.material_name_snapshot].filter(Boolean).join(' ') || '采购物料',
+                    `${item.purchased_quantity} ${referenceLabel(unitOptions, item.unit_id, '单位')}`,
+                    ...(!deliveryOnly ? [
+                      <Form.Item key="price" name={['items', index, 'unit_price']} rules={[{ required: true, message: '请填写单价' }]}>
+                        <InputNumber aria-label={`第${index + 1}行单价`} min="0" stringMode disabled={item.unit_price != null} />
+                      </Form.Item>,
+                    ] : []),
+                    <Form.Item key="arrival" name={['items', index, 'expected_arrival_date']}>
+                      <DateInput aria-label={`第${index + 1}行预计到货日期`} disabled={closed} />
+                    </Form.Item>,
+                  ]}
+                />
+              )
+            }}
+          </BusinessGroupedLineItems>
+        </BusinessForm>
+      </Spin>
+    </BusinessModal>
+  )
+}
