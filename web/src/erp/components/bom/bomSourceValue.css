@@ -1,0 +1,7 @@
+.erp-bom-parts-table--source :is(.erp-bom-col-quantity, .erp-bom-col-total) {
+  width: 128px;
+}
+
+.erp-bom-parts-table--source .erp-bom-col-loss {
+  width: 108px;
+}

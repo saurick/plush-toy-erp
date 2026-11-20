@@ -1,0 +1,40 @@
+.erp-bom-import-line-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-weight: 500;
+}
+
+.erp-bom-import-line-status__source {
+  white-space: nowrap;
+}
+
+.erp-bom-import-issue-trigger.ant-btn {
+  height: auto;
+  min-height: 24px;
+  padding-inline: 0;
+  color: var(--erp-warning-text);
+  font-size: var(--erp-font-caption);
+  white-space: nowrap;
+}
+
+.erp-bom-import-issues-popover .erp-bom-import-issues {
+  max-width: min(280px, calc(100vw - 64px));
+  margin: 0;
+  padding-inline-start: 18px;
+  overflow-wrap: anywhere;
+}
+
+.erp-bom-import-issues-popover .erp-bom-import-issues > li + li {
+  margin-top: 6px;
+}
+
+@media (pointer: coarse) {
+  .erp-bom-import-issue-trigger.ant-btn {
+    min-height: 44px;
+  }
+}
