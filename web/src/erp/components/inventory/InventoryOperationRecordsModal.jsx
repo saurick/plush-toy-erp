@@ -1,0 +1,329 @@
+import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Button, Checkbox, Space, Tag } from 'antd'
+import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
+import { InventoryOperationStatus } from '../../../common/consts/statuses.generated.mjs'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import Table from '@/common/components/table/AppTable'
+
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { listInventoryOperations } from '../../api/inventoryApi.mjs'
+import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
+import { BusinessDataTable, BusinessOperationPanel } from '../business-list/BusinessListLayout.jsx'
+
+const TYPE_LABELS = Object.freeze({
+  CYCLE_COUNT: '库存盘点',
+  TRANSFER: '库存调拨',
+  MANUAL_ADJUSTMENT: '人工调整',
+})
+
+const STATUS_LABELS = Object.freeze({
+  [InventoryOperationStatus.DRAFT]: '草稿',
+  [InventoryOperationStatus.SUBMITTED]: '待审批',
+  [InventoryOperationStatus.APPROVED]: '已批准待执行',
+  [InventoryOperationStatus.REJECTED]: '已驳回',
+  [InventoryOperationStatus.POSTED]: '已过账',
+  [InventoryOperationStatus.CANCELLED]: '已取消',
+})
+
+const STATUS_COLORS = Object.freeze({
+  [InventoryOperationStatus.DRAFT]: 'default',
+  [InventoryOperationStatus.SUBMITTED]: 'gold',
+  [InventoryOperationStatus.APPROVED]: 'cyan',
+  [InventoryOperationStatus.REJECTED]: 'red',
+  [InventoryOperationStatus.POSTED]: 'blue',
+  [InventoryOperationStatus.CANCELLED]: 'default',
+})
+
+const TYPE_OPTIONS = [
+  { label: '全部作业类型', value: '' },
+  ...Object.entries(TYPE_LABELS).map(([value, label]) => ({ value, label })),
+]
+
+const STATUS_OPTIONS = [
+  { label: '全部状态', value: '' },
+  ...Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label })),
+]
+
+function formatDateTime(value) {
+  const timestamp = Number(value)
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return '-'
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(timestamp * 1000))
+}
+
+function statusTag(value) {
+  const status = String(value || '').toUpperCase()
+  return (
+    <Tag color={STATUS_COLORS[status] || 'default'}>
+      {STATUS_LABELS[status] || '状态待核对'}
+    </Tag>
+  )
+}
+
+export default function InventoryOperationRecordsModal({
+  open,
+  inline = false,
+  refreshKey = 0,
+  currentAdminID = 0,
+  canCreate = false,
+  onCreate,
+  onCancel,
+  onSelect,
+  onEdit,
+}) {
+  const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [operationType, setOperationType] = useState('')
+  const [status, setStatus] = useState('')
+  const [onlyMine, setOnlyMine] = useState(true)
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [loading, setLoading] = useState(false)
+  const [actionKey, setActionKey] = useState('')
+  const beginLatestRequest = useLatestRequestCoordinator()
+  const { current: currentPage, pageSize } = pagination
+
+  const loadRecords = useCallback(async () => {
+    if (!open) return
+    const request = beginLatestRequest('inventory-operation-records')
+    setLoading(true)
+    try {
+      const result = await listInventoryOperations(
+        {
+          operation_type: operationType || undefined,
+          status: status || undefined,
+          created_by:
+            onlyMine && Number(currentAdminID) > 0
+              ? Number(currentAdminID)
+              : undefined,
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+        },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) return
+      setRows(
+        Array.isArray(result?.inventory_operations)
+          ? result.inventory_operations
+          : []
+      )
+      setTotal(Number(result?.total || 0))
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return
+      message.error(getActionErrorMessage(error, '读取库存作业记录'))
+    } finally {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+    }
+  }, [
+    beginLatestRequest,
+    currentAdminID,
+    onlyMine,
+    open,
+    operationType,
+    currentPage,
+    pageSize,
+    status,
+  ])
+
+  useEffect(() => {
+    if (!open) {
+      const request = beginLatestRequest('inventory-operation-records')
+      request.finish()
+      setLoading(false)
+      setActionKey('')
+      return
+    }
+    loadRecords()
+  }, [beginLatestRequest, loadRecords, open, refreshKey])
+
+  const runRecordAction = useCallback(async (kind, record, action) => {
+    if (!record?.id || !action) return
+    const key = `${kind}:${record.id}`
+    setActionKey(key)
+    try {
+      await action(record)
+    } finally {
+      setActionKey('')
+    }
+  }, [])
+
+  const columns = useMemo(
+    () => [
+      {
+        title: '作业单号',
+        dataIndex: 'operation_no',
+        width: 180,
+        render: (value) => value || '已登记作业',
+      },
+      {
+        title: '作业类型',
+        dataIndex: 'operation_type',
+        width: 120,
+        render: (value) => TYPE_LABELS[value] || '库存作业',
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        width: 120,
+        render: statusTag,
+      },
+      {
+        align: 'left',
+        title: '业务原因',
+        dataIndex: 'reason',
+        render: (value) => value || '-',
+      },
+      {
+        title: '最近更新',
+        dataIndex: 'updated_at',
+        width: 170,
+        render: formatDateTime,
+      },
+      {
+        align: 'center',
+        title: '操作',
+        key: 'actions',
+        fixed: 'right',
+        width: 160,
+        render: (_, record) => {
+          const canEdit =
+            canCreate &&
+            record?.status === InventoryOperationStatus.DRAFT &&
+            Number(record?.created_by || 0) === Number(currentAdminID || 0)
+          return (
+            <Space size="small">
+              <Button
+                size="small"
+                loading={actionKey === `select:${record.id}`}
+                disabled={Boolean(actionKey)}
+                onClick={() => runRecordAction('select', record, onSelect)}
+              >
+                核对
+              </Button>
+              {canEdit ? (
+                <Button
+                  icon={<EditOutlined aria-hidden="true" />}
+                  className="erp-action-button"
+                  type="primary"
+                  size="small"
+                  loading={actionKey === `edit:${record.id}`}
+                  disabled={Boolean(actionKey)}
+                  onClick={() => runRecordAction('edit', record, onEdit)}
+                >
+                  编辑草稿
+                </Button>
+              ) : null}
+            </Space>
+          )
+        },
+      },
+    ],
+    [actionKey, canCreate, currentAdminID, onEdit, onSelect, runRecordAction]
+  )
+
+  const filters = (
+    <>
+      <FilterChipGroup
+        allowClear
+        label="作业类型"
+        aria-label="作业类型"
+        value={operationType}
+        options={TYPE_OPTIONS}
+        onChange={(value) => {
+            setOperationType(value)
+            setPagination((current) => ({ ...current, current: 1 }))
+          }}
+      />
+      <FilterChipGroup
+        allowClear
+        label="作业状态"
+        aria-label="作业状态"
+        value={status}
+        options={STATUS_OPTIONS}
+        onChange={(value) => {
+            setStatus(value)
+            setPagination((current) => ({ ...current, current: 1 }))
+          }}
+      />
+      <Checkbox
+        checked={onlyMine}
+        onChange={(event) => {
+            setOnlyMine(event.target.checked)
+            setPagination((current) => ({ ...current, current: 1 }))
+          }}
+      >
+        仅看我创建
+      </Checkbox>
+    </>
+  )
+  const refreshAction = (
+    <Button
+      icon={<ReloadOutlined aria-hidden="true" />}
+      className="erp-action-button"
+      disabled={loading}
+      onClick={loadRecords}
+    >
+      刷新
+    </Button>
+  )
+  const note = <span className="erp-business-inline-note" role="note">仅草稿可继续编辑，已提交内容只读。</span>
+  const TableComponent = inline ? BusinessDataTable : Table
+  const content = (
+    <>
+      {inline ? (
+        <BusinessOperationPanel
+          compact
+          viewSwitch={<div className="erp-inventory-operation-filters">{filters}</div>}
+          actions={note}
+          primaryAction={onCreate ? <Button type="primary" onClick={onCreate}>选择库存登记盘点、调拨或调整</Button> : null}
+        />
+      ) : (
+        <>{note}<Space wrap style={{ margin: '16px 0' }}>{filters}{refreshAction}</Space></>
+      )}
+      <TableComponent
+        rowKey="id"
+        size="small"
+        scroll={{ x: 980 }}
+        loading={loading}
+        columns={columns}
+        dataSource={rows}
+        pagination={{
+          ...pagination,
+          total,
+          showSizeChanger: true,
+        }}
+        onChange={(next) =>
+          setPagination({
+            current: next.current || 1,
+            pageSize: next.pageSize || 20,
+          })
+        }
+      />
+    </>
+  )
+  if (inline) return content
+  return (
+    <BusinessModal
+      className="erp-inventory-operation-records-modal"
+      title={<BusinessHelpLabel label="库存作业记录" description="盘点、调拨和人工调整记录；核对明细、复核与过账结果。" />}
+      open={open}
+      size="lineItems"
+      footer={null}
+      destroyOnHidden
+      onCancel={onCancel}
+    >{content}
+    </BusinessModal>
+  )
+}

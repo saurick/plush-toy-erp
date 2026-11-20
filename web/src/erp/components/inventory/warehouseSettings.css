@@ -1,0 +1,45 @@
+.erp-warehouse-settings-modal .ant-modal-body {
+  container: warehouse-settings / inline-size;
+}
+
+.erp-warehouse-settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.erp-warehouse-settings-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-warehouse-settings-toolbar > .erp-search-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.erp-warehouse-settings-toolbar > .ant-btn {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.erp-warehouse-settings-modal .erp-warehouse-settings-form {
+  grid-template-columns: minmax(128px, 1fr) minmax(160px, 1.5fr) minmax(160px, 1.2fr) auto;
+}
+
+@container warehouse-settings (max-width: 640px) {
+  .erp-warehouse-settings-modal .erp-warehouse-settings-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container warehouse-settings (max-width: 420px) {
+  .erp-warehouse-settings-modal .erp-warehouse-settings-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

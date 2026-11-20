@@ -1,0 +1,229 @@
+import React from 'react'
+import { Form, Input } from 'antd'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import Select from '@/common/components/select/AppSelect'
+
+import { FinancePaymentKind } from '../../../common/consts/statuses.generated.mjs'
+import FinancePaymentEvidenceFields from './FinancePaymentEvidenceFields.jsx'
+import { hasActionPermission, BUSINESS_CURRENCY_OPTIONS } from '../../utils/masterDataOrderView.mjs'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
+import FinancePaymentSourceFields from './FinancePaymentSourceFields.jsx'
+
+import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
+
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
+
+import { DateTimeInput } from '../business-list/BusinessDateInputs.jsx'
+
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+
+import {
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
+import BusinessForm from '../business-list/BusinessForm.jsx'
+
+export function FinancePaymentEditor({
+  accountSuggestions = [],
+  adminProfile,
+  customerKey,
+  loading,
+  referenceLoading,
+  paymentOpen,
+  setPaymentOpen,
+  refundSource,
+  paymentForm,
+  paymentKind,
+  partyIsCustomer,
+  partyOptions,
+  createPayment,
+  sourceContext = null,
+}) {
+  return (
+    <BusinessFormPage
+      form={paymentForm}
+      title="登记收付款"
+      open={paymentOpen}
+      loading={referenceLoading}
+      okText="创建收付款记录"
+      confirmLoading={loading}
+      onCancel={() => !loading && setPaymentOpen(false)}
+      onOk={createPayment}
+    >
+      <BusinessForm
+        form={paymentForm}
+        name="finance-payment-create"
+        className="erp-business-action-form"
+        layout="vertical"
+        preserve={false}
+        disabled={loading}
+      >
+        <Form.Item>
+          <ProcessSubmissionRoute
+            processKey="finance_payment_approval"
+            customerKey={customerKey}
+            open={paymentOpen}
+          />
+        </Form.Item>
+        <BusinessFormSection fieldLayout="adaptive" title="往来与金额">
+          {refundSource ? (
+            <p className="erp-business-inline-note">
+              退回原款 {refundSource.payment_no}；当前可退{' '}
+              {refundSource.available_amount} {refundSource.currency}
+              。实际退款须保留独立凭据。
+            </p>
+          ) : null}
+          <Form.Item name="kind" label="款项用途" rules={[{ required: true }]}>
+            <Select
+              placeholder="请选择款项用途"
+              disabled={Boolean(refundSource || sourceContext)}
+              options={
+                refundSource
+                  ? [{ value: FinancePaymentKind.REFUND, label: '实际退款' }]
+                  : [
+                      {
+                        value: FinancePaymentKind.SETTLEMENT,
+                        label: '应收应付结算',
+                      },
+                      {
+                        value: FinancePaymentKind.ADVANCE,
+                        label: '订单预收 / 预付（首款、分期款、发货前尾款）',
+                      },
+                    ]
+              }
+              onChange={() =>
+                paymentForm.setFieldsValue({
+                  source_type: undefined,
+                  source_id: undefined,
+                  currency: undefined,
+                  purpose_note: undefined,
+                })
+              }
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field--short"
+            name="direction"
+            label="收付款方向"
+            rules={[{ required: true }]}
+          >
+            <Select
+              placeholder="请选择收付款方向"
+              options={[
+                { value: 'RECEIPT', label: '收款' },
+                { value: 'DISBURSEMENT', label: '付款' },
+              ]}
+              disabled={Boolean(refundSource || sourceContext)}
+              onChange={() =>
+                paymentForm.setFieldsValue({
+                  counterparty_id: undefined,
+                  source_type: undefined,
+                  source_id: undefined,
+                  currency: undefined,
+                })
+              }
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field--wide"
+            name="counterparty_id"
+            label={partyIsCustomer ? '客户' : '供应商'}
+            rules={[{ required: true, message: '请选择往来方' }]}
+          >
+            <Select
+              placeholder={partyIsCustomer ? '选择客户' : '选择供应商'}
+              key={partyIsCustomer ? 'customer' : 'supplier'}
+              showSearch
+              optionFilterProp="label"
+              loading={referenceLoading}
+              disabled={Boolean(refundSource || sourceContext)}
+              onChange={() =>
+                paymentForm.setFieldsValue({
+                  source_id: undefined,
+                  currency: undefined,
+                })
+              }
+              options={partyOptions}
+            />
+          </Form.Item>
+          <FinancePaymentSourceFields
+            form={paymentForm}
+            profile={adminProfile}
+            open={paymentOpen}
+            sourceContext={sourceContext}
+          />
+          <Form.Item
+            className="erp-business-action-form__field--wide"
+            name="purpose_note"
+            label={refundSource ? '退款原因' : '款项说明'}
+            extra={refundSource ? '说明取消、退货或多收多付的原因。' : undefined}
+            rules={
+              refundSource
+                ? [
+                    {
+                      required: true,
+                      whitespace: true,
+                      message: '请填写退款原因',
+                    },
+                  ]
+                : []
+            }
+          >
+            <BusinessTextArea
+              showCount
+              minRows={2}
+              maxLength={255}
+              placeholder={
+                refundSource
+                  ? '填写退款原因'
+                  : '如订单首款'
+              }
+            />
+          </Form.Item>
+          <Form.Item
+            name="payment_no"
+            label="收付款单号"
+            rules={[{ required: true, whitespace: true, message: '请填写单号' }]}
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            name="amount"
+            label="实收 / 实付金额"
+            rules={[
+              { required: true, message: '请填写金额' },
+              {
+                validator: (_, value) =>
+                  !isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
+                    ? Promise.reject(new Error('金额必须大于 0，最多六位小数'))
+                    : refundSource &&
+                        compareNumeric20Scale6Units(
+                          numeric20Scale6Units(value),
+                          numeric20Scale6Units(refundSource.available_amount)
+                        ) === 1
+                      ? Promise.reject(new Error('退款金额不能超过原款可用余额'))
+                      : Promise.resolve(),
+              },
+            ]}
+          >
+            <Input inputMode="decimal" />
+          </Form.Item>
+          <Form.Item className="erp-business-action-form__field--short" name="currency" label="币种" rules={[{ required: true }]}>
+            <Select
+              placeholder="币种"
+              disabled={paymentKind !== FinancePaymentKind.SETTLEMENT}
+              options={BUSINESS_CURRENCY_OPTIONS}
+            />
+          </Form.Item>
+          <Form.Item name="occurred_at" label="发生时间">
+            <DateTimeInput />
+          </Form.Item>
+        </BusinessFormSection>
+        <BusinessFormSection fieldLayout="adaptive" title="账户与凭据">
+          <FinancePaymentEvidenceFields form={paymentForm} open={paymentOpen} accountSuggestions={accountSuggestions} canRead={hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYMENT_READ)} />
+        </BusinessFormSection>
+      </BusinessForm>
+    </BusinessFormPage>
+  )
+}

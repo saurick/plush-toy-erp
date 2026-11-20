@@ -1,0 +1,29 @@
+.erp-material-record-media {
+  container: material-record-media / inline-size;
+  min-inline-size: 0;
+}
+
+.erp-material-record-media__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 14px 18px;
+}
+
+.erp-material-record-media__reference,
+.erp-material-record-media__attachments {
+  display: grid;
+  min-inline-size: 0;
+  gap: 8px;
+}
+
+.erp-material-record-media__reference-heading {
+  display: grid;
+  gap: 4px;
+}
+
+@container material-record-media (min-width: 760px) {
+  .erp-material-record-media__layout {
+    grid-template-columns: minmax(210px, 3fr) minmax(0, 7fr);
+  }
+}

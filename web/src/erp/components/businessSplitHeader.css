@@ -1,0 +1,27 @@
+.erp-split-page-title.app-select {
+  width: 180px;
+  min-width: 0;
+  max-width: 100%;
+  font-weight: 400;
+  vertical-align: middle;
+}
+
+.erp-split-layout-trigger {
+  flex: none;
+}
+
+.erp-split-fallback-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+}
+
+.erp-split-fallback-header h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  font-weight: inherit;
+}
