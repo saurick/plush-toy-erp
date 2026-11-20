@@ -1,0 +1,250 @@
+export const DEV_WORKBENCH_FAVICON_HREF = new URL('../assets/favicon-dev.svg?no-inline', import.meta.url).href
+
+export const DEV_HUB_ROUTE = '/__dev'
+export const DEV_PRODUCT_ENGINEERING_ROUTE = '/__dev/product-engineering'
+export const DEV_DEVELOPMENT_RESOURCES_ROUTE = '/__dev/development-resources'
+export const DEV_PRODUCT_CORE_ROUTE = '/__dev/product-core'
+export const DEV_INTEGRATION_ROUTE = '/__dev/integration'
+export const DEV_PERMISSION_RELATIONSHIPS_ROUTE =
+  '/__dev/permission-relationships'
+export const DEV_QUALITY_ROUTE = '/__dev/quality'
+export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
+
+export const DEV_DOCS_ROUTE = '/__dev/docs'
+export const DEV_PROJECT_SKILLS_ROUTE = '/__dev/project-skills'
+export const DEV_VISUALIZATION_ROUTE = '/__dev/visualization'
+export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
+export const DEV_FLOW_EXPLORER_ROUTE = '/__dev/flow-explorer'
+export const DEV_BUSINESS_RULES_ROUTE = '/__dev/business-rules'
+export const DEV_TASK_HANDLING_ROUTE = '/__dev/task-handling'
+export const DEV_BUSINESS_USABILITY_ROUTE = '/__dev/business-usability'
+export const DEV_UI_DESIGN_ROUTE = '/__dev/ui-design'
+export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
+export const DEV_DATABASE_MIGRATION_ROUTE = '/__dev/database-migration'
+export const DEV_TESTING_ROUTE = '/__dev/testing'
+export const DEV_BUSINESS_CHAIN_AUDIT_ROUTE = '/__dev/business-chain-audit'
+export const DEV_QUALITY_GATES_ROUTE = '/__dev/quality-gates'
+export const DEV_DATA_PREPARATION_ROUTE = '/__dev/data-preparation'
+export const DEV_VERSION_CENTER_ROUTE = '/__dev/version-center'
+export const DEV_VERSION_GUIDE_ROUTE = '/__dev/version-center/guide'
+export const DEV_DRILL_RECOVERY_ROUTE = '/__dev/drill-recovery'
+
+export const DEV_WORKBENCH_AREA_KEYS = Object.freeze({
+  overview: 'overview',
+  productEngineering: 'product-engineering',
+  developmentResources: 'development-resources',
+  quality: 'quality',
+  delivery: 'delivery',
+})
+
+// 一级菜单使用稳定责任域；二级菜单使用开发者要完成的任务或查看的对象。
+// 路由和内部 key 不随可见名称调整，避免文案治理扩大为深链迁移。
+export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
+  Object.freeze({
+    key: DEV_WORKBENCH_AREA_KEYS.overview,
+    route: DEV_HUB_ROUTE,
+    label: '总览',
+    description: '入口、真源与边界',
+  }),
+  Object.freeze({
+    key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_PRODUCT_ENGINEERING_ROUTE,
+    label: '产品与业务',
+    description: '产品能力、业务链路、流程探索、规则、权限与交互设计',
+  }),
+  Object.freeze({
+    key: DEV_WORKBENCH_AREA_KEYS.developmentResources,
+    route: DEV_DEVELOPMENT_RESOURCES_ROUTE,
+    label: '开发资源',
+    description: '接口、文档、Skill、图例与项目关系图',
+  }),
+  Object.freeze({
+    key: DEV_WORKBENCH_AREA_KEYS.quality,
+    route: DEV_QUALITY_ROUTE,
+    label: '测试验证',
+    description: '测试执行、实测报告、质量门禁与测试数据',
+  }),
+  Object.freeze({
+    key: DEV_WORKBENCH_AREA_KEYS.delivery,
+    route: DEV_DELIVERY_ROUTE,
+    label: '交付运维',
+    description: '配置、迁移、发布与恢复',
+  }),
+])
+
+export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
+  Object.freeze({
+    key: 'product-core',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_PRODUCT_CORE_ROUTE,
+    label: '产品能力',
+  }),
+  Object.freeze({
+    key: 'status-flows',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_STATUS_FLOWS_ROUTE,
+    label: '业务链路',
+  }),
+  Object.freeze({
+    key: 'flow-explorer',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_FLOW_EXPLORER_ROUTE,
+    label: '流程探索',
+  }),
+  Object.freeze({
+    key: 'business-rules',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_BUSINESS_RULES_ROUTE,
+    label: '业务规则',
+  }),
+  Object.freeze({
+    key: 'task-handling',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_TASK_HANDLING_ROUTE,
+    label: '任务办理',
+  }),
+  Object.freeze({
+    key: 'permission-relationships',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_PERMISSION_RELATIONSHIPS_ROUTE,
+    label: '权限关系',
+  }),
+  Object.freeze({
+    key: 'ui-design',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_UI_DESIGN_ROUTE,
+    label: '交互设计',
+  }),
+  Object.freeze({
+    key: 'integration',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
+    route: DEV_INTEGRATION_ROUTE,
+    label: '接口与集成',
+  }),
+  Object.freeze({
+    key: 'business-usability',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    route: DEV_BUSINESS_USABILITY_ROUTE,
+    label: '页面说明检查',
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: 'docs',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
+    route: DEV_DOCS_ROUTE,
+    label: '项目文档',
+  }),
+  Object.freeze({
+    key: 'project-skills',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
+    route: DEV_PROJECT_SKILLS_ROUTE,
+    label: '项目 Skill',
+  }),
+  Object.freeze({
+    key: 'visualization',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.developmentResources,
+    route: DEV_VISUALIZATION_ROUTE,
+    label: '可视化规范',
+  }),
+  Object.freeze({
+    key: 'testing',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    route: DEV_TESTING_ROUTE,
+    label: '测试执行',
+  }),
+  Object.freeze({
+    key: 'business-chain-audit',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
+    label: '链路实测报告',
+    showInNavigation: false,
+    navigationParentRoute: DEV_TESTING_ROUTE,
+  }),
+  Object.freeze({
+    key: 'quality-gates',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    route: DEV_QUALITY_GATES_ROUTE,
+    label: '质量门禁',
+  }),
+  Object.freeze({
+    key: 'data-preparation',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    route: DEV_DATA_PREPARATION_ROUTE,
+    label: '测试数据',
+  }),
+  Object.freeze({
+    key: 'customer-config',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    route: DEV_CUSTOMER_CONFIG_ROUTE,
+    label: '客户配置',
+  }),
+  Object.freeze({
+    key: 'database-migration',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    route: DEV_DATABASE_MIGRATION_ROUTE,
+    label: '数据库迁移',
+  }),
+  Object.freeze({
+    key: 'version-center',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    route: DEV_VERSION_CENTER_ROUTE,
+    label: '版本发布',
+  }),
+  Object.freeze({
+    key: 'drill-recovery',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    route: DEV_DRILL_RECOVERY_ROUTE,
+    label: '安全与恢复',
+  }),
+])
+
+export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
+  [DEV_HUB_ROUTE]: '研发效能工作台',
+  [DEV_VERSION_GUIDE_ROUTE]: '手动与应急发布指引',
+  ...Object.fromEntries(
+    DEV_WORKSPACE_NAV_ITEMS.filter((item) => item.route !== DEV_HUB_ROUTE).map(
+      (item) => [item.route, item.label]
+    )
+  ),
+  ...Object.fromEntries(
+    DEV_SECONDARY_NAV_ITEMS.map((item) => [item.route, item.label])
+  ),
+})
+
+function normalizeDevPathname(pathname = '') {
+  const rawPath = String(pathname || '')
+  if (rawPath === '/') return rawPath
+  return rawPath.replace(/\/+$/, '')
+}
+
+export function resolveDevWorkbenchAreaKey(pathname = '') {
+  const normalizedPath = normalizeDevPathname(pathname)
+  const primaryItem = DEV_WORKSPACE_NAV_ITEMS.find(
+    (item) => item.route === normalizedPath
+  )
+  if (primaryItem) return primaryItem.key
+
+  return (
+    DEV_SECONDARY_NAV_ITEMS.find((item) => item.route === normalizedPath)
+      ?.areaKey || ''
+  )
+}
+
+export function getDevSecondaryNavItems(areaKey = '') {
+  return DEV_SECONDARY_NAV_ITEMS.filter(
+    (item) => item.areaKey === areaKey && item.showInNavigation !== false
+  )
+}
+
+export function resolveDevNavigationRoute(pathname = '') {
+  const normalizedPath = normalizeDevPathname(pathname)
+  const item = DEV_SECONDARY_NAV_ITEMS.find(
+    (entry) => entry.route === normalizedPath
+  )
+  return item?.navigationParentRoute ?? normalizedPath
+}
+
+export function resolveDevPageTitle(pathname, appTitle) {
+  const devTitle = DEV_PAGE_TITLE_BY_ROUTE[normalizeDevPathname(pathname)]
+  return devTitle ? `${devTitle} · ${appTitle}` : appTitle
+}
