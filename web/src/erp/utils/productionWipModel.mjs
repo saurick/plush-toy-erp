@@ -1202,6 +1202,7 @@ export function productionWipMaterialOutsourcingCandidateMatches(
   if (
     !order ||
     !item ||
+    (order.source_wip_batch_id != null && order.source_wip_batch_id !== batch.id) ||
     !positiveSafeInteger(order.id) ||
     !positiveSafeInteger(order.version) ||
     !requiredText(order.outsourcing_order_no) ||

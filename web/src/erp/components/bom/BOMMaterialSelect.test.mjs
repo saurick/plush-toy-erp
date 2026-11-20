@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { installRpcCallHarness } from '../../../../scripts/test/rpcApiTestHarness.mjs'
 import { materialOption } from '../../utils/referenceSelectOptions.mjs'
+import { bomMaterialConflictText } from '../../utils/bomMaterialMatching.mjs'
 
 const materials = [
   {
@@ -59,7 +60,7 @@ async function harness(t, extra = {}) {
     createElement(Select, {
       materialByID: new Map(materials.map((m) => [m.id, m])),
       options: [],
-      sourceItem,
+      getMaterialConflict: (material) => bomMaterialConflictText(sourceItem, material, [{ value: 1, label: '码' }]),
       unitOptions: [{ value: 1, label: '码' }],
       canCreateMaterial: true,
       onCreateMaterial: () => {

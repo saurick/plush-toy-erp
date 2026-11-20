@@ -1266,6 +1266,7 @@ export function buildWorkInstructionDraftFromBOMVersion(
 }
 
 function formatWorkInstructionDate(value) {
+  if (typeof value === 'number') return unixSecondsToBusinessDate(value)
   const raw = toText(value)
   if (!raw) return ''
   if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {

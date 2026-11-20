@@ -96,7 +96,7 @@ export async function runPartialReceiving({ client, fixture, options, report, op
     assert.deepEqual(stock(frozen[1].lot_id), { balance: 0, net: 0, txns: 0, lot: 'REJECTED' });
     flow.dispositionSettled = true;
     await rejected('finance', 'operational_fact', 'create_payable_from_purchase_receipt', payableParams, CODE.BUSINESS_RULE_VIOLATION);
-    assert.deepEqual(snapshot('finance_facts', `source_type='purchase_receipt' AND source_id=${receipt.id}`), []);
+    assert.deepEqual(snapshot('finance_facts', `source_type='PURCHASE_RECEIPT' AND source_id=${receipt.id}`), []);
     flow.unpricedBlocked = true;
     page = await open('purchase', false, 'purchase/orders', orderID, true);
     await pageAction(page, '补齐价格与交期');

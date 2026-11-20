@@ -106,11 +106,11 @@ export default function useShipmentSourceImport({
   )
 
   const loadSalesOrderSources = useCallback(
-    async ({
+    async function loadCandidatePage({
       keyword = '',
       page = 1,
       filters = salesOrderSourceQueryRef.current.filters || {},
-    } = {}) => {
+    } = {}) {
       const normalizedKeyword = String(keyword || '').trim()
       const normalizedPage = Number(page) || 1
       const request = beginLatestRequest('shipment-source-candidates')
@@ -137,6 +137,10 @@ export default function useShipmentSourceImport({
           signal: request.signal,
         })
         if (!request.isCurrent()) return false
+        const lastPage = Math.max(1, Math.ceil(data.total / SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE))
+        if (normalizedPage > lastPage) {
+          return loadCandidatePage({ keyword: normalizedKeyword, page: lastPage, filters })
+        }
         const nextSourceRows = data.shipment_source_candidates.map(
           normalizeShipmentSourceCandidate
         )

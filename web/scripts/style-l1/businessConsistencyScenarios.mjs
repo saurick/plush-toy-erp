@@ -200,13 +200,15 @@ export function createBusinessConsistencyScenarios({
             await page.screenshot({
               path: path.join(outputDir, `${stateID}-4k.png`),
             })
-            await page.emulateMedia({ media: 'print' })
-            await page.pdf({
-              path: path.join(outputDir, `${stateID}.pdf`),
-              format: 'A4',
-              printBackground: true,
-            })
-            await page.emulateMedia({ media: 'screen' })
+            if (page.context().browser()?.browserType().name() === 'chromium') {
+              await page.emulateMedia({ media: 'print' })
+              await page.pdf({
+                path: path.join(outputDir, `${stateID}.pdf`),
+                format: 'A4',
+                printBackground: true,
+              })
+              await page.emulateMedia({ media: 'screen' })
+            }
           },
         }
       }

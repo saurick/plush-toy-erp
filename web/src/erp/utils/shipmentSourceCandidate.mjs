@@ -138,9 +138,7 @@ export function validateShipmentSourceCandidatePage(
     total < 0 ||
     data?.limit !== limit ||
     data?.offset !== offset ||
-    rows.length > limit ||
-    offset + rows.length > total ||
-    (offset + rows.length < total && rows.length !== limit)
+    rows.length !== Math.max(0, Math.min(limit, total - offset))
   ) {
     throw invalidCandidateResponse()
   }

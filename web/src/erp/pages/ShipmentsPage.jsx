@@ -928,11 +928,13 @@ export default function ShipmentsPage() {
       message.warning('只有尚未进入下游流程的销售出货草稿可以编辑')
       return
     }
+    const request = beginLatestRequest('shipment-edit')
     shipmentAttachmentRef.current?.clearPendingAttachments()
     resetShipmentSourceSelectionState()
     setSaving(true)
     try {
-      const detail = await getShipment({ id: shipment.id })
+      const detail = await getShipment({ id: shipment.id }, { signal: request.signal })
+      if (!request.isCurrent()) return
       if (
         !detail?.id ||
         !canEditShipmentDraft(detail) ||
@@ -953,6 +955,7 @@ export default function ShipmentsPage() {
           keyword: '',
           page: 1,
         })
+        if (!request.isCurrent()) return
         if (!sourceReady) {
           message.warning('销售订单来源未完整加载，本次未进入编辑')
           shipmentForm.resetFields()
@@ -961,14 +964,16 @@ export default function ShipmentsPage() {
       }
       setShipmentModal({ mode: 'edit', shipment: detail })
     } catch (error) {
+      if (!request.isCurrent()) return
       message.error(
         `${getActionErrorMessage(error, '加载出货草稿明细')}，未进入编辑`
       )
       shipmentForm.resetFields()
     } finally {
-      setSaving(false)
+      if (request.isCurrent()) setSaving(false)
+      request.finish()
     }
-  }, [canUpdate, loadRows, loadSalesOrderSources, resetShipmentSourceSelectionState, shipmentForm])
+  }, [beginLatestRequest, canUpdate, loadRows, loadSalesOrderSources, resetShipmentSourceSelectionState, shipmentForm])
 
   useEffect(() => {
     if (!taskBusiness || taskBusiness.readOnly || taskSource || !canUpdate || !canEditShipmentDraft(selectedRow) || taskDraftOpenedRef.current === taskBusiness.taskID) return

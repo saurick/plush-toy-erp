@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Form } from 'antd'
 
 import { message } from '@/common/utils/antdApp'
@@ -14,6 +14,10 @@ import {
   executeFinanceCreditCommand,
 } from '../../utils/financeCreditSubmission.mjs'
 
+function pendingCreditFormValues({ credit_note_no, reason, finance_fact_id, amount }) {
+  return { credit_note_no, reason, ...(finance_fact_id ? { finance_fact_id, amount } : {}) }
+}
+
 export default function useFinanceCreditActions({
   customerKey,
   currentCredit,
@@ -25,6 +29,7 @@ export default function useFinanceCreditActions({
   loadReferences,
 }) {
   const [creditOpen, setCreditOpen] = useState(false)
+  const pendingCreateScope = useRef(null)
 
   const [creditForm] = Form.useForm()
 
@@ -40,13 +45,27 @@ export default function useFinanceCreditActions({
     )
     let command
     try {
-      command = buildFinanceCreditCommand({
-        reverse,
-        values,
-        source,
-        currentCredit,
-        customerKey,
-      })
+      const scope = reverse
+        ? `reverse-credit:${currentCredit?.id}`
+        : pendingCreateScope.current || `credit:${Number(values.finance_fact_id)}`
+      const pending = attemptsRef.current.peek(scope)
+      if (pending) {
+        const fields = pendingCreditFormValues(pending.params)
+        if (Object.entries(fields).some(([name, value]) => String(values[name] ?? '').trim() !== String(value ?? ''))) {
+          creditForm.setFieldsValue(fields)
+          message.warning('已恢复结果待确认的账款调整，请核对后重试')
+          return
+        }
+        command = { action: reverse ? 'reverse' : 'create', scope, payload: pending.params }
+      } else {
+        command = buildFinanceCreditCommand({
+          reverse,
+          values,
+          source,
+          currentCredit,
+          customerKey,
+        })
+      }
     } catch (error) {
       message[error.isCreditAmountWarning ? 'warning' : 'error'](
         getActionErrorMessage(error, '准备账款调整')
@@ -59,7 +78,9 @@ export default function useFinanceCreditActions({
         command,
         attemptStore: attemptsRef.current,
       })
+      if (!reverse) pendingCreateScope.current = result.retained ? command.scope : null
       if (result.outcome === 'unconfirmed') {
+        if (result.restore) creditForm.setFieldsValue(pendingCreditFormValues(result.restore))
         message[result.retained ? 'warning' : 'error'](
           result.retained
             ? '调整结果暂时无法确认，请保持内容不变后重试'
@@ -93,12 +114,13 @@ export default function useFinanceCreditActions({
   }
 
   const openCredit = async (reverse = false) => {
+    const pending = attemptsRef.current.peek(reverse ? `reverse-credit:${currentCredit?.id}` : pendingCreateScope.current)
     if (!reverse) {
       const rows = await loadFinanceFactReferences()
-      if (rows === null) return
+      if (rows === null && !pending) return
     }
     creditForm.resetFields()
-    creditForm.setFieldsValue({
+    creditForm.setFieldsValue(pending ? pendingCreditFormValues(pending.params) : {
       credit_note_no: sourceBusinessActionNo(
         reverse ? 'CR-REV' : 'CR',
         currentCredit?.credit_note_no || 'FINANCE',

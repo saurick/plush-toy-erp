@@ -216,12 +216,16 @@ export function useSalesOrderEditor({
         )
         const customerSourceValues =
           buildSalesOrderCustomerSourceValues(customer)
+        const customerSnapshot = !customer && editingOrder &&
+          Number(editingOrder.customer_id) === Number(values.customer_id)
+          ? editingOrder.customer_snapshot
+          : customerSourceValues.customer_snapshot
         try {
           params = {
             ...buildSalesOrderParams(
               {
                 ...values,
-                customer_snapshot: customerSourceValues.customer_snapshot,
+                customer_snapshot: customerSnapshot,
                 contact_snapshot: buildOrderContactSnapshot(values),
               },
               editingOrder?.id

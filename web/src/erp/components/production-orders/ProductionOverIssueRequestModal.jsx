@@ -79,6 +79,7 @@ export default function ProductionOverIssueRequestModal({
     }
     const scope = `production-over-issue:${order?.id || 0}:${requirement?.id || 0}`
     const attempt = attempts.current.prepare(scope, payload)
+    let createdReceipt
     setLoading(true)
     try {
       const created = await submitProductionException(attempt.params)
@@ -91,6 +92,7 @@ export default function ProductionOverIssueRequestModal({
           isInvalidResponse: true,
         })
       }
+      createdReceipt = created
       let processData
       try {
         processData = await startProductionExceptionApprovalProcess({
@@ -107,11 +109,18 @@ export default function ProductionOverIssueRequestModal({
         if (!processData?.process_context) throw error
       }
       const next = processData.source_readback
+      if (next?.id !== created.id || !processData.process_context) {
+        throw Object.assign(new Error('超领审批结果暂时无法确认'), { isInvalidResponse: true })
+      }
       attempts.current.settle(scope, attempt, null)
       showProcessSubmissionReceipt({ result: processData, record: next, title: '超领申请已提交；批准额度须在正式领料时使用' })
       onChanged?.(next)
       onClose?.()
     } catch (error) {
+      if (createdReceipt) {
+        message.warning('超领申请已保存，审批暂未确认。保持内容不变后可继续提交原申请')
+        return
+      }
       const retained = attempts.current.settle(scope, attempt, error)
       message[retained ? 'warning' : 'error'](
         retained

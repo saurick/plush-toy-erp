@@ -234,6 +234,7 @@ function EditableText({
 }) {
   const editableID = useId()
   const editableRef = useRef(null)
+  const committedValue = useRef(value)
   const restoreTimersRef = useRef([])
   const htmlValue = rich ? sanitizeRichEditableHTML(value) : ''
   const restoreFocusIfNeeded = () => {
@@ -266,8 +267,9 @@ function EditableText({
         element.innerHTML = normalizedHTML
       }
     }
-    if (nextValue !== sanitizeRichEditableHTML(value)) {
+    if (nextValue !== sanitizeRichEditableHTML(committedValue.current)) {
       onCommit(nextValue)
+      committedValue.current = nextValue
     }
   }
   const commitPlainValue = (element, { normalizeElement = false } = {}) => {
@@ -281,14 +283,19 @@ function EditableText({
         element.textContent = normalizedText
       }
     }
-    if (nextValue !== String(value ?? '')) {
+    if (nextValue !== String(committedValue.current ?? '')) {
       onCommit(nextValue)
+      committedValue.current = nextValue
     }
   }
 
   useLayoutEffect(() => {
     restoreFocusIfNeeded()
   })
+
+  useLayoutEffect(() => {
+    committedValue.current = value
+  }, [value])
 
   useEffect(() => {
     const ownerDocument = editableRef.current?.ownerDocument

@@ -240,25 +240,6 @@ export function OperationalFactWorkspace({
     currentActiveKey,
     activeSelectedRow
   )
-  const {
-    activeCustomerKey,
-    saving,
-    financeCancelOpen,
-    setFinanceCancelOpen,
-    financeCancelReason,
-    setFinanceCancelReason,
-    runRowAction,
-    confirmFinanceCancellation,
-  } = useOperationalFactMutations({
-    adminProfile,
-    currentActiveKey,
-    loadRows,
-    activeSelectedRow,
-    activeConfig,
-  })
-
-  useWorkflowTaskBusinessBusy(saving)
-
   const resolvedRouteRecord = useMemo(
     () =>
       resolveOperationalFactRouteRecord(activeRows, {
@@ -354,6 +335,30 @@ export function OperationalFactWorkspace({
     if (showingFinanceDue) changeDueFilter(dueFilter)
   }
   const reloadFinanceDueData = financeDueData.reload
+  const refreshMutationRows = useCallback(
+    (key) => {
+      if (key === 'finance' && showingFinanceDue) reloadFinanceDueData()
+      return loadRows(key)
+    },
+    [loadRows, reloadFinanceDueData, showingFinanceDue]
+  )
+  const {
+    activeCustomerKey,
+    saving,
+    financeCancelOpen,
+    setFinanceCancelOpen,
+    financeCancelReason,
+    setFinanceCancelReason,
+    runRowAction,
+    confirmFinanceCancellation,
+  } = useOperationalFactMutations({
+    adminProfile,
+    currentActiveKey,
+    loadRows: refreshMutationRows,
+    activeSelectedRow,
+    activeConfig,
+  })
+  useWorkflowTaskBusinessBusy(saving)
 
   const visibleDetailRecord =
     detailRecord ||

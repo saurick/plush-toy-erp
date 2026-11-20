@@ -2,13 +2,12 @@ import React, { useCallback, useRef, useState } from 'react'
 import { Button } from 'antd'
 import RemoteReferenceSelect from '../RemoteReferenceSelect.jsx'
 import { materialOption } from '../../utils/referenceSelectOptions.mjs'
-import { bomMaterialConflictText } from '../../utils/bomMaterialMatching.mjs'
 import './bomMaterialMatching.css'
 
 export default function BOMMaterialSelect({
   canCreateMaterial,
   onCreateMaterial,
-  sourceItem,
+  getMaterialConflict,
   unitOptions,
   materialByID,
   options = [],
@@ -25,12 +24,10 @@ export default function BOMMaterialSelect({
       identity: {
         name: `${material.name || '物料名称未填写'}${material.is_active === false ? '（已停用）' : ''}`,
       },
-      disabled: Boolean(
-        bomMaterialConflictText(sourceItem, material, unitOptions)
-      ),
+      disabled: Boolean(getMaterialConflict(material)),
       record: material,
     }),
-    [sourceItem, unitOptions]
+    [getMaterialConflict]
   )
   const focusSelect = useCallback(() => selectRef.current?.focus(), [])
   const popupKeys = useCallback(
@@ -50,7 +47,7 @@ export default function BOMMaterialSelect({
   const apply = (material, option) => {
     if (
       !disabled &&
-      !bomMaterialConflictText(sourceItem, material, unitOptions)
+      !getMaterialConflict(material)
     ) {
       setOpen(false)
       onChange?.(material?.id, option)
@@ -60,11 +57,7 @@ export default function BOMMaterialSelect({
     (option) => {
       const material = option.data.record
       if (!material) return option.label
-      const conflict = bomMaterialConflictText(
-        sourceItem,
-        material,
-        unitOptions
-      )
+      const conflict = getMaterialConflict(material)
       return (
         <div className="erp-bom-material-option">
           <span className="erp-bom-material-option__identity">
@@ -94,7 +87,7 @@ export default function BOMMaterialSelect({
         </div>
       )
     },
-    [sourceItem, unitOptions]
+    [getMaterialConflict, unitOptions]
   )
   const renderPopup = useCallback(
     (menu) => (

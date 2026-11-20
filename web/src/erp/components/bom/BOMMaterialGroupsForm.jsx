@@ -637,7 +637,7 @@ export default function BOMMaterialGroupsForm({
                                         optionFilterProp="label"
                                         options={materialOptions}
                                         materialByID={materialByID}
-                                        sourceItem={items[index]}
+                                        getMaterialConflict={(candidate) => materialConflict(group.indexes, candidate)}
                                         unitOptions={unitOptions}
                                         placeholder={
                                           importSource && !material

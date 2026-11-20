@@ -103,18 +103,17 @@ export async function runFinanceCancellationBrowserE2E({
     }
     await currentRow.waitFor({ state: "visible", timeout: 15_000 });
     await currentRow.click();
-    await page.locator("button.ant-btn-dangerous:visible").first().click();
-    const modal = page
-      .locator(".ant-modal:visible")
-      .filter({ hasText: "取消财务记录" });
-    await modal.locator("button").filter({ hasText: "确认取消" }).click();
+    const cancelLabel = "取消对账记录";
+    await page.getByRole("button", { name: cancelLabel, exact: true }).click();
+    const modal = page.getByRole("dialog", { name: cancelLabel, exact: true });
+    await modal.getByRole("button", { name: cancelLabel, exact: true }).click();
     await page
-      .getByText("请填写取消原因", { exact: true })
+      .getByText("请填写业务原因", { exact: true })
       .waitFor({ state: "visible" });
     await modal
-      .getByPlaceholder("请填写客户、供应商或账款调整的业务原因")
+      .getByPlaceholder("填写业务原因")
       .fill(reason);
-    await modal.locator("button").filter({ hasText: "确认取消" }).click();
+    await modal.getByRole("button", { name: cancelLabel, exact: true }).click();
     await modal.waitFor({ state: "hidden", timeout: 15_000 });
     await currentRow
       .getByText("已取消", { exact: true })

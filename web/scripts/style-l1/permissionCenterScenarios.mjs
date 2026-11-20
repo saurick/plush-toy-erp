@@ -85,7 +85,7 @@ export function createPermissionCenterScenarios({
     page.on('request', (request) => {
       if (!request.url().endsWith('/rpc/admin')) return
       const body = request.postDataJSON()
-      if (body?.method === 'get_effective_role_access') accessReads += 1
+      if (body?.method === 'effective_role_access') accessReads += 1
       if (body?.method === 'set_role_settings') writes.push(body.params)
     })
     await expectHeading(page, '权限管理')

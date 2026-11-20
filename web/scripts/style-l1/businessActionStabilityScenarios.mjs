@@ -1831,6 +1831,63 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
     },
     {
+      name: 'business-action-quality-outsourcing-source-recovery-desktop',
+      path: QUALITY_INSPECTION_PATH,
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, { includeSales: false })
+        const sourceA = createQualityInspectionRows().find((row) => row.id === 1305)
+        const sourceB = { ...sourceA, id: 1312, source_id: 702, inspection_no: 'QI-ACTION-OUTSOURCING-NEXT' }
+        await page.route('**/rpc/quality', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'list_quality_inspections') return route.fallback()
+          await fulfillRpc(route, id, rpcPage([sourceA, sourceB], 'quality_inspections', params))
+        })
+        let failed = false
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'list_outsourcing_return_dispositions') return route.fallback()
+          if (params.quality_inspection_id === sourceB.id && !failed) {
+            failed = true
+            await route.fulfill({
+              json: { jsonrpc: '2.0', id, result: { code: 50000, message: 'read failed' } },
+            })
+            return
+          }
+          await fulfillRpc(route, id, {
+            outsourcing_return_dispositions: params.quality_inspection_id === sourceA.id
+              ? [{ id: 9881, disposition_no: 'OUT-DISP-SOURCE-A', status: 'DRAFT',
+                  disposition_type: 'RETURN_TO_VENDOR', quantity: '1', version: 1 }]
+              : [],
+          })
+        })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '质量检验')
+        const action = page.locator('[data-business-action-key="quality-disposition"]')
+        await selectBusinessRow(page, 'QI-ACTION-OUTSOURCING-REJECTED')
+        await action.click()
+        const dialog = page.getByRole('dialog')
+        await dialog.getByText('OUT-DISP-SOURCE-A', { exact: true }).waitFor()
+        assert.equal(await dialog.getByRole('button', { name: '确认执行' }).isEnabled(), true)
+        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+        await selectBusinessRow(page, 'QI-ACTION-OUTSOURCING-NEXT')
+        await action.click()
+        const retry = dialog.getByRole('button', { name: '重试读取' })
+        await retry.waitFor()
+        assert.equal(await dialog.getByText('OUT-DISP-SOURCE-A').count(), 0)
+        assert.equal(await dialog.getByRole('button', { name: '确认执行' }).count(), 0)
+        assert.equal(await dialog.getByRole('button', { name: '取消 / 冲正' }).count(), 0)
+        assert.equal(await dialog.getByRole('button', { name: '生成处置草稿' }).isEnabled(), false)
+        await retry.click()
+        await retry.waitFor({ state: 'hidden' })
+        await dialog.getByRole('button', { name: '生成处置草稿' }).and(dialog.locator(':enabled')).waitFor()
+        assert.equal(await dialog.getByText('OUT-DISP-SOURCE-A').count(), 0)
+      },
+    },
+    {
       name: 'business-action-stability-representative-pages-desktop',
       path: PURCHASE_ORDER_PATH,
       auth: 'admin',

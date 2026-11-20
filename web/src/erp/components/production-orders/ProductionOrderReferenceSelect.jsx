@@ -196,7 +196,7 @@ function ProductionOrderReferenceSelect({
   const renderedOptions = useMemo(() => {
     const merged = new Map()
     for (const option of mergeProductionOrderReferenceOptions(
-      initialOptions,
+      initialOptions.filter((option) => option.value === value),
       options
     )) {
       merged.set(option.value, option)

@@ -68,10 +68,25 @@ test('finance credit retries retain the same intent until a matching amount rece
   })
   assert.equal(uncertain.outcome, 'unconfirmed')
   assert.equal(uncertain.retained, true)
-  assert.ok(store.peek(command.scope))
+  const pending = store.peek(command.scope)
+  assert.ok(pending)
+  const changed = buildFinanceCreditCommand({
+    reverse: false,
+    values: { ...values, credit_note_no: 'CR-2', amount: '8' },
+    source,
+  })
+  assert.deepEqual(
+    await executeFinanceCreditCommand({ command: changed, attemptStore: store }),
+    { outcome: 'unconfirmed', retained: true, restore: pending.params }
+  )
+  assert.equal(store.peek(command.scope), pending)
+  assert.equal(keys.length, 1)
   amount = '10.000000'
   assert.equal(
-    (await executeFinanceCreditCommand({ command, attemptStore: store }))
+    (await executeFinanceCreditCommand({
+      command: { ...command, payload: pending.params },
+      attemptStore: store,
+    }))
       .outcome,
     'confirmed'
   )

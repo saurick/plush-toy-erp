@@ -254,8 +254,8 @@ export default function useFinancePaymentRecords({
     setReferenceLoading(true)
     try {
       const [customerResult, supplierResult] = await Promise.allSettled([
-        listAllCustomers({ active_only: true }, { signal: request.signal }),
-        listAllSuppliers({ active_only: true }, { signal: request.signal }),
+        listAllCustomers({}, { signal: request.signal }),
+        listAllSuppliers({}, { signal: request.signal }),
       ])
       if (!request.isCurrent()) return
       if (customerResult.status === 'fulfilled') {

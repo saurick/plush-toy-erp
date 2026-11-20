@@ -500,8 +500,8 @@ export default function SalesOrdersPage() {
       const normalizedCustomerID = Number(customerID || 0)
       const requestSeq = contactLoadSeqRef.current + 1
       contactLoadSeqRef.current = requestSeq
+      setCustomerContacts([])
       if (normalizedCustomerID <= 0) {
-        setCustomerContacts([])
         if (applyDefault) {
           clearContactFields()
         }

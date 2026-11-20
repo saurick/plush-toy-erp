@@ -133,7 +133,7 @@ export function createPermissionAccessLayoutScenarios() {
       await page
         .getByText('查看功能与页面操作的对应关系', { exact: true })
         .click()
-      await page.getByRole('tab', { name: '菜单排列', exact: true }).click()
+      await page.getByRole('tab', { name: '实际菜单', exact: true }).click()
       await page.getByRole('tab', { name: '页面访问', exact: true }).click()
       assert.equal(await rows.count(), allCount)
       await results.evaluate((node) => {

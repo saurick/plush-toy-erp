@@ -7,6 +7,7 @@ import {
   unitPrecisionFromOptions,
 } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
@@ -25,7 +26,14 @@ import {
 } from '../../utils/sourceBusinessAction.mjs'
 import BusinessForm from '../business-list/BusinessForm.jsx'
 
-export default function OutsourcingReturnDispositionModal({
+export default function OutsourcingReturnDispositionModal(props) {
+  const attempts = useRef(createSourceBusinessActionAttemptStore())
+  const { open, inspection, fact } = props
+  const sourceKey = open ? `${inspection?.id || 0}:${fact?.id || 0}` : 'closed'
+  return <OutsourcingReturnDispositionSource key={sourceKey} {...props} attempts={attempts} />
+}
+
+function OutsourcingReturnDispositionSource({
   open,
   inspection,
   fact,
@@ -34,19 +42,23 @@ export default function OutsourcingReturnDispositionModal({
   canCancel,
   onClose,
   onChanged,
+  attempts,
 }) {
   const [form] = Form.useForm()
   const quantityUnitOptions = useQuantityUnits(open && !!fact?.unit_id)
   const [rows, setRows] = useState([])
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [sourceReady, setSourceReady] = useState(false)
   const readOnly = !canCreate && !canPost && !canCancel
-  const attempts = useRef(createSourceBusinessActionAttemptStore())
+  const beginRequest = useLatestRequestCoordinator()
   const sourceFactID = Number(fact?.id || 0)
   const sourceInspectionID = Number(inspection?.id || 0)
   const load = useCallback(async () => {
     if (!sourceInspectionID && !sourceFactID) return
+    const request = beginRequest('dispositions')
     setLoading(true)
+    setSourceReady(false)
     try {
       const data = await listOutsourcingReturnDispositions({
         ...(sourceInspectionID
@@ -54,13 +66,15 @@ export default function OutsourcingReturnDispositionModal({
           : { outsourcing_return_fact_id: sourceFactID }),
         limit: 50,
         offset: 0,
-      })
+      }, { signal: request.signal })
+      if (!request.isCurrent()) return null
       if (!Array.isArray(data?.outsourcing_return_dispositions)) {
         throw Object.assign(new Error('委外处置记录返回不完整'), {
           isInvalidResponse: true,
         })
       }
       setRows(data.outsourcing_return_dispositions)
+      setSourceReady(true)
       setSelected(
         (current) =>
           data.outsourcing_return_dispositions.find(
@@ -71,12 +85,13 @@ export default function OutsourcingReturnDispositionModal({
       )
       return data.outsourcing_return_dispositions
     } catch (error) {
-      message.error(getActionErrorMessage(error, '读取委外不合格处置'))
+      if (request.isCurrent()) message.error(getActionErrorMessage(error, '读取委外不合格处置'))
       return null
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) setLoading(false)
+      request.finish()
     }
-  }, [sourceFactID, sourceInspectionID])
+  }, [beginRequest, sourceFactID, sourceInspectionID])
   useEffect(() => {
     if (!open) return
     form.resetFields()
@@ -94,7 +109,8 @@ export default function OutsourcingReturnDispositionModal({
   }, [form, inspection?.inspection_no, load, open])
 
   const create = async () => {
-    if (!canCreate || !sourceInspectionID) return
+    if (!canCreate || !sourceInspectionID || !sourceReady || loading) return
+    const request = beginRequest('mutation')
     let values
     try {
       values = await form.validateFields([
@@ -103,9 +119,11 @@ export default function OutsourcingReturnDispositionModal({
         'reason',
       ])
     } catch (error) {
+      request.finish()
       if (!Array.isArray(error?.errorFields)) throw error
       return
     }
+    if (!request.isCurrent()) return
     const payload = {
       disposition_no: values.disposition_no.trim(),
       quality_inspection_id: sourceInspectionID,
@@ -130,8 +148,10 @@ export default function OutsourcingReturnDispositionModal({
         attempt,
         null
       )
-      await load()
-      setSelected(next)
+      if (!request.isCurrent()) return
+      const fresh = await load()
+      if (!request.isCurrent()) return
+      if (fresh) setSelected(fresh.find((item) => item.id === next.id) || fresh[0] || null)
       onChanged?.()
       message.success('委外处置草稿已生成')
     } catch (error) {
@@ -140,22 +160,25 @@ export default function OutsourcingReturnDispositionModal({
         attempt,
         error
       )
+      if (!request.isCurrent()) return
       message[retained ? 'warning' : 'error'](
         retained
           ? '结果暂时无法确认，请保持内容不变后重试'
           : getActionErrorMessage(error, '生成委外处置')
       )
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) setLoading(false)
+      request.finish()
     }
   }
   const transition = async (mode) => {
-    if (!selected?.id) return
+    if (!selected?.id || !sourceReady || loading) return
     const reason = String(form.getFieldValue('cancel_reason') || '').trim()
     if (mode === 'cancel' && !reason) {
       message.warning('请填写取消原因')
       return
     }
+    const request = beginRequest('mutation')
     setLoading(true)
     try {
       const next =
@@ -174,13 +197,17 @@ export default function OutsourcingReturnDispositionModal({
           isInvalidResponse: true,
         })
       }
+      if (!request.isCurrent()) return
       await load()
+      if (!request.isCurrent()) return
       onChanged?.()
       message.success(
         mode === 'post' ? '委外返厂已确认' : '委外处置已取消'
       )
     } catch (error) {
+      if (!request.isCurrent()) return
       const refreshed = await load()
+      if (!request.isCurrent()) return
       const latest = refreshed?.find(
         (item) => Number(item.id) === Number(selected.id)
       )
@@ -194,7 +221,8 @@ export default function OutsourcingReturnDispositionModal({
       }
       message.error(getActionErrorMessage(error, '办理委外处置'))
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) setLoading(false)
+      request.finish()
     }
   }
   return (
@@ -209,8 +237,11 @@ export default function OutsourcingReturnDispositionModal({
           <Button onClick={onClose} disabled={loading}>
             关闭
           </Button>
+          {!sourceReady && !loading && (sourceInspectionID || sourceFactID) ? (
+            <Button onClick={load}>重试读取</Button>
+          ) : null}
           {canCreate && sourceInspectionID ? (
-            <Button type="primary" onClick={create} loading={loading}>
+            <Button type="primary" onClick={create} loading={loading} disabled={!sourceReady}>
               生成处置草稿
             </Button>
           ) : null}
@@ -219,6 +250,7 @@ export default function OutsourcingReturnDispositionModal({
               type="primary"
               onClick={() => transition('post')}
               loading={loading}
+              disabled={!sourceReady}
             >
               确认执行
             </Button>
@@ -229,7 +261,7 @@ export default function OutsourcingReturnDispositionModal({
               className="erp-action-button"
               danger
               onClick={() => transition('cancel')}
-              disabled={loading}
+              disabled={loading || !sourceReady}
             >
               取消 / 冲正
             </Button>
@@ -244,7 +276,7 @@ export default function OutsourcingReturnDispositionModal({
         showIcon
         message="品质登记返厂方案，仓库确认实际退厂后记录出库；取消须按依赖检查冲正。生产返工由业务提出方案，经正式审批后由生产或仓库执行。"
       />
-      {!sourceInspectionID && rows.length === 0 && !loading ? (
+      {!sourceInspectionID && sourceReady && rows.length === 0 ? (
         <Alert
           type="info"
           showIcon

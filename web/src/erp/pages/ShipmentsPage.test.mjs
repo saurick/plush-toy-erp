@@ -240,7 +240,7 @@ test('sales delivery drafts use fail-closed load-before-edit and optimistic save
   assert.match(source, /const openEdit = useCallback\(async \(shipment\) =>/u)
   assert.match(
     source,
-    /const detail = await getShipment\(\{ id: shipment\.id \}\)/u
+    /const detail = await getShipment\(\{ id: shipment\.id \}, \{ signal: request\.signal \}\)\s+if \(!request\.isCurrent\(\)\) return/u
   )
   assert.match(
     source,

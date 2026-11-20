@@ -483,18 +483,19 @@ function numberFormatStyles(xml) {
 function parseSheetRows(xml, sharedStrings, numberFormats) {
   const rows = []
   let cellCount = 0
-  for (const rowMatch of xml.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/gu)) {
+  for (const rowMatch of xml.matchAll(/<row\b([^>]*?)\/>|<row\b([^>]*)>([\s\S]*?)<\/row>/gu)) {
+    if (rowMatch[3] === undefined) continue
     if (rows.length >= MAX_WORKSHEET_ROWS) {
       fail('Excel 工作表行数过多，请拆分后再导入', 'worksheet_too_large')
     }
-    const rowAttributes = parseXmlAttributes(rowMatch[1])
+    const rowAttributes = parseXmlAttributes(rowMatch[2])
     const rowNumber = Number(rowAttributes.r)
     const values = []
     const formulas = []
     const cellTypes = []
     const percentStyles = []
     const cellNumberFormats = []
-    for (const cellMatch of rowMatch[2].matchAll(
+    for (const cellMatch of rowMatch[3].matchAll(
       /<c\b([^>]*)\/>|<c\b([^>]*)>([\s\S]*?)<\/c>/gu
     )) {
       cellCount += 1

@@ -806,10 +806,17 @@ export default function InventoryLedgerPage() {
       const scope = `${operationType}:${operationSourceRows.map((row) => row.id).join(',')}`
       const attempt = operationAttemptsRef.current.prepare(scope, payload)
       let createdReceipt = null
+      const requiresApproval = inventoryOperationRequiresApproval(operationType)
       setOperationLoading(true)
       try {
         const created = await createInventoryOperation(attempt.params)
-        if (!created?.id || created.status !== InventoryOperationStatus.DRAFT) {
+        const draft = created?.status === InventoryOperationStatus.DRAFT
+        const progressed = requiresApproval && [
+          InventoryOperationStatus.SUBMITTED, InventoryOperationStatus.APPROVED,
+          InventoryOperationStatus.REJECTED, InventoryOperationStatus.POSTED,
+          InventoryOperationStatus.CANCELLED,
+        ].includes(created?.status)
+        if (!created?.id || (!draft && !progressed)) {
           throw Object.assign(new Error('库存作业结果暂时无法确认'), {
             isInvalidResponse: true,
           })
@@ -817,21 +824,26 @@ export default function InventoryLedgerPage() {
         createdReceipt = created
         let operation = created
         let submittedProcess
-        if (inventoryOperationRequiresApproval(operationType)) {
+        if (requiresApproval) {
+          const readApproval = () => getInventoryAdjustmentApprovalProcess({
+            ...(customerKey ? { customer_key: customerKey } : {}),
+            inventory_operation_id: created.id,
+          })
           let processData
           try {
-            processData = await startInventoryAdjustmentApprovalProcess({
+            processData = progressed ? await readApproval() : await startInventoryAdjustmentApprovalProcess({
               ...(customerKey ? { customer_key: customerKey } : {}),
               inventory_operation_id: created.id,
               idempotency_key: `inventory-adjustment-approval/${created.id}`,
             })
           } catch (error) {
             if (!isSourceBusinessActionResultUnknown(error)) throw error
-            processData = await getInventoryAdjustmentApprovalProcess({
-              ...(customerKey ? { customer_key: customerKey } : {}),
-              inventory_operation_id: created.id,
-            })
+            processData = await readApproval()
             if (!processData?.process_context) throw error
+          }
+          if (!processData?.process_context || processData.source_readback?.id !== created.id ||
+              (progressed && processData.source_readback.status === InventoryOperationStatus.DRAFT)) {
+            throw Object.assign(new Error('库存作业审批结果暂时无法确认'), { isInvalidResponse: true })
           }
           submittedProcess = processData
           if (processData.source_readback?.status === InventoryOperationStatus.DRAFT) {
@@ -852,10 +864,7 @@ export default function InventoryLedgerPage() {
               operation = execution.source_readback
             } catch (error) {
               if (!isSourceBusinessActionResultUnknown(error)) throw error
-              const readback = await getInventoryAdjustmentApprovalProcess({
-                ...(customerKey ? { customer_key: customerKey } : {}),
-                inventory_operation_id: created.id,
-              })
+              const readback = await readApproval()
               if (readback?.source_readback?.status !== InventoryOperationStatus.SUBMITTED) throw error
               operation = readback.source_readback
             }
@@ -866,11 +875,11 @@ export default function InventoryLedgerPage() {
         operationAttemptsRef.current.settle(scope, attempt, null)
         rememberInventoryOperation(operation)
         setOperationType('')
-        if (inventoryOperationRequiresApproval(operationType)) {
+        if (requiresApproval) {
           showProcessSubmissionReceipt({
             result: submittedProcess,
             record: operation,
-            title: operationType === 'CYCLE_COUNT' ? '库存盘点已提交复核' : '人工库存调整已提交审批',
+            title: progressed ? '已读取原库存作业的审批结果' : operationType === 'CYCLE_COUNT' ? '库存盘点已提交复核' : '人工库存调整已提交审批',
           })
         } else {
           message.success('库存作业草稿已生成，请核对后按对应动作办理')
@@ -881,7 +890,7 @@ export default function InventoryLedgerPage() {
           operationAttemptsRef.current.settle(scope, attempt, error)
         message[retained ? 'warning' : 'error'](
           createdReceipt
-            ? '草稿已生成，审批提交未完成；保持填写内容不变后重试将继续处理原草稿'
+            ? '库存作业已生成，审批结果暂未确认。保持内容不变后可继续处理原作业'
             : retained
               ? '提交结果暂时无法确认，请保持填写内容不变后重试'
               : getActionErrorMessage(error, '生成库存作业')

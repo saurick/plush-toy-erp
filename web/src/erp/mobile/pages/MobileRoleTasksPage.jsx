@@ -716,7 +716,7 @@ export default function MobileRoleTasksPage() {
   const refreshTasksAfterMutation = useCallback(
     async (options = {}) => {
       if (
-        isLinkedTaskTab(activeMainTabKey) &&
+        isLinkedSelection &&
         selectedTaskID
       ) {
         return loadLinkedTask(selectedTaskID)
@@ -791,6 +791,7 @@ export default function MobileRoleTasksPage() {
             ? slot
             : {
                 ...slot,
+                loading: false,
                 loaded: false,
                 error: '',
               },
@@ -828,7 +829,7 @@ export default function MobileRoleTasksPage() {
       return true
     },
     [
-      activeMainTabKey,
+      isLinkedSelection,
       selectedTaskID,
       loadLinkedTask,
       activeTaskViewKey,

@@ -52,6 +52,7 @@ import {
   sourceBusinessActionNo,
 } from '../../utils/sourceBusinessAction.mjs'
 import { matchesOperationalFactLifecycleResult } from '../../utils/operationalFactLifecycle.mjs'
+import { SOURCE_INBOUND_LOT_SELECTION } from '../../utils/sourceInboundLotSelection.mjs'
 
 import {
   buildOutsourcingReturnQualityInspectionPayload,
@@ -90,6 +91,26 @@ const SOURCE_FACT_SUCCESS_TEXT = Object.freeze({
     recovered: '已重新读取并确认委外回货草稿，可在委外记录中继续办理',
   },
 })
+
+function outsourcingCreateScope(actionType, order, item) {
+  return `outsourcing-source-fact:${actionType}:${order.id}:${item.id}`
+}
+
+function pendingOutsourcingFormValues(params) {
+  const values = operationalFactDraftFormValues({
+    ...params,
+    occurred_at: params.occurred_at ? Date.parse(params.occurred_at) / 1000 : 0,
+  })
+  return {
+    warehouse_id: values.warehouse_id,
+    lot_selection: params.new_lot_no ? SOURCE_INBOUND_LOT_SELECTION.NEW : SOURCE_INBOUND_LOT_SELECTION.EXISTING,
+    lot_id: values.lot_id,
+    new_lot_no: params.new_lot_no || '',
+    quantity: values.quantity,
+    occurred_at: values.occurred_at,
+    note: values.note,
+  }
+}
 
 export function useOutsourcingSourceFacts({
   canReadOutsourcingFacts,
@@ -619,11 +640,12 @@ export function useOutsourcingSourceFacts({
         if (sourceFactRequestRef.current !== requestID) {
           return
         }
+        const pending = sourceFactAttemptsRef.current.peek(outsourcingCreateScope(actionType, order, item))
         setSourceFactContext({
           mode: 'create',
           actionType,
           record: null,
-          initialValues: null,
+          initialValues: pending ? pendingOutsourcingFormValues(pending.params) : null,
           order,
           item,
           lots: filterOutsourcingSourceActionLots(
@@ -972,18 +994,24 @@ export function useOutsourcingSourceFacts({
       let attempt
       let params
       try {
-        const payload = {
-          ...buildOutsourcingSourceFactPayload(
-            actionType,
-            values,
-            order,
-            item,
-            facts
-          ),
-          customer_key: activeCustomerKey || undefined,
+        scope = outsourcingCreateScope(actionType, order, item)
+        const pending = sourceFactAttemptsRef.current.peek(scope)
+        if (pending) {
+          const expected = pendingOutsourcingFormValues(pending.params)
+          if (Object.entries(expected).some(([key, value]) =>
+            String(values[key] ?? '').trim() !== String(value ?? ''))) {
+            setSourceFactContext((current) => ({ ...current, initialValues: expected }))
+            message.warning('已恢复结果待确认的委外草稿，请核对后重试')
+            return
+          }
+          attempt = pending
+        } else {
+          const payload = {
+            ...buildOutsourcingSourceFactPayload(actionType, values, order, item, facts),
+            customer_key: activeCustomerKey || undefined,
+          }
+          attempt = sourceFactAttemptsRef.current.prepare(scope, payload)
         }
-        scope = `outsourcing-source-fact:${actionType}:${order.id}:${item.id}`
-        attempt = sourceFactAttemptsRef.current.prepare(scope, payload)
         params = {
           ...attempt.params,
           fact_no: sourceBusinessActionNo(

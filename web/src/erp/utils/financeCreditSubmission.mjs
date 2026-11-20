@@ -8,6 +8,7 @@ import {
 import { trimOptional } from './sourceDocumentValues.mjs'
 import { compareNumeric20Scale6Values } from './numeric20Scale6.mjs'
 import { validateFinanceCreditDraft } from './financePaymentAllocation.mjs'
+import { sourceBusinessActionSignature } from './sourceBusinessAction.mjs'
 
 export function buildFinanceCreditCommand({
   reverse,
@@ -90,7 +91,11 @@ async function readFinanceCreditReversal(creditID) {
 }
 
 export async function executeFinanceCreditCommand({ command, attemptStore }) {
-  const attempt = attemptStore.prepare(command.scope, command.payload)
+  const pending = attemptStore.peek(command.scope)
+  if (pending && pending.signature !== sourceBusinessActionSignature(command.payload)) {
+    return { outcome: 'unconfirmed', retained: true, restore: pending.params }
+  }
+  const attempt = pending || attemptStore.prepare(command.scope, command.payload)
   const execute =
     command.action === 'reverse'
       ? reverseFinanceCreditNote

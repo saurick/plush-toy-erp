@@ -90,6 +90,7 @@ export default function ProductionExceptionRequestModal({
       `production-exception:${inspection?.id || 0}`,
       payload
     )
+    let createdReceipt
     setLoading(true)
     try {
       const created = await submitProductionException(attempt.params)
@@ -98,6 +99,7 @@ export default function ProductionExceptionRequestModal({
           isInvalidResponse: true,
         })
       }
+      createdReceipt = created
       let processData
       try {
         processData = await startProductionExceptionApprovalProcess({
@@ -114,6 +116,9 @@ export default function ProductionExceptionRequestModal({
         if (!processData?.process_context) throw error
       }
       const next = processData.source_readback
+      if (next?.id !== created.id || !processData.process_context) {
+        throw Object.assign(new Error('生产异常审批结果暂时无法确认'), { isInvalidResponse: true })
+      }
       attempts.current.settle(
         `production-exception:${inspection.id}`,
         attempt,
@@ -123,6 +128,10 @@ export default function ProductionExceptionRequestModal({
       onChanged?.(next)
       onClose?.()
     } catch (error) {
+      if (createdReceipt) {
+        message.warning('生产异常申请已保存，审批暂未确认。保持内容不变后可继续提交原申请')
+        return
+      }
       const retained = attempts.current.settle(
         `production-exception:${inspection?.id || 0}`,
         attempt,

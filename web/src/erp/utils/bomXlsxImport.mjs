@@ -342,7 +342,7 @@ function resolveLossRate({
 
 function isFooterRow(row) {
   const joined = row.values.map(normalizeText).filter(Boolean).join(' ')
-  return /^(?:合计|审核|制表)|#REF!/u.test(joined)
+  return /^(?:合计|审核|制表)/u.test(joined)
 }
 
 function isMaterialSubtotal(row, header, current) {
@@ -501,6 +501,10 @@ function extractBOMRows(sheet, header, context) {
 
     const position = valueByAlias(row, header, 'position')
     const rawUnitQuantity = valueByAlias(row, header, 'unitQuantity')
+    if ((current.materialName || current.materialCode || position || rawUnitQuantity) &&
+        [...row.values, ...row.formulas].some((value) => String(value ?? '').includes('#REF!'))) {
+      fail(`Excel 第 ${row.rowNumber} 行包含无效单元格引用，请修正后重新导入`, 'broken_material_reference')
+    }
     if (!position && !rawUnitQuantity) continue
 
     const totalQuantity = valueByAlias(row, header, 'totalQuantity')

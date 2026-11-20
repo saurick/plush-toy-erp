@@ -224,7 +224,7 @@ function createSheetXml(rows, merges = []) {
           return `<c r="${reference}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`
         })
         .join('')
-      return `<row r="${rowIndex + 1}">${cells}</row>`
+      return cells ? `<row r="${rowIndex + 1}">${cells}</row>` : `<row r="${rowIndex + 1}"/>`
     })
     .join('')
   const mergeXml = merges.length
@@ -446,6 +446,25 @@ test('parseBOMXlsx: first material-detail shape keeps unit usage canonical and d
   assert.equal(result.rows[0].processMethod, '激光')
   assert.equal(result.rows[1].materialName, '测试布料')
   assert.equal(result.rows[1].lossRate, '0')
+})
+
+test('material import keeps row coordinates after a self-closing blank row and reports broken references', async () => {
+  const name = '材料分析明细表'
+  const sheet = {
+    name,
+    rows: [
+      ['物料名称', '规格', '单位', '组装部位', '单位用量', '总用量'],
+      [],
+      ['模拟布料', '58"', 'Y', '前片', '1', '10'],
+    ],
+  }
+  const result = await parseBOMXlsx(createWorkbook([sheet]), { fileName: '空行.xlsx' })
+  assert.equal(result.rows[0].rowNumber, 3)
+  sheet.rows[2][5] = { value: '#REF!', formula: 'A3+#REF!' }
+  await assert.rejects(
+    parseBOMXlsx(createWorkbook([sheet]), { fileName: '无效引用.xlsx' }),
+    /第 3 行包含无效单元格引用/
+  )
 })
 
 test('parseBOMXlsx: second shape normalizes explicit percentages and infers blank losses from totals', async () => {

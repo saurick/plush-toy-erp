@@ -53,8 +53,8 @@ export default function useFinancePaymentCreation({
 
   const partyOptions = useMemo(() => {
     const options = partyIsCustomer
-      ? customers.map((item) => partyOption(item, '客户已关联'))
-      : suppliers.map((item) => partyOption(item, '供应商已关联'))
+      ? customers.filter((item) => item.is_active !== false).map((item) => partyOption(item, '客户已关联'))
+      : suppliers.filter((item) => item.is_active !== false).map((item) => partyOption(item, '供应商已关联'))
     if (
       refundSource &&
       !options.some(
@@ -115,6 +115,7 @@ export default function useFinancePaymentCreation({
     }
     const scope = `finance-payment:${payload.direction}:${payload.counterparty_id}`
     const attempt = attemptsRef.current.prepare(scope, payload)
+    let createdReceipt
     setLoading(true)
     try {
       const created = await createFinancePayment(attempt.params)
@@ -123,6 +124,7 @@ export default function useFinancePaymentCreation({
           isInvalidResponse: true,
         })
       }
+      createdReceipt = created
       let processData
       try {
         processData = await startFinancePaymentApprovalProcess({
@@ -139,6 +141,9 @@ export default function useFinancePaymentCreation({
         if (!processData?.process_context) throw error
       }
       const payment = processData.source_readback
+      if (payment?.id !== created.id || !processData.process_context) {
+        throw Object.assign(new Error('收付款审批结果暂时无法确认'), { isInvalidResponse: true })
+      }
       attemptsRef.current.settle(scope, attempt, null)
       rememberPayment(payment)
       setPaymentOpen(false)
@@ -152,6 +157,11 @@ export default function useFinancePaymentCreation({
             : '收付款记录已创建，审批通过后由财务确认实际收付',
       })
     } catch (error) {
+      if (createdReceipt) {
+        rememberPayment(createdReceipt)
+        message.warning('收付款草稿已生成，审批暂未确认。保持内容不变后可继续提交原草稿')
+        return
+      }
       const retained = attemptsRef.current.settle(scope, attempt, error)
       message[retained ? 'warning' : 'error'](
         retained
