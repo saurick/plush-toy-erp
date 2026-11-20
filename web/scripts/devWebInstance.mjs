@@ -130,7 +130,15 @@ export async function readWebInstance(port) {
 
 export function isViteProcessCommand(command, runtime = {}) {
   const value = normalizeNodeRuntimeCommand(command, runtime)
-  return /^(?:\S*\/)?node\s+(?:--import\s+\S*\/viteParentLifetime\.mjs\s+)?\S*\/(?:vite\/bin\/vite\.js|\.bin\/vite)(?:\s|$)/u.test(value)
+  const match = /^(?:\/[^\r\n]*?\/)?node\s+(?:--import\s+(?<guard>(?:file:\/\/)?\/[^\r\n]*?\/viteParentLifetime\.mjs)\s+)?(?<script>(?!-)[^\r\n]*?\/(?:vite\/bin\/vite\.js|\.bin\/vite))(?:\s|$)/u.exec(value)
+  if (!match || [match.groups.guard, match.groups.script].some((item) =>
+    /\s+(?:\/|--|\S+\.m?js\s)/u.test(item || ''))) return false
+  if (!runtime.webRoot) return true
+  try {
+    return statSync(path.resolve(runtime.webRoot, match.groups.script)).isFile()
+  } catch {
+    return false
+  }
 }
 
 export async function inspectWebListeners(port, webRoot) {
@@ -147,7 +155,7 @@ export async function inspectWebListeners(port, webRoot) {
         ]
       )
       // cwd 相同还不够：同目录内的任意 Node/Python 服务不能被当作 Vite 停掉。
-      const viteCommand = isViteProcessCommand(command)
+      const viteCommand = isViteProcessCommand(command, { webRoot: expectedCwd })
       return {
         pid,
         cwd,

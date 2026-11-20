@@ -1309,7 +1309,7 @@ export function assembleCoverageReport({
           businessConsistency: consistencyCandidates.sort(
             (a, b) =>
               Number(b.current) - Number(a.current) ||
-              b.generatedAt.localeCompare(a.generatedAt),
+              b.generatedAt - a.generatedAt,
           )[0],
         }
       : {}),

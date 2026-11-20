@@ -56,6 +56,8 @@ export function verifyGoTestJson(
     .map((key) => displayByIdentity.get(key))
     .sort();
   const failedTests = [...failedIdentities].map((key) => displayByIdentity.get(key)).sort();
+  const failedPackages = [...new Set(events.filter((event) => !event.Test && event.Action === "fail")
+    .map((event) => event.Package || "(unknown package)"))].sort();
   const unresolvedIdentities = [...eligibleRunTests].filter(
     (key) =>
       !passedTests.has(key) && !skippedIdentities.has(key) && !failedIdentities.has(key),
@@ -86,6 +88,7 @@ export function verifyGoTestJson(
       prefixesWithoutPass.length === 0 &&
       skippedTests.length === 0 &&
       failedTests.length === 0 &&
+      failedPackages.length === 0 &&
       unresolvedTests.length === 0 &&
       missingBusinessTests.length === 0,
     ...(businessRules ? { missingBusinessTests } : {}),
@@ -99,6 +102,7 @@ export function verifyGoTestJson(
     skippedTests,
     excludedTests,
     failedTests,
+    ...(failedPackages.length ? { failedPackages } : {}),
     unresolvedTests,
   };
 }
@@ -158,6 +162,9 @@ function main() {
     }
     for (const testName of result.failedTests) {
       console.error(`[qa:go-test-json] failed: ${testName}`);
+    }
+    for (const packageName of result.failedPackages || []) {
+      console.error(`[qa:go-test-json] failed package: ${packageName}`);
     }
     for (const testName of result.unresolvedTests) {
       console.error(`[qa:go-test-json] missing terminal summary: ${testName}`);

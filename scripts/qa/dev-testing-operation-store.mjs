@@ -243,10 +243,7 @@ export function readDevTestingOperation(store, operationId) {
   );
 }
 
-export function listDevTestingOperations(store, { limit = 100 } = {}) {
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
-    throw new Error("testing operation list limit is invalid");
-  }
+function devTestingOperationIDs(store) {
   const directory = path.join(store, "operations");
   if (!existsSync(directory)) return [];
   const stats = lstatSync(directory);
@@ -254,10 +251,16 @@ export function listDevTestingOperations(store, { limit = 100 } = {}) {
     throw new Error("testing operation list directory is invalid");
   }
   return readdirSync(directory)
-    .filter((entry) => UUID_PATTERN.test(entry.replace(/\.json$/u, "")))
-    .map((entry) =>
-      readDevTestingOperation(store, entry.replace(/\.json$/u, "")),
-    )
+    .map((entry) => entry.replace(/\.json$/u, ""))
+    .filter((id) => UUID_PATTERN.test(id));
+}
+
+export function listDevTestingOperations(store, { limit = 100 } = {}) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) {
+    throw new Error("testing operation list limit is invalid");
+  }
+  return devTestingOperationIDs(store)
+    .map((id) => readDevTestingOperation(store, id))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .slice(0, limit);
 }
@@ -269,11 +272,14 @@ export function readDevTestingOperationByIdempotencyKey(
   if (!IDEMPOTENCY_PATTERN.test(String(idempotencyKey || ""))) {
     throw new Error("testing idempotency key is invalid");
   }
-  return (
-    listDevTestingOperations(store, { limit: 1000 }).find(
-      (operation) => operation.idempotencyKey === idempotencyKey,
-    ) || null
-  );
+  let match = null;
+  for (const id of devTestingOperationIDs(store)) {
+    const operation = readDevTestingOperation(store, id);
+    if (operation.idempotencyKey !== idempotencyKey) continue;
+    if (match) throw new Error("testing idempotency key identifies multiple stored operations");
+    match = operation;
+  }
+  return match;
 }
 
 export function createOrReuseDevTestingOperation(

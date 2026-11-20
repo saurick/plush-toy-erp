@@ -597,7 +597,7 @@ async function assertDarkThemeContrast(
         const color = parseColor(style.color)
         const background = backgroundFor(element)
         if (!color || !background) continue
-        const ratio = contrast(color, background)
+        const ratio = contrast(compositeColor(color, background), background)
         if (ratio < minContrastRatio) {
           failures.push({
             element: describe(element),

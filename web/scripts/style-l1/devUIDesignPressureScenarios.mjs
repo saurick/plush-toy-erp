@@ -51,9 +51,10 @@ export function createDevUIDesignPressureScenarios({ assert, assertNoHorizontalO
         await frame.locator('[data-action="all-columns"]').click()
         await frame.locator('[data-action="save-columns"]').click()
         assert.equal(await table.locator('thead th').count(), 8, '实际展开全部业务列')
-        const cdp = await page.context().newCDPSession(page)
-        await cdp.send('HeapProfiler.collectGarbage')
-        const heapBefore = (await cdp.send('Runtime.getHeapUsage')).usedSize
+        const cdp = page.context().browser()?.browserType().name() === 'chromium'
+          ? await page.context().newCDPSession(page) : null
+        await cdp?.send('HeapProfiler.collectGarbage')
+        const heapBefore = (await cdp?.send('Runtime.getHeapUsage'))?.usedSize ?? null
         const timings = []
         for (const size of [50, 500]) {
           await chooseSelectOption(frame.locator('#business-page-size'), String(size))
@@ -61,6 +62,7 @@ export function createDevUIDesignPressureScenarios({ assert, assertNoHorizontalO
           const first = await table.locator('tbody tr[data-row]').first().getAttribute('data-row')
           await table.evaluate((node) => {
             node.ownerDocument.defaultView.__boundaryLongTasks = []
+            if (!globalThis.PerformanceObserver?.supportedEntryTypes?.includes('longtask')) return
             const observer = new PerformanceObserver((list) => {
               node.ownerDocument.defaultView.__boundaryLongTasks.push(...list.getEntries().map((entry) => entry.duration))
             })
@@ -74,7 +76,7 @@ export function createDevUIDesignPressureScenarios({ assert, assertNoHorizontalO
           const metrics = await frame.locator('.app').evaluate(async (node) => {
             await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
             const view = node.ownerDocument.defaultView
-            view.__boundaryObserver.disconnect()
+            view.__boundaryObserver?.disconnect()
             return { rows: node.querySelectorAll('[data-list-scroll] tr[data-row]').length, nodes: node.querySelectorAll('*').length, longTasks: view.__boundaryLongTasks }
           })
           const elapsedMs = performance.now() - start
@@ -84,10 +86,12 @@ export function createDevUIDesignPressureScenarios({ assert, assertNoHorizontalO
           assert(metrics.nodes < 50000, '一页 DOM 节点保持有界')
           timings.push({ size, elapsedMs, ...metrics })
         }
-        await cdp.send('HeapProfiler.collectGarbage')
-        const heapAfter = (await cdp.send('Runtime.getHeapUsage')).usedSize
-        assert(heapAfter - heapBefore < 32 * 1024 * 1024, '从 50 到 500 条的存活堆增量小于 32MiB')
-        await cdp.detach()
+        await cdp?.send('HeapProfiler.collectGarbage')
+        const heapAfter = (await cdp?.send('Runtime.getHeapUsage'))?.usedSize ?? null
+        if (cdp) {
+          assert(heapAfter - heapBefore < 32 * 1024 * 1024, '从 50 到 500 条的存活堆增量小于 32MiB')
+          await cdp.detach()
+        }
         await writeFile(path.join(outputDir, 'ui-pressure-render-metrics.json'), JSON.stringify({ thresholds: { renderMs: 2500, longTaskMs: 750, heapGrowthBytes: 32 * 1024 * 1024 }, timings, heapBefore, heapAfter }, null, 2))
         await page.screenshot({ path: path.join(outputDir, 'ui-pressure-500-records-4k.png') })
         await frame.getByRole('button', { name: '第 1 页', exact: true }).click()
@@ -294,20 +298,25 @@ export function createDevUIDesignPressureScenarios({ assert, assertNoHorizontalO
         assert(numbers.length > 0 && numbers.every((value) => value.startsWith('PO-')), '过期销售读取不覆盖采购结果')
         await chooseUIDesignState(page, '正常')
         assert.equal(await frame.locator('#business-page-size').evaluate((node) => node.value), '50', '跨模块退出也恢复正常页容量')
-        const cdp = await page.context().newCDPSession(page)
-        await cdp.send('HeapProfiler.collectGarbage')
-        const before = (await cdp.send('Runtime.getHeapUsage')).usedSize
+        const cdp = page.context().browser()?.browserType().name() === 'chromium'
+          ? await page.context().newCDPSession(page) : null
+        await cdp?.send('HeapProfiler.collectGarbage')
+        const before = (await cdp?.send('Runtime.getHeapUsage'))?.usedSize ?? null
         const samples = []
         for (let i = 0; i < 5; i += 1) {
           await chooseUIDesignState(page, '边界压力')
           await frame.locator('[data-list-scroll]').waitFor()
           await chooseUIDesignState(page, '正常')
-          await cdp.send('HeapProfiler.collectGarbage')
-          samples.push((await cdp.send('Runtime.getHeapUsage')).usedSize)
+          if (cdp) {
+            await cdp.send('HeapProfiler.collectGarbage')
+            samples.push((await cdp.send('Runtime.getHeapUsage')).usedSize)
+          }
         }
-        const growth = Math.max(...samples) - before
-        assert(growth < 16 * 1024 * 1024, `五轮切换后存活堆增量不得超过 16MiB：${growth}`)
-        await cdp.detach()
+        const growth = cdp ? Math.max(...samples) - before : null
+        if (cdp) {
+          assert(growth < 16 * 1024 * 1024, `五轮切换后存活堆增量不得超过 16MiB：${growth}`)
+          await cdp.detach()
+        }
         await writeFile(path.join(outputDir, 'ui-pressure-recovery-memory.json'), JSON.stringify({ before, samples, growth, cycles: 5, thresholdBytes: 16 * 1024 * 1024 }, null, 2))
         await noOverflow(page, frame)
         assert.deepEqual(requests, [])

@@ -138,6 +138,16 @@ test("go test JSON proof rejects an explicit test failure", () => {
   assert.deepEqual(result.failedTests, ["TestFailure"]);
 });
 
+test("go test JSON proof rejects package teardown failure after all tests pass", () => {
+  const result = verifyGoTestJson(lines([
+    { Action: "run", Package: "example/a", Test: "TestWork" },
+    { Action: "pass", Package: "example/a", Test: "TestWork" },
+    { Action: "fail", Package: "example/a" },
+  ]));
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.failedPackages, ["example/a"]);
+});
+
 test("go test JSON proof keeps same-named tests separate by package", () => {
   const result = verifyGoTestJson(
     lines([

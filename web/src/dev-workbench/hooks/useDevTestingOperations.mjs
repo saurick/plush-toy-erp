@@ -181,6 +181,7 @@ export default function useDevTestingOperations({ client } = {}) {
         { dataScale: testingIdempotencyKeys.current[action].dataScale, chainKey: testingIdempotencyKeys.current[action].chainKey, signal: controller.signal }
       )
       if (controller.signal.aborted) return
+      testingSummaryRequestSequence.current += 1
       setTestingSummary((current) => ({
         ...(current || {
           kind: 'plush.dev-qa-testing-summary',

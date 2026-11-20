@@ -27,6 +27,10 @@ test('Vite ownership recognizes only this runtime guard and rejects arbitrary pr
   assert.equal(isViteProcessCommand(`${executable} --require /other/node-test-bootstrap.cjs /repo/web/node_modules/vite/bin/vite.js`, runtime), false)
   assert.equal(isViteProcessCommand(`${executable} --require ${bootstrap} -e server /repo/web/node_modules/vite/bin/vite.js`, runtime), false)
   assert.equal(isViteProcessCommand(`${executable} --require ${bootstrap} /repo/web/server.js`, runtime), false)
+  assert.equal(isViteProcessCommand('node --import /repo/My Projects/web/scripts/viteParentLifetime.mjs /repo/My Projects/web/node_modules/vite/bin/vite.js'), true)
+  assert.equal(isViteProcessCommand('node --import file:///repo/My%20Projects/web/scripts/viteParentLifetime.mjs /repo/My Projects/web/node_modules/vite/bin/vite.js'), true)
+  assert.equal(isViteProcessCommand('node /repo/web/server.js /repo/web/node_modules/vite/bin/vite.js'), false)
+  assert.equal(isViteProcessCommand('/My Runtime/bin/node -e test /repo/My Projects/web/node_modules/vite/bin/vite.js'), false)
 })
 
 test('已有前端必须匹配真实工作区、后端、客户、模式和 Vite 参数', (t) => {
