@@ -1,0 +1,12 @@
+.erp-sales-order-import-navigation {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-sales-order-import-navigation__select {
+  max-width: 100%;
+  min-width: min(360px, 100%);
+}
