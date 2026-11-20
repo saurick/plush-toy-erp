@@ -1,0 +1,16 @@
+# Optional per-container log retention. Always combine with the production Compose truth.
+x-reference-logging: &reference-logging
+  driver: local
+  options:
+    max-size: "${CONTAINER_LOG_MAX_SIZE:-10m}"
+    max-file: "${CONTAINER_LOG_MAX_FILE:-5}"
+
+services:
+  postgres:
+    logging: *reference-logging
+  jaeger:
+    logging: *reference-logging
+  app-server:
+    logging: *reference-logging
+  web-desktop:
+    logging: *reference-logging
