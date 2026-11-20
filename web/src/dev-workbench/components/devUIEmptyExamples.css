@@ -1,0 +1,54 @@
+.erp-ui-empty-examples {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.erp-ui-empty-examples__toolbar,
+.erp-ui-empty-examples__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.erp-ui-empty-examples__toolbar > .app-select {
+  width: 180px;
+}
+
+.erp-ui-empty-examples__toolbar > .search-input {
+  flex: 1 1 220px;
+}
+
+.erp-ui-empty-examples__lines {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.erp-ui-empty-examples__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.erp-ui-empty-examples__line > .ant-form-item {
+  margin: 0;
+}
+
+.erp-ui-empty-examples__actions {
+  margin-top: 12px;
+}
+
+@media (max-width: 540px) {
+  .erp-ui-empty-examples__line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .erp-ui-empty-examples__line > .ant-form-item:first-child {
+    grid-column: 1 / -1;
+  }
+}

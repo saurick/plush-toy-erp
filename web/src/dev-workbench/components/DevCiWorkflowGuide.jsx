@@ -1,0 +1,138 @@
+import React from 'react'
+import { Collapse, Typography } from 'antd'
+import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
+
+import {
+  CI_WORKFLOW_SECTIONS,
+  formatCiWorkflowSection,
+} from '../config/devCiWorkflow.mjs'
+import './dev-ci-workflow.css'
+
+function CiWorkflowSectionContent({ section }) {
+  return (
+    <div className="erp-dev-ci-guide__section">
+      <Typography.Paragraph type="secondary">
+        {section.description}
+      </Typography.Paragraph>
+      {(section.charts || (section.chart ? [{ label: section.label, chart: section.chart }] : [])).map(({ label, chart }) => (
+        <div className="erp-dev-ci-guide__diagram" data-section={section.key} key={label}>
+          {section.charts ? <Typography.Text type="secondary">{label}</Typography.Text> : null}
+          <MermaidDiagram
+            chart={chart}
+            label={`${label}原理图`}
+            showSourceOnError={false}
+            flowchartHtmlLabels={false}
+            interactiveNodes={section.nodes ? Object.entries(section.nodes).map(([id, node]) => ({ id, label: node.label, description: `${node.trigger} ${node.result} ${node.failure}` })) : undefined}
+          />
+        </div>
+      ))}
+      <ol>
+        {section.points.map((point) => (
+          <li key={point}>{point}</li>
+        ))}
+      </ol>
+      {section.table ? (
+        <div
+          className="erp-dev-ci-guide__table-scroll"
+          role="region"
+          aria-label={`${section.label}明细表`}
+        >
+          <table data-table-lines="appearance">
+            <caption>{section.label} · 当前合同</caption>
+            <thead>
+              <tr>
+                {section.table.headers.map((header) => (
+                  <th key={header} scope="col">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {section.table.rows.map((row) => (
+                <tr key={row[0]}>
+                  {row.map((cell, index) =>
+                    index === 0 ? (
+                      <th key={index} scope="row">
+                        {cell}
+                      </th>
+                    ) : (
+                      <td key={index}>{cell}</td>
+                    )
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {section.commands ? (
+        <div className="erp-dev-ci-guide__commands">
+          <Typography.Text type="secondary">
+            仓库根目录执行；复制不会运行命令，Git 写操作仍需当前任务授权。
+          </Typography.Text>
+          {section.commands.map((command) => (
+            <Typography.Paragraph key={command} copyable={{ text: command }}>
+              <code>{command}</code>
+            </Typography.Paragraph>
+          ))}
+        </div>
+      ) : null}
+
+      <Typography.Paragraph
+        copyable={{ text: formatCiWorkflowSection(section) }}
+      >
+        复制本节排查指引
+      </Typography.Paragraph>
+    </div>
+  )
+}
+
+export default function DevCiWorkflowGuide({
+  initialSection = 'overview',
+  documentMode = false,
+  sectionIdPrefix = '',
+}) {
+  return (
+    <section
+      className={`erp-dev-ci-guide${documentMode ? ' erp-dev-ci-guide--document' : ''}`}
+      aria-label="CI/CD 流程与原理"
+    >
+      <Typography.Title level={documentMode ? 2 : 4}>
+        CI/CD 流程与原理
+      </Typography.Title>
+      <Typography.Paragraph type="secondary">
+        流程说明与配置规则，实际执行结果请查看本次流水线和目标回执。
+      </Typography.Paragraph>
+      {documentMode ? (
+        <div className="erp-dev-ci-guide__chapters">
+          {CI_WORKFLOW_SECTIONS.map((section) => (
+            <section
+              key={section.key}
+              className="erp-dev-ci-guide__chapter"
+              aria-labelledby={`${sectionIdPrefix}${section.key}`}
+            >
+              <Typography.Title
+                level={3}
+                id={`${sectionIdPrefix}${section.key}`}
+              >
+                {section.label}
+              </Typography.Title>
+              <CiWorkflowSectionContent section={section} />
+            </section>
+          ))}
+        </div>
+      ) : (
+        <Collapse
+          defaultActiveKey={[initialSection]}
+          destroyOnHidden
+          items={CI_WORKFLOW_SECTIONS.map((section) => ({
+            key: section.key,
+            label: section.label,
+            children: <CiWorkflowSectionContent section={section} />,
+          }))}
+        />
+      )}
+    </section>
+  )
+}
