@@ -1,4 +1,0 @@
-interface:
-  display_name: "Plush Git Conflict Coordination"
-  short_description: "由当前提交会话核清混合改动与依赖，验证并提交可独立处理的部分"
-  default_prompt: "使用 $plush-git-conflict-coordination 在当前提交会话核对差异和已有交接，验证并提交已授权的独立部分。保留暂缓或仍有冲突的片段，在这里说明原因，不联系其他会话。"
