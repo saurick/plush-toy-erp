@@ -1,0 +1,334 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
+	"server/internal/errcode"
+)
+
+func unknownPurchaseOrderResult(method string) *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code:    errcode.UnknownMethod.Code,
+		Message: fmt.Sprintf("未知 purchase_order 接口 method=%s", method),
+	}
+}
+
+func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutation, bool) {
+	if !jsonRPCParamsAllowed(pm,
+		"customer_key", "id", "expected_version", "purchase_order_no", "supplier_id", "currency",
+		"payment_term_days", "supplier_purchase_order_no", "supplier_snapshot", "contract_party_snapshot",
+		"payment_method", "invoice_required", "invoice_category", "purchase_date", "expected_arrival_date",
+		"supplier_confirmed_arrival_date", "delivery_address", "note", "items",
+	) {
+		return nil, false
+	}
+	supplierID, valid := getRequiredJSONRPCPositiveInt(pm, "supplier_id")
+	if !valid {
+		return nil, false
+	}
+	purchaseDate, ok := getRequiredJSONRPCTime(pm, "purchase_date")
+	if !ok {
+		return nil, false
+	}
+	paymentTermDays, ok := getOptionalJSONRPCNonNegativeInt(pm, "payment_term_days")
+	if !ok {
+		return nil, false
+	}
+	expectedArrivalDate, ok := getOptionalJSONRPCTime(pm, "expected_arrival_date")
+	if !ok {
+		return nil, false
+	}
+	supplierConfirmedArrivalDate, ok := getOptionalJSONRPCTime(pm, "supplier_confirmed_arrival_date")
+	if !ok {
+		return nil, false
+	}
+	invoiceRequired, ok := getOptionalJSONRPCBool(pm, "invoice_required")
+	if !ok {
+		return nil, false
+	}
+	supplierSnapshot, ok := getOptionalJSONRPCMap(pm, "supplier_snapshot")
+	if !ok {
+		return nil, false
+	}
+	contractPartySnapshot, ok := getOptionalJSONRPCMap(pm, "contract_party_snapshot")
+	if !ok {
+		return nil, false
+	}
+	return &biz.PurchaseOrderMutation{
+		PurchaseOrderNo:              getString(pm, "purchase_order_no"),
+		SupplierID:                   supplierID,
+		Currency:                     getString(pm, "currency"),
+		PaymentTermDays:              paymentTermDays,
+		PaymentMethod:                getWorkflowStringPtr(pm, "payment_method"),
+		InvoiceRequired:              invoiceRequired,
+		InvoiceCategory:              getWorkflowStringPtr(pm, "invoice_category"),
+		SupplierPurchaseOrderNo:      getWorkflowStringPtr(pm, "supplier_purchase_order_no"),
+		SupplierSnapshot:             supplierSnapshot,
+		ContractPartySnapshot:        contractPartySnapshot,
+		PurchaseDate:                 purchaseDate,
+		ExpectedArrivalDate:          expectedArrivalDate,
+		SupplierConfirmedArrivalDate: supplierConfirmedArrivalDate,
+		DeliveryAddress:              getWorkflowStringPtr(pm, "delivery_address"),
+		Note:                         getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func purchaseOrderItemMutationFromParams(pm map[string]any) (*biz.PurchaseOrderItemMutation, bool) {
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "purchased_quantity")
+	if !ok {
+		return nil, false
+	}
+	unitPrice, ok := getOptionalJSONRPCDecimalString(pm, "unit_price")
+	if !ok {
+		return nil, false
+	}
+	amount, ok := getOptionalJSONRPCDecimalString(pm, "amount")
+	if !ok {
+		return nil, false
+	}
+	expectedArrivalDate, ok := getOptionalJSONRPCTime(pm, "expected_arrival_date")
+	if !ok {
+		return nil, false
+	}
+	return &biz.PurchaseOrderItemMutation{
+		PurchaseOrderID:        getInt(pm, "purchase_order_id", 0),
+		LineNo:                 getInt(pm, "line_no", 0),
+		MaterialID:             getInt(pm, "material_id", 0),
+		UnitID:                 getInt(pm, "unit_id", 0),
+		MaterialCodeSnapshot:   getWorkflowStringPtr(pm, "material_code_snapshot"),
+		MaterialNameSnapshot:   getWorkflowStringPtr(pm, "material_name_snapshot"),
+		ColorSnapshot:          getWorkflowStringPtr(pm, "color_snapshot"),
+		ProductOrderNoSnapshot: getWorkflowStringPtr(pm, "product_order_no_snapshot"),
+		ProductNoSnapshot:      getWorkflowStringPtr(pm, "product_no_snapshot"),
+		ProductNameSnapshot:    getWorkflowStringPtr(pm, "product_name_snapshot"),
+		PurchasedQuantity:      quantity,
+		UnitPrice:              unitPrice,
+		Amount:                 amount,
+		ExpectedArrivalDate:    expectedArrivalDate,
+		Note:                   getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func purchaseOrderItemSaveRow(fields map[string]any, id int) (*biz.PurchaseOrderItemSaveMutation, bool) {
+	mutation, ok := purchaseOrderItemMutationFromParams(fields)
+	if !ok {
+		return nil, false
+	}
+	return &biz.PurchaseOrderItemSaveMutation{ID: id, PurchaseOrderItemMutation: *mutation}, true
+}
+
+func (d *jsonrpcDispatcher) mapPurchaseOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := canceledRequestResult(ctx, err); result != nil {
+		return result
+	}
+	if result := d.purchaseOrderErrorResult(ctx, err); result != nil {
+		return result
+	}
+	d.log.WithContext(ctx).Errorf("[purchase_order] internal err=%v", err)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+}
+
+func (d *jsonrpcDispatcher) purchaseOrderErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
+	if result := paymentMethodSelectionErrorResult(err); result != nil {
+		return result
+	}
+	l := d.log.WithContext(ctx)
+	switch {
+	case errors.Is(err, biz.ErrPurchaseOrderMaterialSupplierMismatch):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "材料所属厂商与采购供应商不一致，请更换材料或供应商后重试"}
+	case errors.Is(err, biz.ErrPurchaseOrderConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrPurchaseOrderPriceFrozen):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "此处只补缺失单价，已确认的采购价格不能覆盖"}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrSourceOrderStateInvalid):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单当前状态不允许此操作，请刷新后核对可办理的操作"}
+	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单尚未全部入库；若确定不再收货，请改用短关闭并填写原因"}
+	case errors.Is(err, biz.ErrBadParam):
+		l.Warnf("[purchase_order] invalid param err=%v", err)
+		return invalidParamResult()
+	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购订单不存在"}
+	case errors.Is(err, biz.ErrPurchaseOrderItemNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "采购订单行不存在"}
+	case errors.Is(err, biz.ErrPurchaseOrderCloseDraftReceiptDependency):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单存在待入账的入库草稿，不能关闭"}
+	case errors.Is(err, biz.ErrPurchaseOrderCancelReceiptDependency):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单已生成未取消的入库单，不能取消"}
+	case errors.Is(err, biz.ErrPurchaseOrderLifecycleProcessDependency):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "采购订单仍有进行中的备料流程，不能关闭或取消"}
+	case errors.Is(err, biz.ErrSupplierNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选供应商不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrSupplierInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "供应商已停用"}
+	case errors.Is(err, biz.ErrMaterialNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选材料不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrMaterialInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "材料已停用"}
+	case errors.Is(err, biz.ErrUnitNotFound):
+		return &v1.JsonrpcResult{Code: errcode.ResourceNotFound.Code, Message: "所选单位不存在，请刷新后重新选择"}
+	case errors.Is(err, biz.ErrUnitInactive):
+		return &v1.JsonrpcResult{Code: errcode.BusinessRuleViolation.Code, Message: "单位已停用"}
+	default:
+		return nil
+	}
+}
+
+func purchaseOrderMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.PurchaseOrder, err error) *v1.JsonrpcResult {
+	if err != nil {
+		return d.mapPurchaseOrderError(ctx, err)
+	}
+	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"purchase_order": purchaseOrderToMap(item)})}
+}
+
+func purchaseOrderWithItemsMutationResult(ctx context.Context, d *jsonrpcDispatcher, result *biz.PurchaseOrderWithItems, err error) *v1.JsonrpcResult {
+	if err != nil {
+		return d.mapPurchaseOrderError(ctx, err)
+	}
+	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+		"purchase_order":       purchaseOrderToMap(result.Order),
+		"purchase_order_items": purchaseOrderItemsToAny(result.Items),
+	})}
+}
+
+func purchaseOrderReceiptProgressResult(
+	ctx context.Context,
+	d *jsonrpcDispatcher,
+	progress *biz.PurchaseOrderReceiptProgress,
+	err error,
+) *v1.JsonrpcResult {
+	if err != nil {
+		return d.mapPurchaseOrderError(ctx, err)
+	}
+	return okData(map[string]any{
+		"purchase_order_receipt_progress": purchaseOrderReceiptProgressToMap(progress),
+	})
+}
+
+func purchaseOrderReceiptProgressToMap(progress *biz.PurchaseOrderReceiptProgress) map[string]any {
+	if progress == nil {
+		return map[string]any{}
+	}
+	items := make([]any, 0, len(progress.Items))
+	for _, item := range progress.Items {
+		if item == nil {
+			continue
+		}
+		items = append(items, map[string]any{
+			"purchase_order_item_id":         item.PurchaseOrderItemID,
+			"line_no":                        item.LineNo,
+			"material_id":                    item.MaterialID,
+			"material_code":                  item.MaterialCode,
+			"material_name":                  item.MaterialName,
+			"unit_id":                        item.UnitID,
+			"unit_code":                      item.UnitCode,
+			"unit_name":                      item.UnitName,
+			"line_status":                    item.LineStatus,
+			"purchased_quantity":             item.PurchasedQuantity.String(),
+			"effective_received_quantity":    item.EffectiveReceivedQuantity.String(),
+			"draft_reserved_quantity":        item.DraftReservedQuantity.String(),
+			"remaining_receivable_quantity":  item.RemainingReceivableQuantity.String(),
+			"remaining_generatable_quantity": item.RemainingGeneratableQuantity.String(),
+			"can_generate":                   item.CanGenerate,
+			"disabled_reason":                item.DisabledReason,
+		})
+	}
+	return map[string]any{
+		"purchase_order_id": progress.PurchaseOrderID,
+		"purchase_order_no": progress.PurchaseOrderNo,
+		"lifecycle_status":  progress.LifecycleStatus,
+		"items":             items,
+	}
+}
+
+func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":                              item.ID,
+		"purchase_order_no":               item.PurchaseOrderNo,
+		"supplier_id":                     item.SupplierID,
+		"currency":                        item.Currency,
+		"payment_term_days":               optionalIntValue(item.PaymentTermDays),
+		"payment_method":                  optionalStringValue(item.PaymentMethod),
+		"invoice_required":                optionalBoolValue(item.InvoiceRequired),
+		"invoice_category":                optionalStringValue(item.InvoiceCategory),
+		"supplier_purchase_order_no":      optionalStringValue(item.SupplierPurchaseOrderNo),
+		"supplier_snapshot":               item.SupplierSnapshot,
+		"contract_party_snapshot":         item.ContractPartySnapshot,
+		"purchase_date":                   item.PurchaseDate.Unix(),
+		"expected_arrival_date":           optionalTimeUnix(item.ExpectedArrivalDate),
+		"supplier_confirmed_arrival_date": optionalTimeUnix(item.SupplierConfirmedArrivalDate),
+		"delivery_address":                optionalStringValue(item.DeliveryAddress),
+		"lifecycle_status":                item.LifecycleStatus,
+		"version":                         item.Version,
+		"settlement_action":               optionalStringValue(item.SettlementAction),
+		"settlement_mode":                 optionalStringValue(item.SettlementMode),
+		"settlement_reason":               optionalStringValue(item.SettlementReason),
+		"settled_at":                      optionalTimeUnix(item.SettledAt),
+		"settled_by":                      optionalIntValue(item.SettledBy),
+		"note":                            optionalStringValue(item.Note),
+		"created_at":                      item.CreatedAt.Unix(),
+		"updated_at":                      item.UpdatedAt.Unix(),
+	}
+}
+
+func purchaseOrdersToAny(items []*biz.PurchaseOrder) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		mapped := purchaseOrderToMap(item)
+		if item != nil && item.ItemCount != nil {
+			mapped["item_count"] = *item.ItemCount
+		}
+		out = append(out, mapped)
+	}
+	return out
+}
+
+func purchaseOrderItemToMap(item *biz.PurchaseOrderItem) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":                        item.ID,
+		"purchase_order_id":         item.PurchaseOrderID,
+		"line_no":                   item.LineNo,
+		"material_id":               item.MaterialID,
+		"unit_id":                   item.UnitID,
+		"material_spec_snapshot":    optionalStringValue(item.MaterialSpecSnapshot),
+		"supplier_item_no_snapshot": optionalStringValue(item.SupplierItemNoSnapshot),
+		"unit_name_snapshot":        optionalStringValue(item.UnitNameSnapshot),
+		"material_code_snapshot":    optionalStringValue(item.MaterialCodeSnapshot),
+		"material_name_snapshot":    optionalStringValue(item.MaterialNameSnapshot),
+		"color_snapshot":            optionalStringValue(item.ColorSnapshot),
+		"product_order_no_snapshot": optionalStringValue(item.ProductOrderNoSnapshot),
+		"product_no_snapshot":       optionalStringValue(item.ProductNoSnapshot),
+		"product_name_snapshot":     optionalStringValue(item.ProductNameSnapshot),
+		"purchased_quantity":        item.PurchasedQuantity.String(),
+		"unit_price":                optionalDecimalString(item.UnitPrice),
+		"amount":                    optionalDecimalString(item.Amount),
+		"expected_arrival_date":     optionalTimeUnix(item.ExpectedArrivalDate),
+		"line_status":               item.LineStatus,
+		"note":                      optionalStringValue(item.Note),
+		"created_at":                item.CreatedAt.Unix(),
+		"updated_at":                item.UpdatedAt.Unix(),
+	}
+}
+
+func purchaseOrderItemsToAny(items []*biz.PurchaseOrderItem) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, purchaseOrderItemToMap(item))
+	}
+	return out
+}
