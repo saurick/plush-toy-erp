@@ -3785,7 +3785,7 @@
     // 独立 HTML 的选择控件与帮助选择器共用；option 仅保存选项，不打开系统菜单。
     class UIDesignSelect extends HTMLElement {
       static formAssociated = true;
-      static observedAttributes = ['disabled'];
+      static observedAttributes = ['disabled', 'required'];
       constructor() {
         super();
         this.internals = this.attachInternals();
@@ -3941,6 +3941,9 @@
           selected.forEach(option => data.append(this.getAttribute('name') || '', option.value));
           this.internals.setFormValue(data);
         } else this.internals.setFormValue(this.value);
+        if (!this.disabled && this.hasAttribute('required') && !chosen.length) {
+          this.internals.setValidity({valueMissing:true}, '请选择一项后继续', this.display);
+        } else this.internals.setValidity({});
         if (this.disabled && this.expanded) this.close();
         else if (this.expanded) this.activate(this.activeIndex);
       }
@@ -5428,7 +5431,7 @@
         {id:'approval',label:'核对审批流'},
         {id:'allocate',label:'选择应收 / 应付核销',states:['approved'],primary:true,fields:[['fact','待核销账款','finance'],['amount','本次核销金额','number']]},
         {id:'cancel',label:'核对取消',states:['draft','rejected'],next:'cancelled',reason:true},
-        {id:'reverse',label:'冲销收付款',states:['posted'],next:'reversed',reason:true}
+        {id:'reverse',label:'冲销收付款',states:['approved','posted'],next:'reversed',reason:true}
       ],
       receivables: [{id:'payment',label:'登记收款',states:['posted'],fields:[['amount','本次收款金额','number']]}, {id:'records',label:'核销记录'}],
       payables: [{id:'payment',label:'登记付款',states:['posted'],fields:[['amount','本次付款金额','number']]}, {id:'records',label:'核销记录'}]
@@ -5444,6 +5447,7 @@
       if(row.previewOnly)return '大量数据样例仅供查看';
       if(spec.id==='process'&&!productionRouteRows.some(item=>item.order===row.no))return '此订单尚未生成可办理的工序路线';
       if(spec.states&&!spec.states.includes(row.status))return `当前为${row.statusText}；适用：${spec.states.map(status=>config.statuses.find(item=>item[0]===status)?.[1]||status).join('、')}`;
+      if(spec.id==='reverse'&&row.status==='approved'&&!row.allocations?.length)return '已产生核销明细后可以冲销';
       if(config.key==='quality'&&spec.id==='submit'&&!compactActionDrafts.get(`quality:${row.id}:quality`)?.length)return '请先填写并保存检查项';
       if(spec.id==='ship'&&(!row.shippingReleased||!row.qualityPassed))return '需先完成出货放行审批和出货前检验';
       if(config.key==='inbound'&&spec.id==='post'&&!row.qualityPassed)return '需先取得合格的检验结果';
@@ -7285,17 +7289,23 @@ active = new Set()
         </tr></thead><tbody>${body || '<tr><td colspan="8" class="empty">当前筛选暂无数据</td></tr>'}</tbody></table></div>${renderVisualPager(p,config.key)}</section>`;
     }
     function productionCurrentStage(row) {
-      const index=['blocked','review','active'].map(key=>row.processes.findIndex(stage=>stage.state===key)).find(value=>value>=0);
-      return index===undefined?0:index;
+      const stages=row.processes.map((stage,index)=>({stage,index,label:productionRouteStages[index][1]}));
+      stages.splice(3,0,{stage:row.quality,milestone:'quality',label:'质检结果'});
+      stages.push({stage:row.inbound,milestone:'inbound',label:'成品入库'});
+      return ['blocked','review','active','waiting'].map(state=>stages.find(entry=>entry.stage.state===state)).find(Boolean);
     }
     function renderProductionRouteView(config,hub) {
       const all=visualRows(config.key),orderRows=all.filter(row=>row.order===state.productionRouteOrder);
-      const attention=row=>row.processes.some(stage=>['blocked','review'].includes(stage.state))||['blocked','review'].includes(row.quality.state);
+      const attention=row=>[...row.processes,row.quality,row.inbound].some(stage=>['blocked','review'].includes(stage.state));
       const filtered=orderRows.filter(row=>state.productionRouteFilter==='all'||attention(row)),p=visualPage(filtered,config.key);
       const orders=[...new Set(productionRouteRows.map(row=>row.order))],layout=state.productionRouteLayout||'current';
       const chips=visualChip('production-route-filter','all','全部产品',orderRows.length,state.productionRouteFilter==='all')+visualChip('production-route-filter','attention','需跟进',orderRows.filter(attention).length,state.productionRouteFilter==='attention');
       const operation=renderHubTabsRow(hub,config),empty=visibleDataState(operation,'生产执行');if(empty)return empty;
-      const current=`<div class="table-wrap"><table class="process-current-table" aria-label="当前生产事项"><thead><tr><th>产品 / 规格</th><th>当前工序</th><th>进度 / 数量</th><th>当前事项 / 负责岗位</th><th>办理入口</th></tr></thead><tbody>${p.rows.map(row=>{const index=productionCurrentStage(row),stage=row.processes[index];return `<tr><td><strong>${escapeHTML(row.product)}</strong><small>${row.sku} · 计划 ${row.quantity}</small></td><td>${productionRouteStages[index][1]}</td><td>${stage.status}<small>${stage.meta}</small></td><td>${stage.detail}<small>${stage.owner}</small></td><td><button class="btn" data-action="production-stage-open" data-id="${row.id}" data-index="${index}">查看当前事项</button></td></tr>`;}).join('')}</tbody></table></div>`;
+      const current=`<div class="table-wrap"><table class="process-current-table" aria-label="当前生产事项"><thead><tr><th>产品 / 规格</th><th>当前工序</th><th>进度 / 数量</th><th>当前事项 / 负责岗位</th><th>办理入口</th></tr></thead><tbody>${p.rows.map(row=>{
+        const entry=productionCurrentStage(row),stage=entry?.stage;
+        const action=entry?.milestone?`data-action="production-milestone-open" data-value="${entry.milestone}"`:`data-action="production-stage-open" data-index="${entry?.index}"`;
+        return `<tr><td><strong>${escapeHTML(row.product)}</strong><small>${row.sku} · 计划 ${row.quantity}</small></td><td>${entry?.label||'已办结'}</td><td>${stage?.status||'—'}<small>${stage?.meta||''}</small></td><td>${stage?.detail||'—'}<small>${stage?.owner||''}</small></td><td>${entry?`<button class="btn" ${action} data-id="${row.id}">查看当前事项</button>`:'—'}</td></tr>`;
+      }).join('')}</tbody></table></div>`;
       const matrix=`<div class="production-route-scroll"><div class="production-route-matrix" style="--stage-count:${productionRouteStages.length}"><div class="production-route-head"><div class="production-route-product">产品 / SKU</div>${productionRouteStages.map(([no,label])=>`<div><span>${label}</span></div>`).join('')}<div class="process-milestones">独立结果</div></div>${p.rows.map((row,index)=>`<div class="production-route-row"><div class="production-route-product"><div class="product-cell">${renderProductThumb(index,row.product)}<span><strong title="${escapeHTML(row.product)}">${escapeHTML(row.product)}</strong><span>${row.sku} · ${row.quantity}</span></span></div><span>${row.owner}</span></div>${row.processes.map((stage,index)=>`<button class="production-stage-cell ${stage.state}" data-action="production-stage-open" data-id="${row.id}" data-index="${index}"><strong>${stage.status}</strong><span>${stage.meta}</span><small>${stage.owner}</small></button>`).join('')}<div class="process-milestones">${[['quality','质检',row.quality],['inbound','成品入库',row.inbound]].map(([key,label,result])=>`<button class="milestone-result ${result.state}" data-action="production-milestone-open" data-id="${row.id}" data-value="${key}"><span>${label}</span><strong>${result.status}</strong></button>`).join('')}</div></div>`).join('')||'<div class="empty">没有匹配的产品工序</div>'}</div></div>`;
       return `${operation}<section class="surface operation-surface"><div class="command-row"><div class="visual-chips">${chips}</div><label class="search">${icon('search')}<input id="list-search" aria-label="搜索生产产品或规格" placeholder="搜本单产品或规格编码" value="${escapeHTML(state.search)}" /></label><div class="segment" role="group" aria-label="生产执行展示方式">${[['current','当前事项'],['matrix','工序对照']].map(([key,label])=>`<button aria-pressed="${layout===key}" class="${layout===key?'active':''}" data-action="production-route-layout" data-value="${key}">${label}</button>`).join('')}</div></div><div class="record-row process-order-bar"><label>生产订单 <ui-select id="production-route-order" data-required-selection>${orders.map(order=>`<option ${order===state.productionRouteOrder?'selected':''}>${order}</option>`).join('')}</ui-select></label></div></section><section class="surface data-surface production-route-surface">${layout==='matrix'?matrix:current}${renderVisualPager(p,config.key)}</section>`;
     }
@@ -10940,7 +10950,7 @@ return {orders,financeCustomers};})();
 };
     const root = () => document.getElementById('role-help-preview');
     const byId = id => document.getElementById('rh-'+id);
-    const namespace = markup => markup.replace(/(id|for|aria-controls|aria-labelledby)="([^"]+)"/g, (all, attribute, value) => /^(?:roleSelect|sceneSelect|sceneList|sceneTitle|sceneDescription|businessChain|viewBody|entryButton|entryDialog|entryTitle|entryBody|chainNote|note-\d+|manual\w+)$/.test(value) ? attribute+'="rh-'+value+'"' : all);
+    const namespace = markup => markup.replace(/(id|for|aria-controls|aria-labelledby)="([^"]+)"/g, (all, attribute, value) => /^(?:roleSelect|sceneSelect|sceneList|sceneTitle|sceneDescription|businessChain|viewBody|entryButton|entryDialog|entryTitle|entryBody|chainNote|note-\d+|manual\w+|helpContribution\w+)$/.test(value) ? attribute+'="rh-'+value+'"' : all);
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const paths = {arrow:'<path d="M4 12h16m-6-6 6 6-6 6"/>',chevron:'<path d="m9 5 7 7-7 7"/>',check:'<path d="m5 12 4 4L19 6"/>',user:'<circle cx="12" cy="7" r="3"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',moon:'<path d="M20.5 13A9 9 0 0 1 11 3.5 9 9 0 1 0 20.5 13Z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>'};
     const icon = (name, cls='') => `<svg class="${cls}" aria-hidden="true" viewBox="0 0 24 24">${paths[name] || paths.info}</svg>`;
@@ -18177,8 +18187,14 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     let paymentMethodDesignDelete = null;
     let paymentMethodDesignLastChange = null;
     let paymentMethodDesignError = '';
+    function activePaymentMethodOptions() {
+      return [...paymentMethodDesignChoices].filter(([,choice])=>choice.active).map(([name])=>({value:name,label:name}));
+    }
     function paymentMethodDesignOptions() {
-      return [...paymentMethodDesignChoices].filter(([,choice])=>choice.active).map(([name])=>`<option value="${escapeHTML(name)}">${escapeHTML(name)}</option>`).join('');
+      return activePaymentMethodOptions().map(({value,label})=>`<option value="${escapeHTML(value)}">${escapeHTML(label)}</option>`).join('');
+    }
+    function refreshPaymentMethodSelect(node, value) {
+      node.setOptions([{value:'',label:'请选择付款方式'},...activePaymentMethodOptions()],value);
     }
     let paymentMethodDesignQuick = false;
     let paymentMethodDesignQuickDraft = null;
@@ -18210,7 +18226,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const footer=editing?`<span>${editor.original?'正在改名':'正在新增'}</span>${editorActions}`:paymentMethodDesignDelete?'<span>确认删除未使用项</span><div class="payment-catalogue-actions"><button class="btn" data-action="cancel-delete-payment-choice">取消</button><button class="btn" data-action="confirm-delete-payment-choice">确认删除</button></div>':`<span>共 ${matches.length} 项</span>${pager}<div class="payment-catalogue-actions">${paymentMethodDesignQuickDraft!==null?'<button class="text-btn" data-action="return-payment-create">返回新增</button>':''}<button class="btn" data-action="close-overlay">返回填写</button></div>`;
       state.infoModal={kind:'payment-methods',quick:paymentMethodDesignQuick,title:paymentMethodDesignQuick?'新增付款方式':'管理付款方式',html:paymentMethodDesignQuick?`<div class="payment-method-label"><label>名称</label><small>公司共用选项</small></div>${input}${error}`:manager,footer:paymentMethodDesignQuick?`<button class="text-btn" data-action="manage-payment-methods">管理付款方式</button>${editorActions}`:footer};
       state.overlay='info';renderFloating();
-      document.querySelectorAll('[data-payment-select]').forEach(node=>{const current=node.value;node.innerHTML='<option value="">请选择付款方式</option>'+paymentMethodDesignOptions();node.value=current;});
+      document.querySelectorAll('[data-payment-select]').forEach(node=>refreshPaymentMethodSelect(node,node.value));
       document.querySelector('[data-payment-edit]')?.focus();
     }
     function savePaymentMethodDesignChoice() {
@@ -18223,7 +18239,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(editor.original)paymentMethodDesignChoices.delete(editor.original);
       paymentMethodDesignChoices.set(name,previous||{active:true,used:false});
       paymentMethodDesignLastChange=editor.original?{oldName:editor.original,newName:name,previous}:null;
-      if(!editor.original){const input=document.querySelector('[data-payment-select]');if(input){input.innerHTML='<option value="">请选择付款方式</option>'+paymentMethodDesignOptions();input.value=name;input.dispatchEvent(new Event('input',{bubbles:true}));}paymentMethodDesignQuickDraft=null;}
+      if(!editor.original){const input=document.querySelector('[data-payment-select]');if(input){refreshPaymentMethodSelect(input,name);input.dispatchEvent(new Event('input',{bubbles:true}));}paymentMethodDesignQuickDraft=null;}
       paymentMethodDesignEditor=null;paymentMethodDesignError='';
       if(paymentMethodDesignQuick){state.overlay=null;renderFloating();return;}
       paymentMethodDesignView=previous&&!previous.active?'inactive':'active';paymentMethodDesignQueries[paymentMethodDesignView]=name;paymentMethodDesignPages[paymentMethodDesignView]=0;showPaymentMethodDesignManager();
@@ -19942,11 +19958,13 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(event.key==='Enter'&&!event.isComposing&&event.target.matches('[data-import-review-search]')){event.preventDefault();state.importReviewKeyword=event.target.value.trim();if(state.importMode==='purchase')state.purchaseImportPage=1;renderFloating();}
     });
 
+    const BOM_IMPORT_PARTS = [['短毛绒','身体前片','0.42','码'],['填充棉','身体','0.18','千克']];
+
     function renderBOMImportPreview() {
       const creating = state.bomImportTarget === 'new';
       const replacing = !creating && state.bomImportMode === 'replace';
       const title = creating ? '从 Excel 新建 BOM' : '导入材料明细';
-      const rows = [['短毛绒','身体前片','0.42','码'],['填充棉','身体','0.18','千克']];
+      const rows = BOM_IMPORT_PARTS;
       const visibleRows=(state.importReviewFilter?[]:rows).filter(matchesImportReviewSearch);
       return `<div class="overlay" data-action="overlay-bg"><section class="modal bom-import-preview" role="dialog" aria-modal="true" aria-label="${title}"><header class="modal-head"><strong>${title}</strong><button class="btn ghost icon-btn close" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></header><div class="modal-body"><p class="data-note">演示材料明细.xlsx / 材料分析明细表 · 2 个部位</p><p class="data-note">${creating?'带入编辑页，补齐后保存草稿新建 BOM。':'仅导入明细，产品、版本、订单数量和其他表头保留当前草稿内容。'}</p>${renderImportReviewFilter('bom')}<p class="data-note">整份文件导入；筛选仅用于查看，确认后仍带入全部 2 个部位。</p><div class="source-summary-table"><table><thead><tr><th>材料</th><th>部位</th><th>单位用量</th><th>单位</th><th>待处理</th></tr></thead><tbody>${visibleRows.map(row=>`<tr>${row.map(value=>`<td>${value}</td>`).join('')}<td aria-label="无需处理">—</td></tr>`).join('')}</tbody></table>${visibleRows.length?'':`<p class="data-note" role="status">${state.importReviewKeyword?'没有符合条件的部位':'当前没有待处理的部位'}</p>`}</div>${!creating&&state.lineCount?`<fieldset style="border:0;padding:12px 0"><legend>当前草稿已有 ${state.lineCount} 个部位</legend><label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="append" ${!replacing?'checked':''}/> 追加，保留当前明细</label> <label><input type="radio" name="bom-import-mode" data-action="bom-import-mode" data-value="replace" ${replacing?'checked':''}/> 替换当前明细</label></fieldset>`:''}${replacing?'<div class="rm-callout warning">确认后将替换当前草稿明细，保存前可撤销本次导入。</div>':''}</div><footer class="modal-foot"><span class="data-note">每页 10 个部位</span><button class="btn" data-action="close-overlay">取消</button><button class="btn primary" data-action="confirm-import" aria-label="${creating?'带入编辑':replacing?'替换并带入 2 个部位':'追加 2 个部位'}">${creating?'带入编辑（2 个部位）':replacing?'替换并带入 2 个部位':'追加 2 个部位'}</button></footer></section></div>`;
     }
@@ -20829,7 +20847,15 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'shipment-import') { state.importReviewFilter='';state.importReviewKeyword=''; state.importMode='shipment';state.overlay='import-preview';renderFloating(); }
       else if (action === 'confirm-import') {
         const isBom=state.importMode==='bom';
-        if(isBom){if(state.bomImportTarget==='new'){openEntityForm('bom','create');state.lineCount=2;state.bomImportUndo=null;}else{state.bomImportUndo={rows:structuredClone(formRowData()),quantity:state.formValues['order-qty'],invalidated:false};state.lineCount=state.bomImportMode==='replace'?2:state.lineCount+2;}}
+        if(isBom){
+          const creating=state.bomImportTarget==='new', current=creating?[]:formRowData();
+          if(creating)openEntityForm('bom','create');
+          state.bomImportUndo=creating?null:{rows:structuredClone(current),quantity:state.formValues['order-qty'],invalidated:false};
+          const imported=BOM_IMPORT_PARTS.map(([material,position,usage,unit])=>({
+            id:`line-${++state.lineSerial}`, values:{material,position,usage,unit,'vendor-item':'',spec:'',piece:'',loss:''},readonly:[],
+          }));
+          applyFormRows(creating||state.bomImportMode==='replace'?imported:[...current,...imported]);
+        }
         else if(state.lineCount<3){
           state.shipmentImportUndo={rows:structuredClone(formRowData()),weight:state.formValues['total-net-weight'],weightCleared:state.formValues['total-net-weight-cleared'],invalidated:false};
           state.lineCount=3;
@@ -21310,7 +21336,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const rows=formRowData();const index=[...formLineElements()].indexOf(target.closest('tbody[data-form-row]') || target.closest('tr'));
       const next=mutateFormRows(rows,action,index,`line-${++state.lineSerial}`);
       if(state.formSourcePage==='shipments'&&(next.length!==rows.length||next.some((row,i)=>row.id!==rows[i]?.id)))clearShipmentDemoWeight();
+      const selectedSection=document.querySelector('.form-scroll .form-section.is-current')?.id;
       rememberScroll();applyFormRows(next);state.formDirty=true;renderView();
+      const scroller=document.querySelector('.form-scroll');
+      const restored=[...(scroller?.querySelectorAll('.form-section')||[])].find(section=>section.id===selectedSection);
+      if(restored)scroller.selectFormSection?.(restored);
       const focusIndex=action==='copy-line'?index+1:action==='remove-line'?Math.min(index,state.lineCount-1):action==='line-up'?Math.max(0,index-1):state.lineCount-1;
       const focusRow=formLineElements()[focusIndex];
       const focusTarget=focusRow?.querySelector('[data-form-field]');
@@ -21322,7 +21352,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const currency=String(state.formValues.currency||'CNY').includes('USD')?'USD':'CNY';
       formLineElements().forEach((tr,index)=>{
         const qty=formNumber(`qty-${index}`),price=formNumber(`price-${index}`);
-        if(['sales','purchase','outsourcing'].includes(config.key)){const cell=tr.querySelector('td.mono');if(cell)cell.textContent=qty===null||price===null?'—':formatCurrency(qty*price,currency);}
+        if(['sales','purchase','outsourcing'].includes(config.key)){const amount=tr.querySelector('[data-line-amount]');if(amount)amount.textContent=qty===null||price===null?'—':formatCurrency(qty*price,currency);}
         if(config.key==='bom'){const cell=tr.querySelector('input[disabled]');const value=name=>document.querySelector(`[data-form-field="${name}"]`)?.value;if(cell)cell.value=requiredMaterialPreview(value(`usage-${index}`),value('order-qty'),value(`loss-${index}`),value(`unit-${index}`));}
       });
     }

@@ -268,7 +268,7 @@ export default function BusinessChainDesignCanvas({
   const arrow = useId().replaceAll(':', '')
   const { scopeSummary } = projected
   const expandedInScope = Boolean(scopeSummary && map.expandedChains.includes(scopeSummary.chainKey))
-  const reading = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode, expandedNodes: map.expandedNodes, showBranches: draft.presentation?.showBranches, selection, pathIds: highlightPath || [] })
+  const reading = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode, layout, expandedNodes: map.expandedNodes, showBranches: draft.presentation?.showBranches, selection, pathIds: highlightPath || [] })
   const hasBranches = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode }).nodes.length < projected.nodes.length
   const directHandoffs = businessChainHandoffs(catalog, map.chainKey)
   const showHandoffs = Boolean(map.showHandoffs && directHandoffs.length)
@@ -567,7 +567,8 @@ export default function BusinessChainDesignCanvas({
     const target = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest('[data-design-node]')
-    if (active.moved && target && surface.current.contains(target)) {
+    if (active.moved && target && surface.current.contains(target) &&
+        library.byId.has(target.dataset.designNode)) {
       setSelection({ from: active.id, to: target.dataset.designNode })
     }
     setPointer(null)

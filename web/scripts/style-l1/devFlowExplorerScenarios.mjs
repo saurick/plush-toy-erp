@@ -398,6 +398,16 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
         const box = lane.getBoundingClientRect()
         return box.left >= area.left && box.right <= area.right + 1 && box.top >= area.top && box.bottom <= area.bottom + 1
       })), { message: '适应全图包含完整泳道标题和边框' }).toBe(true)
+      const assertLaneGaps = async () => {
+        const gaps = await canvas.locator('.erp-chain-design__lane').evaluateAll((lanes) => {
+          const scale = lanes[0].getBoundingClientRect().height / lanes[0].offsetHeight
+          const boxes = lanes.map((lane) => lane.getBoundingClientRect()).sort((a, b) => a.top - b.top)
+          return boxes.slice(1).map((box, i) => (box.top - boxes[i].bottom) / scale)
+        })
+        assert.equal(gaps.length, 5)
+        assert(gaps.every((gap) => Math.abs(gap - 32) < 1), `相邻泳道净距应为 32，实际为 ${gaps.join('、')}`)
+      }
+      await assertLaneGaps()
       const mainlinePositions = await nodePositions()
       if (process.env.STYLE_L1_OUTPUT_DIR) {
         await page.screenshot({ path: `${process.env.STYLE_L1_OUTPUT_DIR}/swimlane-mainline.png` })
@@ -405,6 +415,7 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       }
       await click('展开分支')
       await expect(canvas.locator('[data-design-node$=":reject_sales_order"]')).toHaveCount(2)
+      await assertLaneGaps()
       await click('收起分支')
       await expect(canvas.locator('[data-design-node$=":reject_sales_order"]')).toHaveCount(0)
       assert.deepEqual(await nodePositions(), mainlinePositions, '展开收起分支不改变主线节点位置')

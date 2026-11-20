@@ -1605,7 +1605,7 @@ export default function DevFlowStateObservatoryPage() {
             ? '当前任务尚未关联唯一业务链，暂不能导出校对稿。'
             : `导出范围：${
                 customerReview?.documentTitle ||
-                chainProjection?.chain.label ||
+                chainProjection?.chain?.label ||
                 chain?.label ||
                 catalog?.businessChainOverview.label
               }`}

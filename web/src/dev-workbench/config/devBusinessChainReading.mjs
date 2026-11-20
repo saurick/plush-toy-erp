@@ -106,18 +106,21 @@ function primarySteps(graph, library) {
   })
 }
 
-export function projectBusinessChainReading(graph, library, { scope, mode, expandedNodes = [], showBranches = false, selection, pathIds = [] } = {}) {
+export function projectBusinessChainReading(graph, library, { scope, mode, layout, expandedNodes = [], showBranches = false, selection, pathIds = [] } = {}) {
   const stepView = mode === 'mainline' || (mode === 'overview' && graph.scopeSummary)
-  if (scope !== 'whole' || !stepView || showBranches || graph.nodes.some((node) => node.summary)) return graph
+  if (scope !== 'whole' || !stepView || graph.nodes.some((node) => node.summary)) return graph
+  const compact = (view, stableNodes) => layout === 'lanes' ? compactBusinessChainLanes(view, library, stableNodes) : view
   const chains = new Set(graph.nodes.map((node) => library.byId.get(node.id).chainKey))
-  if ([...chains].some((key) => ['exception', 'rework', 'reversal'].includes(library.chainDefinitions.get(key).kind))) return graph
+  if (showBranches || [...chains].some((key) => ['exception', 'rework', 'reversal'].includes(library.chainDefinitions.get(key).kind))) return compact(graph)
   const primary = primarySteps(graph, library)
   if (!primary) return graph
   const visible = new Set([
-    ...primary.map((node) => node.id), ...expandedNodes, ...pathIds,
+    ...primary.map((node) => node.id), ...expandedNodes,
     ...graph.nodes.filter((node) => node.manual).map((node) => node.id),
     ...graph.edges.filter((edge) => edge.kind === 'unknown').flatMap((edge) => [edge.from, edge.to]),
   ])
+  const stableNodes = graph.nodes.filter((node) => visible.has(node.id))
+  for (const id of pathIds) visible.add(id)
   if (selection?.nodeId && !selection.detailsOnly && graph.nodes.some((node) => node.id === selection.nodeId)) {
     visible.add(selection.nodeId)
     for (const edge of graph.edges) {
@@ -127,12 +130,17 @@ export function projectBusinessChainReading(graph, library, { scope, mode, expan
       }
     }
   }
-  return {
+  return compact({
     ...graph,
     nodes: graph.nodes.filter((node) => visible.has(node.id)),
     edges: graph.edges.filter((edge) => visible.has(edge.from) && visible.has(edge.to)),
-  }
+  }, stableNodes)
 }
+
+const lanePaddingTop = 30
+const lanePaddingBottom = 14
+const laneGap = 32
+const columnStride = CHAIN_DESIGN_NODE_SIZE.width + 54
 
 // The existing graph determines order. Same-domain steps can share a column;
 // lanes preserve those columns and separate responsibility without inventing edges.
@@ -209,7 +217,6 @@ export function arrangeBusinessChainReading(graph, library, layout = 'flow') {
     )) : 0)
   }
   const positions = new Map()
-  const stride = CHAIN_DESIGN_NODE_SIZE.width + 54
   const rowHeight = CHAIN_DESIGN_NODE_SIZE.height + 42
   if (layout === 'lanes') {
     const domains = [...new Set(sorted.map(([id]) => domain(id)))]
@@ -220,9 +227,11 @@ export function arrangeBusinessChainReading(graph, library, layout = 'flow') {
         const column = columns.get(id)
         const row = rows.get(column) || 0
         rows.set(column, row + 1)
-        positions.set(id, { x: 32 + column * stride, y: top + row * rowHeight })
+        positions.set(id, { x: 32 + column * columnStride, y: top + row * rowHeight })
       }
-      top += Math.max(1, ...rows.values()) * rowHeight + 34
+      const lastRow = Math.max(...rows.values()) - 1
+      const bottom = top + lastRow * rowHeight + CHAIN_DESIGN_NODE_SIZE.height + lanePaddingBottom
+      top = bottom + laneGap + lanePaddingTop
     }
   } else {
     const rows = new Map()
@@ -230,7 +239,7 @@ export function arrangeBusinessChainReading(graph, library, layout = 'flow') {
       const column = columns.get(id)
       const row = rows.get(column) || 0
       rows.set(column, row + 1)
-      positions.set(id, { x: 32 + column * stride, y: 48 + row * rowHeight })
+      positions.set(id, { x: 32 + column * columnStride, y: 48 + row * rowHeight })
     }
   }
   return positions
@@ -241,11 +250,11 @@ export function businessChainLaneBands(graph, library, direction = 'LR') {
   return domains.map((domain) => {
     const nodes = graph.nodes.filter((node) => !node.summary && library.byId.get(node.id).domain === domain)
     const left = Math.min(...nodes.map((node) => node.x)) - (direction === 'TB' ? 60 : 16)
-    const top = Math.min(...nodes.map((node) => node.y)) - 30
+    const top = Math.min(...nodes.map((node) => node.y)) - lanePaddingTop
     const origin = orientBusinessChainPoint({ x: left, y: top }, direction)
     const end = orientBusinessChainPoint({
       x: Math.max(...graph.nodes.map((node) => node.x + CHAIN_DESIGN_NODE_SIZE.width)) + 16,
-      y: Math.max(...nodes.map((node) => node.y + CHAIN_DESIGN_NODE_SIZE.height)) + 14,
+      y: Math.max(...nodes.map((node) => node.y + CHAIN_DESIGN_NODE_SIZE.height)) + lanePaddingBottom,
     }, direction)
     return {
       domain,
@@ -254,4 +263,41 @@ export function businessChainLaneBands(graph, library, direction = 'LR') {
       height: end.y - origin.y,
     }
   })
+}
+
+// Compact only the reading projection, keeping user-placed nodes and the saved layout intact.
+function compactBusinessChainLanes(graph, library, stableNodes = graph.nodes) {
+  if (!stableNodes.length || graph.nodes.some((node) => node.manual)) return graph
+  const domainOf = (node) => library.byId.get(node.id).domain
+  const bands = businessChainLaneBands({ ...graph, nodes: stableNodes }, library).sort((a, b) => a.y - b.y)
+  const lanes = new Map()
+  let bottom = bands[0].y - laneGap
+  for (const band of bands) {
+    const top = Math.min(band.y, bottom + laneGap)
+    lanes.set(band.domain, { offset: band.y - top, minY: top + lanePaddingTop, maxY: top + band.height - lanePaddingBottom - CHAIN_DESIGN_NODE_SIZE.height })
+    bottom = Math.max(bottom, top + band.height)
+  }
+
+  const positions = new Map(stableNodes.map((node) => [
+    node.id, { ...node, y: node.y - lanes.get(domainOf(node)).offset },
+  ]))
+  // Inspection can reveal neighbors while the inspector is open. Use a free column
+  // in their lane so opening details keeps the existing steps under the pointer.
+  for (const node of graph.nodes) {
+    if (positions.has(node.id)) continue
+    const domain = domainOf(node)
+    if (!lanes.has(domain)) {
+      const y = bottom + laneGap + lanePaddingTop
+      lanes.set(domain, { offset: node.y - y, minY: y, maxY: y })
+      bottom = y + CHAIN_DESIGN_NODE_SIZE.height + lanePaddingBottom
+    }
+    const lane = lanes.get(domain)
+    const y = Math.max(lane.minY, Math.min(node.y - lane.offset, lane.maxY))
+    let { x } = node
+    const row = [...positions.values()].filter((other) => Math.abs(other.y - y) < CHAIN_DESIGN_NODE_SIZE.height)
+    const occupied = (candidateX) => row.some((other) => Math.abs(other.x - candidateX) < columnStride)
+    while (occupied(x)) x += columnStride
+    positions.set(node.id, { ...node, x, y })
+  }
+  return { ...graph, nodes: graph.nodes.map((node) => positions.get(node.id)) }
 }

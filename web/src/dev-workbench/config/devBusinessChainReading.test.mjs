@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DEV_FLOW_STATE_CATALOG as catalog } from './devFlowStateCatalog.mjs'
 import { buildBusinessChainDesignLibrary, emptyBusinessChainDraft, parseBusinessChainDraft } from './devBusinessChainDesign.mjs'
-import { showBusinessChainWhole, projectBusinessChainMap, toggleBusinessChainMapRegion } from './devBusinessChainMap.mjs'
+import { arrangeBusinessChainMap, showBusinessChainWhole, projectBusinessChainMap, toggleBusinessChainMapRegion } from './devBusinessChainMap.mjs'
 import { CHAIN_DESIGN_NODE_SIZE } from './devBusinessChainDesignView.mjs'
 import {
   CHAIN_READING_LAYERS,
@@ -11,6 +11,7 @@ import {
   businessChainApprovalChoices,
   businessChainApprovalReading,
   arrangeBusinessChainReading,
+  businessChainLaneBands,
   projectBusinessChainReading,
 } from './devBusinessChainReading.mjs'
 
@@ -70,6 +71,53 @@ test('阶段排布和泳道保留全部节点与原始关系，默认位置不�
     }
   }
   assert.equal(cases, 44)
+})
+
+test('单链泳道按可见内容保持间距，保留横向阶段、泳道内相对位置和草稿坐标', () => {
+  for (const chain of catalog.businessChains) {
+    const draft = arrangeBusinessChainMap(showBusinessChainWhole(emptyBusinessChainDraft(), library, chain.key), library, 'mainline', 'lanes')
+    const projected = projectBusinessChainMap(draft, library, 'mainline')
+    for (const showBranches of [false, true]) {
+      const reading = projectBusinessChainReading(projected, library, { scope: 'whole', mode: 'mainline', showBranches })
+      const original = structuredClone(reading.nodes)
+      const compact = projectBusinessChainReading(projected, library, { scope: 'whole', mode: 'mainline', layout: 'lanes', showBranches })
+      const bands = businessChainLaneBands(compact, library).sort((a, b) => a.y - b.y)
+      for (const [i, band] of bands.entries()) {
+        if (i) assert.equal(band.y - bands[i - 1].y - bands[i - 1].height, 32, chain.key)
+      }
+      const offsets = new Map()
+      for (const [i, node] of compact.nodes.entries()) {
+        const { domain } = library.byId.get(node.id)
+        const offset = original[i].y - node.y
+        assert.equal(node.id, original[i].id)
+        assert.equal(node.x, original[i].x)
+        if (offsets.has(domain)) assert.equal(offset, offsets.get(domain), domain)
+        offsets.set(domain, offset)
+      }
+      assert.deepEqual(reading.nodes, original)
+      const manual = { ...reading, nodes: reading.nodes.map((node, i) => i ? node : { ...node, manual: true }) }
+      assert.deepEqual(projectBusinessChainReading(manual, library, { scope: 'whole', mode: 'mainline', layout: 'lanes', showBranches: true }).nodes, manual.nodes)
+    }
+  }
+})
+
+test('查看节点的上下游时已有步骤原位保留，临时出现的节点互不遮挡', () => {
+  for (const chain of catalog.businessChains) {
+    const draft = arrangeBusinessChainMap(showBusinessChainWhole(emptyBusinessChainDraft(), library, chain.key), library, 'mainline', 'lanes')
+    const projected = projectBusinessChainMap(draft, library, 'mainline')
+    const options = { scope: 'whole', mode: 'mainline', layout: 'lanes' }
+    const original = projectBusinessChainReading(projected, library, options)
+    for (const selected of original.nodes) {
+      const inspected = projectBusinessChainReading(projected, library, { ...options, selection: { nodeId: selected.id } })
+      const positions = new Map(inspected.nodes.map((node) => [node.id, node]))
+      for (const node of original.nodes) assert.deepEqual(positions.get(node.id), node)
+      for (const [i, node] of inspected.nodes.entries()) {
+        for (const other of inspected.nodes.slice(i + 1)) {
+          assert(Math.abs(node.x - other.x) >= CHAIN_DESIGN_NODE_SIZE.width || Math.abs(node.y - other.y) >= CHAIN_DESIGN_NODE_SIZE.height, `${chain.key}: ${node.id} / ${other.id}`)
+        }
+      }
+    }
+  }
 })
 
 test('主路径保留拆分动作，异常专题完整显示，点选与明确展开分别处理', () => {
