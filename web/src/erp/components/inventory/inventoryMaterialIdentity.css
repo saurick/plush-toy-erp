@@ -1,0 +1,8 @@
+.erp-inventory-material-identity__link.ant-btn {
+  justify-content: flex-start;
+  max-inline-size: 100%;
+  block-size: auto;
+  padding-inline: 0;
+  text-align: start;
+  white-space: normal;
+}

@@ -1,0 +1,150 @@
+import React from 'react'
+import { Form, Input } from 'antd'
+import Select from '@/common/components/select/AppSelect'
+
+import { FinanceAllocationStatus } from '../../../common/consts/statuses.generated.mjs'
+import { financePaymentActionPresentation } from '../../utils/businessFactActionPresentation.mjs'
+
+import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
+import BusinessForm from '../business-list/BusinessForm.jsx'
+
+export function FinanceAllocationReversalModal({
+  currentPayment,
+  loading,
+  unallocateOpen,
+  setUnallocateOpen,
+  unallocateForm,
+  reverseAllocation,
+}) {
+  return (
+    <BusinessFormModal
+      title="撤销抵扣"
+      size="confirm"
+      form={unallocateForm}
+      open={unallocateOpen}
+      confirmLoading={loading}
+      onCancel={() => !loading && setUnallocateOpen(false)}
+      onOk={reverseAllocation}
+      okText="确认撤销抵扣"
+    >
+      <p className="erp-business-inline-note">
+        只恢复应收应付和款项可用余额；实际退款另行登记并审批。
+      </p>
+      <BusinessForm form={unallocateForm} layout="vertical" preserve={false}>
+        <Form.Item
+          name="allocation_id"
+          label="已抵扣记录"
+          rules={[{ required: true }]}
+        >
+          <Select
+            placeholder="请选择已抵扣记录"
+            options={(currentPayment?.allocations || [])
+              .filter(
+                (a) =>
+                  a.status === FinanceAllocationStatus.POSTED &&
+                  !(currentPayment?.allocations || []).some(
+                    (r) => r.reversal_of_allocation_id === a.id
+                  )
+              )
+              .map((a) => ({
+                value: a.id,
+                label: `${a.finance_fact_no} · ${a.amount} ${a.currency}`,
+              }))}
+          />
+        </Form.Item>
+        <Form.Item
+          name="reason"
+          label="撤销原因"
+          rules={[{ required: true, whitespace: true }]}
+        >
+          <Input.TextArea maxLength={255} />
+        </Form.Item>
+      </BusinessForm>
+    </BusinessFormModal>
+  )
+}
+export function FinancePaymentCancelModal({
+  currentPayment,
+  loading,
+  cancelOpen,
+  setCancelOpen,
+  cancelForm,
+  cancelPayment,
+}) {
+  return (
+    <BusinessFormModal
+      title={financePaymentActionPresentation(currentPayment, 'cancel').label}
+      size="confirm"
+      description={financePaymentActionPresentation(currentPayment, 'cancel').description}
+      open={cancelOpen}
+      okText={financePaymentActionPresentation(currentPayment, 'cancel').label}
+      cancelText="返回"
+      okButtonProps={{ danger: true }}
+      confirmLoading={loading}
+      maskClosable={!loading}
+      onCancel={() => !loading && setCancelOpen(false)}
+      onOk={cancelPayment}
+    >
+      <BusinessForm
+        form={cancelForm}
+        name="finance-payment-cancel"
+        className="erp-business-action-form"
+        layout="vertical"
+        preserve={false}
+        style={{ marginTop: 16 }}
+      >
+        <Form.Item
+          name="reason"
+          label="取消原因"
+          rules={[
+            { required: true, whitespace: true, message: '请填写取消原因' },
+          ]}
+        >
+          <Input.TextArea rows={3} maxLength={255} showCount />
+        </Form.Item>
+      </BusinessForm>
+    </BusinessFormModal>
+  )
+}
+export function FinancePaymentReversalModal({
+  currentPayment,
+  loading,
+  reverseOpen,
+  setReverseOpen,
+  reverseForm,
+  reversePayment,
+}) {
+  return (
+    <BusinessFormModal
+      title={financePaymentActionPresentation(currentPayment, 'reverse').label}
+      size="confirm"
+      description={financePaymentActionPresentation(currentPayment, 'reverse').description}
+      open={reverseOpen}
+      okText={financePaymentActionPresentation(currentPayment, 'reverse').label}
+      cancelText="返回"
+      okButtonProps={{ danger: true }}
+      confirmLoading={loading}
+      maskClosable={!loading}
+      onCancel={() => !loading && setReverseOpen(false)}
+      onOk={reversePayment}
+    >
+      <BusinessForm
+        form={reverseForm}
+        name="finance-payment-reverse"
+        className="erp-business-action-form"
+        layout="vertical"
+        preserve={false}
+      >
+        <Form.Item
+          name="reason"
+          label="冲销原因"
+          rules={[
+            { required: true, whitespace: true, message: '请填写冲销原因' },
+          ]}
+        >
+          <Input.TextArea rows={3} maxLength={255} showCount />
+        </Form.Item>
+      </BusinessForm>
+    </BusinessFormModal>
+  )
+}

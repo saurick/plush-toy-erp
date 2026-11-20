@@ -1,0 +1,86 @@
+.erp-role-progress {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+.erp-role-progress-toolbar,
+.erp-role-progress-filters,
+.erp-role-progress-item-top,
+.erp-role-progress-item-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.erp-role-progress-toolbar .erp-search-input {
+  flex: 1 1 240px;
+}
+
+.erp-role-progress-filters [aria-pressed='true'] {
+  color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+
+.erp-role-progress-group {
+  padding: 8px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius-sm, 8px);
+  background: var(--erp-surface-bg);
+}
+
+.erp-role-progress-group h3 {
+  margin: 4px 0;
+  font-size: 1em;
+}
+
+.erp-role-progress-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-role-progress-item + .erp-role-progress-item {
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-role-progress-item-button {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 0;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.erp-role-progress-item-button:hover strong {
+  color: var(--erp-primary);
+}
+
+.erp-role-progress-item-context {
+  color: var(--erp-text-muted);
+}
+
+.erp-role-progress-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 100px;
+}
+
+.mobile-progress-panel .erp-role-progress {
+  padding: 8px 12px 12px;
+  overflow: visible;
+}
