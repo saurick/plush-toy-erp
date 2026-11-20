@@ -3468,6 +3468,17 @@ export async function retireLegacyManualAcceptanceTaskBatch(
   ) {
     throw new CliError("legacy task batch must differ from the keep batch", 2);
   }
+  const keepTaskCodes = new Set(
+    keepPlan.tasks.map((task) => task.createParams.task_code),
+  );
+  for (const roleKey of TASK_ROLES) {
+    for (let index = 1; index <= TASKS_PER_ROLE; index += 1) {
+      const code = manualAcceptanceLegacyTaskCode(legacyBatch, roleKey, index);
+      if (keepTaskCodes.has(code)) {
+        throw new CliError(`legacy task code overlaps the keep batch: ${code}`, 2);
+      }
+    }
+  }
   assertManualAcceptanceMutationTarget(keepPlan, {
     confirmation: targetConfirmation,
   });

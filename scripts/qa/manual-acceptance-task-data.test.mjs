@@ -2339,6 +2339,20 @@ test("long-lived workbench supersession is a no-op only when the whole legacy ba
   );
 });
 
+test("legacy retirement rejects overlapping keep task codes before runtime access", async () => {
+  const keepPlan = buildLocalTaskMutationPlan({ runId: "KEEP-BATCH", nowSec: NOW_SEC });
+  let requests = 0;
+  await assert.rejects(
+    retireLegacyManualAcceptanceTaskBatch(keepPlan, {
+      retireRunId: "OTHER-BATCH",
+      retireCopyRevision: keepPlan.copyRevision,
+      fetchImpl: async () => { requests += 1; },
+    }),
+    /legacy task code overlaps the keep batch/u,
+  );
+  assert.equal(requests, 0);
+});
+
 test("PLAIN6 legacy references retain the short visible code scheme for future retirement", () => {
   const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
     runId: "20261107-V9",

@@ -275,6 +275,7 @@ function buildSimulatedDataset(options = {}) {
         name: "试用模拟供应商 001",
         short_name: "模拟供应商001",
         supplier_type: "material",
+        default_payment_term_days: 30,
         tax_no: "SIMULATED-NO-TAX",
         note: "模拟试用数据，请勿用于正式业务。",
       },
@@ -298,6 +299,8 @@ function buildSimulatedDataset(options = {}) {
       },
       salesOrder: {
         order_no: `${SIMULATION_PREFIX}-SO001`,
+        tax_mode: "NONE",
+        freight_terms: "INCLUDED",
         customer_order_no: `${SIMULATION_PREFIX}-CUSTOMER-PO001`,
         customer_snapshot: {
           simulationPrefix: SIMULATION_PREFIX,

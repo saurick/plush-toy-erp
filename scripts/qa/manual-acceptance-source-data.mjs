@@ -5308,6 +5308,11 @@ export async function verifyManualAcceptanceSourceData(
         adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
         "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
       );
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: plan,
+    attestation: parsedTargetAttestation,
+    fetchImpl,
+  });
   const tokens = await loginRoles({
     backendURL: plan.backendURL,
     roleUsers: plan.roleUsers,

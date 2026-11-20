@@ -319,6 +319,9 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "warehouse_id",
     "decision_note",
   ]),
+  "quality.list_finished_goods_quality_inspections": Object.freeze([
+    "shipment_id", "keyword", "limit", "offset",
+  ]),
   "quality.get_quality_inspection": Object.freeze(["customer_key", "id"]),
   "quality.submit_quality_inspection": Object.freeze(["customer_key", "id"]),
   "quality.pass_quality_inspection": Object.freeze([
@@ -374,6 +377,10 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
   "workflow.get_task_process_context": Object.freeze(["task_id"]),
   "operational_fact.ship_shipment": Object.freeze(["customer_key", "id"]),
   "operational_fact.get_shipment": Object.freeze(["id"]),
+  "operational_fact.list_production_facts": Object.freeze(["keyword", "limit", "offset"]),
+  "operational_fact.list_outsourcing_facts": Object.freeze(["keyword", "limit", "offset"]),
+  "operational_fact.list_stock_reservations": Object.freeze(["keyword", "limit", "offset"]),
+  "operational_fact.list_shipments": Object.freeze(["keyword", "limit", "offset"]),
   "operational_fact.create_receivable_from_shipment": Object.freeze([
     "customer_key",
     "fact_no",
@@ -1363,11 +1370,83 @@ function inventoryBudgetKey(record) {
   ].join(":");
 }
 
-function aggregateInventoryBudgets(plan) {
+async function exactInventoryOperation(rpc, list, numberField, identity) {
+  const { [list]: rows, total } = await invoke(rpc, "operational_fact", `list_${list}`, {
+    keyword: identity.businessNo,
+    limit: 100,
+    offset: 0,
+  });
+  if (!Array.isArray(rows) || !Number.isSafeInteger(total) || total !== rows.length) {
+    throw new SourceDrivenFactError(`${identity.businessNo} inventory readback is incomplete`);
+  }
+  const matches = rows.filter((row) => row[numberField] === identity.businessNo);
+  if (matches.length > 1 || (matches.length === 1 &&
+      (!Number.isSafeInteger(matches[0].id) || matches[0].id <= 0 ||
+        matches[0].idempotency_key !== identity.idempotencyKey))) {
+    throw new SourceDrivenFactError(`${identity.businessNo} inventory operation identity conflicts`);
+  }
+  return matches[0] ?? null;
+}
+
+function assertStockGrain(row, expected, label) {
+  for (const [field, value] of Object.entries(expected)) {
+    const actual = row?.[field];
+    const matches = field === "quantity"
+      ? quantityUnits(actual, `${label}.quantity`) === quantityUnits(value, `${label}.quantity`)
+      : (actual ?? null) === (value ?? null);
+    if (!matches) throw new SourceDrivenFactError(`${label} inventory readback conflicts on ${field}`);
+  }
+}
+
+function salesInventoryGrain(source) {
+  return {
+    sales_order_item_id: source.item.id,
+    product_id: source.item.productId,
+    product_sku_id: source.item.productSkuId ?? null,
+    warehouse_id: source.inventory.warehouseId,
+    unit_id: source.item.unitId,
+    lot_id: source.inventory.lotId,
+    quantity: source.inventory.quantity,
+  };
+}
+
+function verifySalesInventory(source, reservation, shipment) {
+  const grain = salesInventoryGrain(source);
+  assertStockGrain(reservation, { sales_order_id: source.order.id, ...grain }, "reservation");
+  if (shipment) {
+    assertStockGrain(shipment, {
+      sales_order_id: source.order.id,
+      customer_id: source.order.customerId,
+    }, "shipment");
+    if (shipment.items?.length !== 1) {
+      throw new SourceDrivenFactError("shipment must contain one exact source line");
+    }
+    assertStockGrain(shipment.items[0], grain, "shipment line");
+  }
+  if (reservation.status === "ACTIVE" && (!shipment || shipment.status === "DRAFT")) return;
+  if (reservation.status === "CONSUMED" && shipment?.status === "SHIPPED") return;
+  throw new SourceDrivenFactError("reservation and shipment lifecycle readbacks conflict");
+}
+
+async function hasPostedMaterialIssue(rpc, identity, list, grain, verifySource) {
+  const issue = await exactInventoryOperation(rpc, list, "fact_no", identity);
+  if (!issue) return false;
+  assertStockGrain(issue, { fact_type: "MATERIAL_ISSUE", ...grain }, identity.businessNo);
+  await verifySource?.(issue);
+  if (!["DRAFT", "POSTED"].includes(issue.status)) {
+    throw new SourceDrivenFactError(`${identity.businessNo} has an incompatible inventory status`);
+  }
+  return issue.status === "POSTED";
+}
+
+async function aggregateInventoryBudgets(plan, rpc) {
   const budgets = [];
   if (plan.phases.production.status === "planned") {
-    for (const record of plan.phases.production.source.materialIssues) {
-      budgets.push({
+    const { source } = plan.phases.production;
+    const identity = plan.identities.production;
+    let production;
+    for (const record of source.materialIssues) {
+      const budget = {
         phase: "production",
         subjectType: "MATERIAL",
         subjectId: record.materialId,
@@ -1375,12 +1454,59 @@ function aggregateInventoryBudgets(plan) {
         lotId: record.lotId,
         unitId: record.unitId,
         quantity: record.quantity,
-      });
+      };
+      const grain = {
+        subject_type: "MATERIAL",
+        subject_id: budget.subjectId,
+        warehouse_id: budget.warehouseId,
+        lot_id: budget.lotId,
+        unit_id: budget.unitId,
+        quantity: budget.quantity,
+      };
+      const index = source.directMaterialIssues.indexOf(record);
+      const posted = index < 0
+        ? await hasPostedMaterialIssue(rpc, identity.fabricIssue, "outsourcing_facts", {
+          ...grain,
+          source_type: "OUTSOURCING_ORDER",
+          source_id: source.fabricOutsourcing.order.id,
+          source_line_id: source.fabricOutsourcing.item.id,
+        })
+        : await hasPostedMaterialIssue(rpc, identity.materialIssues[index], "production_facts", {
+          ...grain,
+          source_type: "PRODUCTION_ORDER",
+        }, async (issue) => {
+          const orderID = positiveID(issue.source_id, "production issue source_id");
+          production ??= await invoke(rpc, "production_order", "get_production_order", { production_order_id: orderID });
+          assertStockGrain(production.production_order, {
+            id: orderID, order_no: identity.order.businessNo, status: "RELEASED",
+          }, identity.order.businessNo);
+          const { item, requirements } = matchProductionRequirements(production, source);
+          const link = requirements.find((entry) =>
+            entry.budget.materialId === budget.subjectId && entry.budget.unitId === budget.unitId);
+          assertStockGrain(issue, {
+            production_order_id: orderID,
+            production_order_item_id: item.id,
+            source_line_id: link.requirement.id,
+          }, identity.materialIssues[index].businessNo);
+        });
+      if (!posted) budgets.push(budget);
     }
   }
   if (plan.phases.outsourcing.status === "planned") {
     const source = plan.phases.outsourcing.source;
-    budgets.push({
+    const posted = await hasPostedMaterialIssue(rpc, plan.identities.outsourcing.issue, "outsourcing_facts", {
+      subject_type: source.issue.item.subjectType,
+      subject_id: source.issue.item.subjectId,
+      product_sku_id: source.issue.item.productSkuId ?? null,
+      warehouse_id: source.issue.warehouseId,
+      lot_id: source.issue.lotId,
+      unit_id: source.issue.item.unitId,
+      quantity: source.issue.quantity,
+      source_type: "OUTSOURCING_ORDER",
+      source_id: source.issue.order.id,
+      source_line_id: source.issue.item.id,
+    });
+    if (!posted) budgets.push({
       phase: "outsourcing",
       subjectType: source.issue.item.subjectType,
       subjectId: source.issue.item.subjectId,
@@ -1395,7 +1521,14 @@ function aggregateInventoryBudgets(plan) {
   }
   if (plan.phases.sales.status === "planned") {
     const source = plan.phases.sales.source;
-    budgets.push({
+    const identity = plan.identities.sales;
+    const reservation = await exactInventoryOperation(rpc, "stock_reservations", "reservation_no", identity.reservation);
+    if (reservation) {
+      const shipment = reservation.status === "CONSUMED"
+        ? await exactInventoryOperation(rpc, "shipments", "shipment_no", identity.shipment)
+        : null;
+      verifySalesInventory(source, reservation, shipment);
+    } else budgets.push({
       phase: "sales",
       subjectType: "PRODUCT",
       subjectId: source.item.productId,
@@ -1496,7 +1629,7 @@ export async function preflightSourceDrivenFactPlan(plan, { rpc } = {}) {
     };
   }
   const inventory = [];
-  for (const budget of aggregateInventoryBudgets(plan)) {
+  for (const budget of await aggregateInventoryBudgets(plan, rpc)) {
     const params = {
       customer_key: CUSTOMER_KEY,
       subject_type: budget.subjectType,
@@ -1698,7 +1831,33 @@ export async function applyFinishedGoodsDeliveryProcess({
     ]),
   );
 
-  let inspection = requireResult(
+  const shippedAlready = shipment.status === "SHIPPED";
+  let inspection;
+  if (shippedAlready) {
+    const data = await invoke(rpc, "quality", "list_finished_goods_quality_inspections", {
+      shipment_id: shipmentID,
+      keyword: normalizedInspectionNo,
+      limit: 20,
+      offset: 0,
+    });
+    const matches = (data.quality_inspections || []).filter(
+      (item) => item.inspection_no === normalizedInspectionNo,
+    );
+    if (matches.length !== 1 || matches[0].status !== "PASSED") {
+      throw new SourceDrivenFactError("shipped source has no matching passed inspection");
+    }
+    inspection = matches[0];
+    assertStockGrain(inspection, {
+      source_type: "SHIPMENT",
+      source_id: shipmentID,
+      inspection_type: "FINISHED_GOODS",
+      inventory_lot_id: normalizedLotID,
+      subject_type: "PRODUCT",
+      subject_id: normalizedProductID,
+      warehouse_id: normalizedWarehouseID,
+    }, normalizedInspectionNo);
+  } else {
+    inspection = requireResult(
     await invoke(
       rpc,
       "quality",
@@ -1715,7 +1874,8 @@ export async function applyFinishedGoodsDeliveryProcess({
     "quality_inspection",
     null,
     "create_finished_goods_quality_inspection_draft",
-  );
+    );
+  }
   let inspectionStatus = String(inspection.status || "").toUpperCase();
   if (inspectionStatus === "DRAFT") {
     inspection = requireResult(
@@ -1933,10 +2093,13 @@ export async function applyFinishedGoodsDeliveryProcess({
   const releasedShipment = requireResult(
     await invoke(rpc, "operational_fact", "get_shipment", { id: shipmentID }),
     "shipment",
-    "DRAFT",
+    null,
     "get_shipment",
   );
   if (
+    !["DRAFT", "SHIPPED"].includes(releasedShipment.status) ||
+    releasedShipment.id !== shipmentID ||
+    releasedShipment.shipment_no !== shipmentNo ||
     String(releasedShipment.finance_release_status || "").toUpperCase() !==
     "APPROVED"
   ) {
@@ -1945,7 +2108,7 @@ export async function applyFinishedGoodsDeliveryProcess({
     );
   }
 
-  const shipped = requireResult(
+  const shipped = releasedShipment.status === "SHIPPED" ? releasedShipment : requireResult(
     await invoke(
       rpc,
       "operational_fact",
@@ -3096,10 +3259,20 @@ async function applySales(plan, rpc) {
       }),
     ),
     "stock_reservation",
-    "ACTIVE",
+    null,
     "create_stock_reservation_from_sales_order",
   );
-  const shipmentDraft = requireResult(
+  assertStockGrain(reservation, {
+    reservation_no: identity.reservation.businessNo,
+    idempotency_key: identity.reservation.idempotencyKey,
+  }, "reservation");
+  const existingShipment = reservation.status === "CONSUMED"
+    ? await exactInventoryOperation(rpc, "shipments", "shipment_no", identity.shipment)
+    : null;
+  if (reservation.status !== "ACTIVE" && !existingShipment) {
+    throw new SourceDrivenFactError("progressed sales reservation has no matching shipment");
+  }
+  const shipmentDraft = existingShipment ?? requireResult(
     await invoke(
       rpc,
       "operational_fact",
@@ -3128,9 +3301,14 @@ async function applySales(plan, rpc) {
       }),
     ),
     "shipment",
-    "DRAFT",
+    null,
     "create_shipment_with_items",
   );
+  assertStockGrain(shipmentDraft, {
+    shipment_no: identity.shipment.businessNo,
+    idempotency_key: identity.shipment.idempotencyKey,
+  }, "shipment");
+  verifySalesInventory(source, reservation, shipmentDraft);
   const delivery = await applyFinishedGoodsDeliveryProcess({
     rpc,
     shipment: shipmentDraft,

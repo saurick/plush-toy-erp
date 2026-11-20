@@ -3125,7 +3125,6 @@ export async function reuseOrApplyManualAcceptanceFactPhase({
   allowVerifiedPartialResume = false,
   validatePartialRecords,
 }) {
-  if (!apply) return readComplete();
   const readRecords = async () => {
     const values = [];
     for (const spec of specs) {
@@ -3135,7 +3134,7 @@ export async function reuseOrApplyManualAcceptanceFactPhase({
   };
   let records = await readRecords();
   let present = records.filter(Boolean);
-  if (present.length > 0 && present.length < specs.length) {
+  if (apply && present.length > 0 && present.length < specs.length) {
     if (!allowVerifiedPartialResume || !validatePartialRecords) {
       throw new CliError(
         `${phase} phase is partial (${present.length}/${specs.length}); stop and verify the exact batch before replay`,
@@ -3165,7 +3164,7 @@ export async function reuseOrApplyManualAcceptanceFactPhase({
     records = await readRecords();
     present = records.filter(Boolean);
   }
-  if (present.length === 0) {
+  if (apply && present.length === 0) {
     await mutate();
     records = await readRecords();
     present = records.filter(Boolean);
@@ -7123,6 +7122,8 @@ export async function applyManualAcceptanceFactPlan(
         ...context,
         apply: true,
       });
+  const shipmentCoverage = options.factStage ? undefined : await prepareShipmentCoverage(plan, sourceReport, purchase, context, true);
+  const formCoverage = options.factStage ? undefined : await prepareFormCoverage(plan, sourceReport, purchase, context, true, shipmentCoverage);
   const finalInventory = options.finalInventoryStage
     ? await options.finalInventoryStage(context.rpc, purchase, facts)
     : options.factStage
@@ -7131,7 +7132,6 @@ export async function applyManualAcceptanceFactPlan(
           ...purchase.inventoryLots,
           ...facts.inventoryLots,
         ]);
-  const shipmentCoverage = options.factStage ? undefined : await prepareShipmentCoverage(plan, sourceReport, purchase, context, true);
   return {
     ...buildFactReport({
       mode: "apply",
@@ -7149,7 +7149,7 @@ export async function applyManualAcceptanceFactPlan(
           ),
     }),
     shipmentCoverage,
-    formCoverage: options.factStage ? undefined : await prepareFormCoverage(plan, sourceReport, purchase, context, true, shipmentCoverage),
+    formCoverage,
     engineeringPreparation,
   };
 }

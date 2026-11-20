@@ -166,6 +166,8 @@ function createRPC({
   conflictMethod,
   prepostedCreateMethods = new Set(),
   interruptBeforePackaging = false,
+  interruptAfterShipping = false,
+  inventoryAfterShip = available,
 } = {}) {
   const calls = [];
   const records = new Map();
@@ -254,11 +256,29 @@ function createRPC({
               warehouse_id: params.warehouse_id,
               lot_id: params.lot_id,
               unit_id: params.subject_type === "MATERIAL" ? 105 : 105,
-              available_quantity: available,
+              available_quantity: [...records.values()].some(
+                ({ key, item }) => key === "shipment" && item.status === "SHIPPED",
+              ) ? inventoryAfterShip : available,
             },
           ],
           total: 1,
         };
+      case "list_production_facts":
+      case "list_outsourcing_facts":
+      case "list_stock_reservations":
+      case "list_shipments": {
+        const list = method.slice("list_".length);
+        const [key, numberField] = {
+          production_facts: ["production_fact", "fact_no"],
+          outsourcing_facts: ["outsourcing_fact", "fact_no"],
+          stock_reservations: ["stock_reservation", "reservation_no"],
+          shipments: ["shipment", "shipment_no"],
+        }[list];
+        const rows = [...records.values()].filter(
+          (record) => record.key === key && record.item[numberField] === params.keyword,
+        ).map((record) => record.item);
+        return { [list]: rows, total: rows.length };
+      }
       case "create_production_order":
         qualityGatesByOperation.set("HANDWORK", [
           "FINISHED_GOODS",
@@ -574,16 +594,30 @@ function createRPC({
         outsourcingQualityInspection.defect_rate_percent =
           params.defect_rate_percent;
         return { quality_inspection: outsourcingQualityInspection };
-      case "create_stock_reservation_from_sales_order":
-        return createRecord("stock_reservation", { status: "ACTIVE" });
+      case "create_stock_reservation_from_sales_order": {
+        const existing = [...records.values()].find(
+          (record) => record.key === "stock_reservation" &&
+            record.item.idempotency_key === params.idempotency_key,
+        );
+        if (existing) return { stock_reservation: existing.item };
+        const fixtureSource = sourceReport().referenceRecords.sourceDrivenFacts.sales.item;
+        return createRecord("stock_reservation", {
+          ...params,
+          product_id: fixtureSource.productId,
+          product_sku_id: fixtureSource.productSkuId,
+          unit_id: fixtureSource.unitId,
+          status: "ACTIVE",
+        });
+      }
       case "create_shipment_with_items": {
         const created = createRecord("shipment", {
-          shipment_no: params.shipment_no,
+          ...params,
           finance_release_status: "PENDING",
         });
         return created;
       }
       case "create_finished_goods_quality_inspection_draft":
+        assert.equal(records.get(params.shipment_id).item.status, "DRAFT");
         finishedGoodsQualityInspection ||= {
           id: nextID++,
           inspection_no: params.inspection_no,
@@ -592,8 +626,13 @@ function createRPC({
           source_id: params.shipment_id,
           inspection_type: "FINISHED_GOODS",
           inventory_lot_id: params.finished_goods_lot_id,
+          subject_type: "PRODUCT",
+          subject_id: params.product_id,
+          warehouse_id: params.warehouse_id,
         };
         return { quality_inspection: finishedGoodsQualityInspection };
+      case "list_finished_goods_quality_inspections":
+        return { quality_inspections: [finishedGoodsQualityInspection] };
       case "get_quality_inspection":
         assert.equal(params.id, finishedGoodsQualityInspection.id);
         return { quality_inspection: finishedGoodsQualityInspection };
@@ -735,11 +774,19 @@ function createRPC({
         assert.equal(domain, "operational_fact");
         const record = records.get(params.id);
         assert.equal(record?.key, "shipment");
+        assert.equal(record.item.status, "DRAFT");
         record.item.status = "SHIPPED";
+        for (const reservation of records.values()) {
+          if (reservation.key === "stock_reservation") reservation.item.status = "CONSUMED";
+        }
         return { shipment: record.item };
       }
       case "create_receivable_from_shipment":
         assert.equal(domain, "operational_fact");
+        if (interruptAfterShipping && !packagingInterrupted) {
+          packagingInterrupted = true;
+          throw new Error("interrupted after shipping");
+        }
         return createRecord(
           "finance_fact",
           {
@@ -1027,13 +1074,60 @@ test("inventory preflight aggregates shared stock grains before any write", asyn
 
   assert.equal(result.ok, true);
   assert.equal(result.writes, false);
-  assert.equal(calls.length, 2);
-  assert.ok(calls.every((call) => call.method === "list_inventory_balances"));
+  assert.equal(calls.filter((call) => call.method === "list_inventory_balances").length, 2);
+  assert.ok(calls.every((call) => call.method.startsWith("list_")));
   const sharedMaterial = result.inventory.find(
     (item) => item.subjectType === "MATERIAL",
   );
   assert.equal(sharedMaterial.requiredQuantity, "3");
   assert.deepEqual(sharedMaterial.phases, ["production", "outsourcing"]);
+});
+
+test("inventory preflight counts only outstanding writes and rejects a conflicting replay", async () => {
+  const plan = buildSourceDrivenFactPlan(sourceReport(), {
+    enabledPhases: ["production", "outsourcing"],
+  });
+  const source = plan.phases.production.source.fabricOutsourcing;
+  const identity = plan.identities.production.fabricIssue;
+  const persisted = {
+    id: 991, fact_no: identity.businessNo, idempotency_key: identity.idempotencyKey,
+    status: "POSTED", fact_type: "MATERIAL_ISSUE", subject_type: "MATERIAL",
+    subject_id: source.item.materialId, warehouse_id: source.warehouseId,
+    lot_id: source.lotId, unit_id: source.item.unitId, quantity: source.quantity,
+    source_type: "OUTSOURCING_ORDER", source_id: source.order.id, source_line_id: source.item.id,
+  };
+  const { rpc } = createRPC({ available: "1" });
+  const read = (request) => request.params.keyword === identity.businessNo
+    ? { outsourcing_facts: [persisted], total: 1 }
+    : rpc(request);
+  const result = await preflightSourceDrivenFactPlan(plan, { rpc: read });
+  assert.equal(result.ok, true);
+  assert.equal(result.inventory[0].requiredQuantity, "1");
+  persisted.source_line_id += 1;
+  await assert.rejects(
+    preflightSourceDrivenFactPlan(plan, { rpc: read }),
+    /conflicts on source_line_id/u,
+  );
+});
+
+test("sales resumes from the exact consumed reservation and shipped order with no stock left", async () => {
+  const plan = buildSourceDrivenFactPlan(sourceReport(), { enabledPhases: ["sales"] });
+  const { rpc, calls } = createRPC({ inventoryAfterShip: "0", interruptAfterShipping: true });
+  const apply = () => applySourceDrivenFactPlan(plan, {
+    rpc,
+    confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+  });
+  await assert.rejects(apply, /interrupted after shipping/u);
+  const previous = calls.length;
+  const report = await apply();
+  assert.equal(report.preflight.inventory.length, 0);
+  assert.equal(report.results.sales.reservation.status, "CONSUMED");
+  assert.equal(report.results.sales.shipment.status, "SHIPPED");
+  assert.equal(report.results.sales.invoice.finance.status, "POSTED");
+  for (const method of ["ship_shipment", "create_shipment_with_items", "create_finished_goods_quality_inspection_draft"]) {
+    assert.ok(!calls.slice(previous).some((call) => call.method === method), method);
+  }
 });
 
 test("apply requires a target-bound confirmation before preflight", async () => {
