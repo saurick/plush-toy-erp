@@ -1,0 +1,797 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"server/internal/data"
+
+	"github.com/DATA-DOG/go-sqlmock"
+)
+
+func TestRotationReceiptPublishesDatabaseIdentity(t *testing.T) {
+	encoded, err := json.Marshal(rotationReceipt{
+		SchemaVersion: credentialRotationReceiptContract,
+		Database:      customerTest133DB,
+		RollbackPoint: &rotationRollbackPoint{
+			BackupAlias:    "pre-credential-rotation-aaaaaaaaaaaa-123e4567-e89b-42d3-a456-426614174000",
+			BackupSHA256:   strings.Repeat("b", 64),
+			BackupSize:     42,
+			RestoreChecked: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal(rotationReceipt): %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal(rotationReceipt): %v", err)
+	}
+	if decoded["database"] != customerTest133DB {
+		t.Fatalf("rotation receipt database = %v, want %q", decoded["database"], customerTest133DB)
+	}
+	if decoded["schemaVersion"] != credentialRotationReceiptContract {
+		t.Fatalf("rotation receipt schemaVersion = %v", decoded["schemaVersion"])
+	}
+	rollbackPoint, ok := decoded["rollbackPoint"].(map[string]any)
+	if !ok || len(rollbackPoint) != 4 ||
+		rollbackPoint["backupAlias"] != "pre-credential-rotation-aaaaaaaaaaaa-123e4567-e89b-42d3-a456-426614174000" ||
+		rollbackPoint["backupSha256"] != strings.Repeat("b", 64) ||
+		rollbackPoint["backupSizeBytes"] != float64(42) ||
+		rollbackPoint["restoreChecked"] != true {
+		t.Fatalf("rotation receipt rollback point = %#v", decoded["rollbackPoint"])
+	}
+}
+
+func validOptions(target string) options {
+	opts := options{
+		target:                   target,
+		datasetVersion:           currentDatasetVersion,
+		expectedMigrationVersion: "20260710150001",
+		expectedRelease:          strings.Repeat("a", 40),
+		operationID:              "123e4567-e89b-42d3-a456-426614174000",
+		timeout:                  30 * time.Second,
+	}
+	if target == targetCustomerTest133 {
+		opts.datasetVersion = ""
+		opts.targetIdentity = customerTest133Identity
+	}
+	if isRemote133Target(target) {
+		opts.backupAlias = "pre-credential-rotation-" + opts.expectedRelease[:12] + "-" + opts.operationID
+		opts.backupSHA256 = strings.Repeat("b", 64)
+		opts.backupSizeBytes = 42
+		opts.backupRestoreChecked = true
+	}
+	opts.confirm = expectedConfirmation(target, optionIdentity(opts))
+	return opts
+}
+
+func TestValidateOptionsBindsConfirmationToTargetAndVersion(t *testing.T) {
+	for _, target := range []string{targetLocalDev, targetCustomerTrial133, targetCustomerTest133} {
+		if err := validateOptions(validOptions(target)); err != nil {
+			t.Fatalf("validateOptions(%s): %v", target, err)
+		}
+	}
+	opts := validOptions(targetCustomerTrial133)
+	opts.confirm = expectedConfirmation(targetLocalDev, opts.datasetVersion)
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("expected mismatched target confirmation to fail")
+	}
+	opts = validOptions(targetCustomerTrial133)
+	opts.operationID = "UPPERCASE"
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("unsafe 133 operation id accepted")
+	}
+	if len(rotationMarkerKey(validOptions(targetCustomerTrial133).operationID)) > 128 {
+		t.Fatal("valid operation marker key exceeds runtime marker capacity")
+	}
+	opts = validOptions(targetCustomerTest133)
+	opts.targetIdentity = targetCustomerTrial133 + ":" + currentDatasetVersion
+	opts.confirm = expectedConfirmation(opts.target, opts.targetIdentity)
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("customer-test-133 accepted a misleading target identity")
+	}
+	opts = validOptions(targetCustomerTest133)
+	opts.datasetVersion = currentDatasetVersion
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("customer-test-133 accepted a simulated dataset version")
+	}
+}
+
+func TestValidateOptionsRequiresOperationBoundRestoreCheckedBackupFor133(t *testing.T) {
+	for _, target := range []string{targetCustomerTrial133, targetCustomerTest133} {
+		valid := validOptions(target)
+		mutations := []func(*options){
+			func(opts *options) { opts.backupAlias = "pre-credential-wrong" },
+			func(opts *options) { opts.backupSHA256 = strings.Repeat("b", 63) },
+			func(opts *options) { opts.backupSizeBytes = 0 },
+			func(opts *options) { opts.backupRestoreChecked = false },
+		}
+		for index, mutate := range mutations {
+			candidate := valid
+			mutate(&candidate)
+			if err := validateOptions(candidate); err == nil {
+				t.Fatalf("%s invalid backup mutation %d accepted", target, index)
+			}
+		}
+	}
+	local := validOptions(targetLocalDev)
+	local.backupAlias = "pre-credential-local"
+	if err := validateOptions(local); err == nil {
+		t.Fatal("local target accepted a remote rollback point")
+	}
+}
+
+func TestAcceptanceAccountUsernamesSeparatesLocalDemoCustomerUATAndCustomerTest(t *testing.T) {
+	for _, target := range []string{targetLocalDev, targetCustomerTrial133, targetCustomerTest133} {
+		opts := validOptions(target)
+		adminUsernames, roleUsernames, accountKind, nonAdminPolicy, err := acceptanceAccountUsernames(opts)
+		if err != nil {
+			t.Fatalf("acceptanceAccountUsernames(%s): %v", target, err)
+		}
+		if target == targetLocalDev && len(adminUsernames) != 0 {
+			t.Fatalf("local admin usernames = %v, want none", adminUsernames)
+		}
+		if isRemote133Target(target) && (len(adminUsernames) != 1 || adminUsernames[0] != "admin") {
+			t.Fatalf("133 admin usernames = %v, want stable admin", adminUsernames)
+		}
+		wantKind := "local-demo"
+		wantPrefix := "demo_"
+		wantPolicy := nonAdminPolicyRotate
+		if target == targetCustomerTrial133 {
+			wantKind = "customer-uat"
+			wantPrefix = "uat_"
+		}
+		if target == targetCustomerTest133 {
+			wantKind = "customer-test-admin-only"
+			wantPrefix = ""
+			wantPolicy = nonAdminPolicyPreserve
+		}
+		if accountKind != wantKind {
+			t.Fatalf("%s account kind = %q, want %q", target, accountKind, wantKind)
+		}
+		if nonAdminPolicy != wantPolicy {
+			t.Fatalf("%s non-admin policy = %q, want %q", target, nonAdminPolicy, wantPolicy)
+		}
+		if target != targetCustomerTest133 && (len(roleUsernames) != 11 || !slices.Contains(roleUsernames, wantPrefix+"finance_purchase")) {
+			t.Fatalf("%s must rotate all 11 managed accounts including finance and purchase, got %v", target, roleUsernames)
+		}
+		if target == targetCustomerTest133 && len(roleUsernames) != 0 {
+			t.Fatalf("customer-test-133 role usernames = %v, want none", roleUsernames)
+		}
+		for _, username := range roleUsernames {
+			if strings.EqualFold(strings.TrimSpace(username), "admin") {
+				t.Fatalf("%s selected protected username %q", target, username)
+			}
+			if !strings.HasPrefix(username, wantPrefix) {
+				t.Fatalf("%s selected cross-target username %q", target, username)
+			}
+		}
+	}
+}
+
+func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  string
+		dsn     string
+		wantErr string
+	}{
+		{name: "local IPv4", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_acceptance_local_fixture_dev?sslmode=disable"},
+		{name: "local hostname", target: targetLocalDev, dsn: "postgres://user:secret@localhost:55432/plush_erp_acceptance_other_run_dev?sslmode=disable"},
+		{name: "local IPv6", target: targetLocalDev, dsn: "postgres://user:secret@[::1]:55432/plush_erp_acceptance_ipv6_run_dev?sslmode=disable"},
+		{name: "local rejects 133", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.133:55436/plush_erp_demo_v1?sslmode=disable", wantErr: "loopback"},
+		{name: "local rejects unregistered remote", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.88:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable", wantErr: "loopback"},
+		{name: "local rejects shared dev database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_simon_dev?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
+		{name: "local rejects generic database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
+		{name: "local rejects browser action database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_acceptance_local_fixture_browser_actions_dev?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
+		{name: "133 host loopback", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable"},
+		{name: "133 postgresql URL and escaped password", target: targetCustomerTrial133, dsn: "postgresql://user:secret%40value%3A1@localhost:55436/plush_erp_demo_v1?sslmode=disable"},
+		{name: "133 exact compose endpoint", target: targetCustomerTrial133, dsn: "postgres://user:secret@postgres:5432/plush_erp_demo_v1?sslmode=disable"},
+		{name: "133 rejects arbitrary compose host", target: targetCustomerTrial133, dsn: "postgres://user:secret@database:5432/plush_erp_demo_v1?sslmode=disable", wantErr: "exact host"},
+		{name: "133 rejects LAN credentials", target: targetCustomerTrial133, dsn: "postgres://user:secret@192.168.0.133:55436/plush_erp_demo_v1?sslmode=disable", wantErr: "loopback"},
+		{name: "133 rejects live db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/plush_erp?sslmode=disable", wantErr: "isolated database"},
+		{name: "133 wrong db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55436/other?sslmode=disable", wantErr: "isolated database"},
+		{name: "133 rejects retired stack port", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:5435/plush_erp_demo_v1?sslmode=disable", wantErr: "55436"},
+		{name: "customer test host loopback", target: targetCustomerTest133, dsn: "postgres://user:secret@127.0.0.1:55437/plush_erp_customer_test_v1?sslmode=disable"},
+		{name: "customer test compose endpoint", target: targetCustomerTest133, dsn: "postgres://user:secret@postgres:5432/plush_erp_customer_test_v1?sslmode=disable"},
+		{name: "customer test rejects demo database", target: targetCustomerTest133, dsn: "postgres://user:secret@127.0.0.1:55437/plush_erp_demo_v1?sslmode=disable", wantErr: "isolated database"},
+		{name: "customer test rejects demo port", target: targetCustomerTest133, dsn: "postgres://user:secret@127.0.0.1:55436/plush_erp_customer_test_v1?sslmode=disable", wantErr: "55437"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			datasetVersion := currentDatasetVersion
+			if test.target == targetCustomerTest133 {
+				datasetVersion = ""
+			}
+			err := validateTargetDSN(test.target, datasetVersion, test.dsn)
+			if test.wantErr == "" && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if test.wantErr != "" && (err == nil || !strings.Contains(err.Error(), test.wantErr)) {
+				t.Fatalf("error=%v, want substring %q", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateRotationPasswordsRequiresRegistered133TestCredentials(t *testing.T) {
+	if err := validateRotationPasswords(targetCustomerTrial133, "adminadmin", "12345678"); err != nil {
+		t.Fatalf("validateRotationPasswords() error = %v", err)
+	}
+	for _, test := range []struct{ admin, role, want string }{
+		{admin: "adminadmin", role: "", want: uatPasswordEnv},
+		{admin: "", role: "12345678", want: adminPasswordEnv},
+		{admin: "remote-admin-secret", role: "12345678", want: "registered"},
+		{admin: "adminadmin", role: "remote-uat-secret", want: "registered"},
+	} {
+		err := validateRotationPasswords(targetCustomerTrial133, test.admin, test.role)
+		if err == nil || !strings.Contains(err.Error(), test.want) {
+			t.Fatalf("validateRotationPasswords(%q,%q) error=%v, want %q", test.admin, test.role, err, test.want)
+		}
+	}
+	if err := validateRotationPasswords(targetLocalDev, "", "12345678"); err != nil {
+		t.Fatalf("registered isolated local target may use the public credential: %v", err)
+	}
+	if err := validateRotationPasswords(targetLocalDev, "", "remote-uat-secret"); err == nil {
+		t.Fatal("local target accepted a non-registered role password")
+	}
+	if err := validateRotationPasswords(targetCustomerTest133, "adminadmin", ""); err != nil {
+		t.Fatalf("customer-test-133 admin-only credential rejected: %v", err)
+	}
+	if err := validateRotationPasswords(targetCustomerTest133, "adminadmin", "12345678"); err == nil || !strings.Contains(err.Error(), "does not accept") {
+		t.Fatalf("customer-test-133 accepted a non-admin password: %v", err)
+	}
+	if err := validateRotationPasswords(targetCustomerTest133, "", ""); err == nil || !strings.Contains(err.Error(), adminPasswordEnv) {
+		t.Fatalf("customer-test-133 accepted a missing admin password: %v", err)
+	}
+}
+
+func TestValidateReleaseBindingRequiresExactImmutable133Version(t *testing.T) {
+	for _, target := range []string{targetCustomerTrial133, targetCustomerTest133} {
+		opts := validOptions(target)
+		if err := validateReleaseBinding(opts, opts.expectedRelease); err != nil {
+			t.Fatalf("%s matching release rejected: %v", target, err)
+		}
+		if err := validateReleaseBinding(opts, strings.Repeat("b", 40)); err == nil {
+			t.Fatalf("%s mismatched rotate binary version accepted", target)
+		}
+	}
+	opts := validOptions(targetCustomerTrial133)
+	opts.expectedRelease = "DEV"
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("non-immutable 133 release accepted")
+	}
+}
+
+func TestNormalizeRotationSMSPhoneRequires133IdentityBinding(t *testing.T) {
+	phone, err := normalizeRotationSMSPhone(targetCustomerTrial133, "+86 138-0013-8000")
+	if err != nil || phone != "13800138000" {
+		t.Fatalf("normalizeRotationSMSPhone() = (%q, %v)", phone, err)
+	}
+	if phone, err := normalizeRotationSMSPhone(targetCustomerTrial133, ""); err != nil || phone != "" {
+		t.Fatalf("133 optional SMS phone = (%q, %v)", phone, err)
+	}
+	if _, err := normalizeRotationSMSPhone(targetCustomerTrial133, "12345678"); err == nil {
+		t.Fatal("133 accepted invalid SMS phone")
+	}
+	if _, err := normalizeRotationSMSPhone(targetLocalDev, "13800138000"); err == nil {
+		t.Fatal("local target accepted remote SMS identity binding")
+	}
+	if _, err := normalizeRotationSMSPhone(targetCustomerTest133, "13800138000"); err == nil {
+		t.Fatal("customer-test-133 accepted demo SMS identity binding")
+	}
+}
+
+func TestDockerfileBuildsAndCopiesRotateBinary(t *testing.T) {
+	raw, err := os.ReadFile("../../Dockerfile")
+	if err != nil {
+		t.Fatalf("read Dockerfile: %v", err)
+	}
+	content := string(raw)
+	for _, anchor := range []string{
+		"-o ./bin/rotate-manual-acceptance-passwords ./cmd/rotate-manual-acceptance-passwords",
+		"COPY --from=go-builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords",
+	} {
+		if !strings.Contains(content, anchor) {
+			t.Fatalf("Dockerfile missing rotate binary anchor %q", anchor)
+		}
+	}
+}
+
+func TestAssertAcceptanceAccountsDoesNotReadStableAdminForLocalDev(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New(): %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	rows := sqlmock.NewRows([]string{"username"})
+	for _, username := range localDemoAcceptanceUsernames {
+		rows.AddRow(username)
+	}
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username LIKE \$1`).WithArgs("demo_%").WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM admin_users WHERE username LIKE \$1`).WithArgs("uat_%").WillReturnRows(
+		sqlmock.NewRows([]string{"count"}).AddRow(0),
+	)
+	if err := assertAcceptanceAccounts(t.Context(), db, targetLocalDev, nil, localDemoAcceptanceUsernames); err != nil {
+		t.Fatalf("assertAcceptanceAccounts(local-dev): %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestAssertAcceptanceAccountsRequiresUATAndRejectsDemoOn133(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New(): %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	rows := sqlmock.NewRows([]string{"username"})
+	for _, username := range customerUATAcceptanceUsernames {
+		rows.AddRow(username)
+	}
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username LIKE \$1`).WithArgs("uat_%").WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username = \$1`).WithArgs("admin").WillReturnRows(
+		sqlmock.NewRows([]string{"username"}).AddRow("admin"),
+	)
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM admin_users WHERE username LIKE \$1`).WithArgs("demo_%").WillReturnRows(
+		sqlmock.NewRows([]string{"count"}).AddRow(0),
+	)
+	if err := assertAcceptanceAccounts(t.Context(), db, targetCustomerTrial133, []string{"admin"}, customerUATAcceptanceUsernames); err != nil {
+		t.Fatalf("assertAcceptanceAccounts(customer-trial-133): %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestAssertAcceptanceAccountsCustomerTestReadsOnlyStableAdmin(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New(): %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectQuery(`SELECT username FROM admin_users WHERE username = \$1`).WithArgs("admin").WillReturnRows(
+		sqlmock.NewRows([]string{"username"}).AddRow("admin"),
+	)
+	if err := assertAcceptanceAccounts(t.Context(), db, targetCustomerTest133, []string{"admin"}, nil); err != nil {
+		t.Fatalf("assertAcceptanceAccounts(customer-test-133): %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestNonAdminReceiptFieldsRequiresAtomicDataReceiptForPreservePolicy(t *testing.T) {
+	preservedReceipt := &data.ManualAcceptancePasswordRotationReceipt{
+		Unselected: &data.ManualAcceptanceUnselectedAccountReceipt{
+			AccountCount:        4,
+			IdentityFingerprint: strings.Repeat("a", 64),
+			Preserved:           true,
+		},
+	}
+	count, preserved, err := nonAdminReceiptFields(nonAdminPolicyPreserve, 0, preservedReceipt)
+	if err != nil || count != 4 || preserved == nil || !*preserved {
+		t.Fatalf("preserve receipt fields = (%d, %v, %v)", count, preserved, err)
+	}
+	if _, _, err := nonAdminReceiptFields(nonAdminPolicyPreserve, 0, &data.ManualAcceptancePasswordRotationReceipt{}); err == nil {
+		t.Fatal("preserve policy accepted a missing atomic receipt")
+	}
+	if _, _, err := nonAdminReceiptFields(nonAdminPolicyRotate, 10, preservedReceipt); err == nil {
+		t.Fatal("rotate policy accepted an unexpected preservation receipt")
+	}
+	count, preserved, err = nonAdminReceiptFields(nonAdminPolicyRotate, 10, &data.ManualAcceptancePasswordRotationReceipt{})
+	if err != nil || count != 10 || preserved != nil {
+		t.Fatalf("rotate receipt fields = (%d, %v, %v)", count, preserved, err)
+	}
+}
+
+func TestValidateTargetDSNRejectsURLAndPGXOverrideAttacks(t *testing.T) {
+	tests := []struct {
+		name   string
+		target string
+		dsn    string
+	}{
+		{
+			name:   "local host query override",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?host=192.168.0.133&sslmode=disable",
+		},
+		{
+			name:   "local database query override",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?dbname=plush_erp&sslmode=disable",
+		},
+		{
+			name:   "local user query override",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?user=postgres&sslmode=disable",
+		},
+		{
+			name:   "local multi host URL",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133,192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
+		},
+		{
+			name:   "local keyword multi host fallback",
+			target: targetLocalDev,
+			dsn:    "host=192.168.0.133,192.168.0.133 port=5432,5435 dbname=plush_erp_acceptance_local_fixture_dev user=user password=top-secret sslmode=disable",
+		},
+		{
+			name:   "local duplicate sslmode",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable&sslmode=disable",
+		},
+		{
+			name:   "local extra query",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable&application_name=acceptance",
+		},
+		{
+			name:   "local missing sslmode",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev",
+		},
+		{
+			name:   "local fragment",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable#host=192.168.0.133",
+		},
+		{
+			name:   "local empty fragment",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable#",
+		},
+		{
+			name:   "local opaque URL",
+			target: targetLocalDev,
+			dsn:    "postgres:user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
+		},
+		{
+			name:   "local escaped database path",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/%70lush_erp_simon_dev?sslmode=disable",
+		},
+		{
+			name:   "local invalid URL",
+			target: targetLocalDev,
+			dsn:    "postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=%zz",
+		},
+		{
+			name:   "local surrounding whitespace",
+			target: targetLocalDev,
+			dsn:    " postgres://user:top-secret@192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable\n",
+		},
+		{
+			name:   "133 host query override",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&host=192.168.0.133",
+		},
+		{
+			name:   "133 port query override",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?port=5432&sslmode=disable",
+		},
+		{
+			name:   "133 database query override",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&dbname=plush_erp",
+		},
+		{
+			name:   "133 user query override",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&user=postgres",
+		},
+		{
+			name:   "133 multi host URL",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1,192.168.0.133:55436/plush_erp_demo_v1?sslmode=disable",
+		},
+		{
+			name:   "133 duplicate sslmode",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&sslmode=disable",
+		},
+		{
+			name:   "133 extra query",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable&target_session_attrs=read-write",
+		},
+		{
+			name:   "133 TLS mode",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=require",
+		},
+		{
+			name:   "133 fragment",
+			target: targetCustomerTrial133,
+			dsn:    "postgres://user:top-secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable#dbname=plush_erp",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateTargetDSN(test.target, currentDatasetVersion, test.dsn)
+			if err == nil {
+				t.Fatal("validateTargetDSN() unexpectedly accepted an unsafe DSN")
+			}
+			if strings.Contains(err.Error(), "top-secret") {
+				t.Fatal("validateTargetDSN() exposed a DSN password")
+			}
+		})
+	}
+}
+
+func TestValidateTargetDSNRequiresExplicitCredentials(t *testing.T) {
+	tests := []string{
+		"postgres://127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
+		"postgres://user@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
+		"postgres://user:@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
+	}
+	for _, dsn := range tests {
+		if err := validateTargetDSN(targetCustomerTrial133, currentDatasetVersion, dsn); err == nil {
+			t.Fatalf("validateTargetDSN() accepted missing credentials for %q", dsn)
+		}
+	}
+}
+
+func TestValidateTargetDSNRejectsUnknown133DatasetVersion(t *testing.T) {
+	err := validateTargetDSN(
+		targetCustomerTrial133,
+		"2026.07.15-v1",
+		"postgres://user:secret@127.0.0.1:55436/plush_erp_demo_v1?sslmode=disable",
+	)
+	if err == nil || !strings.Contains(err.Error(), currentDatasetVersion) {
+		t.Fatalf("validateTargetDSN() error = %v, want dataset version failure", err)
+	}
+}
+
+func localActiveCustomerConfigIdentity() activeCustomerConfigIdentity {
+	return activeCustomerConfigIdentity{
+		revision:       "yoyoosun-local-config.0123456789abcdef01234567",
+		productVersion: localCustomerConfigProductVersion,
+		compiledSnapshot: map[string]any{
+			"applyPurpose": localCustomerConfigApplyPurpose,
+			"pages":        []any{"global-dashboard"},
+		},
+	}
+}
+
+func customerTrial133ActiveConfigIdentity() activeCustomerConfigIdentity {
+	return activeCustomerConfigIdentity{
+		revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
+		productVersion: customerTrial133ProductVersion,
+		compiledSnapshot: map[string]any{
+			"applyPurpose":   customerTrial133ApplyPurpose,
+			"datasetVersion": currentDatasetVersion,
+			"target":         targetCustomerTrial133,
+			"pages":          []any{"global-dashboard"},
+		},
+	}
+}
+
+func TestValidateActiveCustomerConfigIdentityAcceptsOnlyTargetIdentity(t *testing.T) {
+	if err := validateActiveCustomerConfigIdentity(targetLocalDev, localActiveCustomerConfigIdentity()); err != nil {
+		t.Fatalf("local identity rejected: %v", err)
+	}
+	if err := validateActiveCustomerConfigIdentity(targetCustomerTrial133, customerTrial133ActiveConfigIdentity()); err != nil {
+		t.Fatalf("customer-trial-133 identity rejected: %v", err)
+	}
+}
+
+func TestValidateActiveCustomerConfigIdentityRejectsWrongLocalIdentity(t *testing.T) {
+	tests := []struct {
+		name     string
+		identity activeCustomerConfigIdentity
+	}{
+		{
+			name: "formal revision",
+			identity: activeCustomerConfigIdentity{
+				revision:         "yoyoosun-customer-package-v7.runtime-manifest-v1",
+				productVersion:   "local-customer-package",
+				compiledSnapshot: map[string]any{"applyPurpose": localCustomerConfigApplyPurpose},
+			},
+		},
+		{
+			name: "invalid revision length",
+			identity: activeCustomerConfigIdentity{
+				revision:         strings.Repeat("a", 65),
+				productVersion:   localCustomerConfigProductVersion,
+				compiledSnapshot: map[string]any{"applyPurpose": localCustomerConfigApplyPurpose},
+			},
+		},
+		{
+			name: "wrong product version",
+			identity: activeCustomerConfigIdentity{
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
+				productVersion:   "local-customer-package",
+				compiledSnapshot: map[string]any{"applyPurpose": localCustomerConfigApplyPurpose},
+			},
+		},
+		{
+			name: "missing marker",
+			identity: activeCustomerConfigIdentity{
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
+				productVersion:   localCustomerConfigProductVersion,
+				compiledSnapshot: map[string]any{"pages": []any{"global-dashboard"}},
+			},
+		},
+		{
+			name: "wrong marker",
+			identity: activeCustomerConfigIdentity{
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
+				productVersion:   localCustomerConfigProductVersion,
+				compiledSnapshot: map[string]any{"applyPurpose": customerTrial133ApplyPurpose},
+			},
+		},
+		{
+			name: "marker wrong type",
+			identity: activeCustomerConfigIdentity{
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
+				productVersion:   localCustomerConfigProductVersion,
+				compiledSnapshot: map[string]any{"applyPurpose": true},
+			},
+		},
+		{
+			name: "mixed remote marker",
+			identity: activeCustomerConfigIdentity{
+				revision:       "yoyoosun-local-config.0123456789abcdef01234567",
+				productVersion: localCustomerConfigProductVersion,
+				compiledSnapshot: map[string]any{
+					"applyPurpose":   localCustomerConfigApplyPurpose,
+					"datasetVersion": currentDatasetVersion,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := validateActiveCustomerConfigIdentity(targetLocalDev, test.identity); err == nil {
+				t.Fatal("validateActiveCustomerConfigIdentity() accepted invalid local identity")
+			}
+		})
+	}
+}
+
+func TestValidateActiveCustomerConfigIdentityRejectsWrong133Identity(t *testing.T) {
+	tests := []struct {
+		name     string
+		identity activeCustomerConfigIdentity
+	}{
+		{
+			name: "empty revision",
+			identity: activeCustomerConfigIdentity{
+				revision:       "",
+				productVersion: customerTrial133ProductVersion,
+				compiledSnapshot: map[string]any{
+					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": targetCustomerTrial133,
+				},
+			},
+		},
+		{
+			name: "wrong product version",
+			identity: activeCustomerConfigIdentity{
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
+				productVersion: "customer-trial-133-test-2026.07.15-v1",
+				compiledSnapshot: map[string]any{
+					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": targetCustomerTrial133,
+				},
+			},
+		},
+		{
+			name: "missing purpose",
+			identity: activeCustomerConfigIdentity{
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
+				productVersion: customerTrial133ProductVersion,
+				compiledSnapshot: map[string]any{
+					"datasetVersion": currentDatasetVersion, "target": targetCustomerTrial133,
+				},
+			},
+		},
+		{
+			name: "wrong dataset version",
+			identity: activeCustomerConfigIdentity{
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
+				productVersion: customerTrial133ProductVersion,
+				compiledSnapshot: map[string]any{
+					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": "2026.07.15-v1", "target": targetCustomerTrial133,
+				},
+			},
+		},
+		{
+			name: "wrong target",
+			identity: activeCustomerConfigIdentity{
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
+				productVersion: customerTrial133ProductVersion,
+				compiledSnapshot: map[string]any{
+					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": targetLocalDev,
+				},
+			},
+		},
+		{
+			name: "marker wrong type",
+			identity: activeCustomerConfigIdentity{
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
+				productVersion: customerTrial133ProductVersion,
+				compiledSnapshot: map[string]any{
+					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": []any{targetCustomerTrial133},
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := validateActiveCustomerConfigIdentity(targetCustomerTrial133, test.identity); err == nil {
+				t.Fatal("validateActiveCustomerConfigIdentity() accepted invalid customer-trial-133 identity")
+			}
+		})
+	}
+}
+
+func TestActiveCustomerConfigReadsCompiledSnapshotIdentity(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New(): %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(`SELECT revision, product_version, compiled_snapshot`).WillReturnRows(
+		sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot"}).AddRow(
+			"yoyoosun-customer-trial-133.0123456789abcdef01234567",
+			customerTrial133ProductVersion,
+			[]byte(`{"applyPurpose":"customer_trial_test_apply","datasetVersion":"`+currentDatasetVersion+`","target":"customer-trial-133"}`),
+		),
+	)
+	identity, err := activeCustomerConfig(t.Context(), db)
+	if err != nil {
+		t.Fatalf("activeCustomerConfig(): %v", err)
+	}
+	if err := validateActiveCustomerConfigIdentity(targetCustomerTrial133, identity); err != nil {
+		t.Fatalf("validateActiveCustomerConfigIdentity(): %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestActiveCustomerConfigRejectsUnreadableSnapshot(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New(): %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(`SELECT revision, product_version, compiled_snapshot`).WillReturnRows(
+		sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot"}).AddRow(
+			"yoyoosun-customer-trial-133.0123456789abcdef01234567",
+			customerTrial133ProductVersion,
+			[]byte(`{"applyPurpose":`),
+		),
+	)
+	if _, err := activeCustomerConfig(t.Context(), db); err == nil {
+		t.Fatal("activeCustomerConfig() accepted invalid compiled_snapshot JSON")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestValidateActiveCustomerConfigIdentityPreservesFrozenRevision(t *testing.T) {
+	for _, item := range []struct {
+		target, revision string
+		identity         activeCustomerConfigIdentity
+	}{
+		{targetLocalDev, "yoyoosun-customer-package-v7.local-0123456789abcdef.runtime-v1", localActiveCustomerConfigIdentity()},
+		{targetCustomerTrial133, "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1", customerTrial133ActiveConfigIdentity()},
+	} {
+		item.identity.revision = item.revision
+		if err := validateActiveCustomerConfigIdentity(item.target, item.identity); err != nil {
+			t.Fatalf("persisted %s identity rejected: %v", item.target, err)
+		}
+	}
+}
