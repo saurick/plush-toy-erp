@@ -1,0 +1,259 @@
+import React, { useEffect, useMemo } from 'react'
+import { CheckCircleOutlined } from '@ant-design/icons'
+import { Card, Space, Tag, Typography } from 'antd'
+import { useLocation, useSearchParams } from 'react-router-dom'
+import Empty from '@/common/components/empty/AppEmpty.jsx'
+import Table from '@/common/components/table/AppTable'
+import SearchInput from '@/common/components/SearchInput'
+import {
+  BUSINESS_HELP_TYPE_PRESENTATION,
+  BUSINESS_USABILITY_CATALOG,
+  BUSINESS_USABILITY_STATUS,
+  BUSINESS_USABILITY_STATUS_PRESENTATION,
+} from '../../erp/config/businessUsabilityCatalog.mjs'
+import DevPageHeader from '../components/DevPageHeader.jsx'
+import DevPageNav from '../components/DevPageNav.jsx'
+import DevTestingEnvironment from '../components/DevTestingEnvironment.jsx'
+import { DEV_PAGINATION } from '../config/devPagination.mjs'
+import { DEV_BUSINESS_USABILITY_ROUTE, DEV_PAGE_TITLE_BY_ROUTE } from '../config/devRoutes.mjs'
+import {
+  DEV_BUSINESS_USABILITY_PAGE_SIZE,
+  DEV_BUSINESS_USABILITY_ROLE_OPTIONS,
+  DEV_BUSINESS_USABILITY_STATUS_OPTIONS,
+  buildDevBusinessUsabilitySearch,
+  buildBusinessUsabilitySummary,
+  filterBusinessUsabilityEntries,
+  getBusinessUsabilityRoleLabels,
+  parseDevBusinessUsabilitySearch,
+} from '../config/devBusinessUsability.mjs'
+import '../styles/dev-business-usability.css'
+import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
+
+const { Paragraph, Text, Title } = Typography
+
+const STATUS_COLOR = Object.freeze({
+  [BUSINESS_USABILITY_STATUS.COVERED]: 'green',
+  [BUSINESS_USABILITY_STATUS.PARTIAL]: 'gold',
+  [BUSINESS_USABILITY_STATUS.MISSING]: 'red',
+})
+
+export default function DevBusinessUsabilityPage() {
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const parsedSearch = useMemo(
+    () => parseDevBusinessUsabilitySearch(searchParams),
+    [searchParams]
+  )
+  const { keyword, status, role } = parsedSearch
+  const summary = useMemo(() => buildBusinessUsabilitySummary(), [])
+  const filteredEntries = useMemo(
+    () =>
+      filterBusinessUsabilityEntries(BUSINESS_USABILITY_CATALOG, {
+        keyword,
+        status,
+        role,
+      }),
+    [keyword, role, status]
+  )
+
+  useEffect(() => {
+    if (parsedSearch.canonical) return
+    const nextSearch = buildDevBusinessUsabilitySearch(parsedSearch)
+    setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
+      replace: true,
+      state: location.state,
+    })
+  }, [parsedSearch, setSearchParams, location.state])
+
+  const updateQuery = (patch) => {
+    const nextSearch = buildDevBusinessUsabilitySearch({
+      keyword,
+      status,
+      role,
+      ...patch,
+    })
+    setSearchParams(new URLSearchParams(nextSearch.slice(1)), {
+      replace: true,
+      state: location.state,
+    })
+  }
+
+  const columns = useMemo(
+    () => [
+      {
+        align: 'left',
+        title: '业务页面',
+        key: 'page',
+        width: 300,
+        render: (_, entry) => (
+          <div className="erp-dev-business-usability-page-cell">
+            <Text type="secondary">{entry.sectionTitle}</Text>
+            <strong>{entry.title}</strong>
+            <p>{entry.task}</p>
+          </div>
+        ),
+      },
+      {
+        title: '说明覆盖',
+        key: 'coverage',
+        width: 220,
+        render: (_, entry) => (
+          <div className="erp-dev-business-usability-coverage">
+            <Tag color={STATUS_COLOR[entry.status]}>
+              {BUSINESS_USABILITY_STATUS_PRESENTATION[entry.status]?.label ||
+                entry.status}
+            </Tag>
+            <div>
+              {entry.helpTypeKeys.map((type) => (
+                <Tag key={type}>
+                  {BUSINESS_HELP_TYPE_PRESENTATION[type]?.shortLabel || type}
+                </Tag>
+              ))}
+            </div>
+          </div>
+        ),
+      },
+      {
+        align: 'left',
+        title: '员工自己完成的依据',
+        key: 'self-service',
+        width: 380,
+        render: (_, entry) => (
+          <dl className="erp-dev-business-usability-outcomes">
+            <div>
+              <dt>完成标准</dt>
+              <dd>{entry.completion || '尚未接入统一页内说明。'}</dd>
+            </div>
+            <div>
+              <dt>交接对象</dt>
+              <dd>{entry.handoff || '请先按当前业务页面边界办理。'}</dd>
+            </div>
+          </dl>
+        ),
+      },
+      {
+        align: 'left',
+        title: '岗位帮助推荐',
+        key: 'roles',
+        width: 210,
+        render: (_, entry) => {
+          const labels = getBusinessUsabilityRoleLabels(entry)
+          return labels.length > 0 ? (
+            <Space size={[4, 6]} wrap>
+              {labels.map((label) => (
+                <Tag key={label}>{label}</Tag>
+              ))}
+            </Space>
+          ) : (
+            <Text type="secondary">未列入岗位常用入口</Text>
+          )
+        },
+      },
+
+    ],
+    []
+  )
+
+  return (
+    <div className="erp-dev-business-usability-page erp-dev-workspace-page erp-dev-tool-page">
+      <DevPageNav />
+
+      <DevPageHeader
+        className="erp-dev-business-usability-header"
+        title={
+          <div className="erp-dev-business-usability-heading">
+            <Title level={1}>
+              {DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_USABILITY_ROUTE]}
+            </Title>
+          </div>
+        }
+      >
+        <div className="erp-dev-business-usability-filters">
+          <SearchInput
+            allowClear
+            value={keyword}
+            placeholder="搜页面或任务"
+            searchHint="可搜索：页面、任务、公式、来源、岗位"
+            aria-label="搜索页面说明"
+            onSearch={(value) => updateQuery({ keyword: value })}
+          />
+          <FilterChipGroup
+            allowClear
+            emptyValue="all"
+            label="说明覆盖状态"
+            value={status}
+            options={DEV_BUSINESS_USABILITY_STATUS_OPTIONS}
+            aria-label="按说明覆盖状态筛选"
+            onChange={(value) => updateQuery({ status: value })}
+          />
+          <FilterChipGroup
+            allowClear
+            emptyValue="all"
+            label="岗位帮助"
+            value={role}
+            options={DEV_BUSINESS_USABILITY_ROLE_OPTIONS}
+            aria-label="按岗位帮助推荐筛选"
+            onChange={(value) => updateQuery({ role: value })}
+          />
+          <Text type="secondary">当前显示 {filteredEntries.length} 个页面</Text>
+        </div>
+      </DevPageHeader>
+
+      <main className="erp-dev-business-usability-shell">
+        <DevTestingEnvironment view="usability" />
+        <details className="erp-dev-disclosure erp-dev-business-usability-boundary">
+          <summary>检查说明与边界</summary>
+          <Paragraph>推荐岗位不是权限，覆盖状态也不是客户验收。</Paragraph>
+          <Paragraph>
+            岗位标签只表示该页面被哪些岗位帮助列为常用入口；实际能否进入和操作仍以正式权限为准。
+          </Paragraph>
+        </details>
+
+        <section
+          className="erp-dev-business-usability-summary"
+          aria-label="页面说明覆盖摘要"
+        >
+          {[
+            ['业务页面', summary.total],
+            ['已完整覆盖', summary.covered],
+            ['待补齐', summary.total - summary.covered],
+          ].map(([label, value]) => (
+            <div key={label} className="erp-dev-business-usability-summary__item">
+              <Text type="secondary">{label}</Text>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </section>
+
+        <Card className="erp-dev-business-usability-table-card">
+          <div className="erp-dev-business-usability-table-head">
+            <div>
+              <CheckCircleOutlined aria-hidden="true" />
+              <Title level={2}>页面说明覆盖</Title>
+            </div>
+          </div>
+          <Table
+            key={buildDevBusinessUsabilitySearch(parsedSearch)}
+            rowKey="key"
+            size="small"
+            columns={columns}
+            dataSource={filteredEntries}
+            pagination={{
+              ...DEV_PAGINATION,
+              pageSize: DEV_BUSINESS_USABILITY_PAGE_SIZE,
+              hideOnSinglePage: true,
+            }}
+            scroll={{ x: 1280 }}
+            locale={{
+              emptyText: (
+                <Empty
+                  description="没有符合当前条件的页面"
+                />
+              ),
+            }}
+          />
+        </Card>
+      </main>
+    </div>
+  )
+}
