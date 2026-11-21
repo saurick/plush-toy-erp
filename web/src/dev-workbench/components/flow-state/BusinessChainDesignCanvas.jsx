@@ -268,6 +268,7 @@ export default function BusinessChainDesignCanvas({
   const arrow = useId().replaceAll(':', '')
   const { scopeSummary } = projected
   const expandedInScope = Boolean(scopeSummary && map.expandedChains.includes(scopeSummary.chainKey))
+  const expandedOverview = globalOverview && map.expandedChains.length > 0
   const reading = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode, layout, expandedNodes: map.expandedNodes, showBranches: draft.presentation?.showBranches, selection, pathIds: highlightPath || [] })
   const hasBranches = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode }).nodes.length < projected.nodes.length
   const directHandoffs = businessChainHandoffs(catalog, map.chainKey)
@@ -371,17 +372,19 @@ export default function BusinessChainDesignCanvas({
               )
           ) || null
         : null
+    const overviewOnly = mode === 'fit-overview'
     const fittedNodes = chainKey
       ? nodes.filter(
           (node) =>
             !node.summary && library.byId.get(node.id).chainKey === chainKey
         )
-      : nodes
+      : overviewOnly ? nodes.filter((node) => node.summary) : nodes
     const ids = new Set(fittedNodes.map((node) => node.id))
     const fittedBands = chainKey && layout === 'lanes'
       ? businessChainLaneBands({ ...graph, nodes: graph.nodes.filter((node) => ids.has(node.id)) }, library, direction)
       : bands
-    const bounds = [...fittedNodes.map((node) => ({ ...node, ...size })), ...fittedBands]
+    const bounds = fittedNodes.map((node) => ({ ...node, ...size }))
+    if (!overviewOnly) bounds.push(...fittedBands)
     for (const edge of surface.current.querySelectorAll('[data-design-edge]')) {
       if (ids.has(edge.dataset.edgeFrom) && ids.has(edge.dataset.edgeTo)) {
         bounds.push(edge.getBBox())
@@ -451,7 +454,7 @@ export default function BusinessChainDesignCanvas({
       restoreRevision: viewRequest.revision,
     }
     // A saved automatic camera may have included a distant overview card.
-    const refitScope = expandedInScope && viewRequest.view?.mode !== 'manual'
+    const refitScope = (expandedInScope || expandedOverview) && viewRequest.view?.mode !== 'manual'
     if (previous?.restoreRevision !== viewRequest.revision && viewRequest.view && !refitScope) {
       pendingFit.current = false
       return
@@ -465,11 +468,9 @@ export default function BusinessChainDesignCanvas({
     if (!pendingFit.current && !changedScope && (view.mode === 'manual' || selection)) return
     // An entry from the example first unhides the canvas; fit after its size is available.
     if (!viewport.current.clientWidth || !viewport.current.clientHeight) return
-    fitRef.current(
-      view.mode === 'fit-width' ? 'fit-width' : 'fit-all',
-      false,
-      changedFrame ? frameRequest.chainKey : view.chainKey
-    )
+    const fitOverview = expandedOverview && (changedScope || view.mode === 'fit-overview')
+    const mode = view.mode === 'fit-width' ? 'fit-width' : fitOverview ? 'fit-overview' : 'fit-all'
+    fitRef.current(mode, false, changedFrame ? frameRequest.chainKey : view.chainKey)
     pendingFit.current = false
   }, [
     nodes.length,
@@ -483,6 +484,7 @@ export default function BusinessChainDesignCanvas({
     selection,
     viewRequest,
     expandedInScope,
+    expandedOverview,
     setView,
   ])
   const pan = (event) => {
@@ -642,14 +644,20 @@ export default function BusinessChainDesignCanvas({
   const hasEmphasis = Boolean(highlightPath || overviewInGraph || focusId)
   const pending = connecting && library.byId.get(connecting)
   const toggleChain = (key) => {
+    const opening = !map.expandedChains.includes(key)
     change((previous) => toggleBusinessChainMapRegion(previous, library, key))
+    if (globalOverview) {
+      setView((previous) => ({ ...previous, mode: 'manual', chainKey: opening ? key : previous.chainKey }))
+      setNotice(opening ? '已展开步骤，可用「适配宽度」查看。' : '已收起这条链路的步骤。')
+      return
+    }
     setSelection(null)
-    requestFrame(map.expandedChains.includes(key) ? null : key)
+    requestFrame(opening ? key : null)
     setNotice('已调整这条链路的展开状态，其他区域位置保留。')
   }
   const cardActions = selectedSummary ? (
     <>
-      {effectiveMode === 'overview' && (globalOverview || selectedSummary.value === map.chainKey) ? (
+      {effectiveMode === 'overview' && !globalOverview && selectedSummary.value === map.chainKey ? (
         <Button type="primary" onClick={() => toggleChain(selectedSummary.value)}>
           {map.expandedChains.includes(selectedSummary.value)
             ? '折叠这条链路为卡片'
@@ -1188,6 +1196,8 @@ export default function BusinessChainDesignCanvas({
                 {nodes.map((node) => {
               const item = itemFor(node.id)
               const type = node.summary ? 'group' : item.type
+              const overviewCard = globalOverview && node.summary
+              const expanded = node.summary && map.expandedChains.includes(node.chainKey)
               const matchesRole = Boolean(role && !node.summary && item.roles.includes(role))
               const roleLabels = (item.roles || []).map((key) => library.roles.find((entry) => entry.value === key)?.label).filter(Boolean)
               const status =
@@ -1207,6 +1217,7 @@ export default function BusinessChainDesignCanvas({
                   data-design-node={node.id}
                   data-domain={item.domain}
                   data-type={type}
+                  data-chain-expandable={overviewCard || undefined}
                   data-candidate={status}
                   data-role-highlighted={matchesRole || undefined}
                   data-dimmed={
@@ -1231,7 +1242,7 @@ export default function BusinessChainDesignCanvas({
                       <DiagramNodeIcon type={type} />
                       <span>
                         {node.summary
-                          ? `范围内 ${node.count} 步 · ${map.expandedChains.includes(node.chainKey) ? '已展开' : '可展开'}`
+                          ? overviewCard ? `${node.count} 步` : `范围内 ${node.count} 步 · ${expanded ? '已展开' : '可展开'}`
                           : [CHAIN_DESIGN_TYPES[type], roleLabels.length > 1 ? `${roleLabels.length} 个岗位` : roleLabels[0]].filter(Boolean).join(' · ')}
                       </span>
                     </small>
@@ -1248,6 +1259,17 @@ export default function BusinessChainDesignCanvas({
                       </small>
                     ) : null}
                   </button>
+                  {overviewCard ? (
+                    <Button
+                      size="small"
+                      className="erp-chain-design__chain-toggle"
+                      aria-label={`${expanded ? '收起' : '展开'}步骤：${item.label}`}
+                      aria-expanded={expanded}
+                      onClick={() => toggleChain(node.chainKey)}
+                    >
+                      {expanded ? '收起' : '展开'}
+                    </Button>
+                  ) : null}
                   {!node.summary ? (
                     <button
                       type="button"

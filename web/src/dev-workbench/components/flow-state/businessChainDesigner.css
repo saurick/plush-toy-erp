@@ -186,10 +186,13 @@
 .erp-chain-design__node-body > strong { font-size: 14px; line-height: 1.4; }
 .erp-chain-design__node-body > small { font-size: 12px; line-height: 1.3; }
 .erp-chain-design__node-type { display: flex; align-items: center; gap: 6px; }
+.erp-chain-design__node[data-chain-expandable] .erp-chain-design__node-type { min-height: 28px; padding-inline-end: 56px; }
+.erp-chain-design__node > .erp-chain-design__chain-toggle { position: absolute; inset-block-start: 9px; inset-inline-end: 9px; }
 .erp-chain-design__port { position: absolute; inset: var(--chain-port-inset, 32px -12px auto auto); width: 24px; height: 24px; border: 2px solid var(--chain-domain); border-radius: 50%; background: var(--erp-surface-bg); cursor: crosshair; touch-action: none; }
 .erp-chain-design__viewport[data-direction="TB"] { --chain-port-inset: auto auto -12px calc(50% - 12px); }
 .erp-chain-design__node-body:focus-visible,
 .erp-chain-design__port:focus-visible { outline: 3px solid var(--erp-primary); outline-offset: 3px; }
+.erp-chain-design__node[data-chain-expandable] .erp-chain-design__node-body { justify-content: flex-start; }
 .erp-chain-design__node[data-type="business_action"] .erp-chain-design__node-body,
 .erp-chain-design__node[data-type="system"] .erp-chain-design__node-body { border-radius: 12.5% / 25%; }
 .erp-chain-design__node[data-type="record"] .erp-chain-design__node-body { border: 4px double var(--chain-domain); }

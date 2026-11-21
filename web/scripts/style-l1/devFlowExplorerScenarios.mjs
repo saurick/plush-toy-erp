@@ -625,7 +625,7 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
         assert.deepEqual(await readWorking(), beforeBlank.working, '新建不改写原标签页草稿')
         await blankEditor.getByRole('button', { name: '加载业务全流程地图', exact: true }).click()
         await expect(blankEditor.locator('[data-design-node^="map:"]')).toHaveCount(11)
-        await blankPage.reload()
+        await assertOverviewCardExpansion(blankPage, blankEditor, assert, assertNoHorizontalOverflow)
         await expect(blankEditor.locator('[data-design-node^="map:"]')).toHaveCount(11)
         assert.deepEqual(await readWorking(), beforeBlank.working, '两页各自恢复自己的探索')
         assert.deepEqual(writes.get(blankPage), [], '新页探索和保存不调用业务写接口')
@@ -658,6 +658,82 @@ function createFlowExplorerReadingScenario({ assert, assertNoHorizontalOverflow,
       assert.deepEqual(writes.get(page), [], '流程阅读和模拟示例不调用业务写接口')
     },
   }
+}
+
+async function assertOverviewCardExpansion(page, editor, assert, assertNoHorizontalOverflow) {
+  await page.setViewportSize({ width: 1280, height: 720 })
+  const canvas = editor.getByRole('region', { name: '流程探索画布', exact: true })
+  const surface = canvas.locator('.erp-chain-design__surface')
+  const camera = () => surface.evaluate((element) => element.style.transform)
+  const zoom = () => surface.evaluate((element) => new DOMMatrix(getComputedStyle(element).transform).a)
+  const button = (name) => editor.getByRole('button', { name, exact: true })
+  const purchase = '采购下单到入库应付'
+  const rejection = '采购拒收处置'
+  const purchaseStep = button('查看节点：登记采购到货实点')
+  const rejectionStep = button('查看节点：创建采购拒收处置')
+  const viewDetails = editor.getByRole('dialog', { name: '链路衔接', exact: true })
+  const expand = (name) => button(`展开步骤：${name}`)
+  const collapse = (name) => button(`收起步骤：${name}`)
+  const fitAll = button('适应画布全图')
+
+  await viewTrigger(editor).click()
+  const layers = page.getByRole('dialog', { name: '画布视图', exact: true })
+  await layers.getByRole('checkbox', { name: '异常与回接', exact: true }).check()
+  await layers.getByRole('button', { name: '关闭视图面板', exact: true }).click()
+  await expect(layers).toBeHidden()
+  await expect(canvas.getByRole('button', { name: /^展开步骤：/u, expanded: false })).toHaveCount(11)
+  await expect(purchaseStep).toHaveCount(0)
+  await expect(rejectionStep).toHaveCount(0)
+  assert(await canvas.getByRole('button', { name: /^展开步骤：/u }).evaluateAll((buttons) => buttons.every((action) => {
+    const card = action.parentElement
+    const count = card.querySelector('.erp-chain-design__node-type > span:last-child').getBoundingClientRect()
+    const title = card.querySelector('strong').getBoundingClientRect()
+    const bounds = card.getBoundingClientRect()
+    const control = action.getBoundingClientRect()
+    return count.right <= control.left && control.bottom <= title.top && title.bottom <= bounds.bottom
+  })), '展开入口给步数和最长链名预留空间')
+
+  const handoff = button(`查看连线：${purchase} → ${rejection}`)
+  const mapCamera = await camera()
+  const mapZoom = await zoom()
+  await expand(purchase).click()
+  await expect(collapse(purchase)).toHaveAttribute('aria-expanded', 'true')
+  await expect(purchaseStep).toHaveCount(1)
+  await expect.poll(camera).toBe(mapCamera)
+  await expand(rejection).press('Space')
+  await expect(collapse(rejection)).toBeFocused()
+  await expect(collapse(rejection)).toHaveAttribute('aria-expanded', 'true')
+  await expect(purchaseStep).toHaveCount(1)
+  await expect(rejectionStep).toHaveCount(1)
+  await expect(fitAll).toHaveAttribute('aria-pressed', 'false')
+  await expect.poll(camera).toBe(mapCamera)
+  if (process.env.STYLE_L1_OUTPUT_DIR) {
+    await page.screenshot({ path: `${process.env.STYLE_L1_OUTPUT_DIR}/overview-card-expansion.png`, animations: 'disabled' })
+  }
+
+  await handoff.press('Enter')
+  await expect(viewDetails).toBeVisible()
+  await expect.poll(camera).toBe(mapCamera)
+  await button('关闭画布说明').click()
+  await collapse(rejection).click()
+  await expect(expand(rejection)).toHaveAttribute('aria-expanded', 'false')
+  await expect(collapse(purchase)).toHaveAttribute('aria-expanded', 'true')
+  await expect(rejectionStep).toHaveCount(0)
+  await expect(purchaseStep).toHaveCount(1)
+  await expect.poll(camera).toBe(mapCamera)
+
+  await expand(rejection).click()
+  await page.reload()
+  await expect(collapse(purchase)).toHaveAttribute('aria-expanded', 'true')
+  await expect(collapse(rejection)).toHaveAttribute('aria-expanded', 'true')
+  await expect(collapse(rejection)).toBeInViewport()
+  await expect.poll(zoom).toBeGreaterThan(mapZoom * 0.9)
+  await button('适配画布宽度').click()
+  await expect(rejectionStep).toBeInViewport()
+  await fitAll.click()
+  await expect(fitAll).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(zoom).toBeLessThan(mapZoom)
+  await assertNoHorizontalOverflow(page)
 }
 
 async function assertCurrentPageNewView(page, editor, assert, startNoWriteAudit, writes) {

@@ -120,22 +120,14 @@ export function createDevBusinessChainMapScenarios({
           11
         )
         const overview = await working()
-        await action('适应画布全图').click()
-        await action('查看节点：委外发料到回货应付').click()
-        await card
-          .getByRole('button', { name: '折叠这条链路为卡片', exact: true })
-          .click()
+        await action('收起步骤：委外发料到回货应付').click()
         await expect(editor.locator('[data-design-node]')).toHaveCount(11)
         assert.deepEqual(
           (await working()).map.summaries,
           overview.map.summaries,
           '收起区域不移动其他概览节点'
         )
-        await action('适应画布全图').click()
-        await action('查看节点：委外发料到回货应付').click()
-        await card
-          .getByRole('button', { name: '展开这条链路的步骤', exact: true })
-          .click()
+        await action('展开步骤：委外发料到回货应付').click()
         await chooseChainScope(page, '委外发料到回货应付')
         await detail('业务步骤')
         await node.click()
