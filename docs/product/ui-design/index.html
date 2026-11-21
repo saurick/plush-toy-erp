@@ -795,11 +795,12 @@
     .progress-list { min-width:0; min-height:0; overflow:auto; padding:0; }
     .progress-compact-table { width:100%; table-layout:fixed; border-collapse:collapse; }
     .progress-compact-table th { color:var(--text-3); font-size:12px; font-weight:500; text-align:left; padding:10px 12px; background:var(--surface-muted); }
-    .progress-compact-table th:first-child { width:32%; }
-    .progress-compact-table th:nth-child(2) { width:15%; }
-    .progress-compact-table th:nth-child(3) { width:22%; }
-    .progress-compact-table th:nth-child(4) { width:31%; }
-    .progress-compact-table tbody tr { height:var(--work-table-row); cursor:pointer; }
+    .progress-compact-table th:first-child { width:23%; }
+    .progress-compact-table th:nth-child(3) { width:12%; }
+    .progress-compact-table th.progress-document-status { width:6.5rem; }
+    .progress-compact-table th.progress-attention-header { width:20%; }
+    .progress-compact-table th.progress-operation-cell { width:7rem; }
+    .progress-compact-table tbody tr { height:var(--work-table-row); }
     .progress-compact-table tbody tr:hover { background:var(--brand-softer); }
     .progress-compact-table td { padding:var(--table-cell-padding) 12px; border-top:1px solid var(--line); overflow-wrap:anywhere; }
     .progress-compact-table td > strong, .progress-compact-table td > small { display:block; }
@@ -807,11 +808,8 @@
     .progress-compact-table .is-selected { background:var(--brand-softer); }
     .progress-record-identity { display:grid; gap:3px; }
     .progress-record-identity > span { font-size:12px; color:var(--text-3); }
-    .progress-record-open { width:100%; border:0; padding:0; background:transparent; text-align:left; color:var(--text); font:inherit; font-weight:600; }
-    .progress-record-open:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
-    .progress-attention-content { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-    .progress-attention-content > div { flex:1; min-width:0; }
-    .progress-attention-content > button { flex:none; }
+    :is(.delivery-table, .progress-compact-table) .progress-operation-cell { text-align:center; }
+    .progress-open-button.btn { height:28px; padding:0 12px; color:var(--brand-strong); font-size:12px; }
     .progress-attention-content strong, .progress-attention-content small { display:block; }
     .progress-bar { height: 7px; margin-top: 11px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
     .progress-bar i { height: 100%; display: block; border-radius: inherit; background: var(--brand); }
@@ -4505,9 +4503,9 @@
 
     const mobileProgressRows = [
       { id: 'MP01', view: 'orders', no: 'SO-20260924-006', customer: '星河文创有限公司', product: 'IP 联名公仔 · 18cm', imageSeed: 0, due: '2026/10/03', status: '生产中', badge: 'warning', percent: 58, stage: '车缝进行中', quantity: '696 / 1,200 个', task: '暂无待处理任务', taskIds: [], risk: 'due', stages: [['工程',100],['采购',84],['生产',58],['质检',20],['出货',0]] },
-      { id: 'MP02', view: 'orders', no: 'SO-20260922-003', customer: '云杉品牌管理有限公司', product: '品牌吉祥物 30cm', imageSeed: 2, due: '2026/09/30', status: '已逾期', badge: 'danger', percent: 36, stage: '客供图阻塞', quantity: '720 / 2,000 个', task: '销售 · 跟进客供包装到仓', taskIds: ['M04'], risk: 'overdue', stages: [['工程',70],['采购',52],['生产',36],['质检',0],['出货',0]] },
+      { id: 'MP02', view: 'orders', no: 'SO-20260922-003', customer: '云杉品牌管理有限公司', product: '品牌吉祥物 30cm', imageSeed: 2, due: '2026/09/30', status: '已逾期', badge: 'danger', percent: 36, stage: '客供图阻塞', quantity: '720 / 2,000 个', task: '销售 · 跟进客供包装到仓', taskIds: ['M04'], desktopTaskIds: ['T03'], risk: 'overdue', stages: [['工程',70],['采购',52],['生产',36],['质检',0],['出货',0]] },
       { id: 'MP03', view: 'production', no: 'MO-20260922-026', customer: '北辰乐园运营有限公司', product: '乐园限定挂件', due: '2026/10/18', status: '生产执行', badge: 'info', percent: 72, stage: '手工组装', quantity: '2,304 / 3,200 个', task: '生产 · 2 项待处理', taskIds: ['M12','M13'], risk: 'normal', stages: [['布料加工',100],['车缝',100],['手工',72],['包装',18]] },
-      { id: 'MP04', view: 'orders', no: 'SO-20260918-015', customer: '拾光零售有限公司', product: '冬日动物系列', imageSeed: 1, due: '2026/09/28', status: '待出货', badge: 'warning', percent: 94, stage: '等待出货放行', quantity: '1,128 / 1,200 个', task: '仓库 · 完成出货放行复核', taskIds: ['M01'], risk: 'due', stages: [['工程',100],['采购',100],['生产',100],['质检',100],['出货',94]] }
+      { id: 'MP04', view: 'orders', no: 'SO-20260918-015', customer: '拾光零售有限公司', product: '冬日动物系列', imageSeed: 1, due: '2026/09/28', status: '待出货', badge: 'warning', percent: 94, stage: '等待出货放行', quantity: '1,128 / 1,200 个', task: '仓库 · 完成出货放行复核', taskIds: ['M01'], desktopTaskIds: ['T06'], risk: 'due', stages: [['工程',100],['采购',100],['生产',100],['质检',100],['出货',94]] }
     ];
 
     const productionRouteStages = [['10','布料加工'],['20','缝制'],['30','手工制作'],['40','包装']];
@@ -7254,7 +7252,7 @@ active = new Set()
     function renderProgressDeliveryView(operation, all) {
       const empty=visibleDataState(operation,'订单交付');if(empty)return empty;
       const rank={overdue:0,closed:1,due:2,undated:3,unknown:4,progress:5,delivered:6,cancelled:7};const rows=all.filter(row=>state.deliveryFilter==='all'||row.status===state.deliveryFilter).sort((a,b)=>rank[a.status]-rank[b.status]||(a.date||'9999').localeCompare(b.date||'9999'));const p=visualPage(workCenterDemoRows(rows,'delivery-progress'),'delivery-progress');
-      return `${operation}<section class="surface data-surface priority-visual-surface"><div class="table-wrap"><table class="delivery-table" aria-label="交付明细"><colgroup><col style="width:220px"><col style="width:260px"><col style="width:140px"><col style="width:240px"><col style="width:140px"><col style="width:160px"></colgroup><thead><tr>${workCenterSortHeader('delivery-progress','order','订单 / 客户')}${workCenterSortHeader('delivery-progress','product','产品')}${workCenterSortHeader('delivery-progress','date','交付日期')}<th>出货进度</th><th>剩余待交</th><th>交付状态</th></tr></thead><tbody>${p.rows.map((item,index)=>`<tr data-delivery-id="${item.id}"><td><span class="delivery-order"><button type="button" class="entity-link" data-action="delivery-open" data-id="${item.id}" aria-label="查看 ${item.order} 的产品交付进度">${item.order}</button><span>${escapeHTML(item.customer)}</span></span></td><td><span class="product-cell">${renderProductThumb(index,item.product)}<span>${escapeHTML(item.product)}</span></span></td><td>${displayDate(item.date)}</td><td><span class="delivery-progress-copy">${item.percent===null?'<span class="unknown-progress">待核对出货数量</span>':`<span class="delivery-progress-track"><i class="${item.status==='overdue'?'danger':item.status==='delivered'?'success':''}" style="width:${item.percent}%"></i></span><small>${item.shipped.toLocaleString('zh-CN')} / ${item.ordered.toLocaleString('zh-CN')} ${item.unit}</small>`}</span></td><td class="cell-metric">${item.remaining===null?'待核对':`${item.remaining.toLocaleString('zh-CN')} ${item.unit}`}</td><td><span class="badge ${item.badge}">${item.statusText}</span></td></tr>`).join('')||'<tr><td colspan="6" class="empty">没有匹配的交付记录</td></tr>'}</tbody></table></div>${renderVisualPager(p,'delivery-progress')}</section>`;
+      return `${operation}<section class="surface data-surface priority-visual-surface"><div class="table-wrap"><table class="delivery-table" aria-label="交付明细"><colgroup><col style="width:176px"><col style="width:240px"><col style="width:128px"><col style="width:224px"><col style="width:128px"><col style="width:152px"><col style="width:112px"></colgroup><thead><tr>${workCenterSortHeader('delivery-progress','order','订单 / 客户')}${workCenterSortHeader('delivery-progress','product','产品')}${workCenterSortHeader('delivery-progress','date','交付日期')}<th>出货进度</th><th>剩余待交</th><th>交付状态</th><th class="progress-operation-cell" scope="col">操作</th></tr></thead><tbody>${p.rows.map((item,index)=>`<tr data-delivery-id="${item.id}"><td><span class="delivery-order"><span>${escapeHTML(item.order)}</span><span>${escapeHTML(item.customer)}</span></span></td><td><span class="product-cell">${renderProductThumb(index,item.product)}<span>${escapeHTML(item.product)}</span></span></td><td>${displayDate(item.date)}</td><td><span class="delivery-progress-copy">${item.percent===null?'<span class="unknown-progress">待核对出货数量</span>':`<span class="delivery-progress-track"><i class="${item.status==='overdue'?'danger':item.status==='delivered'?'success':''}" style="width:${item.percent}%"></i></span><small>${item.shipped.toLocaleString('zh-CN')} / ${item.ordered.toLocaleString('zh-CN')} ${item.unit}</small>`}</span></td><td class="cell-metric">${item.remaining===null?'待核对':`${item.remaining.toLocaleString('zh-CN')} ${item.unit}`}</td><td><span class="badge ${item.badge}">${item.statusText}</span></td><td class="progress-operation-cell">${renderProgressOpenButton('delivery-open',item.id,item.order+' · '+item.product)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">没有匹配的交付记录</td></tr>'}</tbody></table></div>${renderVisualPager(p,'delivery-progress')}</section>`;
     }
     function isFinanceDueView(config) {
       return ['receivables','payables'].includes(config?.key) && state.financeDueView === 'due';
@@ -8016,10 +8014,10 @@ return {orders,financeCustomers};})();
       if(lines)return renderProgressDeliveryView(operation, deliveryRows);
       if(state.progressView==='orders'&&state.progressOrder&&state.previewState==='data'){
         const matching=deliveryProgressRows();
-        return `${operation}<section class="surface progress-list"><table class="progress-compact-table" aria-label="本单整单总览"><thead><tr>${workCenterSortHeader('orders','no','订单 / 产品')}${workCenterSortHeader('orders','due','交期')}<th>已出货 / 订购</th></tr></thead><tbody>${matching.length?`<tr><td><button class="entity-link" data-action="delivery-open" data-id="${matching[0].id}">${escapeHTML(state.progressOrder)}</button><small>${escapeHTML(matching[0].customer)}</small></td><td>${displayDate(matching.map(item=>item.date).filter(Boolean).sort()[0])}</td><td>${matching.map(item=>`<span>${escapeHTML(item.product)} · ${item.shipped??'待核对'} / ${item.ordered} ${escapeHTML(item.unit)}</span>`).join('<br>')}</td></tr>`:'<tr><td colspan="3">没有符合条件的记录</td></tr>'}</tbody></table></section>`;
+        return `${operation}<section class="surface progress-list"><table class="progress-compact-table" aria-label="本单整单总览"><thead><tr>${workCenterSortHeader('orders','no','订单 / 产品')}<th class="progress-document-status" scope="col">订单状态</th>${workCenterSortHeader('orders','due','交期')}<th>已出货 / 订购</th><th class="progress-operation-cell" scope="col">操作</th></tr></thead><tbody>${matching.length?`<tr data-delivery-id="${matching[0].id}"><td><span>${escapeHTML(state.progressOrder)}</span><small>${escapeHTML(matching[0].customer)}</small></td><td>${renderProgressDesignDocumentStatus('orders',state.progressOrder)}</td><td>${displayDate(matching.map(item=>item.date).filter(Boolean).sort()[0])}</td><td>${matching.map(item=>`<span>${escapeHTML(item.product)} · ${item.shipped??'待核对'} / ${item.ordered} ${escapeHTML(item.unit)}</span>`).join('<br>')}</td><td class="progress-operation-cell">${renderProgressOpenButton('delivery-open',matching[0].id,state.progressOrder)}</td></tr>`:'<tr><td colspan="5">没有符合条件的记录</td></tr>'}</tbody></table></section>`;
       }
       if(state.previewState!=='data')return `${operation}${renderDataState({title:'进度看板'})}`;
-      return `${operation}<section class="surface progress-list"><table class="progress-compact-table" aria-label="进度紧凑总览"><thead><tr>${workCenterSortHeader(state.progressView,'no',state.progressView==='orders'?'订单 / 产品':'生产单 / 产品')}${workCenterSortHeader(state.progressView,'due',state.progressView==='orders'?'交期':'计划结束')}<th>${state.progressView==='orders'?'已出货 / 订购':'有效完工 / 计划'}</th><th>当前关注 / 处理人</th></tr></thead><tbody>${rows.map(row=>`<tr class="${state.progressSelected===row.id?'is-selected':''}" data-action="progress-open-detail" data-id="${row.id}"><td><div class="progress-table-product">${renderProgressProductImage(row)}<div class="progress-record-identity"><button class="progress-record-open" data-action="progress-open-detail" data-id="${row.id}" aria-label="查看 ${escapeHTML(row.no)} 完整进度" aria-haspopup="dialog">${escapeHTML(row.product)}</button><span>${escapeHTML(row.no)}</span><span>${escapeHTML(row.customer)} · ${escapeHTML(row.status)}</span></div></div></td><td><strong class="${row.risk==='overdue'?'text-danger':''}">${row.risk==='overdue'?'已逾期':row.risk==='due'?'7天内到期':'按交期跟进'}</strong><small>${escapeHTML(row.due)}</small></td><td>${escapeHTML(row.quantity)}</td><td><div class="progress-attention-content"><div>${renderCompactDesignAttention(row)}</div>${getMobileProgressTasks(row).length?`<button class="btn text" data-action="progress-open-detail" data-id="${row.id}" data-section="tasks">查看任务</button>`:''}</div></td></tr>`).join('')}</tbody></table>${rows.length?'':'<div class="empty">没有符合条件的进度记录</div>'}</section>`;
+      return `${operation}<section class="surface progress-list"><table class="progress-compact-table" aria-label="进度紧凑总览"><thead><tr>${workCenterSortHeader(state.progressView,'no',state.progressView==='orders'?'订单 / 产品':'生产单 / 产品')}<th class="progress-document-status" scope="col">${state.progressView==='orders'?'订单状态':'生产单状态'}</th>${workCenterSortHeader(state.progressView,'due',state.progressView==='orders'?'交期':'计划结束')}<th>${state.progressView==='orders'?'已出货 / 订购':'有效完工 / 计划'}</th><th class="progress-attention-header" scope="col">当前关注 / 处理人</th><th class="progress-operation-cell" scope="col">操作</th></tr></thead><tbody>${rows.map(row=>`<tr class="${state.progressSelected===row.id?'is-selected':''}" data-progress-id="${row.id}"><td><div class="progress-table-product">${renderProgressProductImage(row)}<div class="progress-record-identity"><strong>${escapeHTML(row.product)}</strong><span>${escapeHTML(row.no)}</span><span>${escapeHTML(row.customer)}</span></div></div></td><td>${renderProgressDesignDocumentStatus(row.view,row.no)}</td><td><strong class="${row.risk==='overdue'?'text-danger':''}">${row.risk==='overdue'?'已逾期':row.risk==='due'?'7天内到期':'按交期跟进'}</strong><small>${escapeHTML(row.due)}</small></td><td>${escapeHTML(row.quantity)}</td><td><div class="progress-attention-content">${renderCompactDesignAttention(row,{withTaskEntry:true})}</div></td><td class="progress-operation-cell">${renderProgressOpenButton('progress-open-detail',row.id,row.no)}</td></tr>`).join('')}</tbody></table>${rows.length?'':'<div class="empty">没有符合条件的进度记录</div>'}</section>`;
     }
 
     function switchProgressDesignView(view,mobile=false) {
@@ -8033,11 +8031,33 @@ return {orders,financeCustomers};})();
       state[prefix+'View']=view;
     }
 
-    function renderCompactDesignAttention(row) {
-      const tasks=getMobileProgressTasks(row);
-      if(!tasks.length)return '<span class="data-note">暂无可见待办</span>';
-      const task=tasks[0],blocked=row.stage.includes('阻塞');
-      return `<strong>${blocked?'受阻 · ':''}${escapeHTML(task.title)}</strong>${blocked?`<small class="text-danger">${escapeHTML(row.stage)}</small>`:''}<small>${escapeHTML(task.role)} · 未指定办理人${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}</small>`;
+    function renderProgressDesignDocumentStatus(view,reference) {
+      const rows=listConfig[view==='orders'?'sales':'production'].rows;
+      const status=rows.find(row=>row.no===reference)?.statusText||'待核对';
+      return `<span class="badge">${escapeHTML(status)}</span>`;
+    }
+
+    function renderProgressOpenButton(action,id,reference) {
+      return `<button type="button" class="btn progress-open-button" data-action="${action}" data-id="${id}" aria-label="查看进度：${escapeHTML(reference)}" aria-haspopup="dialog">查看进度</button>`;
+    }
+
+    function renderCompactDesignAttention(row,{withTaskEntry=false}={}) {
+      const desktopTasks=withTaskEntry&&row.desktopTaskIds
+        ? row.desktopTaskIds.map(id=>tasks.find(task=>task.id===id)).filter(task=>task&&task.lane!=='done')
+        : null;
+      const pending=desktopTasks||getMobileProgressTasks(row);
+      if(!pending.length)return '<span class="data-note">暂无可见待办</span>';
+      const task=pending[0],blocked=row.stage.includes('阻塞');
+      const title=escapeHTML(task.title);
+      const reference=escapeHTML(row.no);
+      const taskTitle=desktopTasks&&pending.length===1
+        ? `<button type="button" class="text-btn" data-action="open-task" data-id="${task.id}" aria-label="${title}（${reference}）">${title}</button>`
+        : title;
+      const count=`${pending.length} 项待办`;
+      const taskCount=withTaskEntry
+        ? `<button type="button" class="text-btn" data-action="progress-open-detail" data-id="${row.id}" data-section="tasks" aria-haspopup="dialog" aria-label="${count}（${reference}）">${count}</button>`
+        : `共 ${count}`;
+      return `<strong>${blocked?'受阻 · ':''}${taskTitle}</strong>${blocked?`<small class="text-danger">${escapeHTML(row.stage)}</small>`:''}<small>${escapeHTML(task.role)} · 未指定办理人${pending.length>1?` · ${taskCount}`:''}</small>`;
     }
     function getPrintProfile(template, source = state.printWorkspaceSource) {
       const profiles = {
@@ -12820,7 +12840,8 @@ return {orders,financeCustomers};})();
         "title": "跟踪进度与异常",
         "paragraphs": [
           "在电脑的「工作中心 → 进度看板」或手机的「进度」打开岗位进度。首页显示本岗受阻、临期、无人接手和待跟进事项，点事项可查处理人、下一步和流转记录。按权限进入办理，回到看板后核对处理结果。点「处理结果」查看已完成、退回和撤回的事项。",
-          "在进度看板切换到「订单交付」，查看权限内产品行的交期、实际出货和待交数量。点相应订单核对当前卡点和处理结果。也可以从销售订单选中一单并点「查看交付进度」。管理层按授权切换全局整单、生产和经营统计。",
+          "在进度看板切换到「订单交付」，查看权限内产品行的交期、实际出货和待交数量。电脑端点最右侧「操作」列的「查看进度」或双击普通单元格，手机端点进度卡，可核对当前卡点和处理结果。也可以从销售订单选中一单并点「查看交付进度」。管理层按授权切换全局整单、生产和经营统计。",
+          "电脑端在「当前关注 / 处理人」点单项待办的任务名可打开任务详情，点多项待办的数量可查看本单待处理任务。",
           "进度看板的「订单交付」可在「整单」和「产品明细」间切换。整单看交期、阻塞和处理人，明细按产品核对已出货与剩余待交。电脑端在「订单交付」和「生产执行」的筛选中都可按姓名查找处理人或业务负责人。选中后立即更新，点「收起」返回看板。",
           "在「委外管理」选中加工合同并点「查看详情」，从「回货进度」核对预计回货日期、已回和待回数量。点批次号可在当行下查看回货记录和有权读取的质检结果。已回货扣除已入账的退回数量，仓库范围受限时只显示可查看的回货批次。工序委外从生产执行核对。",
           "进度看板的「经营统计」可按权限查看「交付汇总」和「应收账龄」。先选主题，再在同一栏设定条件。点「订单交期」后可选快捷期间，或在日历中选择并应用起止日期。默认看表格和表尾合计，切换到「图表」可比较当前页的分布。点名称、状态数字或图表分段核对来源，返回后继续查看原结果。",
@@ -20704,12 +20725,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'progress-blocked') {state.progressBlockedOnly=!state.progressBlockedOnly;renderView();}
       else if (action === 'progress-scope') {state.progressScope=target.dataset.value;if(state.progressScope==='ended'){if(['overdue','due'].includes(state.progressDue))state.progressDue='all';state.progressBlockedOnly=false;}renderView();}
       else if (action === 'progress-open-detail') {
-        if(target.matches('tr')) {
-          if(event.target.closest('button, a, input, textarea, select, label, summary, [role="button"]'))return;
-          const selection=document.getSelection();
-          if(selection&&!selection.isCollapsed&&target.contains(selection.anchorNode))return;
-          target.querySelector('.progress-record-open')?.focus({preventScroll:true});
-        }
+        target.focus({preventScroll:true});
         state.progressSelected=target.dataset.id;
         const row = mobileProgressRows.find(item=>item.id===target.dataset.id) || mobileProgressRows[0];
         state.infoModal = { kind:'progress', progressId:row.id, section:target.dataset.section||'overview', title:`${row.no} · 完整进度` };
@@ -21131,8 +21147,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const template = event.target.closest('[data-action="print-template-select"]');
       if (template) { openPrintSample(printTemplates.find(item => item.key === template.dataset.value)?.title); return; }
       if (event.target.closest('button, input, ui-select, textarea, a')) return;
-      const deliveryRow = event.target.closest('[data-delivery-id]');
-      if (deliveryRow) { openLinkedRecord('sales',findVisualRecord('sales',deliveryRow.dataset.deliveryId)?.record); return; }
+      const progressEntry = event.target.closest('[data-progress-id], [data-delivery-id]')?.querySelector('.progress-open-button');
+      if (progressEntry) {
+        progressEntry.focus({preventScroll:true});
+        progressEntry.click();
+        return;
+      }
       const approvalAdjust = event.target.closest('tr')?.querySelector('[data-action="permission-edit-rule"]');
       if (approvalAdjust) {
         approvalAdjust.click();

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Popover, Spin, Tag } from 'antd'
 import {
   ArrowLeftOutlined,
-  ArrowRightOutlined,
   FilterOutlined,
 } from '@ant-design/icons'
 import {
@@ -26,7 +25,6 @@ import { openWorkflowTaskRow } from '../utils/workflowTaskEntry.mjs'
 import {
   progressQueryFromURL,
   progressSourcePath,
-  progressAttention,
   progressExtraFilters,
   progressFilterCount,
   progressFilterReset,
@@ -49,6 +47,8 @@ import SalesDeliveryWorkspace from '../components/sales-orders/SalesDeliveryWork
 import { useSalesDeliveryWorkspace } from '../components/sales-orders/useSalesDeliveryWorkspace.js'
 import {
   ProgressIdentity,
+  ProgressOpenButton,
+  ProgressDocumentStatus,
   ProgressDue,
   ProgressDelivery,
   ProgressAttention,
@@ -252,6 +252,7 @@ export default function BusinessDashboardPage() {
         view: row.view,
         orderNo: row.order_no,
         section,
+        taskQuery: section === 'tasks' ? { status: 'open' } : undefined,
         profile: adminProfile,
       })
     },
@@ -297,6 +298,7 @@ export default function BusinessDashboardPage() {
     { replace: true, state: { restoredSalesDeliverySelection: salesReturn.selection } }
   )
   const filterCount = progressFilterCount(query)
+  const statusLabel = view === 'orders' ? '订单状态' : '生产单状态'
   const filterCounts = loading ? undefined : data?.counts
   const filterQuery = { ...query, view }
   const extraFilters = progressExtraFilters(query)
@@ -537,7 +539,8 @@ export default function BusinessDashboardPage() {
                         <ProgressSortHeader field={BusinessProgressSort.ORDER_NO} query={query} onSort={update} label={view === 'orders' ? '订单号' : '生产单号'}>
                           {view === 'orders' ? '订单 / 产品' : '生产单 / 产品'}
                         </ProgressSortHeader>
-                        <ProgressSortHeader field={BusinessProgressSort.DUE_DATE} query={query} onSort={update}>
+                        <th scope="col" className="erp-progress-status-cell">{statusLabel}</th>
+                        <ProgressSortHeader className="erp-progress-due-cell" field={BusinessProgressSort.DUE_DATE} query={query} onSort={update}>
                           {view === 'orders' ? '交期' : '计划结束'}
                         </ProgressSortHeader>
                         <th scope="col">
@@ -545,12 +548,12 @@ export default function BusinessDashboardPage() {
                             ? '已出货 / 订购'
                             : '有效完工 / 计划'}
                         </th>
-                        <th scope="col">当前关注 / 处理人</th>
+                        <th scope="col" className="erp-progress-attention-cell">当前关注 / 处理人</th>
+                        <th scope="col" className="erp-progress-action-cell">操作</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data?.rows.map((row) => {
-                        const attention = progressAttention(row, access)
                         const selected =
                           selectedRow?.id === row.id &&
                           selectedRow?.view === row.view
@@ -559,13 +562,15 @@ export default function BusinessDashboardPage() {
                             key={`${row.view}:${row.id}`}
                             className={`erp-progress-row${selected ? ' is-selected' : ''}`}
                             data-progress-order-id={row.id}
-                            data-row-action
-                            onClick={(event) =>
+                            onDoubleClick={(event) =>
                               openWorkflowTaskRow(event, () => openDetail(row))
                             }
                           >
                             <td className="erp-progress-identity-cell">
-                              <ProgressIdentity row={row} onOpen={() => openDetail(row)} />
+                              <ProgressIdentity row={row} showStatus={false} />
+                            </td>
+                            <td className="erp-progress-status-cell" data-label={statusLabel}>
+                              <ProgressDocumentStatus status={row.status} />
                             </td>
                             <td className="erp-progress-due-cell">
                               <ProgressDue
@@ -581,24 +586,21 @@ export default function BusinessDashboardPage() {
                               />
                             </td>
                             <td className="erp-progress-attention-cell">
-                              <div className="erp-progress-attention-content">
-                                <ProgressAttention row={row} access={access} />
-                                {attention.taskCount > 0 &&
-                                canOpen('/erp/task-board') && (
-                                  <Button
-                                    type="link"
-                                    className="erp-progress-task-entry"
-                                    aria-label={`查看 ${row.order_no} 的关联任务`}
-                                    onClick={() =>
-                                      attention.taskID
-                                        ? navigateFromProgress(progressSourcePath({ kind: 'task', id: attention.taskID }), null, row.id)
-                                        : openDetail(row, 'tasks')
-                                    }
-                                  >
-                                    查看任务 <ArrowRightOutlined />
-                                  </Button>
-                                )}
-                              </div>
+                              <ProgressAttention
+                                row={row}
+                                access={access}
+                                showOwnerWithoutTasks={false}
+                                onOpenTask={canOpen('/erp/task-board') ? (taskID) => {
+                                  if (taskID) {
+                                    navigateFromProgress(progressSourcePath({ kind: 'task', id: taskID }), null, row.id)
+                                  } else {
+                                    openDetail(row, 'tasks')
+                                  }
+                                } : undefined}
+                              />
+                            </td>
+                            <td className="erp-progress-action-cell">
+                              <ProgressOpenButton row={row} onOpen={() => openDetail(row)} />
                             </td>
                           </tr>
                         )

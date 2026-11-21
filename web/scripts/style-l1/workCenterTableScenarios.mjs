@@ -403,7 +403,7 @@ offset: params.offset || 0,
         await orderHead.click({ position: { x: headBox.width - 6, y: headBox.height / 2 } })
         await table.locator('tbody tr:first-child[data-progress-order-id="25"]').waitFor()
         assert.equal(await table.locator('th[aria-sort="descending"]').count(), 1)
-        await table.getByRole('button', { name: '查看 SO-0025 完整进度' }).click()
+        await table.getByRole('button', { name: '查看进度：SO-0025' }).click()
         const detail = page.getByRole('dialog')
         await detail.getByRole('button', { name: '返回进度', exact: true }).click()
         await table.locator('tbody tr:first-child[data-progress-order-id="25"]').waitFor()

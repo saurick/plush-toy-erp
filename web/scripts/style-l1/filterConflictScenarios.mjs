@@ -372,6 +372,8 @@ export function createFilterConflictScenarios(deps) {
   const productionOnly = {
     ...desktop,
     name: 'erp-progress-production-filter-conflicts',
+    path: '/erp/business-dashboard',
+    adminProfile: { ...desktop.adminProfile, roles: [] },
     effectiveSession: {
       ...desktop.effectiveSession,
       actions: desktop.effectiveSession.actions.filter((action) => !action.startsWith('sales_order')),
@@ -396,7 +398,7 @@ export function createFilterConflictScenarios(deps) {
     },
     verify: async (page) => {
       const panel = page.getByRole('region', { name: '进度看板', exact: true })
-      await panel.getByRole('button', { name: '查看 MO-0001 完整进度', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '查看进度：MO-0001', exact: true }).waitFor()
       assert.equal(new URL(page.url()).searchParams.has('view'), false)
       await panel.getByRole('button', { name: /^筛选进度/ }).click()
       const filters = page.getByRole('dialog', { name: '筛选进度' })
@@ -409,9 +411,9 @@ export function createFilterConflictScenarios(deps) {
       await owners.press('Escape')
       await page.getByRole('button', { name: /^仅看未关联销售/ }).click()
       await page.waitForURL((url) => url.searchParams.get('view') === 'production' && url.searchParams.get('unlinked_only') === 'true')
-      await panel.getByRole('button', { name: '查看 MO-0003 完整进度', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '查看进度：MO-0003', exact: true }).waitFor()
       await page.reload()
-      await panel.getByRole('button', { name: '查看 MO-0003 完整进度', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '查看进度：MO-0003', exact: true }).waitFor()
       await assertNoHorizontalOverflow(page, '生产进度默认视图筛选')
     },
   }

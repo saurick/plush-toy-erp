@@ -1,9 +1,8 @@
 import React from 'react'
-import { Button } from 'antd'
 import { BusinessProgressSort } from '@/common/consts/statuses.generated.mjs'
 import ProgressSortHeader from './ProgressSortHeader.jsx'
 import { openWorkflowTaskRow } from '../../utils/workflowTaskEntry.mjs'
-import { ProgressDelivery, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus } from './ProgressCompactContent.jsx'
+import { ProgressDelivery, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus, ProgressOpenButton } from './ProgressCompactContent.jsx'
 
 const labels = ['订单 / 客户', '产品', '交付日期', '已出货 / 订购', '剩余待交', '交付状态']
 
@@ -15,7 +14,9 @@ export default function ProgressDeliveryLines({ rows, snapshotAt, onOpen, select
           <ProgressSortHeader field={BusinessProgressSort.ORDER_NO} query={query} onSort={onSort} label="订单号">{labels[0]}</ProgressSortHeader>
           <ProgressSortHeader field={BusinessProgressSort.PRODUCT} query={query} onSort={onSort}>{labels[1]}</ProgressSortHeader>
           <ProgressSortHeader field={BusinessProgressSort.DUE_DATE} query={query} onSort={onSort}>{labels[2]}</ProgressSortHeader>
-          {labels.slice(3).map((label) => <th key={label} scope="col">{label}</th>)}
+          {labels.slice(3, 5).map((label) => <th key={label} scope="col">{label}</th>)}
+          <th scope="col" className="erp-progress-line-status-cell">{labels[5]}</th>
+          <th scope="col" className="erp-progress-action-cell">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -24,25 +25,11 @@ export default function ProgressDeliveryLines({ rows, snapshotAt, onOpen, select
             key={row.id}
             className={`erp-progress-row erp-progress-line-row${selectedID === row.id ? ' is-selected' : ''}`}
             data-progress-line-id={row.id}
-            data-row-action
-            onClick={(event) => openWorkflowTaskRow(event, () => {
-              event.currentTarget.querySelector('[data-task-entry]')?.focus({ preventScroll: true })
-              onOpen(row, 'lines')
-            })}
+            onDoubleClick={(event) => openWorkflowTaskRow(event, () => onOpen(row, 'lines'))}
           >
             <td className="erp-progress-line-identity">
               <div className="erp-progress-identity">
-                <Button
-                  type="link"
-                  size="small"
-                  className="erp-progress-line-open"
-                  data-task-entry
-                  aria-label={`查看 ${row.order_no} · ${row.product} · 第 ${row.line.line_no} 行进度`}
-                  aria-haspopup="dialog"
-                  onClick={() => onOpen(row, 'lines')}
-                >
-                  {row.order_no}
-                </Button>
+                <span className="erp-progress-reference">{row.order_no}</span>
                 <span className="erp-progress-customer">{row.customer || '客户未填写'}</span>
               </div>
             </td>
@@ -51,6 +38,9 @@ export default function ProgressDeliveryLines({ rows, snapshotAt, onOpen, select
             <td data-label={labels[3]}><ProgressDelivery row={row} showLabel={false} showProgress /></td>
             <td data-label={labels[4]}><ProgressLineRemaining row={row} /></td>
             <td data-label={labels[5]}><ProgressLineStatus row={row} snapshotAt={snapshotAt} /></td>
+            <td className="erp-progress-action-cell">
+              <ProgressOpenButton row={row} onOpen={() => onOpen(row, 'lines')} />
+            </td>
           </tr>
         ))}
       </tbody>

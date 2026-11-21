@@ -122,13 +122,17 @@ export default function BusinessProgressDrawer({
   useEffect(() => {
     contextRef.current.clear()
   }, [adminProfile])
+  const entryTaskQuery = selection?.taskQuery
   useLayoutEffect(() => {
     const previous = contextRef.current.get(requestKey)
+    if (!mobile && previous && entryTaskQuery) {
+      contextRef.current.set(requestKey, { ...previous, taskQuery: entryTaskQuery })
+    }
     setTab(selection?.section || previous?.section || 'overview')
     setProductionOpen(
       previous?.productionOpen ?? selection?.productionOpen ?? true
     )
-  }, [requestKey, selection?.section, selection?.productionOpen])
+  }, [requestKey, selection?.section, selection?.productionOpen, mobile, entryTaskQuery])
   const data =
     state?.key === requestKey && state?.profile === adminProfile
       ? state.data

@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { Tag } from 'antd'
+import { Button, Tag } from 'antd'
 import { FileTextOutlined } from '@ant-design/icons'
 import ProductIdentity, { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
 import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
@@ -45,29 +45,42 @@ export function ProgressProductIdentity({ row, compact = false, children }) {
   ) : <span className="erp-progress-product erp-progress-product--empty"><span className="erp-task-product-image erp-task-product-image--placeholder" aria-label="未关联产品／物料"><FileTextOutlined aria-hidden="true" /></span>{content}</span>
 }
 
-export function ProgressIdentity({ row, onOpen }) {
+export function ProgressOpenButton({ row, onOpen }) {
+  const reference = row.line
+    ? `${row.order_no} · ${row.product} · 第 ${row.line.line_no} 行`
+    : progressIdentityPresentation(row).reference
+  return (
+    <Button
+      color="primary"
+      variant="outlined"
+      size="small"
+      className="erp-progress-row-open"
+      data-task-entry
+      aria-label={`查看进度：${reference}`}
+      aria-haspopup="dialog"
+      onClick={(event) => {
+        event.currentTarget.focus({ preventScroll: true })
+        onOpen()
+      }}
+    >
+      查看进度
+    </Button>
+  )
+}
+
+export function ProgressDocumentStatus({ status }) {
+  return <Tag>{progressStatusLabel(status)}</Tag>
+}
+
+export function ProgressIdentity({ row, showStatus = true }) {
   const identity = progressIdentityPresentation(row)
   const content = (
     <span className="erp-progress-identity">
-      {onOpen ? (
-        <button
-          type="button"
-          className="erp-progress-row-open"
-          data-task-entry
-          aria-label={`查看 ${row.order_no} 完整进度`}
-          aria-haspopup="dialog"
-          onClick={(event) => {
-            event.currentTarget.focus({ preventScroll: true })
-            onOpen()
-          }}
-        >
-          {identity.product}
-        </button>
-      ) : <strong>{identity.product}</strong>}
+      <strong>{identity.product}</strong>
       <span className="erp-progress-reference">{identity.reference}</span>
       <span className="erp-progress-customer">
         {identity.customer}
-        <Tag>{progressStatusLabel(row.status)}</Tag>
+        {showStatus && <ProgressDocumentStatus status={row.status} />}
       </span>
     </span>
   )
@@ -144,10 +157,11 @@ export function ProgressLineStatus({ row, snapshotAt }) {
   return <VisualizationStatus status={progressLineStatus(row, snapshotAt)} />
 }
 
-export function ProgressAttention({ row, access, compact = false, suffix }) {
+export function ProgressAttention({ row, access, compact = false, suffix, onOpenTask, showOwnerWithoutTasks = true }) {
   const attention = progressAttention(row, access)
-  const detail = attention.detail ? `${attention.detail}${attention.taskCount > 1 ? ` · 共 ${attention.taskCount} 项待办` : ''}` : ''
+  const countLabel = attention.taskCount > 1 ? `${attention.taskCount} 项待办` : ''
   if (compact) {
+    const detail = attention.detail ? `${attention.detail}${countLabel ? ` · 共 ${countLabel}` : ''}` : ''
     return (
       <span className="erp-progress-attention erp-progress-attention--compact">
         <span className="erp-progress-attention-heading">
@@ -166,21 +180,42 @@ export function ProgressAttention({ row, access, compact = false, suffix }) {
       </span>
     )
   }
+  const owner = attention.taskCount > 0 || showOwnerWithoutTasks ? attention.detail : ''
+  const taskInTitle = attention.taskCount === 1 && Boolean(onOpenTask)
+  const taskActionLabel = taskInTitle ? attention.title : countLabel
+  const taskAction = onOpenTask && taskActionLabel ? (
+    <Button
+      type="link"
+      size="small"
+      className="erp-progress-task-entry"
+      aria-label={`${taskActionLabel}（${row.order_no}）`}
+      aria-haspopup={attention.taskID ? undefined : 'dialog'}
+      onClick={(event) => {
+        event.currentTarget.focus({ preventScroll: true })
+        onOpenTask(attention.taskID)
+      }}
+    >
+      {taskActionLabel}
+    </Button>
+  ) : null
   return (
     <span
       className={`erp-progress-attention${attention.blocked ? ' is-blocked' : ''}`}
     >
       <strong>
         {attention.blocked ? '受阻 · ' : ''}
-        {attention.title}
+        {taskInTitle ? taskAction : attention.title}
       </strong>
       {attention.reason && (
         <span className="erp-progress-attention-reason">
           {attention.reason}
         </span>
       )}
-      {attention.detail && (
-        <span>{detail}</span>
+      {owner && (
+        <span>
+          {owner}
+          {countLabel && <> · {taskAction || `共 ${countLabel}`}</>}
+        </span>
       )}
     </span>
   )
