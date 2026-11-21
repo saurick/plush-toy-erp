@@ -1,8 +1,6 @@
 import { WorkflowTaskDiscoveryCatalog as tasks } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { isWorkflowBusinessChainException } from '../../erp/utils/workflowBusinessChain.mjs'
-import { buildDevBusinessChainTopics } from '../config/devBusinessChainProjection.mjs'
-import { normalizeFulfillmentRole } from '../../erp/utils/workflowFulfillment.mjs'
-import { DEV_FLOW_SPECIALIZED_CHAIN_TAB, DEV_FLOW_STATE_QUERY_KEYS as keys } from './devFlowStateQuery.mjs'
+import { DEV_FLOW_STATE_QUERY_KEYS as keys } from './devFlowStateQuery.mjs'
 
 export const FLOW_READING_CONTEXT_KEYS = [
   keys.financeFact,
@@ -15,13 +13,6 @@ export const FLOW_READING_CONTEXT_KEYS = [
   keys.roleSubstep,
   keys.relationAction,
   keys.roleTab,
-  keys.roleTopic,
-  keys.roleTopicNode,
-  keys.roleTopicStep,
-  keys.roleTopicPanel,
-  keys.roleTopicBatch,
-  keys.roleMap,
-  keys.roleMapNode,
   keys.exception,
   keys.exceptionOrigin,
   keys.exceptionDecision,
@@ -36,7 +27,6 @@ export function restoreDevFlowPrimaryContext(previous, current, { independentKey
     .filter((key) => !independentKeys.includes(key))
   const contextValue = (params, key) => key === keys.chain ? params.get(key) || 'all' : params.get(key)
   const changed = shared.some((key) =>
-    ![keys.roleTopicPanel, keys.roleTopicBatch].includes(key) &&
     contextValue(next, key) !== contextValue(current, key)
   )
   for (const key of shared) {
@@ -74,19 +64,6 @@ export function resolveDevFlowViewContext({
     chainKey = tasks.exception_guides.find(
       (item) => item.key === searchParams.get(keys.exception)
     )?.business_chain
-  } else if (searchParams.get(keys.roleTab) === DEV_FLOW_SPECIALIZED_CHAIN_TAB) {
-    const topicKey = searchParams.has(keys.roleTopic)
-      ? searchParams.get(keys.roleTopic)
-      : buildDevBusinessChainTopics(catalog, {
-          role: normalizeFulfillmentRole(searchParams.get(keys.role)),
-        }).flatMap((lane) => lane.topics)[0]?.chain.key
-    chainKey =
-      searchParams.get(keys.roleMapNode) ||
-      searchParams.get(keys.roleMap) ||
-      topicKey
-    nodeKey = searchParams.get(keys.roleMap)
-      ? null
-      : searchParams.get(keys.roleTopicNode)
   } else {
     chainKey = tasks.fulfillment_flow.find(
       (item) => item.stage === searchParams.get(keys.roleStage)

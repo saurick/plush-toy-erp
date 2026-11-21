@@ -9,7 +9,6 @@ import {
   describeDevBusinessChainResponsibility,
 } from '../../config/devBusinessChainProjection.mjs'
 import TaskFulfillmentGuide from './TaskFulfillmentGuide.jsx'
-import BusinessTopicsView from './BusinessTopicsView.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
 import { DEFINITION_SELECT_CLASS_NAMES, formatQueryTime, Paragraph, Text, Title, cleanText, useDefinitionSelectSearch, renderDefinitionSelectOption, asArray, KeyValue } from './FlowStateShared.jsx'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
@@ -174,7 +173,6 @@ function BusinessChainOverviewView({
   taskId,
   selectedTask,
   onOpenView,
-  onOpenTopics,
 }) {
   const { runtime, matchingChain } = useBusinessChainRuntime(
     catalog,
@@ -186,14 +184,6 @@ function BusinessChainOverviewView({
       <TaskFulfillmentGuide
         businessCatalog={catalog}
         onOpenView={onOpenView}
-        onOpenTopics={onOpenTopics}
-        specializedChains={
-          <BusinessTopicsView
-            catalog={catalog}
-            currentChainKey={matchingChain?.key}
-            onOpenView={onOpenView}
-          />
-        }
       />
       {taskId ? (
         <section

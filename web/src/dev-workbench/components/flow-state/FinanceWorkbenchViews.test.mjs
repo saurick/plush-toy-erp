@@ -9,7 +9,7 @@ import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCata
 registerMermaidTestRenderer()
 
 const initialURL =
-  '/__dev/status-flows?flow_tab=topics&flow_topic=finance_relations'
+  '/__dev/status-flows?flow_tab=finance'
 const button = (root, label) =>
   [...root.querySelectorAll('button')].find(
     (item) => item.textContent === label

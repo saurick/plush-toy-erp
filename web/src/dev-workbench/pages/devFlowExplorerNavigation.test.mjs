@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../config/devFlowStateCatalog.mjs'
+import { devFlowExplorerChainURL } from '../config/devRoutes.mjs'
 import {
   buildBusinessChainDesignLibrary,
   emptyBusinessChainDraft,
 } from '../config/devBusinessChainDesign.mjs'
+import { projectBusinessChainMap } from '../config/devBusinessChainMap.mjs'
+import { projectBusinessChainReading } from '../config/devBusinessChainReading.mjs'
 import {
   applyDevFlowExplorerEntry,
-  buildDevFlowExplorerLocation,
   resolveDevFlowExplorerEntry,
   DEV_FLOW_EXPLORER_BLANK_HREF,
 } from './devFlowExplorerNavigation.mjs'
@@ -26,16 +28,16 @@ test('探索入口校验链路、节点归属及重复参数', () => {
     'new=unknown',
     'new=blank&new=blank',
     'new=blank&chain=purchase_to_inventory',
+    'chain=sales_to_production&step=unknown',
+    'chain=sales_to_production&panel=rules',
+    'chain=sales_to_production&batch=rules-20261103',
   ]) {
     assert.ok(
       resolveDevFlowExplorerEntry(new URLSearchParams(search), catalog).error,
       search
     )
   }
-  const target = buildDevFlowExplorerLocation(
-    'purchase_to_inventory',
-    'purchase_order'
-  )
+  const target = new URL(devFlowExplorerChainURL('purchase_to_inventory', 'purchase_order'), 'http://localhost')
   assert.equal(target.pathname, '/__dev/flow-explorer')
   assert.deepEqual(
     resolveDevFlowExplorerEntry(new URLSearchParams(target.search), catalog)
@@ -75,5 +77,34 @@ test('来源节点按现有目录展开分支，保留手动位置和备注', ()
     )
     assert.deepEqual(result.ideas, draft.ideas)
     assert.equal(result.map.chainKey, source.chainKey)
+  }
+})
+
+test('动作核验仅恢复同一链路内的正式动作', () => {
+  const chain = catalog.businessChains.find(({ key }) => key === 'purchase_to_inventory')
+  const step = chain.steps[0]
+  const valid = new URLSearchParams({ chain: chain.key, step: step.key, panel: 'rules' })
+  const result = resolveDevFlowExplorerEntry(valid, catalog)
+  assert.equal(result.entry, null)
+  assert.equal(result.verification.chain.key, chain.key)
+  assert.equal(result.verification.action.key, step.key)
+  for (const invalid of [
+    new URLSearchParams({ chain: 'sales_to_production', step: step.key }),
+    new URLSearchParams({ chain: chain.key, step: step.key, node: chain.entryNodeKeys[0] }),
+    new URLSearchParams(`${valid}&step=${step.key}`),
+  ]) assert.ok(resolveDevFlowExplorerEntry(invalid, catalog).error)
+})
+
+test('异常与纠正的直达入口加载该范围及其业务分支', () => {
+  const library = buildBusinessChainDesignLibrary(catalog)
+  const draft = { ...emptyBusinessChainDraft(), presentation: { mode: 'overview', layers: ['normal'] } }
+  for (const key of ['purchase_quality_disposition', 'purchase_posting_corrections']) {
+    const result = applyDevFlowExplorerEntry(draft, library, { chainKey: key })
+    assert.equal(result.map.chainKey, key)
+    assert.equal(result.presentation.mode, 'mainline')
+    const graph = projectBusinessChainMap(result, library, result.presentation.mode)
+    const reading = projectBusinessChainReading(graph, library, { scope: result.map.scope, mode: result.presentation.mode })
+    assert.ok(reading.edges.length)
+    assert.deepEqual([...new Set(reading.nodes.map(({ id }) => library.byId.get(id).chainKey))], [key])
   }
 })

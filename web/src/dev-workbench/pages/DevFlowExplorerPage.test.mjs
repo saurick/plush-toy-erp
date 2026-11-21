@@ -18,8 +18,7 @@ registerMermaidTestRenderer()
 async function setup(t) {
   const ui = await createReactTestHarness(t)
   const { default: Explorer } = await import('./DevFlowExplorerPage.jsx')
-  const { default: Topics } =
-    await import('../components/flow-state/BusinessTopicsView.jsx')
+  const { default: Guide } = await import('../components/flow-state/TaskFulfillmentGuide.jsx')
   const { default: Nav } = await import('../components/DevPageNav.jsx')
   const { ERPThemeProvider } = await import('../../common/theme/erpTheme.jsx')
   let location
@@ -33,7 +32,7 @@ async function setup(t) {
       h(Route, { path: '/__dev/flow-explorer', element: h(Explorer) }),
       h(Route, {
         path: '/__dev/status-flows',
-        element: h('div', null, h(Nav), h(Topics, { catalog })),
+        element: h('div', null, h(Nav), h(Guide, { businessCatalog: catalog })),
       })
     )
   }
@@ -111,7 +110,7 @@ test('独立菜单恢复最近探索，页面往返和刷新保留本页草稿',
     )
   )
   await app.click('业务链路')
-  assert.ok(app.ui.container.querySelector('[data-topic-diagram]'))
+  assert.ok(app.ui.container.querySelector('[aria-label="流程视图"]'))
   await app.click('流程探索')
   assert.deepEqual(JSON.parse(window.sessionStorage.getItem(workingKey)), JSON.parse(working))
   assert.equal(app.ui.container.querySelector('[aria-label="视图保存状态"]'), null)
@@ -170,36 +169,23 @@ test('空白初始化暂存失败时保留显式入口，刷新不会误恢复�
   assert.deepEqual(JSON.parse(storage.getItem(workingKey)).draft.nodes, [])
 })
 
-test('链路和节点入口只调整阅读范围，浏览器后退恢复来源选择与上下文', async (t) => {
+test('订单环节直达对应链路，返回来源时恢复环节和筛选', async (t) => {
   const app = await setup(t)
   window.localStorage.setItem(workingKey, recent)
-  const source =
-    '/__dev/status-flows?view=chain&flow_tab=topics&flow_topic=purchase_to_inventory&flow_topic_node=purchase_order&flow_role=purchase'
-  const state = { readingContext: { stage: 'material_supply', scrollTop: 320 } }
-  await app.render({
-    pathname: source.split('?')[0],
-    search: `?${source.split('?')[1]}`,
-    state,
-  })
-  await app.click('从此节点探索')
+  const search = '?view=chain&flow_stage=incoming_quality&flow_role=purchase'
+  await app.render({ pathname: '/__dev/status-flows', search })
+  await app.click('在流程探索中查看链路')
   assert.equal(app.location().pathname, '/__dev/flow-explorer')
   assert.equal(app.location().search, '')
-  let working = JSON.parse(window.sessionStorage.getItem(workingKey))
-  assert.equal(working.draft.map.focusId, 'node:purchase_order')
-  assert.equal(working.draft.map.chainKey, 'purchase_to_inventory')
-  assert.deepEqual(
-    working.draft.nodes.find((node) => node.id === 'node:sales_order'),
-    previousDraft.nodes[0]
-  )
-  assert.deepEqual(working.draft.ideas, [{ text: '保留原备注' }])
-  await app.back()
-  assert.equal(app.location().pathname + app.location().search, source)
-  assert.deepEqual(app.location().state.readingContext, state.readingContext)
-  assert.equal(app.location().state.flowRestoreFrame.focus, '从此节点探索')
-  await app.click('在流程探索中打开')
-  working = JSON.parse(window.sessionStorage.getItem(workingKey))
+  const working = JSON.parse(window.sessionStorage.getItem(workingKey))
   assert.equal(working.draft.map.scope, 'whole')
   assert.equal(working.draft.map.chainKey, 'purchase_to_inventory')
+  assert.deepEqual(working.draft.nodes.find((node) => node.id === 'node:sales_order'), previousDraft.nodes[0])
+  assert.deepEqual(working.draft.ideas, previousDraft.ideas)
+  await app.back()
+  assert.equal(app.location().pathname, '/__dev/status-flows')
+  assert.equal(app.location().search, search)
+  assert.equal(app.location().state.flowRestoreFrame.focus, '在流程探索中查看链路')
 })
 
 test('无效入口不改写本地视图，可继续上次探索', async (t) => {

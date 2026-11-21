@@ -29,6 +29,12 @@ export const DEV_VERSION_CENTER_ROUTE = '/__dev/version-center'
 export const DEV_VERSION_GUIDE_ROUTE = '/__dev/version-center/guide'
 export const DEV_DRILL_RECOVERY_ROUTE = '/__dev/drill-recovery'
 
+export function devFlowExplorerChainURL(chainKey, nodeKey) {
+  const params = new URLSearchParams({ chain: chainKey })
+  if (nodeKey) params.set('node', nodeKey)
+  return `${DEV_FLOW_EXPLORER_ROUTE}?${params}`
+}
+
 export const DEV_WORKBENCH_AREA_KEYS = Object.freeze({
   overview: 'overview',
   productEngineering: 'product-engineering',

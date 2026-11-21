@@ -5,7 +5,8 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
-import { DEV_FLOW_SPECIALIZED_CHAIN_TAB, DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
+import { DEV_FLOW_FINANCE_RELATIONS_TAB, DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
+import { devFlowExplorerChainURL } from '../../config/devRoutes.mjs'
 import { FLOW_READING_CONTEXT_KEYS } from '../../pages/devFlowViewContext.mjs'
 import { buildFulfillmentRelations, buildChainActionRelations, relationMatches, relationFiltersActive } from '../../config/devFulfillmentRelations.mjs'
 import BusinessRelationFilters from './BusinessRelationFilters.jsx'
@@ -24,8 +25,10 @@ import {
 import FulfillmentSubflow from './FulfillmentSubflow.jsx'
 import FulfillmentChainCanvas from './FulfillmentChainCanvas.jsx'
 import FulfillmentExceptionDetails from './FulfillmentExceptionDetails.jsx'
+import FinanceRelationshipsView from './FinanceRelationshipsView.jsx'
 import './taskFulfillmentGuide.css'
 import { ChainCapabilityLinks, ChainEvidenceLinks } from '../DevProductCoreRelations.jsx'
+import { DevReadingLink } from '../DevReadingNavigation.jsx'
 
 const exceptionKeys = [
   queryKeys.exception,
@@ -41,8 +44,8 @@ const detailKeys = [
 ]
 const structureTabs = [
   { value: 'main', label: '订单全流程' },
-  { value: DEV_FLOW_SPECIALIZED_CHAIN_TAB, label: '专项链路' },
   { value: 'exceptions', label: '异常处理' },
+  { value: DEV_FLOW_FINANCE_RELATIONS_TAB, label: '财务关联概览' },
 ]
 
 export default function TaskFulfillmentGuide({
@@ -50,8 +53,6 @@ export default function TaskFulfillmentGuide({
   steps = catalog.fulfillment_flow,
   scoped = false,
   onOpenView,
-  onOpenTopics,
-  specializedChains,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
@@ -71,7 +72,7 @@ export default function TaskFulfillmentGuide({
   const openerRef = React.useRef(null)
   const revealRef = React.useRef(false)
   const view = scoped ? 'main' : searchParams.get(queryKeys.roleTab) || 'main'
-  const showSpecializedChains = view === DEV_FLOW_SPECIALIZED_CHAIN_TAB
+  const showFinance = view === DEV_FLOW_FINANCE_RELATIONS_TAB
   const guideKey = searchParams.get(queryKeys.exception)
   const selection = guideKey
     ? selectFulfillmentException({
@@ -179,14 +180,14 @@ export default function TaskFulfillmentGuide({
             onChange={setView}
           />
         )}
-        {!showSpecializedChains ? <BusinessRelationFilters
+        <BusinessRelationFilters
           catalog={businessCatalog}
           actions={filterActions}
           filters={filters}
           onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
-        /> : null}
+        />
       </div>
-      {showSpecializedChains ? specializedChains : view === 'main' ? (
+      {showFinance ? <FinanceRelationshipsView catalog={businessCatalog} role={role} filters={filters} /> : view === 'main' ? (
         <>
           <p className="erp-dev-fulfillment-guide__scope-bar" role="status">
             {filtered
@@ -254,7 +255,7 @@ export default function TaskFulfillmentGuide({
           ) : null}
         </section>
       )}
-      {!showSpecializedChains && showDetail ? (
+      {!showFinance && showDetail ? (
         <section
           className="erp-dev-fulfillment-guide__panel"
           aria-label="流程详情"
@@ -414,7 +415,12 @@ export default function TaskFulfillmentGuide({
           /> : null}
           {!scoped && !selection?.invalid && relatedChainKnown ? (
             <>
-              {onOpenTopics ? <Button onClick={() => onOpenTopics(relatedChainKey)}>查看相关专项链路</Button> : null}
+              <DevReadingLink
+                to={devFlowExplorerChainURL(relatedChainKey)}
+                fromLabel={selection ? '异常详情' : '订单全流程'}
+              >
+                在流程探索中查看链路
+              </DevReadingLink>
               <ChainCapabilityLinks chainKey={relatedChainKey} fromLabel="业务链路" />
               <details className="erp-dev-disclosure">
                 <summary>数据与验证</summary>

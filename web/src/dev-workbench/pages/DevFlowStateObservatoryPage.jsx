@@ -27,7 +27,7 @@ import { WorkflowView } from '../components/flow-state/WorkflowView.jsx'
 import BusinessChainInstanceView from '../components/flow-state/BusinessChainInstanceView.jsx'
 import FinanceTraceView from '../components/flow-state/FinanceTraceView.jsx'
 import FinanceRulesView from '../components/flow-state/FinanceRulesView.jsx'
-import { FINANCE_RELATIONS_TOPIC_KEY, FINANCE_RULES, FINANCE_TOPIC_KEYS } from '../config/devFinanceWorkbench.mjs'
+import { FINANCE_RULES, FINANCE_TOPIC_KEYS } from '../config/devFinanceWorkbench.mjs'
 import BusinessRelationFilters from '../components/flow-state/BusinessRelationFilters.jsx'
 import { TaskFinder } from '../components/flow-state/FlowTaskContext.jsx'
 import {
@@ -54,6 +54,7 @@ import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import { restoreDevReadingPosition } from '../components/DevReadingNavigation.jsx'
 import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_BUSINESS_RULES_ROUTE,
@@ -83,9 +84,8 @@ import {
   DEV_FLOW_STATE_VIEW_SELECTION_QUERY_KEYS as VIEW_SELECTION_QUERY_KEYS,
   canonicalizeDevFlowStateSearchParams,
   DEV_BUSINESS_RULE_VIEWS,
-  DEV_FLOW_SPECIALIZED_CHAIN_TAB,
+  DEV_FLOW_FINANCE_RELATIONS_TAB,
   resolveDevFlowViewRoute,
-  buildDevSpecializedChainLocation,
   readDevFlowRelationFilters,
   patchDevFlowRelationFilters,
 } from './devFlowStateQuery.mjs'
@@ -464,7 +464,7 @@ function invalidQueryMessages(searchParams, catalog, defaultView = DEFAULT_VIEW)
     }
   }
   const readingTab = searchParams.get(QUERY_KEYS.roleTab)
-  if (readingTab && ![DEV_FLOW_SPECIALIZED_CHAIN_TAB, 'exceptions'].includes(readingTab)) messages.push('未登记的流程视图')
+  if (readingTab && ![DEV_FLOW_FINANCE_RELATIONS_TAB, 'exceptions'].includes(readingTab)) messages.push('未登记的流程视图')
   const view = cleanText(searchParams.get(QUERY_KEYS.view))
   const chainKey = cleanText(searchParams.get(QUERY_KEYS.chain))
   const nodeKey = cleanText(searchParams.get(QUERY_KEYS.node))
@@ -473,17 +473,6 @@ function invalidQueryMessages(searchParams, catalog, defaultView = DEFAULT_VIEW)
   const processKey = cleanText(searchParams.get(QUERY_KEYS.process))
   const factKey = cleanText(searchParams.get(QUERY_KEYS.fact))
   const taskId = cleanText(searchParams.get(QUERY_KEYS.taskId))
-  const topicKey = searchParams.get(QUERY_KEYS.roleTopic)
-  const topicNodeKey = searchParams.get(QUERY_KEYS.roleTopicNode)
-  const mapKey = searchParams.get(QUERY_KEYS.roleMap)
-  const mapNodeKey = searchParams.get(QUERY_KEYS.roleMapNode)
-  if (
-    topicKey &&
-    topicKey !== FINANCE_RELATIONS_TOPIC_KEY &&
-    !catalog.businessChains.some((item) => item.key === topicKey)
-  ) {
-    messages.push('未登记的专项链路')
-  }
   for (const [key, values] of [
     [QUERY_KEYS.financeRule, ['', ...FINANCE_RULES.map((item) => item.key)]],
     [QUERY_KEYS.financeTopic, FINANCE_TOPIC_KEYS],
@@ -495,30 +484,6 @@ function invalidQueryMessages(searchParams, catalog, defaultView = DEFAULT_VIEW)
   }
   const financeFactID = searchParams.get(QUERY_KEYS.financeFact)
   if (financeFactID !== null && (!/^[1-9]\d*$/.test(financeFactID) || !Number.isSafeInteger(Number(financeFactID)))) messages.push('账款编号无效')
-  if (mapKey && !catalog.businessChains.some((item) => item.key === mapKey)) {
-    messages.push('未登记的系统关联链路')
-  }
-  if (mapNodeKey) {
-    const related = new Set([
-      mapKey,
-      ...catalog.businessChainOverview.relations
-        .filter(
-          (item) => item.fromChainKey === mapKey || item.toChainKey === mapKey
-        )
-        .flatMap((item) => [item.fromChainKey, item.toChainKey]),
-    ])
-    if (!mapKey || !related.has(mapNodeKey)) {
-      messages.push('系统关联节点不属于当前范围')
-    }
-  }
-  if (
-    topicNodeKey &&
-    !catalog.businessChains
-      .find((item) => item.key === topicKey)
-      ?.nodes.some((item) => item.key === topicNodeKey)
-  ) {
-    messages.push('节点不属于当前专项链路')
-  }
   const chain = catalog.businessChains.find((item) => item.key === chainKey)
   const overviewSelected = chainKey === catalog.businessChainOverview.key
   const chainNode =
@@ -534,8 +499,8 @@ function invalidQueryMessages(searchParams, catalog, defaultView = DEFAULT_VIEW)
     : null
   const flow = catalog.flows.find((item) => item.key === flowKey)
   const activeView = view || defaultView
-  if (activeView === 'chain' && readingTab === DEV_FLOW_SPECIALIZED_CHAIN_TAB && chainKey && !overviewSelected) {
-    messages.push('请从业务结构打开专项链路')
+  if (activeView === 'chain' && readingTab === DEV_FLOW_FINANCE_RELATIONS_TAB && chainKey && !overviewSelected) {
+    messages.push('请从业务结构打开财务关联概览')
   }
 
   if (view && !VIEW_KEYS.has(view)) messages.push(`未知视图：${view}`)
@@ -635,7 +600,6 @@ export default function DevFlowStateObservatoryPage() {
   const requestedView = cleanText(activeSearchParams.get(QUERY_KEYS.view))
   const view = requestedView || defaultView
   const viewRoute = resolveDevFlowViewRoute(view)
-  const specializedChainSelected = view === 'chain' && activeSearchParams.get(QUERY_KEYS.roleTab) === DEV_FLOW_SPECIALIZED_CHAIN_TAB
   const [customerExportOpen, setCustomerExportOpen] = useState(false)
   const [definitionSearchOpen, setDefinitionSearchOpen] = useState(false)
   const [printingCurrent, setPrintingCurrent] = useState(false)
@@ -987,14 +951,7 @@ export default function DevFlowStateObservatoryPage() {
     function restore() {
       const pending = [...pageRef.current.querySelectorAll('[data-mermaid-status="loading"], [data-graph-status="loading"]')]
         .some((element) => element.getClientRects().length)
-      if (pending) return
-      window.scrollTo({ top: frame.scroll, behavior: 'instant' })
-      if (Math.abs(window.scrollY - frame.scroll) > 1) return
-      ;[...document.querySelectorAll('button,a')]
-        .find((element) => element.getClientRects().length &&
-          (element.getAttribute('aria-label') || element.textContent).trim() === frame.focus)
-        ?.focus({ preventScroll: true })
-      stop()
+      if (!pending && restoreDevReadingPosition(frame)) stop()
     }
     observer.observe(pageRef.current)
     contentObserver.observe(pageRef.current, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-mermaid-status', 'data-graph-status'] })
@@ -1007,7 +964,7 @@ export default function DevFlowStateObservatoryPage() {
     return {
       pathname: location.pathname,
       search: activeSearchParams.toString(),
-      label: specializedChainSelected ? '专项链路' : VIEW_META[view]?.label || '上一层',
+      label: VIEW_META[view]?.label || '上一层',
       scroll: window.scrollY,
       focus: (active?.getAttribute('aria-label') || active?.textContent || '').trim(),
       taskScoped,
@@ -1024,20 +981,6 @@ export default function DevFlowStateObservatoryPage() {
         flowReturnFrames: returnFrames.slice(0, -1),
         flowTaskContext: previous.taskScoped,
         flowRestoreFrame: previous,
-      },
-    })
-  }
-  const openSpecializedChain = (chainKey) => {
-    const frame = captureReadingFrame()
-    navigate({ pathname: location.pathname, search: location.search }, {
-      replace: true,
-      state: { ...location.state, flowRestoreFrame: frame },
-    })
-    navigate(buildDevSpecializedChainLocation(chainKey, activeSearchParams), {
-      state: {
-        flowReturnFrames: [...returnFrames, frame],
-        flowTaskContext: false,
-        flowRestoreFrame: null,
       },
     })
   }
@@ -1307,7 +1250,6 @@ export default function DevFlowStateObservatoryPage() {
             taskId={taskId}
             selectedTask={selectedTask}
             onOpenView={openView}
-            onOpenTopics={openSpecializedChain}
           />
         )
       }
@@ -1652,13 +1594,12 @@ export default function DevFlowStateObservatoryPage() {
                       new URLSearchParams({
                         view: 'chain',
                         chain: catalog.businessChainOverview.key,
-                        ...(specializedChainSelected ? { [QUERY_KEYS.roleTab]: DEV_FLOW_SPECIALIZED_CHAIN_TAB } : {}),
                       }),
                       { replace: true }
                     )
                   }}
                 >
-                  {specializedChainSelected ? '恢复到专项链路' : '恢复到业务总图'}
+                  恢复到业务总图
                 </Button>
               </Space>
             }

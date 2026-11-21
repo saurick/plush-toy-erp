@@ -32,13 +32,6 @@ export const DEV_FLOW_STATE_QUERY_KEYS = Object.freeze({
   roleStage: 'flow_stage',
   roleSubstep: 'flow_substep',
   roleTab: 'flow_tab',
-  roleTopic: 'flow_topic',
-  roleTopicNode: 'flow_topic_node',
-  roleTopicStep: 'flow_topic_step',
-  roleTopicPanel: 'flow_topic_panel',
-  roleTopicBatch: 'flow_topic_batch',
-  roleMap: 'flow_map',
-  roleMapNode: 'flow_map_node',
   exception: 'flow_exception',
   exceptionDecision: 'flow_decision',
   exceptionStep: 'flow_exception_step',
@@ -67,20 +60,7 @@ export function patchDevFlowRelationFilters(searchParams, patch) {
 
 export const DEV_FLOW_STATE_DEFAULT_VIEW = 'chain'
 export const DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY = 'all'
-export const DEV_FLOW_SPECIALIZED_CHAIN_TAB = 'topics'
-
-export function buildDevSpecializedChainLocation(chainKey, searchParams = new URLSearchParams()) {
-  const next = new URLSearchParams({
-    [DEV_FLOW_STATE_QUERY_KEYS.view]: DEV_FLOW_STATE_DEFAULT_VIEW,
-    [DEV_FLOW_STATE_QUERY_KEYS.chain]: DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY,
-    [DEV_FLOW_STATE_QUERY_KEYS.roleTab]: DEV_FLOW_SPECIALIZED_CHAIN_TAB,
-    [DEV_FLOW_STATE_QUERY_KEYS.roleTopic]: chainKey,
-  })
-  for (const key of Object.values(DEV_FLOW_RELATION_FILTER_KEYS)) {
-    if (searchParams.has(key)) next.set(key, searchParams.get(key))
-  }
-  return { pathname: DEV_STATUS_FLOWS_ROUTE, search: `?${next}` }
-}
+export const DEV_FLOW_FINANCE_RELATIONS_TAB = 'finance'
 
 export const DEV_FLOW_STATE_VIEW_SELECTION_QUERY_KEYS = Object.freeze({
   finance_records: Object.freeze([

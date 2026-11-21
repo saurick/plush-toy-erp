@@ -120,13 +120,12 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
   assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
-  assert.match(page, /<BusinessTopicsView/u);
-  assert.match(read("web/src/dev-workbench/components/flow-state/BusinessTopicsView.jsx"), /<BusinessChainTopics/u);
-  assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
+  assert.match(guide, /<FinanceRelationshipsView/u);
+  assert.match(guide, /label: '财务关联概览'/u);
   assert.match(guide, /aria-label="流程视图"/u);
   assert.match(guide, /relatedChainKnown = businessCatalog\.businessChains\.some\(\(chain\) => chain\.key === relatedChainKey\)/u);
   assert.match(guide, /!scoped && !selection\?\.invalid && relatedChainKnown/u);
-  assert.match(guide, /onOpenTopics\(relatedChainKey\)/u);
+  assert.match(guide, /devFlowExplorerChainURL\(relatedChainKey\)/u);
   assert.doesNotMatch(guide, /按业务查阅|返回完整流程|topic-nodes/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
   assert.match(guide, /aria-label="流程详情"/u);
@@ -299,13 +298,6 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "flow_stage",
     "flow_substep",
     "flow_tab",
-    "flow_topic",
-    "flow_topic_node",
-    "flow_topic_step",
-    "flow_topic_panel",
-    "flow_topic_batch",
-    "flow_map",
-    "flow_map_node",
     "flow_exception",
     "flow_decision",
     "flow_exception_step",
@@ -352,10 +344,6 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
   assert.match(page, /erp-dev-flow-context-path/u);
   assert.match(page, /data-selected-chain-node/u);
   assert.match(page, /data-business-chain-overview/u);
-  assert.match(page, /data-topic-diagram/u);
-  assert.match(page, /data-business-chain-system/u);
-  assert.match(page, /buildDevBusinessChainTopics\(catalog,\s*\{/u);
-  assert.match(page, /系统衔接图/u);
 });
 
 test("dev flow state observatory: customer review print is generated from the shared catalog and contains no second flow catalog", () => {
@@ -489,7 +477,7 @@ test("dev flow state observatory: Runtime completion never promotes Workflow or 
   assert.match(chain, /item\.processKeys\.includes\(runtimeProcessKey\)/u);
   assert.match(chain, /runtimeKey=\{currentRuntimeNode\?\.key\}/u);
   assert(read('web/src/common/components/diagram/mermaidGraph.mjs').includes("'runtime-current': node.key === runtimeKey"), 'Mermaid runtime highlight is limited to the exact current node');
-  assert.match(overview, /matchingChain\?\.key/u);
+  assert.match(overview, /当前实例所属链：\{matchingChain\.label\}/u);
   assert.match(overview, /总图最多只高亮这笔任务所属的一条业务链/u);
   assert.match(overview, /只证明定位到所属链；尚未证明上下游完成/u);
   assert.doesNotMatch(

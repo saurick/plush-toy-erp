@@ -34,7 +34,9 @@ import { applyDevFlowExplorerEntry } from '../../pages/devFlowExplorerNavigation
 import { DEV_FLOW_EXPLORER_ROUTE, DEV_PAGE_TITLE_BY_ROUTE } from '../../config/devRoutes.mjs'
 import './businessChainDesigner.css'
 
-export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, initialRange, startBlank = false }) {
+export default function BusinessChainDesigner({
+  catalog, entry, onEntryApplied, initialRange, startBlank = false, onOpenVerification, returnToSource, restoredPurpose,
+}) {
   const legendId = useId()
   const { fullscreen, toggleFullscreen, workspaceRef, buttonRef } =
     useBusinessChainDesignFullscreen()
@@ -45,7 +47,9 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
   const draftModel = useBusinessChainDraft(library, initialRange, startBlank)
   const { draft, change, undo, redo, past, future, issue } = draftModel
   const [connecting, setConnecting] = useState(null)
-  const [selection, setSelection] = useState(null)
+  const [selection, setSelection] = useState(() =>
+    library.chainDefinitions.has(restoredPurpose?.chainKey) ? restoredPurpose : null
+  )
   const [notice, setNotice] = useState('')
   const [frameKey, setFrameKey] = useState(0)
   const [libraryVisible, setLibraryVisible] = useState(false)
@@ -213,6 +217,7 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
         navigation={workspace === 'example' ? <Button onClick={() => setWorkspace('explore')}>返回规则探索</Button> : null}
         tools={
           <div className="erp-chain-design__file-actions" hidden={workspace !== 'explore'}>
+            {returnToSource}
             <Button
               ref={libraryToggle}
               icon={showLibrary ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
@@ -301,6 +306,7 @@ export default function BusinessChainDesigner({ catalog, entry, onEntryApplied, 
           viewRequest={viewRequest}
           onNavigate={navigateReading}
           onNavigateChain={navigateChain}
+          onOpenVerification={onOpenVerification}
           onReturn={history.at(-1)?.kind === 'focus' ? () => returnReading(true) : null}
           layers={layers}
           layout={layout}

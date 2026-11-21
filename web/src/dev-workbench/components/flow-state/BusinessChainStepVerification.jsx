@@ -19,7 +19,7 @@ import {
 } from '../../config/devTestingOperation.mjs'
 import { businessChainRuleBatch } from '../../../../../scripts/qa/lib/business-chain-rule-contract.mjs'
 import { CHAIN_AUDIT_BATCH_PATTERN } from '../../config/devBusinessChainAudit.mjs'
-import { DEV_FLOW_STATE_QUERY_KEYS as queryKeys } from '../../pages/devFlowStateQuery.mjs'
+import { DEV_FLOW_EXPLORER_VERIFICATION_KEYS as queryKeys } from '../../pages/devFlowExplorerNavigation.mjs'
 import {
   describeDevBusinessChainResponsibility,
   describeDevBusinessChainStep,
@@ -47,16 +47,15 @@ const emptyBatch = { audit: null, ruleResult: null, error: '' }
 
 export default function BusinessChainStepVerification({
   catalog,
-  topic,
+  chain,
   step,
-  onClose,
   testingClient,
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
-  const view = searchParams.getAll(queryKeys.roleTopicPanel).length === 1 &&
-    searchParams.get(queryKeys.roleTopicPanel) === 'rules' ? 'rules' : 'evidence'
-  const updateSelection = useCallback((patch, replace = false) => {
+  const view = searchParams.getAll(queryKeys.panel).length === 1 &&
+    searchParams.get(queryKeys.panel) === 'rules' ? 'rules' : 'evidence'
+  const updateSelection = useCallback((patch) => {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous)
       for (const [key, value] of Object.entries(patch)) {
@@ -64,7 +63,7 @@ export default function BusinessChainStepVerification({
         else next.set(key, value)
       }
       return next
-    }, { replace, state: location.state })
+    }, { replace: true, state: location.state })
   }, [setSearchParams, location.state])
   const [evidence, setEvidence] = useState({})
   const [loading, setLoading] = useState(true)
@@ -77,37 +76,37 @@ export default function BusinessChainStepVerification({
   const running = useRef('')
   const operations = useDevTestingOperations({ client: testingClient })
   const candidate = operations.testingOperations[DEV_CHAIN_RULE_ACTION.key]
-  const operation = candidate?.chainKey === topic.key ? candidate : null
+  const operation = candidate?.chainKey === chain.key ? candidate : null
   const batches = (evidence.batches || []).filter((batch) =>
-    batch.status === 'ready' && batch.chainKeys.includes(topic.key)
+    batch.status === 'ready' && batch.chainKeys.includes(chain.key)
   )
-  const requestedBatch = searchParams.getAll(queryKeys.roleTopicBatch).length === 1
-    ? searchParams.get(queryKeys.roleTopicBatch) : ''
+  const requestedBatch = searchParams.getAll(queryKeys.batch).length === 1
+    ? searchParams.get(queryKeys.batch) : ''
   const selectedBatch = CHAIN_AUDIT_BATCH_PATTERN.test(requestedBatch || '') &&
     batches.some((batch) => batch.id === requestedBatch)
     ? requestedBatch : batches[0]?.id || ''
-  const currentBatch = batchData.audit?.batch === selectedBatch && batchData.audit?.chainKey === topic.key
+  const currentBatch = batchData.audit?.batch === selectedBatch && batchData.audit?.chainKey === chain.key
     ? batchData : emptyBatch
   const visibleEvidence = { ...evidence, ruleResult: currentBatch.ruleResult }
   const description = describeDevBusinessChainStep(catalog, step)
   const rules = chainStepRuleRows(step, visibleEvidence)
   const layers = chainStepEvidenceLayers(step, visibleEvidence, currentBatch.audit)
-  const from = topic.nodes.find((node) => node.key === step.fromNodeKey)
-  const to = topic.nodes.find((node) => node.key === step.toNodeKey)
+  const from = chain.nodes.find((node) => node.key === step.fromNodeKey)
+  const to = chain.nodes.find((node) => node.key === step.toNodeKey)
   const access = chainStepSourceAccessFacts(step)
   const failed = layers.some((layer) => ['failed', 'blocked'].includes(layer.status))
   const reading = loading || batchLoading
 
   useEffect(() => {
     const patch = {}
-    if (searchParams.has(queryKeys.roleTopicPanel) &&
-      (searchParams.getAll(queryKeys.roleTopicPanel).length !== 1 ||
-        !['rules', 'evidence'].includes(searchParams.get(queryKeys.roleTopicPanel)))) {
-      patch[queryKeys.roleTopicPanel] = null
+    if (searchParams.has(queryKeys.panel) &&
+      (searchParams.getAll(queryKeys.panel).length !== 1 ||
+        !['rules', 'evidence'].includes(searchParams.get(queryKeys.panel)))) {
+      patch[queryKeys.panel] = null
     }
-    if (!loading && evidence.generation === reload && evidence.batchesLoaded && searchParams.has(queryKeys.roleTopicBatch) &&
-      requestedBatch !== selectedBatch) patch[queryKeys.roleTopicBatch] = null
-    if (Object.keys(patch).length) updateSelection(patch, true)
+    if (!loading && evidence.generation === reload && evidence.batchesLoaded && searchParams.has(queryKeys.batch) &&
+      requestedBatch !== selectedBatch) patch[queryKeys.batch] = null
+    if (Object.keys(patch).length) updateSelection(patch)
   }, [searchParams, requestedBatch, selectedBatch, loading, reload, evidence.generation, evidence.batchesLoaded, updateSelection])
 
   useEffect(() => {
@@ -135,7 +134,7 @@ export default function BusinessChainStepVerification({
     setBatchLoading(true)
     setBatchError('')
     setBatchData(emptyBatch)
-    readChainVerificationBatch({ batch: selectedBatch, chain: topic, signal: controller.signal }).then(
+    readChainVerificationBatch({ batch: selectedBatch, chain, signal: controller.signal }).then(
       (value) => {
         if (!controller.signal.aborted) {
           setBatchData(value)
@@ -150,7 +149,7 @@ export default function BusinessChainStepVerification({
       }
     )
     return () => controller.abort()
-  }, [loading, selectedBatch, topic])
+  }, [loading, selectedBatch, chain])
 
   useEffect(() => {
     if (!operation) return
@@ -162,15 +161,15 @@ export default function BusinessChainStepVerification({
     const key = `${operation.id}:${operation.revision}`
     if (completed.current === key) return
     completed.current = key
-    updateSelection({ [queryKeys.roleTopicBatch]: businessChainRuleBatch(operation.id) })
+    updateSelection({ [queryKeys.batch]: businessChainRuleBatch(operation.id) })
     setReload((value) => value + 1)
   }, [operation, updateSelection])
 
   const run = async () => {
-    const result = await operations.runTestingAction(DEV_CHAIN_RULE_ACTION.key, undefined, topic.key)
+    const result = await operations.runTestingAction(DEV_CHAIN_RULE_ACTION.key, undefined, chain.key)
     if (result && !isDevTestingOperationActive(result)) {
       completed.current = `${result.id}:${result.revision}`
-      updateSelection({ [queryKeys.roleTopicBatch]: businessChainRuleBatch(result.id) })
+      updateSelection({ [queryKeys.batch]: businessChainRuleBatch(result.id) })
       setReload((value) => value + 1)
     }
   }
@@ -244,7 +243,7 @@ export default function BusinessChainStepVerification({
               className="erp-dev-chain-step-verification__batch"
               value={selectedBatch}
               options={batches.map((batch) => ({ value: batch.id, label: batch.title }))}
-              onChange={(batch) => updateSelection({ [queryKeys.roleTopicBatch]: batch })}
+              onChange={(batch) => updateSelection({ [queryKeys.batch]: batch })}
             />
           ) : null}
           {layers.find((layer) => layer.observed)?.observed ? (
@@ -275,7 +274,7 @@ export default function BusinessChainStepVerification({
               </ul>
             ) : null}
           </details>
-          <DevReadingLink to={chainStepAuditURL(topic.key, step.key, selectedBatch)} fromLabel={step.label}>查看所选动作的链路实测报告</DevReadingLink>
+          <DevReadingLink to={chainStepAuditURL(chain.key, step.key, selectedBatch)} fromLabel={step.label}>查看所选动作的链路实测报告</DevReadingLink>
         </>
       )}
     </div>
@@ -291,11 +290,10 @@ export default function BusinessChainStepVerification({
       title={step.label}
       headingLevel={3}
       description={`${from.label} → ${to.label}`}
-      actions={onClose ? <Button onClick={onClose}>返回关系图</Button> : null}
     >
       <SlidingTabs
         activeKey={view}
-        onChange={(key) => updateSelection({ [queryKeys.roleTopicPanel]: key === 'evidence' ? null : key })}
+        onChange={(key) => updateSelection({ [queryKeys.panel]: key === 'evidence' ? null : key })}
         items={panelTabs.map((tab) => ({ ...tab, children: tab.key === view ? content : null }))}
         aria-label="所选动作的核验内容"
       />

@@ -130,9 +130,7 @@ test('工作台内容区只保留受控对象关联、岗位配置和规则出�
       const clickSource = click ? source.slice(click.range[0], click.range[1]) : ''
       const permissionAction = permissionSurfaces.has(relative) && permissionCallbacks.test(clickSource)
       const contextualRuleAction = relative === 'components/flow-state/BusinessActionRelations.jsx' && /onOpenRules\(action\)/u.test(clickSource)
-      const contextualTopicAction = relative === 'components/flow-state/TaskFulfillmentGuide.jsx' && /onOpenTopics\(relatedChainKey\)/u.test(clickSource)
-      const contextualNodeRuleAction = relative === 'components/flow-state/BusinessTopicDetails.jsx' && /onExploreChain\(topic.key, node.key\)/u.test(clickSource)
-      if (node.name.name === 'Button' && click && navigationCallbacks.test(clickSource) && !permissionAction && !contextualRuleAction && !contextualTopicAction && !contextualNodeRuleAction) violations.push(`${relative}:${node.loc.start.line} 关联跳转回调`)
+      if (node.name.name === 'Button' && click && navigationCallbacks.test(clickSource) && !permissionAction && !contextualRuleAction) violations.push(`${relative}:${node.loc.start.line} 关联跳转回调`)
     })
   }
   assert.deepEqual(violations, [])

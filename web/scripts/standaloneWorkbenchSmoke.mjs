@@ -270,9 +270,10 @@ try {
   checks.push('built component catalog retains local sample links, consumer guidance and document return state without business shortcuts')
 
   await page.goto(
-    `${origin}/__dev/status-flows?flow_tab=topics&flow_topic=purchase_to_inventory&flow_topic_node=purchase_quality&flow_topic_step=purchase_quality%3Aposts_fact%3Apurchase_accepted`
+    `${origin}/__dev/flow-explorer?chain=purchase_to_inventory&step=purchase_quality%3Aposts_fact%3Apurchase_accepted`
   )
-  const purchaseStep = page.getByRole('region', {
+  const verificationDrawer = page.getByRole('dialog', { name: '规则与验证', exact: true })
+  const purchaseStep = verificationDrawer.getByRole('region', {
     name: '交接规则与验证',
     exact: true,
   })
@@ -285,9 +286,10 @@ try {
     0
   )
   assert.equal(await purchaseStep.getByRole('link').count(), 0)
-  assert.equal(await purchaseStep.evaluate((element) => Boolean(element.closest('[data-topic-diagram="purchase_to_inventory"]'))), true)
-  await purchaseStep.getByRole('button', { name: '返回关系图', exact: true }).click()
-  await page.locator('[data-graph-node="purchase_accepted"]').click()
+  assert.equal(await purchaseStep.getAttribute('data-chain-step-verification'), 'purchase_quality:posts_fact:purchase_accepted')
+  await verificationDrawer.getByRole('button', { name: '关闭', exact: true }).click()
+  await verificationDrawer.waitFor({ state: 'hidden' })
+  await page.locator('[data-design-node="step:purchase_accepted:posts_fact:purchase_lot"]').click()
   await page
     .getByRole('button', {
       name: '查看仓库确认本次合格行入库的规则与验证',

@@ -459,7 +459,7 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/pages/devFlowViewContext.mjs",
-    new Set(["utils/workflowBusinessChain.mjs", "utils/workflowFulfillment.mjs"]),
+    new Set(["utils/workflowBusinessChain.mjs"]),
   ],
   [
     "web/src/dev-workbench/components/flow-state/TaskFulfillmentGuide.jsx",
@@ -475,14 +475,6 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/components/flow-state/FulfillmentChainCanvas.jsx",
-    new Set(["utils/workflowFulfillment.mjs"]),
-  ],
-  [
-    "web/src/dev-workbench/components/flow-state/BusinessChainTopics.jsx",
-    new Set(["utils/workflowFulfillment.mjs"]),
-  ],
-  [
-    "web/src/dev-workbench/config/devBusinessChainProjection.mjs",
     new Set(["utils/workflowFulfillment.mjs"]),
   ],
   [
@@ -1104,12 +1096,10 @@ test("work-center samples keep direct business actions outside the presentation 
 
 test("business chain reading context retains a closed presentation adapter", () => {
   const file = "web/src/dev-workbench/pages/devFlowViewContext.mjs";
-  const modules = ["utils/workflowBusinessChain.mjs", "utils/workflowFulfillment.mjs"];
+  const module = "utils/workflowBusinessChain.mjs";
   for (const prefix of ["@/erp/", "../../erp/"]) {
-    for (const module of modules) {
-      assert.equal(isAllowedERPImport(file, `${prefix}${module}`), true);
-      assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", `${prefix}${module}`), false);
-    }
+    assert.equal(isAllowedERPImport(file, `${prefix}${module}`), true);
+    assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", `${prefix}${module}`), false);
     for (const module of ["pages/PurchaseOrdersPage.jsx", "api/masterDataOrderApi.mjs", "config/businessModules.mjs", "config/commandCenter.mjs"]) {
       assert.equal(isAllowedERPImport(file, `${prefix}${module}`), false);
     }
@@ -1120,8 +1110,6 @@ test("business chain reading context retains a closed presentation adapter", () 
   assert.deepEqual(new Set(imports), new Set([
     "../../common/consts/workflowTaskDiscovery.generated.mjs",
     "../../erp/utils/workflowBusinessChain.mjs",
-    "../config/devBusinessChainProjection.mjs",
-    "../../erp/utils/workflowFulfillment.mjs",
     "./devFlowStateQuery.mjs",
   ]));
 });

@@ -211,8 +211,7 @@ export function createDevBusinessChainDesignScenarios({
         await page
           .getByRole('link', { name: '业务链路', exact: true })
           .click()
-        await page.getByRole('tab', { name: '专项链路', exact: true }).click()
-        await expect(page.locator('[data-topic-diagram]')).toBeVisible()
+        await expect(page.getByRole('tab', { name: '订单全流程', exact: true })).toHaveAttribute('aria-selected', 'true')
         await expect(flowBoundary).toBeVisible()
         await page.getByRole('link', { name: '流程探索', exact: true }).click()
         await editor.getByRole('button', { name: '展开节点库', exact: true }).click()
@@ -221,7 +220,7 @@ export function createDevBusinessChainDesignScenarios({
         await expect(saveStatus).toHaveCount(0)
         await expect(editor.locator('[data-design-node]')).toHaveCount(5)
         await expect(page.getByRole('heading', { name: '流程探索', level: 1 })).toBeVisible()
-        await expect(page.getByRole('tablist', { name: '专项链路内容' })).toHaveCount(0)
+        await expect(page.getByRole('tablist', { name: '流程视图' })).toHaveCount(0)
         await chooseExplorerAction(editor, '视图备注')
         await editor
           .getByRole('textbox', { name: '视图备注内容', exact: true })

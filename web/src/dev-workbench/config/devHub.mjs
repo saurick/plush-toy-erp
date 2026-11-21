@@ -64,7 +64,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'status-flows',
-    searchKeywords: Object.freeze(['业务链观察', '专项链路', '财务关联', '系统衔接']),
+    searchKeywords: Object.freeze(['业务链观察', '订单全流程', '财务关联', '异常处理']),
     englishTitle: 'Business Chain Observatory',
     group: '业务链治理 / Business Chain Governance',
     route: DEV_STATUS_FLOWS_ROUTE,
@@ -77,7 +77,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '禁止通用改状态 / No generic status write',
       '不进生产构建 / No prod build',
     ]),
-    description: '查看订单全流程、专项链路与逐步验证，跟踪具体业务实例。',
+    description: '查看订单全流程、异常处理和财务关联，跟踪具体业务实例。',
   }),
   Object.freeze({
     key: 'flow-explorer',
@@ -92,7 +92,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不修改正式流程、状态或业务事实 / No business writes',
       '不进生产构建 / No prod build',
     ]),
-    description: '从链路或节点展开规则、状态与任务，保存自己的阅读视图。',
+    description: '从链路或节点展开上下游，按动作查看规则、验证证据与实测报告。',
   }),
   Object.freeze({
     key: 'business-rules',

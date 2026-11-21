@@ -5,14 +5,14 @@ import {
   PRODUCT_CORE_RELEASE_EVIDENCE_URL,
   productCapabilitiesForChain,
   productCoreCapabilityURL,
-  productCoreChainURL,
 } from '../config/devProductCoreRelations.mjs'
+import { devFlowExplorerChainURL } from '../config/devRoutes.mjs'
 import { chainStepAuditURL } from '../config/devBusinessChainVerification.mjs'
 import { DevReadingLink } from './DevReadingNavigation.jsx'
 
 const { Title } = Typography
 
-export function ChainCapabilityLinks({ chainKey, fromLabel = '专项链路', report = false }) {
+export function ChainCapabilityLinks({ chainKey, fromLabel = '流程探索', report = false, explorerPurpose }) {
   const names = productCapabilitiesForChain(chainKey)
   if (!names.length) return null
   return (
@@ -20,20 +20,20 @@ export function ChainCapabilityLinks({ chainKey, fromLabel = '专项链路', rep
       <Title level={4}>{report ? '当前定义关联的产品能力' : '关联产品能力'}</Title>
       <Space wrap>
         {names.map((name) => (
-          <DevReadingLink key={name} to={productCoreCapabilityURL(name)} fromLabel={fromLabel}>{name}</DevReadingLink>
+          <DevReadingLink key={name} to={productCoreCapabilityURL(name)} fromLabel={fromLabel} explorerPurpose={explorerPurpose}>{name}</DevReadingLink>
         ))}
       </Space>
-      {report ? <p><DevReadingLink to={productCoreChainURL(chainKey)} fromLabel={fromLabel}>查看当前专项链路</DevReadingLink>；本批次是否覆盖该链路，以报告记录为准。</p> : null}
+      {report ? <p><DevReadingLink to={devFlowExplorerChainURL(chainKey)} fromLabel={fromLabel}>在流程探索中查看当前链路</DevReadingLink>。本批次是否覆盖该链路，以报告记录为准。</p> : null}
     </section>
   )
 }
 
-export function ChainEvidenceLinks({ chainKey, fromLabel = '专项链路' }) {
+export function ChainEvidenceLinks({ chainKey, fromLabel = '流程探索', explorerPurpose }) {
   return (
     <>
       <Space wrap>
-        <DevReadingLink to={chainStepAuditURL(chainKey, '')} fromLabel={fromLabel}>链路实测报告</DevReadingLink>
-        <DevReadingLink to={PRODUCT_CORE_RELEASE_EVIDENCE_URL} fromLabel={fromLabel}>版本发布记录</DevReadingLink>
+        <DevReadingLink to={chainStepAuditURL(chainKey, '')} fromLabel={fromLabel} explorerPurpose={explorerPurpose}>链路实测报告</DevReadingLink>
+        <DevReadingLink to={PRODUCT_CORE_RELEASE_EVIDENCE_URL} fromLabel={fromLabel} explorerPurpose={explorerPurpose}>版本发布记录</DevReadingLink>
       </Space>
       <p>实测报告核对所选链路，发布记录按版本与目标环境核对；二者都不代表客户验收。</p>
     </>

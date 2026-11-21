@@ -1,10 +1,10 @@
 import {
   DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
+  DEV_FLOW_EXPLORER_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
-  DEV_STATUS_FLOWS_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
+  devFlowExplorerChainURL,
 } from './devRoutes.mjs'
-import { buildDevSpecializedChainLocation, DEV_FLOW_SPECIALIZED_CHAIN_TAB } from '../pages/devFlowStateQuery.mjs'
 import { chainStepAuditURL } from './devBusinessChainVerification.mjs'
 import { CHAIN_AUDIT_BATCH_PATTERN } from './devBusinessChainAudit.mjs'
 import { DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS } from './devBusinessChainStepContracts.mjs'
@@ -25,11 +25,6 @@ export function productCoreCapabilityURL(capability) {
   return `${DEV_PRODUCT_CORE_ROUTE}?${new URLSearchParams({ capability })}`
 }
 
-export function productCoreChainURL(chainKey) {
-  const { pathname, search } = buildDevSpecializedChainLocation(chainKey)
-  return pathname + search
-}
-
 export const PRODUCT_CORE_RELEASE_EVIDENCE_URL = `${DEV_VERSION_CENTER_ROUTE}?view=history`
 
 export function isProductCoreReadingDestination(value) {
@@ -39,14 +34,12 @@ export function isProductCoreReadingDestination(value) {
   const query = url.searchParams
   if ([...new Set(query.keys())].some((key) => query.getAll(key).length !== 1)) return false
   const onlyKeys = (keys) => [...query.keys()].every((key) => keys.includes(key))
-  const knownChain = (key) => PRODUCT_CORE_CHAIN_REFERENCES.some((entry) => entry.chainKeys.includes(key))
+  const knownChain = (key) => Object.hasOwn(DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS, key)
   if (url.pathname === DEV_PRODUCT_CORE_ROUTE) {
     return onlyKeys(['capability']) && PRODUCT_CORE_CHAIN_REFERENCES.some((entry) => entry.capability === query.get('capability'))
   }
-  if (url.pathname === DEV_STATUS_FLOWS_ROUTE) {
-    return onlyKeys(['view', 'chain', 'flow_tab', 'flow_topic']) &&
-      query.get('view') === 'chain' && query.get('chain') === 'all' &&
-      query.get('flow_tab') === DEV_FLOW_SPECIALIZED_CHAIN_TAB && knownChain(query.get('flow_topic'))
+  if (url.pathname === DEV_FLOW_EXPLORER_ROUTE) {
+    return onlyKeys(['chain']) && knownChain(query.get('chain'))
   }
   if (url.pathname === DEV_BUSINESS_CHAIN_AUDIT_ROUTE) {
     return onlyKeys(['chain', 'step', 'batch']) && knownChain(query.get('chain')) &&
@@ -76,7 +69,7 @@ export function buildProductCoreChainRelations(capabilities, catalog, references
   return new Map(references.map((entry) => [entry.capability, entry.chainKeys.map((key) => ({
     key,
     label: chains.get(key).label,
-    definitionURL: productCoreChainURL(key),
+    definitionURL: devFlowExplorerChainURL(key),
     evidenceURL: chainStepAuditURL(key, ''),
   }))]))
 }

@@ -1,6 +1,6 @@
 import { expect } from 'playwright/test'
 import { createDevBusinessRulesScenarios } from './devBusinessRulesScenarios.mjs'
-import { createDevBusinessTopicsScenarios } from './devBusinessTopicsScenarios.mjs'
+import { createDevBusinessChainNavigationScenarios } from './devBusinessChainNavigationScenarios.mjs'
 import { createDevFinanceWorkbenchScenarios } from './devFinanceWorkbenchScenarios.mjs'
 import { createDevBusinessChainScenarios } from './devBusinessChainScenarios.mjs'
 import { createDevFlowDetailScenarios } from './devFlowDetailScenarios.mjs'
@@ -34,5 +34,5 @@ export function createDevFlowStateObservatoryScenarios(deps) {
       await assertNoHorizontalOverflow(page)
       assert.deepEqual(writes.get(page), [], '结构页面保持只读')
     },
-  }, ...createDevBusinessRulesScenarios(deps), ...createDevBusinessTopicsScenarios(deps), ...createDevBusinessChainDesignScenarios({ ...deps, startNoWriteAudit }), ...createDevFinanceWorkbenchScenarios({ ...deps, startNoWriteAudit }), ...createDevBusinessRelationsScenarios(deps), ...createDevBusinessChainScenarios({ ...deps, observatoryPath: DEV_FLOW_STATE_OBSERVATORY_PATH, startNoWriteAudit }), ...createDevFlowDetailScenarios(deps)]
+  }, ...createDevBusinessRulesScenarios(deps), ...createDevBusinessChainNavigationScenarios(deps), ...createDevBusinessChainDesignScenarios({ ...deps, startNoWriteAudit }), ...createDevFinanceWorkbenchScenarios({ ...deps, startNoWriteAudit }), ...createDevBusinessRelationsScenarios(deps), ...createDevBusinessChainScenarios({ ...deps, observatoryPath: DEV_FLOW_STATE_OBSERVATORY_PATH, startNoWriteAudit }), ...createDevFlowDetailScenarios(deps)]
 }

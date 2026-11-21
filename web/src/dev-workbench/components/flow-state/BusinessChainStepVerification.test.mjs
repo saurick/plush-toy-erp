@@ -5,10 +5,10 @@ import { MemoryRouter } from 'react-router-dom'
 import { createReactTestHarness } from '../../../../scripts/test/reactRuntime.mjs'
 import { DEV_FLOW_STATE_CATALOG as catalog } from '../../config/devFlowStateCatalog.mjs'
 
-const topic = catalog.businessChains.find(
+const chain = catalog.businessChains.find(
   (chain) => chain.key === 'purchase_to_inventory'
 )
-const step = topic.steps.find((step) => step.toNodeKey === 'purchase_accepted')
+const step = chain.steps.find((step) => step.toNodeKey === 'purchase_accepted')
 const testingClient = {
   summary: async () => ({ operations: {}, busy: { active: false, kind: '', profile: '' } }),
 }
@@ -18,7 +18,7 @@ const render = (Component, props = {}) =>
     {
       future: { v7_startTransition: true, v7_relativeSplatPath: true },
     },
-    h(Component, { catalog, topic, step, testingClient, ...props })
+    h(Component, { catalog, chain, step, testingClient, ...props })
   )
 
 test('交接详情保留岗位、独立结果和验证摘要，读取失败可恢复', async (t) => {

@@ -3,6 +3,7 @@ import { Button } from 'antd'
 import AppSelect from '@/common/components/select/AppSelect.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList.jsx'
 import { WorkbenchFacts } from '../WorkbenchPattern.jsx'
+import { ChainCapabilityLinks, ChainEvidenceLinks } from '../DevProductCoreRelations.jsx'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import {
   businessChainApprovalReading,
@@ -11,8 +12,15 @@ import {
   CHAIN_READING_LAYERS,
 } from '../../config/devBusinessChainReading.mjs'
 
-export function ChainPurposeDetails({ catalog, chainKey, onRelation, onShowHandoffs }) {
+const evidenceLabels = {
+  dataset: '模拟数据',
+  contract_test: '规则测试',
+  browser: '浏览器验证',
+}
+
+export function ChainPurposeDetails({ catalog, chainKey, onRelation, onShowHandoffs, onOpenVerification, restoreEvidence }) {
   const { chain, inputs, outputs, handoffs } = describeBusinessChainReading(catalog, chainKey)
+  const [evidenceOpen, setEvidenceOpen] = useState(Boolean(restoreEvidence))
   return (
     <div className="erp-chain-reading-details">
       <strong>用途与交接</strong>
@@ -36,6 +44,24 @@ export function ChainPurposeDetails({ catalog, chainKey, onRelation, onShowHando
           ))}
         </section>
       ) : <p>当前目录尚未登记这条链路的对外交接。</p>}
+      {onOpenVerification ? (
+        <>
+          <Button onClick={(event) => onOpenVerification(chain.key, chain.steps[0].key, event.currentTarget)}>
+            查看本链动作的规则与验证
+          </Button>
+          <ChainCapabilityLinks chainKey={chain.key} explorerPurpose={{ chainKey, evidenceOpen }} />
+          <details className="erp-dev-disclosure" open={evidenceOpen} onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}>
+            <summary>数据与验证（{chain.acceptanceScenarios.length} 类场景）</summary>
+            <ChainEvidenceLinks chainKey={chain.key} explorerPurpose={{ chainKey, evidenceOpen: true }} />
+            <WorkbenchFacts
+              items={chain.acceptanceScenarios.map((scenario) => ({
+                label: scenario.label,
+                value: scenario.evidenceModes.map((mode) => evidenceLabels[mode]).join('、'),
+              }))}
+            />
+          </details>
+        </>
+      ) : null}
       <details>
         <summary>流程地图与实际进度有什么区别？</summary>
         <p>地图说明规则、分支与交接；某笔业务可能按行、按批并行推进，实际经过以任务、单据和事实记录为准。</p>

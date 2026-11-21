@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  buildDevSpecializedChainLocation,
   canonicalizeDevFlowStateSearchParams,
   DEV_BUSINESS_RULE_VIEWS,
   resolveDevFlowViewRoute,
@@ -168,24 +167,7 @@ test('exception origin stays separate from the page return position and survives
 
 test('reading and instance filters survive specialist views without stale object selections', () => {
   const query =
-    'view=runtime&chain=all&flow_topic=delivery_to_settlement&flow_topic_node=shipped&flow_map=delivery_to_settlement&flow_map_node=finance_payment_and_reversal&task_id=42&task_filter=pending&task_stage=shell_quality'
+    'view=runtime&chain=all&flow_tab=finance&finance_topic=purchase&finance_step=2&task_id=42&task_filter=pending&task_stage=shell_quality'
   assert.deepEqual(canonicalize(`${query}&fact=old`), { changed: true, query })
   assert.deepEqual(canonicalize(query), { changed: false, query })
-})
-
-test('专项链路链接保留关联筛选，清除旧环节、实例与核验选择', () => {
-  const from = new URLSearchParams('view=tracking&chain=purchase_to_inventory&node=receipt&flow_stage=incoming_quality&flow_role=warehouse&flow_object=fact.purchase_receipt&flow_permission=warehouse.inbound.confirm&task_id=42&flow_topic=finance_relations&finance_topic=adjustments')
-  from.set('flow_topic_step', 'old-action')
-  from.set('flow_topic_batch', 'old-report')
-  const target = buildDevSpecializedChainLocation('purchase_to_inventory', from)
-  assert.equal(target.pathname, '/__dev/status-flows')
-  assert.deepEqual(Object.fromEntries(new URLSearchParams(target.search)), {
-    view: 'chain',
-    chain: 'all',
-    flow_tab: 'topics',
-    flow_role: 'warehouse',
-    flow_object: 'fact.purchase_receipt',
-    flow_permission: 'warehouse.inbound.confirm',
-    flow_topic: 'purchase_to_inventory',
-  })
 })

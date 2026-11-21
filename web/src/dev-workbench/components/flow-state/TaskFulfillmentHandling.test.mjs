@@ -32,16 +32,26 @@ test('所有环节保留办理规则和受阻处理，关联岗位路径只读�
       })
     )
     assert(!rules.querySelector('a[href^="/erp/"]'))
+    const chainLink = [...root.querySelectorAll('a')].find((link) => link.textContent === '在流程探索中查看链路')
+    assert.equal(chainLink?.getAttribute('href'), `/__dev/flow-explorer?chain=${step.business_chain}`)
   }
 })
 
-test('专项链路选定后直接呈现同源交互图，没有文字节点中转页', async (t) => {
+test('异常详情直达正式链路，财务关联概览使用独立页签', async (t) => {
   const harness = await createReactTestHarness(t)
-  const { default: Topics } = await import('./BusinessChainTopics.jsx')
-  const chain = businessCatalog.businessChains.find((item) => item.key === 'delivery_to_settlement')
-  await harness.render(h(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, h(Topics, { catalog: businessCatalog, selectedTopicKey: chain.key, onSelectChain: () => {} })))
+  const { default: Guide } = await import('./TaskFulfillmentGuide.jsx')
+  const exception = catalog.exception_guides.find((guide) => guide.key === 'production_quality')
+  const render = (search) => harness.render(h(MemoryRouter, {
+    key: search,
+    initialEntries: [`/__dev/status-flows?${search}`],
+    future: { v7_startTransition: true, v7_relativeSplatPath: true },
+  }, h(Guide, { businessCatalog })))
+  await render(`flow_tab=exceptions&flow_exception=${exception.key}`)
   const root = harness.container
-  assert(root.querySelector('[data-topic-diagram="delivery_to_settlement"] [data-business-flow]'))
-  assert(root.querySelector('[aria-label="选择专项链路"]'))
-  assert(!root.querySelector('.erp-dev-fulfillment-guide__topic-nodes'))
+  const chainLink = [...root.querySelectorAll('a')].find((link) => link.textContent === '在流程探索中查看链路')
+  assert.equal(chainLink?.getAttribute('href'), `/__dev/flow-explorer?chain=${exception.business_chain}`)
+  await render('flow_tab=finance')
+  assert.deepEqual([...root.querySelectorAll('[aria-label="流程视图"] [role="tab"]')].map((node) => node.textContent),
+    ['订单全流程', '异常处理', '财务关联概览'])
+  assert.ok(root.querySelector('[data-finance-relationships]'))
 })

@@ -1,7 +1,6 @@
 import { BUSINESS_RULES } from '../../../../scripts/qa/lib/business-rule-catalog.mjs'
 
 // This is a navigation projection over registered chains, not another chain or ledger.
-export const FINANCE_RELATIONS_TOPIC_KEY = 'finance_relations'
 export const FINANCE_RULES = Object.freeze([
   {
     key: 'sources',

@@ -76,8 +76,7 @@ export function createDevFlowExplorerScenarios({
         await page
           .getByRole('link', { name: '业务链路', exact: true })
           .click()
-        await page.getByRole('tab', { name: '专项链路', exact: true }).click()
-        await expect(page.locator('[data-topic-diagram]')).toBeVisible()
+        await expect(page.getByRole('tab', { name: '订单全流程', exact: true })).toHaveAttribute('aria-selected', 'true')
         await page.getByRole('link', { name: '流程探索', exact: true }).click()
         await expect(
           editor.getByRole('status', { name: '视图保存状态' })
@@ -87,47 +86,23 @@ export function createDevFlowExplorerScenarios({
         await expect(editor).toBeVisible()
         assert.deepEqual(await readWorking(), workingBefore)
 
-      await page.goto(new URL(
-        '/__dev/status-flows?view=chain&flow_tab=topics&flow_topic=purchase_to_inventory&flow_topic_node=purchase_order&flow_role=purchase',
-        page.url()
-      ).href)
-        await expect(
-          page.getByRole('region', {
-            name: '采购下单到入库应付关系图',
-            exact: true,
-          })
-        ).toHaveAttribute('data-graph-status', 'rendered')
-        const opener = page.getByRole('button', {
-          name: '从此节点探索',
-          exact: true,
-        })
+        await page.goto(new URL(
+          '/__dev/status-flows?view=chain&chain=all&flow_stage=incoming_quality&flow_role=purchase',
+          page.url()
+        ).href)
+        const opener = page.getByRole('link', { name: '在流程探索中查看链路', exact: true })
+        await expect(opener).toHaveAttribute('href', '/__dev/flow-explorer?chain=purchase_to_inventory')
         await opener.scrollIntoViewIfNeeded()
-        const source = {
-          url: page.url(),
-          scroll: await page.evaluate(() => window.scrollY),
-        }
+        const source = new URL(page.url())
         await opener.click()
+        await expect(page.getByRole('button', { name: '流程范围：采购下单到入库应付' })).toBeVisible()
         await expect(page).toHaveURL(/\/__dev\/flow-explorer$/u)
-        await expect(
-          editor.getByLabel('当前探索范围', { exact: true })
-        ).toContainText('局部 · 采购订单')
-        const focused = await readWorking()
-        await page.reload()
-        await expect(editor).toBeVisible()
-        assert.deepEqual(await readWorking(), focused)
-        await page.goBack()
-        await expect(page).toHaveURL(source.url)
+        await page.getByRole('button', { name: '返回 订单全流程', exact: true }).click()
+        await expect(page).toHaveURL(source.href)
         await expect(opener).toBeFocused()
-        await expect
-          .poll(() => page.evaluate(() => window.scrollY))
-          .toBeCloseTo(source.scroll, 0)
-        await page
-          .getByRole('button', { name: '在流程探索中打开', exact: true })
-          .click()
+        await opener.click()
         await expect(editor).toBeVisible()
-        await expect
-          .poll(async () => (await readWorking()).draft.map.scope)
-          .toBe('whole')
+        await expect.poll(async () => (await readWorking()).draft.map.scope).toBe('whole')
         const restored = (await readWorking()).draft
         assert.deepEqual(restored.nodes.find((node) => node.id === 'node:purchase_order'), recentDraft.nodes[0])
         assert.deepEqual(restored.ideas, recentDraft.ideas)

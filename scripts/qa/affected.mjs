@@ -102,7 +102,7 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-flow-explorer-reading-desktop",
   "dev-flow-explorer-overview-lanes-desktop",
   "dev-flow-explorer-export-desktop",
-  "dev-business-topics-navigation-desktop",
+  "dev-business-chain-navigation-desktop",
   "dev-page-task-handling-desktop-light",
   "dev-quality-gates-desktop-light",
   "dev-version-center-tabs-pagination-desktop",
@@ -727,21 +727,20 @@ function devBrowserScenarioNames(file) {
   const relations = /devFulfillmentRelations|BusinessRelationFilters|BusinessActionRelations|businessRelations|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage|BusinessChainInstanceView|FulfillmentSubflow|TaskFulfillmentGuide/u.test(file)
     ? ["dev-business-relations-desktop", "dev-finished-quality-responsibility"]
     : [];
-  const topics = /BusinessTopics|BusinessChainTopics|BusinessTopicDetails|BusinessChainStepVerification|TaskFulfillmentGuide|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage/u.test(file)
-    ? ["dev-business-topics-navigation-desktop"]
+  const chainNavigation = /DevFlowExplorer|devFlowExplorer|devBusinessChainNavigationScenarios|TaskFulfillmentGuide|devFlowViewContext|devFlowStateQuery|DevFlowStateObservatoryPage/u.test(file)
+    ? ["dev-business-chain-navigation-desktop"]
     : [];
   const rules = /BusinessRules|business-rules|stateRules\.css|StateRulesView|FlowRuleTables|devFlowViewContext|devFlowState(?:Query|RulePresentation)|DevFlowStateObservatoryPage|devRoutes|devHub|DevWorkbenchRoutes|devRelationshipPerspectives|BusinessActionRelations|TaskFulfillmentGuide|BusinessChainViews/u.test(file)
     ? ["dev-business-rules-navigation-desktop", "dev-business-rules-context-return-desktop", "dev-business-rules-selection-recovery-desktop"]
     : [];
   const mappings = [
-    [/BusinessTopicsView|BusinessChainTopics|BusinessTopicDetails/u, ["dev-flow-explorer-navigation-desktop"]],
     [/BusinessChain(?:Design|Exploration|Granularity|NodeCatalog|NodeLibrary|NodeFilter|Map|Reading|Employee|Export)|businessChain(?:Design|Export)|useBusinessChainDraft|DevFlowExplorer|devFlowExplorer/u, ["dev-flow-explorer-export-desktop", "dev-flow-explorer-overview-lanes-desktop", "dev-flow-explorer-reading-desktop", "dev-flow-explorer-navigation-desktop", "dev-business-chain-design-desktop", "dev-business-chain-design-fullscreen-desktop", "dev-business-chain-design-viewport-desktop", "dev-business-chain-design-mainline-desktop", "dev-business-chain-map-desktop", "dev-business-chain-map-fit-width-desktop"]],
-    [/ProductCoreRelations|ReadingNavigation|dev-reading-navigation/u, ["dev-page-product-core-desktop-light", "dev-business-topics-navigation-desktop", "dev-page-business-chain-audit-desktop-light", "dev-version-center-tabs-pagination-desktop"]],
+    [/ProductCoreRelations|ReadingNavigation|dev-reading-navigation/u, ["dev-page-product-core-desktop-light", "dev-business-chain-navigation-desktop", "dev-page-business-chain-audit-desktop-light", "dev-version-center-tabs-pagination-desktop"]],
     [/DevPageHeader|styles\/dev-workbench-(?:density|layout)\.css/u, ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-workbench-patterns-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]],
     [/DevSourceReferences|dev-source-references/u, ["dev-workbench-content-desktop-light", "dev-workbench-patterns-desktop-light", "dev-flow-rules-complete", "dev-page-integration-desktop-light", "dev-project-skills-guidance-desktop-light"]],
     [/TaskHandling|taskHandlingMatrix|devTaskHandling/u, ["dev-page-task-handling-desktop-light"]],
     [/FinanceRelationshipsView|FinanceRulesView|devFinanceWorkbench|financeWorkbench\.css/u, ["dev-finance-prototype-alignment", "dev-finance-rules-reading-desktop"]],
-    [/BusinessChainStepVerification|BusinessChainTopics|BusinessTopicDetails|TaskFulfillmentGuide|devBusinessChain(?:Catalog|StepContracts|Verification|Audit)|DevBusinessChainAuditPage|businessChainStepVerification|devFlowStateQuery/u, ["dev-purchase-chain-verification"]],
+    [/BusinessChainStepVerification|DevFlowExplorerPage|BusinessChainDesignCanvas|devFlowExplorerNavigation|TaskFulfillmentGuide|devBusinessChain(?:Catalog|StepContracts|Verification|Audit)|DevBusinessChainAuditPage|businessChainStepVerification|devFlowStateQuery/u, ["dev-purchase-chain-verification"]],
     [
       /BusinessChainCustomerReview|devBusinessChainPrint/u,
       ["dev-business-chain-customer-review-print"],
@@ -819,7 +818,7 @@ function devBrowserScenarioNames(file) {
     [/dev-delivery-workflow/u, ["dev-page-delivery-desktop-light"]],
   ];
   const match = mappings.find(([pattern]) => pattern.test(file));
-  if (match) return uniqueSorted([...match[1], ...growth, ...relations, ...topics, ...rules]);
+  if (match) return uniqueSorted([...match[1], ...growth, ...relations, ...chainNavigation, ...rules]);
   if (
     /(?:DevWorkbenchRoutes|DevPageNav|DevTaskNav|devRoutes|dev-navigation|dev-workbench-density|styles\/index\.css|style-l1\/scenarios\.mjs)/u.test(
       file,
@@ -827,7 +826,7 @@ function devBrowserScenarioNames(file) {
   ) {
     return uniqueSorted([...DEV_DESKTOP_SCENARIOS, ...rules]);
   }
-  return uniqueSorted([...growth, ...relations, ...topics, ...rules]);
+  return uniqueSorted([...growth, ...relations, ...chainNavigation, ...rules]);
 }
 
 function devBrowserFollowUpText(file) {

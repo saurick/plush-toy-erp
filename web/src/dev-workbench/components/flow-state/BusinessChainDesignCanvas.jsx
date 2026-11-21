@@ -151,6 +151,7 @@ export default function BusinessChainDesignCanvas({
   viewRequest,
   onNavigate,
   onNavigateChain,
+  onOpenVerification,
   onReturn,
   layers,
   layout,
@@ -597,6 +598,13 @@ export default function BusinessChainDesignCanvas({
     selection?.chainKey &&
     library.chains.find(({ value }) => value === selection.chainKey)
   const selectedNode = library.byId.get(selection?.nodeId)
+  const verificationChain = library.chainDefinitions.get(
+    selectedNode?.chainKey || library.byId.get(selection?.to)?.chainKey
+  )
+  const referencedSteps = selectedNode?.steps || [assessment?.relation?.evidence?.step].filter(Boolean)
+  const verificationSteps = verificationChain?.steps.filter((step) =>
+    referencedSteps.some((reference) => reference.key === step.key || reference.edgeKey === step.edgeKey)
+  ) || []
   const removableNode =
     selectedNode && map.visibleIds.includes(selectedNode.id)
   // A mainline edge represents paths; disconnect their final links without removing intermediate nodes.
@@ -1314,13 +1322,31 @@ export default function BusinessChainDesignCanvas({
                 >
                   返回原节点
                 </Button>
-          ) : null}
+              ) : null}
+              {onOpenVerification && !selection.shared && verificationSteps.length ? (
+                <section aria-label="关联动作核验">
+                  {verificationSteps.length > 1 ? <strong>规则与验证</strong> : null}
+                  <Space wrap>
+                    {verificationSteps.map((step) => (
+                      <Button
+                        key={step.key}
+                        aria-label={`查看${step.label}的规则与验证`}
+                        onClick={(event) => onOpenVerification(verificationChain.key, step.key, event.currentTarget)}
+                      >
+                        {verificationSteps.length === 1 ? '规则与验证' : step.label}
+                      </Button>
+                    ))}
+                  </Space>
+                </section>
+              ) : null}
               {selectedSummary ? (
                 <ChainPurposeDetails
                   catalog={catalog}
                   chainKey={selectedSummary.value}
                   onRelation={(overview) => setSelection({ overview })}
                   onShowHandoffs={selectedSummary.value === map.chainKey && !showHandoffs ? () => toggleHandoffs(true) : undefined}
+                  onOpenVerification={onOpenVerification}
+                  restoreEvidence={selection.evidenceOpen}
                 />
           ) : selection.overview ? (
             <ChainHandoffDetails catalog={catalog} relation={selection.overview} onNavigate={onNavigateChain} />

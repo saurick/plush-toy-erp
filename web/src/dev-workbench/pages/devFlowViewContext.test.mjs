@@ -7,29 +7,6 @@ import {
   restoreDevFlowPrimaryContext,
 } from './devFlowViewContext.mjs'
 
-test('核验页签和报告随阅读上下文恢复，不改变同一业务对象的规则选择', () => {
-  const previous = new URLSearchParams({
-    view: 'states',
-flow: 'fact.production',
-    flow_topic: 'production_exception',
-flow_topic_step: 'same-step',
-    flow_topic_panel: 'rules',
-flow_topic_batch: 'history',
-  })
-  const current = new URLSearchParams(previous)
-  current.set('flow_topic_panel', 'evidence')
-  current.set('flow_topic_batch', 'new-report')
-  const restored = restoreDevFlowPrimaryContext(previous, current)
-  assert.equal(restored.changed, false)
-  assert.equal(restored.searchParams.get('flow'), 'fact.production')
-  assert.equal(restored.searchParams.get('flow_topic_panel'), 'evidence')
-  assert.equal(restored.searchParams.get('flow_topic_batch'), 'new-report')
-  current.set('flow_topic_step', 'another-step')
-  const changed = restoreDevFlowPrimaryContext(previous, current)
-  assert.equal(changed.changed, true)
-  assert.equal(changed.searchParams.has('flow'), false)
-})
-
 test('规则分类保留各自对象与动作，财务口径选择不改变另一分类的业务范围', () => {
   const previous = 'view=states&flow=fact.shipment&rule_action=cancel&flow_role=warehouse'
   const current = new URLSearchParams('view=finance_rules&finance_rule=terms&flow_role=warehouse')
@@ -73,25 +50,12 @@ const resolve = (query, task, taskScoped = false) =>
     task,
     taskScoped,
   })
-test('reading context follows the selected topic, stage, or exception instead of old global selections', () => {
-  assert.equal(
-    resolve(
-      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_stage=shell_quality'
-    ).chainKey,
-    'delivery_to_settlement'
-  )
-  assert.equal(
-    resolve('chain=all&flow_stage=supplier_advance').chainKey,
-    'finance_payment_and_reversal'
-  )
-  assert.equal(
-    resolve(
-      'chain=all&flow_exception=production_quality&flow_stage=supplier_advance'
-    ).chainKey,
-    'production_exception'
-  )
-  assert.equal(resolve('chain=all&flow_tab=topics&flow_topic='), null)
+test('业务链语境来自当前环节或异常详情，财务概览直接打开独立视图', () => {
+  assert.equal(resolve('chain=all&flow_stage=supplier_advance').chainKey, 'finance_payment_and_reversal')
+  assert.equal(resolve('chain=all&flow_exception=production_quality&flow_stage=supplier_advance').chainKey, 'production_exception')
+  assert.equal(resolve('chain=all&flow_tab=finance&finance_topic=purchase'), null)
 })
+
 test('task tools reject stale task records and use only registered unambiguous discovery', () => {
   const task = { id: 23, discovery: { stage_key: 'shipping' } }
   assert.equal(
@@ -127,33 +91,7 @@ test('task tools reject stale task records and use only registered unambiguous d
   )
 })
 
-test('default topic, map focus and selected neighbor use the same visible business definition', () => {
-  assert.equal(
-    resolve('chain=all&flow_tab=topics').chainKey,
-    'sales_to_production'
-  )
-  assert.equal(
-    resolve(
-      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_map=purchase_to_inventory'
-    ).chainKey,
-    'purchase_to_inventory'
-  )
-  assert.equal(
-    resolve(
-      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_map=purchase_to_inventory&flow_map_node=finance_payment_and_reversal'
-    ).chainKey,
-    'finance_payment_and_reversal'
-  )
-  assert.equal(
-    resolve(
-      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_topic_node=shipped'
-    ).nodeKey,
-    'shipped'
-  )
-  assert.equal(
-    resolve(
-      'chain=all&flow_tab=topics&flow_topic=delivery_to_settlement&flow_topic_node=missing'
-    ),
-    null
-  )
+test('单链对象必须属于当前链路', () => {
+  assert.equal(resolve('chain=delivery_to_settlement&node=shipped').nodeKey, 'shipped')
+  assert.equal(resolve('chain=delivery_to_settlement&node=purchase_order'), null)
 })
