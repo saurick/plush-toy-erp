@@ -5,6 +5,7 @@ import { installPermissionRelationshipMock } from './permissionRelationshipScena
 import { installDatabaseMigrationFixture } from './devDeliveryWorkspaceScenarios.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { verifyDevDocsSidebarResize } from './devDocsLayoutAssertions.mjs'
 
 export async function assertPlainDirectory(page, selector, assert) {
   await page.locator(selector).first().waitFor()
@@ -122,23 +123,31 @@ export function createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizonta
         if (await pin.count()) await pin.click()
         await page.locator('.erp-dev-docs-pinned-disclosure > summary').click()
         await assertPlainDirectory(page, '.erp-dev-docs-pinned__open', assert)
-        const toc = page.locator('.erp-dev-docs-toc')
-        const toggle = page.locator('[data-dev-doc-toc-toggle]')
-        if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click()
+        const toc = page.getByRole('navigation', { name: '文档章节', exact: true })
         const chapter = toc.getByRole('button').nth(1)
         const chapterID = await chapter.getAttribute('data-dev-doc-heading-id')
         await chapter.press('Enter')
         await page.waitForFunction((id) => document.querySelector('.erp-dev-docs-toc [aria-current="location"]')?.dataset.devDocHeadingId === id, chapterID)
         assert.equal(await chapter.evaluate((node) => getComputedStyle(node).outlineWidth), '2px')
-        await assertPlainDirectory(page, '.erp-dev-docs-toc__tag', assert)
+        await assertPlainDirectory(page, '.erp-dev-docs-toc__item', assert)
+        const idleChapter = toc.locator('.erp-dev-docs-toc__item:not([aria-current])').first()
+        const idleBackground = await idleChapter.evaluate((node) => getComputedStyle(node).backgroundColor)
+        await idleChapter.hover()
+        const hover = await idleChapter.evaluate((node) => ({
+          background: getComputedStyle(node).backgroundColor,
+          decoration: getComputedStyle(node.querySelector('span')).textDecorationLine,
+        }))
+        assert.equal(hover.decoration, 'none', '章节悬停时文字无下划线')
+        assert.notEqual(hover.background, idleBackground, '章节悬停时用共享底色反馈')
         await page.locator('.erp-dev-docs-sidebar__section--results .erp-dev-docs-sidebar__section-head').click()
+        await verifyDevDocsSidebarResize(page, assert)
         await page.screenshot({ path: path.join(outputDir, 'documents-directory.png') })
         const url = page.url()
         await page.reload()
         await page.locator('.erp-dev-docs-toc [aria-current="location"]').waitFor()
         assert.equal(page.url(), url, '刷新恢复文档、检索条件与章节')
         await page.setViewportSize({ width: 1280, height: 800 })
-        await assertPlainDirectory(page, '.erp-dev-docs-list__open, .erp-dev-docs-toc__tag', assert)
+        await assertPlainDirectory(page, '.erp-dev-docs-list__open, .erp-dev-docs-toc__item', assert)
         await assertNoHorizontalOverflow(page)
 
         await page.goto(new URL(DEV_VERSION_GUIDE_ROUTE, page.url()).href)

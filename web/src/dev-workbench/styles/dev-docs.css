@@ -35,11 +35,55 @@
 
 .erp-dev-docs-shell {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns:
+    clamp(
+      var(--dev-docs-sidebar-min),
+      var(--dev-docs-sidebar-width),
+      calc(100% - var(--dev-docs-divider-width) - var(--dev-docs-reader-min))
+    )
+    var(--dev-docs-divider-width)
+    minmax(0, 1fr);
+  row-gap: var(--dev-workbench-section-gap);
   max-width: 1440px;
   align-self: stretch;
   margin: 0 auto;
   min-height: 0;
+}
+
+.erp-dev-docs-divider {
+  position: relative;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.erp-dev-docs-divider::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--erp-border-strong);
+  content: '';
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.erp-dev-docs-divider:is(:hover, :focus-visible)::before {
+  background: var(--erp-primary);
+}
+
+.erp-dev-docs-divider:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+
+.erp-dev-docs-divider[data-resizing]::before {
+  height: 100%;
+  background: var(--erp-primary);
 }
 
 .erp-dev-docs-sidebar,
@@ -100,10 +144,6 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-dev-docs-lifecycle__count.ant-typography {
-  white-space: nowrap;
-}
-
 .erp-dev-docs-sidebar__section {
   display: grid;
   gap: 8px;
@@ -125,6 +165,7 @@
   gap: 8px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-small);
+  white-space: nowrap;
 }
 
 .erp-dev-docs-sidebar__section-icon {
@@ -332,9 +373,16 @@
 }
 
 .erp-dev-docs-reader {
+  container: dev-docs-reader / inline-size;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.erp-dev-docs-reader__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 
 .erp-dev-docs-reader__toolbar {
@@ -412,75 +460,57 @@
 
 .erp-dev-docs-toc-shell {
   display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  border-bottom: 1px solid var(--erp-border);
+  flex: 0 0 clamp(148px, 23%, 184px);
+  flex-direction: column;
+  min-height: 0;
+  border-inline-end: 1px solid var(--erp-border);
   background: var(--erp-surface-bg-soft);
-  padding: 6px 12px;
 }
 
-.erp-dev-docs-toc-shell--expanded {
-  align-items: flex-start;
-}
-
-.erp-dev-docs-toc-shell__label,
-.erp-dev-docs-toc-shell__toggle {
-  flex: 0 0 auto;
-}
-
-.erp-dev-docs-toc-shell--expanded .erp-dev-docs-toc-shell__label {
-  padding-block: 4px;
+.erp-dev-docs-toc-shell__label {
+  padding: 10px 18px 4px;
+  color: var(--erp-text-muted);
+  font-weight: 600;
 }
 
 .erp-dev-docs-toc {
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
-.erp-dev-docs-toc__tag {
-  flex: 0 1 auto;
-  width: auto;
-  max-width: 360px;
-  white-space: normal;
-}
-
-.erp-dev-docs-toc--collapsed {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-}
-
-.erp-dev-docs-toc--collapsed .erp-dev-docs-toc__tag {
-  flex: 0 0 auto;
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.erp-dev-docs-toc--expanded {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   gap: 2px;
-  max-height: 192px;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 2px 8px 10px;
+  scrollbar-gutter: stable;
 }
 
-.erp-dev-docs-toc--expanded .erp-dev-docs-toc__tag {
-  width: 100%;
-  max-width: none;
-  padding-inline-start: calc(10px + var(--heading-depth) * 14px);
+.erp-dev-docs-toc__item > span {
+  margin-inline-start: calc(10px * var(--heading-depth));
 }
 
 .erp-dev-docs-markdown {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
   padding: 24px 28px 40px;
+}
+
+@container dev-docs-reader (max-width: 34rem) {
+  .erp-dev-docs-reader__body {
+    flex-direction: column;
+  }
+
+  .erp-dev-docs-toc-shell {
+    flex: 0 0 auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--erp-border);
+  }
+
+  .erp-dev-docs-toc {
+    max-height: min(8rem, 24dvh);
+  }
 }
 
 .erp-dev-docs-document {

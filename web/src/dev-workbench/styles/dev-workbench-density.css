@@ -241,10 +241,6 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   font-size: var(--erp-font-small);
 }
 
-.erp-dev-docs-shell {
-  gap: var(--dev-workbench-section-gap);
-}
-
 .erp-dev-workspace-page
   :is(
     .erp-dev-version-summary,

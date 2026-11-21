@@ -22,6 +22,7 @@ import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
+import DevDocsLayout from '../components/DevDocsLayout.jsx'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
@@ -35,7 +36,6 @@ import {
   DEV_DOCS_SEARCH_SCOPE_ALL,
   DEV_DOCS_SEARCH_SCOPE_TITLE,
   DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
-  DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
   applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
@@ -269,24 +269,6 @@ function readExpandedKeys(availableKeys = []) {
   }
 }
 
-function readTocExpanded() {
-  if (typeof window === 'undefined') {
-    return false
-  }
-
-  try {
-    const rawValue = window.localStorage.getItem(
-      DEV_DOCS_TOC_EXPANDED_STORAGE_KEY
-    )
-    if (rawValue === null) {
-      return false
-    }
-    return rawValue !== 'false'
-  } catch {
-    return false
-  }
-}
-
 function DevDocsTreeNode({
   node,
   depth = 0,
@@ -444,7 +426,6 @@ export default function DevDocsPage() {
   const [expandedKeys, setExpandedKeys] = useState(
     () => new Set(readExpandedKeys(allDirectoryKeys))
   )
-  const [tocExpanded, setTocExpanded] = useState(() => readTocExpanded())
   const markdownRef = useRef(null)
   const tocRef = useRef(null)
   const [readingHeading, setReadingHeading] = useState(null)
@@ -542,10 +523,22 @@ export default function DevDocsPage() {
   }, [headings, selectedDocPath, selectedDocSource])
 
   useEffect(() => {
-    tocRef.current
-      ?.querySelector('[aria-current="location"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [activeHeadingId, tocExpanded])
+    const toc = tocRef.current
+    if (!toc) return
+    const chapter = toc.querySelector('[aria-current="location"]')
+    if (!chapter) {
+      toc.scrollTop = 0
+      return
+    }
+
+    const listBox = toc.getBoundingClientRect()
+    const chapterBox = chapter.getBoundingClientRect()
+    if (chapterBox.top < listBox.top) {
+      toc.scrollTop += chapterBox.top - listBox.top
+    } else if (chapterBox.bottom > listBox.bottom) {
+      toc.scrollTop += chapterBox.bottom - listBox.bottom
+    }
+  }, [activeHeadingId, selectedDocPath, selectedDocSource])
 
   useEffect(() => {
     pendingTreeRevealRef.current = selectedDocPath || ''
@@ -674,20 +667,6 @@ export default function DevDocsPage() {
       // 目录展开偏好写入失败时不影响 dev docs 主路径浏览。
     }
   }, [allDirectoryKeys, expandedKeys])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-    try {
-      window.localStorage.setItem(
-        DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
-        tocExpanded ? 'true' : 'false'
-      )
-    } catch {
-      // 章节导航偏好写入失败时不影响 dev docs 主路径浏览。
-    }
-  }, [tocExpanded])
 
   useEffect(() => {
     if (!querySelectedPath && selectedDoc?.path) {
@@ -994,8 +973,8 @@ export default function DevDocsPage() {
         </div>
       </DevPageHeader>
 
-      <main className="erp-dev-docs-shell">
-        <aside className="erp-dev-docs-sidebar">
+      <DevDocsLayout>
+        <aside id="dev-docs-sidebar" className="erp-dev-docs-sidebar">
           {pinnedDocs.length > 0 ? (
             <details className="erp-dev-disclosure erp-dev-docs-sidebar__section erp-dev-docs-pinned erp-dev-docs-pinned-disclosure">
               <summary>
@@ -1163,19 +1142,18 @@ export default function DevDocsPage() {
           ) : (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--tree">
               <div className="erp-dev-docs-sidebar__section-head">
-                <Text strong>按目录找</Text>
                 <Space size={6}>
-                  <Text type="secondary">
-                    {lifecycleDocs.length} / {docs.length} 篇
-                  </Text>
-                  <Button
-                    size="small"
-                    type="text"
-                    onClick={toggleAllDirectories}
+                  <Text strong>目录</Text>
+                  <Text
+                    type="secondary"
+                    title={`本层级 ${lifecycleDocs.length} 篇，共 ${docs.length} 篇`}
                   >
-                    {allExpanded ? '收起全部' : '展开全部'}
-                  </Button>
+                    {lifecycleDocs.length}/{docs.length}
+                  </Text>
                 </Space>
+                <Button size="small" type="text" onClick={toggleAllDirectories}>
+                  {allExpanded ? '收起全部' : '展开全部'}
+                </Button>
               </div>
               <div ref={treeRef} className="erp-dev-docs-tree" aria-label="项目文档目录树">
                 {docTree.map((node) => (
@@ -1255,81 +1233,59 @@ export default function DevDocsPage() {
             </div>
           ) : null}
 
-          {tocHeadings.length > 0 ? (
-            <div className={tocExpanded ? 'erp-dev-docs-toc-shell erp-dev-docs-toc-shell--expanded' : 'erp-dev-docs-toc-shell'}>
-              <Text strong className="erp-dev-docs-toc-shell__label">章节</Text>
-              <div
-                id="dev-docs-chapters"
-                className={
-                  tocExpanded
-                    ? 'erp-dev-docs-toc erp-dev-docs-toc--expanded'
-                    : 'erp-dev-docs-toc erp-dev-docs-toc--collapsed'
-                }
-                aria-label="文档章节"
-                ref={tocRef}
-              >
-                {tocHeadings.map((heading) => (
-                  <button
-                    type="button"
-                    key={heading.id}
-                    className="erp-dev-directory-item erp-dev-docs-toc__tag"
-                    data-dev-doc-heading-id={heading.id}
-                    data-dev-doc-heading-level={heading.level}
-                    style={{ '--heading-depth': Math.max(0, heading.level - 2) }}
-                    aria-current={heading.id === activeHeadingId ? 'location' : undefined}
-                    title={heading.title}
-                    onClick={() => scrollToHeading(heading.id)}
-                  >
-                    {getDevDocsDisplayTitle(heading.title)}
-                  </button>
-                ))}
-              </div>
-              <Button
-                size="small"
-                type="text"
-                className="erp-dev-docs-toc-shell__toggle"
-                data-dev-doc-toc-toggle
-                aria-controls="dev-docs-chapters"
-                aria-expanded={tocExpanded}
-                onClick={() => setTocExpanded((current) => !current)}
-              >
-                {tocExpanded ? '收起为一行' : '展开全部'}
-              </Button>
-            </div>
-          ) : null}
+          <div className="erp-dev-docs-reader__body">
+            {tocHeadings.length > 0 ? (
+              <nav className="erp-dev-docs-toc-shell" aria-label="文档章节">
+                <div className="erp-dev-docs-toc-shell__label">章节</div>
+                <div className="erp-dev-docs-toc" ref={tocRef}>
+                  {tocHeadings.map((heading) => (
+                    <button
+                      type="button"
+                      key={heading.id}
+                      className="erp-dev-directory-item erp-dev-docs-toc__item"
+                      data-dev-doc-heading-id={heading.id}
+                      data-dev-doc-heading-level={heading.level}
+                      style={{ '--heading-depth': Math.max(0, heading.level - 2) }}
+                      aria-current={heading.id === activeHeadingId ? 'location' : undefined}
+                      title={heading.title}
+                      onClick={() => scrollToHeading(heading.id)}
+                    >
+                      <span>{getDevDocsDisplayTitle(heading.title)}</span>
+                    </button>
+                  ))}
+                </div>
+              </nav>
+            ) : null}
 
-          {selectedDoc?.source ? (
-            <article className="erp-dev-docs-markdown" ref={markdownRef}>
-              <div className="erp-dev-docs-document">
-                <Markdown source={selectedDoc.source} />
+            {selectedDoc?.source ? (
+              <article className="erp-dev-docs-markdown" ref={markdownRef}>
+                <div className="erp-dev-docs-document">
+                  <Markdown source={selectedDoc.source} />
+                </div>
+              </article>
+            ) : selectedDoc && selectedSourceLoadState?.status === 'error' ? (
+              <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
+                <Empty description={selectedSourceLoadState.message}>
+                  <Button onClick={retrySelectedSource}>重新加载</Button>
+                </Empty>
               </div>
-            </article>
-          ) : selectedDoc && selectedSourceLoadState?.status === 'error' ? (
-            <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
-              <Empty
-                description={selectedSourceLoadState.message}
-              >
-                <Button onClick={retrySelectedSource}>重新加载</Button>
-              </Empty>
-            </div>
-          ) : selectedDoc ? (
-            <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
-              <Space direction="vertical" align="center" size="small">
-                <Spin />
-                <Typography.Text type="secondary">
-                  正在加载文档正文…
-                </Typography.Text>
-              </Space>
-            </div>
-          ) : (
-            <div className="erp-dev-docs-markdown">
-              <Empty
-                description="没有匹配的文档，阅读操作已隐藏"
-              />
-            </div>
-          )}
+            ) : selectedDoc ? (
+              <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
+                <Space direction="vertical" align="center" size="small">
+                  <Spin />
+                  <Typography.Text type="secondary">
+                    正在加载文档正文…
+                  </Typography.Text>
+                </Space>
+              </div>
+            ) : (
+              <div className="erp-dev-docs-markdown">
+                <Empty description="没有匹配的文档，阅读操作已隐藏" />
+              </div>
+            )}
+          </div>
         </section>
-      </main>
+      </DevDocsLayout>
     </div>
   )
 }

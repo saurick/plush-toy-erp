@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { openERPAppearance } from './themeAssertions.mjs'
 import { ERP_ACCENTS, WORKBENCH_APPEARANCE_STORAGE_KEY } from '../../src/common/theme/erpAppearance.mjs'
+import { WORKBENCH_ROLES } from '../../src/dev-workbench/config/workbenchAccess.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
@@ -265,7 +266,7 @@ export function createAccountAppearanceScenarios({
         deviceScaleFactor: 2,
         adminProfile: {
           erp_preferences: {
-            appearance: { theme_mode: 'dark', accent: 'pink', density: 'standard', tableLines: 'simple' },
+            appearance: { theme_mode: 'dark', accent: 'pink', density: 'standard', tableLines: 'simple', formDisplay: 'section' },
           },
         },
         beforeNavigate: async (page) => {
@@ -282,6 +283,9 @@ export function createAccountAppearanceScenarios({
               assert.equal(response.status(), 200, '独立工作台 HTML 入口必须可用')
               await route.fulfill({ response })
             })
+            await page.route('**/__dev/auth/session', (route) => route.fulfill({ json: {
+              username: 'appearance-test', role: WORKBENCH_ROLES.operator, expiresAt: '2099-01-01T00:00:00Z',
+            } }))
           }
         },
         verify: async (page) => {
@@ -294,13 +298,14 @@ export function createAccountAppearanceScenarios({
             }, expected)
           }
           const initial = { theme_mode: 'system', accent: 'blue', density: 'compact', tableLines: 'grid' }
-          const chosen = { theme_mode: 'light', accent: 'teal', density: 'standard', tableLines: 'simple' }
+          const chosen = { theme_mode: 'light', accent: 'teal', density: 'standard', tableLines: 'simple', formDisplay: 'all' }
           await page.getByRole('heading', { name: '产品与业务', exact: true }).waitFor()
           await expectAppearance(initial)
           const accountBefore = await page.evaluate(() => localStorage.getItem('admin_erp_preferences'))
           await openERPAppearance(page)
           const dialog = page.getByRole('dialog', { name: '外观与密度' })
           await assertButtonSpacing(dialog, `workbench-${standalone ? 'standalone' : 'local'}-initial`)
+          assert.equal(await dialog.locator('[aria-label="编辑页显示"]').count(), 0, '工作台不显示 ERP 编辑页偏好')
           await dialog.getByRole('button', { name: '青绿', exact: true }).click()
           await dialog.getByText('浅色', { exact: true }).click()
           await dialog.getByText('标准', { exact: true }).click()
@@ -325,6 +330,9 @@ export function createAccountAppearanceScenarios({
           await expectAppearance({ theme_mode: 'dark', accent: 'pink', density: 'standard', tableLines: 'simple' })
           await page.locator('.erp-admin-shell').waitFor({ state: 'visible' })
           await openERPAppearance(page)
+          const editorTabs = dialog.locator('[aria-label="编辑页显示"]').getByRole('radio', { name: '页签', exact: true })
+          await editorTabs.locator('..').waitFor()
+          assert.equal(await editorTabs.isChecked(), true, 'ERP 保留账号原有的编辑页显示选项')
           await dialog.getByRole('button', { name: '橙色', exact: true }).click()
           await waitForSavedAppearance(page, { accent: 'orange' })
           assert.deepEqual(saves, [{ accent: 'orange' }], 'ERP 自身仍按账号保存外观')

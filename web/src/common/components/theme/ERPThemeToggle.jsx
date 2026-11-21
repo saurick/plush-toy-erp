@@ -74,6 +74,7 @@ export default function ERPThemeToggle({
   variant = 'button',
   showLabel = false,
   showDensity = true,
+  showFormDisplay = true,
   open: controlledOpen,
   onOpenChange,
   afterClose,
@@ -178,16 +179,18 @@ export default function ERPThemeToggle({
               onChange={(tableLines) => setAppearance({ tableLines })}
             />
           </fieldset>
-          <fieldset>
-            <legend><span>编辑页显示</span>{help('display')}</legend>
-            <Segmented
-              block
-              aria-label="编辑页显示"
-              value={appearance.formDisplay}
-              options={ERP_FORM_DISPLAY_OPTIONS}
-              onChange={(formDisplay) => setAppearance({ formDisplay })}
-            />
-          </fieldset>
+          {showFormDisplay ? (
+            <fieldset>
+              <legend><span>编辑页显示</span>{help('display')}</legend>
+              <Segmented
+                block
+                aria-label="编辑页显示"
+                value={appearance.formDisplay}
+                options={ERP_FORM_DISPLAY_OPTIONS}
+                onChange={(formDisplay) => setAppearance({ formDisplay })}
+              />
+            </fieldset>
+          ) : null}
         </>
       ) : null}
       {variant === 'settings' ? saveStatus : null}

@@ -5,7 +5,8 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
 import { openUIDesignAppearance } from './devUIDesignNavigation.mjs'
 
-const labels = ['表格密度', '表格线条', '编辑页显示']
+const tableLabels = ['表格密度', '表格线条']
+const labels = [...tableLabels, '编辑页显示']
 const notes = [
   '紧凑减少行高和留白，同屏可显示更多记录。',
   '网格给列表和桌面编辑明细加列线；卡片、打印和固定版式保持原样。',
@@ -73,6 +74,7 @@ export function createAppearanceHelpScenarios({ desktop, outputDir }) {
         const body = request.postDataJSON()
         if (body.method === 'set_erp_appearance') saves.push(body.params)
       })
+      await page.locator('.erp-admin-shell').waitFor()
       await openERPAppearance(page)
       const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
       await dialog.waitFor()
@@ -182,8 +184,11 @@ export function createAppearanceHelpScenarios({ desktop, outputDir }) {
         const before = await page.evaluate(() => localStorage.getItem('admin_erp_preferences'))
         await openERPAppearance(page)
         const dialog = page.getByRole('dialog', { name: '外观与密度', exact: true })
+        await dialog.waitFor()
+        assert.equal(await dialog.locator('[aria-label="编辑页显示"], [aria-label="查看编辑页显示说明"]').count(), 0, '工作台外观只显示适用于工作台的选项')
+        await waitForFiniteAnimations(page)
         const popup = page.locator('.erp-appearance-help-popover:visible')
-        for (const [index, label] of labels.entries()) {
+        for (const [index, label] of tableLabels.entries()) {
           const trigger = dialog.getByRole('button', { name: `查看${label}说明`, exact: true })
           await trigger.hover()
           await popup.getByText(notes[index], { exact: true }).waitFor()

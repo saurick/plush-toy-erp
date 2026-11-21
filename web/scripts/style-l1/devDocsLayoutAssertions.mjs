@@ -1,5 +1,75 @@
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
+export async function verifyDevDocsSidebarResize(page, assert) {
+  const divider = page.getByRole('slider', { name: '调整文档列表宽度', exact: true })
+  const sidebar = page.locator('.erp-dev-docs-sidebar')
+  const reader = page.locator('.erp-dev-docs-reader')
+  const currentWidth = async () => (await sidebar.boundingBox()).width
+  const readerWidth = async () => (await reader.boundingBox()).width
+  const gripCenter = async () => {
+    const grip = await divider.boundingBox()
+    return { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 }
+  }
+  const initialWidth = await currentWidth()
+  const initialReader = await readerWidth()
+  const url = page.url()
+  const viewport = page.viewportSize()
+  const { x, y } = await gripCenter()
+
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 60, y)
+  assert.equal(await currentWidth(), initialWidth + 60, '拖动时左栏实时展开')
+  assert.equal(await readerWidth(), initialReader - 60, '阅读区随拖动一起收缩')
+  await page.keyboard.press('Escape')
+  await page.mouse.up()
+  assert.equal(await currentWidth(), initialWidth, 'Escape 恢复拖动前的宽度')
+  assert.equal(await readerWidth(), initialReader)
+
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 200, y, { steps: 5 })
+  const draggedWidth = initialWidth + 200
+  assert.equal(await currentWidth(), draggedWidth, '松手前已应用拖动宽度')
+  assert.equal(Number(await divider.getAttribute('aria-valuenow')), draggedWidth)
+  await page.mouse.up()
+  assert.equal(await currentWidth(), draggedWidth, '松手后保持当前宽度')
+  assert.equal(await readerWidth(), initialReader - 200, '两栏共享可用宽度')
+  assert.equal(page.url(), url, '调宽时保持当前文档和章节')
+
+  await divider.press('ArrowLeft')
+  let preferredWidth = draggedWidth - 20
+  assert.equal(await currentWidth(), preferredWidth, '聚焦分隔线后可用方向键调宽')
+  for (const delta of [-0.5, 0.5, -0.5]) {
+    const { x: startX, y: startY } = await gripCenter()
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(startX + delta, startY)
+    preferredWidth += delta
+    assert.equal(await currentWidth(), preferredWidth, `拖动 ${delta}px 时实时调整宽度`)
+    await page.mouse.up()
+    assert.equal(await currentWidth(), preferredWidth, `保留 ${delta}px 的小幅拖动`)
+  }
+  await page.reload()
+  await divider.waitFor()
+  assert.equal(await currentWidth(), preferredWidth, '刷新恢复左栏宽度')
+
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await page.waitForFunction((width) => {
+    const sidebar = document.querySelector('.erp-dev-docs-sidebar')
+    const reader = document.querySelector('.erp-dev-docs-reader')
+    return sidebar.getBoundingClientRect().width < width && reader.getBoundingClientRect().width >= 480
+  }, preferredWidth)
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '桌面宽度被正文约束限制')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await divider.waitFor({ state: 'hidden' })
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '窄屏上下排列而且无横向溢出')
+
+  await page.setViewportSize(viewport)
+  await divider.waitFor({ state: 'visible' })
+  assert.equal(await currentWidth(), preferredWidth, '窗口放宽后恢复原宽度偏好')
+}
+
 export async function assertDevDocsDirectorySpace(page, assert) {
   const tree = page.locator('.erp-dev-docs-tree')
   await tree.waitFor()
@@ -133,11 +203,13 @@ export function createDevDocsReadingFixture(keyword) {
   return [
     '# 归档全文检索探针',
     keyword,
-    ...Array.from(
-      { length: 20 },
-      (_, index) =>
-        `${'#'.repeat(2 + (index % 5))} 阅读章节 ${index + 1}\n\n${'示例正文，用于验证滚动定位与章节层级。'.repeat(45)}`
-    ),
+    ...Array.from({ length: 20 }, (_, index) => {
+      const mark = '#'.repeat(2 + (index % 5))
+      const title = index === 4
+        ? '阅读章节 5 的完整标题需要在狭窄的章节目录中分行显示'
+        : `阅读章节 ${index + 1}`
+      return `${mark} ${title}\n\n${'示例正文，用于验证滚动定位与章节层级。'.repeat(45)}`
+    }),
   ].join('\n\n')
 }
 
@@ -174,11 +246,25 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         .querySelector('.erp-dev-docs-reader__top')
         ?.getAttribute('aria-current') === 'location'
   )
-  const toggle = page.locator('[data-dev-doc-toc-toggle]')
-  if ((await toggle.getAttribute('aria-expanded')) === 'false') {
-    await toggle.click()
-  }
-  assert((await toc.boundingBox()).height <= 193, '全部章节在有界区域内滚动')
+  const navigation = page.getByRole('navigation', { name: '文档章节', exact: true })
+  await navigation.waitFor()
+  const chapterLayout = await toc.evaluate((element) => {
+    const first = element.querySelector('button[data-dev-doc-heading-level="2"] span')
+    const nested = element.querySelector('button[data-dev-doc-heading-level="6"] span')
+    const { height } = nested.getBoundingClientRect()
+    const nestedIndent = nested.getBoundingClientRect().left - first.getBoundingClientRect().left
+    element.scrollTop = element.scrollHeight
+    return {
+      nestedIndent,
+      wraps: height > Number.parseFloat(getComputedStyle(nested).lineHeight) + 1,
+      chapterScroll: element.scrollTop,
+      bodyScroll: document.querySelector('.erp-dev-docs-markdown').scrollTop,
+      horizontalOverflow: element.scrollWidth > element.clientWidth + 1,
+    }
+  })
+  assert(chapterLayout.nestedIndent > 0 && chapterLayout.wraps, '深层章节缩进，长标题可完整换行')
+  assert(chapterLayout.chapterScroll > 0 && chapterLayout.bodyScroll === 0, '章节列表可独立滚到末尾')
+  assert(!chapterLayout.horizontalOverflow, '长标题在章节栏内换行')
   const lastId = await chapters.last().getAttribute('data-dev-doc-heading-id')
   await chapters.last().click()
   await page.waitForFunction(
@@ -198,6 +284,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         ?.getAttribute('aria-current') === 'location'
   )
   assert.equal(new URL(page.url()).hash, '', '回到顶部仍清理显式章节锚点')
+  await page.waitForFunction(() => document.querySelector('.erp-dev-docs-toc').scrollTop <= 1)
 
   const firstId = await chapters.first().getAttribute('data-dev-doc-heading-id')
   await chapters.first().press('Enter')
@@ -234,7 +321,6 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     hashBeforeScroll,
     '手工阅读不应生成章节浏览历史'
   )
-  await toggle.click()
   const visual = await toc.evaluate((element) => {
     const selected = element.querySelector('[aria-current="location"]')
     const idle = element.querySelector('button:not([aria-current])')
@@ -250,7 +336,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
       textDistinct: activeStyle.color !== idleStyle.color,
       shadow: activeStyle.boxShadow,
       weight: activeStyle.fontWeight,
-      visible: box.left >= frame.left - 1 && box.right <= frame.right + 1,
+      visible: box.top >= frame.top - 1 && box.bottom <= frame.bottom + 1,
     }
   })
   assert.equal(visual.selectedCount, 1)
@@ -259,7 +345,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     '当前章节以主题浅底和加粗文字突出'
   )
   assert.equal(visual.shadow, 'none', '章节目录不叠加选中底线')
-  assert(visual.visible, '收起后当前章节仍应可见')
+  assert(visual.visible, '手工阅读时目录应自动滚动到当前章节')
 
   await page.goto(
     new URL(
@@ -268,8 +354,8 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     ).href
   )
   await page.locator('.erp-dev-docs-markdown h1').waitFor()
-  await page.locator('.erp-dev-docs-toc__tag').first().waitFor()
-  for (const width of [1440, 1024]) {
+  await navigation.waitFor()
+  for (const width of [1920, 1280, 1024, 390]) {
     await page.setViewportSize({ width, height: 900 })
     await page.evaluate(() => document.fonts.ready)
     await waitForFiniteAnimations(page)
@@ -279,16 +365,18 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         const toolbar = root.querySelector('.erp-dev-docs-reader__toolbar')
         const name = root.querySelector('.erp-dev-docs-reader__name')
         const path = root.querySelector('.erp-dev-docs-reader__path')
-        const shell = root.querySelector('.erp-dev-docs-toc-shell')
-        const chapter = root.querySelector('.erp-dev-docs-toc__tag')
-        const toggle = root.querySelector('[data-dev-doc-toc-toggle]')
+        const sidebar = root.closest('.erp-dev-docs-shell').querySelector('.erp-dev-docs-sidebar')
+        const chapterNav = root.querySelector('.erp-dev-docs-toc-shell')
+        const article = root.querySelector('.erp-dev-docs-markdown')
+        const chapter = chapterNav.querySelector('button')
         const center = (element) => {
           const box = element.getBoundingClientRect()
           return box.top + box.height / 2
         }
         const toolbarBox = toolbar.getBoundingClientRect()
-        const shellBox = shell.getBoundingClientRect()
-        const shellStyle = getComputedStyle(shell)
+        const sidebarBox = sidebar.getBoundingClientRect()
+        const navBox = chapterNav.getBoundingClientRect()
+        const articleBox = article.getBoundingClientRect()
         return {
           viewport: { width: innerWidth, height: innerHeight },
           documentSize: {
@@ -296,43 +384,38 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
             height: document.documentElement.scrollHeight,
           },
           toolbarHeight: toolbarBox.height,
-          tocHeight: shellBox.height,
+          sidebarWidth: sidebarBox.width,
+          navHeight: navBox.height,
+          articleWidth: articleBox.width,
+          navLeftOfArticle: Math.abs(navBox.right - articleBox.left) <= 1 && Math.abs(navBox.top - articleBox.top) <= 1,
+          navAboveArticle: Math.abs(navBox.bottom - articleBox.top) <= 1 && Math.abs(navBox.width - articleBox.width) <= 1,
           chapterHeight: chapter.getBoundingClientRect().height,
-          tocInsets: ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((sum, key) => sum + parseFloat(shellStyle[key]), 0),
           titlePathCenterDelta: Math.abs(center(name) - center(path)),
-          chapterToggleCenterDelta: Math.abs(center(chapter) - center(toggle)),
           titleHint: name.title.startsWith(name.textContent),
           pathHint: path.title === path.textContent,
           fontSize: Number.parseFloat(getComputedStyle(chapter).fontSize),
-          allControlsInside: [
-            ...toolbar.querySelectorAll('button'),
-            toggle,
-          ].every((button) => {
+          allControlsInside: [...toolbar.querySelectorAll('button')].every((button) => {
             const box = button.getBoundingClientRect()
-            const parent = toolbar.contains(button) ? toolbarBox : shellBox
             return (
-              box.left >= parent.left &&
-              box.right <= parent.right &&
-              box.top >= parent.top &&
-              box.bottom <= parent.bottom
+              box.left >= toolbarBox.left &&
+              box.right <= toolbarBox.right &&
+              box.top >= toolbarBox.top &&
+              box.bottom <= toolbarBox.bottom
             )
           }),
-          pageOverflow:
-            document.documentElement.scrollWidth > innerWidth + 1 ||
-            document.documentElement.scrollHeight > innerHeight + 1,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
+          verticalOverflow: document.documentElement.scrollHeight > innerHeight + 1,
         }
       })
     console.info(
       `[style:l1:docs-reader] width=${width} ${JSON.stringify(geometry)}`
     )
     assert(
-      geometry.toolbarHeight <= (width === 1440 ? 50 : 90),
+      geometry.toolbarHeight <= (width === 1920 ? 50 : 90),
       '标题、路径和操作按可用宽度紧凑排列'
     )
-    assert.equal(geometry.chapterHeight, 40, '章节目录保留共享点击高度')
-    assert(geometry.tocHeight <= geometry.chapterHeight + geometry.tocInsets + 1, '章节标签、导航和展开操作共用一行')
+    assert(geometry.chapterHeight >= 40, '章节目录保留共享点击高度')
     assert(geometry.titlePathCenterDelta <= 1, '标题与路径同行对齐')
-    assert(geometry.chapterToggleCenterDelta <= 1, '章节与展开操作同行对齐')
     assert(
       geometry.titleHint && geometry.pathHint,
       '截断标题和路径仍保留完整提示'
@@ -340,13 +423,23 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     assert(
       geometry.fontSize >= 14 &&
         geometry.allControlsInside &&
-        !geometry.pageOverflow,
-      `压缩后保留字号、完整操作和独立滚动：${JSON.stringify(geometry)}`
+        !geometry.horizontalOverflow,
+      `压缩后保留字号、完整操作且页面无横向溢出：${JSON.stringify(geometry)}`
     )
+    if (width === 390) {
+      assert(geometry.navAboveArticle && geometry.navHeight < 180, '窄屏章节保留有限高度，正文占满该行')
+      await navigation.getByRole('button').first().click()
+      await page.waitForFunction(() => document.querySelector('.erp-dev-docs-markdown').scrollTop > 0)
+    } else {
+      assert(geometry.sidebarWidth <= 240 && geometry.navLeftOfArticle, '桌面文档列表收窄，章节与正文齐顶并排')
+      assert(!geometry.verticalOverflow, '桌面目录与正文各自滚动')
+    }
   }
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByRole('textbox', { name: '搜索项目文档' }).fill('没有该标题 docs-governance')
   await page.getByRole('textbox', { name: '搜索项目文档' }).press('Enter')
+  await page.getByText('没有匹配的文档，阅读操作已隐藏', { exact: true }).waitFor()
+  assert.equal(await navigation.count(), 0, '无匹配文档时隐藏章节目录')
   await page.getByRole('button', { name: '文档首页', exact: true }).click()
   const home = page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '文档入口与治理 / docs Guide', exact: true })
   await home.waitFor()

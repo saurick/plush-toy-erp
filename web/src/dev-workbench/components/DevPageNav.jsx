@@ -223,6 +223,7 @@ export default function DevPageNav({ navRef = null }) {
           <ERPThemeToggle
             className="erp-dev-workspace-nav__theme-toggle"
             showLabel
+            showFormDisplay={false}
           />
           {import.meta.env.MODE === 'workbench' ? (
             <form method="post" action="/__dev/auth/logout">
