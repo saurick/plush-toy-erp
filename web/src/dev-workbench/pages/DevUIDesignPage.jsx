@@ -36,7 +36,7 @@ const VIEWS = [
 ]
 
 const DESIGN_SAMPLES = [
-  { value: 'controls', label: '控件设计' },
+  { value: 'controls', label: '组件设计' },
   { value: 'workbench', label: '统一页面样板' },
 ]
 
@@ -162,7 +162,7 @@ export default function DevUIDesignPage() {
                 </Suspense>
               </div>
             ) : (
-              <Suspense fallback={<Loading title="正在加载控件设计" />}>
+              <Suspense fallback={<Loading title="正在加载组件设计" />}>
                 <DevControlStandards key={controlRevision} />
               </Suspense>
             )}

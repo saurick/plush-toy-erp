@@ -276,7 +276,7 @@ export function createDevUIDesignDetailScenarios({
         await assertHTMLNotLoaded()
 
         await page.goto(new URL('/__dev/ui-design?page=controls', page.url()).href)
-        await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
+        await page.getByRole('region', { name: '组件设计', exact: true }).waitFor()
         assert.equal(await page.getByRole('tab', { name: '设计样例', exact: true }).getAttribute('aria-selected'), 'true')
         await assertHTMLNotLoaded()
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()

@@ -361,8 +361,8 @@ export function createFilterConflictScenarios(deps) {
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
     verify: async (page) => {
-      const root = page.getByRole('region', { name: '控件设计', exact: true })
-      await root.getByRole('navigation', { name: '控件设计目录' }).getByRole('button', { name: /筛选与搜索/ }).click()
+      const root = page.getByRole('region', { name: '组件设计', exact: true })
+      await root.getByRole('navigation', { name: '组件设计目录' }).getByRole('button', { name: /筛选与搜索/ }).click()
       const scopeExample = root.getByRole('region', { name: '分组单选气泡（流程范围）', exact: true })
       const filterExample = root.getByRole('region', { name: '总筛选', exact: true })
       await scopeExample.getByText('点选即切换并收起。', { exact: true }).waitFor()

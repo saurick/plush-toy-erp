@@ -946,17 +946,17 @@ export default function DevControlStandards() {
   )
 
   return (
-    <section className="erp-control-library" aria-label="控件设计">
+    <section className="erp-control-library" aria-label="组件设计">
       <aside className="erp-control-library-directory" ref={directoryRef}>
         <SearchInput
-          aria-label="搜索控件设计"
+          aria-label="搜索组件设计"
           placeholder="用途或组件名"
           searchHint="可搜索：组件代码名、使用场景、复用边界"
           value={query}
           allowClear
           onSearch={(value) => update({ controlq: value })}
         />
-        <nav aria-label="控件设计目录">
+        <nav aria-label="组件设计目录">
           {matches.map((topic) => {
             const componentName =
               topic.componentNames.find((name) => words.includes(name.toLowerCase())) ??
@@ -979,7 +979,7 @@ export default function DevControlStandards() {
           })}
           {!matches.length && (
             <div className="erp-control-library-no-results">
-              <p>没有匹配的控件</p>
+              <p>没有匹配的专题</p>
               <Button
                 onClick={() => {
                   update({ controlq: '' })
@@ -1006,7 +1006,7 @@ export default function DevControlStandards() {
               <>
                 <span>样例外观</span>
                 <SlidingSegmented
-                  aria-label="控件样例主题"
+                  aria-label="组件样例主题"
                   value={mode}
                   onChange={setMode}
                   options={[

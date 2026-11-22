@@ -4,7 +4,7 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
   const cases = [
     { name: 'design-reference', path: '/__dev/ui-design?view=specification&read=reference', label: '搜索设计图解', queryKey: 'q' },
     { name: 'design-guide', path: '/__dev/ui-design?view=rationale&read=guide', label: '搜索设计图解', queryKey: 'q', themeMode: 'dark' },
-    { name: 'controls', path: '/__dev/ui-design?page=controls&control=components', label: '搜索控件设计', queryKey: 'controlq', width: 1280 },
+    { name: 'controls', path: '/__dev/ui-design?page=controls&control=components', label: '搜索组件设计', queryKey: 'controlq', width: 1280 },
     { name: 'skills', path: '/__dev/project-skills', label: '搜索任务或 Skill', queryKey: 'q' },
     { name: 'docs', path: '/__dev/docs', label: '搜索项目文档' },
     { name: 'definitions', path: '/__dev/status-flows?view=chain&chain=all', label: '本页 5 个视图的定义总索引，不属于当前 Tab；不搜索具体任务、运行实例或真实业务记录' },

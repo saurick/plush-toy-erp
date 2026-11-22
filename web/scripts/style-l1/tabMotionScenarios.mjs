@@ -583,8 +583,8 @@ export function createTabMotionScenarios({ outputDir }) {
         viewport: { width: 1920, height: 1080 },
         deviceScaleFactor: 2,
         verify: async (page) => {
-          const controls = page.getByRole('region', { name: '控件设计', exact: true })
-          await controls.getByRole('navigation', { name: '控件设计目录' })
+          const controls = page.getByRole('region', { name: '组件设计', exact: true })
+          await controls.getByRole('navigation', { name: '组件设计目录' })
             .getByRole('button', { name: /弹窗与反馈/ }).click()
           await controls.getByRole('heading', { name: '弹窗与反馈', exact: true }).waitFor()
           await verifyStandardModal(page, controls, outputDir)
@@ -623,8 +623,8 @@ export function createTabMotionScenarios({ outputDir }) {
         viewport: { width: 1920, height: 1080 },
         deviceScaleFactor: 2,
         verify: async (page) => {
-          const controls = page.getByRole('region', { name: '控件设计', exact: true })
-          const directory = controls.getByRole('navigation', { name: '控件设计目录' })
+          const controls = page.getByRole('region', { name: '组件设计', exact: true })
+          const directory = controls.getByRole('navigation', { name: '组件设计目录' })
           const returnToPreview = async () => {
             await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
             await page.locator(visibleUIDesignFrame).waitFor()
@@ -633,13 +633,13 @@ export function createTabMotionScenarios({ outputDir }) {
             await page.getByRole('tab', { name: '设计样例', exact: true }).click()
             await controls.waitFor()
           }
-          const search = controls.getByRole('textbox', { name: '搜索控件设计' })
+          const search = controls.getByRole('textbox', { name: '搜索组件设计' })
           const choose = async (name) => {
             await directory.getByRole('button', { name: new RegExp(name) }).click()
             await controls.getByRole('heading', { name, exact: true }).waitFor()
           }
           const chooseTheme = async (name) => {
-            await controls.getByLabel('控件样例主题', { exact: true })
+            await controls.getByLabel('组件样例主题', { exact: true })
               .getByText(name, { exact: true }).click()
             await controls.locator(`.erp-control-library-stage[data-erp-theme="${name === '深色' ? 'dark' : 'light'}"]`).waitFor()
             await waitForFiniteAnimations(page)
@@ -649,14 +649,14 @@ export function createTabMotionScenarios({ outputDir }) {
             '控件页面不应出现页面级横向溢出'
           )
           await controls.waitFor()
-          assert.equal(await page.getByLabel('设计样例分类', { exact: true }).getByRole('radio', { name: '控件设计' }).isChecked(), true)
+          assert.equal(await page.getByLabel('设计样例分类', { exact: true }).getByRole('radio', { name: '组件设计' }).isChecked(), true)
           assert.equal(await page.getByRole('dialog').count(), 0)
           assert.equal(await page.getByRole('button', { name: '下载 HTML' }).count(), 0)
           await assertFits()
 
           await search.fill('不存在的控件')
           await search.press('Enter')
-          await directory.getByText('没有匹配的控件').waitFor()
+          await directory.getByText('没有匹配的专题').waitFor()
           await directory.getByRole('button', { name: '清除搜索' }).click()
           await directory.getByRole('button', { name: /弹窗与反馈/ }).waitFor()
           assert.equal(await search.inputValue(), '')

@@ -75,7 +75,7 @@ export function createDevBusinessComponentScenarios({ assert, assertNoHorizontal
     await decideLeave('继续编辑')
     assert.equal(await subject.inputValue(), '多行材料演示')
     assert.equal(await headerNote.inputValue(), '首批按确认样交付\n余量另行安排', '取消离开保留整单备注')
-    await page.getByRole('navigation', { name: '控件设计目录' }).getByRole('button', { name: /来源选择/u }).click()
+    await page.getByRole('navigation', { name: '组件设计目录' }).getByRole('button', { name: /来源选择/u }).click()
     await decideLeave('继续编辑')
     assert.equal(new URL(page.url()).searchParams.get('control'), 'business-form', '目录切换也受未保存保护')
     await editor.getByRole('button', { name: '保存', exact: true }).click()

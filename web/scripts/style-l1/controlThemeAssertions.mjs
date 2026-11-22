@@ -140,7 +140,7 @@ async function readPreviewPortals(page, stage, label) {
 // Run against both the development entry and the built standalone workbench.
 export async function assertControlPreviewThemeIsolation(page) {
   const stage = page.locator('.erp-control-library-stage')
-  const directory = page.getByRole('navigation', { name: '控件设计目录' })
+  const directory = page.getByRole('navigation', { name: '组件设计目录' })
   const snapshots = new Map()
   const evidence = []
   for (const rootMode of ['light', 'dark']) {
@@ -149,7 +149,7 @@ export async function assertControlPreviewThemeIsolation(page) {
     for (const [localMode, label] of [['light', '浅色'], ['dark', '深色'], ['light', '浅色']]) {
       await directory.getByRole('button', { name: /^按钮与动作/u }).click()
       await stage.getByRole('button', { name: '保存', exact: true }).waitFor()
-      await page.getByLabel('控件样例主题', { exact: true }).getByText(label, { exact: true }).click()
+      await page.getByLabel('组件样例主题', { exact: true }).getByText(label, { exact: true }).click()
       await waitForFiniteAnimations(page)
       assert.equal(await stage.getAttribute('data-erp-theme'), localMode)
       const button = stage.getByRole('button', { name: '保存', exact: true })

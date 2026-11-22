@@ -15,7 +15,7 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         const single = page.getByRole('combobox', { name: '单选记录类型', exact: true })
         const control = stage.locator('.ant-select').filter({ has: single })
         await single.waitFor()
-        await page.getByLabel('控件样例主题', { exact: true })
+        await page.getByLabel('组件样例主题', { exact: true })
           .getByText(themeMode === 'dark' ? '深色' : '浅色', { exact: true }).click()
         await control.locator('.ant-select-selector').click()
         const popup = page.locator('.ant-select-dropdown:visible')

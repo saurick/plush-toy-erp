@@ -824,7 +824,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
         await waitReady(page)
         await openSamples(page)
-        await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
+        await page.getByRole('region', { name: '组件设计', exact: true }).waitFor()
         await assertViewportFilled(reader)
         await returnToPreview(page)
         await waitReady(page)
@@ -860,7 +860,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
 
         const topTabs = '.erp-dev-ui-design-header .erp-sliding-tabs'
         await verifyMobileNavigationMotion(page, assert, topTabs, 1)
-        await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
+        await page.getByRole('region', { name: '组件设计', exact: true }).waitFor()
         assert.equal(await preview.isVisible(), false)
         assert.equal(await page.getByLabel('设计预览界面', { exact: true }).isVisible(), false)
         assert.equal(await page.getByRole('button', { name: '返回预览', exact: true }).count(), 0)

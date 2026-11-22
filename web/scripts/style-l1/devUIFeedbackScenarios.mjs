@@ -146,7 +146,7 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
-        const controls = page.getByRole('region', { name: '控件设计', exact: true })
+        const controls = page.getByRole('region', { name: '组件设计', exact: true })
         await controls.waitFor()
         await controls.getByRole('radio', { name: '深色', exact: true }).locator('..').click()
         await openEditor(page)

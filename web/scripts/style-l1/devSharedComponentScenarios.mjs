@@ -30,7 +30,7 @@ export function createDevSharedComponentScenarios({
       verify: async (page) => {
         const stage = page.locator('.erp-control-library-stage')
         await stage.getByLabel('产品名称', { exact: true }).waitFor()
-        await page.getByLabel('控件样例主题', { exact: true })
+        await page.getByLabel('组件样例主题', { exact: true })
           .getByText(themeMode === 'dark' ? '深色' : '浅色', { exact: true }).click()
         const error = stage.getByRole('radio', { name: '错误', exact: true })
         await error.locator('..').click()
@@ -82,7 +82,7 @@ export function createDevSharedComponentScenarios({
       deviceScaleFactor: 2,
       verify: async (page) => {
         const evidence = await assertControlPreviewThemeIsolation(page)
-        await assertNoHorizontalOverflow(page, '控件样例内外主题隔离')
+        await assertNoHorizontalOverflow(page, '组件样例内外主题隔离')
         await writeFile(`${outputDir}/control-preview-theme.json`, JSON.stringify(evidence, null, 2))
       },
     },
@@ -143,9 +143,9 @@ export function createDevSharedComponentScenarios({
         assert.equal(await catalog.locator('a[href^="/erp/"], a[target="_blank"]').count(), 0, '设计目录沿用工作台规范，不附加业务快捷跳转')
         const designLink = catalog.getByRole('link', { name: '下拉选择与清空', exact: true })
         assert((await designLink.getAttribute('href')).startsWith('/__dev/docs?path='), '嵌入文档沿用项目阅读器解析相对链接')
-        const search = page.getByLabel('搜索控件设计', { exact: true })
+        const search = page.getByLabel('搜索组件设计', { exact: true })
         const directory = page.getByRole('navigation', {
-          name: '控件设计目录',
+          name: '组件设计目录',
           exact: true,
         })
         const catalogEntry = directory.getByRole('button', { name: '组件选用', exact: true })
@@ -187,7 +187,7 @@ export function createDevSharedComponentScenarios({
         assert.equal(await search.inputValue(), 'PrintEditableText')
         await search.fill('没有这样的控件')
         await search.press('Enter')
-        await directory.getByText('没有匹配的控件', { exact: true }).waitFor()
+        await directory.getByText('没有匹配的专题', { exact: true }).waitFor()
         await directory
           .getByRole('button', { name: '清除搜索', exact: true })
           .focus()
@@ -233,7 +233,7 @@ export function createDevSharedComponentScenarios({
 
         await picker.click()
         await popup.waitFor()
-        const directory = page.getByRole('navigation', { name: '控件设计目录', exact: true })
+        const directory = page.getByRole('navigation', { name: '组件设计目录', exact: true })
         const inputs = directory.getByRole('button', { name: /基础输入/u })
         await inputs.focus()
         await page.keyboard.press('Enter')

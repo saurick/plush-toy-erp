@@ -236,7 +236,7 @@ export function createEmptyFeedbackScenarios({
           path: path.join(outputDir, 'empty-feedback-form-4k.png'),
         })
         await page
-          .locator('[aria-label="控件样例主题"]')
+          .locator('[aria-label="组件样例主题"]')
           .getByText('深色', { exact: true })
           .click()
         await chooseScene(demo, '列表区域')
