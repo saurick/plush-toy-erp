@@ -11,6 +11,7 @@ import {
   buildPermissionRelationshipTargetOptions,
   getPermissionRelationshipRoleKeys,
 } from './devPermissionRelationshipGraph.mjs'
+import { groupPermissionModuleSelectOptions } from './devCatalogSelectOptions.mjs'
 
 const accounts = [
   {
@@ -488,6 +489,19 @@ test('target and module helpers keep stable human-readable choices', () => {
       (option) => option.label === '系统管理员（root-admin） · 超级管理员'
     )
   )
+})
+
+test('the graph module selector pins the overview and preserves all modules from the snapshot', () => {
+  const flat = buildPermissionRelationshipModuleOptions([
+    ...permissions,
+    { module: 'masterdata', module_name: '基础资料' },
+    { module: 'system', module_name: '系统管理' },
+  ])
+  const [overview, ...groups] = groupPermissionModuleSelectOptions(flat)
+  assert.deepEqual(overview, { value: PERMISSION_RELATIONSHIP_ALL_MODULES, label: '权限总览' })
+  assert.deepEqual(groups.map(({ key }) => key), ['group:business', 'group:workspace', 'group:system', 'group:other'])
+  assert.deepEqual(groups.flatMap(({ options }) => options).map(({ value }) => value).sort(),
+    flat.slice(1).map(({ value }) => value).sort())
 })
 
 for (const [label, override] of [

@@ -25,6 +25,7 @@ import DevIntegrationRelationshipExamples, {
   DevIntegrationAccess,
 } from '../components/DevIntegrationRelationships.jsx'
 import { buildProjectGraph } from '../config/devProjectGraph.mjs'
+import { buildIntegrationDomainSelectOptions, matchCatalogSelectOption } from '../config/devCatalogSelectOptions.mjs'
 import { readPermissionRelationshipSnapshot } from '../config/devPermissionRelationshipApi.mjs'
 import { createDevQualityGateClient } from '../config/devQualityGates.mjs'
 import { qualityGateViewStatus } from '../config/qualityGatePresentation.mjs'
@@ -59,10 +60,7 @@ const views = [
   ['changes', '本轮变更'],
   ['guide', '接入指引'],
 ]
-const domains = [...new Map(entries.map((entry) => [entry.domain, {
-  label: entry.domainLabel,
-  value: entry.domain,
-}])).values()]
+const domainOptions = buildIntegrationDomainSelectOptions(entries)
 const contractLabel = (contract) =>
   contract?.documentation ? '调用合同' :
     contract?.kind === 'detail' ? '明细合同' : '章节说明'
@@ -381,10 +379,11 @@ export default function DevIntegrationPage() {
                     allowClear
                     showSearch
                     virtual={false}
-                    filterOption={(input, option) => `${option.label} ${option.value}`.toLowerCase().includes(input.toLowerCase())}
+                    listHeight={420}
+                    filterOption={matchCatalogSelectOption}
                     value={query.domain || undefined}
-                    placeholder="业务域"
-                    options={[{ label: '全部业务域', value: '' }, ...domains]}
+                    placeholder="全部业务域"
+                    options={domainOptions}
                     onChange={(domain) => updateFilters({ domain })}
                   />
                   <div className="erp-dev-integration__filter erp-dev-integration__filter--search">

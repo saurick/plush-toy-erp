@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Button, Space, Tag } from 'antd'
 import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import { WorkbenchEmpty } from './WorkbenchPattern.jsx'
+import { groupPermissionModuleSelectOptions, matchCatalogSelectOption } from '../config/devCatalogSelectOptions.mjs'
 import { PERMISSION_RELATIONSHIP_ALL_MODULES } from '../config/devPermissionRelationshipGraph.mjs'
 
 export default function DevPermissionRelationshipGraph({
@@ -19,6 +20,7 @@ export default function DevPermissionRelationshipGraph({
     model.summary.permissions === 0
   const moduleLabel =
     moduleOptions.find((item) => item.value === moduleKey)?.label || '所选模块'
+  const selectOptions = useMemo(() => groupPermissionModuleSelectOptions(moduleOptions), [moduleOptions])
 
   return (
     <div className="erp-permission-relationship__tab-panel">
@@ -29,7 +31,11 @@ export default function DevPermissionRelationshipGraph({
           placeholder="选择功能范围"
           aria-label="选择关系图功能范围"
           value={moduleKey}
-          options={moduleOptions}
+          options={selectOptions}
+          showSearch
+          virtual={false}
+          listHeight={420}
+          filterOption={matchCatalogSelectOption}
           onChange={onChangeModule}
         />
         <Space wrap size={[6, 6]} aria-label="权限关系图例">

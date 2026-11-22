@@ -1,6 +1,9 @@
 import { writeFile } from 'node:fs/promises'
+import { expect } from 'playwright/test'
+import { DEV_PERMISSION_RELATIONSHIPS_API } from '../../src/dev-workbench/config/devPermissionRelationshipApi.mjs'
 import { assertGroupedSelectHierarchy } from './groupedSelectAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { permissionRelationshipFixture } from './permissionRelationshipScenarios.mjs'
 
 export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
   return [
@@ -109,6 +112,80 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
       },
     },
     {
+      name: 'grouped-select-workbench-catalogs',
+      path: '/__dev/integration',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      auth: 'admin',
+      mockAdminRpc: true,
+      beforeNavigate: async (page) => {
+        const snapshot = permissionRelationshipFixture()
+        snapshot.permissions[0].module = 'sales_order'
+        snapshot.permissions.push(...[
+          ['warehouse.inventory.read', '查看库存', 'warehouse', '仓储'],
+          ['masterdata.material.read', '查看材料', 'masterdata', '基础资料'],
+          ['workflow.task.read', '查看任务', 'workflow', '任务协同'],
+          ['system.role.read', '查看岗位', 'system', '系统管理'],
+        ].map(([permission_key, name, module, module_name]) => ({ permission_key, name, module, module_name })))
+        await page.route(`**${DEV_PERMISSION_RELATIONSHIPS_API}`, (route) => route.fulfill({ json: snapshot }))
+      },
+      verify: async (page) => {
+        const popup = page.locator('.ant-select-dropdown:visible')
+        const control = (input) => page.locator('.ant-select').filter({ has: input })
+        const open = (input) => control(input).locator('.ant-select-selector').click()
+        const domain = page.getByRole('combobox', { name: '筛选业务域', exact: true })
+        const domainFilters = page.locator('.erp-dev-integration__filters')
+        const domainResults = domainFilters.getByRole('status')
+        await expect(domainResults).toHaveText(/^共 \d+ 个接口$/u)
+        const total = await domainResults.innerText()
+        await open(domain)
+        await expect(popup.locator('.ant-select-item-group')).toHaveText(['订单与履约 · 9', '资料与协作 · 5', '账号与系统 · 6'])
+        await assertGroupedSelectHierarchy(popup, '接口清单业务域')
+        await expect(popup.getByText('资料与协作 · 5', { exact: true })).toBeInViewport()
+        await page.screenshot({ path: `${outputDir}/interface-domains-4k.png` })
+        await domain.fill('sales_order')
+        await expect(popup.getByRole('option')).toHaveText('销售订单')
+        await popup.getByRole('option', { name: '销售订单', exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('domain') === 'sales_order')
+        await expect(domainResults).not.toHaveText(total)
+        await open(domain)
+        await domain.fill('协作任务')
+        await popup.getByRole('option', { name: '协作任务', exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('domain') === 'workflow')
+        await control(domain).hover()
+        await control(domain).locator('.ant-select-clear').click()
+        await page.waitForURL((url) => !url.searchParams.has('domain'))
+        await expect(domainResults).toHaveText(total)
+        await expect(control(domain).locator('.ant-select-selection-placeholder')).toHaveText('全部业务域')
+        await assertNoHorizontalOverflow(page, '接口清单业务域')
+
+        await page.goto(new URL('/__dev/permission-relationships?target=sales', page.url()).href)
+        const module = page.getByRole('combobox', { name: '选择关系图功能范围', exact: true })
+        const graph = page.getByRole('region', { name: '权限生效关系图', exact: true })
+        await expect(graph.locator('svg').first()).toBeVisible()
+        await open(module)
+        await expect(popup.locator('.ant-select-item-group')).toHaveText(['业务办理 · 2', '基础资料与通用工具 · 2', '系统与开发 · 1'])
+        await expect(popup.getByRole('option').first()).toHaveText('权限总览')
+        await expect(popup.getByRole('option', { selected: true })).toHaveText('权限总览')
+        await assertGroupedSelectHierarchy(popup, '权限关系功能范围')
+        await expect(popup.getByText('系统与开发 · 1', { exact: true })).toBeInViewport()
+        await page.screenshot({ path: `${outputDir}/permission-modules-4k.png` })
+        await module.fill('不存在的范围')
+        await expect(popup.getByText('没有匹配的选项', { exact: true })).toBeVisible()
+        await module.fill('warehouse')
+        await expect(popup.getByRole('option')).toHaveText('仓储')
+        await popup.getByRole('option', { name: '仓储', exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('module') === 'warehouse')
+        await expect(graph.getByText(/未授予“仓储”模块权限/u)).toBeVisible()
+        await open(module)
+        await expect(popup.getByRole('option', { selected: true })).toHaveText('仓储')
+        await popup.getByRole('option', { name: '权限总览', exact: true }).click()
+        await page.waitForURL((url) => (url.searchParams.get('module') || 'all') === 'all')
+        await expect(graph.locator('svg').first()).toBeVisible()
+        await assertNoHorizontalOverflow(page, '权限关系功能范围')
+      },
+    },
+    {
       name: 'grouped-select-design-html',
       path: '/__dev/ui-design',
       viewport: { width: 1920, height: 1080 },
@@ -145,6 +222,31 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         await picker.press('Escape')
         await menu.waitFor({ state: 'hidden' })
         await assertNoHorizontalOverflow(page, '分组下拉独立 HTML')
+
+        await page.goto(new URL('/__dev/ui-design?page=workbench&workbenchMode=preview', page.url()).href)
+        await frame.locator('#sidebar').getByRole('button', { name: '接口与集成', exact: true }).click()
+        const domain = frame.getByRole('combobox', { name: '筛选业务域', exact: true })
+        const domainMenu = domain.locator('.design-select-menu:popover-open')
+        const domainSearch = domain.getByRole('textbox', { name: '搜索业务域', exact: true })
+        const rows = frame.getByRole('table', { name: '接口清单样例', exact: true }).locator('tbody tr')
+        await domain.click()
+        await expect(domainMenu.getByRole('group')).toHaveCount(2)
+        await expect(domainSearch).toBeFocused()
+        await domainSearch.fill('找不到的业务域')
+        await expect(domainMenu.getByText('没有匹配的选项', { exact: true })).toBeVisible()
+        await domainSearch.fill('sales_order')
+        await expect(domainMenu.getByRole('option')).toHaveAccessibleName('销售订单')
+        await domainSearch.press('Enter')
+        await expect(domain).toHaveAttribute('data-value', 'sales_order')
+        await expect(rows).toHaveCount(2)
+        await domain.click()
+        await domainSearch.fill('登录')
+        await domainSearch.press('Escape')
+        await expect(domainMenu).toHaveCount(0)
+        await expect(domain).toHaveAttribute('data-value', 'sales_order')
+        await domain.getByRole('button', { name: '清空筛选业务域', exact: true }).click()
+        await expect(domain).toHaveAttribute('data-value', '')
+        await expect(rows).toHaveCount(3)
       },
     },
   ]
