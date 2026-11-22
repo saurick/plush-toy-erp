@@ -36,6 +36,30 @@ export async function assertPlainDirectory(page, selector, assert) {
   return rows
 }
 
+async function assertDevDocsTreeHierarchy(tree, assert) {
+  const layout = await tree.evaluate((element) => {
+    const titleStart = (node) => node.querySelector('.erp-dev-docs-tree__name, .erp-dev-docs-tree__doc-title').getBoundingClientRect().left
+    const branches = [...element.querySelectorAll('.erp-dev-docs-tree__children')].map((group) => {
+      const folder = group.previousElementSibling
+      const childStarts = [...group.children].map(titleStart)
+      return {
+        path: folder.dataset.devDocDir,
+        indent: Math.min(...childStarts) - titleStart(folder),
+        spread: Math.max(...childStarts) - Math.min(...childStarts),
+        guideWidth: Number.parseFloat(getComputedStyle(group).borderInlineStartWidth),
+      }
+    })
+    return { branches, overflows: element.scrollWidth > element.clientWidth + 1 }
+  })
+  assert(layout.branches.length > 0, '已展开的目录应有子项')
+  for (const { path, indent, spread, guideWidth } of layout.branches) {
+    assert(indent >= 12, `${path} 的子项标题应比父文件夹缩进，实测 ${indent}px`)
+    assert(spread <= 1, `${path} 下的同层文件与子文件夹标题应对齐，实测偏差 ${spread}px`)
+    assert(guideWidth > 0, `${path} 应有标示归属的引导线`)
+  }
+  assert.equal(layout.overflows, false, '目录树应在栏内换行或省略长标题')
+}
+
 function reviewFixture() {
   return {
     kind: 'plush.rpc-contract-review',
@@ -111,6 +135,16 @@ export function createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizonta
         assert.equal(await folder.getAttribute('aria-expanded'), 'false')
         await folder.press('Enter')
         assert.equal(await folder.getAttribute('aria-expanded'), 'true')
+        const directory = page.locator('.erp-dev-docs-tree')
+        const viewport = page.viewportSize()
+        await page.getByRole('button', { name: '展开全部', exact: true }).click()
+        await assertDevDocsTreeHierarchy(directory, assert)
+        await page.setViewportSize({ width: 390, height: 844 })
+        await assertDevDocsTreeHierarchy(directory, assert)
+        await assertNoHorizontalOverflow(page, '文档树窄屏展开')
+        await page.setViewportSize(viewport)
+        await page.getByRole('button', { name: '收起全部', exact: true }).click()
+        assert.equal(await directory.locator('.erp-dev-docs-tree__children').count(), 0)
         const search = page.getByRole('textbox', { name: '搜索项目文档' })
         await search.fill('工作台')
         await search.press('Enter')

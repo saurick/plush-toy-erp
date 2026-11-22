@@ -271,7 +271,6 @@ function readExpandedKeys(availableKeys = []) {
 
 function DevDocsTreeNode({
   node,
-  depth = 0,
   expandedKeys,
   selectedKey,
   onToggleDocPin,
@@ -286,8 +285,7 @@ function DevDocsTreeNode({
           type="button"
           data-dev-doc-dir={node.path}
           title={node.path}
-          className="erp-dev-directory-item erp-dev-docs-tree__row erp-dev-docs-tree__folder"
-          style={{ '--depth-offset': `${depth * 14}px` }}
+          className="erp-dev-directory-item erp-dev-docs-tree__row"
           aria-expanded={expanded}
           onClick={() => onToggleDirectory(node.key)}
         >
@@ -302,7 +300,6 @@ function DevDocsTreeNode({
               <DevDocsTreeNode
                 key={child.key}
                 node={child}
-                depth={depth + 1}
                 expandedKeys={expandedKeys}
                 selectedKey={selectedKey}
                 onToggleDocPin={onToggleDocPin}
@@ -326,7 +323,6 @@ function DevDocsTreeNode({
           ? 'erp-dev-docs-tree__doc-shell erp-dev-docs-tree__doc-shell--active'
           : 'erp-dev-docs-tree__doc-shell'
       }
-      style={{ '--depth-offset': `${depth * 14}px` }}
     >
       <button
         type="button"

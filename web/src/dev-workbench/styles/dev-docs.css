@@ -262,11 +262,16 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-docs-tree {
+.erp-dev-docs-tree,
+.erp-dev-docs-tree__children {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.erp-dev-docs-tree {
   align-content: start;
   flex: 1;
-  gap: 2px;
   min-height: 0;
   overflow-y: auto;
   padding: 2px 18px 8px 2px;
@@ -274,28 +279,25 @@
 }
 
 .erp-dev-docs-tree__children {
-  display: grid;
-  gap: 2px;
+  margin-inline-start: 12px;
+  border-inline-start: 1px solid var(--erp-border);
+  padding-inline-start: 3px;
 }
 
-.erp-dev-docs-tree__row {
-  padding-inline-start: calc(10px + var(--depth-offset, 0px));
+.erp-dev-docs-tree__row > .anticon,
+.erp-dev-docs-tree__doc::before {
+  flex: 0 0 1em;
 }
 
-.erp-dev-docs-tree__folder {
-  color: var(--erp-text-muted);
-  font-weight: 600;
+.erp-dev-docs-tree__doc::before {
+  content: '';
 }
 
 .erp-dev-docs-tree__doc {
   flex: 1;
-  align-items: center;
-  min-width: 0;
 }
 
 .erp-dev-docs-tree__doc-shell {
-  --depth-offset: 0px;
-
   display: flex;
   min-width: 0;
   align-items: center;
