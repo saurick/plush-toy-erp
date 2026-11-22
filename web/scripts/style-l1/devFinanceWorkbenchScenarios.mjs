@@ -47,7 +47,6 @@ export function createDevFinanceWorkbenchScenarios({
           await page.setViewportSize({ width, height: 1080 })
           await assertNoHorizontalOverflow(page)
           for (const graph of await overview.locator('[data-business-flow]').all()) await assertBusinessMermaidGraph(graph)
-
         }
         const initialURL = page.url()
         const historyLength = await page.evaluate(() => history.length)
@@ -126,6 +125,29 @@ export function createDevFinanceWorkbenchScenarios({
         await expect(
           overview.getByRole('button', { name: '月结与期间对账', exact: true })
         ).toBeFocused()
+        await page.setViewportSize({ width: 1280, height: 720 })
+        await overview
+          .getByRole('button', { name: '审批、权限与凭据', exact: true })
+          .click()
+        const permissions = drawer.locator('[data-finance-detail="permissions"]')
+        const permissionsGraph = permissions.locator('[data-business-flow]')
+        await assertBusinessMermaidGraph(permissionsGraph)
+        await expect(permissionsGraph).toHaveAttribute('data-flow-edge-count', '3')
+        await expect(
+          permissionsGraph.getByRole('button', { name: /^查看条件：/u })
+        ).toHaveCount(1)
+        await permissionsGraph
+          .getByRole('button', { name: '查看条件：审批通过', exact: true })
+          .click()
+        await expect(permissions.locator('.erp-dev-finance__explanation')).toContainText(
+          '审批责任以生效客户配置和流程冻结结果为准。审批通过后，由财务显式过账。'
+        )
+        await expect(
+          permissionsGraph.locator('.erp-dev-business-flow__print-conditions dd').filter({ hasText: /\S/u })
+        ).toHaveText([
+          '审批责任以生效客户配置和流程冻结结果为准。审批通过后，由财务显式过账。',
+        ])
+        await close.click()
         await assertNoHorizontalOverflow(page)
         assert.deepEqual(writes.get(page), [], '财务阅读与关系页没有业务写入')
       },

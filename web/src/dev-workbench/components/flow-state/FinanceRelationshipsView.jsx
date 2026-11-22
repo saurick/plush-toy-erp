@@ -23,7 +23,7 @@ import {
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import './financeWorkbench.css'
 
-function FinanceSteps({ nodes, label, selected, onSelect, preview }) {
+function FinanceSteps({ nodes, label, selected, onSelect, preview, edges }) {
   const root = useRef(null)
   const active = nodes.find((node) => node.key === preview?.active)
   const graph = {
@@ -34,7 +34,14 @@ function FinanceSteps({ nodes, label, selected, onSelect, preview }) {
       expanded: preview ? preview.active === node.key : undefined,
       data: { 'finance-node': node.key, financial: node.financial || undefined, match: node.match || undefined },
     })),
-    edges: nodes.slice(1).map((node, index) => ({ from: nodes[index].key, to: node.key, label: '办理顺序', condition: node.description || node.summary })),
+    edges:
+      edges ??
+      nodes.slice(1).map((node, index) => ({
+        from: nodes[index].key,
+        to: node.key,
+        label: '办理顺序',
+        condition: node.description || node.summary,
+      })),
   }
   const trigger = () => [...root.current.querySelectorAll('[data-finance-node]')].find((node) => node.dataset.financeNode === active?.key)
   const close = () => { trigger()?.focus({ preventScroll: true }); preview?.setActive(null) }
@@ -178,12 +185,27 @@ export default function FinanceRelationshipsView({
           label,
           financial: index === 3,
         }))
-      : (FINANCE_TOPIC_STEPS[topic] || []).map(([label, summary], index) => ({
-          key: `${topic}-${index}`,
-          label,
-          summary,
-          financial: index >= 2,
-        }))
+      : (FINANCE_TOPIC_STEPS[topic] || []).map(
+          ([label, summary, description, conditionLabel], index) => ({
+            key: `${topic}-${index}`,
+            label,
+            summary,
+            description,
+            conditionLabel,
+            financial: index >= 2,
+          })
+        )
+  const topicEdges =
+    topic === 'permissions'
+      ? topicSteps
+          .slice(0, -1)
+          .map(({ key: from, description, conditionLabel }, index) => ({
+            from,
+            to: topicSteps[index + 1].key,
+            label: conditionLabel,
+            condition: conditionLabel ? description : undefined,
+          }))
+      : undefined
   const purchaseNotes = scenario && [
     stage === 'draft'
       ? '原草稿保留冻结金额与取消原因。'
@@ -412,6 +434,7 @@ export default function FinanceRelationshipsView({
                     ) : null}
                     <FinanceSteps
                       nodes={topicSteps}
+                      edges={topicEdges}
                       label={`${detailTitle}办理顺序`}
                       selected={step}
                       onSelect={(_node, index) =>
@@ -429,7 +452,7 @@ export default function FinanceRelationshipsView({
                         <p>
                           {topic === 'purchase'
                             ? purchaseNotes[step]
-                            : FINANCE_TOPIC_STEPS[topic]?.[step]?.[2]}
+                            : topicSteps[step]?.description}
                         </p>
                       ) : null}
                     </div>
