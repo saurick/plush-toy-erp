@@ -21,6 +21,48 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
   }
   const openSamples = (page) => page.getByRole('tab', { name: '设计样例', exact: true }).click()
   const returnToPreview = (page) => page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+  const assertMobilePreviewFits = async (frame) => {
+    const clipped = await frame.locator('.mobile-preview-stage').evaluate((stage) => {
+      const area = stage.getBoundingClientRect()
+      return ['.role-mobile-device', '.rm-bottom-nav'].filter((selector) => {
+        const box = stage.querySelector(selector).getBoundingClientRect()
+        return box.width === 0 || box.height === 0
+          || box.top < area.top - 1 || box.bottom > area.bottom + 1
+          || box.left < area.left - 1 || box.right > area.right + 1
+      })
+    })
+    assert.deepEqual(clipped, [], '手机外框和底部导航完整显示在预览区内')
+  }
+  const assertMobilePreviewSelectAligned = async (frame, name) => {
+    const control = frame.getByRole('combobox', { name, exact: true })
+    const menu = control.getByRole('listbox')
+    const trigger = await control.evaluate((node) => {
+      const { left, right, bottom } = node.getBoundingClientRect()
+      const popup = node.querySelector('[role="listbox"]')
+      popup.addEventListener('beforetoggle', () => {
+        popup.openingFrames = (async () => {
+          const samples = []
+          for (let index = 0; index < 3; index++) {
+            await new Promise((resolve) => requestAnimationFrame(resolve))
+            const { left, right, top } = popup.getBoundingClientRect()
+            samples.push({ left, right, top })
+          }
+          return samples
+        })()
+      }, { once: true })
+      return { left, right, bottom, border: parseFloat(getComputedStyle(node).borderLeftWidth) }
+    })
+    assert(trigger.border > 0, `${name}的选择框和展开入口共用一个边框`)
+    await control.press('ArrowDown')
+    const frames = await menu.evaluate((node) => node.openingFrames)
+    for (const popup of frames) {
+      assert(Math.abs(popup.left - trigger.left) <= 1 && Math.abs(popup.right - trigger.right) <= 1
+        && popup.top >= trigger.bottom, `${name}的下拉菜单从首帧起贴齐选择框两侧`)
+    }
+    await control.press('Escape')
+    await menu.waitFor({ state: 'hidden' })
+    assert(await control.evaluate((node) => document.activeElement === node), `${name}收起后焦点回到选择框`)
+  }
   return [
     {
       name: 'dev-ui-design-sales-delivery-table',
@@ -554,15 +596,22 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await verifyMobileNavigationMotion(page, assert, switcher, 2, true)
         await waitReady(page)
         await page.goBack()
-        await waitReady(page)
+        await page.setViewportSize({ width: 1920, height: 873 })
+        const mobileFrame = await waitReady(page)
+        await assertMobilePreviewFits(mobileFrame)
+        await assertMobilePreviewSelectAligned(mobileFrame, '预览身份')
+        await assertMobilePreviewSelectAligned(mobileFrame, '预览岗位')
         assert.equal(await modes.getByRole('radio', { name: '手机版' }).isChecked(), true)
+        await page.setViewportSize({ width: 1920, height: 1080 })
         await chooseUIDesignMode(page, '桌面 ERP')
         await waitReady(page)
         assert.equal(await search.inputValue(), '采购到货')
         await page.screenshot({ path: path.join(outputDir, 'ui-design-preview-modes-4k.png') })
         await page.setViewportSize({ width: 390, height: 844 })
         await chooseUIDesignMode(page, '手机版')
-        await waitReady(page)
+        const narrowMobileFrame = await waitReady(page)
+        await assertMobilePreviewFits(narrowMobileFrame)
+        await assertMobilePreviewSelectAligned(narrowMobileFrame, '预览岗位')
         const headerTabs = page.locator('.erp-dev-ui-design-header').getByRole('tablist')
         assert.deepEqual(await headerTabs.getByRole('tab').allTextContents(), ['可交互设计', '设计样例', '设计说明', '设计依据'])
         assert.equal(await headerTabs.evaluate((node) => {
@@ -579,6 +628,10 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         assert(bar.fits && bar.labelsFit, '窄屏完整显示三个预览入口')
         await assertNoHorizontalOverflow(page)
         await page.screenshot({ path: path.join(outputDir, 'ui-design-preview-modes-narrow.png') })
+        await page.getByRole('link', { name: '设备支持范围', exact: true }).click()
+        await page.getByRole('heading', { name: '任务办理', exact: true }).waitFor()
+        await page.goBack()
+        await assertMobilePreviewFits(await waitReady(page))
       },
     },
     {

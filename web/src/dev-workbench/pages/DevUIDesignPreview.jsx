@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { DownloadOutlined, FullscreenOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Result, Space } from 'antd'
+import { Link } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import Select from '@/common/components/select/AppSelect'
+import { DEV_TASK_HANDLING_ROUTE } from '../config/devRoutes.mjs'
 import { getUIDesignStateOptions, prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
 
@@ -182,6 +184,7 @@ export default function DevUIDesignPreview({ active, page }) {
               }}
             />
           ) : null}
+          {page === 'mobile-tasks' ? <Link to={DEV_TASK_HANDLING_ROUTE}>设备支持范围</Link> : null}
           <Button icon={<ReloadOutlined />} onClick={() => setPreviewRevision((value) => value + 1)}>
             重置演示
           </Button>
