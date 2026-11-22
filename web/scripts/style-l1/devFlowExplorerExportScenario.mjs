@@ -11,7 +11,7 @@ const draft = {
   ],
   edges: [{ from: 'node:sales_order', to: 'node:purchase_lot', kind: 'unknown' }],
   ideas: [],
-  presentation: { mode: 'all', role: '', layout: 'lanes', viewport: { x: 40, y: 40, scale: 1, mode: 'manual' } },
+  presentation: { mode: 'all', highlightedRoles: ['sales', 'warehouse', 'boss', 'engineering', 'pmc'], layout: 'lanes', viewport: { x: 40, y: 40, scale: 1, mode: 'manual' } },
 }
 
 export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOverflow, startNoWriteAudit }) {
@@ -60,6 +60,9 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
       assert(svg.includes('操作说明（在流程探索页面使用）'))
       assert(svg.includes('图例'))
       assert(svg.includes('业务全流程地图'))
+      assert(svg.includes('高亮岗位：业务、仓库、老板、工程、PMC'))
+      assert.match(svg, /data-export-node="node:sales_order"><title>共同 · 业务、仓库、老板、工程、PMC<\/title>(?:(?!<\/g>)[\s\S])*…<\/text>/u)
+      assert.match(svg, /data-export-node="node:purchase_order"><title>仓库<\/title>/u)
       assert.equal((svg.match(/data-export-node=/gu) || []).length, 3)
       const laneStyles = await page.locator('.erp-chain-design__lane').evaluateAll((lanes) => lanes.map((lane) => ({ domain: lane.dataset.domain, fill: getComputedStyle(lane).backgroundColor, border: getComputedStyle(lane).borderTopColor })))
       assert.equal((svg.match(/data-export-lane=/gu) || []).length, laneStyles.length)

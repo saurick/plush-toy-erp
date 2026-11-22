@@ -3,8 +3,18 @@
 .erp-chain-design__picker-trigger { min-width: 180px; max-width: 100%; justify-content: space-between; }
 .erp-chain-design__picker-panel { display: flex; flex-direction: column; gap: 8px; width: min(566px, calc(100vw - 56px)); max-height: min(480px, calc(100dvh - 80px)); }
 .erp-chain-design__picker-trigger[data-picker="role"] { min-width: 120px; }
-.erp-chain-design__picker-panel[data-picker="role"] { width: min(420px, calc(100vw - 56px)); }
+.erp-chain-design__picker-panel:is([data-picker="scope"], [data-picker="role"]) {
+  width: max-content;
+  min-width: min(240px, calc(100vw - 56px));
+  max-width: min(var(--chain-picker-max-width, 566px), calc(100vw - 56px));
+  max-height: min(480px, calc(50dvh - 56px));
+}
+.erp-chain-design__picker-panel[data-picker="role"] { --chain-picker-max-width: 420px; }
 .erp-chain-design__picker-panel[data-picker="view"] { width: min(335px, calc(100vw - 56px)); }
 .erp-chain-design__picker-trigger[data-picker="view"] { min-width: 0; }
 .erp-chain-design__picker-panel > header { display: flex; align-items: center; justify-content: space-between; }
+.erp-chain-design__picker-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.erp-chain-design__picker-heading > small { color: var(--erp-text-muted); }
 .erp-chain-design__picker-options { min-height: 0; display: grid; gap: 12px; padding: 3px; overflow: auto; overscroll-behavior: contain; }
+.erp-chain-design__role-options { display: flex; flex-wrap: wrap; gap: 8px 16px; overflow-wrap: anywhere; }
+.erp-chain-design__role-count { margin-inline-start: 6px; color: var(--erp-text-muted); font-variant-numeric: tabular-nums; }

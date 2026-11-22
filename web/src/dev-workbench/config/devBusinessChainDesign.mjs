@@ -507,10 +507,18 @@ export function parseBusinessChainDraft(raw, library) {
     }
     pairs.add(key)
   }
+  const savedRoles = draft.presentation?.highlightedRoles
+  const legacyRole = draft.presentation?.role
+  // Older saved views stored one role in the browser's working draft.
+  const highlightedRoles = savedRoles === undefined && typeof legacyRole === 'string'
+    ? legacyRole ? [legacyRole] : []
+    : savedRoles
   if (
     draft.presentation &&
     (!['overview', 'mainline', 'all'].includes(draft.presentation.mode) ||
-      typeof draft.presentation.role !== 'string' ||
+      !Array.isArray(highlightedRoles) ||
+      new Set(highlightedRoles).size !== highlightedRoles.length ||
+      highlightedRoles.some((key) => typeof key !== 'string' || !key) ||
       (draft.presentation.layout !== undefined && !['flow', 'lanes'].includes(draft.presentation.layout)) ||
       (draft.presentation.direction !== undefined && !['LR', 'TB'].includes(draft.presentation.direction)) ||
       (draft.presentation.showBranches !== undefined && typeof draft.presentation.showBranches !== 'boolean') ||
@@ -544,7 +552,7 @@ export function parseBusinessChainDraft(raw, library) {
       ? {
           presentation: {
             mode: draft.presentation.mode,
-            role: draft.presentation.role,
+            highlightedRoles: highlightedRoles.filter((key) => library.roles.some(({ value }) => value === key)),
             ...(draft.presentation.layout ? { layout: draft.presentation.layout } : {}),
             ...(draft.presentation.direction ? { direction: draft.presentation.direction } : {}),
             ...(draft.presentation.showBranches !== undefined ? { showBranches: draft.presentation.showBranches } : {}),

@@ -102,7 +102,7 @@ test('完整保留原节点坐标、关系、备注及阅读模式，无需清�
       .filter((edge) => ids.has(edge.from) && ids.has(edge.to))
       .map(({ from, to }) => ({ from, to, kind: 'known' })),
     ideas: [{ text: '原有阅读笔记' }],
-    presentation: { mode: 'all', role: 'quality' },
+    presentation: { mode: 'all', highlightedRoles: ['quality'] },
   }
   draft.edges = [
     ...new Map(

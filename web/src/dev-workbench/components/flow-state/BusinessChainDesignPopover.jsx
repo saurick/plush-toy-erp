@@ -5,7 +5,7 @@ import { CloseOutlined, DownOutlined } from '@ant-design/icons'
 import AnchoredControlPopover from '@/common/components/overlay/AnchoredControlPopover.jsx'
 import './businessChainDesignPopover.css'
 
-export default function BusinessChainDesignPopover({ kind, label, title, closeLabel, current, singleChoice = false, dock, children }) {
+export default function BusinessChainDesignPopover({ kind, label, title, modeLabel, closeLabel, current, singleChoice = false, dock, children }) {
   const { getPopupContainer } = React.useContext(ConfigProvider.ConfigContext)
   const [open, setOpen] = useState(false)
   const panelId = useId()
@@ -65,6 +65,7 @@ export default function BusinessChainDesignPopover({ kind, label, title, closeLa
       id={panelId}
       role="dialog"
       aria-label={title}
+      aria-describedby={modeLabel ? `${panelId}-mode` : undefined}
       className="erp-chain-design__picker-panel"
       data-picker={kind}
       onKeyDownCapture={onPanelKey}
@@ -74,7 +75,10 @@ export default function BusinessChainDesignPopover({ kind, label, title, closeLa
       }}
     >
       <header>
-        <strong>{title}</strong>
+        <div className="erp-chain-design__picker-heading">
+          <strong>{title}</strong>
+          {modeLabel && <small id={`${panelId}-mode`}>{modeLabel}</small>}
+        </div>
         <Button type="text" size="small" icon={<CloseOutlined />} aria-label={closeLabel} onClick={dismiss} />
       </header>
       <div ref={list} className="erp-chain-design__picker-options">
@@ -116,7 +120,7 @@ export default function BusinessChainDesignPopover({ kind, label, title, closeLa
           open={open}
           onOpenChange={setOpen}
           placement="bottomLeft"
-          getPopupContainer={(element) => element.closest('.erp-chain-design-shell') ?? getPopupContainer?.(element) ?? element.ownerDocument.body}
+          getPopupContainer={(element) => element.closest('.erp-chain-design-shell') ?? getPopupContainer?.() ?? element.ownerDocument.body}
           afterOpenChange={(visible) => { if (visible && open) focusCurrent() }}
           content={panel}
         >

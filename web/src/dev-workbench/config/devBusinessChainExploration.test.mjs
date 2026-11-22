@@ -60,10 +60,10 @@ test('展开完整上下游终止于已访问节点，保留手摆位置，重�
     view
   )
   const restored = parseBusinessChainDraft(
-    JSON.stringify({ ...view, presentation: { mode: 'all', role: 'quality' } }),
+    JSON.stringify({ ...view, presentation: { mode: 'all', highlightedRoles: ['quality', 'warehouse'] } }),
     library
   )
-  assert.equal(restored.presentation.role, 'quality')
+  assert.deepEqual(restored.presentation.highlightedRoles, ['quality', 'warehouse'])
   assert.equal(restored.presentation.mode, 'all')
   assert.deepEqual(restored.nodes, view.nodes)
 })

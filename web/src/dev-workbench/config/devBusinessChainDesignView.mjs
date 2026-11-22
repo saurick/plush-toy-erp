@@ -11,6 +11,13 @@ export const CHAIN_LAYOUT_OPTIONS = {
 
 export const CHAIN_DESIGN_NODE_SIZE = Object.freeze({ width: 176, height: 88 })
 
+export function businessChainRoleHighlight(nodeRoles, selectedRoles) {
+  const labels = selectedRoles.filter(({ value }) => nodeRoles.includes(value)).map(({ label }) => label)
+  if (!labels.length) return null
+  const shared = labels.length > 1
+  return { kind: shared ? 'shared' : 'single', text: shared ? `共同 · ${labels.join('、')}` : labels[0] }
+}
+
 // The same mapping converts a vertical drop position back to the saved coordinates.
 export function orientBusinessChainPoint(point, direction) {
   if (direction !== 'TB') return point

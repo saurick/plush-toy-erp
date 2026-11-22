@@ -172,7 +172,8 @@ test('本地视图保存阅读布局、图层和镜头，拒绝非法镜头', ()
   const draft = showBusinessChainWhole(emptyBusinessChainDraft(), library, 'purchase_to_inventory')
   draft.presentation = { mode: 'mainline', role: 'quality', layout: 'lanes', layers: ['normal', 'exception'], viewport: { x: -37, y: 92, scale: 1.25, mode: 'manual', chainKey: null } }
   const restored = parseBusinessChainDraft(JSON.stringify(draft), library)
-  assert.deepEqual(restored.presentation, draft.presentation)
+  const { role, ...presentation } = draft.presentation
+  assert.deepEqual(restored.presentation, { ...presentation, highlightedRoles: [role] })
   assert.deepEqual(restored.nodes, draft.nodes)
   assert.throws(() => parseBusinessChainDraft(JSON.stringify({ ...draft, presentation: { ...draft.presentation, viewport: { ...draft.presentation.viewport, scale: 0 } } }), library))
 })

@@ -178,7 +178,7 @@ test('聚焦、回到整体及不同链路往返保留已缓存和手动调整�
     'outsourcing_to_inventory'
   )
   draft.nodes = storedPosition(draft.nodes, start, { x: -300, y: 42, manual: true })
-  draft.presentation = { mode: 'all', role: 'quality' }
+  draft.presentation = { mode: 'all', highlightedRoles: ['quality', 'warehouse'] }
   const whole = structuredClone(draft)
   draft = focusBusinessChainMap(draft, library, start)
   assert.equal(draft.map.scope, 'local')
@@ -284,7 +284,7 @@ test('保存往返完整保留局部范围、颗粒度、分区展开、局部�
   draft = focusBusinessChainMap(draft, library, start)
   draft.map.focusPositions = storedPosition(draft.map.focusPositions, start, { x: -800, y: -60 })
   draft.map.focusPositions = storedPosition(draft.map.focusPositions, 'map:outsourcing_to_inventory', { x: 33, y: 55 })
-  draft.presentation = { mode: 'overview', role: '', direction: 'TB' }
+  draft.presentation = { mode: 'overview', highlightedRoles: [], direction: 'TB' }
   draft.map.expandedChains = ['outsourcing_to_inventory']
   draft.map.expandedNodes = [start]
   const parsed = parseBusinessChainDraft(

@@ -9,7 +9,7 @@ const equal = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b)
 function blankState() {
   const draft = {
     ...emptyBusinessChainDraft(),
-    presentation: { mode: 'mainline', role: '', layout: 'lanes', showBranches: false, layers: ['normal'] },
+    presentation: { mode: 'mainline', highlightedRoles: [], layout: 'lanes', showBranches: false, layers: ['normal'] },
   }
   return { draft, initialDraft: draft, past: [], future: [], issue: '', restoreFailed: false }
 }
@@ -78,7 +78,7 @@ export default function useBusinessChainDraft(library, initialRange, startBlank 
     const previous = current.current
     const update = (snapshot) => ({
       ...snapshot,
-      presentation: { mode: 'mainline', role: '', ...snapshot.presentation, ...patch },
+      presentation: { mode: 'mainline', highlightedRoles: [], ...snapshot.presentation, ...patch },
     })
     const draft = update(previous.draft)
     if (equal(previous.draft.presentation, draft.presentation)) return

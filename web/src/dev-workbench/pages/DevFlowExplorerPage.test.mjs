@@ -80,7 +80,7 @@ const previousDraft = {
   nodes: [{ id: 'node:sales_order', x: 96, y: 80, manual: true }],
   edges: [],
   ideas: [{ text: '保留原备注' }],
-  presentation: { mode: 'all', role: '' },
+  presentation: { mode: 'all', highlightedRoles: [] },
 }
 const recent = JSON.stringify({ draft: previousDraft })
 
@@ -131,7 +131,7 @@ test('新建空白入口优先于原标签页复制的草稿，消费入口后�
   assert.equal(app.location().search, '')
   assert.equal(app.ui.container.querySelectorAll('[data-design-node]').length, 0)
   assert.match(app.ui.container.querySelector('[aria-label="当前探索范围"]').textContent, /尚未加载链路/u)
-  assert.deepEqual(JSON.parse(window.sessionStorage.getItem(workingKey)), { draft: { nodes: [], edges: [], ideas: [], presentation: { mode: 'mainline', role: '', layout: 'lanes', showBranches: false, layers: ['normal'] } } })
+  assert.deepEqual(JSON.parse(window.sessionStorage.getItem(workingKey)), { draft: { nodes: [], edges: [], ideas: [], presentation: { mode: 'mainline', highlightedRoles: [], layout: 'lanes', showBranches: false, layers: ['normal'] } } })
   await app.click('更多视图操作')
   const link = document.querySelector('a[href="/__dev/flow-explorer?new=blank"]')
   assert(link)

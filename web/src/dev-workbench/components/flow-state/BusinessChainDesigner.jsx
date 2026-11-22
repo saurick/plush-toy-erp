@@ -89,7 +89,8 @@ export default function BusinessChainDesigner({
     setFrameKey((value) => value + 1)
     onEntryApplied()
   }, [startBlank, entry, issue, change, library, onEntryApplied, draftModel])
-  const { mode: viewMode = 'mainline', role = '' } = draft.presentation || {}
+  const { mode: viewMode = 'mainline', highlightedRoles = [] } = draft.presentation || {}
+  const selectedRoles = library.roles.filter(({ value }) => highlightedRoles.includes(value))
   const layout = draft.presentation?.layout || 'flow'
   const layers = draft.presentation?.layers || ['normal']
   const setPresentation = draftModel.changePresentation
@@ -150,12 +151,12 @@ export default function BusinessChainDesigner({
       next = arrangeBusinessChainMap(next, library, mode, layout)
     }
     const { viewport: _viewport, ...readingOptions } = draft.presentation || {}
-    navigateReading({ ...next, presentation: { ...readingOptions, mode, role, layout, layers } }, selected, 'chain')
+    navigateReading({ ...next, presentation: { ...readingOptions, mode, highlightedRoles, layout, layers } }, selected, 'chain')
   }
   const returnReading = (preserveGranularity = false) => {
     const previous = history.at(-1)
     if (!previous) return
-    change(preserveGranularity === true ? { ...previous.draft, presentation: { ...previous.draft.presentation, mode: viewMode, role } } : previous.draft)
+    change(preserveGranularity === true ? { ...previous.draft, presentation: { ...previous.draft.presentation, mode: viewMode, highlightedRoles } } : previous.draft)
     setHistory((items) => items.slice(0, -1))
     setSelection(previous.selection)
     setFilters(previous.filters)
@@ -188,7 +189,7 @@ export default function BusinessChainDesigner({
       kind="scope"
       value={draft.nodes.length ? map.chainKey : null}
       groups={library.chainOptionGroups}
-      onSelect={(key) => {
+      onChange={(key) => {
         if (key !== map.chainKey || map.scope !== 'whole') navigateChain(key)
       }}
     />
@@ -199,7 +200,7 @@ export default function BusinessChainDesigner({
     const next = arrangeBusinessChainMap(draft, library, arrangementMode, value)
     const { viewport: _viewport, ...readingOptions } = draft.presentation || {}
     const nextCamera = value === 'lanes' ? { x: 24, y: 24, scale: 1, mode: 'manual' } : null
-    change({ ...next, presentation: { ...readingOptions, mode: viewMode, role, layout: value, layers, ...(nextCamera ? { viewport: nextCamera } : {}) } })
+    change({ ...next, presentation: { ...readingOptions, mode: viewMode, highlightedRoles, layout: value, layers, ...(nextCamera ? { viewport: nextCamera } : {}) } })
     resetInteraction()
     restoreCamera(nextCamera)
     setNotice(value === 'lanes' ? '已按领域分行；可平移查看交接，也可适应全图。' : '已调整当前布局，可撤销；业务关系保持不变。')
@@ -260,7 +261,7 @@ export default function BusinessChainDesigner({
                     map.focusId ? library.byId.get(map.focusId)?.label : '',
                     CHAIN_DISPLAY_OPTIONS[effectiveMode].label,
                     effectiveMode === 'overview' ? '' : CHAIN_LAYOUT_OPTIONS[layout].label,
-                    role ? `岗位：${library.roles.find(({ value }) => value === role)?.label}` : '',
+                    selectedRoles.length ? `高亮岗位：${selectedRoles.map(({ label }) => label).join('、')}` : '',
                     draft.presentation?.showBranches ? '分支已展开' : '',
                   ].filter(Boolean).join(' · '),
                 }
@@ -294,7 +295,7 @@ export default function BusinessChainDesigner({
           onUndo={onUndo}
           onRedo={onRedo}
           addNode={addNode}
-          role={role}
+          selectedRoles={selectedRoles}
           connecting={connecting}
           setConnecting={setConnecting}
           selection={selection}

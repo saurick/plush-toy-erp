@@ -24,6 +24,7 @@ import { useERPTheme } from '@/common/theme/erpTheme'
 import ERPThemeScope from '@/common/theme/ERPThemeScope'
 import { BusinessOperationPanel, SearchInput as BusinessSearchInput } from '@/erp/components/business-list/BusinessListLayout.jsx'
 import BusinessChainDesignPicker from './flow-state/BusinessChainDesignPicker.jsx'
+import { businessChainRoleHighlight } from '../config/devBusinessChainDesignView.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
 import DevSharedComponentGuide, { DevUIConsumerName, SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
@@ -47,7 +48,6 @@ const PURCHASE_PAGE = getBusinessPagePresentation('accessories-purchase')
 const MATERIAL_PAGE = getBusinessPagePresentation('materials')
 const TASK_PAGE = getBusinessPagePresentation('task-board')
 const HISTORY_PAGE = getBusinessPagePresentation('history-records')
-const FLOW_SCOPE_EXAMPLE_TITLE = '分组单选气泡（流程范围）'
 
 const TOPICS = [
   {
@@ -259,6 +259,25 @@ const TOPICS = [
     consumer: { ...getBusinessPagePresentation('shipments'), task: '打开出货编辑页，核对产品、SKU、仓库、批次的完整值与明细横向滚动；无需保存真实单据。' },
   },
   {
+    key: 'chain-view-picker',
+    title: '分组选择（单选／多选）',
+    summary: '流程范围单选、岗位高亮多选',
+    description: '流程范围点选即切换。岗位高亮可同时勾选采购和仓库，查看各自和共同参与的示例步骤。',
+    rules: [
+      ['切换流程范围', '全流程地图或一条链路', '同一画布采用一个范围。点选后，按钮显示当前范围，面板随即收起。'],
+      ['查看岗位参与步骤', '可连续勾选多个岗位', '节点显示命中的岗位，共同参与的步骤带「共同」标记。点选「全链路视角」清除全部高亮。'],
+      ['键盘操作', '单选用方向键和 Enter，多选用 Tab 和空格', 'Esc 关闭后焦点回到入口。'],
+    ],
+    checks: [
+      '打开流程范围，核对分组、当前勾选和尖角位置。',
+      '选择另一项，核对面板收起和按钮当前值。',
+      '勾选采购和仓库，核对各自与共同参与的步骤。再选「全链路视角」清除高亮。',
+    ],
+    componentRefs: ['BusinessChainDesignPicker'],
+    source: '交互设计说明 #workbench-patterns',
+    consumer: { title: '流程探索', task: '切换链路并选择高亮岗位，核对画布范围、节点高亮与数量。' },
+  },
+  {
     key: 'dates',
     title: '日期与时间',
     summary: '日期、分钟与范围约束',
@@ -314,15 +333,14 @@ const TOPICS = [
         '左侧漏斗和固定的「筛选」',
         '浮层尖角对准入口。条件立即生效，面板保持展开，可连续调整后收起。',
       ],
-      [FLOW_SCOPE_EXAMPLE_TITLE, '当前值与右侧固定下箭头', '沿用同一按钮与浮层外观，点选即切换并收起。'],
       ['重置筛选', '清除面板内条件', '保留关键词，清除搜索由输入框单独处理。'],
     ],
     checks: [
       '选择逾期：结果与数量一起变化。',
       '输入期间结果不变；提交不存在的关键词后，出现无结果与清除入口。',
-      '打开流程范围和总筛选，核对尖角指向。点选流程会收起，选择记录范围及负责人可连续操作。',
+      '打开总筛选，核对尖角指向。连续调整记录范围及负责人，再收起面板。',
     ],
-    componentRefs: ['AnchoredControlPopover', 'BusinessOperationPanel', 'BusinessChainDesignPicker', 'FilterSelect', 'FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'MobileFilterPopover', 'MobileFilterChoices'],
+    componentRefs: ['AnchoredControlPopover', 'BusinessOperationPanel', 'FilterSelect', 'FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'MobileFilterPopover', 'MobileFilterChoices'],
     consumer: { ...TASK_PAGE, task: '组合任务范围与关键词，再清空和返回，核对当前条件及结果。' },
   },
   {
@@ -638,7 +656,7 @@ function demoRiskAvailable(risk, scope) {
   return risk === 'blocked' ? query.blocked_only : query.due_status === due
 }
 
-const FILTER_EXAMPLE_FLOW_GROUPS = [
+const PICKER_EXAMPLE_FLOW_GROUPS = [
   { key: 'sales', label: '销售、生产与出货', options: [{ value: 'sales_to_production', label: '销售受理到生产准备' }] },
   {
     key: 'purchase',
@@ -649,17 +667,58 @@ const FILTER_EXAMPLE_FLOW_GROUPS = [
     ],
   },
 ]
+const PICKER_EXAMPLE_STEPS = [
+  { label: '核对采购订单', roles: ['purchase'] },
+  { label: '交接到货', roles: ['purchase', 'warehouse'] },
+  { label: '登记入库', roles: ['warehouse'] },
+]
+const PICKER_EXAMPLE_ROLE_GROUPS = [
+  {
+    key: 'present',
+    label: '本图有节点',
+    options: [
+      { value: 'purchase', label: '采购' },
+      { value: 'warehouse', label: '仓库' },
+    ].map((option) => ({ ...option, count: PICKER_EXAMPLE_STEPS.filter(({ roles }) => roles.includes(option.value)).length })),
+  },
+  { key: 'absent', label: '本图暂无节点', options: [{ value: 'finance', label: '财务' }] },
+]
+
+function BusinessChainPickerExample() {
+  const [scope, setScope] = useState('outsourcing_to_inventory')
+  const [highlightedRoles, setHighlightedRoles] = useState([])
+  const selectedRoles = PICKER_EXAMPLE_ROLE_GROUPS.flatMap(({ options }) => options).filter(({ value }) => highlightedRoles.includes(value))
+
+  return (
+    <div className="erp-control-example-stack">
+      <div className="erp-control-example-row">
+        <BusinessChainDesignPicker kind="scope" value={scope} groups={PICKER_EXAMPLE_FLOW_GROUPS} onChange={setScope} />
+        <BusinessChainDesignPicker kind="role" value={highlightedRoles} groups={PICKER_EXAMPLE_ROLE_GROUPS} onChange={setHighlightedRoles} />
+      </div>
+      <div className="erp-control-table-scroll">
+        <table className="erp-control-table" data-table-lines="appearance" aria-label="岗位高亮示例步骤">
+          <thead><tr><th>示例步骤</th><th>高亮岗位</th></tr></thead>
+          <tbody>
+            {PICKER_EXAMPLE_STEPS.map(({ label, roles }) => {
+              const highlight = businessChainRoleHighlight(roles, selectedRoles)
+              return <tr key={label}><td>{label}</td><td>{highlight ? <strong>{highlight.text}</strong> : '—'}</td></tr>
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 const FILTER_EXAMPLE_OWNERS = [...new Set(RECORDS.map(({ owner }) => owner))].map((owner) => ({ label: owner, value: owner }))
 
 function FiltersExample() {
-  const comparisonId = React.useId()
   const [device, setDevice] = useState('desktop')
   const [risk, setRisk] = useState('all')
   const [keyword, setKeyword] = useState('')
   const [scope, setScope] = useState('active')
   const [open, setOpen] = useState(false)
   const [owner, setOwner] = useState('')
-  const [flowScope, setFlowScope] = useState('outsourcing_to_inventory')
   const mobile = device === 'mobile'
   const changeScope = (nextScope) => {
     setScope(nextScope)
@@ -752,27 +811,16 @@ function FiltersExample() {
       <div className={`erp-control-filter-preview${mobile ? ' erp-mobile-controls erp-control-filter-preview--mobile' : ''}`}>
         {mobile ? <>{searchControls}{quickFilters}</> : (
           <>
-            <div className="erp-control-filter-comparison">
-              <section aria-labelledby={`${comparisonId}-scope`}>
-                <h4 id={`${comparisonId}-scope`}>{FLOW_SCOPE_EXAMPLE_TITLE}</h4>
-                <p>点选即切换并收起。</p>
-                <BusinessChainDesignPicker kind="scope" value={flowScope} groups={FILTER_EXAMPLE_FLOW_GROUPS} onSelect={setFlowScope} />
-              </section>
-              <section aria-labelledby={`${comparisonId}-filter`}>
-                <h4 id={`${comparisonId}-filter`}>总筛选</h4>
-                <p>可以连续调整条件，完成后手动收起。</p>
-                <BusinessOperationPanel
-                  showSelection={false}
-                  activeFilterCount={Number(scope !== 'active') + Number(Boolean(owner))}
-                  onClearFilters={resetFilters}
-                  filters={[
-                    <BusinessSearchInput key="search" aria-label="演示搜索" placeholder="单号、产品、负责人" value={keyword} onSearch={setKeyword} />,
-                    <FilterChipGroup key="scope" label="演示记录范围" value={scope} options={PROGRESS_SCOPE_OPTIONS} onChange={changeScope} />,
-                    <FilterSelect key="owner" label="演示负责人" value={owner} options={FILTER_EXAMPLE_OWNERS} onChange={setOwner} showSearch />,
-                  ]}
-                />
-              </section>
-            </div>
+            <BusinessOperationPanel
+              showSelection={false}
+              activeFilterCount={Number(scope !== 'active') + Number(Boolean(owner))}
+              onClearFilters={resetFilters}
+              filters={[
+                <BusinessSearchInput key="search" aria-label="演示搜索" placeholder="单号、产品、负责人" value={keyword} onSearch={setKeyword} />,
+                <FilterChipGroup key="scope" label="演示记录范围" value={scope} options={PROGRESS_SCOPE_OPTIONS} onChange={changeScope} />,
+                <FilterSelect key="owner" label="演示负责人" value={owner} options={FILTER_EXAMPLE_OWNERS} onChange={setOwner} showSearch />,
+              ]}
+            />
             {quickFilters}
           </>
         )}
@@ -1049,6 +1097,8 @@ export default function DevControlStandards() {
                     <NavigationExample />
                   ) : current.key === 'filters' ? (
                     <FiltersExample />
+                  ) : current.key === 'chain-view-picker' ? (
+                    <BusinessChainPickerExample />
                   ) : current.key === 'actions' ? (
                     <ActionsExample />
                   ) : current.key === 'inputs' ? (

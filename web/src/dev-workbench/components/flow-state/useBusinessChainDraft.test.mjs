@@ -50,13 +50,15 @@ test('已有自动记录恢复布局、备注和手动坐标，忽略旧的收�
     await t.test(layout || '未记录布局', async (t) => {
       const draft = { ...canvas('原有备注'), presentation: { mode: 'all', role: 'warehouse', ...(layout ? { layout } : {}), showBranches: true } }
       const editor = await setup(t, { durable: { currentId: 'previous-view', draft }, initialRange: 'all' })
-      assert.deepEqual(editor.value.draft, draft)
+      const restored = { ...draft, presentation: { mode: 'all', highlightedRoles: ['warehouse'], ...(layout ? { layout } : {}), showBranches: true } }
+      assert.deepEqual(editor.value.draft, restored)
       assert.equal(editor.value.needsNewConfirmation, true)
-      assert.deepEqual(JSON.parse(window.localStorage.getItem(workingKey)), { draft })
-      await editor.run((api) => api.changePresentation({ ...draft.presentation, role: 'finance' }))
+      assert.deepEqual(JSON.parse(window.localStorage.getItem(workingKey)), { draft: restored })
+      await editor.run((api) => api.changePresentation({ highlightedRoles: ['warehouse', 'finance'] }))
       const working = editor.value.draft
       await editor.reload()
       assert.deepEqual(editor.value.draft, working)
+      assert.deepEqual(editor.value.draft.presentation.highlightedRoles, ['warehouse', 'finance'])
     })
   }
 })
@@ -170,13 +172,14 @@ test('岗位、显示范围和方向随视图保存，切换方向保留布局�
   await editor.run((api) => api.change({ ...api.draft, nodes: [{ ...api.draft.nodes[0], x: 600 }], presentation: { ...api.draft.presentation, layout: 'flow' } }))
   await editor.run((api) => api.undo())
   const history = [editor.value.past.length, editor.value.future.length]
-  await editor.run((api) => api.changePresentation({ mode: 'all', role: 'quality', direction: 'TB' }))
+  await editor.run((api) => api.changePresentation({ mode: 'all', highlightedRoles: ['quality', 'warehouse'], direction: 'TB' }))
   assert.deepEqual([editor.value.past.length, editor.value.future.length], history)
   assert.equal(editor.value.draft.presentation.layout, 'lanes')
   await editor.run((api) => api.redo())
   assert.equal(editor.value.draft.nodes[0].x, 600)
   assert.equal(editor.value.draft.presentation.layout, 'flow')
   assert.equal(editor.value.draft.presentation.direction, 'TB')
+  assert.deepEqual(editor.value.draft.presentation.highlightedRoles, ['quality', 'warehouse'])
   const working = editor.value.draft
   await editor.reload()
   assert.deepEqual(editor.value.draft, working)

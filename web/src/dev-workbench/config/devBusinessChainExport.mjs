@@ -1,4 +1,5 @@
 import { DIAGRAM_DOMAINS, DIAGRAM_NODE_TYPES } from '../../common/components/diagram/diagramSemantics.mjs'
+import { ERP_LIGHT_PALETTE } from '../../common/theme/erpThemePalette.mjs'
 
 export const CHAIN_CANVAS_OPERATIONS = '拖空白平移 · Ctrl / ⌘ + 滚轮缩放。全流程地图和阶段排布可切换横竖方向。'
 export const CHAIN_CANVAS_RELATIONS = Object.freeze({
@@ -18,7 +19,7 @@ const relationStyle = (kind) => ({
   color: kind === 'exception' ? '#ad6800' : muted,
   dash: ({ exception: '8 5', unknown: '2 5', supplies: '5 4', cross_cuts: '2 4' })[kind] || '',
 })
-const tint = (hex) => `#${hex.slice(1).match(/../gu).map((part) => Math.round(parseInt(part, 16) * 0.16 + 255 * 0.84).toString(16).padStart(2, '0')).join('')}`
+const tint = (hex, amount = 0.16) => `#${hex.slice(1).match(/../gu).map((part) => Math.round(parseInt(part, 16) * amount + 255 * (1 - amount)).toString(16).padStart(2, '0')).join('')}`
 
 // Capture the rendered graph in its unscaled coordinates, including off-screen
 // and negative positions. No camera change, re-layout or hidden node expansion.
@@ -34,7 +35,11 @@ export function captureBusinessChainExport(surface, scale) {
     const segmenter = new Intl.Segmenter('zh', { granularity: 'grapheme' })
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if ((!element.closest('svg') && node.parentElement.closest('svg')) || !node.textContent.trim()) continue
-      const style = window.getComputedStyle(node.parentElement)
+      const parent = node.parentElement
+      const style = window.getComputedStyle(parent)
+      const size = parseFloat(style.fontSize)
+      const clippedRole = parent.hasAttribute('data-role-label') && parent.scrollWidth > parent.clientWidth
+      const clipAt = clippedRole ? box(parent.getBoundingClientRect()).x + parent.clientWidth - size : Infinity
       let line = null
       for (const { segment, index } of segmenter.segment(node.textContent)) {
         const range = document.createRange()
@@ -42,8 +47,15 @@ export function captureBusinessChainExport(surface, scale) {
         range.setEnd(node, index + segment.length)
         const rect = box(range.getBoundingClientRect())
         if (!rect.width && !rect.height) continue
+        if (rect.x + rect.width > clipAt) {
+          if (line) {
+            line.text += '…'
+            line.width += size
+          }
+          break
+        }
         if (!line || Math.abs(line.y - rect.y) > 1 || rect.x < line.x - 1) {
-          line = { ...rect, text: segment, size: parseFloat(style.fontSize), weight: style.fontWeight, color }
+          line = { ...rect, text: segment, size, weight: style.fontWeight, color }
           result.push(line)
         } else {
           line.text += segment
@@ -64,7 +76,7 @@ export function captureBusinessChainExport(surface, scale) {
       viewBox: icon.getAttribute('viewBox'),
       paths: [...icon.querySelectorAll('path')].map((path) => path.getAttribute('d')),
     }))
-    return { ...rect, id: element.dataset.designNode || element.dataset.handoffChain, type: element.dataset.type || 'group', domain: element.dataset.domain, texts, icons }
+    return { ...rect, id: element.dataset.designNode || element.dataset.handoffChain, type: element.dataset.type || 'group', domain: element.dataset.domain, roleHighlight: element.dataset.roleHighlighted, roleLabel: body.querySelector('[data-role-label]')?.textContent, texts, icons }
   })
   if (!nodes.length) throw new Error('当前范围没有可导出的节点。')
   const edges = [...surface.querySelectorAll('[data-design-edge]')].map((element) => {
@@ -116,7 +128,10 @@ function exportGraph(snapshot) {
   for (const node of snapshot.nodes) {
     const color = DIAGRAM_DOMAINS[node.domain]?.color || muted
     const rounded = ['business_action', 'system'].includes(node.type)
-    graph.push(`<g data-export-node="${escape(node.id)}">`, rectSvg(node, `rx="${rounded ? 22 : 4}" ry="${rounded ? 22 : 4}" fill="${tint(color)}" stroke="${color}"`))
+    const fill = node.roleHighlight ? tint(ERP_LIGHT_PALETTE.info, node.roleHighlight === 'shared' ? 0.21 : 0.10) : tint(color)
+    graph.push(`<g data-export-node="${escape(node.id)}">`)
+    if (node.roleLabel) graph.push(`<title>${escape(node.roleLabel)}</title>`)
+    graph.push(rectSvg(node, `rx="${rounded ? 22 : 4}" ry="${rounded ? 22 : 4}" fill="${fill}" stroke="${color}"`))
     if (node.type === 'record') graph.push(rectSvg({ x: node.x + 3, y: node.y + 3, width: node.width - 6, height: node.height - 6 }, `rx="2" fill="none" stroke="${color}"`))
     for (const icon of node.icons) graph.push(`<svg x="${number(icon.x)}" y="${number(icon.y)}" width="${number(icon.width)}" height="${number(icon.height)}" viewBox="${escape(icon.viewBox)}" fill="${muted}">${icon.paths.map((d) => `<path d="${escape(d)}"/>`).join('')}</svg>`)
     graph.push(...node.texts.map(textSvg), '</g>')

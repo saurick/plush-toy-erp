@@ -64,7 +64,7 @@ for (const layout of ['lanes', 'flow']) {
     const library = buildBusinessChainDesignLibrary(catalog)
     const chain = library.chains.find((item) => item.label === '销售受理到生产准备')
     const draft = arrangeBusinessChainMap(showBusinessChainWhole(emptyBusinessChainDraft(), library, chain.value), library, 'mainline', layout)
-    draft.presentation = { mode: 'overview', role: '', layout }
+    draft.presentation = { mode: 'overview', highlightedRoles: [], layout }
     window.localStorage.setItem(workingKey, JSON.stringify({ draft }))
     await harness.render(h(Designer, { catalog }))
     const root = harness.container

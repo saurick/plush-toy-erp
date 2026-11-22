@@ -21,7 +21,7 @@ import {
   assessBusinessChainConnection,
   addBusinessChainDraftEdge,
 } from '../../config/devBusinessChainDesign.mjs'
-import { routeBusinessChainEdges, businessChainNeighbors, orientBusinessChainPoint } from '../../config/devBusinessChainDesignView.mjs'
+import { routeBusinessChainEdges, businessChainNeighbors, orientBusinessChainPoint, businessChainRoleHighlight } from '../../config/devBusinessChainDesignView.mjs'
 import {
   businessChainMapState,
   expandBusinessChainMap,
@@ -139,7 +139,7 @@ export default function BusinessChainDesignCanvas({
   onUndo,
   onRedo,
   addNode,
-  role,
+  selectedRoles,
   connecting,
   setConnecting,
   selection,
@@ -290,9 +290,12 @@ export default function BusinessChainDesignCanvas({
     ? graph.nodes.map((node) => ({ ...node, ...orientBusinessChainPoint(node, direction) }))
     : graph.nodes
   const roleCounts = new Map()
+  let roleMatchCount = 0
   for (const node of reading.nodes) {
     if (node.summary) continue
-    for (const key of new Set(library.byId.get(node.id).roles)) {
+    const nodeRoles = new Set(library.byId.get(node.id).roles)
+    if (selectedRoles.some(({ value }) => nodeRoles.has(value))) roleMatchCount += 1
+    for (const key of nodeRoles) {
       roleCounts.set(key, (roleCounts.get(key) || 0) + 1)
     }
   }
@@ -302,7 +305,6 @@ export default function BusinessChainDesignCanvas({
     { key: 'present', label: '本图有节点', options: presentRoles.map((item) => ({ ...item, count: roleCounts.get(item.value) })) },
     { key: 'absent', label: '本图暂无节点', options: absentRoles },
   ].filter((group) => group.options.length)
-  const roleMatchCount = roleCounts.get(role) || 0
   const bands = layout === 'lanes' ? businessChainLaneBands(graph, library, direction) : []
   const routes = routeBusinessChainEdges(graph, direction)
   const connectingNode = connecting && graph.nodes.find((node) => node.id === connecting)
@@ -598,6 +600,7 @@ export default function BusinessChainDesignCanvas({
     selection?.chainKey &&
     library.chains.find(({ value }) => value === selection.chainKey)
   const selectedNode = library.byId.get(selection?.nodeId)
+  const selectedRoleHighlight = selectedNode && businessChainRoleHighlight(selectedNode.roles, selectedRoles)
   const verificationChain = library.chainDefinitions.get(
     selectedNode?.chainKey || library.byId.get(selection?.to)?.chainKey
   )
@@ -860,9 +863,9 @@ export default function BusinessChainDesignCanvas({
       )}
       <BusinessChainDesignPicker
         kind="role"
-        value={role}
+        value={selectedRoles.map(({ value }) => value)}
         groups={roleGroups}
-        onSelect={(value) => setReadingOptions({ role: value })}
+        onChange={(highlightedRoles) => setReadingOptions({ highlightedRoles })}
         hint={nodes.length > 0 && nodes.every((node) => node.summary) ? '展开一条链路的步骤后，可查看办理岗位。' : undefined}
       />
       {!globalOverview && (
@@ -884,7 +887,7 @@ export default function BusinessChainDesignCanvas({
         </div>
       )}
       <div className="erp-chain-design__canvas-actions" role="group" aria-label="画布操作">
-        {role && <span className="erp-chain-design__scope-label" role="status">{roleMatchCount ? `高亮 ${roleMatchCount} 个节点` : '本图无该岗位节点'}</span>}
+        {selectedRoles.length > 0 && <span className="erp-chain-design__scope-label" role="status">{roleMatchCount ? `高亮 ${roleMatchCount} 个节点` : '本图无所选岗位节点'}</span>}
         {returnAction}
         {map.scope !== 'whole' && draft.nodes.length > 0 ? (
           <Button onClick={() => (onReturn ? onReturn() : onNavigateChain(map.chainKey))}>回到整体</Button>
@@ -1206,7 +1209,9 @@ export default function BusinessChainDesignCanvas({
               const type = node.summary ? 'group' : item.type
               const overviewCard = globalOverview && node.summary
               const expanded = node.summary && map.expandedChains.includes(node.chainKey)
-              const matchesRole = Boolean(role && !node.summary && item.roles.includes(role))
+              const roleHighlight = !node.summary && businessChainRoleHighlight(item.roles, selectedRoles)
+              const nodeDescription = roleHighlight ? `${CHAIN_DESIGN_TYPES[type]}。高亮岗位：${roleHighlight.text}` : ''
+              const descriptionId = `${arrow}-${node.id}-description`
               const roleLabels = (item.roles || []).map((key) => library.roles.find((entry) => entry.value === key)?.label).filter(Boolean)
               const status =
                 pending && !node.summary
@@ -1227,9 +1232,9 @@ export default function BusinessChainDesignCanvas({
                   data-type={type}
                   data-chain-expandable={overviewCard || undefined}
                   data-candidate={status}
-                  data-role-highlighted={matchesRole || undefined}
+                  data-role-highlighted={roleHighlight?.kind}
                   data-dimmed={
-                    (role && !node.summary && !matchesRole) ||
+                    (selectedRoles.length > 0 && !node.summary && !roleHighlight) ||
                     (hasEmphasis && !emphasized.has(node.id)) ||
                     undefined
                   }
@@ -1240,6 +1245,7 @@ export default function BusinessChainDesignCanvas({
                     type="button"
                     className="erp-chain-design__node-body"
                     aria-label={`查看节点：${item.label}`}
+                    aria-describedby={nodeDescription ? descriptionId : undefined}
                     onClick={() =>
                       node.summary
                         ? setSelection({ chainKey: node.chainKey })
@@ -1248,11 +1254,15 @@ export default function BusinessChainDesignCanvas({
                   >
                     <small className="erp-chain-design__node-type">
                       <DiagramNodeIcon type={type} />
-                      <span>
-                        {node.summary
-                          ? overviewCard ? `${node.count} 步` : `范围内 ${node.count} 步 · ${expanded ? '已展开' : '可展开'}`
-                          : [CHAIN_DESIGN_TYPES[type], roleLabels.length > 1 ? `${roleLabels.length} 个岗位` : roleLabels[0]].filter(Boolean).join(' · ')}
-                      </span>
+                      {roleHighlight ? (
+                        <span className="erp-chain-design__role-label" data-role-label title={roleHighlight.text}>{roleHighlight.text}</span>
+                      ) : (
+                        <span>
+                          {node.summary
+                            ? overviewCard ? `${node.count} 步` : `范围内 ${node.count} 步 · ${expanded ? '已展开' : '可展开'}`
+                            : [CHAIN_DESIGN_TYPES[type], roleLabels.length > 1 ? `${roleLabels.length} 个岗位` : roleLabels[0]].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
                     </small>
                     <strong>{item.label}</strong>
                     {status || item.terminal || item.entry ? (
@@ -1267,6 +1277,7 @@ export default function BusinessChainDesignCanvas({
                       </small>
                     ) : null}
                   </button>
+                  {nodeDescription && <span id={descriptionId} hidden>{nodeDescription}</span>}
                   {overviewCard ? (
                     <Button
                       size="small"
@@ -1316,6 +1327,7 @@ export default function BusinessChainDesignCanvas({
               onClose={close}
               actions={cardActions}
             >
+              {selectedRoleHighlight && <p><strong>高亮岗位</strong> {selectedRoleHighlight.text}</p>}
               {selection.anchorId && selection.anchorId !== selection.nodeId ? (
                 <Button
                   onClick={() => setSelection({ nodeId: selection.anchorId })}
