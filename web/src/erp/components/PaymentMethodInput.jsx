@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { DownOutlined } from '@ant-design/icons'
 import { Button, Form, Space, Spin, Typography } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -124,7 +123,6 @@ export default function PaymentMethodInput({ value, onChange, onBlur, disabled, 
         options={options}
         placeholder={placeholder}
         popupMatchSelectWidth
-        suffixIcon={<DownOutlined />}
         value={value}
         onChange={(next) => { onChange?.(next ?? ''); setKeyword('') }}
         onSearch={(next) => setKeyword(next.slice(0, 128))}

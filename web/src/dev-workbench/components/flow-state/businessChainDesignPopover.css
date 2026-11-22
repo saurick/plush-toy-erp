@@ -1,0 +1,10 @@
+.erp-chain-design__role-filter { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.erp-chain-design__role-filter > label { white-space: nowrap; }
+.erp-chain-design__picker-trigger { min-width: 180px; max-width: 100%; justify-content: space-between; }
+.erp-chain-design__picker-panel { display: flex; flex-direction: column; gap: 8px; width: min(566px, calc(100vw - 56px)); max-height: min(480px, calc(100dvh - 80px)); }
+.erp-chain-design__picker-trigger[data-picker="role"] { min-width: 120px; }
+.erp-chain-design__picker-panel[data-picker="role"] { width: min(420px, calc(100vw - 56px)); }
+.erp-chain-design__picker-panel[data-picker="view"] { width: min(335px, calc(100vw - 56px)); }
+.erp-chain-design__picker-trigger[data-picker="view"] { min-width: 0; }
+.erp-chain-design__picker-panel > header { display: flex; align-items: center; justify-content: space-between; }
+.erp-chain-design__picker-options { min-height: 0; display: grid; gap: 12px; padding: 3px; overflow: auto; overscroll-behavior: contain; }

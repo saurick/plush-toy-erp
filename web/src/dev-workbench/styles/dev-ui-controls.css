@@ -312,6 +312,28 @@
   min-width: 0;
 }
 
+.erp-control-filter-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.erp-control-filter-comparison > section {
+  min-width: 0;
+}
+
+.erp-control-filter-comparison h4 {
+  margin: 0;
+  font-size: var(--erp-font-body);
+  font-weight: 600;
+}
+
+.erp-control-filter-comparison > section > p {
+  margin: 4px 0 8px;
+  color: var(--erp-text-muted);
+}
+
 .erp-control-filter-preview--mobile {
   --erp-font-small: 15px;
   gap: 0;

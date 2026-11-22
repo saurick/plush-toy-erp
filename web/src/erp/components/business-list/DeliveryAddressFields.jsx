@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Cascader, Form, Input } from 'antd'
-import Select from '@/common/components/select/AppSelect'
+import Select, { SELECT_DOWN_ARROW } from '@/common/components/select/AppSelect'
 import BusinessTextArea from './BusinessTextArea.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useOverlayPopupAlign } from '@/common/components/overlay/OverlayScopeContext.mjs'
@@ -48,6 +48,7 @@ function DeliveryAddressInput({ value = '', onChange, country, disabled, id, des
           className="erp-delivery-address__part"
         >
           <Cascader
+            className="erp-select-fixed-arrow"
             dropdownAlign={dropdownAlign}
             id={regionID}
             aria-label="所在地区"
@@ -56,6 +57,7 @@ function DeliveryAddressInput({ value = '', onChange, country, disabled, id, des
             options={MAINLAND_DELIVERY_REGIONS}
             value={draft.path}
             placeholder="选择省 / 市 / 区县"
+            suffixIcon={SELECT_DOWN_ARROW}
             showSearch={{
               filter: (input, path) =>
                 path

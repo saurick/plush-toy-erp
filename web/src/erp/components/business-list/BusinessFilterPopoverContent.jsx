@@ -4,8 +4,6 @@ import { RollbackOutlined } from '@ant-design/icons'
 import { canRestoreOverlayFocus, hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { BusinessFilterPanelContext } from './BusinessFilterPanelContext.mjs'
 
-export const businessFilterPopoverOverflow = { adjustX: true, adjustY: true, shiftX: true, shiftY: true }
-
 export function useFilterPopoverMaxHeight(open, triggerRef) {
   const overlay = useOverlayScope()
   const pane = overlay?.enabled ? overlay.host : null

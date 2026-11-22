@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Popover, Spin, Tag } from 'antd'
+import { Alert, Button, Spin, Tag } from 'antd'
 import {
   ArrowLeftOutlined,
-  FilterOutlined,
 } from '@ant-design/icons'
 import {
   useLocation,
@@ -55,7 +54,8 @@ import {
 } from '../components/business-visualizations/ProgressCompactContent.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
-import BusinessFilterPopoverContent, { businessFilterPopoverOverflow } from '../components/business-list/BusinessFilterPopoverContent.jsx'
+import AnchoredControlPopover, { FilterPopoverButton } from '@/common/components/overlay/AnchoredControlPopover.jsx'
+import BusinessFilterPopoverContent from '../components/business-list/BusinessFilterPopoverContent.jsx'
 import '../styles/app/progress-board.css'
 
 export default function BusinessDashboardPage() {
@@ -396,12 +396,11 @@ export default function BusinessDashboardPage() {
                   allowClear
                   maxLength={100}
                 />
-                <Popover
+                <AnchoredControlPopover
                   trigger="click"
                   open={moreOpen}
                   onOpenChange={setMoreOpen}
                   placement="bottomRight"
-                  autoAdjustOverflow={businessFilterPopoverOverflow}
                   classNames={{ root: 'erp-business-filter-popover' }}
                   afterOpenChange={(visible) => {
                     if (visible && [filterTriggerRef.current, document.body].includes(document.activeElement)) {
@@ -431,10 +430,9 @@ export default function BusinessDashboardPage() {
                     </BusinessFilterPopoverContent>
                   }
                 >
-                  <Button
+                  <FilterPopoverButton
                     ref={filterTriggerRef}
-                    icon={<FilterOutlined />}
-                    aria-haspopup="dialog"
+                    count={filterCount}
                     aria-controls={moreOpen ? filterPanelId : undefined}
                     aria-expanded={moreOpen}
                     aria-label={
@@ -442,10 +440,8 @@ export default function BusinessDashboardPage() {
                         ? `筛选进度，已应用 ${filterCount} 项`
                         : '筛选进度'
                     }
-                  >
-                    筛选{filterCount ? ` · ${filterCount}` : ''}
-                  </Button>
-                </Popover>
+                  />
+                </AnchoredControlPopover>
                 <SupplementalHelp
                   label="进度计算"
                   aria-label="查看进度计算说明"

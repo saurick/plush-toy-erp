@@ -68,6 +68,7 @@ test('筛选选择、清空及重新选择保留字段用途，清空返回声�
   await harness.click(options[0])
   assert.equal(select.querySelector('.app-select__label').textContent, '供应商')
   assert.ok(select.querySelector('.ant-select-clear'))
+  assert.ok(select.querySelector('.ant-select-arrow .anticon-down'), '有值可清空时仍保留下箭头')
   await act(() => select.querySelector('.ant-select-clear').dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
   await harness.flush()
   assert.equal(select.querySelector('.ant-select-selection-placeholder').textContent, '供应商')
@@ -385,11 +386,13 @@ test('远程选项首次出现时保留输入根节点、焦点和展开状态',
   function Example() {
     const [options, setOptions] = React.useState([])
     receive = setOptions
-    return h(AppSelect, { ref, showSearch: true, options })
+    return h(AppSelect, { ref, showSearch: true, loading: options.length === 0, options })
   }
   await harness.render(h(Example))
   const root = ref.current.nativeElement
   const input = root.querySelector('input')
+  const suffixIcons = () => [...root.querySelectorAll('.ant-select-arrow [data-icon]')].map((icon) => icon.getAttribute('data-icon'))
+  assert.deepEqual(suffixIcons(), ['loading', 'down'], '加载指示和下箭头各占独立位置')
   await act(() => input.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })))
   await harness.flush()
   await act(() => input.focus())
@@ -398,5 +401,6 @@ test('远程选项首次出现时保留输入根节点、焦点和展开状态',
   assert.ok(ref.current.nativeElement === root, '选项到达不重建 Select 根节点')
   assert.ok(document.activeElement === input, '键盘焦点仍在原输入框')
   assert.equal(root.classList.contains('ant-select-open'), true, '选项加载后仍可继续选择')
+  assert.deepEqual(suffixIcons(), ['down'], '展开的搜索控件持续显示下箭头')
   assert.equal(document.querySelector('.ant-select-item-option-content').textContent, 'CUS-7 晴空品牌 晴空')
 })

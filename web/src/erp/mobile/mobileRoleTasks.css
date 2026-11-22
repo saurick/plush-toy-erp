@@ -1886,9 +1886,6 @@
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .mobile-role-tasks-page .mobile-filter-control[data-summary] .mobile-filter-trigger__label {
-    max-width: 40px;
-  }
 }
 
 .mobile-role-task-query:not(:has(.mobile-filter-trigger)) {

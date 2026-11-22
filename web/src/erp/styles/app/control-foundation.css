@@ -85,15 +85,15 @@ body
   font: inherit;
 }
 
-/* 自动补全与级联选择保留各自输入能力，清空入口与 AppSelect 一致。 */
+/* 自动补全保留单槽位的清空操作。 */
 :where(#root, .ant-modal, .ant-drawer, .ant-popover)
-  :is(.ant-select-auto-complete, .ant-cascader) .ant-select-clear {
+  .ant-select-auto-complete .ant-select-clear {
   color: var(--erp-text-muted, #4d5d53);
   opacity: 1;
 }
 
 :where(#root, .ant-modal, .ant-drawer, .ant-popover)
-  :is(.ant-select-auto-complete, .ant-cascader):has(.ant-select-clear) .ant-select-arrow {
+  .ant-select-auto-complete:has(.ant-select-clear) .ant-select-arrow {
   opacity: 0;
 }
 

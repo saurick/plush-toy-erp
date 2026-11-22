@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Popover, theme } from 'antd'
-import { CloseOutlined, FilterOutlined, UpOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Button, theme } from 'antd'
+import { CloseOutlined, UpOutlined, ReloadOutlined } from '@ant-design/icons'
+import AnchoredControlPopover, { FilterPopoverLabel } from '@/common/components/overlay/AnchoredControlPopover.jsx'
 import './mobileFilterPopover.css'
 
 function MobileFilterClearButton({ contextLabel, onClear }) {
@@ -35,8 +36,6 @@ export default function MobileFilterPopover({
   const localTrigger = useRef(null)
   const trigger = triggerRef || localTrigger
   const panel = useRef(null)
-  const firstSummary = summary[0] || ''
-  const summaryLabel = firstSummary.includes('：') ? firstSummary.slice(firstSummary.indexOf('：') + 1) : firstSummary
   const [clearRevision, setClearRevision] = useState(0)
   useLayoutEffect(() => {
     if (clearRevision) trigger.current?.focus({ preventScroll: true })
@@ -61,12 +60,10 @@ export default function MobileFilterPopover({
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onKeyDown, open])
   const popover = (
-    <Popover
+    <AnchoredControlPopover
       trigger={[]}
       placement="bottomRight"
-      arrow={false}
       align={{ offset: [0, 0] }}
-      autoAdjustOverflow={{ shiftX: true, shiftY: true }}
       open={open}
       zIndex={token.zIndexPopupBase + 1}
       onOpenChange={onOpenChange}
@@ -129,11 +126,9 @@ export default function MobileFilterPopover({
         }}
         onKeyDown={onKeyDown}
       >
-        <FilterOutlined aria-hidden="true" />
-        <span className="mobile-filter-trigger__label">{count > 0 && summaryLabel ? summaryLabel : '筛选'}</span>
-        {count > 0 && (!summaryLabel || count > 1) ? <span className="erp-control-count">{summaryLabel ? `+${count - 1}` : count}</span> : null}
+        <FilterPopoverLabel count={count} labelClassName="mobile-filter-trigger__label" />
       </button>
-    </Popover>
+    </AnchoredControlPopover>
   )
 
   return (
@@ -166,7 +161,6 @@ export default function MobileFilterPopover({
         role="group"
         aria-label={`${contextLabel}筛选操作`}
         data-active={count > 0 || open}
-        data-summary={summary.length > 0 || undefined}
       >
         {popover}
         {count > 0 && onReset && (

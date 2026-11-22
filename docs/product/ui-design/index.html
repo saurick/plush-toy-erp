@@ -3692,9 +3692,8 @@
     .help-picker ui-select { width:100%; }
     .role-mobile-device ui-select, .role-mobile-device .design-select-option { min-height:44px; font-size:16px; }
     @media(max-width:767px) { ui-select, .design-select-option { min-height:44px; font-size:16px; } }
-    ui-select[data-can-clear] { padding-right: 32px; }
-    ui-select[data-can-clear]::after { display: none; }
-    ui-select .design-select-clear { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 18px; }
+    ui-select[data-can-clear] > .design-select-value { margin-inline-end: 24px; }
+    ui-select .design-select-clear { position: absolute; inset-inline-end: 24px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 18px; }
     ui-select .design-select-clear[hidden] { display: none; }
     .search[data-submitted-search], .rm-search[data-submitted-search] { padding-right:1px; }
     [data-submitted-search] input[type=search]::-webkit-search-cancel-button { display:none; }
@@ -5932,7 +5931,7 @@
       const action=actions.find(item=>item.key===selected)||actions[0];
       const active=Object.entries(filters).filter(([,value])=>value);
       const picker=(key,label)=>`<label>${label}<ui-select aria-label="样例${label}" data-relation-demo-filter="${key}"><option value="">全部</option>${[...new Set(devRelationExampleActions.map(item=>item[key]))].map(value=>{const count=devRelationExampleActions.filter(item=>matches(item,{...filters,[key]:value})).length;return `<option value="${value}" ${filters[key]===value?'selected':''} ${!count&&filters[key]!==value?'disabled':''}>${value} · ${count}</option>`;}).join('')}</ui-select></label>`;
-      return `<section data-dev-relation-example aria-label="关联动作筛选样例"><p class="data-note">来料环节的两项动作演示；完整关联以当前业务链路页面为准。</p><div class="dev-design-toolbar"><details ${open?'open':''}><summary>筛选${active.length?' · '+active.length:''}</summary><div class="dev-design-toolbar">${Object.entries(dimensions).map(([key,label])=>picker(key,label)).join('')}</div><p>不同维度匹配同一动作；岗位不代表当前账号已获授权。</p></details>${active.map(([key,value])=>`<button class="btn" data-action="dev-relation-clear" data-value="${key}" aria-label="移除样例${dimensions[key]}筛选">${value} ×</button>`).join('')}</div>${action?`<div class="dev-design-toolbar"><label>关联动作<ui-select aria-label="样例关联动作" data-relation-demo-action data-required-selection>${actions.map(item=>`<option value="${item.key}" ${item===action?'selected':''}>${item.label}</option>`).join('')}</ui-select></label></div><dl data-relation-demo-detail><dt>上游输入 → 下游结果</dt><dd>${action.input} → ${action.result}</dd><dt>责任与状态变化</dt><dd>${action.role} · ${action.object}：${action.state}</dd><dt>办理条件</dt><dd>${action.condition}</dd></dl><details><summary>技术标识与依据</summary><p>正式页面引用所属状态、权限及源码；此处只演示信息层级。</p></details>`:'<p role="status">没有同时满足条件的动作，请移除条件。</p>'}</section>`;
+      return `<section data-dev-relation-example aria-label="关联动作筛选样例"><p class="data-note">来料环节的两项动作演示；完整关联以当前业务链路页面为准。</p><div class="dev-design-toolbar"><details ${open?'open':''}><summary class="btn">${icon('filter')}筛选${active.length?' · '+active.length:''}</summary><div class="dev-design-toolbar">${Object.entries(dimensions).map(([key,label])=>picker(key,label)).join('')}</div><p>不同维度匹配同一动作；岗位不代表当前账号已获授权。</p></details>${active.map(([key,value])=>`<button class="btn" data-action="dev-relation-clear" data-value="${key}" aria-label="移除样例${dimensions[key]}筛选">${value} ×</button>`).join('')}</div>${action?`<div class="dev-design-toolbar"><label>关联动作<ui-select aria-label="样例关联动作" data-relation-demo-action data-required-selection>${actions.map(item=>`<option value="${item.key}" ${item===action?'selected':''}>${item.label}</option>`).join('')}</ui-select></label></div><dl data-relation-demo-detail><dt>上游输入 → 下游结果</dt><dd>${action.input} → ${action.result}</dd><dt>责任与状态变化</dt><dd>${action.role} · ${action.object}：${action.state}</dd><dt>办理条件</dt><dd>${action.condition}</dd></dl><details><summary>技术标识与依据</summary><p>正式页面引用所属状态、权限及源码；此处只演示信息层级。</p></details>`:'<p role="status">没有同时满足条件的动作，请移除条件。</p>'}</section>`;
     }
     function updateDevRelationExample(scope,removed) {
       const filters=Object.fromEntries([...scope.querySelectorAll('[data-relation-demo-filter]')].map(input=>[input.dataset.relationDemoFilter,input.value]));
@@ -17208,8 +17207,7 @@ return {orders,financeCustomers};})();
     function renderFilterTrigger(count, openAction='open-task-filter', clearAction='task-filter-clear-direct', activeLabel='') {
       const active=count>0;
       const expanded=state.overlay===(openAction==='open-filter'?'filter':'task-filter');
-      const summary = activeLabel && count > 1 ? `${activeLabel} +${count - 1}` : activeLabel || count;
-      return `<span class="filter-trigger-group" role="group" aria-label="筛选操作"><button class="control ${active?'filter-active':''}" data-action="${openAction}" aria-label="筛选${activeLabel?`，${activeLabel}`:''}${active?`，已应用 ${count} 项`:''}" aria-haspopup="dialog" aria-expanded="${expanded}">${icon('filter')}筛选${active?` · ${summary}`:''}</button>${active?`<button class="control filter-active filter-trigger-clear" data-action="${clearAction}" aria-label="清空筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</span>`;
+      return `<span class="filter-trigger-group" role="group" aria-label="筛选操作"><button class="control ${active?'filter-active':''}" data-action="${openAction}" aria-label="筛选${activeLabel?`，${activeLabel}`:''}${active?`，已应用 ${count} 项`:''}" aria-haspopup="dialog" aria-expanded="${expanded}">${icon('filter')}筛选${active?` · ${count}`:''}</button>${active?`<button class="control filter-active filter-trigger-clear" data-action="${clearAction}" aria-label="清空筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</span>`;
     }
     function renderTaskFilterPopover() {
       const tracking = ['visible','started','participated'].includes(state.boardMode);
@@ -18447,9 +18445,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function renderMobileFilterControl(count, label, summary=[]) {
-      const first=summary[0]||'筛选', text=first.includes('：')?first.slice(first.indexOf('：')+1):first;
       const active=count>0||state.mobileOptionsOpen;
-      return `<div class="rm-filter-control ${active?'active':''}" role="group" aria-label="${label}筛选操作"><button class="rm-filter-button" data-action="mobile-options" aria-label="筛选${label}${count?`，已应用 ${count} 项`:''}" aria-expanded="${state.mobileOptionsOpen}">${icon('filter')}<span class="rm-filter-label" title="${escapeHTML(summary.join('；'))}">${escapeHTML(count?text:'筛选')}</span>${count&&(!summary.length||count>1)?`<span class="rm-filter-count">${summary.length?'+'+(count-1):count}</span>`:''}</button>${count?`<button class="rm-filter-clear" data-action="mobile-filter-clear-all" aria-label="清空${label}筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</div>`;
+      return `<div class="rm-filter-control ${active?'active':''}" role="group" aria-label="${label}筛选操作"><button class="rm-filter-button" data-action="mobile-options" aria-label="筛选${label}${count?`，已应用 ${count} 项`:''}" aria-expanded="${state.mobileOptionsOpen}">${icon('filter')}<span class="rm-filter-label" title="${escapeHTML(summary.join('；'))}">筛选</span>${count?`<span class="rm-filter-count">${count}</span>`:''}</button>${count?`<button class="rm-filter-clear" data-action="mobile-filter-clear-all" aria-label="清空${label}筛选" title="清空额外条件，保留搜索与快捷筛选">${icon('close')}</button>`:''}</div>`;
     }
     function renderMobileApplied(items, action) {
       const selected=items.filter(item=>item[1]);

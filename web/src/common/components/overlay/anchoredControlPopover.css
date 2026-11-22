@@ -1,0 +1,27 @@
+.erp-anchored-control-trigger.ant-btn[aria-expanded='true'],
+.erp-anchored-control-trigger.ant-btn[data-active='true'] {
+  border-color: var(--erp-control-accent);
+  background: var(--erp-control-selected);
+  color: var(--erp-control-selected-text);
+}
+
+.erp-anchored-control-popover.ant-popover > .ant-popover-content > .ant-popover-inner {
+  border-radius: 12px;
+  padding: var(--erp-anchored-control-padding, 12px);
+}
+
+.erp-anchored-control-popover.ant-popover > .ant-popover-arrow {
+  left: clamp(12px, var(--erp-anchored-control-pointer-x, var(--arrow-x, 50%)), calc(100% - 12px));
+  right: auto;
+  pointer-events: none;
+}
+
+.erp-anchored-control-popover.ant-popover:is(.ant-popover-placement-bottom, .ant-popover-placement-bottomLeft, .ant-popover-placement-bottomRight) > .ant-popover-arrow {
+  top: var(--erp-anchored-control-arrow-inset-top, 0);
+  transform: translate(-50%, -100%);
+}
+
+.erp-anchored-control-popover.ant-popover:is(.ant-popover-placement-top, .ant-popover-placement-topLeft, .ant-popover-placement-topRight) > .ant-popover-arrow {
+  bottom: var(--erp-anchored-control-arrow-inset-bottom, 0);
+  transform: translate(-50%, 100%) rotate(180deg);
+}

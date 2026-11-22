@@ -3,7 +3,7 @@ import test from 'node:test'
 import React, { createElement as h } from 'react'
 import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
 
-test('筛选摘要具名显示首项和剩余数量，一键清空后恢复默认并保留搜索', async (t) => {
+test('手机筛选固定显示筛选和条件总数，一键清空恢复默认并保留搜索', async (t) => {
   const harness = await businessFormHarness(t)
   const { default: Filter } = await import('./MobileFilterPopover.jsx')
   function Example() {
@@ -19,8 +19,9 @@ count,
   }
   await harness.render(h(Example))
   const trigger = document.querySelector('.mobile-filter-trigger')
-  assert.equal(trigger.querySelector('.mobile-filter-trigger__label').textContent, '待处理')
-  assert.equal(trigger.querySelector('.erp-control-count').textContent, '+2')
+  assert.equal(trigger.firstElementChild.querySelector('[data-icon]')?.getAttribute('data-icon'), 'filter')
+  assert.equal(trigger.querySelector('.mobile-filter-trigger__label').textContent, '筛选')
+  assert.equal(trigger.querySelector('.erp-control-count').textContent, '3')
   assert.equal(trigger.getAttribute('title'), '任务状态：待处理；单据类型：销售订单；排序：等待最久')
   await harness.click(document.querySelector('.mobile-filter-clear'))
   assert.equal(trigger.querySelector('.mobile-filter-trigger__label').textContent, '筛选')

@@ -319,9 +319,13 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       const immediateDropdown = await openFilters()
       assert.equal(await immediateDropdown.locator('details').count(), 0, '手机常用条件保持直接可见')
       assert.equal(await immediateDropdown.locator('.ant-select').count(), 0, '固定来源、状态与任务排序均直接点选')
-      const controls = await immediateDropdown.locator('.mobile-filter-options .erp-filter-chip').evaluateAll((nodes) => nodes.map((node) => ({ height: node.getBoundingClientRect().height, overflow: node.scrollWidth - node.clientWidth })))
       for (const label of ['任务状态筛选', '截止时间']) await immediateDropdown.getByRole('group', { name: label, exact: true }).waitFor()
       await immediateDropdown.getByRole('group', { name: '任务排序', exact: true }).waitFor()
+      await page.waitForFunction((panel) => {
+        const popup = panel.closest('.mobile-filter-popover')
+        return panel.contains(document.activeElement) && popup && getComputedStyle(popup).opacity === '1'
+      }, await immediateDropdown.elementHandle())
+      const controls = await immediateDropdown.locator('.mobile-filter-options .erp-filter-chip').evaluateAll((nodes) => nodes.map((node) => ({ height: node.getBoundingClientRect().height, overflow: node.scrollWidth - node.clientWidth })))
       assert(controls.length > 0 && controls.every(({ height, overflow }) => height >= 44 && overflow <= 1), JSON.stringify(controls))
       await chooseMobileFilterOption(immediateDropdown.getByRole('group', { name: '任务排序', exact: true }), '截止最早')
       assert(await immediateDropdown.isVisible(), '点选立即生效且保留筛选面板')

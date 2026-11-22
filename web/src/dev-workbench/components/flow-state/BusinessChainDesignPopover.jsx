@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Popover } from 'antd'
+import { Button, ConfigProvider } from 'antd'
 import { CloseOutlined, DownOutlined } from '@ant-design/icons'
+import AnchoredControlPopover from '@/common/components/overlay/AnchoredControlPopover.jsx'
+import './businessChainDesignPopover.css'
 
 export default function BusinessChainDesignPopover({ kind, label, title, closeLabel, current, singleChoice = false, dock, children }) {
+  const { getPopupContainer } = React.useContext(ConfigProvider.ConfigContext)
   const [open, setOpen] = useState(false)
   const panelId = useId()
   const trigger = useRef(null)
@@ -84,7 +87,7 @@ export default function BusinessChainDesignPopover({ kind, label, title, closeLa
       ref={trigger}
       onClick={dock ? () => setOpen((previous) => !previous) : undefined}
       id={`${panelId}-trigger`}
-      className="erp-chain-design__picker-trigger"
+      className="erp-chain-design__picker-trigger erp-anchored-control-trigger"
       data-picker={kind}
       aria-label={`${label || title}：${current}`}
       aria-haspopup="dialog"
@@ -108,19 +111,17 @@ export default function BusinessChainDesignPopover({ kind, label, title, closeLa
     <div className="erp-chain-design__role-filter">
       {label && <label htmlFor={`${panelId}-trigger`}>{label}</label>}
       {dock ? <>{control}{open && dock.current && createPortal(panel, dock.current)}</> : (
-        <Popover
+        <AnchoredControlPopover
           trigger="click"
           open={open}
           onOpenChange={setOpen}
           placement="bottomLeft"
-          arrow={false}
-          autoAdjustOverflow={{ shiftX: true, shiftY: true }}
-          getPopupContainer={(element) => element.closest('.erp-chain-design-shell')}
+          getPopupContainer={(element) => element.closest('.erp-chain-design-shell') ?? getPopupContainer?.(element) ?? element.ownerDocument.body}
           afterOpenChange={(visible) => { if (visible && open) focusCurrent() }}
           content={panel}
         >
           {control}
-        </Popover>
+        </AnchoredControlPopover>
       )}
     </div>
   )

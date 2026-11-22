@@ -1,6 +1,7 @@
 import React, { useId, useRef, useState } from 'react'
-import { Button, Checkbox, Popover, Tag } from 'antd'
-import { DownOutlined, FilterOutlined, MenuFoldOutlined, RightOutlined } from '@ant-design/icons'
+import { Button, Checkbox, Tag } from 'antd'
+import { DownOutlined, MenuFoldOutlined, RightOutlined } from '@ant-design/icons'
+import AnchoredControlPopover, { FilterPopoverButton } from '@/common/components/overlay/AnchoredControlPopover.jsx'
 import SearchInput from '@/common/components/SearchInput.jsx'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect.jsx'
@@ -180,13 +181,11 @@ export default function BusinessChainNodeLibrary({
         options={quickViews}
         onChange={(view) => change({ view, type: '' })}
       />
-      <Popover
+      <AnchoredControlPopover
         trigger="click"
         open={open}
         onOpenChange={setOpen}
         placement="bottomLeft"
-        autoAdjustOverflow={{ shiftX: true, shiftY: true }}
-        arrow={false}
         getPopupContainer={(element) => element.closest('.erp-chain-design-shell') || element.parentElement}
         classNames={{ root: 'erp-chain-node-filter-popover' }}
         afterOpenChange={(visible) => {
@@ -283,19 +282,16 @@ export default function BusinessChainNodeLibrary({
           </section>
         }
       >
-        <Button
+        <FilterPopoverButton
           ref={trigger}
-          icon={<FilterOutlined />}
+          count={count}
           aria-label={`筛选业务节点 · ${filterSummary}`}
           title={filterSummary}
-          aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? id : undefined}
           onKeyDown={closeOnEscape}
-        >
-          筛选{count ? ` · ${count}` : ''}
-        </Button>
-      </Popover>
+        />
+      </AnchoredControlPopover>
     </div>
   )
   const resultsPanel = (

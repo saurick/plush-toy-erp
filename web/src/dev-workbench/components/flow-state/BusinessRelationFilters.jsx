@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
-import { Button, Popover } from 'antd'
-import { CloseOutlined, FilterOutlined } from '@ant-design/icons'
+import { Button } from 'antd'
+import { CloseOutlined } from '@ant-design/icons'
+import AnchoredControlPopover, { FilterPopoverButton } from '@/common/components/overlay/AnchoredControlPopover.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import {
   buildRelationFacets,
@@ -27,7 +28,7 @@ export default function BusinessRelationFilters({
   )
   return (
     <div className="erp-dev-relation-filters" data-relation-filters>
-      <Popover
+      <AnchoredControlPopover
         trigger="click"
         placement="bottomLeft"
         open={open}
@@ -68,14 +69,12 @@ export default function BusinessRelationFilters({
           </section>
         }
       >
-        <Button
-          icon={<FilterOutlined />}
+        <FilterPopoverButton
+          count={active.length}
           aria-label="关联筛选"
           aria-expanded={open}
-        >
-          筛选{active.length ? ` · ${active.length}` : ''}
-        </Button>
-      </Popover>
+        />
+      </AnchoredControlPopover>
       {active.map((key) => (
         <Button
           key={key}

@@ -262,7 +262,9 @@ test('节点库提交搜索后更新列表，分组筛选应用后生效，重�
       .querySelector('[aria-label="可加入的节点"]')
       .textContent.includes('订单审批')
   )
-  assert.equal(findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程').textContent, '筛选 · 2')
+  const filterTrigger = findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程')
+  assert.equal(filterTrigger.querySelector('.erp-control-count').textContent, '2')
+  assert.equal(filterTrigger.querySelector('.anticon-filter + span').textContent, '筛选')
   assert.equal(
     document.activeElement === findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程'),
     true

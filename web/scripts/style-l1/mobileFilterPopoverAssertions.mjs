@@ -87,6 +87,7 @@ export async function assertMobileFilterEdgePositions({
           viewportHeight: window.innerHeight,
           scrollWidth: document.documentElement.scrollWidth,
           popup: rect(node.closest('.mobile-filter-popover')),
+          pointer: rect(node.closest('.mobile-filter-popover').querySelector('.ant-popover-arrow')),
           panel: rect(node),
           fieldsHeight: node.querySelector('.mobile-filter-fields').clientHeight,
           fieldsContent: node.querySelector('.mobile-filter-fields').scrollHeight,
@@ -115,6 +116,9 @@ export async function assertMobileFilterEdgePositions({
           geometry.panel.bottom <= geometry.viewportHeight - 12,
         `筛选面板完整显示并保留上下边距：${JSON.stringify(geometry)}`
       )
+      const anchor = await trigger.boundingBox()
+      assert(geometry.pointer && Math.abs(geometry.pointer.x + geometry.pointer.width / 2 - anchor.x - anchor.width / 2) <= 1,
+        `小三角对准筛选按钮中心：${JSON.stringify({ pointer: geometry.pointer, anchor })}`)
       assert(
         geometry.fieldsContent <= geometry.fieldsHeight + 1 ||
           geometry.panel.height >= geometry.viewportHeight - 28,

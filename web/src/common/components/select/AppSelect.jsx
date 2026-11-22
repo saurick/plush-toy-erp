@@ -1,6 +1,6 @@
 import React, { useContext, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { Select } from 'antd'
-import { CheckOutlined } from '@ant-design/icons'
+import { CheckOutlined, DownOutlined, LoadingOutlined } from '@ant-design/icons'
 import Empty from '../empty/AppEmpty.jsx'
 import { useSelectPopupWidth } from './useSelectPopupWidth.mjs'
 import SelectPresentationContext from './SelectPresentationContext.jsx'
@@ -8,6 +8,13 @@ import { useOverlayPopupAlign, useOverlayScope } from '../overlay/OverlayScopeCo
 import './app-select.css'
 
 const GROUPED_SELECTED_ICON = <CheckOutlined />
+export const SELECT_DOWN_ARROW = <DownOutlined className="ant-select-suffix" aria-hidden="true" />
+
+function selectSuffixIcon({ suffixIcon, loading }) {
+  if (suffixIcon !== undefined) return suffixIcon
+  if (!loading) return SELECT_DOWN_ARROW
+  return <><LoadingOutlined className="ant-select-suffix" aria-hidden="true" />{SELECT_DOWN_ARROW}</>
+}
 
 export function hasSelectValue(value) {
   return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== ''
@@ -129,10 +136,10 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
       placeholder={placeholder || label || props['aria-label']}
       prefix={basePrefix}
       labelRender={reference ? referenceLabelRenderer(identities, referenceLayout) : props.labelRender}
-      suffixIcon={referenceLayout && reference && props.disabled ? null : props.suffixIcon}
+      suffixIcon={referenceLayout && reference && props.disabled ? null : selectSuffixIcon(props)}
       allowClear={props.loading ? false : allowClear}
       popupMatchSelectWidth={explicitPopupWidth ?? popupWidth}
-      className={`app-select ${referenceLayout ? 'app-select--reference' : ''} ${className}`.trim()}
+      className={`app-select erp-select-fixed-arrow ${referenceLayout ? 'app-select--reference' : ''} ${className}`.trim()}
     />
   )
   return select

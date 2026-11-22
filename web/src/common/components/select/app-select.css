@@ -1,10 +1,18 @@
-.app-select .ant-select-clear {
+.erp-select-fixed-arrow .ant-select-clear {
   color: var(--erp-text-muted, #4d5d53);
   opacity: 1;
 }
 
-.app-select:has(.ant-select-clear) .ant-select-arrow {
-  opacity: 0;
+.erp-select-fixed-arrow.ant-select-show-arrow .ant-select-clear {
+  inset-inline-end: 30px;
+}
+
+.erp-select-fixed-arrow.ant-select-show-arrow:has(.ant-select-clear, .ant-select-arrow .anticon-loading) .ant-select-selector {
+  padding-inline-end: 30px;
+}
+
+.erp-select-fixed-arrow.ant-select-multiple.ant-select-show-arrow:has(.ant-select-clear, .ant-select-arrow .anticon-loading) .ant-select-selector {
+  padding-inline-end: 46px;
 }
 
 .app-select__label {

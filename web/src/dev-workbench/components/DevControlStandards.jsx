@@ -15,12 +15,15 @@ import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import MobileFilterPopover from '@/erp/mobile/components/MobileFilterPopover.jsx'
 import MobileFilterChoices from '@/erp/mobile/components/MobileFilterChoices.jsx'
 import NavigationCountBadge from '@/common/components/navigation/NavigationCountBadge'
+import FilterSelect from '@/common/components/select/FilterSelect.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import { getBusinessPagePresentation } from '@/erp/config/businessUsabilityCatalog.mjs'
 import { useERPTheme } from '@/common/theme/erpTheme'
 import ERPThemeScope from '@/common/theme/ERPThemeScope'
+import { BusinessOperationPanel, SearchInput as BusinessSearchInput } from '@/erp/components/business-list/BusinessListLayout.jsx'
+import BusinessChainDesignPicker from './flow-state/BusinessChainDesignPicker.jsx'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
 import DevSharedComponentGuide, { DevUIConsumerName, SHARED_COMPONENT_SEARCH_TEXT } from './DevSharedComponentGuide.jsx'
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
@@ -44,6 +47,7 @@ const PURCHASE_PAGE = getBusinessPagePresentation('accessories-purchase')
 const MATERIAL_PAGE = getBusinessPagePresentation('materials')
 const TASK_PAGE = getBusinessPagePresentation('task-board')
 const HISTORY_PAGE = getBusinessPagePresentation('history-records')
+const FLOW_SCOPE_EXAMPLE_TITLE = '分组单选气泡（流程范围）'
 
 const TOPICS = [
   {
@@ -307,17 +311,18 @@ const TOPICS = [
       ],
       [
         '少量次级条件',
-        '按钮下方的轻量浮层',
-        '覆盖内容，选择立即生效，不挤动列表。',
+        '左侧漏斗和固定的「筛选」',
+        '浮层尖角对准入口。条件立即生效，面板保持展开，可连续调整后收起。',
       ],
-      ['重置筛选', '只恢复范围', '保留关键词；清除搜索由输入框单独处理。'],
+      [FLOW_SCOPE_EXAMPLE_TITLE, '当前值与右侧固定下箭头', '沿用同一按钮与浮层外观，点选即切换并收起。'],
+      ['重置筛选', '清除面板内条件', '保留关键词，清除搜索由输入框单独处理。'],
     ],
     checks: [
       '选择逾期：结果与数量一起变化。',
       '输入期间结果不变；提交不存在的关键词后，出现无结果与清除入口。',
-      '改变范围再重置：搜索词保持，其他页面条件不变。',
+      '打开流程范围和总筛选，核对尖角指向。点选流程会收起，选择记录范围及负责人可连续操作。',
     ],
-    componentRefs: ['FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'MobileFilterPopover', 'MobileFilterChoices'],
+    componentRefs: ['AnchoredControlPopover', 'BusinessOperationPanel', 'BusinessChainDesignPicker', 'FilterSelect', 'FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'MobileFilterPopover', 'MobileFilterChoices'],
     consumer: { ...TASK_PAGE, task: '组合任务范围与关键词，再清空和返回，核对当前条件及结果。' },
   },
   {
@@ -633,15 +638,41 @@ function demoRiskAvailable(risk, scope) {
   return risk === 'blocked' ? query.blocked_only : query.due_status === due
 }
 
+const FILTER_EXAMPLE_FLOW_GROUPS = [
+  { key: 'sales', label: '销售、生产与出货', options: [{ value: 'sales_to_production', label: '销售受理到生产准备' }] },
+  {
+    key: 'purchase',
+    label: '采购、委外与库存',
+    options: [
+      { value: 'purchase_to_inventory', label: '采购下单到入库应付' },
+      { value: 'outsourcing_to_inventory', label: '委外发料到回货应付' },
+    ],
+  },
+]
+const FILTER_EXAMPLE_OWNERS = [...new Set(RECORDS.map(({ owner }) => owner))].map((owner) => ({ label: owner, value: owner }))
+
 function FiltersExample() {
+  const comparisonId = React.useId()
   const [device, setDevice] = useState('desktop')
   const [risk, setRisk] = useState('all')
   const [keyword, setKeyword] = useState('')
   const [scope, setScope] = useState('active')
   const [open, setOpen] = useState(false)
+  const [owner, setOwner] = useState('')
+  const [flowScope, setFlowScope] = useState('outsourcing_to_inventory')
+  const mobile = device === 'mobile'
+  const changeScope = (nextScope) => {
+    setScope(nextScope)
+    if (!demoRiskAvailable(risk, nextScope)) setRisk('all')
+  }
+  const resetFilters = () => {
+    changeScope('active')
+    if (!mobile) setOwner('')
+  }
   const matching = RECORDS.filter(
     (row) =>
       (scope === 'all' || row.scope === scope) &&
+      (mobile || !owner || row.owner === owner) &&
       `${row.number} ${row.product} ${row.owner}`
         .toLowerCase()
         .includes(keyword.trim().toLowerCase())
@@ -650,7 +681,6 @@ function FiltersExample() {
   const scopeLabel = PROGRESS_SCOPE_OPTIONS.find(
     ({ value }) => value === scope
   )?.label
-  const mobile = device === 'mobile'
   const FilterRow = mobile ? HorizontalScroll : 'div'
   const quickFilters = (
     <FilterRow
@@ -694,15 +724,12 @@ function FiltersExample() {
         open={open}
         onOpenChange={setOpen}
         count={scope === 'active' ? 0 : 1}
-        onReset={() => { setScope('active'); setRisk('all') }}
+        onReset={resetFilters}
       >
         <MobileFilterChoices
           label="演示记录范围"
           value={scope}
-          onChange={(nextScope) => {
-            setScope(nextScope)
-            if (!demoRiskAvailable(risk, nextScope)) setRisk('all')
-          }}
+          onChange={changeScope}
           options={PROGRESS_SCOPE_OPTIONS}
         />
       </MobileFilterPopover>
@@ -723,8 +750,32 @@ function FiltersExample() {
         ]}
       />
       <div className={`erp-control-filter-preview${mobile ? ' erp-mobile-controls erp-control-filter-preview--mobile' : ''}`}>
-        {mobile ? searchControls : quickFilters}
-        {mobile ? quickFilters : searchControls}
+        {mobile ? <>{searchControls}{quickFilters}</> : (
+          <>
+            <div className="erp-control-filter-comparison">
+              <section aria-labelledby={`${comparisonId}-scope`}>
+                <h4 id={`${comparisonId}-scope`}>{FLOW_SCOPE_EXAMPLE_TITLE}</h4>
+                <p>点选即切换并收起。</p>
+                <BusinessChainDesignPicker kind="scope" value={flowScope} groups={FILTER_EXAMPLE_FLOW_GROUPS} onSelect={setFlowScope} />
+              </section>
+              <section aria-labelledby={`${comparisonId}-filter`}>
+                <h4 id={`${comparisonId}-filter`}>总筛选</h4>
+                <p>可以连续调整条件，完成后手动收起。</p>
+                <BusinessOperationPanel
+                  showSelection={false}
+                  activeFilterCount={Number(scope !== 'active') + Number(Boolean(owner))}
+                  onClearFilters={resetFilters}
+                  filters={[
+                    <BusinessSearchInput key="search" aria-label="演示搜索" placeholder="单号、产品、负责人" value={keyword} onSearch={setKeyword} />,
+                    <FilterChipGroup key="scope" label="演示记录范围" value={scope} options={PROGRESS_SCOPE_OPTIONS} onChange={changeScope} />,
+                    <FilterSelect key="owner" label="演示负责人" value={owner} options={FILTER_EXAMPLE_OWNERS} onChange={setOwner} showSearch />,
+                  ]}
+                />
+              </section>
+            </div>
+            {quickFilters}
+          </>
+        )}
       </div>
       <p role="status">
         样例结果：{rows.length} 条 · 搜索：{keyword || '未输入'} · 范围：
@@ -759,7 +810,7 @@ function FiltersExample() {
             onClick={() => {
               setKeyword('')
               setRisk('all')
-              setScope('active')
+              resetFilters()
             }}
           >
             清除条件

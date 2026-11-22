@@ -73,7 +73,7 @@
 
 [分组下拉](/__dev/ui-design?page=controls&control=grouped-select)直接使用 `AppSelect` 和历史来源分组构造器，比较分类标题、缩进选项和勾选，操作单选、多选、搜索、清空与禁用状态；统一规则和当前使用入口见[分组选项](交互设计说明.md#grouped-select-options)。
 
-“筛选与搜索”（`control=filters`）可切换电脑和手机，直接操作共享 `FilterChip`、`HorizontalScroll` 与搜索。手机展示 32px 可见外观、至少 44px 点击区和数量底色，窄屏在同一行滑动；完整手机稿同步相同外观，筛选面板仍保留可换行的 36px 底色选项。
+“筛选与搜索”（`/__dev/ui-design?page=controls&control=filters`）的电脑样例对照展示「分组单选气泡（流程范围）」和「总筛选」，均可操作真实控件并查看尖角定位。流程范围点选即切换并收起，总筛选可连续调整记录范围和负责人，完成后手动收起。手机样例用同一筛选入口及浮层样式，快捷条件保持至少 44px 点击区，窄屏可横向滑动。
 
 ### 岗位帮助看什么
 

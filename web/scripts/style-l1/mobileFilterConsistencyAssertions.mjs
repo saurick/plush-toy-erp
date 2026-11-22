@@ -4,10 +4,16 @@ export async function assertMobileFilterSummary({ assert, trigger }) {
   const geometry = await trigger.evaluate((node) => {
     const controls = node.closest('.mobile-task-list-toolbar, .mobile-progress-controls, .mobile-workflow-tracking-controls')
     const box = controls.getBoundingClientRect()
-    return { height: box.height, summary: node.querySelector('.mobile-filter-trigger__label').textContent, extraRows: controls.querySelectorAll('.mobile-applied-filters').length }
+    return {
+      height: box.height,
+      label: node.querySelector('.mobile-filter-trigger__label').textContent,
+      count: Number(node.querySelector('.erp-control-count')?.textContent),
+      extraRows: controls.querySelectorAll('.mobile-applied-filters').length,
+    }
   })
   assert.equal(geometry.extraRows, 0, '已选条件合入筛选入口，不增加标签行')
-  assert(geometry.summary && geometry.summary !== '筛选', '入口直接显示所选条件')
+  assert.equal(geometry.label, '筛选', '有条件时入口仍显示筛选')
+  assert(geometry.count > 0, '入口显示额外条件总数')
   assert(geometry.height <= 160, `查询区保持紧凑：${JSON.stringify(geometry)}`)
 }
 
