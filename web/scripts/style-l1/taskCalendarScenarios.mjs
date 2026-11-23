@@ -7,6 +7,7 @@ import { shiftCalendarMonth } from '../../src/erp/utils/workflowTaskCalendar.mjs
 import { WORKFLOW_TASKS_CHANGED } from '../../src/erp/utils/workflowTaskChanges.mjs'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { assertContentTabAffordance } from './controlAffordanceAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 async function verifyCalendarAlignment(calendar, assert) {
   const geometry = await calendar.evaluate((root) => {
@@ -45,6 +46,7 @@ async function verifyCalendarAlignment(calendar, assert) {
 
 async function verifyCalendarScroll(calendar, assert, { monthSticks, headingSticks, screenshot }) {
   const scrollRegion = '[data-testid="mobile-role-scroll"], .erp-admin-content'
+  await waitForFiniteAnimations(calendar.page(), { selector: scrollRegion })
   const initialScroll = await calendar.evaluate((root, selector) => root.closest(selector).scrollTop, scrollRegion)
   try {
     const layout = await calendar.evaluate(async (root, selector) => {
@@ -57,6 +59,7 @@ async function verifyCalendarScroll(calendar, assert, { monthSticks, headingStic
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       }
       await scroll(1000)
+      const firstScrollTop = scroller.scrollTop
       const firstTop = firstTask.getBoundingClientRect().top
       const firstMonthTop = month.getBoundingClientRect().top
       const firstHeadingTop = heading.getBoundingClientRect().top
@@ -65,6 +68,8 @@ async function verifyCalendarScroll(calendar, assert, { monthSticks, headingStic
       const monthBox = month.getBoundingClientRect()
       const headingBox = heading.getBoundingClientRect()
       return {
+        firstScrollTop,
+        lastScrollTop: scroller.scrollTop,
         taskTravel: firstTop - firstTask.getBoundingClientRect().top,
         monthTravel: firstMonthTop - monthBox.top,
         headingTravel: firstHeadingTop - headingBox.top,
@@ -74,7 +79,9 @@ async function verifyCalendarScroll(calendar, assert, { monthSticks, headingStic
         headingAbove: headingBox.bottom <= viewport.top,
       }
     }, scrollRegion)
-    assert(Math.abs(layout.taskTravel - 300) <= 1, '主滚动区向下滚动时任务卡同步移动')
+    const distance = layout.lastScrollTop - layout.firstScrollTop
+    assert(distance >= 250, `主滚动区应有足够滚动距离 ${JSON.stringify(layout)}`)
+    assert(Math.abs(layout.taskTravel - distance) <= 1, `任务卡跟随主滚动区移动 ${JSON.stringify(layout)}`)
     assert(monthSticks ? layout.monthVisible && Math.abs(layout.monthTravel) <= 1 : layout.monthAbove, '月历在高双栏保持吸顶，在矮屏和单栏随任务滚走')
     assert(headingSticks ? layout.headingVisible && Math.abs(layout.headingTravel) <= 1 : layout.headingAbove, '日期摘要在桌面双栏保持吸顶，在单栏随任务滚走')
     if (screenshot) await calendar.page().screenshot({ path: screenshot })
@@ -242,7 +249,9 @@ revision,
             await option.and(page.locator('[aria-pressed="true"]')).waitFor()
             await desktopFilters.getByRole('button', { name: '收起', exact: true }).click()
             await desktopFilters.waitFor({ state: 'hidden' })
-            if (selection !== 'date') assert((await desktopFilterTrigger.innerText()).includes(label))
+            if (selection !== 'date') {
+              await desktopTools.getByRole('button', { name: new RegExp(`^筛选，${label}，已应用 `, 'u') }).waitFor()
+            }
             return
           }
           await page.getByTestId('mobile-task-list-filter-trigger').click()
@@ -503,7 +512,7 @@ revision,
           await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
           await desktopTools.getByRole('button', { name: '清空筛选', exact: true }).click()
           await calendar.locator(`button[data-date="${nextMonth}-01"][aria-pressed="true"]`).waitFor()
-          assert.equal(await desktopFilterTrigger.innerText(), '筛选')
+          await desktopTools.getByRole('button', { name: '筛选', exact: true }).waitFor()
 
           await search.fill('跟进')
           await search.press('Enter')
@@ -514,7 +523,7 @@ revision,
           await deadlineChoice('已逾期').getByText('0', { exact: true }).waitFor()
           await desktopFilters.getByRole('button', { name: '收起', exact: true }).click()
           await desktopFilters.waitFor({ state: 'hidden' })
-          assert.equal(await desktopFilterTrigger.innerText(), '筛选 · 已逾期 +1')
+          await desktopTools.getByRole('button', { name: '筛选，已逾期，已应用 2 项', exact: true }).waitFor()
           await desktopFilterTrigger.click()
           await desktopFilters.getByRole('button', { name: '清空筛选', exact: true }).click()
           await calendar.locator(`button[data-date="${nextMonth}-01"][aria-pressed="true"]`).waitFor()
