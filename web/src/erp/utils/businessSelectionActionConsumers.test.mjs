@@ -195,7 +195,12 @@ test('共享操作区保留岗位动作入口，桌面和窄屏均按实际空�
   )
   assert.match(layout, /selectStableBusinessActionIndexes/u)
   assert.match(layout, /ResizeObserver/u)
-  assert.match(layout, /child\.props\?\.visible !== false/u)
+  assert.match(layout, /flattenSelectionActions\(children\)/u)
+  const selectionActions = readFileSync(
+    resolve(currentDirectory, '../components/business-list/businessSelectionActions.mjs'),
+    'utf8'
+  )
+  assert.match(selectionActions, /child\.props\?\.visible !== false/u)
   assert.match(
     layout,
     /recordActions\.length > 0 \? \(\s*<div\s*className="erp-business-selection-action-bar__record-actions"/u

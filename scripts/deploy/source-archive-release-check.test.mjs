@@ -189,6 +189,7 @@ test("required archive inputs cover the customer overlay static import closure",
   assert.deepEqual(CUSTOMER_WEB_OVERLAY_ARCHIVE_INPUTS, [
     "scripts/build/apply-customer-web-config.mjs",
     "config/customers/index.mjs",
+    "config/customers/customerDraftConfig.mjs",
     "config/customers/demo/customerPackage.mjs",
     "config/customers/reference-customer/customerPackage.mjs",
     "config/customers/yoyoosun/customerPackage.mjs",

@@ -3,12 +3,19 @@ package data
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
+
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 func deleteWorkflowSourceTaskBundleForBackfillTest(
@@ -172,10 +179,13 @@ func TestWorkflowSourceTaskBackfillDoesNotGuessMissingProjection(t *testing.T) {
 	}
 }
 
-func TestPurchasePayableTaskBackfillPostgres(t *testing.T) {
+func TestPurchaseReceiptPostgresPayableTaskBackfill(t *testing.T) {
 	ctx := t.Context()
-	db, client := openPurchaseReceiptPostgresTestData(t)
-	f := partialInboundFixtureWithData(t, db, client, createInventoryTestFixtures(t, ctx, client), "APBF-"+postgresTestSuffix())
+	db, client := openPayableBackfillPostgresTestData(t)
+	fixture := createInventoryPostgresFixtures(t, ctx, client)
+	f := partialInboundFixtureWithData(t, db, client, inventoryTestFixtures{
+		unitID: fixture.unitID, materialID: fixture.materialID, warehouseID: fixture.warehouseID,
+	}, "APBF-"+postgresTestSuffix())
 	orderID := client.PurchaseOrderItem.GetX(ctx, *f.items[4].PurchaseOrderItemID).PurchaseOrderID
 	client.PurchaseOrder.UpdateOneID(orderID).ClearPaymentTermDays().SaveX(ctx)
 	f.decide(t, 4, true)
@@ -208,4 +218,39 @@ func TestPurchasePayableTaskBackfillPostgres(t *testing.T) {
 	if replay.ID != restored.ID || replay.Version != restored.Version || client.FinanceFact.Query().CountX(ctx) != factsBefore {
 		t.Fatal("repeated backfill changed the handoff or financial facts")
 	}
+}
+
+func openPayableBackfillPostgresTestData(t *testing.T) (*Data, *ent.Client) {
+	t.Helper()
+	base, _ := openPurchaseReceiptPostgresTestData(t)
+	dsn := os.Getenv("PURCHASE_RECEIPT_PG_TEST_DB_URL")
+	if dsn == "" {
+		dsn = os.Getenv("PURCHASE_RECEIPT_PG_DB_URL")
+	}
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal("parse isolated PostgreSQL connection configuration")
+	}
+	// Backfill scans the whole schema, so this case owns its source and task rows.
+	schema := "payable_backfill_" + postgresTestSuffix()
+	if _, err := base.sqldb.ExecContext(t.Context(), "CREATE SCHEMA "+schema); err != nil {
+		t.Fatalf("create payable backfill schema: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := base.sqldb.ExecContext(context.Background(), "DROP SCHEMA "+schema+" CASCADE"); err != nil {
+			t.Errorf("drop payable backfill schema: %v", err)
+		}
+	})
+	config.RuntimeParams["search_path"] = schema
+	db := stdlib.OpenDB(*config)
+	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+	t.Cleanup(func() {
+		if err := client.Close(); err != nil {
+			t.Errorf("close payable backfill database: %v", err)
+		}
+	})
+	if err := client.Schema.Create(t.Context()); err != nil {
+		t.Fatalf("create current payable backfill tables: %v", err)
+	}
+	return &Data{postgres: client, sqldb: db, sqlDialect: dialect.Postgres}, client
 }

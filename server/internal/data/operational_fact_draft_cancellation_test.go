@@ -265,6 +265,13 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	actor := client.AdminUser.Create().SetUsername("finance-source-draft-cancel").SetPasswordHash("test-password-hash").SaveX(ctx)
 	otherActor := client.AdminUser.Create().SetUsername("finance-source-draft-cancel-other").SetPasswordHash("test-password-hash").SaveX(ctx)
+	receiptFixture := partialInboundFixtureWithData(t, data, client, createInventoryTestFixtures(t, ctx, client), "FIN-DRAFT-CANCEL-RECEIPT")
+	receiptFixture.decide(t, 4, true)
+	receiptFixture.decide(t, 6, true)
+	receipt, err := receiptFixture.inv.PostPurchaseReceipt(ctx, receiptFixture.receipt.ID)
+	if err != nil {
+		t.Fatalf("post finance draft receipt fixture failed: %v", err)
+	}
 	beforeTxns := client.InventoryTxn.Query().CountX(ctx)
 	firstCancelledID := 0
 	firstCancelledVersion := 0
@@ -278,10 +285,16 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 	}
 	for index, test := range types {
 		occurredAt := time.Date(2026, time.August, 12, 10, index, 0, 0, time.UTC)
+		sourceID := 1000 + index
+		amount := decimal.NewFromInt(1)
+		if test.sourceType == biz.PurchaseReceiptSourceType {
+			sourceID = receipt.ID
+			amount = decimal.NewFromInt(20)
+		}
 		create := client.FinanceFact.Create().SetFactNo("FIN-DRAFT-CANCEL-" + test.factType + "-" + test.sourceType).
 			SetFactType(test.factType).SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(test.counterpartyType).
-			SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
-			SetOccurredAt(occurredAt).SetSourceType(test.sourceType).SetSourceID(1000 + index).
+			SetAmount(amount).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
+			SetOccurredAt(occurredAt).SetSourceType(test.sourceType).SetSourceID(sourceID).
 			SetIdempotencyKey("fin-draft-cancel-" + test.factType + "-" + test.sourceType)
 		if test.factType == biz.FinanceFactReceivable || test.factType == biz.FinanceFactPayable {
 			create.SetPaymentTerm(biz.FinancePaymentTermDueOnOccurrence).SetPaymentTermDays(0).SetDueAt(occurredAt)
@@ -325,10 +338,10 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 	sourceOccurredAt := time.Date(2026, time.August, 12, 10, 6, 0, 0, time.UTC)
 	source := client.FinanceFact.Create().SetFactNo("FIN-DRAFT-WITH-RECON").SetFactType(biz.FinanceFactPayable).
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).
-		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
+		SetAmount(decimal.NewFromInt(20)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
 		SetPaymentTerm(biz.FinancePaymentTermDueOnOccurrence).SetPaymentTermDays(0).
 		SetOccurredAt(sourceOccurredAt).SetDueAt(sourceOccurredAt).
-		SetSourceType(biz.PurchaseReceiptSourceType).SetSourceID(9999).SetIdempotencyKey("fin-draft-with-recon").SaveX(ctx)
+		SetSourceType(biz.PurchaseReceiptSourceType).SetSourceID(receipt.ID).SetIdempotencyKey("fin-draft-with-recon").SaveX(ctx)
 	child := client.FinanceFact.Create().SetFactNo("FIN-DRAFT-RECON-CHILD").SetFactType(biz.FinanceFactReconciliation).
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).
 		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).

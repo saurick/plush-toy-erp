@@ -58,9 +58,10 @@ export function CustomerDraftDialog({ open, busy, onClose, onCreate, onCreated }
       cancelButtonProps={{ disabled: busy }}
       closable={!busy}
       keyboard={!busy}
-      maskClosable={false}
+      maskClosable={!busy}
       destroyOnHidden
       onCancel={() => {
+        if (busy) return
         setError('')
         onClose()
       }}

@@ -15,15 +15,29 @@ const review = read("docs/architecture/生产工艺路线与在制品边界评�
 const customerPackage = read("config/customers/yoyoosun/customerPackage.mjs");
 
 test("production route review fixes sewing before handwork and keeps every quality gate distinct", () => {
-  assert.match(
-    review,
-    /布料加工 → 裁片检验 → 车缝 → 皮套检验 → 手工 → 正式成品入库（待检 \/ 待包装）→ 成品检验 → 针检 → 抽检 →（订单要求时）客户验货 → 查货与包装 → 可发货/u,
-  );
-  assert.match(review, /`车缝 → 手工` 是前后步骤，不是两个可互换选项/u);
-  assert.match(
-    review,
-    /车缝和手工各自再选择本厂或外发，前一步的执行方式不得自动复制为后一步决定/u,
-  );
+  const mainLine = review.match(/## 正式生产主线\n([\s\S]*?)\n## /u)?.[1];
+  assert.ok(mainLine, "production main line section is required");
+  const graphs = [...mainLine.matchAll(/```mermaid\nflowchart LR\n([\s\S]*?)\n```/gu)];
+  assert.deepEqual(graphs.map(([, body]) => body.split("\n").map((line) => line.trim())), [
+    [
+      'fabric["布料加工"] --> cuts["裁片检验"]',
+      'cuts --> sew["车缝"]',
+      'sew --> shell["皮套检验"]',
+      'shell --> hand["手工"]',
+      'hand --> inbound["正式成品入库<br/>待检、待包装"]',
+    ],
+    [
+      'inbound["正式成品入库"] --> quality["成品检验"]',
+      'quality --> needle["针检"]',
+      'needle --> sample["抽检"]',
+      'sample --> gate{"订单要求客户验货？"}',
+      'gate -->|是| customer["客户验货"]',
+      'gate -->|否| pack["查货与包装"]',
+      "customer --> pack",
+      'pack --> ready["可发货"]',
+    ],
+  ]);
+  assert.match(mainLine, /车缝和手工依次进行，各自选择本厂或外发/u);
   for (const gate of [
     "主辅料 IQC",
     "裁片检验",

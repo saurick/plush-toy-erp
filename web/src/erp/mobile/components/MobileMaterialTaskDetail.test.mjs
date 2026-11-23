@@ -118,6 +118,12 @@ test('mobile material task separates on-demand reading from versioned task proce
     assert.ok(node, 'expected button to exist')
     await act(async () => node.click())
   }
+  const openDialogs = () =>
+    [...document.querySelectorAll('[role="dialog"]')].filter((node) => {
+      const drawer = node.closest('.ant-drawer')
+      return (!drawer || drawer.classList.contains('ant-drawer-open')) &&
+        !node.closest('[hidden], [aria-hidden="true"]')
+    })
   t.after(async () => {
     await act(async () => root.unmount())
     container.remove()
@@ -126,7 +132,7 @@ test('mobile material task separates on-demand reading from versioned task proce
   })
 
   await render()
-  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
+  assert.equal(openDialogs().length, 0)
   assert.equal(
     calls.filter(({ method }) => method === 'get_engineering_material_request').length,
     1
@@ -138,12 +144,12 @@ test('mobile material task separates on-demand reading from versioned task proce
   assert.equal(Boolean(button('审核通过，交财务')), false)
   assert.equal(Boolean(button('退回工程')), false)
   await click(document.querySelector('.ant-modal-close'))
-  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
+  assert.equal(openDialogs().length, 0)
   assert.equal(openedActions, 0)
 
   await click(button('处理任务'))
   assert.equal(openedActions, 1)
-  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
+  assert.equal(openDialogs().length, 0)
   assert.equal(Boolean(button('审核通过，交财务')), false)
   assert.equal(
     calls.filter(({ method }) => method === 'get_engineering_material_request')
@@ -158,7 +164,7 @@ test('mobile material task separates on-demand reading from versioned task proce
   assert.ok(calls.every(({ method }) => !method.includes('review_engineering')))
 
   await render({ selectedTask: { ...task, id: 9, assignee_id: 99 } })
-  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
+  assert.equal(openDialogs().length, 0)
   assert.ok(button('查看材料汇总'))
   assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 2)
   assert.equal(Boolean(button('处理任务')), false)

@@ -139,7 +139,7 @@ test('version decisions and target evidence remain source-backed', () => {
 test('manual takeover guide uses a standalone page without the former modal limits', () => {
   assert.match(versionPage, /手动与应急发布指引/u)
   assert.match(versionPage, /<ManualTakeoverGuide \/>/u)
-  assert.match(versionPage, /<main className="erp-dev-version-guide-content">/u)
+  assert.match(versionPage, /<main className="erp-dev-version-guide-content" ref=\{contentRef\}>/u)
   assert.doesNotMatch(css, /erp-dev-version-takeover-modal/u)
 })
 

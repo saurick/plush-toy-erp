@@ -79,7 +79,7 @@ test('semantic interactive controls expose pointer and disabled feedback', () =>
 
 test('mobile progress uses an anchored dropdown without desktop date inputs', () => {
   assert.match(mobileProgressSource, /<MobileFilterPopover/u)
-  assert.match(mobileFilterSource, /<Popover/u)
+  assert.match(mobileFilterSource, /<AnchoredControlPopover/u)
   assert.equal(
     (mobileProgressSource.match(/<MobileSearchInput/gu) || []).length,
     1,

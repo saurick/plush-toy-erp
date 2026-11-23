@@ -200,6 +200,7 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
       (node) =>
         node.textContent.replace(/\s/gu, '') === label.replace(/\s/gu, '')
     )
+  const processingTab = () => document.getElementById('erp-task-action-step-action-tab')
   const click = async (node) => {
     assert.ok(node, 'expected control')
     await act(async () => node.click())
@@ -228,6 +229,7 @@ async function setup(t, { stage = 'boss', mobile = false } = {}) {
     render,
     hide: async () => act(async () => root.render(null)),
     button,
+    processingTab,
     click,
     fill,
     calls,
@@ -286,7 +288,7 @@ for (const mobile of [false, true]) {
       }
       if (!mobile) {
         assert.equal(Boolean(ui.button('查看材料汇总')), stage !== 'revision')
-        await ui.click(ui.button('任务办理'))
+        await ui.click(ui.processingTab())
       }
       const assertProcessingOnly = () => {
         assert.ok(document.querySelector('.erp-engineering-material-review'))
@@ -333,7 +335,7 @@ test('desktop material processing stays inside the task tab and confirms the ver
     ),
     false
   )
-  await ui.click(ui.button('任务办理'))
+  await ui.click(ui.processingTab())
   assert.equal(document.querySelectorAll('[role="dialog"]').length, 1)
   assert.equal(document.querySelector('.erp-material-summary-modal'), null)
   assert.match(
@@ -381,7 +383,7 @@ for (const mobile of [false, true]) {
   test(`${mobile ? 'mobile' : 'desktop'} review notes do not block leaving or reloading the task`, async (t) => {
     const ui = await setup(t, { mobile })
     await ui.render()
-    if (!mobile) await ui.click(ui.button('任务办理'))
+    if (!mobile) await ui.click(ui.processingTab())
     await ui.fill('textarea', '材料已核对')
 
     const beforeUnload = new window.Event('beforeunload', { cancelable: true })
@@ -449,7 +451,7 @@ for (const mobile of [false, true]) {
     ui.profile.effective_session.actions = [...ui.profile.permissions]
     await ui.render()
     assert.equal(ui.button('填写核价'), undefined)
-    if (!mobile) await ui.click(ui.button('任务办理'))
+    if (!mobile) await ui.click(ui.processingTab())
     assert.equal(document.querySelector('[aria-label="采购核价录入"]'), null)
     assert.equal(document.querySelector('[aria-label="采购金额合计"]'), null)
     assert.ok(document.querySelector('.erp-material-sheet'))
@@ -524,7 +526,7 @@ for (const purchaseRead of [false, true]) {
 test('material review form does not expose manual engineering aggregation or submission', async (t) => {
   const ui = await setup(t, { stage: 'revision', mobile: false })
   await ui.render()
-  await ui.click(ui.button('任务办理'))
+  await ui.click(ui.processingTab())
   assert.equal(ui.button('提交老板审核'), undefined)
   assert.equal(ui.button('按当前资料重新整理'), undefined)
   assert.ok(document.querySelector('.erp-material-sheet'))
@@ -535,7 +537,7 @@ for (const mobile of [false, true]) {
   test(`${mobile ? 'mobile' : 'desktop'} finance rejection requires a reason and never sends material values`, async (t) => {
     const ui = await setup(t, { stage: 'finance', mobile })
     await ui.render()
-    if (!mobile) await ui.click(ui.button('任务办理'))
+    if (!mobile) await ui.click(ui.processingTab())
     await ui.click(document.querySelector('input[value="reject"]'))
     await ui.click(ui.button('确认退回工程'))
     assert.equal(ui.receipt, undefined)
@@ -561,7 +563,7 @@ for (const mobile of [false, true]) {
 test('desktop finance preserves its review note when returning to the source summary', async (t) => {
   const ui = await setup(t, { stage: 'finance' })
   await ui.render()
-  await ui.click(ui.button('任务办理'))
+  await ui.click(ui.processingTab())
   await ui.fill('textarea', '用料已核对')
   await ui.click(document.querySelector('#erp-task-action-step-context-tab'))
   assert.ok(ui.button('查看材料汇总'))
