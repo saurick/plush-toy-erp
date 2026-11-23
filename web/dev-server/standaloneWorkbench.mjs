@@ -59,10 +59,11 @@ export async function createStandaloneWorkbenchServer({
   const proxy = createDevHttpsProxyMiddleware(origin, { allowPublicClients: true, trustedProxyAddress })
   const authenticate = createWorkbenchSessionMiddleware({
     ...credentials,
-    onEvent: (outcome, identity) => writeEvent({ event: 'workbench_auth',
-outcome,
-      ...(identity ? { role: identity.role } : {}),
-at: new Date().toISOString() }),
+    onEvent: (outcome) => writeEvent({
+      event: 'workbench_auth',
+      outcome,
+      at: new Date().toISOString(),
+    }),
   })
   const apiOrigin = getDeploymentTarget(target.businessTarget).endpoints.server
   const middlewares = []

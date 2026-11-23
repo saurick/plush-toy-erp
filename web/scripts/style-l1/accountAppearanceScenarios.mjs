@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import { openERPAppearance } from './themeAssertions.mjs'
 import { ERP_ACCENTS, WORKBENCH_APPEARANCE_STORAGE_KEY } from '../../src/common/theme/erpAppearance.mjs'
-import { WORKBENCH_ROLES } from '../../src/dev-workbench/config/workbenchAccess.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { assertReadableOnBackground } from './colorAssertions.mjs'
@@ -284,7 +283,7 @@ export function createAccountAppearanceScenarios({
               await route.fulfill({ response })
             })
             await page.route('**/__dev/auth/session', (route) => route.fulfill({ json: {
-              username: 'appearance-test', role: WORKBENCH_ROLES.operator, expiresAt: '2099-01-01T00:00:00Z',
+              username: 'appearance-test', expiresAt: '2099-01-01T00:00:00Z',
             } }))
           }
         },

@@ -13,9 +13,6 @@ const origin = 'https://workbench.example.test'
 const password = 'test-only-independent-password-32-bytes'
 const username = 'operator'
 const passwordHash = await hashWorkbenchPassword(password)
-const viewerUsername = 'viewer'
-const viewerPassword = 'test-only-viewer-password-independent-32'
-const viewerPasswordHash = await hashWorkbenchPassword(viewerPassword)
 
 async function fixture(t, options = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'plush-workbench-http-'))
@@ -79,72 +76,36 @@ test('standalone requires a valid operator identity and an immutable frontend ar
   await assert.rejects(createStandaloneWorkbenchServer({ staticRoot: '/nonexistent', httpsOrigin: origin }), /ENOENT/u)
 })
 
-test('viewer configuration fails closed on partial, invalid, duplicate or shared credentials', () => {
-  const base = { username, passwordHash }
-  for (const viewer of [
-    { viewerUsername }, { viewerPasswordHash },
-    { viewerUsername: '', viewerPasswordHash },
-    { viewerUsername: 'OPERATOR', viewerPasswordHash },
-    { viewerUsername, viewerPasswordHash: 'invalid' },
-    { viewerUsername, viewerPasswordHash: passwordHash },
-  ]) assert.throws(() => createWorkbenchSessionMiddleware({ ...base, ...viewer }), /viewer identity/u)
-  assert.doesNotThrow(() => createWorkbenchSessionMiddleware({ ...base, viewerUsername, viewerPasswordHash }))
+test('only the configured account can authenticate', async (t) => {
+  assert.throws(() => createWorkbenchSessionMiddleware({ username: '', passwordHash }), /operator identity/u)
+  assert.throws(() => createWorkbenchSessionMiddleware({ username, passwordHash: 'invalid' }), /operator identity/u)
+  const { request, login, calls, events } = await fixture(t)
+  for (const input of [{ username: 'viewer', role: 'operator' }, { password: 'wrong' }]) {
+    const denied = await login(input)
+    assert.equal(denied.status, 401)
+    assert.equal(denied.headers.get('set-cookie'), null)
+  }
+  const response = await request('/__dev/api/test/action', {
+    method: 'POST', headers: { origin, 'x-workbench-role': 'operator' }, body: '{}',
+  })
+  assert.equal(response.status, 401)
+  assert.equal(calls(), 0)
+  assert.equal(events.filter((event) => event.outcome === 'login_failed').length, 2)
+  assert.equal(JSON.stringify(events).includes(password), false)
 })
 
-test('viewer reads pages and results while every mutation and business proxy is refused before reaching a sink', async (t) => {
-  const { request, login, calls, events } = await fixture(t, { viewerUsername, viewerPasswordHash })
-  const result = await login({ username: viewerUsername, password: viewerPassword, role: 'operator' })
-  assert.equal(result.status, 303)
-  const cookie = result.headers.get('set-cookie').split(';')[0]
-  const session = await (await request('/__dev/auth/session', { headers: { cookie } })).json()
-  assert.equal(session.username, viewerUsername)
-  assert.equal(session.role, 'viewer')
-  for (const route of ['/__dev', '/__dev/docs', '/assets/page.js', '/__dev/api/test/summary']) {
-    assert.equal((await request(route, { headers: { cookie } })).status, 200, route)
-  }
-  const before = calls()
-  for (const route of ['/__dev/api/test/action', '/__dev/api/delivery/actions', '/__dev/api/database-migration/actions', '/%5f%5fdev/api/test/action', '/rpc/auth']) {
-    const denied = await request(route, { method: 'POST', headers: { cookie, origin, 'x-workbench-role': 'operator' }, body: '{}' })
-    assert.equal(denied.status, 403, `POST ${route}`)
-    assert.equal((await denied.json()).code, 'workbench_read_only')
-  }
-  for (const method of ['PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
-    const denied = await request('/__dev/api/test/action', { method, headers: { cookie, origin } })
-    assert.equal(denied.status, 403, method)
-    assert.match(await denied.text(), /请通过工作台 HTTPS 域名访问/u)
-  }
-  for (const route of ['/rpc/auth', '/templates', '/templates/example']) {
-    assert.equal((await request(route, { headers: { cookie } })).status, 403, route)
-  }
-  assert.equal(calls(), before)
-  assert(events.some((event) => event.outcome === 'viewer_write_denied' && event.role === 'viewer'))
-  assert.equal(JSON.stringify(events).includes(viewerPassword), false)
-  assert.equal(JSON.stringify(events).includes(cookie), false)
-  const loggedOut = await request('/__dev/auth/logout', { method: 'POST', headers: { cookie, origin } })
-  assert.equal(loggedOut.status, 303)
-  assert.equal((await request('/__dev/auth/session', { headers: { cookie } })).status, 401)
-})
-
-test('operator and viewer sessions remain distinct and account switching revokes the prior identity', async (t) => {
+test('operator re-login revokes the old session and the new session expires', async (t) => {
   let time = Date.now()
-  const { request, login, calls } = await fixture(t, { viewerUsername, viewerPasswordHash, now: () => time, sessionTtlMs: 1000 })
-  for (const input of [
-    { username, password: viewerPassword }, { username: viewerUsername, password },
-    { username: 'unknown', password: viewerPassword },
-  ]) assert.equal((await login(input)).status, 401)
-  const operator = (await login()).headers.get('set-cookie').split(';')[0]
-  const viewer = (await login({ username: viewerUsername, password: viewerPassword })).headers.get('set-cookie').split(';')[0]
-  assert.notEqual(operator, viewer)
-  assert.equal((await request('/__dev/api/test/action', { method: 'POST', headers: { cookie: operator, origin } })).status, 200)
-  assert.equal((await request('/__dev/api/test/action', { method: 'POST', headers: { cookie: viewer, origin } })).status, 403)
+  const { request, login, calls } = await fixture(t, { now: () => time, sessionTtlMs: 1000 })
+  const first = (await login()).headers.get('set-cookie').split(';')[0]
+  assert.equal((await request('/__dev/api/test/action', { method: 'POST', headers: { cookie: first, origin } })).status, 200)
   assert.equal(calls(), 1)
-  const switched = await login({}, viewer)
-  const switchedCookie = switched.headers.get('set-cookie').split(';')[0]
-  assert.equal((await request('/__dev/auth/session', { headers: { cookie: viewer } })).status, 401)
-  assert.equal((await (await request('/__dev/auth/session', { headers: { cookie: switchedCookie } })).json()).role, 'operator')
+  const current = (await login({}, first)).headers.get('set-cookie').split(';')[0]
+  assert.notEqual(current, first)
+  assert.equal((await request('/__dev/auth/session', { headers: { cookie: first } })).status, 401)
+  assert.equal((await (await request('/__dev/auth/session', { headers: { cookie: current } })).json()).username, username)
   time += 1001
-  assert.equal((await request('/__dev/auth/session', { headers: { cookie: operator } })).status, 401)
-  assert.equal((await request('/__dev/auth/session', { headers: { cookie: switchedCookie } })).status, 401)
+  assert.equal((await request('/__dev/auth/session', { headers: { cookie: current } })).status, 401)
 })
 
 test('release maintenance blocks new tool writes, retains reads and proves existing requests have drained', async (t) => {
@@ -263,8 +224,7 @@ test('correct login restores the deep link, uses a secure opaque cookie and prot
   }
   const session = await request('/__dev/auth/session', { headers: { cookie } })
   const identity = await session.json()
-  assert.deepEqual(Object.keys(identity).sort(), ['expiresAt', 'role', 'username'])
-  assert.equal(identity.role, 'operator')
+  assert.deepEqual(Object.keys(identity).sort(), ['expiresAt', 'username'])
   assert.equal(calls(), 1)
   assert.equal(JSON.stringify(events).includes(password), false)
   assert.equal(JSON.stringify(events).includes(cookie), false)

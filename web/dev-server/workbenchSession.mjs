@@ -1,7 +1,6 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { renderWorkbenchLoginPage, WORKBENCH_LOGIN_CONTENT_SECURITY_POLICY } from './workbenchLoginPage.mjs'
-import { WORKBENCH_ROLES, WORKBENCH_READ_ONLY_CODE, WORKBENCH_READ_ONLY_MESSAGE } from '../src/dev-workbench/config/workbenchAccess.mjs'
 import {
   isDevWorkbenchHttpsRequest,
   isDevWorkbenchProxyTransportRequest,
@@ -42,8 +41,6 @@ export async function hashWorkbenchPassword(password, salt = randomBytes(16).toS
 export function createWorkbenchSessionMiddleware({
   username = process.env.PLUSH_WORKBENCH_USERNAME,
   passwordHash = process.env.PLUSH_WORKBENCH_PASSWORD_HASH,
-  viewerUsername = process.env.PLUSH_WORKBENCH_VIEWER_USERNAME,
-  viewerPasswordHash = process.env.PLUSH_WORKBENCH_VIEWER_PASSWORD_HASH,
   now = Date.now,
   sessionTtlMs = WORKBENCH_SESSION_TTL_MS,
   onEvent = () => {},
@@ -53,16 +50,8 @@ export function createWorkbenchSessionMiddleware({
   if (typeof username !== 'string' || !/^[A-Za-z0-9_.@-]{1,64}$/u.test(username) || !hashParts) {
     throw new Error('Workbench operator identity is missing or invalid')
   }
-  const identities = [{ username, hashParts, role: WORKBENCH_ROLES.operator }]
-  if (viewerUsername !== undefined || viewerPasswordHash !== undefined) {
-    const viewerHashParts = typeof viewerPasswordHash === 'string'
-      ? viewerPasswordHash.match(/^scrypt:([a-f0-9]{32}):([a-f0-9]{128})$/u) : null
-    if (typeof viewerUsername !== 'string' || !/^[A-Za-z0-9_.@-]{1,64}$/u.test(viewerUsername) ||
-      viewerUsername.toLowerCase() === username.toLowerCase() || !viewerHashParts || viewerPasswordHash === passwordHash) {
-      throw new Error('Workbench viewer identity is missing or invalid')
-    }
-    identities.push({ username: viewerUsername, hashParts: viewerHashParts, role: WORKBENCH_ROLES.viewer })
-  }
+  const expectedUser = Buffer.from(digest(username), 'hex')
+  const expectedKey = Buffer.from(hashParts[2], 'hex')
   const sessions = new Map()
   const failures = new Map()
   let globalAttempts = { count: 0, until: 0 }
@@ -162,11 +151,9 @@ export function createWorkbenchSessionMiddleware({
         html(400, '登录信息无效，请重新填写'); return
       }
       const password = typeof input?.password === 'string' && input.password.length <= 1024 ? input.password : ''
-      const requestedUser = Buffer.from(digest(String(input?.username || '')))
-      const identity = identities.find((candidate) => timingSafeEqual(requestedUser, Buffer.from(digest(candidate.username))))
-      const expected = identity?.hashParts || hashParts
-      const suppliedKey = await deriveKey(password, expected[1], 64)
-      if (!timingSafeEqual(suppliedKey, Buffer.from(expected[2], 'hex')) || !identity) {
+      const requestedUser = Buffer.from(digest(String(input?.username || '')), 'hex')
+      const suppliedKey = await deriveKey(password, hashParts[1], 64)
+      if (!timingSafeEqual(suppliedKey, expectedKey) || !timingSafeEqual(requestedUser, expectedUser)) {
         onEvent('login_failed')
         html(401, '账号或密码不正确', input.returnTo); return
       }
@@ -176,9 +163,9 @@ export function createWorkbenchSessionMiddleware({
         html(503, '当前登录人数较多，请稍后再试'); return
       }
       const token = randomBytes(32).toString('hex')
-      sessions.set(digest(token), { expiresAt: time + sessionTtlMs, username: identity.username, role: identity.role })
+      sessions.set(digest(token), { expiresAt: time + sessionTtlMs })
       response.setHeader('set-cookie', cookie(token, Math.ceil(sessionTtlMs / 1000)))
-      onEvent('login_succeeded', { role: identity.role })
+      onEvent('login_succeeded')
       redirect(safeWorkbenchReturnTo(input.returnTo))
       return
     }
@@ -205,15 +192,7 @@ export function createWorkbenchSessionMiddleware({
     }
     if (url.pathname === '/__dev/auth/session' && request.method === 'GET') {
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
-      response.end(JSON.stringify({ username: session.username, role: session.role, expiresAt: new Date(session.expiresAt).toISOString() }))
-      return
-    }
-    // 查看身份不进入工具写入口或业务代理，即使浏览器携带其它有效身份也不放行。
-    if (session.role === WORKBENCH_ROLES.viewer && (!['GET', 'HEAD'].includes(request.method) ||
-      /^\/(?:rpc|templates)(?:\/|$)/u.test(url.pathname))) {
-      onEvent('viewer_write_denied', { role: session.role })
-      response.writeHead(403, { 'content-type': 'application/json; charset=utf-8' })
-      response.end(JSON.stringify({ code: WORKBENCH_READ_ONLY_CODE, message: WORKBENCH_READ_ONLY_MESSAGE }))
+      response.end(JSON.stringify({ username, expiresAt: new Date(session.expiresAt).toISOString() }))
       return
     }
     return next()

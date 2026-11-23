@@ -42,7 +42,7 @@ assert.doesNotMatch(
 )
 await mkdir(output, { recursive: true })
 const password = `fixture-${randomUUID()}`
-const viewerPassword = `fixture-viewer-${randomUUID()}`
+
 let time = Date.now()
 let writes = 0
 const requests = []
@@ -134,8 +134,6 @@ try {
     credentials: {
       username: 'operator',
       passwordHash: await hashWorkbenchPassword(password),
-      viewerUsername: 'viewer',
-      viewerPasswordHash: await hashWorkbenchPassword(viewerPassword),
       now: () => time,
     },
     writeEvent: () => {},
@@ -405,26 +403,7 @@ try {
   checks.push(
     'expired API sessions return to login, restore the view, and logout clears access'
   )
-  await login('viewer', viewerPassword)
-  await page.goto(`${origin}/__dev/quality-gates?view=run`)
-  await page.getByRole('heading', { name: '质量门禁', exact: true }).waitFor()
-  await page.getByRole('status').getByText('只读查看', { exact: true }).waitFor()
-  const viewerRefusals = await page.evaluate(async () => {
-    const results = []
-    for (const url of [
-      '/__dev/api/delivery/actions', '/__dev/api/database-migration/actions',
-      '/__dev/api/data-preparation/actions', '/__dev/api/customer-config/actions',
-      '/__dev/api/qa/testing/actions', '/rpc/auth',
-    ]) {
-      const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role: 'operator' }) })
-      results.push({ status: response.status, code: (await response.json()).code })
-    }
-    return results
-  })
-  assert(viewerRefusals.every(({ status, code }) => status === 403 && code === 'workbench_read_only'))
-  assert.equal(writes, 0, 'viewer writes must not enter tool plugins or the business proxy')
-  await page.screenshot({ path: path.join(output, 'viewer-readonly-4k.png'), fullPage: true })
-  checks.push('viewer sees the read-only identity and cannot submit tool or business writes even with a forged role')
+  await login()
 
   await page.route('**/__dev/auth/session', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }))
   await page.goto(`${origin}/__dev/quality-gates?view=run`)
@@ -432,10 +411,10 @@ try {
   assert.equal(await page.locator('.erp-dev-workspace-nav').count(), 0)
   await page.unroute('**/__dev/auth/session')
   await page.getByRole('button', { name: '重新读取', exact: true }).click()
-  await page.getByRole('status').getByText('只读查看', { exact: true }).waitFor()
+  await page.getByRole('heading', { name: '质量门禁', exact: true }).waitFor()
   await page.getByRole('button', { name: '退出登录', exact: true }).click()
   await page.getByRole('button', { name: '登录工作台', exact: true }).waitFor()
-  checks.push('failed identity reads keep workbench tools unmounted and explicit retry restores the viewer session')
+  checks.push('failed identity reads keep workbench tools unmounted and explicit retry restores the operator session')
   assert.deepEqual(errors, [])
   assert(
     requests.some(
