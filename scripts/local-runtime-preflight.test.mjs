@@ -162,6 +162,42 @@ test("local runtime preflight: 每个外部命令有超时与取消信号，错�
   }
 });
 
+test("local runtime preflight: 终端与前端显示 Atlas 失败原因且不公开连接信息", async () => {
+  const dsn = "postgres://private-user:private-password@private-host/db";
+  for (const [cause, code, expected] of [
+    ["spawn atlas ENOENT", "ENOENT", /找不到 atlas/u],
+    ["connect: no route to host", 1, /本地网络权限/u],
+    ["connect: connection refused", 1, /端口拒绝连接/u],
+    ["lookup private-host: no such host", 1, /解析数据库主机名/u],
+    ["SQLSTATE 28P01", 1, /身份验证失败/u],
+    ["permission denied", 1, /权限不足/u],
+    ["i/o timeout", 1, /读取状态超时/u],
+    ["unknown failure", 7, /Atlas 退出码 7/u],
+  ]) {
+    const detail = `${cause}: ${dsn}`;
+    for (const error of [
+      Object.assign(new Error(detail), { code, stderr: detail }),
+      Object.assign(new Error("atlas 未完成"), { exitCode: code, diagnostic: detail }),
+    ]) {
+      await assert.rejects(checkLocalDatabaseMigrations({
+        writeLine: () => {},
+        execFile: async (command) => {
+          if (command === "atlas") throw error;
+          assert(["bash", "go"].includes(command));
+          return { stdout: command === "go" ? dsn : "" };
+        },
+      }), (failure) => {
+        assert.equal(failure.code, "database_status_unavailable");
+        assert(isRecoverableWebRuntimePreflightError(failure));
+        assert.match(failure.message, expected);
+        assert.match(failure.message, /make migrate_status/u);
+        assert.doesNotMatch(failure.message + failure.diagnostic, /private-|postgres:\/\//u);
+        return true;
+      });
+    }
+  }
+});
+
 test("local runtime preflight: migration 必须精确落到最新 version", () => {
   assert.deepEqual(evaluateMigrationStatus(currentMigrationStatus()), {
     ok: true,

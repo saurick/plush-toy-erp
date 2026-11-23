@@ -82,6 +82,31 @@ function commandFailureDetails(error) {
   return output.length > 4000 ? `${output.slice(0, 4000)}\n...` : output;
 }
 
+function migrationStatusFailureMessage(error) {
+  // execFile exposes stderr directly; the restart executor wraps it in diagnostic.
+  // Atlas errors can include the login name, connection string and command line.
+  const evidence = String(error?.stderr || error?.diagnostic || "");
+  const exitCode = error?.exitCode ?? error?.code;
+  let reason;
+  if (exitCode === "ENOENT")
+    reason = "当前启动环境找不到 atlas 命令，请检查安装位置和 PATH";
+  else if (/no route to host|network is unreachable|connect: operation not permitted/iu.test(evidence))
+    reason = "当前启动进程无法连到数据库网络，请检查网络连通性；macOS 还需核对发起应用的本地网络权限";
+  else if (/connection refused/iu.test(evidence))
+    reason = "数据库端口拒绝连接，请核对数据库地址、端口和服务状态";
+  else if (/no such host|could not translate host name/iu.test(evidence))
+    reason = "无法解析数据库主机名，请核对数据库地址和域名解析";
+  else if (/password authentication failed|SQLSTATE 28P01/iu.test(evidence))
+    reason = "数据库身份验证失败，请核对本地开发库的连接凭据";
+  else if (/permission denied|SQLSTATE 42501/iu.test(evidence))
+    reason = "读取迁移状态时权限不足，请核对报错环境的读取权限";
+  else if (/i\/o timeout|connection timed out|context deadline exceeded/iu.test(evidence))
+    reason = "连接数据库或读取状态超时，请核对网络和服务状态";
+  else
+    reason = Number.isInteger(exitCode) ? `Atlas 退出码 ${exitCode}` : "Atlas 状态命令执行失败";
+  return `无法读取开发数据库迁移状态：${reason}。可在 server 目录执行 make migrate_status 只读复查`;
+}
+
 async function runCommand(
   command,
   args,
@@ -117,7 +142,7 @@ async function runCommand(
       timedOut ? "local_runtime_preflight_timeout" : code,
       timedOut
         ? `${stage}超时（预检限时 ${LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS / 1000} 秒）；检查未完成，本次启动已停止，可在恢复页重新检查`
-        : failureMessage,
+        : typeof failureMessage === "function" ? failureMessage(error) : failureMessage,
     );
     failure.diagnostic = details;
     throw failure;
@@ -210,7 +235,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
       maxBuffer: 4 * 1024 * 1024,
     },
     runtime,
-    "无法读取本地开发数据库 migration 状态；未执行任何 migration",
+    migrationStatusFailureMessage,
     { code: "database_status_unavailable", stage: "开发数据库迁移状态读取" },
   );
 
