@@ -1,4 +1,4 @@
-import React, { Suspense, useLayoutEffect, useRef, useState } from 'react'
+import React, { Suspense, useId, useLayoutEffect, useRef, useState } from 'react'
 import { Button } from 'antd'
 import {
   ReloadOutlined,
@@ -82,7 +82,7 @@ const TOPICS = [
   },
   {
     key: 'components',
-    title: '组件选用',
+    title: '组件使用指南',
     summary: '按用途查正式入口与复用边界',
     description: '从当前实现约定查找基础控件、共享交互、业务组合和打印组件，再进入对应样例。',
     rules: [],
@@ -954,6 +954,7 @@ export default function DevControlStandards() {
   )
   const contentRef = useRef(null)
   const directoryRef = useRef(null)
+  const headingId = useId()
   const update = (values) => {
     const next = new URLSearchParams(window.location.search)
     Object.entries(values).forEach(([key, value]) =>
@@ -1062,7 +1063,7 @@ export default function DevControlStandards() {
       <div className="erp-control-library-content" ref={contentRef}>
         <header className="erp-control-library-heading">
           <div>
-            <h2>{current.title}</h2>
+            <h2 id={headingId}>{current.title}</h2>
             <p>{current.description}</p>
           </div>
           <div className="erp-control-library-theme">
@@ -1083,7 +1084,7 @@ export default function DevControlStandards() {
           </div>
         </header>
         {current.key === 'components' ? (
-          <DevSharedComponentGuide topics={TOPICS} />
+          <DevSharedComponentGuide topics={TOPICS} labelledBy={headingId} />
         ) : (
           <>
             {isNavigation ? rules : null}

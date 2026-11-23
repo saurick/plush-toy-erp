@@ -253,7 +253,7 @@ name: 'dev-ui-toolbar-composition',
         await page.getByRole('button', { name: '恢复示例', exact: true }).click()
         assert.equal(await current(page).getByRole('textbox', { name: '库存查询搜索', exact: true }).inputValue(), '')
         assert.equal(await page.locator('.erp-dev-toolbar-example__page').count(), 1, '恢复示例释放已访问的样例')
-        await page.getByRole('navigation', { name: '组件设计目录', exact: true }).getByRole('button', { name: /组件选用/u }).click()
+        await page.getByRole('navigation', { name: '组件设计目录', exact: true }).getByRole('button', { name: /组件使用指南/u }).click()
         await page.getByRole('link', { name: '操作业务工具栏组合示例', exact: true }).click()
         assert.equal(new URL(page.url()).searchParams.get('control'), 'business-toolbar', '组件目录直达同一真实组件样例')
         await page.reload({ waitUntil: 'domcontentloaded' })

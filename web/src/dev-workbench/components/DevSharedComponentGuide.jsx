@@ -21,9 +21,9 @@ export function DevUIConsumerName({ consumer }) {
   return <span>{consumer.title}</span>
 }
 
-export default function DevSharedComponentGuide({ topics }) {
+export default function DevSharedComponentGuide({ topics, labelledBy }) {
   return (
-    <section className="erp-control-library-catalog" aria-label="公共组件选用">
+    <section className="erp-control-library-catalog" aria-labelledby={labelledBy}>
       <section aria-label="组件样例与真实页面">
         <h3>操作样例与真实页面</h3>
         <p>样例使用本地虚构数据；真实页面核对沿用业务账号权限。</p>

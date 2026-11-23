@@ -97,11 +97,12 @@ export function createDevSharedComponentScenarios({
       viewport: { width: 1920, height: 1080 },
       verify: async (page) => {
         const catalog = page.getByRole('region', {
-          name: '公共组件选用',
+          name: '组件使用指南',
           exact: true,
         })
         await catalog.waitFor()
-        assert.equal(await page.getByRole('button', { name: /重置演示/u }).count(), 0, '只读选用表不显示演示重置动作')
+        await page.getByRole('heading', { name: '组件使用指南', exact: true }).waitFor()
+        assert.equal(await page.getByRole('button', { name: /重置演示/u }).count(), 0, '指南不显示演示重置动作')
         const source = await readFile(
           new URL(
             '../../../docs/engineering/前端实现与交互约定.md',
@@ -148,7 +149,7 @@ export function createDevSharedComponentScenarios({
           name: '组件设计目录',
           exact: true,
         })
-        const catalogEntry = directory.getByRole('button', { name: '组件选用', exact: true })
+        const catalogEntry = directory.getByRole('button', { name: '组件使用指南', exact: true })
         const paginationEntry = directory.getByRole('button', { name: /列表与分页/u })
         const pickerEntry = directory.getByRole('button', { name: /来源选择/u })
         assert.equal(await catalogEntry.locator('code').count(), 0, '选用索引没有虚构的组件名')
@@ -162,7 +163,7 @@ export function createDevSharedComponentScenarios({
         await paginationEntry.focus()
         await page.keyboard.press('Enter')
         await page.getByRole('heading', { name: '列表与分页', exact: true }).waitFor()
-        assert.equal(await page.getByRole('button', { name: '返回组件选用', exact: true }).count(), 0)
+        assert.equal(await page.getByRole('button', { name: '返回组件使用指南', exact: true }).count(), 0)
         await catalogEntry.click()
         await catalog.waitFor()
 
@@ -171,7 +172,7 @@ export function createDevSharedComponentScenarios({
         await page.waitForURL((url) => url.searchParams.get('controlq') === 'PrintEditableText')
         await directory.getByRole('button').nth(1).waitFor({ state: 'detached' })
         assert.equal(await directory.getByRole('button').count(), 1)
-        await directory.getByRole('button', { name: /组件选用/u }).waitFor()
+        await directory.getByRole('button', { name: /组件使用指南/u }).waitFor()
         await page.reload()
         await catalog.waitFor()
         assert.equal(await search.inputValue(), 'PrintEditableText')

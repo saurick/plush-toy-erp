@@ -117,10 +117,10 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       assert.equal(Number(await quantity.inputValue()), 1464, '重置后恢复初始数量')
       assert.equal(await sample.getByRole('checkbox', { name: '窄区域', exact: true }).isChecked(), false)
       await assertNoHorizontalOverflow(page)
-      await page.getByRole('navigation', { name: '组件设计目录', exact: true }).getByRole('button', { name: /组件选用/u }).click()
+      await page.getByRole('navigation', { name: '组件设计目录', exact: true }).getByRole('button', { name: /组件使用指南/u }).click()
       await page.getByRole('link', { name: '操作长值与多列示例', exact: true }).click()
       await sample.waitFor()
-      assert.equal(new URL(page.url()).searchParams.get('control'), 'select-overflow', '组件选用可回到正式长值样例')
+      assert.equal(new URL(page.url()).searchParams.get('control'), 'select-overflow', '组件使用指南可回到正式长值样例')
     },
   }]
 }
