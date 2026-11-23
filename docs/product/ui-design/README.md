@@ -73,6 +73,8 @@
 
 “日期与时间”（`control=dates`）直接使用 `DateInput`、`DateTimeInput`、`DateRangeFilter`，操作即时选值、清空、快捷截止及倒置范围。基础输入通过 `AppSelect` 演示用途标签、清空和空态；筛选由 `FilterSelect` / `SelectFilter` 统一空条件，规则见[下拉选择与清空](交互设计说明.md#select-controls)。
 
+[筛选下拉](/__dev/ui-design?page=controls&control=filter-select)以任务管理的“办理人”为例。输入姓名缩小候选，选中后核对任务数，清空后恢复不限。规则见[下拉选择与清空](交互设计说明.md#select-controls)。
+
 [分组下拉](/__dev/ui-design?page=controls&control=grouped-select)直接使用 `AppSelect` 和历史来源分组构造器，比较分类标题、缩进选项和勾选，操作单选、多选、搜索、清空与禁用状态；统一规则和当前使用入口见[分组选项](交互设计说明.md#grouped-select-options)。
 
 [筛选与搜索](/__dev/ui-design?page=controls&control=filters)演示关键词、快捷条件和总筛选如何改变列表结果。电脑样例可连续调整记录范围和负责人，在右上角清空筛选，完成后手动收起。手机样例沿用筛选入口和浮层样式，快捷条件保持至少 44px 点击区，窄屏可横向滑动。位置与生效方式见[电脑版筛选气泡](交互设计说明.md#desktop-filter-popovers)。

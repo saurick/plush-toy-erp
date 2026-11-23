@@ -354,6 +354,36 @@ export function createDevSharedComponentScenarios({
       },
     },
     {
+      name: 'dev-ui-assignee-filter-select',
+      path: '/__dev/ui-design?page=controls&control=filter-select',
+      viewport: { width: 1024, height: 768 },
+      verify: async (page) => {
+        const stage = page.locator('.erp-control-library-stage')
+        const input = stage.getByRole('combobox', { name: '办理人', exact: true })
+        const result = stage.getByLabel('筛选当前结果', { exact: true })
+        await result.waitFor()
+        assert.equal(await result.innerText(), '不限 · 4 条任务')
+
+        await input.fill('无匹配姓名')
+        const dropdown = page.locator('.ant-select-dropdown:visible')
+        await dropdown.getByText('没有匹配的选项', { exact: true }).waitFor()
+        assert.equal(await result.innerText(), '不限 · 4 条任务')
+
+        await input.fill('王')
+        const options = dropdown.locator('.ant-select-item-option-content')
+        const match = options.filter({ hasText: /^王小禾$/u })
+        await match.waitFor()
+        assert.deepEqual(await options.allTextContents(), ['王小禾'])
+        await match.click()
+        assert.equal(await result.innerText(), '王小禾 · 2 条任务')
+
+        await stage.locator('.ant-select').hover()
+        await stage.locator('.ant-select-clear').click()
+        assert.equal(await result.innerText(), '不限 · 4 条任务')
+        await assertNoHorizontalOverflow(page)
+      },
+    },
+    {
       name: 'dev-ui-shared-date-inputs',
       path: '/__dev/ui-design?page=controls&control=dates',
       viewport: { width: 1920, height: 1080 },

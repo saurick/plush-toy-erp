@@ -30,6 +30,7 @@ import DevSharedComponentGuide, { DevUIConsumerName, SHARED_COMPONENT_SEARCH_TEX
 import DevUIPaginationExample from './DevUIPaginationExample.jsx'
 import DevUIPageStateExamples from './DevUIPageStateExamples.jsx'
 import { BasicInputExample, DateInputExample, GroupedSelectExample } from './DevUIInputExamples.jsx'
+import { FilterSelectExample } from './DevUISingleControlExamples.jsx'
 import DevSelectValueExample from './DevSelectValueExample.jsx'
 import DevSupplementalHelpExample from './DevSupplementalHelpExample.jsx'
 import {
@@ -237,6 +238,21 @@ const TOPICS = [
     componentRefs: ['AppSelect'],
     source: 'historySourceSelectOptions · control-foundation.css；规范：交互设计说明 #grouped-select-options',
     consumer: { ...HISTORY_PAGE, task: '展开记录类型，核对基础资料与业务单据两类，以及搜索、清空和选择后的结果。' },
+  },
+  {
+    key: 'filter-select',
+    title: '筛选下拉',
+    summary: '按姓名搜索与清空',
+    description: '按姓名查找办理人，选中后只看该办理人的任务。',
+    rules: [['从人员名单筛选任务', '筛选下拉', '输入姓名缩小候选，选中后筛选生效，清空恢复不限。']],
+    checks: [
+      '在“办理人”输入“王”，候选只显示王小禾。',
+      '选择王小禾，结果缩小到 2 条任务。',
+      '点击下拉框右侧的 ×，恢复“不限 · 4 条任务”。',
+    ],
+    componentRefs: ['FilterSelect'],
+    source: '规范：交互设计说明 #select-controls',
+    consumer: { ...TASK_PAGE, task: '打开“待我处理”的筛选面板，按姓名查找并选中办理人，再清空核对结果。' },
   },
   {
     key: 'select-overflow',
@@ -1105,6 +1121,8 @@ export default function DevControlStandards() {
                     <BasicInputExample />
                   ) : current.key === 'grouped-select' ? (
                     <GroupedSelectExample />
+                  ) : current.key === 'filter-select' ? (
+                    <FilterSelectExample />
                   ) : current.key === 'select-overflow' ? (
                     <DevSelectValueExample />
                   ) : current.key === 'dates' ? (
