@@ -1,6 +1,7 @@
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   getCustomerPackage,
+  getCustomerPackageSourcePath,
   listCustomerPackageKeys,
 } from '../../../../config/customers/index.mjs'
 import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
@@ -3345,7 +3346,7 @@ const CUSTOMER_PACKAGE_REGISTRY = Object.freeze(
   listCustomerPackageKeys().map((customerKey) =>
     Object.freeze({
       customerPackage: getCustomerPackage(customerKey),
-      sourceRef: `config/customers/${customerKey}/customerPackage.mjs`,
+      sourceRef: getCustomerPackageSourcePath(customerKey),
     })
   )
 )

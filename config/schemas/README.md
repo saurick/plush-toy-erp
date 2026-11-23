@@ -16,6 +16,8 @@
 
 ## 校验入口
 
+本机生成的 `customerPackage.json` 和工程样例共用包结构校验。JSON 草稿的品牌名称取 `label`，菜单隐藏项取 `desktopMenu.hiddenItemKeys`。检查脚本从客户包登记取得实际源码路径。
+
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 node scripts/qa/customer-package-lint.mjs --customer yoyoosun

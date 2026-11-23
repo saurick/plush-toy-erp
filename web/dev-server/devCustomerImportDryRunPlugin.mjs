@@ -29,6 +29,8 @@ import {
 } from '../../scripts/qa/dev-customer-config-operation-store.mjs'
 import {
   isDevWorkbenchRequest,
+  isLoopbackHostHeader,
+  isLoopbackRemoteAddress,
   isSameOriginRequest,
   readJsonBody,
 } from './devServerSecurity.mjs'
@@ -38,6 +40,7 @@ const execFileAsync = promisify(execFile)
 const API_PATH = '/__dev/api/customer-import/dry-run'
 const CUSTOMER_CONFIG_API_PREFIX = '/__dev/api/customer-config'
 const SESSION_API_PATH = `${CUSTOMER_CONFIG_API_PREFIX}/session`
+const DRAFTS_API_PATH = `${CUSTOMER_CONFIG_API_PREFIX}/drafts`
 const OPERATIONS_API_PATH = `${CUSTOMER_CONFIG_API_PREFIX}/operations`
 const RUNTIME_MANIFEST_API_PATH = '/__dev/api/customer-config/runtime-manifest'
 const RELEASE_BATCHES_API_PATH = '/__dev/api/customer-config/release-batches'
@@ -453,6 +456,7 @@ export function createDevCustomerConfigService({
   runtimeManifestCompiler = compileRuntimeManifest,
   releaseBatchLister = listReleaseBatches,
   releaseReadinessRunner = runReleaseReadiness,
+  onDraftRegistered,
   now = () => new Date().toISOString(),
 } = {}) {
   const root = path.resolve(projectRoot)
@@ -599,6 +603,11 @@ export function createDevCustomerConfigService({
   }
 
   return {
+    async createDraft(input) {
+      assertExactKeys(input, ['customerKey', 'customerName'], 'customer draft request')
+      const { createDevCustomerDraft } = await import('./devCustomerDraft.mjs')
+      return createDevCustomerDraft({ projectRoot: root, store, input, onRegistered: onDraftRegistered })
+    },
     async releaseBatches(customerKey) {
       const normalized = normalizeCustomerKey(customerKey)
       if (!registeredCustomer(normalized)) {
@@ -622,6 +631,7 @@ export function createDevCustomerConfigService({
 
 export function createDevCustomerConfigMiddleware({
   service,
+  allowDraftCreation = false,
   csrfToken = randomBytes(32).toString('base64url'),
   ...serviceOptions
 } = {}) {
@@ -635,6 +645,7 @@ export function createDevCustomerConfigMiddleware({
     RELEASE_BATCHES_API_PATH,
     RELEASE_READINESS_API_PATH,
   ])
+  if (allowDraftCreation) handledPaths.add(DRAFTS_API_PATH)
   return async (request, response, next) => {
     let requestURL
     try {
@@ -705,7 +716,8 @@ export function createDevCustomerConfigMiddleware({
             : requestURL.pathname === RELEASE_READINESS_API_PATH
               ? 'release-readiness'
               : ''
-      if (request.method === 'POST' && action) {
+      const isCreateDraft = requestURL.pathname === DRAFTS_API_PATH
+      if (request.method === 'POST' && (action || isCreateDraft)) {
         if (
           !isSameOriginRequest(request) ||
           request.headers?.['x-csrf-token'] !== csrfToken ||
@@ -719,13 +731,24 @@ export function createDevCustomerConfigMiddleware({
           })
           return
         }
-        const result = await customerConfigService.act(
-          action,
-          await readJsonBody(request, {
-            maxBytes: MAX_REQUEST_BYTES,
-            label: 'customer config request',
-          })
-        )
+        if (isCreateDraft && (
+          !isLoopbackRemoteAddress(request.socket?.remoteAddress) ||
+          !isLoopbackHostHeader(request.headers?.host)
+        )) {
+          sendJson(response, 403, { status: 'failed', message: '请在本机打开客户配置页后创建草稿' })
+          return
+        }
+        if (isCreateDraft && requestURL.search) throw new Error('query is invalid')
+        const input = await readJsonBody(request, {
+          maxBytes: MAX_REQUEST_BYTES,
+          label: 'customer config request',
+        })
+        if (isCreateDraft) {
+          const draft = await customerConfigService.createDraft(input)
+          sendJson(response, draft.created ? 201 : 200, draft)
+          return
+        }
+        const result = await customerConfigService.act(action, input)
         sendJson(response, result.statusCode, result.payload)
         return
       }
@@ -743,6 +766,7 @@ export function createDevCustomerConfigMiddleware({
           : 500)
       sendJson(response, statusCode, {
         status: 'failed',
+        ...(error?.draftCode ? { code: error.draftCode } : {}),
         message:
           statusCode === 403
             ? '本地客户上下文不符合固定配置合同'
@@ -755,12 +779,26 @@ export function createDevCustomerConfigMiddleware({
   }
 }
 
-export function createDevCustomerImportDryRunPlugin(options = {}) {
+export function createDevCustomerImportDryRunPlugin({ allowDraftCreation = false, ...options } = {}) {
+  const customerIndexPath = path.resolve(options.projectRoot || '..', 'config/customers/index.mjs')
+  let writtenIndex
   return {
     name: 'plush-dev-customer-import-dry-run-api',
     apply: 'serve',
     configureServer(server) {
-      server.middlewares.use(createDevCustomerConfigMiddleware(options))
+      server.middlewares.use(createDevCustomerConfigMiddleware({
+        ...options,
+        allowDraftCreation,
+        onDraftRegistered: (source) => { writtenIndex = source },
+      }))
+    },
+    async handleHotUpdate({ file, read }) {
+      if (file !== customerIndexPath || writtenIndex === undefined) return
+      // The creating tab loads the new draft after the request succeeds.
+      // Keep the other tabs in their current view for this specific write.
+      const generated = writtenIndex
+      writtenIndex = undefined
+      if (await read() === generated) return []
     },
   }
 }

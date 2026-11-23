@@ -3,6 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
+import { CUSTOMER_DRAFT_JSON_FILE, customerDraftWebScript } from '../../config/customers/customerDraftConfig.mjs'
 
 import { normalizeDevCustomerKey } from '../dev-server/devCustomerConfigPlugin.mjs'
 import { loadDevPorts, validateDevAuxPort } from '../../scripts/dev-ports.mjs'
@@ -76,9 +77,14 @@ export function parseYoyoosunDevArgs(argv) {
   return options
 }
 
-export function checkDevCustomerPackage(customer, projectRoot = repoRoot) {
+export function checkDevCustomerPackage(customer, projectRoot = repoRoot, packageSourcePath = '') {
   const customerKey = normalizeDevCustomerKey(customer)
   const customerDir = path.join(projectRoot, 'config', 'customers', customerKey)
+  if (packageSourcePath?.endsWith(`/${CUSTOMER_DRAFT_JSON_FILE}`)) {
+    const configPath = path.join(customerDir, CUSTOMER_DRAFT_JSON_FILE)
+    customerDraftWebScript(JSON.parse(readFileSync(configPath, 'utf8')), customerKey)
+    return { customerKey, configPath, faviconPath: null }
+  }
   const configPath = path.join(customerDir, 'customer-config.example.js')
   const faviconPath = path.join(
     customerDir,
@@ -107,7 +113,7 @@ export function checkDevCustomerPackage(customer, projectRoot = repoRoot) {
 function printPlan(options) {
   const label = 'start-yoyoosun'
   const verificationLines = [
-    `[${label}] verify customer config: curl -fsS http://localhost:${options.port}/customer-config.js | grep 'customerKey: "${options.customer}"'`,
+    `[${label}] verify customer config: curl -fsS http://localhost:${options.port}/customer-config.js | grep -E '"?customerKey"?: "${options.customer}"'`,
   ]
 
   if (options.customer === 'yoyoosun') {
@@ -183,7 +189,8 @@ async function main() {
   const gitlabCredential = startup.recoveryMode
     ? { source: 'missing', token: '' }
     : await resolveDevGitlabCredential()
-  checkDevCustomerPackage(options.customer)
+  const { getCustomerPackageSourcePath } = await import('../../config/customers/index.mjs')
+  checkDevCustomerPackage(options.customer, repoRoot, getCustomerPackageSourcePath(options.customer))
   options.signature = webInstanceSignature({
     ...options,
     projectRoot: repoRoot,

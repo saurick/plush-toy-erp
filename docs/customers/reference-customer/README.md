@@ -52,7 +52,7 @@
 
 ### 开发人员
 
-1. 先从 `config/customers/index.mjs` 取得已登记客户包，不在业务代码增加 customer key 条件。
+1. 接入新客户时从本机工作台[新建客户草稿](../../../config/customers/reference-customer/README.md#new-customer-draft)，核对必填项和产品默认值。工作台把草稿登记到 `config/customers/index.mjs`。
 2. 把差异写入现有 catalog/schema/compiler 能消费的声明字段；无真实消费者的配置不新增。
 3. 保持 raw package 为 `draft`、`previewOnly=true`，禁止直接 publish/activate/rollback 或写业务 Fact。
 4. 涉及字段时核对真源、列表/CSV consumer、来源切换和旧 revision；涉及 Workflow 时核对 Fact 禁区。

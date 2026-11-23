@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { SettingOutlined } from '@ant-design/icons'
 import { Alert, Button, Space, Tag, Typography } from 'antd'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import { canCreateLocalCustomerDraft, DEV_CUSTOMER_CONFIG_ROUTE } from '../config/devCustomerConfig.mjs'
 import { AssetsPanel } from './customer-config/AssetsPanel.jsx'
+import { CustomerDraftDialog } from './customer-config/CustomerDraftDialog.jsx'
 import { DiffPanel } from './customer-config/DiffPanel.jsx'
 import { OverviewPanel } from './customer-config/OverviewPanel.jsx'
 import { PreflightPanel } from './customer-config/PreflightPanel.jsx'
@@ -35,6 +37,7 @@ const steps = CUSTOMER_CONFIG_STEPS.map((step) => ({
 }))
 
 export default function DevCustomerConfigPage() {
+  const [draftOpen, setDraftOpen] = useState(false)
   const route = useCustomerConfigRoute()
   const { overview, activeStep } = route
   const operations = useCustomerConfigOperations({
@@ -43,6 +46,7 @@ export default function DevCustomerConfigPage() {
   })
   const { isMutationRunning, releaseBatch, releaseBatchesState } = operations
   const isMissingCustomer = overview.status !== 'ready'
+  const canCreateDraft = canCreateLocalCustomerDraft(globalThis.location?.hostname)
   const selectStep = (step) => {
     if (!isMutationRunning) route.navigate(step)
   }
@@ -167,8 +171,26 @@ export default function DevCustomerConfigPage() {
             disabled={isMutationRunning}
           />
           {!isMissingCustomer ? <Tag>工作区配置源</Tag> : null}
+          {canCreateDraft ? (
+            <Button disabled={isMutationRunning} onClick={() => setDraftOpen(true)}>
+              从模板新建草稿
+            </Button>
+          ) : null}
         </section>
       </DevPageHeader>
+
+      {canCreateDraft ? (
+        <CustomerDraftDialog
+          open={draftOpen}
+          busy={operations.draftCreating}
+          onClose={() => setDraftOpen(false)}
+          onCreate={operations.requestCreateDraft}
+          onCreated={(customerKey) => {
+            const query = new URLSearchParams({ customer: customerKey, view: 'preflight' })
+            window.location.assign(`${DEV_CUSTOMER_CONFIG_ROUTE}?${query}`)
+          }}
+        />
+      ) : null}
 
       {operations.historyState.status === 'error' ? (
         <Alert

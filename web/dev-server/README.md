@@ -11,7 +11,8 @@
 | `devWorkbenchPlugins.mjs` | 聚合 development-serve 插件，供 `web/vite.shared.mjs` 单点注册 |
 | `devWebInstancePlugin.mjs` | 仅向 loopback GET 提供前端进程、启动配置摘要和实时恢复状态，供启动器核对重复启动；不提供停服或写操作接口 |
 | `devCustomerConfigPlugin.mjs` | 为本地客户调试提供受控配置和公开资源 |
-| `devCustomerImportDryRunPlugin.mjs` | 提供客户配置预检、Dry Run、runtime manifest 和发布准备读回 |
+| `devCustomerImportDryRunPlugin.mjs` | 提供本机草稿创建、客户配置预检、Dry Run、runtime manifest 和发布准备读回 |
+| `devCustomerDraft.mjs` | 用标准样例生成独立草稿，以检查和预览的原有合同校验，写入并读回工作区登记 |
 
 ### 验证、数据与权限读取
 
@@ -66,6 +67,8 @@
 调整本目录后至少运行同目录 Node 测试、工作台源码边界测试、production build、制品零残留扫描和 production `/__dev` 浏览器 smoke。
 
 DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有界 JSON 请求解析。各插件显式提供请求大小上限，继续独立维护令牌、动作允许列表和状态机。
+
+草稿创建使用 `POST /__dev/api/customer-config/drafts`，仅在本机 Vite 开发服务注册，并核对本机连接、同源和客户配置会话的 CSRF。请求只接受 `customerKey`、`customerName`。每次创建从仓库读取[标准 JSON 模板](../../config/customers/reference-customer/customer-draft.template.json)，通过声明和预览校验后写入 `customerPackage.json`。生成目录和登记更新共用客户配置执行锁，发布登记保持独立。相同内容的请求可恢复登记或读回原草稿。登记完成后在开发日志记录操作编号与客户标识。ERP 的本地品牌预览从这份已登记的 JSON 生成 `/customer-config.js` 响应。
 
 工作台页面和所有高权限 API 先经过 `devOperatorAuthPlugin.mjs`。`PLUSH_DEV_WORKBENCH_ACCESS` 由 Vite 开发服务读取，未设置时使用 `local`，本机开发无需工作台登录且拒绝远程访问；值无效返回 503。
 

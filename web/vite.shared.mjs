@@ -205,6 +205,7 @@ export function createERPViteConfig(appId) {
     const devWorkbenchServePlugins =
       devWorkbenchModule
         ? devWorkbenchModule.createDevWorkbenchServePlugins({
+            allowCustomerDraftCreation: true,
             apiOrigin,
             command,
             devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',

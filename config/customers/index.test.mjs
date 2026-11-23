@@ -5,6 +5,7 @@ import test from "node:test";
 
 import {
   getCustomerPackage,
+  getCustomerPackageSourcePath,
   getCustomerReleasePackage,
   listCustomerPackageKeys,
 } from "./index.mjs";
@@ -12,22 +13,19 @@ import {
 const customersRoot = import.meta.dirname;
 
 test("customer package index: lists every tracked package in stable order", () => {
-  assert.deepEqual(listCustomerPackageKeys(), [
-    "demo",
-    "reference-customer",
-    "yoyoosun",
-  ]);
-
   const packageDirectories = readdirSync(customersRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .filter((entry) =>
-      readdirSync(path.join(customersRoot, entry.name)).includes(
-        "customerPackage.mjs",
-      ),
-    )
+    .filter((entry) => readdirSync(path.join(customersRoot, entry.name))
+      .some((file) => ["customerPackage.mjs", "customerPackage.json"].includes(file)))
     .map((entry) => entry.name)
     .sort();
   assert.deepEqual(listCustomerPackageKeys(), packageDirectories);
+  for (const customerKey of packageDirectories) {
+    const files = readdirSync(path.join(customersRoot, customerKey))
+      .filter((file) => ["customerPackage.mjs", "customerPackage.json"].includes(file));
+    assert.deepEqual(files.map((file) => `config/customers/${customerKey}/${file}`),
+      [getCustomerPackageSourcePath(customerKey)]);
+  }
 });
 
 test("customer package index: registered keys match package identity", () => {

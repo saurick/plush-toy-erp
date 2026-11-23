@@ -23,7 +23,7 @@ Product Core 提供中性正文与最小默认值，不硬编码真实客户名�
 ## 主路径
 
 - 可复用 key 先登记到 `config/catalog/`，结构边界先进入 `config/schemas/`。
-- 客户配置先进入 `config/customers/<customer-key>/`；中性 demo 只用于本地验证，reference 保持 draft/preview，真实客户配置还必须同步客户资料文档和客户交付矩阵中的差异决策。
+- 本机工作台读取[标准 JSON 模板](customers/reference-customer/customer-draft.template.json)，生成并登记独立的 `config/customers/<customer-key>/customerPackage.json`。[检查和预览](customers/reference-customer/README.md#new-customer-draft)从登记取得这份文件。中性 demo 只用于本地验证。真实客户差异决策同步到对应客户资料与交付矩阵。
 - 客户包流程结构当前只能进入 lint / preview；如需进入后端 `customer_config`，必须先通过 `customer-config-runtime-manifest` 生成受控 manifest，再走后端 validate / publish / activate。raw 客户包不直接 publish、不 activate、不 rollback，也不接 Workflow / Fact runtime。
 - 永绅本地联调只有一条受控例外：`pnpm start:yoyoosun` 只执行预检并启动 Vite，不自动写库；登录后由管理员在 `/__dev/customer-config?customer=yoyoosun` 显式确认，才能生成并应用内容寻址、长度不超过 64 的 `local_test_apply` revision。
 

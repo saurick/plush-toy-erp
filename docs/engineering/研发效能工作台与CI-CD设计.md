@@ -1178,7 +1178,8 @@ flowchart LR
 
 ### 客户配置包预检与发布 `/__dev/customer-config`
 
-- 页面通过 `customer`、`view`、`section`、`action`、`release` query 和客户包选择器读取 dev-only registry，当前只登记 `yoyoosun`。直接进入页面或传入单个空白 customer 时规范化为当前登记的 `yoyoosun`；显式未登记或重复 customer 不 fallback，只显示状态与已登记列表。视图、当前任务和证据批次均可通过 URL 恢复。
+- 页面通过 `customer`、`view`、`section`、`action`、`release` query 和客户包选择器读取仓库登记。标准样例和[独立客户草稿](../../config/customers/reference-customer/README.md#new-customer-draft)共用检查和预览，`demo` 供验证使用。直接进入页面或传入单个空白 customer 时选择 `yoyoosun`，显式未登记或重复 customer 时显示状态与已登记列表。视图、当前任务和证据批次均可通过 URL 恢复。
+- 本机开发页的「从模板新建草稿」只收客户标识和名称，弹窗可下载[标准 JSON 模板](../../config/customers/reference-customer/customer-draft.template.json)。Bridge 读同一文件取得默认配置，校验后保存并登记独立的 `customerPackage.json`。创建后进入新草稿的「检查配置」。重名保留原配置，重复提交同一份未修改的草稿时读回已有结果。
 - 常驻导航按下表组织真实办理顺序，另保留“配置总览”。数字只表达顺序，不根据访问过页面点亮完成状态。步骤页提供前后操作；运行中的操作锁定客户、步骤与验证方式。只有一个有效登记客户时直接显示名称；地址无效时保留选择入口。
 
 | 步骤 | 当前任务 | 输出与范围 |
@@ -1210,7 +1211,7 @@ flowchart LR
 - 页面入口只负责编排；面板、路由、Bridge 操作和本地配置 CAS 写入按职责拆分，见[客户配置页面模块](../../web/src/dev-workbench/pages/customer-config/README.md)。
 #### 固定输入与操作保护
 
-- 页面只读取已登记 customer package，不提供 raw package、任意代码、SQL 或脚本上传。可视内容包括品牌 / 桌面菜单 runtime、字段和编号草案、流程 preview、`moduleStates`、打印模板字段、差异与版本门禁。
+- 页面检查已登记 customer package，由固定 `POST /__dev/api/customer-config/drafts` 在本机 Vite 创建草稿。源文件、校验、登记和幂等边界见[开发服务 Bridge](../../web/dev-server/README.md#边界)。可视内容包括品牌 / 桌面菜单 runtime、字段和编号草案、流程 preview、`moduleStates`、打印模板字段、差异与版本门禁。
 - Dry Run、runtime manifest 与 release readiness 统一通过持久化 operation store 执行：动作、customer 与幂等键共同确定一次意图，全局排他锁避免并发脚本写同一输出；Vite 重启时遗留的 `running` 会转成 `not_proven`，仍由存活进程持锁的操作除外。
 
   每次 Dry Run 使用独立 operation 输出目录，manifest 先写临时文件再原子替换，历史可在页面恢复但不会冒充当前包已发布。

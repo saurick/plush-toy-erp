@@ -71,12 +71,15 @@ export function CustomerPackageDiagram({ summary, menu, numbering, area, onSelec
   const extensions = summary.extensionRegistryChecks.filter((item) => item.status !== 'controlled_empty')
   const blocked = extensions.some((item) => item.status === 'blocked')
   const policyCount = summary.processPolicies.length
+  const roles = summary.roleProfileNames.length
+    ? `${summary.roleProfileNames.length} 个岗位`
+    : '岗位沿用默认'
   const routes = [
     {
       key: 'config',
       title: '后端配置',
       icon: AppstoreOutlined,
-      summary: `${summary.moduleStates.length} 个模块 · ${summary.fieldVisibilityReview.length} 列字段 · ${summary.roleProfileNames.length} 个岗位 · ${summary.printTemplateDefaults.length} 套打印默认值`,
+      summary: `${summary.moduleStates.length} 个模块 · ${summary.fieldVisibilityReview.length} 列字段 · ${roles} · ${summary.printTemplateDefaults.length} 套打印默认值`,
       destinations: ['编译正式清单', '发布并激活', '目标读回'],
       note: '通过发布门禁后才能应用',
     },
@@ -85,7 +88,9 @@ export function CustomerPackageDiagram({ summary, menu, numbering, area, onSelec
       title: '品牌与菜单',
       icon: LayoutOutlined,
       summary: `${menu.sectionCount} 个分组 · ${menu.itemCount} 个菜单项`,
-      destinations: ['部署注入', '前端展示'],
+      destinations: menu.runtimeStatus === 'preview_only'
+        ? [menu.sourceLabel, '界面预览']
+        : ['部署注入', '前端展示'],
       note: '菜单显隐不授予权限',
     },
     {

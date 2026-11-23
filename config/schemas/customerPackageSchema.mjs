@@ -2,6 +2,9 @@ export const customerPackageSchema = Object.freeze({
   schemaKey: "customer-package-schema-v1",
   status: "draft_schema",
   runtimeEnabled: false,
+  // Leave space for the manifest's -config suffix and content hash.
+  draftCustomerKeyMaxLength: 32,
+  draftCustomerNameMaxLength: 160,
   moduleStates: Object.freeze({
     enabled: "启用",
     read_only: "只读",

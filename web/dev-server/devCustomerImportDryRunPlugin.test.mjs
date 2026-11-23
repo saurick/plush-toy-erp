@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { writeFileSync } from 'node:fs'
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import test from 'node:test'
+import { buildRuntimePreviewManifest } from '../../scripts/qa/customer-config-runtime-manifest.mjs'
 
 import {
   buildReleaseReadinessPaths,
   compileReleaseRuntimeManifestTo,
   createDevCustomerConfigMiddleware,
   createDevCustomerConfigService,
+  createDevCustomerImportDryRunPlugin,
   listReleaseBatches,
 } from './devCustomerImportDryRunPlugin.mjs'
 import {
@@ -92,6 +95,156 @@ async function temporaryRoot(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   return root
 }
+
+async function draftWorkspace(t) {
+  const root = await temporaryRoot(t)
+  const customers = path.join(root, 'config/customers')
+  const reference = path.join(customers, 'reference-customer')
+  await mkdir(reference, { recursive: true })
+  const index = path.join(customers, 'index.mjs')
+  const source = await readFile(new URL('../../config/customers/index.mjs', import.meta.url), 'utf8')
+  await writeFile(index, source)
+  const template = path.join(reference, 'customer-draft.template.json')
+  await writeFile(template, await readFile(new URL('../../config/customers/reference-customer/customer-draft.template.json', import.meta.url)))
+  return { root, customers, index, source, template }
+}
+
+const createDraftRequest = {
+  method: 'POST',
+  url: '/__dev/api/customer-config/drafts',
+  body: { customerKey: 'draft-toys', customerName: '测试玩具厂' },
+}
+
+test('creates an independent JSON draft with product defaults and replays the same request', async (t) => {
+  const { root, customers, index } = await draftWorkspace(t)
+  const middleware = createDevCustomerConfigMiddleware({ projectRoot: root, allowDraftCreation: true, csrfToken: CSRF_TOKEN })
+  const result = await invoke(middleware, createDraftRequest)
+  assert.equal(result.statusCode, 201)
+  assert.deepEqual(result.body, { status: 'success', customerKey: 'draft-toys', created: true })
+  const draft = path.join(customers, 'draft-toys')
+  assert.deepEqual((await readdir(draft)).sort(), ['README.md', 'customerPackage.json'])
+  const customerPackage = JSON.parse(await readFile(path.join(draft, 'customerPackage.json'), 'utf8'))
+  assert.equal(customerPackage.label, '测试玩具厂')
+  assert.equal(customerPackage.status, 'draft')
+  assert.equal(customerPackage.sourcePolicy.localTestApplyEnabled, false)
+  assert.equal(customerPackage.sourcePolicy.trackedConfigFormat, 'json-declarative-object')
+  assert.deepEqual(customerPackage.desktopMenu.hiddenItemKeys, [])
+  const manifest = buildRuntimePreviewManifest(customerPackage)
+  assert.equal(manifest.publishable, false)
+  assert(manifest.module_states.every(({ state }) => state === 'enabled'))
+  assert.equal(manifest.compiled_snapshot.fieldPolicies['suppliers.default'].supplier_type.visible, true)
+  assert.deepEqual(manifest.compiled_snapshot.runtimeProcessSelections, [])
+  assert.deepEqual(manifest.compiled_snapshot.printTemplateDefaults.templates, [])
+  const indexWithDraft = await readFile(index, 'utf8')
+  assert.match(indexWithDraft, /import customerDraft_draft_toys from "\.\/draft-toys\/customerPackage\.json" with \{ type: "json" \};/u)
+  assert.match(indexWithDraft, /Object\.freeze\(\["draft-toys", customerDraft_draft_toys, "customerPackage\.json"\]\)/u)
+
+  const replay = await invoke(middleware, createDraftRequest)
+  assert.equal(replay.statusCode, 200)
+  assert.equal(replay.body.created, false)
+  const conflict = await invoke(middleware, {
+    ...createDraftRequest, body: { ...createDraftRequest.body, customerName: '另一名称' },
+  })
+  assert.equal(conflict.statusCode, 409)
+  assert.equal(conflict.body.code, 'customer_key_taken')
+  assert.equal(await readFile(index, 'utf8'), indexWithDraft)
+})
+
+test('draft creation reads defaults from the current JSON template', async (t) => {
+  const { root, customers, index, source, template } = await draftWorkspace(t)
+  const middleware = createDevCustomerConfigMiddleware({ projectRoot: root, allowDraftCreation: true, csrfToken: CSRF_TOKEN })
+  const templateValues = JSON.parse(await readFile(template, 'utf8'))
+  await writeFile(template, JSON.stringify({
+    ...templateValues,
+    customerPackage: { ...templateValues.customerPackage, runtimeEnabled: true },
+  }))
+  const invalid = await invoke(middleware, createDraftRequest)
+  assert.equal(invalid.statusCode, 422)
+  assert.equal(invalid.body.code, 'draft_template_invalid')
+  assert.equal(await readFile(index, 'utf8'), source)
+  await assert.rejects(readFile(path.join(customers, 'draft-toys/customerPackage.json')), { code: 'ENOENT' })
+
+  templateValues.customerPackage.fieldPolicyOverrides = [{
+    surfaceKey: 'suppliers.default', fieldKey: 'supplier_type', visible: false, reason: '模板验证',
+  }]
+  templateValues.desktopMenu.hiddenItemKeys = ['suppliers']
+  await writeFile(template, JSON.stringify(templateValues))
+  assert.equal((await invoke(middleware, createDraftRequest)).statusCode, 201)
+  const draft = path.join(customers, 'draft-toys')
+  const customerPackage = JSON.parse(await readFile(path.join(draft, 'customerPackage.json'), 'utf8'))
+  assert.equal(buildRuntimePreviewManifest(customerPackage).compiled_snapshot.fieldPolicies['suppliers.default'].supplier_type.visible, false)
+  assert.deepEqual(customerPackage.desktopMenu.hiddenItemKeys, ['suppliers'])
+})
+
+test('draft creation rejects remote writers, unsupported input and existing directories', async (t) => {
+  const { root, customers, index, source } = await draftWorkspace(t)
+  const middleware = createDevCustomerConfigMiddleware({ projectRoot: root, allowDraftCreation: true, csrfToken: CSRF_TOKEN })
+  const disabled = createDevCustomerConfigMiddleware({ projectRoot: root, csrfToken: CSRF_TOKEN })
+  assert.equal((await invoke(disabled, createDraftRequest)).statusCode, 599)
+  const lan = await invoke(middleware, {
+    ...createDraftRequest,
+    remoteAddress: '192.168.0.40',
+    localAddress: '192.168.0.30',
+    headers: { host: '192.168.0.30:5175', origin: 'http://192.168.0.30:5175' },
+  })
+  assert.equal(lan.statusCode, 403)
+  const missingToken = await invoke(middleware, { ...createDraftRequest, headers: { 'x-csrf-token': '' } })
+  assert.equal(missingToken.statusCode, 403)
+  for (const body of [
+    { ...createDraftRequest.body, customerKey: 'Bad Key' },
+    { ...createDraftRequest.body, customerKey: 'tenant' },
+    { ...createDraftRequest.body, customerName: '   ' },
+    { ...createDraftRequest.body, customerName: '前\n后' },
+    { ...createDraftRequest.body, runtimeEnabled: true },
+  ]) {
+    assert.equal((await invoke(middleware, { ...createDraftRequest, body })).statusCode, 400)
+  }
+  const existingPath = path.join(customers, 'draft-toys')
+  await mkdir(existingPath)
+  await writeFile(path.join(existingPath, 'README.md'), '已有草稿')
+  const conflict = await invoke(middleware, createDraftRequest)
+  assert.equal(conflict.statusCode, 409)
+  assert.equal(conflict.body.code, 'customer_key_taken')
+  assert.equal(await readFile(index, 'utf8'), source)
+  assert.deepEqual(await readdir(existingPath), ['README.md'])
+  assert.equal(await readFile(path.join(existingPath, 'README.md'), 'utf8'), '已有草稿')
+})
+
+test('only the Vite development entry may register the draft route', async (t) => {
+  const projectRoot = await temporaryRoot(t)
+  const methodProbe = { url: createDraftRequest.url }
+  for (const [enabled, statusCode] of [[false, 599], [true, 405]]) {
+    const plugin = createDevCustomerImportDryRunPlugin({ projectRoot, allowDraftCreation: enabled })
+    let handler
+    plugin.configureServer({ middlewares: { use: (middleware) => { handler = middleware } } })
+    assert.equal((await invoke(handler, methodProbe)).statusCode, statusCode)
+  }
+})
+
+test('resumes a fully saved draft after preserving a concurrent registry edit', async (t) => {
+  const { root, customers, index, source } = await draftWorkspace(t)
+  const concurrentSource = `// 独立的仓库修改\n${source}`
+  let interfere = true
+  const middleware = createDevCustomerConfigMiddleware({
+    projectRoot: root,
+    allowDraftCreation: true,
+    csrfToken: CSRF_TOKEN,
+    onDraftRegistered() {
+      if (interfere) writeFileSync(index, concurrentSource)
+      interfere = false
+    },
+  })
+  const interrupted = await invoke(middleware, createDraftRequest)
+  assert.equal(interrupted.statusCode, 409)
+  assert.equal(interrupted.body.code, 'draft_registry_changed')
+  assert.equal(await readFile(index, 'utf8'), concurrentSource)
+  const packagePath = path.join(customers, 'draft-toys/customerPackage.json')
+  const saved = await readFile(packagePath, 'utf8')
+  const retry = await invoke(middleware, createDraftRequest)
+  assert.equal(retry.statusCode, 201)
+  assert.equal(await readFile(packagePath, 'utf8'), saved)
+  assert.match(await readFile(index, 'utf8'), /\/\/ 独立的仓库修改/u)
+})
 
 test('release readiness paths bind one explicit registered batch', () => {
   assert.deepEqual(buildReleaseReadinessPaths('yoyoosun', '2026-07-11'), {

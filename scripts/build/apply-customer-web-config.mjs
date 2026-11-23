@@ -10,18 +10,21 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { TextDecoder } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
-  getCustomerPackage,
+  getCustomerPackageSourcePath,
   listCustomerPackageKeys,
 } from "../../config/customers/index.mjs";
+import { CUSTOMER_DRAFT_JSON_FILE, customerDraftWebScript } from "../../config/customers/customerDraftConfig.mjs";
 
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const CUSTOMER_CONFIG_EXTENSIONS = new Set([".js"]);
+const CUSTOMER_DRAFT_EXTENSIONS = new Set([".json"]);
 const PUBLIC_ASSET_EXTENSIONS = new Set([".svg"]);
 const MAX_CUSTOMER_WEB_FILE_BYTES = 256 * 1024;
 const DANGEROUS_SOURCE_EXTENSIONS = new Set([
@@ -302,7 +305,8 @@ function resolveCustomerPackage({ customer, configRoot }) {
     );
   }
 
-  if (!getCustomerPackage(customer)) {
+  const packageSourcePath = getCustomerPackageSourcePath(customer);
+  if (!packageSourcePath) {
     throw new Error(
       `unknown customer web package: ${customer}; allowed=${listCustomerPackageKeys().join(",") || "none"}`,
     );
@@ -323,6 +327,16 @@ function resolveCustomerPackage({ customer, configRoot }) {
   assertDirectory(customerDir, "customer package");
   const realCustomerDir = realpathSync(customerDir);
   assertInsideRoot(customersRoot, realCustomerDir, "customer package");
+
+  if (packageSourcePath.endsWith(`/${CUSTOMER_DRAFT_JSON_FILE}`)) {
+    const customerConfigPath = path.join(realCustomerDir, CUSTOMER_DRAFT_JSON_FILE);
+    assertSafeTextFile(customerConfigPath, "customer JSON draft", CUSTOMER_DRAFT_EXTENSIONS);
+    return {
+      customerConfigPath,
+      customerAssetsDir: null,
+      draftWebScript: customerDraftWebScript(JSON.parse(readFileSync(customerConfigPath, "utf8")), customer),
+    };
+  }
 
   const customerConfigPath = path.join(
     realCustomerDir,
@@ -376,7 +390,7 @@ export function applyCustomerWebConfig({
   } catch (error) {
     failClosedWithNeutralWebConfig(error, webBuildDir);
   }
-  const { customerConfigPath, customerAssetsDir } = customerPackagePaths;
+  const { customerConfigPath, customerAssetsDir, draftWebScript } = customerPackagePaths;
   const realWebBuildDir = prepareWebBuildDirectory(webBuildDir);
   const targetConfigPath = path.join(realWebBuildDir, "customer-config.js");
   const targetAssetsRoot = path.join(realWebBuildDir, "customer-assets");
@@ -394,25 +408,26 @@ export function applyCustomerWebConfig({
     assertNoSymlinksInTree(targetAssetsRoot, "target assets");
     rmSync(targetAssetsRoot, { recursive: true, force: true });
   }
-  mkdirSync(targetAssetsDir, { recursive: true });
-  cpSync(customerConfigPath, targetConfigPath);
-  cpSync(customerAssetsDir, targetAssetsDir, { recursive: true });
+  if (draftWebScript) {
+    writeFileSync(targetConfigPath, draftWebScript, "utf8");
+  } else {
+    mkdirSync(targetAssetsDir, { recursive: true });
+    cpSync(customerConfigPath, targetConfigPath);
+    cpSync(customerAssetsDir, targetAssetsDir, { recursive: true });
+  }
   assertSafeTextFile(
     targetConfigPath,
     "published customer web config",
     CUSTOMER_CONFIG_EXTENSIONS,
   );
-  assertSafePublicAssetTree(
-    targetAssetsDir,
-    "published customer web assets",
-  );
+  if (customerAssetsDir) assertSafePublicAssetTree(targetAssetsDir, "published customer web assets");
 
   return {
     applied: true,
     customer: normalizedCustomer,
     customerConfigPath,
     targetConfigPath,
-    targetAssetsDir,
+    targetAssetsDir: customerAssetsDir ? targetAssetsDir : null,
   };
 }
 

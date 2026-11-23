@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { createDevCustomerConfigIdempotencyKey } from '../../config/devCustomerConfig.mjs'
+import {
+  createDevCustomerConfigIdempotencyKey,
+  DEV_CUSTOMER_CONFIG_DRAFTS_API,
+  DEV_CUSTOMER_CONFIG_SESSION_API,
+} from '../../config/devCustomerConfig.mjs'
 import { releaseHistoryForBatch } from './navigation.mjs'
 import { useCustomerConfigTestApply } from './useCustomerConfigTestApply.mjs'
 
@@ -12,7 +16,13 @@ export function useCustomerConfigOperations({
   const { customerKey } = overview
   const ready = overview.status === 'ready'
   const api = overview.importSummary || {}
-  const { uiSessionApiPath, uiReleaseBatchesApiPath, uiOperationsApiPath } = api
+  const {
+    uiSessionApiPath = DEV_CUSTOMER_CONFIG_SESSION_API,
+    uiReleaseBatchesApiPath,
+    uiOperationsApiPath,
+  } = api
+  const canReadHistory = ready && (api.canRunUiDryRun || api.canApplyTestConfig || api.canCheckReleaseReadiness)
+  const [draftCreating, setDraftCreating] = useState(false)
   const [dryRunState, setDryRunState] = useState({ status: 'idle' })
   const [currentRelease, setCurrentRelease] = useState({ status: 'idle' })
   const [releaseBatchesState, setReleaseBatchesState] = useState({
@@ -27,6 +37,7 @@ export function useCustomerConfigOperations({
   const activityRef = useRef(0)
   const dryRunRequestRef = useRef(0)
   const dryRunAbortRef = useRef(null)
+  const draftAbortRef = useRef(null)
   const releaseRequestRef = useRef(0)
   const releaseAbortRef = useRef(null)
   const inFlightRef = useRef(false)
@@ -91,12 +102,14 @@ export function useCustomerConfigOperations({
             result: previousRelease.result,
           }
         : { status: 'idle' }
-  const isMutationRunning =
+  const isCheckingOrApplying =
     dryRunState.status === 'running' ||
     applyState.status === 'running' ||
     releaseState.status === 'checking'
+  const isMutationRunning = isCheckingOrApplying || draftCreating
 
   useEffect(() => {
+    setDraftCreating(false)
     setDryRunState({ status: 'idle' })
     setCurrentRelease({ status: 'idle' })
     setReleaseBatchesState({ status: 'idle', batches: [] })
@@ -108,6 +121,8 @@ export function useCustomerConfigOperations({
       dryRunRequestRef.current += 1
       releaseRequestRef.current += 1
       dryRunAbortRef.current?.abort()
+      draftAbortRef.current?.abort()
+      draftAbortRef.current = null
       releaseAbortRef.current?.abort()
       sessionRef.current.controller?.abort()
       sessionRef.current = { token: '', promise: null, controller: null }
@@ -115,7 +130,7 @@ export function useCustomerConfigOperations({
   }, [customerKey])
 
   useEffect(() => {
-    if (!ready || !uiReleaseBatchesApiPath) return undefined
+    if (!ready || !api.canCheckReleaseReadiness || !uiReleaseBatchesApiPath) return undefined
     const controller = new AbortController()
     const url = new URL(uiReleaseBatchesApiPath, window.location.origin)
     url.searchParams.set('customerKey', customerKey)
@@ -144,10 +159,10 @@ export function useCustomerConfigOperations({
         })
       })
     return () => controller.abort()
-  }, [customerKey, readAttempt, ready, uiReleaseBatchesApiPath])
+  }, [api.canCheckReleaseReadiness, customerKey, readAttempt, ready, uiReleaseBatchesApiPath])
 
   useEffect(() => {
-    if (!ready || !uiOperationsApiPath) return undefined
+    if (!canReadHistory || !uiOperationsApiPath) return undefined
     const controller = new AbortController()
     const revision = activityRef.current
     const url = new URL(uiOperationsApiPath, window.location.origin)
@@ -194,17 +209,18 @@ export function useCustomerConfigOperations({
         })
       })
     return () => controller.abort()
-  }, [customerKey, readAttempt, ready, uiOperationsApiPath])
+  }, [canReadHistory, customerKey, readAttempt, uiOperationsApiPath])
 
   useEffect(() => {
     if (!isMutationRunning) return undefined
     const warn = (event) => {
+      if (!isCheckingOrApplying && !draftAbortRef.current) return
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [isMutationRunning])
+  }, [isCheckingOrApplying, isMutationRunning])
 
   const postBridge = async (path, body, controller) => {
     const csrfToken = await getBridgeCsrfToken()
@@ -227,9 +243,36 @@ export function useCustomerConfigOperations({
     if (!response.ok) {
       const error = new Error('客户配置操作失败')
       error.httpStatus = response.status
+      if (path === DEV_CUSTOMER_CONFIG_DRAFTS_API) {
+        error.draftCode = (await response.json().catch(() => null))?.code
+      }
       throw error
     }
     return response.json()
+  }
+
+  const requestCreateDraft = async (input) => {
+    if (isMutationRunning || inFlightRef.current) {
+      throw Object.assign(new Error('客户配置操作正在进行'), { draftCode: 'draft_workspace_busy' })
+    }
+    inFlightRef.current = true
+    const controller = new AbortController()
+    draftAbortRef.current = controller
+    setDraftCreating(true)
+    try {
+      const result = await postBridge(DEV_CUSTOMER_CONFIG_DRAFTS_API, input, controller)
+      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError')
+      if (result.status !== 'success' || result.customerKey !== input.customerKey) {
+        throw new Error('客户草稿回执不匹配')
+      }
+      return result.customerKey
+    } finally {
+      if (draftAbortRef.current === controller) {
+        draftAbortRef.current = null
+        inFlightRef.current = false
+        setDraftCreating(false)
+      }
+    }
   }
 
   const handleRunDryRun = async () => {
@@ -331,6 +374,8 @@ export function useCustomerConfigOperations({
     historyState,
     releaseBatch,
     isMutationRunning,
+    draftCreating,
+    requestCreateDraft,
     handleRunDryRun,
     requestApplyTestConfig: () => {
       if (isMutationRunning || inFlightRef.current) return

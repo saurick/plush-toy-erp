@@ -191,3 +191,34 @@ test('createDevCustomerConfigPlugin serves yoyoosun config and assets without ex
     true
   )
 })
+
+test('development frontend reads the registered JSON draft on each request', async (t) => {
+  const projectRoot = await createFixtureProject(t)
+  const previousKey = process.env.ERP_DEV_CUSTOMER_KEY
+  process.env.ERP_DEV_CUSTOMER_KEY = 'yoyoosun'
+  t.after(() => {
+    if (previousKey === undefined) delete process.env.ERP_DEV_CUSTOMER_KEY
+    else process.env.ERP_DEV_CUSTOMER_KEY = previousKey
+  })
+  const packageSourcePath = 'config/customers/yoyoosun/customerPackage.json'
+  const packagePath = path.join(projectRoot, packageSourcePath)
+  const draft = {
+    customerKey: 'yoyoosun',
+    label: 'JSON 品牌',
+    status: 'draft',
+    sourcePolicy: { trackedConfigFormat: 'json-declarative-object' },
+    desktopMenu: { hiddenItemKeys: ['suppliers'] },
+  }
+  await fsp.writeFile(packagePath, JSON.stringify(draft))
+  const middleware = capturePluginMiddleware(createDevCustomerConfigPlugin({ projectRoot, packageSourcePath }))
+  const initial = await requestMiddleware(middleware, '/customer-config.js')
+  assert.equal(initial.statusCode, 200)
+  assert.match(initial.body, /"companyName": "JSON 品牌"/u)
+  assert.match(initial.body, /"suppliers"/u)
+
+  await fsp.writeFile(packagePath, JSON.stringify({ ...draft, label: '改后的品牌' }))
+  const refreshed = await requestMiddleware(middleware, '/customer-config.js')
+  assert.match(refreshed.body, /"companyName": "改后的品牌"/u)
+  await fsp.unlink(packagePath)
+  assert.equal((await requestMiddleware(middleware, '/customer-config.js')).statusCode, 404)
+})

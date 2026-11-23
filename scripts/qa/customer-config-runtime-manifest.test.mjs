@@ -7,6 +7,7 @@ import { runInNewContext } from "node:vm";
 
 import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
+import { listCustomerPackageKeys } from "../../config/customers/index.mjs";
 import { referenceCustomerPackage } from "../../config/customers/reference-customer/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import { yoyoosunReleasePackage } from "../../config/customers/yoyoosun/releasePackage.mjs";
@@ -940,7 +941,7 @@ test("customer-config-runtime-manifest: repeated flags and --all inspect drafts 
   });
   assert.deepEqual(
     all.map((result) => result.manifest.customer_key),
-    ["demo", "reference-customer", "yoyoosun"],
+    listCustomerPackageKeys(),
   );
 });
 

@@ -130,7 +130,7 @@ function assertCommonYoyoosunPlan(output, label) {
   assert.match(
     output,
     new RegExp(
-      `\\[${label}\\] verify customer config: curl -fsS http://localhost:\\d+/customer-config\\.js \\| grep 'customerKey: "yoyoosun"'`,
+      `\\[${label}\\] verify customer config: curl -fsS http://localhost:\\d+/customer-config\\.js \\| grep -E '"\\?customerKey"\\?: "yoyoosun"'`,
       'u'
     )
   )

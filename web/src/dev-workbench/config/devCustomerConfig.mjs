@@ -1,4 +1,14 @@
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
+import {
+  getCustomerPackage,
+  getCustomerPackageSourcePath,
+  listCustomerPackageKeys,
+} from '../../../../config/customers/index.mjs'
+import {
+  CUSTOMER_DRAFT_JSON_FORMAT,
+  customerDraftWebConfig,
+  isCustomerDraftDesktopMenu,
+} from '../../../../config/customers/customerDraftConfig.mjs'
 import { yoyoosunFieldNumberingConfig } from '../../../../config/customers/yoyoosun/fieldNumberingConfig.mjs'
 import { yoyoosunCustomerPackage } from '../../../../config/customers/yoyoosun/customerPackage.mjs'
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
@@ -14,6 +24,10 @@ import {
   printTemplateCatalog,
   printTemplateStats,
 } from '../../erp/config/printTemplates.mjs'
+import { getActiveERPBrand } from '../../common/consts/brand.js'
+import { readRuntimeCustomerConfig } from '../../common/consts/runtimeCustomerConfig.mjs'
+import { getSidebarNavigationSections } from '../../erp/config/customerMenuConfig.mjs'
+import { getNavigationSections } from '../../erp/config/seedData.mjs'
 
 export { DEV_CUSTOMER_CONFIG_ROUTE }
 export const DEV_CUSTOMER_CONFIG_QUERY_KEY = DEV_CUSTOMER_QUERY_KEY
@@ -37,12 +51,12 @@ export const DEV_PRINT_TEMPLATE_BEHAVIOR_DOC_PATH =
   'docs/打印模板字段与编辑行为清单.md'
 export const DEV_CUSTOMER_CONFIG_QA_COMMAND =
   'node scripts/qa/customer-config-boundaries.mjs'
-export const DEV_CUSTOMER_PACKAGE_QA_COMMAND =
-  'node scripts/qa/customer-package-lint.mjs --customer yoyoosun'
 export const DEV_CUSTOMER_IMPORT_DRY_RUN_API =
   '/__dev/api/customer-import/dry-run'
 export const DEV_CUSTOMER_CONFIG_SESSION_API =
   '/__dev/api/customer-config/session'
+export const DEV_CUSTOMER_CONFIG_DRAFTS_API =
+  '/__dev/api/customer-config/drafts'
 export const DEV_CUSTOMER_CONFIG_OPERATIONS_API =
   '/__dev/api/customer-config/operations'
 export const DEV_CUSTOMER_CONFIG_RUNTIME_MANIFEST_API =
@@ -77,19 +91,33 @@ export function createDevCustomerConfigIdempotencyKey(
   return `customer-config:${action}:${normalizedCustomerKey}:${uuid}`
 }
 
-export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze({
-  yoyoosun: Object.freeze({
-    customerKey: 'yoyoosun',
-    label: DEV_CUSTOMER_SCOPE_REGISTRY.yoyoosun.label,
-    sourcePath: DEV_CUSTOMER_CONFIG_SOURCE_PATH,
-    menuConfig: yoyoosunMenuConfig,
-    menuConfigSourcePath: DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH,
-    fieldNumberingConfig: yoyoosunFieldNumberingConfig,
-    fieldNumberingSourcePath: DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH,
-    customerPackage: yoyoosunCustomerPackage,
-    customerPackageSourcePath: DEV_CUSTOMER_PACKAGE_SOURCE_PATH,
-  }),
-})
+export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze(
+  Object.fromEntries(
+    listCustomerPackageKeys()
+      .filter((customerKey) => customerKey !== 'demo')
+      .map((customerKey) => {
+        const customerPackage = getCustomerPackage(customerKey)
+        const directory = `config/customers/${customerKey}`
+        return [
+          customerKey,
+          Object.freeze({
+            customerKey,
+            label:
+              DEV_CUSTOMER_SCOPE_REGISTRY[customerKey]?.label || customerPackage.label,
+            sourcePath: `${directory}/README.md`,
+            customerPackage,
+            customerPackageSourcePath: getCustomerPackageSourcePath(customerKey),
+            ...(customerKey === 'yoyoosun' && {
+              menuConfig: yoyoosunMenuConfig,
+              menuConfigSourcePath: DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH,
+              fieldNumberingConfig: yoyoosunFieldNumberingConfig,
+              fieldNumberingSourcePath: DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH,
+            }),
+          }),
+        ]
+      })
+  )
+)
 
 const FIELD_DECISION_LABELS = Object.freeze({
   review_required: '待客户确认',
@@ -113,6 +141,9 @@ const SOURCE_PATH_LABELS = Object.freeze({
   [DEV_PRINT_TEMPLATE_SOURCE_PATH]: '打印模板字段配置',
   [DEV_PRINT_TEMPLATE_BEHAVIOR_DOC_PATH]: '打印模板字段清单',
   'config/customers/<customer-key>/': '客户配置包目录',
+  'config/customers/<customer-key>/README.md': '客户配置包说明',
+  'config/customers/<customer-key>/customerPackage.mjs': '客户配置包',
+  'config/customers/<customer-key>/customerPackage.json': '客户草稿 JSON',
 })
 
 const MODULE_STATE_LABELS = customerPackageSchema.moduleStates
@@ -215,6 +246,12 @@ export function isDevCustomerConfigEnabled(env = import.meta.env) {
   return env?.DEV === true
 }
 
+export function canCreateLocalCustomerDraft(hostname, env = import.meta.env) {
+  return isDevCustomerConfigEnabled(env) && (
+    hostname === 'localhost' || hostname === '[::1]' || /^127(?:\.\d{1,3}){3}$/u.test(hostname)
+  )
+}
+
 function normalizeCustomerKey(value = '') {
   return String(value || '')
     .trim()
@@ -242,7 +279,11 @@ function mapSourcePathLabel(sourcePath) {
   if (typeof sourcePath !== 'string' || sourcePath.trim() === '') {
     return SOURCE_PATH_FALLBACK_LABEL
   }
-  return SOURCE_PATH_LABELS[sourcePath] || SOURCE_PATH_FALLBACK_LABEL
+  const packagePath = sourcePath.replace(
+    /^config\/customers\/[^/]+\//u,
+    'config/customers/<customer-key>/'
+  )
+  return SOURCE_PATH_LABELS[sourcePath] || SOURCE_PATH_LABELS[packagePath] || SOURCE_PATH_FALLBACK_LABEL
 }
 
 function resolveBrandMark(brand = {}, label = '') {
@@ -287,7 +328,7 @@ export function resolveDevCustomerConfigPackage(
   registry = DEV_CUSTOMER_CONFIG_REGISTRY
 ) {
   const normalizedKey = normalizeCustomerKey(customerKey)
-  const matched = registry[normalizedKey]
+  const matched = Object.hasOwn(registry, normalizedKey) && registry[normalizedKey]
   return {
     status: matched ? 'ready' : 'missing',
     customerKey: normalizedKey,
@@ -743,6 +784,18 @@ export function buildCustomerPackagePreviewSummary(
     },
     ...buildBoundaryItems(config),
   ]
+  if (config.sourcePolicy?.trackedConfigFormat === CUSTOMER_DRAFT_JSON_FORMAT) {
+    const validMenu = isCustomerDraftDesktopMenu(config.desktopMenu)
+    boundaries.push({
+      key: 'desktopMenu',
+      label: '草稿菜单设置',
+      value: validMenu,
+      valueLabel: validMenu ? '已登记' : '待修正',
+      expected: true,
+      expectedLabel: '已登记',
+      ok: validMenu,
+    })
+  }
 
   return {
     customerKey: config.customerKey,
@@ -920,7 +973,7 @@ export function buildCustomerPackagePreviewSummary(
     moduleStateSource: moduleStateSummary.source,
     boundaries,
     boundaryOk: allPackageBoundariesOk(boundaries),
-    qaCommand: DEV_CUSTOMER_PACKAGE_QA_COMMAND,
+    qaCommand: `node scripts/qa/customer-package-lint.mjs --customer ${config.customerKey}`,
     sourcePath,
     sourceLabel: mapSourcePathLabel(sourcePath),
   }
@@ -950,6 +1003,42 @@ export function buildCustomerMenuRuntimeSummary(
     sourcePath,
     sourceLabel: mapSourcePathLabel(sourcePath),
     runtimeStatus: 'runtime_frontend_only',
+  }
+}
+
+function buildDraftMenuPreview({ customerKey, label, customerPackageSourcePath }, customerPackage) {
+  const jsonDraft = customerPackageSourcePath?.endsWith('.json')
+  const runtimeConfig = jsonDraft ? customerDraftWebConfig(customerPackage) : readRuntimeCustomerConfig()
+  const matchingConfig = runtimeConfig?.customerKey === customerKey ? runtimeConfig : null
+  const navigation = getNavigationSections(matchingConfig)
+  const sidebar = getSidebarNavigationSections(navigation)
+  const sections = sidebar.map(({ title, items }) => ({
+    title,
+    items: items.map(({ key }) => key),
+  }))
+  const routeOnlyItemKeys = navigation.flatMap(({ items }) =>
+    items.filter(({ sidebarVisible }) => sidebarVisible === false).map(({ key }) => key)
+  )
+  const sourcePath = jsonDraft
+    ? customerPackageSourcePath
+    : matchingConfig ? `config/customers/${customerKey}/customer-config.example.js` : 'web/src/erp/config/seedData.mjs'
+  return {
+    ...buildCustomerMenuRuntimeSummary(
+      {
+        customerKey,
+        label,
+        brand: getActiveERPBrand(matchingConfig || { brand: { companyName: label } }),
+        desktopMenu: { sections, routeOnlyItemKeys },
+      },
+      sourcePath
+    ),
+    itemLabels: Object.fromEntries(
+      sidebar.flatMap(({ items }) => items.map(({ key, label }) => [key, label]))
+    ),
+    sourceLabel: jsonDraft
+      ? mapSourcePathLabel(sourcePath)
+      : matchingConfig ? '本机草稿前端配置' : '客户名称与产品默认菜单',
+    runtimeStatus: 'preview_only',
   }
 }
 
@@ -1079,7 +1168,7 @@ function resolveCustomerConfigTestApplyAvailability(
     blockedReasons: blockers.map((item) => item.code),
     note: `当前配置包不可用于本地测试应用：${blockers
       .map((item) => item.message)
-      .join('；')}。可继续做只读预览和试跑。`,
+      .join('；')}。`,
   }
 }
 
@@ -1223,8 +1312,7 @@ export function buildImportToolingSummary(
         title: '读取已登记包',
         status: 'passed',
         outcome: '读取已登记客户包并解析资产清单',
-        target:
-          'config/customers/yoyoosun/customerPackage.mjs；不开放原始压缩包或任意代码上传',
+        target: getCustomerPackageSourcePath(normalizedCustomerKey) || '客户包未登记',
         writesDatabase: false,
         writesConfigControl: false,
         writesBusinessData: false,
@@ -1533,7 +1621,7 @@ export function buildCustomerPackageConsoleSummary({
     menuSummary?.customerKey ||
     DEFAULT_DEV_CUSTOMER_KEY
   const packageQaCommand =
-    customerPackageSummary?.qaCommand || DEV_CUSTOMER_PACKAGE_QA_COMMAND
+    customerPackageSummary?.qaCommand || 'node scripts/qa/customer-package-lint.mjs --all'
   const boundaryFailedCount = (customerPackageSummary?.boundaries || []).filter(
     (item) => !item.ok
   ).length
@@ -1555,7 +1643,7 @@ export function buildCustomerPackageConsoleSummary({
       nextAction: boundaryOk
         ? canApplyTestConfig
           ? '先做试跑和本地/测试后端配置应用；正式版进入发布门禁检查。'
-          : '继续只读预览和试跑；完成正式评审并开放运行时、发布与激活后再应用。'
+          : '继续核对差异和预览界面，按需要生成预览清单。'
         : '先修复 failed boundary，再重新运行客户包 lint。',
     },
     decisionCards: [
@@ -1704,18 +1792,25 @@ export function buildCustomerPackageConsoleSummary({
         command: buildPackagePreviewReportCommand(customerKey),
         note: '输出评审证据，不写运行时配置。',
       },
-      {
-        key: 'customer-config-boundaries',
-        label: '客户配置边界',
-        command: importSummary?.qaCommand || DEV_CUSTOMER_CONFIG_QA_COMMAND,
-        note: '校验客户配置、导入 tooling 和禁止项。',
-      },
+      importSummary?.canRunUiDryRun
+        ? {
+            key: 'customer-config-boundaries',
+            label: '客户配置边界',
+            command: DEV_CUSTOMER_CONFIG_QA_COMMAND,
+            note: '校验客户配置、导入 tooling 和禁止项。',
+          }
+        : {
+            key: 'preview-manifest',
+            label: '预览后端清单',
+            command: `node scripts/qa/customer-config-runtime-manifest.mjs --customer ${customerKey} --mode preview`,
+            note: '编译供评审的候选清单。',
+          },
     ],
     sourceReferences: [
       {
         key: 'menu',
         label: '菜单品牌',
-        status: 'runtime_frontend_only',
+        status: menuSummary?.runtimeStatus,
         sourcePath: menuSummary?.sourcePath,
         sourceLabel: menuSummary?.sourceLabel,
       },
@@ -2024,16 +2119,13 @@ export function buildCustomerConfigDevOverview({
 
   const { packageConfig } = resolved
   const activeMenuConfig = menuConfig || packageConfig.menuConfig
-  const activeFieldNumberingConfig =
-    fieldNumberingConfig || packageConfig.fieldNumberingConfig
   const activeCustomerPackage = customerPackage || packageConfig.customerPackage
-  const menuSummary = buildCustomerMenuRuntimeSummary(
-    activeMenuConfig,
-    packageConfig.menuConfigSourcePath
-  )
+  const menuSummary = activeMenuConfig
+    ? buildCustomerMenuRuntimeSummary(activeMenuConfig, packageConfig.menuConfigSourcePath)
+    : buildDraftMenuPreview(packageConfig, activeCustomerPackage)
   const fieldNumberingSummary = buildFieldNumberingDraftSummary(
-    activeFieldNumberingConfig,
-    packageConfig.fieldNumberingSourcePath
+    fieldNumberingConfig || packageConfig.fieldNumberingConfig || activeCustomerPackage,
+    packageConfig.fieldNumberingSourcePath || packageConfig.customerPackageSourcePath
   )
   const customerPackageSummary = buildCustomerPackagePreviewSummary(
     activeCustomerPackage,
@@ -2054,7 +2146,7 @@ export function buildCustomerConfigDevOverview({
 
   return {
     status: resolved.status,
-    customerKey: menuSummary.customerKey,
+    customerKey: resolved.customerKey,
     requestedCustomerKey: resolved.customerKey,
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     sourcePath: packageConfig.sourcePath,
@@ -2072,7 +2164,7 @@ export function buildCustomerConfigDevOverview({
         title: '品牌 / 桌面菜单展示配置',
         sourcePath: menuSummary.sourcePath,
         sourceLabel: menuSummary.sourceLabel,
-        status: '已接前端运行时',
+        status: menuSummary.runtimeStatus === 'preview_only' ? 'preview_only' : '已接前端运行时',
         boundary:
           '只控制前端品牌展示、桌面菜单分组、排序、隐藏和文案；不是安全边界。',
       },

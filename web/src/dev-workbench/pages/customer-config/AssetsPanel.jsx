@@ -9,12 +9,12 @@ import { guardItemLabel, StatusTag } from './presentation.jsx'
 const { Paragraph, Text, Title } = Typography
 const wide = 'erp-dev-customer-panel erp-dev-customer-panel--wide'
 
-function MenuPreviewItem({ itemKey, showKey }) {
+function MenuPreviewItem({ itemKey, label, showKey }) {
   const key = String(itemKey || '').trim()
   const item = getBusinessModule(key) || navigationItemRegistry[key]
   return (
     <li className="erp-dev-customer-menu-item">
-      <span>{item?.label || '未识别菜单项'}</span>
+      <span>{label || item?.label || '未识别菜单项'}</span>
       {showKey ? <code>{key}</code> : null}
     </li>
   )
@@ -102,7 +102,14 @@ export function AssetsPanel({ menuSummary, fieldNumberingSummary, printTemplateS
                     <th scope="row">{section.title}</th>
                     <td>
                       <ul className="erp-dev-customer-menu-items">
-                        {section.items.map((item) => <MenuPreviewItem key={item} itemKey={item} showKey={showMenuKeys} />)}
+                        {section.items.map((item) => (
+                          <MenuPreviewItem
+                            key={item}
+                            itemKey={item}
+                            label={menuSummary.itemLabels?.[item]}
+                            showKey={showMenuKeys}
+                          />
+                        ))}
                       </ul>
                     </td>
                   </tr>

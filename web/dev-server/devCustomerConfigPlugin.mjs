@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
+import { CUSTOMER_DRAFT_JSON_FILE, customerDraftWebScript } from '../../config/customers/customerDraftConfig.mjs'
 
 function contentTypeFor(filePath) {
   if (filePath.endsWith('.svg')) {
@@ -29,7 +30,7 @@ export function normalizeDevCustomerKey(value) {
   return customerKey
 }
 
-export function createDevCustomerConfigPlugin({ projectRoot } = {}) {
+export function createDevCustomerConfigPlugin({ projectRoot, packageSourcePath } = {}) {
   const customerKey = normalizeDevCustomerKey(process.env.ERP_DEV_CUSTOMER_KEY)
 
   if (!customerKey) {
@@ -39,9 +40,10 @@ export function createDevCustomerConfigPlugin({ projectRoot } = {}) {
   const configRoot = path.resolve(projectRoot || process.cwd(), 'config')
   const customersRoot = path.join(configRoot, 'customers')
   const customerDir = path.join(customersRoot, customerKey)
+  const jsonDraft = packageSourcePath?.endsWith(`/${CUSTOMER_DRAFT_JSON_FILE}`)
   const customerConfigPath = path.join(
     customerDir,
-    'customer-config.example.js'
+    jsonDraft ? CUSTOMER_DRAFT_JSON_FILE : 'customer-config.example.js'
   )
   const customerAssetsDir = path.join(customerDir, 'public-assets')
 
@@ -64,11 +66,25 @@ export function createDevCustomerConfigPlugin({ projectRoot } = {}) {
             return
           }
 
-          response.writeHead(200, {
-            'cache-control': 'no-cache',
-            'content-type': 'text/javascript; charset=utf-8',
-          })
-          response.end(await fsp.readFile(customerConfigPath, 'utf8'))
+          try {
+            if (jsonDraft && (!(await fsp.lstat(customerDir)).isDirectory() ||
+              !(await fsp.lstat(customerConfigPath)).isFile())) {
+              throw new Error('invalid draft file')
+            }
+            const source = await fsp.readFile(customerConfigPath, 'utf8')
+            const script = jsonDraft ? customerDraftWebScript(JSON.parse(source), customerKey) : source
+            response.writeHead(200, {
+              'cache-control': 'no-cache',
+              'content-type': 'text/javascript; charset=utf-8',
+            })
+            response.end(script)
+          } catch (error) {
+            response.writeHead(error?.code === 'ENOENT' ? 404 : 422, {
+              'cache-control': 'no-store',
+              'content-type': 'text/plain; charset=utf-8',
+            })
+            response.end('客户前端配置无法读取或校验未通过。')
+          }
           return
         }
 

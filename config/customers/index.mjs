@@ -2,8 +2,9 @@ import { demoCustomerPackage } from "./demo/customerPackage.mjs";
 import { referenceCustomerPackage } from "./reference-customer/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "./yoyoosun/customerPackage.mjs";
 import { yoyoosunReleasePackage } from "./yoyoosun/releasePackage.mjs";
+import { CUSTOMER_DRAFT_JSON_FILE, CUSTOMER_DRAFT_JSON_FORMAT } from "./customerDraftConfig.mjs";
 
-const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+export const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const PACKAGE_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-package$/u;
 
 const customerPackageEntries = Object.freeze([
@@ -16,7 +17,7 @@ const registeredPackageKeys = new Set();
 
 const customerPackages = Object.freeze(
   Object.fromEntries(
-    customerPackageEntries.map(([customerKey, customerPackage]) => {
+    customerPackageEntries.map(([customerKey, customerPackage, sourceFile = "customerPackage.mjs"]) => {
       if (!CUSTOMER_KEY_PATTERN.test(customerKey)) {
         throw new Error(`invalid registered customer package key: ${customerKey}`);
       }
@@ -39,8 +40,18 @@ const customerPackages = Object.freeze(
           `registered customer package key is duplicated: ${customerPackage.packageKey}`,
         );
       }
+      if (
+        !["customerPackage.mjs", CUSTOMER_DRAFT_JSON_FILE].includes(sourceFile) ||
+        (sourceFile === CUSTOMER_DRAFT_JSON_FILE) !==
+          (customerPackage.sourcePolicy?.trackedConfigFormat === CUSTOMER_DRAFT_JSON_FORMAT)
+      ) {
+        throw new Error(`registered customer package source format mismatch: ${customerKey}`);
+      }
       registeredPackageKeys.add(customerPackage.packageKey);
-      return [customerKey, customerPackage];
+      return [customerKey, Object.freeze({
+        customerPackage,
+        sourcePath: `config/customers/${customerKey}/${sourceFile}`,
+      })];
     }),
   ),
 );
@@ -49,20 +60,30 @@ const customerReleasePackages = Object.freeze({
   yoyoosun: yoyoosunReleasePackage,
 });
 
-export function getCustomerPackage(customerKey) {
+function getCustomerPackageRegistration(customerKey) {
   const normalizedCustomerKey = String(customerKey || "").trim();
-  return customerPackages[normalizedCustomerKey] || null;
+  return Object.hasOwn(customerPackages, normalizedCustomerKey)
+    ? customerPackages[normalizedCustomerKey]
+    : null;
+}
+
+export function getCustomerPackage(customerKey) {
+  return getCustomerPackageRegistration(customerKey)?.customerPackage ?? null;
+}
+
+export function getCustomerPackageSourcePath(customerKey) {
+  return getCustomerPackageRegistration(customerKey)?.sourcePath ?? null;
 }
 
 export function getCustomerReleasePackage(customerKey) {
   const normalizedCustomerKey = String(customerKey || "").trim();
-  const releasePackage = customerReleasePackages[normalizedCustomerKey] || null;
-  if (!releasePackage) {
+  if (!Object.hasOwn(customerReleasePackages, normalizedCustomerKey)) {
     return null;
   }
+  const releasePackage = customerReleasePackages[normalizedCustomerKey];
   if (
     releasePackage.customerKey !== normalizedCustomerKey ||
-    releasePackage.packageKey !== customerPackages[normalizedCustomerKey]?.packageKey
+    releasePackage.packageKey !== getCustomerPackage(normalizedCustomerKey)?.packageKey
   ) {
     throw new Error(
       `registered customer release package identity mismatch: ${normalizedCustomerKey}`,
@@ -72,5 +93,5 @@ export function getCustomerReleasePackage(customerKey) {
 }
 
 export function listCustomerPackageKeys() {
-  return Object.keys(customerPackages);
+  return customerPackageEntries.map(([customerKey]) => customerKey);
 }

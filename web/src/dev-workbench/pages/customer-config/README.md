@@ -15,12 +15,15 @@
 | `CustomerExtensionRegistry.jsx` | 扩展候选、声明受阻、空登记与来源 |
 | `ValidationPanel.jsx` / `ReleasePanel.jsx`      | 样本试跑、本地配置应用、正式发布检查与执行器交接                 |
 | `CustomerConfigPath.jsx` | 办理去向及已知状态的一行展示 |
+| `CustomerDraftDialog.jsx` | 下载 JSON 模板，输入客户标识和名称后创建草稿，反馈重名与校验结果 |
 | `useCustomerConfigOperations.mjs`               | 受控 Bridge 会话、只读历史与批次、试跑和发布检查、请求清理       |
 | `useCustomerConfigTestApply.mjs`                | 管理员确认、后端校验、发布身份检查、CAS 切换和有效配置读回       |
 | `*Summary.jsx` / `presentation.jsx`             | 操作反馈、证据时间、明细、状态标签和共享展示单元                 |
 | `customer-config-workflow.css`                  | 本页步骤、范围、交接与对齐的布局；控件外观及动效仍由共享组件负责 |
 
 ## 交互与证据边界
+
+客户包选择器读取仓库登记。本机页头「从模板新建草稿」使用标准样例生成[独立 JSON 草稿](../../../../../config/customers/reference-customer/README.md#new-customer-draft)，保存成功后进入新包的「检查配置」。检查、核对变化和预览都读取这份 `customerPackage.json`。名称和菜单来自草稿，自定义后可在预览核对实际值。
 
 步骤按“检查配置 → 核对变化 → 预览界面 → 测试验证 → 发布交接”组织，编号表示办理顺序；浏览过步骤不表示检查通过。总览常显配置来源与上线交接流程；状态只反映工作区配置、本次操作或明确标记的历史记录，不推测测试服、正式服的有效配置。
 

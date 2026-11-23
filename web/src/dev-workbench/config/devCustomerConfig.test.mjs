@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { customerPackageCatalog } from '../../../../config/catalog/customerPackageCatalog.mjs'
+import { getCustomerPackage, listCustomerPackageKeys } from '../../../../config/customers/index.mjs'
+import { CUSTOMER_DRAFT_JSON_FORMAT } from '../../../../config/customers/customerDraftConfig.mjs'
 import {
   DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY,
   DEFAULT_DEV_CUSTOMER_KEY,
@@ -18,6 +20,7 @@ import {
   buildFieldNumberingDraftSummary,
   buildPrintTemplateFieldSummary,
   buildImportToolingSummary,
+  canCreateLocalCustomerDraft,
   createDevCustomerConfigIdempotencyKey,
   isDevCustomerConfigEnabled,
   listRegisteredDevCustomerPackages,
@@ -176,7 +179,7 @@ test('devCustomerConfig: 默认进入永绅客户包', () => {
   assert.equal(overview.customerKey, 'yoyoosun')
   assert.equal(overview.requestedCustomerKey, 'yoyoosun')
   assert.equal(overview.sourceLabel, '客户配置包说明')
-  assert.equal(overview.registeredCustomers.length, 1)
+  assert(overview.registeredCustomers.some((item) => item.customerKey === 'yoyoosun'))
 
   const blankQueryOverview =
     buildCustomerConfigDevOverviewFromSearch('?customer=')
@@ -202,6 +205,7 @@ test('devCustomerConfig: 未登记客户返回 missing 且不 fallback 到 yoyoo
   assert.equal(resolved.status, 'missing')
   assert.equal(resolved.customerKey, 'unknown-customer')
   assert.equal(resolved.packageConfig, null)
+  assert.equal(resolveDevCustomerConfigPackage('constructor').status, 'missing')
 
   const overview = buildCustomerConfigDevOverviewFromSearch(
     '?customer=unknown-customer'
@@ -230,15 +234,118 @@ test('devCustomerConfig: 未登记客户返回 missing 且不 fallback 到 yoyoo
 })
 
 test('devCustomerConfig: registry 暴露已登记客户列表', () => {
-  assert.deepEqual(Object.keys(DEV_CUSTOMER_CONFIG_REGISTRY), ['yoyoosun'])
-  assert.deepEqual(listRegisteredDevCustomerPackages(), [
+  const keys = listCustomerPackageKeys().filter((key) => key !== 'demo')
+  assert.deepEqual(Object.keys(DEV_CUSTOMER_CONFIG_REGISTRY).sort(), keys)
+  assert.deepEqual(listRegisteredDevCustomerPackages().map((item) => item.customerKey).sort(), keys)
+  assert.deepEqual(listRegisteredDevCustomerPackages().find((item) => item.customerKey === 'yoyoosun'),
     {
       customerKey: 'yoyoosun',
       label: '永绅 yoyoosun',
       sourcePath: 'config/customers/yoyoosun/README.md',
       sourceLabel: '客户配置包说明',
+    }
+  )
+})
+
+test('devCustomerConfig: 样例草稿按自身配置检查、核对和预览', () => {
+  const customerKey = 'reference-customer'
+  const overview = buildCustomerConfigDevOverviewFromSearch(`?customer=${customerKey}`)
+  assert.equal(DEV_CUSTOMER_CONFIG_REGISTRY[customerKey].customerPackage, getCustomerPackage(customerKey))
+  assert.equal(overview.status, 'ready')
+  assert.equal(overview.customerKey, customerKey)
+  assert.equal(overview.customerPackageSummary.previewOnly, true)
+  assert.equal(overview.customerPackageSummary.printTemplateDefaultCount, 2)
+  assert.equal(overview.packageConsoleSummary.primaryStatus, 'PREVIEW_READY')
+  assert.equal(overview.fieldNumberingSummary.fieldCandidateCount, 0)
+  assert.equal(overview.menuSummary.sourceLabel, '客户名称与产品默认菜单')
+  assert.equal(overview.menuSummary.brand.companyName, getCustomerPackage(customerKey).label)
+  assert.equal(overview.menuSummary.runtimeStatus, 'preview_only')
+  assert(overview.menuSummary.sections.some(({ items }) => items.includes('suppliers')))
+  assert.equal(overview.importSummary.canRunUiDryRun, false)
+  assert.equal(overview.importSummary.canApplyTestConfig, false)
+  assert.equal(overview.importSummary.canCheckReleaseReadiness, false)
+  const commands = overview.packageConsoleSummary.qaCommands.map(({ command }) => command)
+  assert(commands.every((command) => command.includes(`--customer ${customerKey}`)))
+  assert(commands.some((command) => command.endsWith('--mode preview')))
+})
+
+test('devCustomerConfig: 草稿品牌与菜单只使用同一客户的本机前端配置', (t) => {
+  const previousWindow = globalThis.window
+  t.after(() => {
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+  })
+  const runtimeConfig = {
+    customerKey: 'different-customer',
+    brand: { companyName: '草稿客户品牌' },
+    desktopMenu: {
+      hiddenItemKeys: ['suppliers'],
+      itemOverrides: { customers: { label: '往来客户' } },
     },
-  ])
+  }
+  globalThis.window = { __PLUSH_ERP_CUSTOMER_CONFIG__: runtimeConfig }
+
+  const search = 'customer=reference-customer&view=assets'
+  const mismatched = buildCustomerConfigDevOverviewFromSearch(search).menuSummary
+  assert.equal(mismatched.sourceLabel, '客户名称与产品默认菜单')
+  assert.notEqual(mismatched.brand.companyName, '草稿客户品牌')
+  assert(mismatched.sections.some(({ items }) => items.includes('suppliers')))
+
+  runtimeConfig.customerKey = 'reference-customer'
+  const matched = buildCustomerConfigDevOverviewFromSearch(search).menuSummary
+  assert.equal(matched.sourceLabel, '本机草稿前端配置')
+  assert.equal(matched.brand.companyName, '草稿客户品牌')
+  assert(!matched.sections.some(({ items }) => items.includes('suppliers')))
+  assert.equal(matched.itemLabels.customers, '往来客户')
+})
+
+test('devCustomerConfig: 草稿创建入口只出现在本机开发服务', () => {
+  assert.equal(canCreateLocalCustomerDraft('127.0.0.1', { DEV: true }), true)
+  assert.equal(canCreateLocalCustomerDraft('192.168.0.30', { DEV: true }), false)
+  assert.equal(canCreateLocalCustomerDraft('127.0.0.1', { DEV: false }), false)
+})
+
+test('devCustomerConfig: JSON 草稿用同一文件核对候选值并预览菜单', (t) => {
+  const customerKey = 'draft-toys'
+  const customerPackageSourcePath = 'config/customers/draft-toys/customerPackage.json'
+  const reference = getCustomerPackage('reference-customer')
+  const customerPackage = {
+    ...reference,
+    customerKey,
+    label: 'JSON 草稿玩具厂',
+    sourcePolicy: { ...reference.sourcePolicy, trackedConfigFormat: CUSTOMER_DRAFT_JSON_FORMAT },
+    desktopMenu: { hiddenItemKeys: ['suppliers'] },
+  }
+  const previousWindow = globalThis.window
+  t.after(() => {
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
+  })
+  globalThis.window = {
+    __PLUSH_ERP_CUSTOMER_CONFIG__: {
+      customerKey,
+      brand: { companyName: '已加载的前端品牌' },
+      desktopMenu: { hiddenItemKeys: [] },
+    },
+  }
+  const overview = buildCustomerConfigDevOverview({
+    customerKey,
+    registry: {
+      [customerKey]: {
+        customerKey,
+        label: customerPackage.label,
+        sourcePath: 'config/customers/draft-toys/README.md',
+        customerPackage,
+        customerPackageSourcePath,
+      },
+    },
+  })
+  assert.equal(overview.packageConsoleSummary.primaryStatus, 'PREVIEW_READY')
+  assert.equal(overview.customerPackageSummary.sourcePath, customerPackageSourcePath)
+  assert.equal(overview.menuSummary.sourcePath, customerPackageSourcePath)
+  assert.equal(overview.menuSummary.sourceLabel, '客户草稿 JSON')
+  assert.equal(overview.menuSummary.brand.companyName, 'JSON 草稿玩具厂')
+  assert(!overview.menuSummary.sections.some(({ items }) => items.includes('suppliers')))
 })
 
 test('devCustomerConfig: 字段编号配置保持 draft 且不放开边界', () => {

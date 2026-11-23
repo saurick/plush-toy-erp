@@ -8,8 +8,13 @@ import { customerPackageCatalog } from "../../config/catalog/customerPackageCata
 import { customerPackageSchema } from "../../config/schemas/customerPackageSchema.mjs";
 import {
   getCustomerPackage,
+  getCustomerPackageSourcePath,
   listCustomerPackageKeys,
 } from "../../config/customers/index.mjs";
+import {
+  CUSTOMER_DRAFT_JSON_FORMAT,
+  isCustomerDraftDesktopMenu,
+} from "../../config/customers/customerDraftConfig.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
@@ -600,6 +605,12 @@ function validatePackage(
       "localTestApplyEnabled must be boolean when declared",
     );
   }
+  if (config.sourcePolicy?.trackedConfigFormat === CUSTOMER_DRAFT_JSON_FORMAT) {
+    assert(config.status === "draft" && config.sourcePolicy.localTestApplyEnabled === false,
+      "JSON customer package must stay draft and disable local test apply");
+    assertNonEmptyString(config.label, "label");
+    assert(isCustomerDraftDesktopMenu(config.desktopMenu), "JSON customer package desktopMenu must declare hiddenItemKeys");
+  }
 
   for (const key of schema.requiredBoundaryFalseKeys) {
     assert(
@@ -904,9 +915,7 @@ function assertDocsExist() {
     "config/schemas/README.md",
     "config/schemas/customerPackageSchema.mjs",
     "config/customers/index.mjs",
-    ...listCustomerPackageKeys().map(
-      (customerKey) => `config/customers/${customerKey}/customerPackage.mjs`,
-    ),
+    ...listCustomerPackageKeys().map(getCustomerPackageSourcePath),
   ]) {
     assert(
       existsSync(path.join(repoRoot, relativePath)),

@@ -16,6 +16,8 @@
 
 ## 最小客户包
 
+本表描述正式交付资料。开发时先按[新建客户草稿](../customers/reference-customer/README.md#new-customer-draft)生成、检查和预览独立 JSON 包。
+
 | 层级 | 必须内容 | 说明 |
 | --- | --- | --- |
 | 客户文档 | `README.md` 中的“差异与边界”“实施与验收” | 面向开发、测试、运维和业务验收 |

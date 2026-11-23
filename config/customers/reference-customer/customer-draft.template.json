@@ -1,0 +1,13 @@
+{
+  "customerPackage": {
+    "moduleStates": [],
+    "roleProfiles": [],
+    "fieldPolicyOverrides": [],
+    "runtimeProcessSelections": [],
+    "workPoolRoleOverrides": {},
+    "printTemplateDefaults": []
+  },
+  "desktopMenu": {
+    "hiddenItemKeys": []
+  }
+}

@@ -12,6 +12,7 @@ import { createDevQualityGatePlugin } from './devQualityGatePlugin.mjs'
 import { createDevWebInstancePlugin } from './devWebInstancePlugin.mjs'
 import { createDevOperatorAuthPlugin } from './devOperatorAuthPlugin.mjs'
 import { createDevProjectSkillsPlugin } from './devProjectSkillsPlugin.mjs'
+import { getCustomerPackageSourcePath } from '../../config/customers/index.mjs'
 import {
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   runWebRuntimePreflight,
@@ -36,6 +37,7 @@ export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
 ])
 
 export function createDevWorkbenchServePlugins({
+  allowCustomerDraftCreation = false,
   apiOrigin,
   command,
   devCustomerKey = '',
@@ -70,11 +72,15 @@ export function createDevWorkbenchServePlugins({
     createDevWebInstancePlugin({ isRecoveryActive: recovery.isActive }),
     recovery.plugin,
     createDevCustomerImportDryRunPlugin({
+      allowDraftCreation: allowCustomerDraftCreation,
       projectRoot,
       apiOrigin,
       devCustomerKey,
     }),
-    createDevCustomerConfigPlugin({ projectRoot }),
+    createDevCustomerConfigPlugin({
+      projectRoot,
+      packageSourcePath: getCustomerPackageSourcePath(devCustomerKey),
+    }),
     createDevDatabaseMigrationPlugin({
       projectRoot,
       apiOrigin,

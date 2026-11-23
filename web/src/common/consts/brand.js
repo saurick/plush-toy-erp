@@ -43,8 +43,7 @@ function normalizeCustomerKey(runtimeConfig = {}) {
     : undefined
 }
 
-export function getActiveERPBrand() {
-  const runtimeConfig = readRuntimeCustomerConfig()
+export function getActiveERPBrand(runtimeConfig = readRuntimeCustomerConfig()) {
   const runtimeBrand = normalizeBrandConfig(runtimeConfig?.brand)
   return {
     customerKey: normalizeCustomerKey(runtimeConfig),

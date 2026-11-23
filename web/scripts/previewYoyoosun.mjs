@@ -110,7 +110,7 @@ function printPlan(options) {
       ? `[${label}] port=${options.port}`
       : `[${label}] requested port ${options.requestedPort} is occupied; using ${options.port}`
   const verificationLines = [
-    `[${label}] verify customer config: curl -fsS http://localhost:${options.port}/customer-config.js | grep 'customerKey: "${options.customer}"'`,
+    `[${label}] verify customer config: curl -fsS http://localhost:${options.port}/customer-config.js | grep -E '"?customerKey"?: "${options.customer}"'`,
   ]
 
   if (options.customer === 'yoyoosun') {
