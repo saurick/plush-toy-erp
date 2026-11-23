@@ -1,8 +1,10 @@
 import { writeFile } from 'node:fs/promises'
 import { expect } from 'playwright/test'
+import { DEV_FLOW_STATE_CATALOG } from '../../src/dev-workbench/config/devFlowStateCatalog.mjs'
 import { DEV_PERMISSION_RELATIONSHIPS_API } from '../../src/dev-workbench/config/devPermissionRelationshipApi.mjs'
 import { assertGroupedSelectHierarchy } from './groupedSelectAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { permissionRelationshipFixture } from './permissionRelationshipScenarios.mjs'
 
 export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
@@ -108,6 +110,46 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
           await input.press('Escape')
         }
         await assertNoHorizontalOverflow(page, '业务规则分组下拉')
+        const overview = DEV_FLOW_STATE_CATALOG.businessChainOverview
+        await page.goto(new URL('/__dev/flow-explorer?chain=purchase_to_inventory', page.url()).href)
+        const editor = page.getByRole('region', { name: '流程探索', exact: true })
+        await searchWholeLibrary(editor)
+        const nodeFilter = editor.getByRole('button', { name: /^筛选业务节点/u })
+        const filterDialog = page.getByRole('dialog', { name: '筛选业务节点', exact: true })
+        const sourceField = filterDialog.getByRole('region', { name: '来源链路', exact: true })
+        const selectedSource = sourceField.getByRole('button', { pressed: true })
+        const clearSource = sourceField.getByRole('button', { name: '清空来源链路', exact: true })
+        const closeFilters = filterDialog.getByRole('button', { name: '收起', exact: true })
+        const results = editor.getByRole('status', { name: '节点筛选结果', exact: true })
+        const allResults = await results.innerText()
+        await nodeFilter.click()
+        await waitForFiniteAnimations(page)
+        await expect(filterDialog.getByRole('textbox')).toHaveCount(0)
+        const sourceGroups = sourceField.getByRole('group')
+        await expect(sourceGroups).toHaveCount(overview.lanes.length)
+        for (const { label } of overview.lanes) {
+          await expect(sourceField.getByRole('group', { name: label, exact: true })).toBeInViewport({ ratio: 1 })
+        }
+        await expect(closeFilters).toBeInViewport()
+        await expect(clearSource).toHaveText('清空来源链路')
+        await expect(clearSource).toBeDisabled()
+        await sourceField.getByRole('button', { name: '采购下单到入库应付', exact: true }).click()
+        await expect(selectedSource).toHaveText('采购下单到入库应付')
+        await sourceField.getByRole('button', { name: '销售受理到生产准备', exact: true }).click()
+        await expect(sourceGroups).toHaveCount(overview.lanes.length)
+        await expect(selectedSource).toHaveText('销售受理到生产准备')
+        await expect(filterDialog.getByText('来源链路：销售受理到生产准备', { exact: true })).toHaveCount(0)
+        await expect(nodeFilter).toHaveAccessibleName(/来源链路：销售受理到生产准备/u)
+        await expect(results).not.toHaveText(allResults)
+        await closeFilters.click()
+        await nodeFilter.click()
+        await expect(sourceGroups).toHaveCount(overview.lanes.length)
+        await expect(selectedSource).toHaveText('销售受理到生产准备')
+        await clearSource.click()
+        await expect(selectedSource).toHaveCount(0)
+        await expect(nodeFilter).not.toHaveAccessibleName(/来源链路/u)
+        await expect(results).toHaveText(allResults)
+        await closeFilters.click()
         await writeFile(`${outputDir}/grouped-select-business-rules.json`, JSON.stringify(evidence, null, 2))
       },
     },

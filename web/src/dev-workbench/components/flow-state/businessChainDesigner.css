@@ -256,9 +256,8 @@
   .erp-chain-design__canvas-area { height: 400px; }
 }
 
-.erp-chain-design__selected-filters { display: flex; flex-wrap: wrap; gap: 4px; }
-.erp-chain-design__selected-filters .ant-tag { max-width: 100%; margin: 0; white-space: normal; overflow-wrap: anywhere; }
 .erp-chain-node-filters { display: flex; flex-direction: column; width: min(480px, calc(100vw - 64px)); max-height: min(640px, calc(100dvh - 120px)); }
-.erp-chain-node-filters__fields { display: grid; gap: 20px; overflow: auto; padding: 4px; }
+.erp-chain-node-filters__fields { --erp-filter-panel-field-gap: 20px; padding-inline: 4px; }
 .erp-chain-node-filters__fields > section { display: grid; gap: 8px; }
-.erp-chain-node-filters > footer { display: flex; justify-content: space-between; gap: 8px; padding-block-start: 12px; margin-block-start: 12px; border-block-start: 1px solid var(--erp-border); }
+.erp-chain-node-filters__source-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.erp-chain-node-filters__source-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 208px), 1fr)); align-items: start; gap: 12px; }

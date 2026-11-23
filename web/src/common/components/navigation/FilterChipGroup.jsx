@@ -3,7 +3,19 @@ import FilterChip from './FilterChip.jsx'
 import FilterField from './FilterField.jsx'
 import { filterSelectOptions, isEmptyFilterValue } from '../select/filterSelectOptions.mjs'
 
-export default function FilterChipGroup({ options, value, onChange, disabled = false, loading = false, allowClear = false, emptyValue = '', className = '', label, 'aria-label': ariaLabel = label }) {
+export default function FilterChipGroup({
+  options,
+  value,
+  onChange,
+  disabled = false,
+  loading = false,
+  allowClear = false,
+  emptyValue = '',
+  className = '',
+  label,
+  selectedIndicator,
+  'aria-label': ariaLabel = label,
+}) {
   const items = allowClear
     ? [{ value: emptyValue, label: '不限' }, ...filterSelectOptions(options, emptyValue)]
     : options
@@ -19,6 +31,7 @@ export default function FilterChipGroup({ options, value, onChange, disabled = f
           onClick={() => { if (selected !== option.value) onChange?.(option.value, option) }}
         >
           {option.label}
+          {selected === option.value && selectedIndicator}
         </FilterChip>
       ))}
     </div>

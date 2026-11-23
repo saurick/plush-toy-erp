@@ -453,27 +453,6 @@
   overflow-y: auto;
 }
 
-.erp-business-filter-popover__overview:not([hidden]) {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.erp-business-filter-popover__overview > header,
-.erp-business-filter-popover__overview > footer {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 0 10px;
-}
-
-.erp-business-filter-popover__overview > footer {
-  justify-content: flex-end;
-  padding: 10px 0 0;
-}
-
 .erp-business-operation-panel__filter,
 .erp-business-filter-trigger-anchor {
   display: flex;
@@ -534,14 +513,6 @@
 /* 每个直接子项按顺序占一行，组内选项由控件自行排列。 */
 .erp-business-operation-panel__filters {
   --erp-filter-field-width: 260px;
-
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  min-width: 0;
-  min-height: 0;
-  align-content: start;
-  gap: 10px;
-  overflow-y: auto;
 }
 
 .erp-business-operation-panel__filters > :not(.app-scroll-edges) {

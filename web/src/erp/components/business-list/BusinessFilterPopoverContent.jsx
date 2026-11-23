@@ -1,6 +1,6 @@
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Button, theme } from 'antd'
-import { RollbackOutlined } from '@ant-design/icons'
+import { theme } from 'antd'
+import FilterPopoverPanel from '@/common/components/overlay/FilterPopoverPanel.jsx'
 import { canRestoreOverlayFocus, hasVisibleOverlayPopup, useOverlayScope } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { BusinessFilterPanelContext } from './BusinessFilterPanelContext.mjs'
 
@@ -103,32 +103,17 @@ export default function BusinessFilterPopoverContent({ open, id, panelRef, trigg
       }}
     >
       <BusinessFilterPanelContext.Provider value={context}>
-        <div className="erp-business-filter-popover__overview" hidden={Boolean(activeDetail)}>
-          <header>
-            <strong>筛选条件</strong>
-            {onClear ? (
-              <Button
-                aria-label="清空筛选"
-                size="small"
-                type="text"
-                disabled={clearDisabled}
-                icon={<RollbackOutlined aria-hidden />}
-                onClick={() => {
-                  onClear()
-                  panelRef.current.focus({ preventScroll: true })
-                }}
-              >
-                清空筛选
-              </Button>
-            ) : null}
-          </header>
-          <div className="erp-business-operation-panel__filters" ref={fieldsRef}>
-            {children}
-          </div>
-          <footer>
-            <Button type="primary" onClick={onDismiss}>收起</Button>
-          </footer>
-        </div>
+        <FilterPopoverPanel
+          hidden={Boolean(activeDetail)}
+          panelRef={panelRef}
+          fieldsRef={fieldsRef}
+          fieldsClassName="erp-business-operation-panel__filters"
+          onClear={onClear}
+          clearDisabled={clearDisabled}
+          onDismiss={onDismiss}
+        >
+          {children}
+        </FilterPopoverPanel>
       </BusinessFilterPanelContext.Provider>
     </section>
   )

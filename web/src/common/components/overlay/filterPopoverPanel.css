@@ -1,0 +1,36 @@
+.erp-filter-popover-panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.erp-filter-popover-panel > header,
+.erp-filter-popover-panel > footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-filter-popover-panel > header {
+  justify-content: space-between;
+  padding: 4px 0 8px;
+  border-block-end: 1px solid var(--erp-border);
+}
+
+.erp-filter-popover-panel__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  align-content: start;
+  gap: var(--erp-filter-panel-field-gap, 10px);
+  overflow-y: auto;
+  padding-block: 10px;
+}
+
+.erp-filter-popover-panel > footer {
+  justify-content: flex-end;
+  padding-block-start: 10px;
+  border-block-start: 1px solid var(--erp-border);
+}

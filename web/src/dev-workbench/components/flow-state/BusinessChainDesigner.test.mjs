@@ -169,7 +169,7 @@ test('拖入单个业务步骤即可探索规则、状态、任务并保存展�
   await click('筛选业务节点 · 业务步骤')
   await click('全库')
   await click('全部')
-  await click('应用筛选')
+  await click('收起')
   await click('加入：按业务分支创建岗位任务')
   await tab('任务与单据')
   assert(
@@ -219,7 +219,7 @@ test('损坏视图保留现场并显示错误，编辑画布不覆盖原存储',
   assert.equal(!!harness.container.querySelector('[role="alert"]'), false)
 })
 
-test('节点库提交搜索后更新列表，分组筛选应用后生效，重置筛选保留关键词和阅读视角', async (t) => {
+test('节点库分组筛选即时生效，来源链路联动全库，清空保留关键词和阅读视角', async (t) => {
   const harness = await createReactTestHarness(t)
   const { default: Designer } = await import('./BusinessChainDesigner.jsx')
   await harness.render(h(Designer, { catalog }))
@@ -247,11 +247,24 @@ test('节点库提交搜索后更新列表，分组筛选应用后生效，重�
   )
   assert(dialog)
   const perspectives = dialog.querySelector('[aria-label="常用视角"]')
-  await click(dialog, '全库')
+  const scope = dialog.querySelector('[aria-label="节点库范围"]')
+  const resultSummary = root.querySelector('.erp-chain-design__library-summary')
+  assert.equal(findButton(scope, '当前链').getAttribute('aria-pressed'), 'true')
+  await click(dialog, '委外发料到回货应付')
+  assert.equal(findButton(scope, '全库').getAttribute('aria-pressed'), 'true')
+  assert.match(resultSummary.textContent, /全库.*来源链路：委外发料到回货应付/u)
+  await click(dialog, '清空来源链路')
+  assert.equal(findButton(scope, '全库').getAttribute('aria-pressed'), 'true')
+  assert.doesNotMatch(resultSummary.textContent, /来源链路/u)
   await click(perspectives, '岗位任务')
-  await click(dialog.querySelector('[aria-label="按业务领域筛选"]'), '工程')
-  assert(dialog.querySelector('[aria-label="已选节点筛选"]').textContent.includes('业务领域：工程'))
-  await click(dialog, '应用筛选')
+  const domainFilter = dialog.querySelector('[aria-label="按业务领域筛选"]')
+  await click(domainFilter, '工程')
+  assert.equal(findButton(domainFilter, '工程').getAttribute('aria-pressed'), 'true')
+  assert.doesNotMatch(dialog.textContent, /业务领域：工程/u)
+  await click(domainFilter, '全部')
+  assert.equal(findButton(domainFilter, '全部').getAttribute('aria-pressed'), 'true')
+  assert.match(resultSummary.textContent, /^全库 · 岗位任务$/u)
+  await click(domainFilter, '工程')
   assert(
     root
       .querySelector('[aria-label="可加入的节点"]')
@@ -263,8 +276,10 @@ test('节点库提交搜索后更新列表，分组筛选应用后生效，重�
       .textContent.includes('订单审批')
   )
   const filterTrigger = findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程')
+  assert.equal(filterTrigger.getAttribute('aria-expanded'), 'true')
   assert.equal(filterTrigger.querySelector('.erp-control-count').textContent, '2')
   assert.equal(filterTrigger.querySelector('.anticon-filter + span').textContent, '筛选')
+  await click(dialog, '收起')
   assert.equal(
     document.activeElement === findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程'),
     true
@@ -278,13 +293,21 @@ test('节点库提交搜索后更新列表，分组筛选应用后生效，重�
   await click(root.querySelector('[aria-label="查找节点"]'), '搜索')
   await click(root, '筛选业务节点 · 岗位任务 · 业务领域：工程')
   const reopened = document.querySelector('[aria-label="筛选业务节点"][role="dialog"]')
-  await click(reopened, '重置筛选')
+  const clear = findButton(reopened.querySelector('header'), '清空筛选')
+  assert.ok(clear?.querySelector('.anticon-rollback'))
+  await click(reopened, '清空筛选')
+  assert.equal(clear.disabled, true)
+  assert.equal(document.activeElement === reopened, true)
   assert.equal(search.value, '工程')
   assert.equal(
     findButton(reopened.querySelector('[aria-label="常用视角"]'), '岗位任务').getAttribute('aria-pressed'),
     'true'
   )
-  assert.equal(!!reopened.querySelector('[aria-label="已选节点筛选"]'), false)
+  assert.equal(
+    findButton(reopened.querySelector('[aria-label="按业务领域筛选"]'), '全部').getAttribute('aria-pressed'),
+    'true'
+  )
+  assert.match(resultSummary.textContent, /^当前链 · 岗位任务/u)
   await harness.act(() =>
     reopened.dispatchEvent(
       new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
@@ -292,7 +315,7 @@ test('节点库提交搜索后更新列表，分组筛选应用后生效，重�
   )
   await harness.flush()
   assert.equal(
-    findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程').getAttribute('aria-expanded'),
+    findButton(root, '筛选业务节点 · 岗位任务').getAttribute('aria-expanded'),
     'false'
   )
   assert.equal(window.sessionStorage.getItem(workingKey), before)
@@ -302,7 +325,7 @@ test('没有匹配节点时查看全部会清掉尚未提交的搜索草稿', as
   const harness = await createReactTestHarness(t)
   const { default: NodeLibrary } = await import('./BusinessChainNodeLibrary.jsx')
   await harness.render(h(NodeLibrary, {
-    library: { entries: [], nodes: [], chains: [], roles: [] },
+    library: { entries: [], nodes: [], chains: [], chainOptionGroups: [], roles: [] },
     filters: { view: 'steps', search: '', domain: '', type: '', role: '', chain: '' },
     chainKey: 'all',
     nodeScope: 'all',

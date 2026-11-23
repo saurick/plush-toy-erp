@@ -67,7 +67,7 @@ async function assertFilterFits(assert, dialog) {
 async function assertDesktopFilterLayout(assert, dialog) {
   await assertFilterFits(assert, dialog)
   const geometry = await dialog.evaluate((node) => {
-    const overview = node.querySelector('.erp-business-filter-popover__overview')
+    const overview = node.querySelector('.erp-filter-popover-panel')
     const fields = overview.querySelector('.erp-business-operation-panel__filters').getBoundingClientRect()
     const title = overview.querySelector('header strong').getBoundingClientRect()
     const clear = overview.querySelector('header button').getBoundingClientRect()

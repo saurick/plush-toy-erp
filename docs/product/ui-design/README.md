@@ -75,7 +75,7 @@
 
 [分组下拉](/__dev/ui-design?page=controls&control=grouped-select)直接使用 `AppSelect` 和历史来源分组构造器，比较分类标题、缩进选项和勾选，操作单选、多选、搜索、清空与禁用状态；统一规则和当前使用入口见[分组选项](交互设计说明.md#grouped-select-options)。
 
-[筛选与搜索](/__dev/ui-design?page=controls&control=filters)演示关键词、快捷条件和总筛选如何改变列表结果。电脑样例可连续调整记录范围和负责人，完成后手动收起。手机样例沿用筛选入口和浮层样式，快捷条件保持至少 44px 点击区，窄屏可横向滑动。
+[筛选与搜索](/__dev/ui-design?page=controls&control=filters)演示关键词、快捷条件和总筛选如何改变列表结果。电脑样例可连续调整记录范围和负责人，在右上角清空筛选，完成后手动收起。手机样例沿用筛选入口和浮层样式，快捷条件保持至少 44px 点击区，窄屏可横向滑动。位置与生效方式见[电脑版筛选气泡](交互设计说明.md#desktop-filter-popovers)。
 
 [分组选择（单选／多选）](/__dev/ui-design?page=controls&control=chain-view-picker)复用流程探索的 `BusinessChainDesignPicker`。面板标明选择方式，尖角对准露在面板外的按钮。流程范围点选后收起，岗位高亮可连续勾选，示例步骤显示各自和共同参与的岗位，「全链路视角」清除全部高亮。
 

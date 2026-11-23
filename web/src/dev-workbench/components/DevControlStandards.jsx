@@ -333,14 +333,14 @@ const TOPICS = [
         '左侧漏斗和固定的「筛选」',
         '浮层尖角对准入口。条件立即生效，面板保持展开，可连续调整后收起。',
       ],
-      ['重置筛选', '清除面板内条件', '保留关键词，清除搜索由输入框单独处理。'],
+      ['面板清空', '电脑右上角「清空筛选」', '清除面板内可重置的条件。关键词由搜索框单独清除。'],
     ],
     checks: [
       '选择逾期：结果与数量一起变化。',
       '输入期间结果不变；提交不存在的关键词后，出现无结果与清除入口。',
-      '打开总筛选，核对尖角指向。连续调整记录范围及负责人，再收起面板。',
+      '打开总筛选，核对尖角指向。电脑上调整记录范围及负责人，从面板右上角清空，再收起。',
     ],
-    componentRefs: ['AnchoredControlPopover', 'BusinessOperationPanel', 'FilterSelect', 'FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'MobileFilterPopover', 'MobileFilterChoices'],
+    componentRefs: ['AnchoredControlPopover', 'FilterPopoverPanel', 'BusinessOperationPanel', 'FilterSelect', 'FilterChip', 'SearchInput', 'HorizontalScroll', 'MobileSearchInput', 'MobileFilterPopover', 'MobileFilterChoices'],
     consumer: { ...TASK_PAGE, task: '组合任务范围与关键词，再清空和返回，核对当前条件及结果。' },
   },
   {

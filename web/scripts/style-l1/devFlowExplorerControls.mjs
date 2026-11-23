@@ -32,5 +32,7 @@ export async function searchWholeLibrary(editor) {
   await editor.getByRole('button', { name: /^筛选业务节点/ }).click()
   const dialog = editor.page().getByRole('dialog', { name: '筛选业务节点' })
   await dialog.getByRole('button', { name: '全库', exact: true }).click()
-  await dialog.getByRole('button', { name: '应用筛选', exact: true }).click()
+  await dialog.getByRole('button', { name: '收起', exact: true }).click()
+  const showResults = editor.getByRole('button', { name: '展开节点库', exact: true })
+  if (await showResults.isVisible()) await showResults.click()
 }
