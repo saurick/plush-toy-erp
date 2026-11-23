@@ -35,7 +35,7 @@
 2. 在 `web/` 定向运行 `dev-delivery-task-navigation-desktop`、`dev-database-migration-workspace-desktop`、`dev-version-center-tabs-pagination-desktop`、`dev-drill-recovery-desktop-light` 浏览器场景。保留原有确认、失败恢复、记录、切换动效与焦点测试，并核对编号、状态与标题对齐和窄屏溢出。
 3. 对本目录和四个入口执行 ESLint、局部 CSS 检查及 workbench 构建。浏览器使用隔离夹具，不执行实际目标发布、迁移或恢复。
 
-正式交互与执行边界见[研发效能工作台与 CI/CD 设计](../../../../../docs/engineering/研发效能工作台与CI-CD设计.md)。
+正式交互与执行边界见[研发效能工作台设计](../../../../../docs/engineering/研发效能工作台设计.md)。
 
 GitLab 原生任务明细与日志沿链接查看；工作台保留项目汇总、检查及操作入口。部署详情展示 GitLab 环境和回执归档引用，历史补录保留原始时间；“补录 GitLab”只调用终态记录同步，不重复部署。协议与恢复入口见 [部署登记](../../../../../scripts/deploy/README.md#gitlab-部署登记与回执归档)。
 

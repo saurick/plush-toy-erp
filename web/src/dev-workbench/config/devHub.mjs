@@ -84,7 +84,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     englishTitle: 'Flow Explorer',
     group: '业务链治理 / Business Chain Governance',
     route: DEV_FLOW_EXPLORER_ROUTE,
-    source: 'docs/engineering/研发效能工作台与CI-CD设计.md#business-chain-design-draft',
+    source: 'docs/engineering/研发效能工作台设计.md#business-chain-design-draft',
     truthSource: '复用已登记业务链路、规则与岗位责任投影',
     status: '本地阅读视图 / Local reading views',
     guardrails: Object.freeze([
@@ -225,7 +225,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     englishTitle: 'Business Chain Reports',
     group: '验证治理 / QA',
     route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
-    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    source: 'docs/engineering/研发效能工作台设计.md#链路实测报告-__devbusiness-chain-audit',
     truthSource: '当前工作台保存的实跑批次、逐步观察、问题与原始证据清单',
     status: '只读批次报告 / Read-only reports',
     guardrails: Object.freeze([
@@ -258,7 +258,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     englishTitle: 'Test Data',
     group: '验证治理 / QA',
     route: DEV_DATA_PREPARATION_ROUTE,
-    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    source: 'docs/engineering/研发效能工作台设计.md#测试数据中心-__devdata-preparation',
     truthSource: '计划回执、正式 Source / Fact API 与目标读回',
     status: '按目标受控写入 / Target-scoped writes',
     guardrails: Object.freeze([
@@ -305,7 +305,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     englishTitle: 'Database Migration',
     group: '交付治理 / Delivery',
     route: DEV_DATABASE_MIGRATION_ROUTE,
-    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    source: 'docs/engineering/研发效能工作台设计.md#数据库迁移-__devdatabase-migration',
     truthSource: 'migration / schema 真源、固定目标身份、备份恢复与读回',
     status: '本机受控写入 / Local controlled writes',
     guardrails: Object.freeze([
@@ -325,7 +325,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     englishTitle: 'Release & Deployment',
     group: '交付治理 / Delivery',
     route: DEV_VERSION_CENTER_ROUTE,
-    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    source: 'docs/engineering/研发效能工作台设计.md#版本发布与部署中心-__devversion-center',
     truthSource: 'GitLab 不可变制品、固定目标预检与 operation 回执',
     status: '本地受控编排 / Local controlled actions',
     guardrails: Object.freeze([

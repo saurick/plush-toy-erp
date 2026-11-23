@@ -1230,20 +1230,19 @@ test("CLI help and active docs keep isolated defaults and explicit shared browse
   assert.match(help, /customer-trial-133/u);
   assert.match(help, /--target-attestation-json/u);
 
-  const readme = await fs.readFile(
-    path.resolve(repoRoot, "scripts/qa/README.md"),
-    "utf8",
-  );
-  assert.doesNotMatch(
-    readme,
-    /manual-acceptance-browser\.mjs[\s\S]{0,900}--task-report/u,
-  );
-  for (const [, command] of readme.matchAll(/```bash\n([\s\S]*?)```/gu)) {
-    if (
-      command.includes("manual-acceptance-browser.mjs") &&
-      command.includes("--backend-url http://127.0.0.1:8300")
-    ) {
-      assert.match(command, /--scenario-demo-shared-local/u);
+  for (const file of ["scripts/qa/README.md", "docs/engineering/全页面试用验收数据.md"]) {
+    const document = await fs.readFile(path.resolve(repoRoot, file), "utf8");
+    assert.doesNotMatch(
+      document,
+      /manual-acceptance-browser\.mjs[\s\S]{0,900}--task-report/u,
+    );
+    for (const [, command] of document.matchAll(/```bash\n([\s\S]*?)```/gu)) {
+      if (
+        command.includes("manual-acceptance-browser.mjs") &&
+        command.includes("--backend-url http://127.0.0.1:8300")
+      ) {
+        assert.match(command, /--scenario-demo-shared-local/u);
+      }
     }
   }
 });

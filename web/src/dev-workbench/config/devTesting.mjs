@@ -267,6 +267,7 @@ const DEV_TESTING_CURRENT_DOCS = Object.freeze([
   Object.freeze({ path: 'server/README.md', documentRole: '工程说明' }),
   Object.freeze({ path: 'scripts/README.md', documentRole: '执行脚本' }),
   Object.freeze({ path: 'scripts/qa/README.md', documentRole: '执行脚本' }),
+  Object.freeze({ path: 'docs/engineering/全页面试用验收数据.md', documentRole: '执行脚本' }),
   Object.freeze({
     path: 'docs/部署约定.md',
     documentRole: '部署与发布',

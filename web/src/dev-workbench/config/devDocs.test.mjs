@@ -571,16 +571,18 @@ test('devDocs: 支持刷新后恢复目录展开状态', () => {
 })
 
 test('devDocs: workbench name changes preserve bookmarked section anchors', () => {
+  const workbenchBookmarks = [
+    ['产品工程入口-__devproduct-engineering', '产品与业务入口'],
+    ['产品内核-__devproduct-core', '产品能力'],
+    ['工程规范与-skill-__devproject-skills', '项目 Skill'],
+    ['开发文档-__devdocs', '项目文档'],
+    ['ui-交互设计-__devui-design', '交互设计'],
+    ['链路实测-__devbusiness-chain-audit', '链路实测报告'],
+    ['交付运行总览-__devdelivery', '交付运维总览'],
+  ]
   const sources = [
-    ['docs/engineering/研发效能工作台与CI-CD设计.md', [
-      ['产品工程入口-__devproduct-engineering', '产品与业务入口'],
-      ['产品内核-__devproduct-core', '产品能力'],
-      ['工程规范与-skill-__devproject-skills', '项目 Skill'],
-      ['开发文档-__devdocs', '项目文档'],
-      ['ui-交互设计-__devui-design', '交互设计'],
-      ['链路实测-__devbusiness-chain-audit', '链路实测报告'],
-      ['交付运行总览-__devdelivery', '交付运维总览'],
-    ]],
+    ['docs/engineering/研发效能工作台与CI-CD设计.md', workbenchBookmarks],
+    ['docs/engineering/研发效能工作台设计.md', workbenchBookmarks],
     ['docs/architecture/业务链与运行轨迹边界.md', [
       ['业务链观察的页面合同', '业务链路的页面合同'],
     ]],

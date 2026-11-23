@@ -325,6 +325,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "server/README.md",
     "scripts/README.md",
     "scripts/qa/README.md",
+    "docs/engineering/全页面试用验收数据.md",
     "docs/部署约定.md",
     "server/deploy/README.md",
     "server/deploy/compose/prod/README.md",

@@ -6,7 +6,6 @@ import {
   DEV_DELIVERY_ACTION_API_PATH,
   DEV_DELIVERY_OPERATION_API_PREFIX,
   DEV_DELIVERY_SESSION_API_PATH,
-  DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_SUMMARY_API_PATH,
   DEV_DELIVERY_TARGETS,
   DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
@@ -270,10 +269,6 @@ test('version center uses fixed dev-only routes and engineering truth source', (
   assert.equal(
     DEV_DELIVERY_OPERATION_API_PREFIX,
     '/__dev/api/delivery/operations'
-  )
-  assert.equal(
-    DEV_DELIVERY_SOURCE_PATH,
-    'docs/engineering/研发效能工作台与CI-CD设计.md'
   )
 })
 

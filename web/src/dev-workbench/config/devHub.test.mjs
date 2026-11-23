@@ -550,7 +550,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   assert.match(dataPreparationItem?.title || '', /测试数据/)
   assert.equal(
     dataPreparationItem?.source,
-    'docs/engineering/研发效能工作台与CI-CD设计.md'
+    'docs/engineering/研发效能工作台设计.md#测试数据中心-__devdata-preparation'
   )
   assert.match(dataPreparationItem?.truthSource || '', /Source \/ Fact API/)
   const dataPreparationGuardrails = dataPreparationItem?.guardrails?.join(' ') || ''

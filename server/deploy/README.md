@@ -44,7 +44,7 @@ promotion 会在同一份受保护 env 备份边界内，把 PostgreSQL、Jaeger
 
 根域 `yoyoosun.net` 临时 `302` 跳转到未来可能使用的 `erp.yoyoosun.net`，但不会把它登记为生产 target；`admin.yoyoosun.net` 退役后也不进入目标、检查、发布或回滚矩阵。
 
-目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/研发效能工作台与CI-CD设计.md`。
+目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/持续交付设计.md`。
 
 Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/bin/atlas`，版本统一固定为 `v1.3.0`。demo / test 使用各自目标根下固定、非符号链接、精确版本的 Atlas，并使用各自 registry 登记的数据库端口和 migration lock；运行环境不得通过 `ATLAS_BIN` 覆盖，也不得替换系统 Atlas。
 

@@ -47,4 +47,4 @@
 2. 浏览器回归：在 `web/` 运行 `STYLE_L1_SCENARIOS=dev-customer-config-workspace-desktop pnpm style:l1`，核对步骤动效与对齐、失败恢复、确认取消、刷新、批次失效、未知客户和桌面溢出。
 3. 只对本页与本目录执行 ESLint、CSS 检查，并构建 workbench；浏览器夹具不执行真实配置写入或发布。
 
-架构与运行合同见[研发效能工作台与 CI/CD 设计](../../../../../docs/engineering/研发效能工作台与CI-CD设计.md#客户配置包预检与发布-__devcustomer-config)。
+架构与运行合同见[客户配置包预检与发布](../../../../../docs/engineering/研发效能工作台设计.md#客户配置包预检与发布-__devcustomer-config)。

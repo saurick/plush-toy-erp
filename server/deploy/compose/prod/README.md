@@ -109,7 +109,7 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 
 该重建的恢复检查只证明 PostgreSQL，不自动切换附件 bucket，也不证明附件已恢复。需要成套恢复保证时，按[备份恢复手册](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)对同批 PG 与全部登记附件完成隔离恢复、对象校验和临时资源清理，单独保留回执。
 
-fresh demo 须按[全页面试用验收数据](../../../../scripts/qa/README.md#全页面试用验收数据)先用临时管理员准备完整 formal 岗位账号，再激活客户配置、bootstrap core、轮换凭据，并按显式来源规模执行 runner；这些步骤不属于普通 promotion 的隐含阶段。
+fresh demo 须按[全页面试用验收数据](../../../../docs/engineering/全页面试用验收数据.md#全页面试用验收数据)先用临时管理员准备完整 formal 岗位账号，再激活客户配置、bootstrap core、轮换凭据，并按显式来源规模执行 runner；这些步骤不属于普通 promotion 的隐含阶段。
 
 ## customer-test 干净基线
 

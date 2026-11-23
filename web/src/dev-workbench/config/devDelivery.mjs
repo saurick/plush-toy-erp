@@ -11,8 +11,6 @@ export const DEV_DELIVERY_ACTION_API_PATH = '/__dev/api/delivery/actions'
 export const DEV_DELIVERY_OPERATION_API_PREFIX =
   '/__dev/api/delivery/operations'
 export const DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY = 'version-center'
-export const DEV_DELIVERY_SOURCE_PATH =
-  'docs/engineering/研发效能工作台与CI-CD设计.md'
 export const DEV_VERSION_CENTER_VIEW_QUERY_KEY = 'view'
 export const DEV_VERSION_CENTER_VIEW_VERSIONS = 'versions'
 export const DEV_VERSION_CENTER_VIEW_OVERVIEW = 'overview'

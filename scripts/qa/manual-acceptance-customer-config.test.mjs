@@ -232,42 +232,42 @@ test("help documents both dedicated local and registered 133 backends", async ()
   assert.doesNotMatch(result.usage, /Must be the registered/u);
 });
 
-test("QA README provides a complete local and 133 config-to-dataset chain", async () => {
-  const qaReadme = await readFile(path.resolve("scripts/qa/README.md"), "utf8");
+test("the trial dataset guide provides a complete local and 133 config-to-dataset chain", async () => {
+  const guide = await readFile(path.resolve("docs/engineering/全页面试用验收数据.md"), "utf8");
   assert.match(
-    qaReadme,
+    guide,
     /customer-config-runtime-manifest\.mjs[\s\S]{0,240}yoyoosun-runtime-manifest-preview\.json/u,
-    "QA README must generate the preview manifest before apply",
+    "the guide must generate the preview manifest before apply",
   );
   assert.match(
-    qaReadme,
+    guide,
     /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target local-dev/u,
-    "QA README must document local customer-config apply",
+    "the guide must document local customer-config apply",
   );
   assert.match(
-    qaReadme,
+    guide,
     /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target customer-trial-133/u,
-    "QA README must document 133 customer-config apply",
+    "the guide must document 133 customer-config apply",
   );
   assert.match(
-    qaReadme,
+    guide,
     /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133/u,
-    "QA README must document the 133 top-level dataset runner",
+    "the guide must document the 133 top-level dataset runner",
   );
   assert.doesNotMatch(
-    qaReadme,
+    guide,
     /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133[\s\S]{0,240}--database-name plush_erp_demo_v1/u,
-    "QA README must let the registered 133 target policy supply the database identity",
+    "the guide must let the registered 133 target policy supply the database identity",
   );
   assert.match(
-    qaReadme,
+    guide,
     /customer-trial-133\/dataset\/apply-report\.json/u,
-    "QA README must bind the canonical 133 dataset receipt",
+    "the guide must bind the canonical 133 dataset receipt",
   );
   assert.match(
-    qaReadme,
+    guide,
     /--resume-report/u,
-    "QA README must document safe same-batch resume",
+    "the guide must document safe same-batch resume",
   );
 });
 

@@ -16,7 +16,6 @@ import {
   DEV_DATA_PREPARATION_PROFILE_KEYS,
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DATA_PREPARATION_SESSION_API_PATH,
-  DEV_DATA_PREPARATION_SOURCE_PATH,
   DEV_DATA_PREPARATION_SUMMARY_API_PATH,
   DEV_DATA_PREPARATION_TARGET_KEYS,
   createDataPreparationIdempotencyKey,
@@ -352,10 +351,6 @@ test('data preparation uses one fixed DEV-only API surface', () => {
   assert.equal(
     DEV_DATA_PREPARATION_OPERATION_API_PREFIX,
     '/__dev/api/data-preparation/operations'
-  )
-  assert.equal(
-    DEV_DATA_PREPARATION_SOURCE_PATH,
-    'docs/engineering/研发效能工作台与CI-CD设计.md'
   )
 })
 

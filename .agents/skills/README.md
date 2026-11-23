@@ -46,7 +46,7 @@
 
 ## 维护与验证 / Skill Validation
 
-项目 Skill 的详细执行指引由工作台直接读取各 `SKILL.md`，专题与四项步骤说明的格式、同源和浏览器合同见[执行指引来源与维护](../../docs/engineering/研发效能工作台与CI-CD设计.md#skill-execution-guides)。修改流程时同步图和对应节点的前置条件、具体操作、完成标准与失败处理；图不产生额外授权或运行证据。
+项目 Skill 的详细执行指引由工作台直接读取各 `SKILL.md`，专题与四项步骤说明的格式、同源和浏览器合同见[执行指引来源与维护](../../docs/engineering/研发效能工作台设计.md#skill-execution-guides)。修改流程时同步图和对应节点的前置条件、具体操作、完成标准与失败处理；图不产生额外授权或运行证据。
 
 仓库根目录运行 `node scripts/qa/skill-health.mjs`。这是项目 validator，仅使用现有 Node 与仓库代码，不依赖 Python、PyYAML、客户私有仓库或运行服务。`affected` 对 Markdown 与项目 Skill 变更选择同一入口，也核对被引用文档的章节变化。
 

@@ -28,9 +28,9 @@
 
 ## 可视化图索引 / Visual Diagram Index
 
-[选用规则](engineering/可视化表达规范.md#visualization-choices)和[工作台图例入口](engineering/研发效能工作台与CI-CD设计.md#visualization-standards)用于按问题选择表达方式。
+[选用规则](engineering/可视化表达规范.md#visualization-choices)和[工作台图例入口](engineering/研发效能工作台设计.md#visualization-standards)用于按问题选择表达方式。
 
-按问题查看：[业务与协同](workflow/业务与协同流程地图.md)、[状态与事实](architecture/状态工作流事实边界.md)、[流程建模](architecture/各类流程建模边界评审.md)、[业务链与轨迹](architecture/业务链与运行轨迹边界.md)、[CI/CD](engineering/研发效能工作台与CI-CD设计.md)。
+按问题查看：[业务与协同](workflow/业务与协同流程地图.md)、[状态与事实](architecture/状态工作流事实边界.md)、[流程建模](architecture/各类流程建模边界评审.md)、[业务链与轨迹](architecture/业务链与运行轨迹边界.md)、[CI/CD](engineering/持续交付设计.md)。
 
 ## 文档写法 / Writing Rules
 

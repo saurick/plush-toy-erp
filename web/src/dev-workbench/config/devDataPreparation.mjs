@@ -10,9 +10,6 @@ export const DEV_DATA_PREPARATION_SESSION_API_PATH = `${DEV_DATA_PREPARATION_API
 export const DEV_DATA_PREPARATION_SUMMARY_API_PATH = `${DEV_DATA_PREPARATION_API_PREFIX}/summary`
 export const DEV_DATA_PREPARATION_ACTION_API_PATH = `${DEV_DATA_PREPARATION_API_PREFIX}/actions`
 export const DEV_DATA_PREPARATION_OPERATION_API_PREFIX = `${DEV_DATA_PREPARATION_API_PREFIX}/operations`
-export const DEV_DATA_PREPARATION_SOURCE_PATH =
-  'docs/engineering/研发效能工作台与CI-CD设计.md'
-
 export const DEV_DATA_PREPARATION_PROFILE_KEYS = Object.freeze({
   coreDemo: 'core-demo',
   scenarioDemo: 'scenario-demo',
