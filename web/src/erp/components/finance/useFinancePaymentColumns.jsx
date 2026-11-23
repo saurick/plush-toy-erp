@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { Tag } from 'antd'
 
-import { FinanceAllocationStatus, FinanceAdjustmentDirection } from '../../../common/consts/statuses.generated.mjs'
+import { FinanceAllocationStatus, FinanceAdjustmentDirection, FinancePaymentKind } from '../../../common/consts/statuses.generated.mjs'
 
 import { formatUnixDateTime } from '../../utils/masterDataOrderView.mjs'
 
@@ -77,6 +77,11 @@ export default function useFinancePaymentColumns({ customers, suppliers }) {
         defaultPriority: 66,
         title: '关联来源',
         dataIndex: 'source_no',
+        copyable: {
+          label: (record) => record?.kind === FinancePaymentKind.REFUND ? '原收付款单号' : '关联订单号',
+          resolveValue: (_value, record) => paymentSourceReference(record, { numberOnly: true }),
+        },
+        detailCopyable: true,
         width: 190,
         render: (_value, record) => paymentSourceReference(record),
         exportValue: (record) => paymentSourceReference(record, { emptyText: '' }),

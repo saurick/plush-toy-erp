@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { businessFormHarness } from '../../../../scripts/test/businessFormHarness.mjs'
+import { resolveBusinessDetailCopyText } from '../../utils/businessTableCopy.mjs'
 import {
   applyModuleColumnVisibility,
   buildDefaultModuleHiddenColumns,
@@ -48,4 +49,19 @@ test('quality export identifies the recorded inspector and superseded lineage wi
   assert.ok(columns.some(({ dataIndex }) => dataIndex === 'correction_of_inspection_no'))
   assert.ok(columns.some(({ dataIndex }) => dataIndex === 'corrected_inspection_no'))
   assert.deepEqual(QUALITY_INSPECTION_TYPE_FILTER_OPTIONS.map(({ value }) => value), ['INCOMING', 'OUTSOURCING_RETURN', 'FINISHED_GOODS', 'PRODUCTION_STAGE'])
+})
+
+test('quality copy uses the recorded source and batch without copying association placeholders', async (t) => {
+  await businessFormHarness(t)
+  const { buildQualityInspectionDataColumns } = await import('./qualityInspectionColumns.jsx')
+  const columns = buildQualityInspectionDataColumns({
+    allPurchaseReceiptItemOptions: [{ value: 5, label: '入库单 RET-001 第 2 行' }],
+  })
+  const source = columns.find(({ dataIndex }) => dataIndex === 'inspection_type')
+  const batch = columns.find(({ dataIndex }) => dataIndex === 'inventory_lot_id')
+  const incoming = { source_type: 'PURCHASE_RECEIPT', source_no: 'RET-001', purchase_receipt_item_id: 5 }
+  assert.equal(resolveBusinessDetailCopyText(source, incoming), 'RET-001\n入库单 RET-001 第 2 行')
+  assert.equal(resolveBusinessDetailCopyText(source, { source_type: 'SHIPMENT' }), '')
+  assert.equal(resolveBusinessDetailCopyText(batch, { inventory_lot_id: 9 }), '')
+  assert.equal(resolveBusinessDetailCopyText(batch, { source_type: 'PRODUCTION_WIP', wip_batch_no: 'WIP-001' }), 'WIP-001')
 })

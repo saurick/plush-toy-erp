@@ -19,6 +19,7 @@ import {
 } from '../../utils/masterDataOrderView.mjs'
 import { formatPaymentCondition } from '../../utils/paymentConditions.mjs'
 import { deriveSalesOrderItemAmount } from '../../utils/sourceOrderAmounts.mjs'
+import { formatDeliverySnapshotCopy, formatDeliverySnapshotText } from '../../utils/sourcePartySnapshots.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import {
   compareNumeric20Scale6Values,
@@ -84,15 +85,6 @@ function quotedFreightText(record = {}, fallback = '-') {
     .toUpperCase()
   if (terms === 'INCLUDED') return '已含在单价'
   return moneyText(record.quoted_freight_amount, record.currency, fallback)
-}
-
-function deliveryText(snapshot = {}, fallback = '-') {
-  const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
-  return (
-    [source.country_region, source.recipient, source.phone, source.address]
-      .filter(Boolean)
-      .join(' ') || fallback
-  )
 }
 
 function salesOrderStatusTag(status) {
@@ -324,15 +316,17 @@ export function buildSalesOrderColumns() {
       title: '收货信息',
       exportTitle: '收货信息',
       dataIndex: 'delivery_snapshot',
+      copyable: { resolveValue: formatDeliverySnapshotCopy },
+      detailCopyable: true,
       defaultHidden: true,
       width: 360,
       sorter: (a, b) =>
         compareText(
-          deliveryText(a?.delivery_snapshot),
-          deliveryText(b?.delivery_snapshot)
+          formatDeliverySnapshotText(a?.delivery_snapshot),
+          formatDeliverySnapshotText(b?.delivery_snapshot)
         ),
       render: (value) => <DeliveryInfoCell snapshot={value} />,
-      exportValue: (record) => deliveryText(record?.delivery_snapshot, ''),
+      exportValue: (record) => formatDeliverySnapshotText(record?.delivery_snapshot, { emptyText: '' }),
     },
     {
       defaultPriority: 80,
@@ -372,10 +366,9 @@ function renderSalesOrderGroupedField(column, record, label) {
   const copyText = column.copyable ? resolveBusinessTableCopyText(column, value, record) : ''
   if (!copyText) return content
   return (
-    <span className="erp-business-table-copyable-cell" data-copyable-column={column.dataIndex} data-align="left">
+    <span className="erp-business-table-copyable-cell" data-copyable-column={column.dataIndex} data-align="left" data-copy-reveal="hover">
       <span className="erp-business-table-copyable-cell__content" title={copyText}>{content}</span>
       <BusinessCopyButton
-        className="erp-business-table-copyable-cell__button"
         label={resolveBusinessTableCopyLabel(column, record)}
         value={copyText}
       />

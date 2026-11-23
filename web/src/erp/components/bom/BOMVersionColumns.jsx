@@ -52,6 +52,7 @@ export function buildBOMVersionColumns({ productOptions = [] }) {
         productId={value}
         name={option?.identity?.name || referenceLabel(productOptions, value, '产品')}
         code={option?.identity?.code}
+        copyCode={{ label: '产品编号', revealOnHover: true }}
       />
     )
   }

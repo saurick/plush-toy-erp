@@ -2,9 +2,11 @@ import React, { useState } from 'react'
 import { Cascader, Form, Input } from 'antd'
 import Select, { SELECT_DOWN_ARROW } from '@/common/components/select/AppSelect'
 import BusinessTextArea from './BusinessTextArea.jsx'
+import BusinessCopyButton from './BusinessCopyButton.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import { useOverlayPopupAlign } from '@/common/components/overlay/OverlayScopeContext.mjs'
 import { optionalContactPhoneRule } from '../../utils/contactValidation.mjs'
+import { formatDeliverySnapshotCopy } from '../../utils/sourcePartySnapshots.mjs'
 import {
   DELIVERY_COUNTRY_OPTIONS,
   MAINLAND_DELIVERY_REGIONS,
@@ -110,11 +112,16 @@ export default function DeliveryAddressFields({
   const addressField = customer
     ? 'default_delivery_address'
     : 'delivery_address'
-  const countries = Form.useWatch(
-    (values) => [values.country_region, values.delivery_country_region],
-    form
-  )
-  const country = countries?.[customer ? 0 : 1] || ''
+  const delivery = Form.useWatch((values) => ({
+    country_region: values[countryField],
+    ...(disabled ? {
+      recipient: values[recipientField],
+      phone: values[phoneField],
+      address: values[addressField],
+    } : {}),
+  }), form)
+  const country = delivery?.country_region || ''
+  const copyText = disabled ? formatDeliverySnapshotCopy(delivery) : ''
   const options =
     country && !DELIVERY_COUNTRY_OPTIONS.some(({ value }) => value === country)
       ? [
@@ -180,6 +187,11 @@ export default function DeliveryAddressFields({
       >
         <DeliveryAddressInput country={country} disabled={disabled} description={description} />
       </Form.Item>
+      {copyText && (
+        <Form.Item className="erp-business-action-form__field erp-business-action-form__field--full">
+          <BusinessCopyButton label={customer ? '默认收货信息' : '收货信息'} value={copyText} showLabel />
+        </Form.Item>
+      )}
     </>
   )
 }

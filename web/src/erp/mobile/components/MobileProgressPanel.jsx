@@ -27,7 +27,7 @@ import { useSalesDeliveryWorkspace } from '../../components/sales-orders/useSale
 import { progressBoardViews, scopeProgressBoardQuery } from '../../utils/progressBoardAccess.mjs'
 import { canOpenRelatedDocumentPath } from '../../utils/relatedDocumentNavigation.mjs'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
-import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus } from '../../components/business-visualizations/ProgressCompactContent.jsx'
+import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention, ProgressDocumentNumber, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus } from '../../components/business-visualizations/ProgressCompactContent.jsx'
 import {
   progressQueryFromURL,
   progressExtraFilters,
@@ -556,7 +556,10 @@ export default function MobileProgressPanel({
                       <ProgressLineProduct row={row} />
                       <ProgressLineStatus row={row} snapshotAt={data.snapshot_at} />
                     </span>
-                    <span className="erp-progress-reference">{row.order_no} · {row.customer || '客户未填写'}</span>
+                    <span className="erp-progress-reference">
+                      <ProgressDocumentNumber number={row.order_no} />{' · '}
+                      {row.customer || '客户未填写'}
+                    </span>
                     <span>交付日期 {row.due_date || '未排交期'} · 剩余待交 <ProgressLineRemaining row={row} /></span>
                     <ProgressDelivery row={row} showProgress />
                   </WorkflowTaskCard>

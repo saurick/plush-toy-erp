@@ -177,7 +177,7 @@ export function progressFixtureData(
         due_date: i % 2 ? '2026-09-26' : '2026-09-22',
         overdue: i % 2 === 0 && i !== 4,
         due_soon: i % 2 === 1,
-        line: { sales_order_id: order.id, line_no: i % 2 + 1, customer_product_no: '',
+        line: { sales_order_id: order.id, line_no: i % 2 + 1, customer_product_no: i === 0 ? 'STYLE-0001' : '',
           delivery_status: i === 4 ? 'unknown' : delivery_status,
           remaining_quantity: i === 4 ? null : i % 2 ? '120' : '72' },
       }

@@ -9,6 +9,7 @@ import { openBusinessTableTool } from './businessTableTools.mjs'
 import { clickERPThemeOption } from './themeAssertions.mjs'
 import { assertSingleSelectValues } from './singleSelectAssertions.mjs'
 import { assertProductFieldLayout } from './productFieldLayoutAssertions.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
 async function assertProductIdentityLayout(page) {
   const metrics = await page.locator('.ant-table-tbody .erp-product-identity').evaluateAll((nodes) =>
@@ -57,6 +58,7 @@ function createBOMProductListScenarios({ customerRuntimeEffectiveSession, output
         id: 51 - index,
         product_id: index === 50 ? 4 : index === 2 ? 3 : index === 1 ? 2 : 1,
         version: `BOM-VIEW-${51 - index}`,
+        source_order_no: index === 0 ? 'YS9-XD-150' : '',
         status: 'DRAFT',
       }))
       page.bomProductProbe = { products, requests: [], details: 0, fail: mode === 'retry' }
@@ -83,6 +85,7 @@ function createBOMProductListScenarios({ customerRuntimeEffectiveSession, output
         assert.equal(page.bomProductProbe.requests.length, 0, '无产品读取权限时不能请求产品资料')
         assert.equal(page.productImageProbe.requests.length, 0, '无产品读取权限时不能请求产品图片')
         assert.equal(await first.locator('.erp-product-gallery__trigger').count(), 0)
+        assert.equal(await first.getByRole('button', { name: '复制产品编号', exact: true }).count(), 0)
         return
       }
       if (mode === 'retry') {
@@ -96,6 +99,32 @@ function createBOMProductListScenarios({ customerRuntimeEffectiveSession, output
       assert.equal(page.bomProductProbe.details, 0, '产品名称不依赖选中记录或打开详情')
       assert.ok(page.bomProductProbe.requests.every((params) => JSON.stringify(params.ids) === '[1,2,3]' && params.active_only !== true), '首屏只批量读取当前页的去重产品，并保留停用产品')
       assert.equal(await rows.filter({ hasText: 'BOM-VIEW-49' }).locator('.erp-product-identity__text').innerText(), '产品已关联', '缺失资料不补造产品名称')
+      if (mode === 'list') {
+        const missingProduct = rows.filter({ hasText: 'BOM-VIEW-49' })
+        assert.equal(await missingProduct.getByRole('button', { name: '复制产品编号', exact: true }).count(), 0)
+        assert.equal(await missingProduct.getByRole('button', { name: '复制来源订单号', exact: true }).count(), 0)
+        const fields = [['产品编号', 'BOM-P-001'], ['BOM 版本', 'BOM-VIEW-51'], ['来源订单号', 'YS9-XD-150']]
+        for (const [label, value] of fields) {
+          const button = first.getByRole('button', { name: `复制${label}`, exact: true })
+          const spacing = await button.evaluate((node) => {
+            const range = document.createRange()
+            range.selectNodeContents(node.previousElementSibling)
+            return node.getBoundingClientRect().left - range.getBoundingClientRect().right
+          })
+          assert.ok(Math.abs(spacing - 4) <= 1, `${label}与复制按钮的间距为 ${spacing}px`)
+          await first.getByText(value, { exact: true }).hover()
+          await page.waitForFunction((node) => getComputedStyle(node).opacity === '1', await button.elementHandle())
+          await assertTaskCopy(page, button, value)
+          await page.getByRole('button', { name: `关闭「${label}已复制」提示`, exact: true }).click()
+          await page.mouse.move(0, 0)
+          await page.waitForFunction((node) => getComputedStyle(node).opacity === '0', await button.elementHandle())
+        }
+        const versionCopy = first.getByRole('button', { name: '复制BOM 版本', exact: true })
+        await assertTaskCopy(page, versionCopy, 'BOM-VIEW-51', { keyboard: true, fallback: true })
+        await page.getByRole('button', { name: '关闭「BOM 版本已复制」提示', exact: true }).click()
+        assert.equal(await first.getByRole('checkbox').isChecked(), false, '复制不改变选中行')
+        assert.equal(page.bomProductProbe.details, 0, '复制不打开 BOM 详情')
+      }
       const geometry = async () => first.locator('.erp-product-identity').evaluate((node) => {
         const cell = node.closest('td')
         const image = node.querySelector('.erp-task-product-image').getBoundingClientRect()

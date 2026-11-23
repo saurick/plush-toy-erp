@@ -59,8 +59,8 @@ export default function FinanceSourceAdjustmentsPanel({ customerKey, canCreate, 
     } finally { setSaving(false) }
   }
   const columns = [
-    { title: '来源单号', dataIndex: 'source_no', width: 210 },
-    { title: '应付单号', dataIndex: 'finance_fact_no', width: 210 },
+    { title: '来源单号', dataIndex: 'source_no', copyable: true, width: 210 },
+    { title: '应付单号', dataIndex: 'finance_fact_no', copyable: true, width: 210 },
     { title: '供应商', dataIndex: 'counterparty_name', width: 170 },
     { title: '调整方向', dataIndex: 'balance_direction', width: 110, render: (value) => value === FinanceAdjustmentDirection.INCREASE ? '增加应付' : '减少应付' },
     { title: '差额', dataIndex: 'amount', width: 130, align: 'right' },

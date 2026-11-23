@@ -3,6 +3,7 @@ import { Button, Tag } from 'antd'
 import { FileTextOutlined } from '@ant-design/icons'
 import ProductIdentity, { ProductThumbnail } from '../master-data/ProductIdentity.jsx'
 import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
+import { BusinessCopyField } from '../business-list/BusinessCopyButton.jsx'
 import { canReadDocumentProductGallery } from '../business-list/BusinessDocumentProductGallery.jsx'
 import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import { loadDocumentGalleryProducts } from '../../api/documentProductGalleryApi.mjs'
@@ -72,12 +73,20 @@ export function ProgressDocumentStatus({ status }) {
   return <Tag>{progressStatusLabel(status)}</Tag>
 }
 
+export function ProgressDocumentNumber({ number, view, children, className }) {
+  return (
+    <BusinessCopyField label={view === 'production' ? '生产单号' : '订单号'} value={number} className={className}>
+      {children ?? number?.trim()}
+    </BusinessCopyField>
+  )
+}
+
 export function ProgressIdentity({ row, showStatus = true }) {
   const identity = progressIdentityPresentation(row)
   const content = (
     <span className="erp-progress-identity">
       <strong>{identity.product}</strong>
-      <span className="erp-progress-reference">{identity.reference}</span>
+      <ProgressDocumentNumber number={row.order_no} view={row.view} className="erp-progress-reference">{identity.reference}</ProgressDocumentNumber>
       <span className="erp-progress-customer">
         {identity.customer}
         {showStatus && <ProgressDocumentStatus status={row.status} />}
@@ -144,7 +153,7 @@ export function ProgressDelivery({
 }
 
 export function ProgressLineProduct({ row }) {
-  return <ProductIdentity productId={row.product_id} name={row.product} code={row.line.customer_product_no} compact />
+  return <ProductIdentity productId={row.product_id} name={row.product} code={row.line.customer_product_no} copyCode={{ label: '客户款号' }} compact />
 }
 
 export function ProgressLineRemaining({ row }) {

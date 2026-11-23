@@ -13,6 +13,7 @@ import {
 } from '../../utils/productImageReferences.mjs'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
+import { BusinessCopyField } from '../business-list/BusinessCopyButton.jsx'
 import '../workflow/workflowTaskIdentity.css'
 import './productIdentity.css'
 
@@ -131,6 +132,7 @@ export default function ProductIdentity({
   productId,
   name,
   code,
+  copyCode,
   children,
   compact = false,
   preview = true,
@@ -149,7 +151,13 @@ export default function ProductIdentity({
       />}
       <span className="erp-product-identity__text">
         {children || name || '产品'}
-        {code ? <small>{code}</small> : null}
+        {code ? (
+          <small>
+            {copyCode ? (
+              <BusinessCopyField label={copyCode.label} value={code} revealOnHover={copyCode.revealOnHover} />
+            ) : code}
+          </small>
+        ) : null}
       </span>
     </span>
   )

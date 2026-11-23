@@ -1,6 +1,7 @@
 import React from 'react'
 import { Tag } from 'antd'
 import BusinessCellStack from '../business-list/BusinessCellStack.jsx'
+import { BusinessCopyField } from '../business-list/BusinessCopyButton.jsx'
 import DeliveryInfoCell from '../business-list/DeliveryInfoCell.jsx'
 import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
 
@@ -9,6 +10,7 @@ import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 import { hasFinalShipmentWeight } from '../../utils/shipmentWeight.mjs'
 import { shipmentApprovalState } from '../../utils/shipmentApproval.mjs'
+import { formatDeliverySnapshotCopy, formatDeliverySnapshotText } from '../../utils/sourcePartySnapshots.mjs'
 
 export const SHIPMENTS_MODULE_KEY = 'shipments'
 
@@ -47,15 +49,6 @@ export function shipmentStatusTag(status) {
     <Tag color={SHIPMENT_STATUS_COLORS[key] || 'default'}>
       {shipmentStatusText(key)}
     </Tag>
-  )
-}
-
-function deliveryText(snapshot = {}, { emptyText = '-' } = {}) {
-  const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
-  return (
-    [source.country_region, source.recipient, source.phone, source.address]
-      .filter(Boolean)
-      .join(' ') || emptyText
   )
 }
 
@@ -230,10 +223,12 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '收货信息',
       exportTitle: '收货信息',
       dataIndex: 'delivery_snapshot',
+      copyable: { resolveValue: formatDeliverySnapshotCopy },
+      detailCopyable: true,
       width: 220,
-      sortValue: (record) => deliveryText(record?.delivery_snapshot),
+      sortValue: (record) => formatDeliverySnapshotText(record?.delivery_snapshot),
       render: (value) => <DeliveryInfoCell snapshot={value} />,
-      exportValue: (record) => deliveryText(record?.delivery_snapshot, { emptyText: '' }),
+      exportValue: (record) => formatDeliverySnapshotText(record?.delivery_snapshot, { emptyText: '' }),
     },
     {
       align: 'left',
@@ -241,18 +236,17 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       title: '物流信息',
       exportTitle: '物流信息',
       key: 'transport',
-      copyable: {
-        label: '物流单号',
-        resolveValue: (_value, record) => record?.tracking_no || '',
-      },
       width: 300,
       sortValue: transportText,
-      render: (_, record) => (
-        <BusinessCellStack
-          primary={[record.carrier_name, record.transport_method].filter(Boolean).join(' ')}
-          secondary={record.tracking_no}
-        />
-      ),
+      render: (_, record) => {
+        const trackingNo = String(record.tracking_no ?? '').trim()
+        return (
+          <BusinessCellStack
+            primary={[record.carrier_name, record.transport_method].filter(Boolean).join(' ')}
+            secondary={trackingNo ? <BusinessCopyField label="物流单号" value={trackingNo} revealOnHover /> : null}
+          />
+        )
+      },
       exportValue: (record) => transportText(record, { emptyText: '' }),
     },
     {

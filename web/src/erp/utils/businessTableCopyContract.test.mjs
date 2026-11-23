@@ -3,8 +3,11 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { createElement, useEffect } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { registerJSXTestLoader } from '../../../scripts/test/reactRuntime.mjs'
+import { createReactTestHarness, registerJSXTestLoader } from '../../../scripts/test/reactRuntime.mjs'
+import { resolveBusinessDetailCopyText, resolveBusinessTableCopyText } from './businessTableCopy.mjs'
+import { deliverySnapshotFormValues } from './sourcePartySnapshots.mjs'
 
 registerJSXTestLoader()
 
@@ -32,23 +35,50 @@ function assertCopyableMarker(relativePath, marker, sectionMarker = '') {
   )
 }
 
-test('BusinessDataTable only decorates explicitly copyable columns', () => {
-  const source = readSource('components/business-list/BusinessListLayout.jsx')
-  const componentStart = source.indexOf('function CopyableBusinessTableCell')
-  const componentEnd = source.indexOf('function resolveBusinessTableScrollX')
-  const componentSource = source.slice(componentStart, componentEnd)
+test('a new business table column opts into the shared copy control and keeps row actions separate', async (t) => {
+  const { act, container, render, runtimeWindow } = await createReactTestHarness(t)
+  const { normalizeBusinessTableColumns } = await import('../components/business-list/BusinessListLayout.jsx')
+  const [reference, note] = normalizeBusinessTableColumns([
+    {
+      title: '来源单号',
+      dataIndex: 'external_reference',
+      copyable: true,
+      render: (value) => value ? `来源 ${value}` : '未填写',
+    },
+    { title: '备注', dataIndex: 'note', render: (value) => value },
+  ])
+  const writes = []
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: async (value) => { writes.push(value) } },
+  })
+  const rowEvents = []
+  const renderRow = (value) => render(createElement('div', {
+    onClick: () => rowEvents.push('click'),
+    onDoubleClick: () => rowEvents.push('dblclick'),
+  }, reference.render(value, { external_reference: value }, 0), note.render('备注内容', {}, 0)))
 
-  assert.notEqual(componentStart, -1)
-  assert.notEqual(componentEnd, -1)
-  assert.match(componentSource, /if \(nextColumn\.copyable\)/u)
-  assert.match(componentSource, /event\.stopPropagation\(\)/u)
-  assert.match(componentSource, /event\.detail > 0/u)
-  assert.match(componentSource, /trigger\.blur\(\)/u)
-  assert.match(componentSource, /aria-label=\{`复制\$\{copyLabel\}`\}/u)
-  assert.match(
-    componentSource,
-    /onDoubleClick=\{\(event\) => event\.stopPropagation\(\)\}/u
-  )
+  await renderRow('SO-NEW-001')
+  assert.match(container.textContent, /来源 SO-NEW-001.*备注内容/u)
+  const copy = container.querySelector('button[aria-label="复制来源单号"]')
+  assert.ok(copy?.classList.contains('erp-business-copy-button'))
+  assert.equal(container.querySelectorAll('button').length, 1)
+
+  const sendMouseEvent = (type, detail) => act(async () => {
+    copy.dispatchEvent(new runtimeWindow.MouseEvent(type, { bubbles: true, detail }))
+  })
+  copy.focus()
+  await sendMouseEvent('click', 0)
+  assert.equal(document.activeElement === copy, true, 'keyboard activation retains focus')
+  await sendMouseEvent('click', 1)
+  assert.equal(document.activeElement === copy, false, 'pointer activation releases focus')
+  await sendMouseEvent('dblclick', 2)
+  assert.deepEqual(writes, ['SO-NEW-001', 'SO-NEW-001'])
+  assert.deepEqual(rowEvents, [])
+
+  await renderRow('')
+  assert.equal(container.textContent, '未填写备注内容')
+  assert.equal(container.querySelectorAll('button').length, 0)
 })
 
 test('formal business main tables register useful text columns explicitly', () => {
@@ -69,6 +99,7 @@ test('formal business main tables register useful text columns explicitly', () =
       'export function buildQualityInspectionDataColumns',
     ],
     ['components/bom/BOMVersionColumns.jsx', "dataIndex: 'version'"],
+    ['components/bom/BOMVersionColumns.jsx', "dataIndex: 'source_order_no'"],
     [
       'components/outsourcing-orders/outsourcingOrderColumns.jsx',
       "dataIndex: 'outsourcing_order_no'",
@@ -109,6 +140,57 @@ test('sales order contacts keep missing values safe and copy text independent of
     assert.equal(contact.exportValue(record), copy)
     assert.doesNotMatch(markup, /must-not-be-rendered|\[object Object\]/u)
   }
+})
+
+test('sales, shipment and customer columns copy the visible delivery fields together', async () => {
+  const [{ buildSalesOrderColumns }, { buildShipmentColumns }, { buildMasterDataRecordColumns }] = await Promise.all([
+    import('../components/sales-orders/salesOrderColumns.jsx'),
+    import('../components/shipments/shipmentColumns.jsx'),
+    import('../components/master-data/masterDataColumns.jsx'),
+  ])
+  const delivery = { recipient: '模拟收货人', phone: '020-****0001', country_region: '中国', address: '示例路 10 号' }
+  const expected = '收货人：模拟收货人\n收货电话：020-****0001\n国家 / 地区：中国\n收货地址：示例路 10 号'
+  for (const columns of [buildSalesOrderColumns(), buildShipmentColumns({ salesOrdersByID: new Map() })]) {
+    const column = columns.find(({ dataIndex }) => dataIndex === 'delivery_snapshot')
+    const record = { delivery_snapshot: delivery }
+    assert.equal(resolveBusinessTableCopyText(column, delivery, record), expected)
+    assert.equal(resolveBusinessDetailCopyText(column, record), expected)
+    assert.equal(column.exportValue(record), '中国 模拟收货人 020-****0001 示例路 10 号')
+    assert.equal(resolveBusinessDetailCopyText(column, { delivery_snapshot: { address: '-', country_region: '中国' } }), '')
+  }
+  const column = buildMasterDataRecordColumns({ type: 'customers' }).find(({ key }) => key === 'default_delivery')
+  assert.equal(resolveBusinessDetailCopyText(column, {
+    country_region: '中国',
+    default_delivery_address: '新示例地址',
+  }), '收货地址：新示例地址')
+})
+
+test('read-only delivery copy follows replaced and cleared form fields', async (t) => {
+  const { act, container, render } = await createReactTestHarness(t)
+  const [{ Form }, { default: DeliveryAddressFields }] = await Promise.all([
+    import('antd'),
+    import('../components/business-list/DeliveryAddressFields.jsx'),
+  ])
+  const writes = []
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: async (value) => { writes.push(value) } },
+  })
+  function Preview({ snapshot }) {
+    const [form] = Form.useForm()
+    useEffect(() => { form.setFieldsValue(deliverySnapshotFormValues(snapshot)) }, [form, snapshot])
+    return createElement(Form, { form, disabled: true }, createElement(DeliveryAddressFields, { form, disabled: true }))
+  }
+  const copy = () => container.querySelector('button[aria-label="复制收货信息"]')
+  await render(createElement(Preview, { snapshot: { recipient: '模拟收货人', phone: '020-****0001' } }))
+  assert.ok(copy())
+  assert.equal(copy().disabled, false)
+  await act(async () => copy().click())
+  await render(createElement(Preview, { snapshot: { address: '新示例地址' } }))
+  await act(async () => copy().click())
+  assert.deepEqual(writes, ['收货人：模拟收货人\n收货电话：020-****0001', '收货地址：新示例地址'])
+  await render(createElement(Preview, { snapshot: {} }))
+  assert.equal(Boolean(copy()), false)
 })
 
 test('copy whitelist avoids routine dates, amounts, quantities and statuses', () => {

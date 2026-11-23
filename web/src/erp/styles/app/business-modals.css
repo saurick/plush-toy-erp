@@ -250,27 +250,6 @@
   grid-column: 1 / -1;
 }
 
-.erp-business-details-modal__copy-value {
-  display: inline-flex;
-  max-width: 100%;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-}
-
-.erp-business-copy-button.ant-btn {
-  width: max(24px, var(--erp-touch-target, 0px));
-  min-width: max(24px, var(--erp-touch-target, 0px));
-  height: max(24px, var(--erp-touch-target, 0px));
-  padding: 0;
-  color: var(--erp-primary-strong, #237234);
-}
-
-.erp-business-details-modal__copy-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .erp-business-action-form__section-title-text {
   min-width: 0;
   flex: 0 1 auto;

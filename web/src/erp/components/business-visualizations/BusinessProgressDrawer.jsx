@@ -24,6 +24,7 @@ import { canReadPurchaseFollowups, salesPurchaseFollowupPath } from '../../utils
 import MobileDetailHeader from '../../mobile/components/MobileDetailHeader.jsx'
 import MobileProgressSummary from '../../mobile/components/MobileProgressSummary.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
+import { ProgressDocumentNumber } from './ProgressCompactContent.jsx'
 import BusinessProgressSummary, {
   BusinessProgressHeader,
 } from './BusinessProgressSummary.jsx'
@@ -284,9 +285,11 @@ export default function BusinessProgressDrawer({
     : {
         title: (
           <>
-            <span role="heading" aria-level={2} ref={headingRef} tabIndex={-1}>
-              {selection?.orderNo || '订单'}
-            </span>{' '}
+            <ProgressDocumentNumber number={data?.row.order_no} view={selectedView}>
+              <span role="heading" aria-level={2} ref={headingRef} tabIndex={-1}>
+                {data?.row.order_no?.trim() || selection?.orderNo || '订单'}
+              </span>
+            </ProgressDocumentNumber>{' '}
             · 完整进度
           </>
         ),

@@ -11,6 +11,7 @@ import {
 } from '../../utils/businessProgress.mjs'
 import {
   ProgressAttention,
+  ProgressDocumentNumber,
   ProgressProductIdentity,
 } from './ProgressCompactContent.jsx'
 import ProgressMetricHint, { ProgressHint } from './ProgressMetricHint.jsx'
@@ -39,8 +40,8 @@ export function BusinessProgressHeader({
     <header className="erp-progress-detail-header" aria-label="单据摘要">
       <div className="erp-progress-overview-identity">
         {mobile && (
-          <h2 ref={headingRef} tabIndex={-1}>
-            {identity.reference}
+          <h2 ref={headingRef} tabIndex={-1} aria-label={identity.reference}>
+            <ProgressDocumentNumber number={row.order_no} view={row.view}>{identity.reference}</ProgressDocumentNumber>
           </h2>
         )}
         <div className="erp-progress-overview-product">

@@ -1,5 +1,6 @@
 .erp-task-copy-field {
   display: inline-flex;
+  width: fit-content;
   align-items: center;
   gap: 4px;
   max-width: 100%;
@@ -146,7 +147,7 @@
   pointer-events: none;
 }
 
-.erp-task-card__content .erp-task-copy {
+.erp-task-card__content :is(.erp-task-copy, .erp-business-copy-button) {
   pointer-events: auto;
 }
 

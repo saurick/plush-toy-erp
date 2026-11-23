@@ -2,7 +2,7 @@ import React from 'react'
 import { Descriptions } from 'antd'
 import { resolveBusinessDetailCopyText, resolveBusinessTableCopyLabel } from '../../utils/businessTableCopy.mjs'
 import { getColumnLabel } from './ColumnOrderModal.jsx'
-import BusinessCopyButton from './BusinessCopyButton.jsx'
+import { BusinessCopyField } from './BusinessCopyButton.jsx'
 import { visibleDetailValue } from './BusinessRowItemCards.jsx'
 
 function readDataIndex(record, dataIndex) {
@@ -67,13 +67,9 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
                 {emptyValue.reason ? <p className="mobile-task-facts__note">{emptyValue.reason}</p> : null}
               </>
             ) : copyText ? (
-              <span className="erp-business-details-modal__copy-value">
-                <span className="erp-business-details-modal__copy-text">{value}</span>
-                <BusinessCopyButton
-                  label={resolveBusinessTableCopyLabel(column, record)}
-                  value={copyText}
-                />
-              </span>
+              <BusinessCopyField label={resolveBusinessTableCopyLabel(column, record)} value={copyText}>
+                {value}
+              </BusinessCopyField>
             ) : (
               value
             ),

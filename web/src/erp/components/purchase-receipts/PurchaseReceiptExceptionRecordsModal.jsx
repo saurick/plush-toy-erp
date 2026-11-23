@@ -6,6 +6,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Popconfirm, Space, Tag } from 'antd'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { BusinessCopyField } from '../business-list/BusinessCopyButton.jsx'
 import Table from '@/common/components/table/AppTable'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 
@@ -303,7 +304,12 @@ export default function PurchaseReceiptExceptionRecordsModal({
 
   const returnColumns = useMemo(
     () => [
-      { title: '退货单号', dataIndex: 'return_no', width: 180 },
+      {
+        title: '退货单号',
+        dataIndex: 'return_no',
+        width: 180,
+        render: (value) => <BusinessCopyField label="退货单号" value={value} revealOnHover>{value || '—'}</BusinessCopyField>,
+      },
       { title: '状态', dataIndex: 'status', width: 100, render: statusTag },
       {
         title: '退货时间',
@@ -333,7 +339,12 @@ export default function PurchaseReceiptExceptionRecordsModal({
 
   const adjustmentColumns = useMemo(
     () => [
-      { title: '调整单号', dataIndex: 'adjustment_no', width: 180 },
+      {
+        title: '调整单号',
+        dataIndex: 'adjustment_no',
+        width: 180,
+        render: (value) => <BusinessCopyField label="调整单号" value={value} revealOnHover>{value || '—'}</BusinessCopyField>,
+      },
       { title: '状态', dataIndex: 'status', width: 100, render: statusTag },
       {
         title: '调整时间',

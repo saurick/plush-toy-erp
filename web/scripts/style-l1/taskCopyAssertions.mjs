@@ -5,7 +5,13 @@ export async function assertTaskCopy(
   page,
   button,
   expected,
-  { keyboard = false, failure = false, fallback = false, returnFocus = button } = {}
+  {
+    keyboard = false,
+    failure = false,
+    fallback = false,
+    returnFocus = button,
+    failureMessage = '复制失败，请在任务详情中选中文字复制',
+  } = {}
 ) {
   const details = page.locator(
     '.erp-task-action-drawer:visible, [data-testid="mobile-task-detail-screen"]'
@@ -54,7 +60,7 @@ export async function assertTaskCopy(
     } else await button.click()
     if (failure) {
       await page
-        .getByText('复制失败，请在任务详情中选中文字复制', { exact: true })
+        .getByText(failureMessage, { exact: true })
         .waitFor()
     } else {
       await page.waitForFunction(

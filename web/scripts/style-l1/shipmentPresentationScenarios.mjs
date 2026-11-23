@@ -7,6 +7,9 @@ import { chooseSelectOption } from './selectControlActions.mjs'
 import { mockShipmentSourceCandidates } from './factRpcMocks.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
+
+const shipmentDeliveryCopy = '收货人：模拟收货人\n收货电话：020-00000001\n国家 / 地区：中国\n收货地址：广东省东莞市示例路 10 号'
 
 export function createShipmentSourceCandidateAssertions(deps) {
   const { assert, assertTextAbsent, expectText, outputDir, path } = deps
@@ -323,6 +326,21 @@ export function createShipmentWeightScenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       ...presentation,
       verify: async (page) => {
+        const row = page.getByRole('row').filter({ hasText: 'SHIP-STYLE-L1' })
+        if (variant === 'desktop') {
+          await assertTaskCopy(page, row.getByRole('button', { name: '复制收货信息', exact: true }), shipmentDeliveryCopy, { keyboard: true })
+          await page.getByRole('button', { name: '关闭「收货信息已复制」提示', exact: true }).click()
+          const tracking = row.getByRole('button', { name: '复制物流单号', exact: true })
+          const gap = await tracking.evaluate((button) => {
+            const range = document.createRange()
+            range.selectNodeContents(button.previousElementSibling)
+            return button.getBoundingClientRect().left - range.getBoundingClientRect().right
+          })
+          assert.ok(Math.abs(gap - 4) <= 1, `物流单号与按钮的间距为 ${gap}px`)
+          await assertTaskCopy(page, tracking, 'TRACK-STYLE-L1', { keyboard: true })
+          await page.getByRole('button', { name: '关闭「物流单号已复制」提示', exact: true }).click()
+          assert.equal(await row.getByRole('radio').isChecked(), false)
+        }
         await page.getByText('SHIP-STYLE-L1', { exact: true }).first().click()
         await page.getByRole('button', { name: '查看明细', exact: false }).click()
         const editor = page.getByRole('region', { name: '查看出货明细', exact: true })
@@ -342,6 +360,19 @@ export function createShipmentWeightScenarios(deps) {
         for (const title of ['财务审批', '出货明细', '收货信息', '财务审批', '备注与附件']) {
           await jump(title)
         }
+        await jump('收货信息')
+        const deliverySection = editor.getByRole('region', { name: '收货信息', exact: true })
+        const copy = deliverySection.getByRole('button', { name: '复制收货信息', exact: true })
+        if (!targetViewport) {
+          const headingID = await deliverySection.getByRole('heading', { name: '收货信息', exact: true }).getAttribute('id')
+          await page.waitForFunction((id) => document.activeElement?.id === id, headingID)
+        }
+        if (targetViewport) {
+          const box = await copy.boundingBox()
+          assert.ok(box && box.width >= 44 && box.height >= 44, '收货资料复制按钮触区至少 44px')
+        }
+        await assertTaskCopy(page, copy, shipmentDeliveryCopy, { keyboard: !targetViewport })
+        await page.getByRole('button', { name: '关闭「收货信息已复制」提示', exact: true }).click()
         await jump('财务审批')
         const number = editor.getByRole('textbox', { name: /出货单号/u })
         assert.equal(await number.isDisabled(), true)

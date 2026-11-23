@@ -12,6 +12,7 @@ import {
 import { formatPaymentCondition } from '../../utils/paymentConditions.mjs'
 import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import { formatDeliverySnapshotCopy, formatDeliverySnapshotText } from '../../utils/sourcePartySnapshots.mjs'
 
 export const SUPPLIER_TYPE_OPTIONS = Object.freeze([
   { label: '原辅料供应商', value: 'material' },
@@ -391,6 +392,14 @@ function supplierProcessLabels(processIDs, processOptions) {
     .filter(Boolean)
 }
 
+function customerDefaultDelivery(record) {
+  return {
+    recipient: record?.default_delivery_recipient,
+    phone: record?.default_delivery_phone,
+    address: record?.default_delivery_address,
+  }
+}
+
 function baseColumns({ type, unitDisplay, processOptions }) {
   return [
     {
@@ -512,43 +521,18 @@ function baseColumns({ type, unitDisplay, processOptions }) {
             title: '默认收货信息',
             exportTitle: '默认收货信息',
             key: 'default_delivery',
+            copyable: { resolveValue: (_value, record) => formatDeliverySnapshotCopy(customerDefaultDelivery(record)) },
+            detailCopyable: true,
             defaultHidden: true,
             width: 320,
             widthGrow: 2,
             sorter: (a, b) =>
               compareText(
-                [
-                  a?.default_delivery_recipient,
-                  a?.default_delivery_phone,
-                  a?.default_delivery_address,
-                ]
-                  .filter(Boolean)
-                  .join(' '),
-                [
-                  b?.default_delivery_recipient,
-                  b?.default_delivery_phone,
-                  b?.default_delivery_address,
-                ]
-                  .filter(Boolean)
-                  .join(' ')
+                formatDeliverySnapshotText(customerDefaultDelivery(a), { emptyText: '' }),
+                formatDeliverySnapshotText(customerDefaultDelivery(b), { emptyText: '' })
               ),
-            render: (_, record) => (
-              <DeliveryInfoCell
-                snapshot={{
-                  recipient: record?.default_delivery_recipient,
-                  phone: record?.default_delivery_phone,
-                  address: record?.default_delivery_address,
-                }}
-              />
-            ),
-            exportValue: (record) =>
-              [
-                record?.default_delivery_recipient,
-                record?.default_delivery_phone,
-                record?.default_delivery_address,
-              ]
-                .filter(Boolean)
-                .join(' '),
+            render: (_, record) => <DeliveryInfoCell snapshot={customerDefaultDelivery(record)} />,
+            exportValue: (record) => formatDeliverySnapshotText(customerDefaultDelivery(record), { emptyText: '' }),
           },
         ]
       : []),

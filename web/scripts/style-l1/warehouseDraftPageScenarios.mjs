@@ -2,6 +2,7 @@ import { expect } from 'playwright/test'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { installImages } from './productIdentityScenarios.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
 export function createWarehouseDraftPageScenarios(deps) {
   return [
@@ -134,6 +135,8 @@ export function createWarehouseDraftPageScenarios(deps) {
           .getByRole('row')
           .filter({ hasText: record.operation_no })
         if (kind === 'CYCLE_COUNT') {
+          await assertTaskCopy(page, row.getByRole('button', { name: '复制作业单号', exact: true }), record.operation_no, { keyboard: true })
+          await page.getByRole('button', { name: '关闭「作业单号已复制」提示', exact: true }).click()
           await expect(row.locator('.erp-product-identity')).toHaveCount(0)
           await row.getByRole('button', { name: '核对', exact: true }).click()
           const detail = page.getByRole('dialog', { name: /库存作业明细/ })

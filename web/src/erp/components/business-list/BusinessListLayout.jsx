@@ -5,7 +5,6 @@ import {
   CheckCircleOutlined,
   CheckSquareOutlined,
   CloseOutlined,
-  CopyOutlined,
   DownOutlined,
   EllipsisOutlined,
   SendOutlined,
@@ -39,6 +38,7 @@ import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresenta
 import BusinessFilterPopoverContent from './BusinessFilterPopoverContent.jsx'
 import { BusinessFilterPanelContext } from './BusinessFilterPanelContext.mjs'
 import './businessFilterChoices.css'
+import BusinessCopyButton from './BusinessCopyButton.jsx'
 import {
   describeSelectionActions,
   flattenSelectionActions,
@@ -50,8 +50,6 @@ import { WorkflowTaskSelectionActions, WorkflowTaskSourceDetails } from '../work
 import ERPPageActions from '../ERPPageActions.jsx'
 import { BusinessSplitPageTitle } from '../BusinessSplitHeader.jsx'
 import useBusinessListStickyHeader from './useBusinessListStickyHeader.js'
-import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
-import { showCopyFailure, showCopySuccess } from '@/common/components/feedback/copyFeedback.jsx'
 import { BusinessHelpLabel, BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 import { formatPaginationTotal } from '@/common/utils/pagination.mjs'
@@ -525,28 +523,12 @@ function CopyableBusinessTableCell({ column, value, record, children }) {
   const copyText = resolveBusinessTableCopyText(column, value, record)
   if (!copyText) return children
 
-  const copyLabel = resolveBusinessTableCopyLabel(column, record)
-  const handleCopy = async (event) => {
-    const trigger = event.currentTarget
-    const shouldReleasePointerFocus = event.detail > 0
-    event.stopPropagation()
-    try {
-      await copyTextToClipboard(copyText)
-      showCopySuccess(copyLabel, trigger)
-    } catch {
-      showCopyFailure()
-    } finally {
-      if (shouldReleasePointerFocus && document.activeElement === trigger) {
-        trigger.blur()
-      }
-    }
-  }
-
   return (
     <div
       className="erp-business-table-copyable-cell"
       data-copyable-column={businessTableCopyColumnKey(column) || undefined}
       data-align={column.align || 'left'}
+      data-copy-reveal="hover"
     >
       <div
         className="erp-business-table-copyable-cell__content"
@@ -554,15 +536,9 @@ function CopyableBusinessTableCell({ column, value, record, children }) {
       >
         {children}
       </div>
-      <Button
-        type="text"
-        size="small"
-        className="erp-business-table-copyable-cell__button"
-        icon={<CopyOutlined />}
-        aria-label={`复制${copyLabel}`}
-        title={`复制${copyLabel}`}
-        onClick={handleCopy}
-        onDoubleClick={(event) => event.stopPropagation()}
+      <BusinessCopyButton
+        label={resolveBusinessTableCopyLabel(column, record)}
+        value={copyText}
       />
     </div>
   )

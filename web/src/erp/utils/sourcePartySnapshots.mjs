@@ -3,6 +3,7 @@ import {
   normalizeOptionalNonNegativeInteger,
   compactParams,
 } from './sourceDocumentValues.mjs'
+import { normalizeBusinessTableCopyText } from './businessTableCopy.mjs'
 
 function buildCustomerSnapshot(customer = {}) {
   if (!customer?.id) {
@@ -33,6 +34,26 @@ function deliverySnapshotFormValues(snapshot = {}) {
     delivery_phone: trimOptional(source.phone) || '',
     delivery_address: trimOptional(source.address) || '',
   }
+}
+
+function formatDeliverySnapshotText(snapshot, { emptyText = '-' } = {}) {
+  return [snapshot?.country_region, snapshot?.recipient, snapshot?.phone, snapshot?.address]
+    .filter(Boolean)
+    .join(' ') || emptyText
+}
+
+function formatDeliverySnapshotCopy(snapshot) {
+  const recipient = normalizeBusinessTableCopyText(snapshot?.recipient)
+  const phone = normalizeBusinessTableCopyText(snapshot?.phone)
+  const country = normalizeBusinessTableCopyText(snapshot?.country_region)
+  const address = normalizeBusinessTableCopyText(snapshot?.address)
+  if (!recipient && !phone && !address) return ''
+  return [
+    recipient && `收货人：${recipient}`,
+    phone && `收货电话：${phone}`,
+    country && `国家 / 地区：${country}`,
+    address && `收货地址：${address}`,
+  ].filter(Boolean).join('\n')
 }
 
 function buildSalesOrderCustomerSourceValues(customer = {}) {
@@ -233,6 +254,8 @@ export {
   contractPartySnapshotFromPrintTemplateDefaults,
   buildCustomerSnapshot,
   deliverySnapshotFormValues,
+  formatDeliverySnapshotCopy,
+  formatDeliverySnapshotText,
   buildSalesOrderCustomerSourceValues,
   SUPPLIER_CONTACT_OWNER_TYPE,
   buildSupplierSnapshot,

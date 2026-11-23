@@ -6,6 +6,10 @@ const stylesheet = readFileSync(
   new URL('./business-tables.css', import.meta.url),
   'utf8'
 )
+const copyStyles = readFileSync(
+  new URL('../../components/business-list/businessCopy.css', import.meta.url),
+  'utf8'
+)
 
 test('business page headers share compact layout without decorative count tiles', () => {
   assert.doesNotMatch(stylesheet, /erp-business-page-header-card__stat/u)
@@ -17,17 +21,12 @@ test('business page headers share compact layout without decorative count tiles'
 
 test('copyable table cells reveal a real button on hover and keyboard focus', () => {
   assert.match(
-    stylesheet,
-    /\.erp-business-table-copyable-cell:hover[\s\S]*?\.erp-business-table-copyable-cell__button\.ant-btn[\s\S]*?opacity:\s*1\s*;/u
+    copyStyles,
+    /\[data-copy-reveal='hover'\]:is\(:hover, :focus-within\)\s*>\s*\.erp-business-copy-button\.ant-btn\s*\{\s*opacity:\s*1\s*;/u
   )
   assert.match(
-    stylesheet,
-    /\.erp-business-table-copyable-cell:focus-within[\s\S]*?\.erp-business-table-copyable-cell__button\.ant-btn/u
-  )
-  assert.match(stylesheet, /@media\s*\(hover:\s*none\)\s*\{/u)
-  assert.doesNotMatch(
-    stylesheet,
-    /@media\s*\(hover:\s*none\)\s+and\s+\(pointer:\s*coarse\)\s*\{/u
+    copyStyles,
+    /@media\s*\(hover:\s*hover\)\s+and\s+\(pointer:\s*fine\)\s*\{[^}]*opacity:\s*0\s*;/u
   )
 })
 

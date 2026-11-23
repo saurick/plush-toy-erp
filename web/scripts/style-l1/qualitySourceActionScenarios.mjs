@@ -2,6 +2,7 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertCompactSettingsModal } from './compactSettingsAssertions.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
 export function createQualitySourceActionScenarios(deps) {
   const {
@@ -763,6 +764,10 @@ viewport: { width: viewport.width, height: viewport.height },
           }
           await filters.getByRole('button', { name: '收起', exact: true }).click()
 
+          await assertTaskCopy(page, row.getByRole('button', { name: '复制检验来源', exact: true }), '生产订单：MO-WIP-STYLE-L1-001\n生产工序：车缝\n质量关口：皮套检验', { keyboard: true })
+          await page.getByRole('button', { name: '关闭「检验来源已复制」提示', exact: true }).click()
+          await assertTaskCopy(page, row.getByRole('button', { name: '复制批次号', exact: true }), 'WIP-SEWING-STYLE-L1-001', { keyboard: true })
+          await page.getByRole('button', { name: '关闭「批次号已复制」提示', exact: true }).click()
           await row.click()
           for (const technicalCopy of [
             'PRODUCTION_STAGE',

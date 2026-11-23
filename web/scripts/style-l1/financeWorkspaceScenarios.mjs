@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
 async function verifyCreditReversal(page, screenshotPath) {
   await page.getByRole('row').filter({ hasText: 'CR-NAV-901' }).click()
@@ -88,8 +89,13 @@ export function createFinanceWorkspaceScenarios({
           if (method !== 'list_finance_payments') return route.fallback()
           const totals = groups.filter((g) => !params.status || g.status === params.status)
             .map(({ currency, direction, status, count, amount }) => ({ currency, direction, status, count, amount }))
+          const sourceExamples = [
+            { kind: 'ADVANCE', source_no: 'SO-PAY-001' },
+            { kind: 'REFUND', refund_of_payment_no: 'PAY-ORIGINAL-001' },
+            { kind: 'ADVANCE' },
+          ]
           const payments = groups.flatMap((g) => Array.from({ length: g.count }, () => g))
-            .map((g, i) => ({ id: i + 1, payment_no: `PAY-SUM-${i + 1}`, amount: g.unitAmount, status: g.status, direction: g.direction, currency: g.currency }))
+            .map((g, i) => ({ id: i + 1, payment_no: `PAY-SUM-${i + 1}`, amount: g.unitAmount, status: g.status, direction: g.direction, currency: g.currency, ...sourceExamples[i] }))
             .filter((row) => !params.status || row.status === params.status)
           const data = { ...stylePaginatedRpcData(payments, 'payments', params), status_counts: { DRAFT: 1, POSTED: 52 } }
           if (params.include_totals) data.totals = totals
@@ -97,6 +103,18 @@ export function createFinanceWorkspaceScenarios({
         })
       },
       verify: async (page) => {
+        const paymentRow = (number) => page.getByRole('row').filter({ has: page.getByText(number, { exact: true }) })
+        for (const [number, label, value] of [
+          ['PAY-SUM-1', '关联订单号', 'SO-PAY-001'],
+          ['PAY-SUM-2', '原收付款单号', 'PAY-ORIGINAL-001'],
+        ]) {
+          const row = paymentRow(number)
+          await assertTaskCopy(page, row.getByRole('button', { name: `复制${label}`, exact: true }), value, { keyboard: true })
+          await page.getByRole('button', { name: `关闭「${label}已复制」提示`, exact: true }).click()
+          await expect(row.getByRole('radio')).not.toBeChecked()
+        }
+        await expect(paymentRow('PAY-SUM-3')).toContainText('关联订单待核对')
+        await expect(paymentRow('PAY-SUM-3').getByRole('button', { name: '复制关联订单号', exact: true })).toHaveCount(0)
         const tools = page.getByRole('button', { name: '表格工具', exact: true })
         const dialog = page.getByRole('dialog', { name: '金额汇总', exact: true })
         const openSummary = async () => {
@@ -326,6 +344,13 @@ export function createFinanceWorkspaceScenarios({
         await header.getByRole('tab', { name: '应付', exact: true }).click()
         await nav.getByRole('tab', { name: '采购待调整', exact: true }).click()
         await page.getByText('RET-NAV-81', { exact: true }).waitFor()
+        if (width === 1920) {
+          const row = page.getByRole('row').filter({ hasText: 'RET-NAV-81' })
+          await assertTaskCopy(page, row.getByRole('button', { name: '复制来源单号', exact: true }), 'RET-NAV-81', { keyboard: true })
+          await page.getByRole('button', { name: '关闭「来源单号已复制」提示', exact: true }).click()
+          await assertTaskCopy(page, row.getByRole('button', { name: '复制应付单号', exact: true }), 'AP-NAV-81', { keyboard: true })
+          await page.getByRole('button', { name: '关闭「应付单号已复制」提示', exact: true }).click()
+        }
         await page.screenshot({
           path: `${outputDir}/finance-payables-${width}.png`,
         })

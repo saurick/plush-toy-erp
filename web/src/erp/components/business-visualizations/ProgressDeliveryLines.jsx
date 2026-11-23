@@ -2,7 +2,7 @@ import React from 'react'
 import { BusinessProgressSort } from '@/common/consts/statuses.generated.mjs'
 import ProgressSortHeader from './ProgressSortHeader.jsx'
 import { openWorkflowTaskRow } from '../../utils/workflowTaskEntry.mjs'
-import { ProgressDelivery, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus, ProgressOpenButton } from './ProgressCompactContent.jsx'
+import { ProgressDelivery, ProgressDocumentNumber, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus, ProgressOpenButton } from './ProgressCompactContent.jsx'
 
 const labels = ['订单 / 客户', '产品', '交付日期', '已出货 / 订购', '剩余待交', '交付状态']
 
@@ -29,7 +29,7 @@ export default function ProgressDeliveryLines({ rows, snapshotAt, onOpen, select
           >
             <td className="erp-progress-line-identity">
               <div className="erp-progress-identity">
-                <span className="erp-progress-reference">{row.order_no}</span>
+                <ProgressDocumentNumber number={row.order_no} className="erp-progress-reference" />
                 <span className="erp-progress-customer">{row.customer || '客户未填写'}</span>
               </div>
             </td>

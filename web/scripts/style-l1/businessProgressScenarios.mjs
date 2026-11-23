@@ -4,6 +4,7 @@ import { openDateFilter } from './dateFilterActions.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 import { isTransparentColor } from './colorAssertions.mjs'
 
 async function verifyProgressMotion(page, assert, reduced) {
@@ -275,6 +276,15 @@ export function createBusinessProgressScenarios({
           row.cells.length === 6 && Array.from(row.cells).every((cell) => cell.colSpan === 1))))
         assert.equal(await board.getByRole('button', { name: '查看任务', exact: true }).count(), 0)
         const firstCells = table.locator('tbody tr').first().getByRole('cell')
+        if (name === 'erp-business-dashboard-desktop') {
+          const copy = firstCells.first().getByRole('button', { name: '复制订单号', exact: true })
+          assert.equal(await copy.evaluate((node) => getComputedStyle(node).opacity), '1')
+          await assertTaskCopy(page, copy, '', { failure: true, failureMessage: '复制失败，请手动复制' })
+          await assertTaskCopy(page, copy, 'SO-0001', { keyboard: true })
+          await page.getByText('复制失败，请手动复制', { exact: true }).waitFor({ state: 'hidden' })
+          await page.getByRole('button', { name: '关闭「订单号已复制」提示', exact: true }).click()
+          assert.equal(await page.getByRole('dialog').count(), 0)
+        }
         assert.equal(await firstCells.nth(1).getByText('已生效', { exact: true }).count(), 1, '订单状态独立展示')
         assert.equal(await firstCells.first().getByText('已生效', { exact: true }).count(), 0)
         const firstProgressEntry = firstCells.last()
@@ -355,6 +365,11 @@ export function createBusinessProgressScenarios({
         let drawer = page.getByRole('dialog')
         await waitForDetail('SO-0002')
         assert.equal(new URL(page.url()).searchParams.get('selected'), 'orders:2')
+        if (name === 'erp-business-dashboard-desktop') {
+          await assertTaskCopy(page, drawer.getByRole('button', { name: '复制订单号', exact: true }), 'SO-0002', { keyboard: true })
+          assert(await drawer.isVisible(), '复制单号后保持详情打开')
+          await page.getByRole('button', { name: '关闭「订单号已复制」提示', exact: true }).click()
+        }
         assert.equal(calls.filter((call) => call.method === 'list_progress').length, listReadCount)
         await drawer.getByRole('tab', { name: '进度总览', exact: true, selected: true }).waitFor()
         const stageMetric = drawer.getByRole('button', { name: '查看已出货 / 订购数值与口径', exact: true })
@@ -492,11 +507,24 @@ export function createBusinessProgressScenarios({
         await search.fill('')
         await search.press('Enter')
         await progressCard('SO-0001').waitFor()
+        if (name === 'erp-business-dashboard-desktop') {
+          const switcher = board.getByLabel('交付查看方式', { exact: true })
+          await switcher.getByText('产品明细', { exact: true }).click()
+          const line = board.locator('tr[data-progress-line-id="101"]')
+          await assertTaskCopy(page, line.getByRole('button', { name: '复制订单号', exact: true }), 'SO-0001')
+          await assertTaskCopy(page, line.getByRole('button', { name: '复制客户款号', exact: true }), 'STYLE-0001')
+          await switcher.getByText('整单', { exact: true }).click()
+          await progressCard('SO-0001').waitFor()
+        }
         await verifyProgressMotion(page, assert, false)
         await progressCard('MO-0001').waitFor()
         const productionTable = board.locator('table[aria-label="生产执行紧凑总览"]')
         assert.deepEqual(await productionTable.locator('th').allTextContents(), ['生产单 / 产品', '生产单状态', '计划结束', '有效完工 / 计划', '当前关注 / 处理人', '操作'])
         const productionCells = productionTable.locator('tbody tr').first().getByRole('cell')
+        if (name === 'erp-business-dashboard-desktop') {
+          await assertTaskCopy(page, productionCells.first().getByRole('button', { name: '复制生产单号', exact: true }), 'MO-0001')
+          assert.equal(await page.getByRole('dialog').count(), 0)
+        }
         assert.equal(await productionCells.nth(1).getByText('已下达', { exact: true }).count(), 1)
         await productionCells.last().getByRole('button', { name: '查看进度：MO-0001', exact: true }).waitFor()
         await openFromRow('MO-0002')

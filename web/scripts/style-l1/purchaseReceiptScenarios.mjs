@@ -9,6 +9,7 @@ import { assertBusinessSectionInteractions } from './businessFormSectionAssertio
 import { assertBusinessFormPage, assertBusinessNoteTextAreas, closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 import { PermissionCode } from '../../src/common/consts/permissions.generated.mjs'
 import { assertAlertSiblingSpacing } from './alertSpacingAssertions.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
 export function createPurchaseReceiptScenarios(deps) {
   const {
@@ -551,6 +552,8 @@ export function createPurchaseReceiptScenarios(deps) {
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '确认草稿后库存会同步更新')
         await expectText(page, 'PRT-STYLE-L1')
+        await assertTaskCopy(page, modal.getByRole('button', { name: '复制退货单号', exact: true }), 'PRT-STYLE-L1', { keyboard: true })
+        await page.getByRole('button', { name: '关闭「退货单号已复制」提示', exact: true }).click()
         await assertBusinessModalViewport(page, modal, {
           label: 'purchase-return-adjustment-records',
           minWidthRatio: 0.9,
@@ -577,6 +580,8 @@ export function createPurchaseReceiptScenarios(deps) {
         await expectText(page, '采购退货已确认')
         await modal.getByRole('tab', { name: /入库调整/u }).click()
         await expectText(page, 'PRA-STYLE-L1')
+        await assertTaskCopy(page, modal.getByRole('button', { name: '复制调整单号', exact: true }), 'PRA-STYLE-L1', { keyboard: true })
+        await page.getByRole('button', { name: '关闭「调整单号已复制」提示', exact: true }).click()
         await modal.getByText('草稿可直接作废且不更新库存；确认草稿后库存会同步更新；撤销已确认记录只撤销该笔记录对库存的影响，原记录仍保留。').waitFor()
         await modal.getByRole('button', { name: '撤销入库调整', exact: true }).click()
         await page

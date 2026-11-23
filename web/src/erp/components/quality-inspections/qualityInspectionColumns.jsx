@@ -487,6 +487,10 @@ export function buildQualityInspectionDataColumns({
       dataIndex: 'inspection_type',
       width: 240,
       widthGrow: 1,
+      copyable: {
+        resolveValue: (_value, record) => sourceParts(record, purchaseReceiptOptions, allPurchaseReceiptItemOptions, { emptyText: '' }),
+      },
+      detailCopyable: true,
       render: (_value, record) =>
         renderStackCell(
           inspectionTypeLabel(record),
@@ -563,6 +567,8 @@ export function buildQualityInspectionDataColumns({
           return {
             ...column,
             defaultPriority: 45,
+            copyable: { label: '批次号', resolveValue: (_value, record) => batchLabel(record, { emptyText: '' }) },
+            detailCopyable: true,
             width: 170,
             sortType: 'text',
             sortValue: (record) => batchLabel(record, { emptyText: '' }),

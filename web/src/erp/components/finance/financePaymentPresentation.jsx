@@ -94,13 +94,14 @@ export function partyOption(record, fallback) {
   }
 }
 
-export function paymentSourceReference(record, { emptyText = '—' } = {}) {
+export function paymentSourceReference(record, { emptyText = '—', numberOnly = false } = {}) {
   if (record?.kind === FinancePaymentKind.REFUND) {
-    return record.refund_of_payment_no || '原收付款单待核对'
+    return record.refund_of_payment_no || (numberOnly ? '' : '原收付款单待核对')
   }
   if (record?.kind === FinancePaymentKind.ADVANCE) {
-    return record.source_no || '关联订单待核对'
+    return record.source_no || (numberOnly ? '' : '关联订单待核对')
   }
+  if (numberOnly) return ''
   const allocations = Array.isArray(record?.allocations)
     ? record.allocations
     : []

@@ -18,6 +18,7 @@ import { createMobileFilterScrollScenarios } from './mobileFilterScrollScenarios
 import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 import { createMobileTaskBlockerScenarios } from './mobileTaskBlockerScenarios.mjs'
 import { createMobileCardFooterScenarios } from './mobileCardFooterScenarios.mjs'
+import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
 async function assertMobileDetailSurface(root, assert) {
   await root.page().locator('.mobile-task-flow-header:visible .mobile-task-flow-back').click({ trial: true })
@@ -507,6 +508,14 @@ data: {
           const openLine = line.getByRole('button', { name: /SO-0001.*第 1 行进度/u })
           await openLine.waitFor()
           assert.match(await line.textContent(), /剩余待交.*72 只/u)
+          const copy = line.getByRole('button', { name: '复制订单号', exact: true })
+          const { width, height } = await copy.boundingBox()
+          assert(width >= 44 && height >= 44, '手机行内复制按钮至少有 44px 触区')
+          await assertTaskCopy(page, copy, 'SO-0001')
+          await page.getByRole('button', { name: '关闭「订单号已复制」提示', exact: true }).click()
+          await assertTaskCopy(page, line.getByRole('button', { name: '复制客户款号', exact: true }), 'STYLE-0001')
+          await page.getByRole('button', { name: '关闭「客户款号已复制」提示', exact: true }).click()
+          assert.equal(await page.locator('.erp-progress-drawer--mobile').count(), 0)
           assert(calls.some(({ params }) => params.display === 'lines'))
           await line.getByRole('button', { name: /查看.+大图/u }).click()
           await page.getByRole('button', { name: '关闭图片预览', exact: true }).click()

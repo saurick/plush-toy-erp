@@ -13,6 +13,7 @@ import { listInventoryOperations } from '../../api/inventoryApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import { BusinessDataTable, BusinessOperationPanel } from '../business-list/BusinessListLayout.jsx'
+import { BusinessCopyField } from '../business-list/BusinessCopyButton.jsx'
 
 const TYPE_LABELS = Object.freeze({
   CYCLE_COUNT: '库存盘点',
@@ -165,7 +166,7 @@ export default function InventoryOperationRecordsModal({
         title: '作业单号',
         dataIndex: 'operation_no',
         width: 180,
-        render: (value) => value || '已登记作业',
+        render: (value) => <BusinessCopyField label="作业单号" value={value} revealOnHover>{value || '已登记作业'}</BusinessCopyField>,
       },
       {
         title: '作业类型',

@@ -1,0 +1,58 @@
+.erp-business-copy-field {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+.erp-business-copy-field__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-business-table-copyable-cell,
+.erp-business-copy-button.ant-btn {
+  --erp-copy-target: max(24px, var(--erp-touch-target, 0px));
+}
+
+.erp-business-copy-button.ant-btn {
+  flex: none;
+  width: var(--erp-copy-target);
+  min-width: var(--erp-copy-target);
+  height: var(--erp-copy-target);
+  padding: 0;
+  color: var(--erp-primary-strong, #237234);
+}
+
+.erp-business-copy-button--label.ant-btn {
+  width: fit-content;
+  padding-inline: 6px;
+}
+
+@media (pointer: coarse) {
+  .erp-business-table-copyable-cell,
+  .erp-business-copy-button.ant-btn {
+    --erp-copy-target: 44px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-copy-reveal='hover'] > .erp-business-copy-button.ant-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  [data-copy-reveal='hover']:is(:hover, :focus-within) > .erp-business-copy-button.ant-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  [data-copy-reveal='hover'] > .erp-business-copy-button.ant-btn {
+    transition: opacity 0.16s ease;
+  }
+}

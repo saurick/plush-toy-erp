@@ -663,11 +663,10 @@
 }
 
 .erp-business-table-copyable-cell {
-  --erp-cell-copy-target: max(24px, var(--erp-touch-target, 0px));
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) var(--erp-cell-copy-target);
+  grid-template-columns: minmax(0, max-content) var(--erp-copy-target);
   align-items: center;
   gap: 4px;
 }
@@ -680,43 +679,16 @@
 }
 
 .erp-business-table-copyable-cell[data-align='center'] {
-  grid-template-columns: var(--erp-cell-copy-target) minmax(0, 1fr) var(--erp-cell-copy-target);
+  grid-template-columns: var(--erp-copy-target) minmax(0, max-content) var(--erp-copy-target);
+  justify-content: center;
 }
 
 .erp-business-table-copyable-cell[data-align='center']::before {
   content: '';
 }
 
-.erp-business-table-copyable-cell__button.ant-btn {
-  width: var(--erp-cell-copy-target);
-  min-width: var(--erp-cell-copy-target);
-  height: var(--erp-cell-copy-target);
-  padding: 0;
-  color: var(--erp-primary-strong, #237234);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.16s ease;
-}
-
-.erp-business-table-copyable-cell:hover
-  .erp-business-table-copyable-cell__button.ant-btn,
-.erp-business-table-copyable-cell:focus-within
-  .erp-business-table-copyable-cell__button.ant-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-@media (hover: none) {
-  .erp-business-table-copyable-cell__button.ant-btn {
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .erp-business-table-copyable-cell__button.ant-btn {
-    transition: none;
-  }
+.erp-business-table-copyable-cell[data-align='right'] {
+  justify-content: end;
 }
 
 .erp-business-page-header-card__grid {

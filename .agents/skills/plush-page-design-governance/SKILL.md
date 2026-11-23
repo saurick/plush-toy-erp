@@ -18,6 +18,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 - 生成或调整 Mermaid 时按[布局方向](../../../docs/engineering/可视化表达规范.md#diagram-direction)在源码或模型中显式选向，并核对实际容器；保留订单阶段导航、手机帮助与打印各自的阅读合同。
 - 涉及可视化时按[图形关键信息](../../../docs/engineering/可视化表达规范.md#chart-inspection)落实 hover、键盘 focus 与手机点按的同等提示；核验数值／单位／口径、权限边界、关闭和原有下钻，避免只给桌面悬停。
 - 页面不能补造业务事实、掩盖后端或权限缺口，也不能以局部字段映射替代共享真源。
+- 新增或改动 ERP 页面及字段时，按[复制与身份展示](../../../docs/engineering/前端实现与交互约定.md#business-field-copy)核对岗位怎样复用这些值。常用单项就近复制，经常一起使用的资料整组复制，批量使用导出。检查当前页面已有入口及本次新增项，并在实际入口验收复制内容、按钮位置和缺值行为。
 - 任务详情、流程/异常追踪及 ERP 桌面与手机一致性，按 [任务聚焦与两端一致](references/page-semantics.md#task-focus-and-cross-device-parity) 核对信息层级、入口和实际结果。
 - 复用设计系统和共享业务组件，按 [Visual Finish](references/page-implementation.md#visual-finish) 保留简洁页面的视觉完成度。布局或交互变化必须以真实浏览器证据和 DOM / box metrics 验证，覆盖受影响的默认、交互、恢复、边界与相邻区域；主题、移动端和共享组件按实际影响扩大范围。
 - 新增或修改 Tab、分段切换和自定义页签时，使用项目共享导航组件并让页签条在视图切换期间保持挂载；只替换下方内容，不在各内容分支内重复创建页签。具体组件和动效验证见 [Page Implementation](references/page-implementation.md)。
