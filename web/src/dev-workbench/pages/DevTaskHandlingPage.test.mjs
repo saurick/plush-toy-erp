@@ -84,7 +84,9 @@ async function mount(t, url = '/__dev/task-handling') {
 test('任务办理直接显示清单，筛选清空和历史导航恢复时保留页头', async (t) => {
   const v = await mount(t)
   const header = v.container.querySelector('.erp-dev-task-handling__header')
-  assert.equal(v.container.querySelector('[role="tab"]'), null)
+  const tabs = [...v.container.querySelectorAll('[role="tab"]')]
+  assert.deepEqual(tabs.map((tab) => tab.textContent), ['任务清单', '操作与填写规则'])
+  assert.deepEqual(tabs.map((tab) => tab.getAttribute('aria-selected')), ['true', 'false'])
   assert.doesNotMatch(v.container.textContent, /场景原型|演练任务|重置演练/u)
   await v.choose('办理岗位', '业务')
   assert.equal(v.params().get('role'), 'sales')
@@ -125,6 +127,16 @@ test('有筛选的独立深链直接打开，动作清空不回选且保留环�
   assert.equal(v.params().get('action'), '')
   assert.equal(v.container.querySelector('[data-relation-action]'), null)
   assert(v.container.querySelector('[aria-label="关联动作"]'))
+  const [listTab, rulesTab] = v.container.querySelectorAll('[role="tab"]')
+  const savedSearch = v.params().toString()
+  await v.click(rulesTab)
+  assert.equal(rulesTab.getAttribute('aria-selected'), 'true')
+  assert(v.container.querySelector('[aria-label="任务处理填写规则"]'))
+  await v.click(listTab)
+  assert.equal(listTab.getAttribute('aria-selected'), 'true')
+  assert.equal(v.params().toString(), savedSearch)
+  assert.equal(v.container.querySelector('[data-row-key="sewing_execute"] button').getAttribute('aria-expanded'), 'true')
+  assert.equal(v.container.querySelector('[data-relation-action]'), null)
   await v.go(`/__dev/task-handling?${v.params()}`)
   await v.flush()
   assert.equal(v.container.querySelector('[data-relation-action]'), null)
@@ -339,7 +351,7 @@ test('已移除的演示参数提供明确恢复入口，重新选择后直接�
   await v.click(v.button('重新选择'))
   assert.equal(v.params().toString(), '')
   assert.equal(v.container.querySelector('[role="alert"]'), null)
-  assert.equal(v.container.querySelector('[role="tab"]'), null)
+  assert.equal(v.container.querySelector('[role="tab"][aria-selected="true"]')?.textContent, '任务清单')
   assert.equal(
     v.container.querySelectorAll('.erp-dev-task-catalog .ant-table-row').length,
     TASK_HANDLING_ROWS.length

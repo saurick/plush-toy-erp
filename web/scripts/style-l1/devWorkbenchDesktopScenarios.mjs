@@ -28,6 +28,7 @@ import {
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertDevDocsDirectorySpace, createDevDocsReadingFixture, verifyDevDocsReadingNavigation, verifyDevDocsScopeHelp } from './devDocsLayoutAssertions.mjs'
 import { verifyTestingOverview } from './devTestingOverviewAssertions.mjs'
 import { openTestingDetails, closeTestingDetails } from './devTestingDetailsActions.mjs'
@@ -110,6 +111,13 @@ export function createDevWorkbenchDesktopScenarios({
         `${item.route} 桌面 smoke 必须落到登记页面`
       )
       if (item.route === DEV_TASK_HANDLING_ROUTE) {
+        const tabSelector = '.erp-dev-task-handling__tabs'
+        const listTab = page.getByRole('tab', { name: '任务清单', exact: true })
+        const rulesTab = page.getByRole('tab', { name: '操作与填写规则', exact: true })
+        assert.equal(await listTab.getAttribute('aria-selected'), 'true')
+        assert.equal(await page.getByRole('region', { name: '必填与选填', exact: true }).count(), 0)
+        await verifySlidingMotion(page, assert, tabSelector, 1)
+        assert.equal(await page.getByRole('region', { name: '任务清单', exact: true }).count(), 0)
         const common = page.locator('[aria-label="通用任务协作条件"]')
         assert.deepEqual(await common.locator('dt').allTextContents(), ['标记任务受阻', '解除任务阻塞', '转交任务', '催办任务'])
         assert.equal(await common.getByRole('button').count(), 0, 'the workbench describes conditions without granting task actions')
@@ -124,6 +132,8 @@ export function createDevWorkbenchDesktopScenarios({
         ]) assert.match(await inputRows.filter({ hasText: action }).innerText(), new RegExp(input, 'u'))
         assert.match(await inputs.innerText(), /未补充说明.*未记录/su)
         assert.equal(await inputs.getByRole('button').count(), 0)
+        await assertNoHorizontalOverflow(page)
+        await verifySlidingMotion(page, assert, tabSelector, 0, true)
         const approvalRow = page.locator('[data-row-key="process/sales_order_acceptance/order_approval"]')
         assert.match(await approvalRow.innerText(), /审批通过 \/ 审批退回/u)
         const header = page.locator('.erp-dev-task-handling__header')
@@ -132,7 +142,7 @@ export function createDevWorkbenchDesktopScenarios({
           .getByRole('group', { name: group, exact: true })
           .getByRole('button', { name: option, exact: true })
           .click()
-        assert.equal(await page.getByRole('tab').count(), 0)
+        assert.equal(await listTab.getAttribute('aria-selected'), 'true')
         assert.deepEqual(await page.locator('.erp-dev-task-catalog').getByRole('columnheader').allTextContents(),
           ['办理事项', '办理岗位', '办理类型', '本次办理', '审批与交接', '电脑', '手机'])
         for (const [key, label] of Object.entries(ROLE_DISPLAY_NAMES)) {
@@ -171,6 +181,39 @@ export function createDevWorkbenchDesktopScenarios({
         await page.getByRole('button', { name: '重置', exact: true }).click()
         const after = await header.boundingBox()
         for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `任务办理页头 ${key} 不应跳动`)
+
+        await page.setViewportSize({ width: 1024, height: 360 })
+        await chooseFilter('办理岗位', '仓库')
+        const warehouse = page.getByRole('group', { name: '办理岗位', exact: true })
+          .getByRole('button', { name: '仓库', exact: true })
+        await warehouse.and(page.locator('[aria-pressed="true"]')).waitFor()
+        const detail = page.getByRole('button', { name: '材料入库', exact: true })
+        await detail.click()
+        await detail.and(page.locator('[aria-expanded="true"]')).waitFor()
+        const selectedSearch = new URL(page.url()).search
+        const tableScroll = page.locator('.erp-dev-task-catalog .ant-table-content')
+        const scrollLeft = await tableScroll.evaluate((node) => {
+          node.scrollLeft = 96
+          return node.scrollLeft
+        })
+        assert(scrollLeft > 0, '验证窄窗口下表内横向滚动的恢复')
+        await page.evaluate(() => window.scrollTo({ top: 420, behavior: 'instant' }))
+        const scrollTop = await page.evaluate(() => window.scrollY)
+        assert(scrollTop > 0, '验证列表恢复前必须实际离开页首')
+        assert(Math.abs((await page.locator(tabSelector).getByRole('tablist').boundingBox()).y) <= 1, '滚动后仍能在窗口顶部切换页签')
+        await rulesTab.click()
+        await inputs.waitFor()
+        await waitForFiniteAnimations(page, { selector: tabSelector })
+        assert.equal(await page.evaluate(() => window.scrollY), 0)
+        await listTab.click()
+        await waitForFiniteAnimations(page, { selector: tabSelector })
+        const restoredTop = await page.evaluate(() => window.scrollY)
+        assert(Math.abs(restoredTop - scrollTop) <= 1, `切回清单应恢复纵向位置 ${scrollTop}，实际为 ${restoredTop}`)
+        assert.equal(await tableScroll.evaluate((node) => node.scrollLeft), scrollLeft)
+        assert.equal(new URL(page.url()).search, selectedSearch)
+        assert.equal(await detail.getAttribute('aria-expanded'), 'true')
+        assert.equal(await warehouse.getAttribute('aria-pressed'), 'true')
+        await assertNoHorizontalOverflow(page)
       }
       if (item.route === '/__dev') {
         const nav = page.locator('.erp-dev-workspace-nav')

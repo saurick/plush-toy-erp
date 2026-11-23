@@ -1,4 +1,14 @@
-.erp-dev-task-matrix {
+.erp-dev-task-handling__tabs {
+  overflow-anchor: none;
+}
+
+.erp-dev-task-handling__tabs > .ant-tabs-nav {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 8;
+}
+
+:is(.erp-dev-task-matrix, .erp-dev-task-rules) {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
@@ -60,19 +70,19 @@
   background: var(--erp-surface-bg);
 }
 
-.erp-dev-task-matrix__collaboration {
+.erp-dev-task-rules__collaboration {
   margin: 0;
   display: grid;
   gap: 8px;
 }
-.erp-dev-task-matrix__collaboration > div {
+.erp-dev-task-rules__collaboration > div {
   display: grid;
   grid-template-columns: minmax(100px, 140px) minmax(0, 1fr);
   gap: 12px;
 }
-.erp-dev-task-matrix__collaboration dt {
+.erp-dev-task-rules__collaboration dt {
   font-weight: 600;
 }
-.erp-dev-task-matrix__collaboration dd {
+.erp-dev-task-rules__collaboration dd {
   margin: 0;
 }

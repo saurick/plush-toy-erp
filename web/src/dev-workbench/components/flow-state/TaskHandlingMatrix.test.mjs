@@ -135,10 +135,13 @@ test('岗位切换核对九岗位完整集合，清空后恢复固定执行和�
 
 test('任务协作只说明后端条件，审批动作明确属于对应办理事项', async (t) => {
   const v = await mount(t)
+  const [listTab, rulesTab] = v.root.querySelectorAll('[role="tab"]')
+  await v.click(rulesTab)
   const conditions = v.root.querySelector('[aria-label="通用任务协作条件"]')
   assert.deepEqual([...conditions.querySelectorAll('dt')].map((node) => node.textContent), ['标记任务受阻', '解除任务阻塞', '转交任务', '催办任务'])
   assert.equal(conditions.querySelector('button'), null, 'the workbench never grants live task operations')
   assert.match(conditions.textContent, /任务处于受阻状态.*后端允许改派.*不能代为办理/su)
+  await v.click(listTab)
   const approval = v.root.querySelector('[data-row-key="process/sales_order_acceptance/order_approval"]')
   assert.match(approval.textContent, /审批通过 \/ 审批退回/u)
   assert.doesNotMatch(approval.textContent, /标记任务受阻/u)

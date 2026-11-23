@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react'
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import AppSelect from '@/common/components/select/AppSelect'
+import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import {
   WorkbenchFacts,
@@ -40,6 +41,23 @@ const INPUT_RULE_ROWS = [
 
 export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
   const [params, setParams] = useSearchParams()
+  const [view, setView] = useState('list')
+  const listScrollTop = useRef(null)
+  const changeView = (next) => {
+    if (view === 'list') listScrollTop.current = window.scrollY
+    setView(next)
+  }
+
+  useLayoutEffect(() => {
+    if (listScrollTop.current === null) return undefined
+    const top = view === 'list' ? listScrollTop.current : 0
+    // Wait for the active pane to contribute its full height before restoring scroll.
+    const frame = window.requestAnimationFrame(() => {
+      if (window.scrollY !== top) window.scrollTo({ top, behavior: 'instant' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [view])
+
   const { role, kind, mobile, stage, action } = readTaskHandlingSearch(params)
   const rows = TASK_HANDLING_ROWS
   const selected = rows.find((row) => row.key === stage)
@@ -161,7 +179,7 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
       )}
     </WorkbenchSection>
   ) : null
-  return (
+  const list = (
     <section className="erp-dev-task-matrix" aria-label="任务清单">
       <WorkbenchToolbar>
         <FilterChipGroup
@@ -286,9 +304,30 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
           },
         ]}
       />
+    </section>
+  )
+
+  return (
+    <SlidingTabs
+      className="erp-dev-task-handling__tabs"
+      aria-label="任务办理视图"
+      activeKey={view}
+      onChange={changeView}
+      tabBarStyle={{ background: 'var(--erp-surface-bg)' }}
+      items={[
+        { key: 'list', label: '任务清单', children: list },
+        { key: 'rules', label: '操作与填写规则', children: <TaskHandlingRules /> },
+      ]}
+    />
+  )
+}
+
+function TaskHandlingRules() {
+  return (
+    <div className="erp-dev-task-rules">
       <WorkbenchSection title="操作分组与显示条件">
         <p>第二步底部将通用任务协作与当前业务办理分开。业务办理使用原编辑器的保存、提交、审批或执行动作；当前对象、状态及权限决定具体按钮。附件作为资料入口保留，复制操作放在页头。</p>
-        <dl className="erp-dev-task-matrix__collaboration" aria-label="通用任务协作条件">
+        <dl className="erp-dev-task-rules__collaboration" aria-label="通用任务协作条件">
           {Object.entries(WORKFLOW_TASK_COLLABORATION_ACTIONS).map(([key, item]) => (
             <div key={key}><dt>{item.label}</dt><dd>{item.condition}</dd></div>
           ))}
@@ -309,6 +348,6 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
         />
         <p>选填说明留空时，仍记录实际动作、办理人和时间，回执与处理记录省略空说明行；记录详情显示“未补充说明”。历史必填内容缺失时标为“未记录”，不补造原因。数量、结论等业务必填字段继续由原业务表单校验。</p>
       </WorkbenchSection>
-    </section>
+    </div>
   )
 }
