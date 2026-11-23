@@ -323,33 +323,8 @@
   display: none;
 }
 
-.erp-business-form-page__section-links {
-  display: grid;
-  gap: 4px;
-}
-
-.erp-business-form-page__section-links button {
-  width: 100%;
-  min-height: max(38px, var(--erp-touch-target, 0px));
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--erp-text-muted);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.erp-business-form-page__section-links button:hover {
-  background: var(--erp-primary-softer);
-}
-
-.erp-business-form-page__section-links button[aria-current='location'] {
-  border-color: var(--erp-primary-soft);
-  background: var(--erp-primary-soft);
-  color: var(--erp-primary-strong);
-  font-weight: 650;
+.erp-business-form-page__section-links > .erp-directory-item {
+  flex-wrap: wrap;
 }
 
 .erp-business-form-page__section-picker {
@@ -363,11 +338,6 @@
 .erp-business-form-page__section-picker .ant-select {
   flex: 1;
   min-width: 0;
-}
-
-.erp-business-form-page__section-links button:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
 }
 
 @container business-editor (max-width: 1080px) {

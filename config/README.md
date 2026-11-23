@@ -22,22 +22,36 @@ Product Core 提供中性正文与最小默认值，不硬编码真实客户名�
 
 ## 主路径
 
+### 登记配置并生成预览
+
 - 可复用 key 先登记到 `config/catalog/`，结构边界先进入 `config/schemas/`。
 - 本机工作台读取[标准 JSON 模板](customers/reference-customer/customer-draft.template.json)，生成并登记独立的 `config/customers/<customer-key>/customerPackage.json`。[检查和预览](customers/reference-customer/README.md#new-customer-draft)从登记取得这份文件。中性 demo 只用于本地验证。真实客户差异决策同步到对应客户资料与交付矩阵。
 - 客户包流程结构当前只能进入 lint / preview；如需进入后端 `customer_config`，必须先通过 `customer-config-runtime-manifest` 生成受控 manifest，再走后端 validate / publish / activate。raw 客户包不直接 publish、不 activate、不 rollback，也不接 Workflow / Fact runtime。
+
+### 永绅本地联调
+
 - 永绅本地联调只有一条受控例外：`pnpm start:yoyoosun` 只执行预检并启动 Vite，不自动写库；登录后由管理员在 `/__dev/customer-config?customer=yoyoosun` 显式确认，才能生成并应用内容寻址、长度不超过 64 的 `local_test_apply` revision。
 
   该入口同时要求 `start:yoyoosun` 的客户上下文、loopback `API_ORIGIN`，以及由本地 `make run / make dev_restart` 显式开放的后端 local-test gate；后端按 pgx 最终连接配置把 DSN 固定到共享开发 PostgreSQL `192.168.0.133:5432` 的 `plush_erp` / `plush_erp_*_dev` 数据库，其他共享库使用者也会看到 active revision 切换。
 
   正式 validator / executor 和默认后端均拒绝 local-test marker，production 配置还会拒绝携带本地 gate 开关，不能把这条路径用于正式 publish / activate。
+
+### 页面和岗位能力
+
 - Runtime manifest 的页面投影必须来自已登记正式菜单 key；manifest 编译器和后端 `validate_customer_config / publish_customer_config` 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，旧 active revision 缺 pages 或无有效 pages 时 `get_effective_session` 不回退 RBAC 全量页面。
 - 每个正式页面还必须在 `config/catalog/customerPackageCatalog.mjs` 登记能力门禁：`requiredCapabilityKeys` 表示必须全部具备，`requiredAnyCapabilityKeys` 表示至少具备一项；两组同时存在时同时满足。
 
   客户角色的 `menuSurfaces` 只有在其能力集合满足页面读取合同后才能编译；编译结果写入 `compiled_snapshot.rolePageProjections`，用于把“页面所需的窄引用读取权限”和“角色真正可见的菜单”分开，避免补一个引用读取权限就意外开放整个主数据页面。
 - 动作能力只有一个客户配置加法真源：`access_entitlements`。`role_profiles` 只保留角色启停、能力包标记和 `revokes`；最终动作集合按 `后端 RBAC ∩ 模块状态 ∩ access_entitlements - role_profiles.revokes` 逐角色计算，再对多角取并集。
+
+### 审批责任
+
 - “权限管理 → 审批责任”只承接 Product Core 登记的销售订单、采购订单和 Shipment 财务放行三类可配置责任。runtime manifest 为三类事项生成固定 `approval.*` 责任池，业务管理角色为 `primary/100`，老板为 `escalation/300`；管理员以新 immutable revision 覆盖角色或具名成员。
 
   启用事项至少需要一个成员；停用事项可以无成员，并在创建 ProcessInstance 前阻断相应的新流程，不终止旧 revision 的在途实例。收付款、库存人工调整和生产异常同样由 manifest 选择正式 ProcessRuntime，但审批 / 执行责任池由 Product Core 合同固定，不进入这三项可配置模板。没有正式门禁的 PMC / 工程自由审批继续失败关闭。
+
+### 字段显示与发布范围
+
 - Runtime manifest 的字段策略不是 catalog fields 全量发布；当前只发布 `customers.default`、`suppliers.default` 和 `sales_orders.default`，前端仅消费列表 / CSV 导出列的 `visible`。
 
   默认值为 `visible=true`；reference 工程样例仅隐藏低风险的 `suppliers.default.supplier_type`，yoyoosun 未配置隐藏规则。该合同不驱动表单 label、editable、required。
@@ -45,6 +59,9 @@ Product Core 提供中性正文与最小默认值，不硬编码真实客户名�
   BOM、采购、委外、质检、库存、出货和财务字段只属于正式业务字段合同，不是 active field policy；`sales_order_items` 的款式 / 颜色尺码仍是导入 / 客户评审草案。
 
   后端 `validate_customer_config / publish_customer_config` 会拒绝其他 surface / field key，`get_effective_session` 输出会过滤旧 revision 中的非法字段策略。
+
+### 产品与部署归属
+
 - 行业通用能力进入 Product Core 前，必须回到代码、测试、产品 / 架构文档和客户差异边界复核。
 - 私有化部署资料进入 `deployments/<customer-key>/`；当前产品部署真源仍是 `server/deploy/compose/prod`。
 

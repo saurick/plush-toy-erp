@@ -1,8 +1,13 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { buildCustomerConfigDevOverviewFromSearch } from '../../config/devCustomerConfig.mjs'
 import {
-  customerConfigStepSearch,
+  buildCustomerConfigDevOverviewFromSearch,
+  DEV_CUSTOMER_CONFIG_QUERY_KEY,
+} from '../../config/devCustomerConfig.mjs'
+import {
+  customerConfigTaskSearch,
+  REVIEW_FIELDS,
+  REVIEW_TASK,
   resolveCustomerConfigLocation,
 } from './navigation.mjs'
 
@@ -10,9 +15,13 @@ export function useCustomerConfigRoute() {
   const [params, setParams] = useSearchParams()
   const search = params.toString()
   const route = useMemo(() => resolveCustomerConfigLocation(search), [search])
+  const lastReviewSection = useRef(REVIEW_FIELDS)
+  const customerSearch = new URLSearchParams(
+    params.getAll(DEV_CUSTOMER_CONFIG_QUERY_KEY).map((value) => [DEV_CUSTOMER_CONFIG_QUERY_KEY, value])
+  ).toString()
   const overview = useMemo(
-    () => buildCustomerConfigDevOverviewFromSearch(params),
-    [params]
+    () => buildCustomerConfigDevOverviewFromSearch(customerSearch),
+    [customerSearch]
   )
   useEffect(() => {
     if (route.canonicalSearch !== search) {
@@ -30,8 +39,9 @@ export function useCustomerConfigRoute() {
   return {
     ...route,
     overview,
-    navigate: (step) => {
-      const next = customerConfigStepSearch(search, step)
+    navigate: (task) => {
+      if (route.activeTask === REVIEW_TASK) lastReviewSection.current = route.activeSection
+      const next = customerConfigTaskSearch(search, task, lastReviewSection.current)
       if (next !== search) setParams(next)
     },
     selectCustomer: (key) => {
@@ -40,8 +50,11 @@ export function useCustomerConfigRoute() {
       next.delete('release')
       setParams(next)
     },
-    selectSection: (section) => update('section', section),
-    selectAction: (action) => update('action', action),
+    selectSection: (section) => {
+      const next = customerConfigTaskSearch(search, REVIEW_TASK, section)
+      if (next !== search) setParams(next)
+    },
+    selectDetail: (detail) => update('detail', detail, { replace: true }),
     selectReleaseBatch: (batch, options) => update('release', batch, options),
   }
 }

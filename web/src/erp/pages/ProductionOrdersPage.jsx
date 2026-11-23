@@ -1006,6 +1006,7 @@ export default function ProductionOrdersPage() {
       {
         title: '生产单号',
         dataIndex: 'order_no',
+        taskDetailRole: 'identity',
         copyable: { label: '生产单号' },
         width: 180,
         widthGrow: 1,

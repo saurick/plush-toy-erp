@@ -145,6 +145,9 @@ function metrics(rows, ages, restricted) {
       ) }
     result.balance = money(rows.reduce((sum, row) => sum + row.amount, 0))
   } else {
+    const ordered = rows.reduce((total,row)=>total+row.quantity,0)
+    const shipped = rows.reduce((total,row)=>total+row.shipped,0)
+    result.quantities = { unit: '只', ordered: String(ordered), shipped: String(shipped), remaining: String(ordered-shipped) }
     result.done = rows.filter((row) => row.status === 'done').length
     result.pending = result.count - result.done
     result.soon = rows.filter((row) => row.near).length

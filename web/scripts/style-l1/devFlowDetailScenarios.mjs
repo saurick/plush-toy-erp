@@ -90,13 +90,13 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
           const label = node.querySelector('.erp-dev-flow-definition-option__label')
           return {
             labelWidth: label.getBoundingClientRect().width,
-            labelBottom: label.getBoundingClientRect().bottom,
+            contentWidth: node.closest('.ant-select-item-option-content').getBoundingClientRect().width,
             labelOverflow: label.scrollWidth - label.clientWidth,
           }
         }))
         assert(options.length > 0, '实际定义选项已加载')
         for (const option of options) {
-          assert(option.labelWidth >= menu.width - 40, '业务名称使用完整行宽，不被技术标识挤成逐字折行')
+          assert(Math.abs(option.labelWidth - option.contentWidth) <= 1, '业务名称占满分类缩进和勾选标记之间的可用行宽')
           assert(option.labelOverflow <= 1, '名称不裁切或横向溢出')
         }
         if (!hasValue && width === 1920 && await input.getAttribute('id') === 'dev-flow-state-select') {
@@ -109,7 +109,8 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       }
     }
     await page.setViewportSize(viewport)
-    await input.fill(selectedLabel)
+    await expect(input).not.toBeEditable()
+    await selector.locator('.ant-select-selector').click()
     await popup.locator(`.ant-select-item-option[title=${JSON.stringify(selectedTitle)}]`).click()
     await expect(popup).toBeHidden()
     await expect(selector.locator('.ant-select-selection-item')).toHaveText(selectedLabel)
@@ -219,7 +220,7 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
       for (const node of await processGraph.locator('[data-graph-node]').all()) {
         await node.click()
         await expect(node).toHaveAttribute('aria-pressed', 'true')
-        await expect(page.locator('.erp-dev-flow-process-definition .erp-dev-fulfillment-guide__focus strong')).toHaveText(await node.locator('strong').innerText())
+        await expect(page.locator('.erp-dev-flow-process-definition .erp-dev-fulfillment-guide__focus strong')).toHaveText(await node.getAttribute('aria-label'))
       }
       await processGraph.locator('[data-graph-node][aria-pressed="true"]').click()
       await expect(page.locator('.erp-dev-flow-process-definition .erp-dev-fulfillment-guide__focus')).toHaveCount(0)
@@ -372,23 +373,36 @@ export function createDevFlowDetailScenarios({ assert, assertNoHorizontalOverflo
     verify: async (page) => verifyFocusedFlowRules(page, { assert, assertNoHorizontalOverflow, outputDir, path, keys: ['workflow.task', 'fact.shipment', catalog.flows.find((flow) => flow.lifecycleRules.length).key] }),
   }, {
     name: 'dev-flow-details-design-preview',
-    path: '/__dev/ui-design?page=workbench&workbenchMode=preview',
+    path: '/__dev/ui-design?page=workbench',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       await frame.getByRole('table', { name: '开发工具对照' }).getByRole('button', { name: '业务链路', exact: true }).click()
       const preview = frame.locator('[data-dev-flow-preview]')
-      await preview.getByText('关联筛选与动作详情 · 交互示例', { exact: true }).click()
-      const example = preview.locator('[data-dev-relation-example]')
+      await preview.getByRole('combobox', { name: '参与岗位', exact: true }).click()
+      await preview.getByRole('option', { name: '仓库', exact: true }).click()
+      await expect(preview.locator('[data-inline-fulfillment]')).toHaveAttribute('data-flow-role', 'warehouse')
+      await preview.getByRole('tab', { name: '异常处理', exact: true }).click()
+      await expect(preview.getByRole('combobox', { name: '参与岗位', exact: true })).toHaveCount(0)
+      await preview.getByRole('combobox', { name: '异常类型', exact: true }).click()
+      await preview.getByRole('option', { name: '首次来料不合格', exact: true }).click()
+      await expect(preview.getByRole('combobox', { name: '发生环节', exact: true })).toHaveCount(0)
+      await preview.getByRole('button', { name: '退厂', exact: true }).click()
+      await expect(preview.locator('[data-inline-fulfillment]')).toHaveAttribute('data-flow-plan', 'return_to_vendor')
+      await preview.getByRole('button', { name: '查看全部方案', exact: true }).click()
+      await expect(preview.locator('[data-inline-fulfillment]')).toHaveAttribute('data-flow-plan', '')
+      await expect(preview.getByRole('tab', { name: '查看规则', exact: true })).toHaveCount(0)
+      await page.reload()
+      await frame.getByRole('table', { name: '开发工具对照' }).getByRole('button', { name: '业务规则', exact: true }).click()
+      const rulePreview = frame.locator('[data-dev-rules-preview]')
+      await rulePreview.getByText('关联筛选与动作详情 · 交互示例', { exact: true }).click()
+      const example = rulePreview.locator('[data-dev-relation-example]')
       await example.getByText('筛选', { exact: true }).click()
       await example.getByRole('combobox', { name: '样例参与岗位', exact: true }).click()
       await example.getByRole('option', { name: '仓库 · 1', exact: true }).click()
       await expect(example.locator('[data-relation-demo-detail]')).toContainText('采购入库：草稿 → 已过账')
       await example.getByRole('button', { name: '移除样例参与岗位筛选', exact: true }).click()
       await expect(example.getByRole('combobox', { name: '样例参与岗位', exact: true })).toContainText('全部')
-      await expect(preview.getByRole('tab', { name: '查看规则', exact: true })).toHaveCount(0)
-      await page.reload()
-      await frame.getByRole('table', { name: '开发工具对照' }).getByRole('button', { name: '业务规则', exact: true }).click()
       const rules = frame.locator('[data-flow-rules]')
       await expect(rules).toBeVisible()
       const stateRules = rules.locator('[data-dev-rule-preview]')

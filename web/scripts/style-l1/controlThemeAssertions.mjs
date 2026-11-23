@@ -31,8 +31,7 @@ async function readAnchoredOverlays(page, stage, directory, label) {
     const css = getComputedStyle(node)
     return { color: css.color, background: css.backgroundColor, border: css.border, shadow: css.boxShadow }
   })
-  await directory.getByRole('button', { name: /^弹窗与反馈/u }).click()
-  await stage.getByLabel('反馈演示场景', { exact: true }).getByText('浮层与确认', { exact: true }).click()
+  await directory.getByRole('button', { name: '抽屉内查看附件', exact: true }).click()
   await stage.getByRole('button', { name: '打开上下文抽屉', exact: true }).hover()
   const tooltip = stage.getByRole('tooltip', { name: '单击查看已有摘要，不离开当前页面', exact: true })
   await tooltip.waitFor()
@@ -63,9 +62,12 @@ async function readAnchoredOverlays(page, stage, directory, label) {
   return { tooltip: tooltipPaint, arrowColor, popover: popoverPaint, text }
 }
 
-async function readPreviewPortals(page, stage, label) {
+async function readPreviewPortals(page, stage, directory, label) {
   const result = {}
-  const scenes = stage.getByLabel('反馈演示场景', { exact: true })
+  const choose = async (title) => {
+    await directory.getByText(title, { exact: true }).click()
+    await page.getByRole('heading', { name: title, exact: true }).waitFor()
+  }
   const open = async (name) => {
     const trigger = stage.getByRole('button', { name, exact: true })
     await trigger.focus()
@@ -87,45 +89,53 @@ async function readPreviewPortals(page, stage, label) {
     assert(await trigger.evaluate((node) => node === document.activeElement), `${label} 关闭后焦点回到触发按钮`)
   }
 
-  await scenes.getByText('编辑与提交', { exact: true }).click()
+  await choose('业务编辑弹窗')
   const editorTrigger = await open('打开编辑弹窗')
   const editor = page.locator('.erp-business-action-modal--form:visible')
   await record('editor', editor.locator('.ant-modal-content'), editor.getByLabel('说明标题', { exact: true }))
   await page.keyboard.press('Escape')
   await closed(editor, editorTrigger)
 
-  await scenes.getByText('浮层与确认', { exact: true }).click()
+  await choose('通用弹窗')
   const modalTrigger = await open('打开标准弹窗')
   const modal = page.getByRole('dialog', { name: '共享标准弹窗', exact: true })
   await record('modal', modal.locator('.ant-modal-content'), modal.locator('p'))
   await page.keyboard.press('Escape')
   await closed(modal, modalTrigger)
 
+  await choose('详情抽屉')
   const drawerTrigger = await open('打开上下文抽屉')
   const drawer = page.getByRole('dialog', { name: '采购单上下文摘要', exact: true })
   await record('drawer', drawer, drawer.locator('p').first())
   await page.keyboard.press('Escape')
   await closed(drawer, drawerTrigger)
 
+  await choose('危险操作确认')
   const confirmTrigger = await open('危险操作确认')
   const confirm = page.locator('.ant-modal-confirm:visible')
   await record('confirm', confirm.locator('.ant-modal-content'), confirm.locator('.ant-modal-confirm-content'))
   await confirm.getByRole('button', { name: '保留草稿', exact: true }).click()
   await closed(confirm, confirmTrigger)
 
-  const panelTrigger = await open('打开单步提示')
-  const panel = page.getByRole('alertdialog', { name: '样例状态已说明', exact: true })
+  await choose('会话提示')
+  const panelTrigger = await open('打开会话提示')
+  const panel = page.getByRole('alertdialog', { name: '登录状态已失效', exact: true })
   await record('panel', panel.locator('.surface-panel'), panel.locator('[data-app-alert-message]'))
-  assert(await page.locator('#root').evaluate((node) => node.inert), '单步提示保留背景隔离')
+  assert(await page.locator('#root').evaluate((node) => node.inert), '会话提示保留背景隔离')
   assert.equal(await panel.evaluate((node) => Boolean(node.closest('[inert]'))), false, '独立 portal 不被背景隔离禁用')
-  await panel.getByRole('button', { name: '知道了', exact: true }).click()
+  await panel.getByRole('button', { name: '重新登录', exact: true }).click()
   await closed(panel, panelTrigger)
   assert.equal(await page.locator('#root').evaluate((node) => node.inert), false, '关闭提示释放背景隔离')
 
-  await scenes.getByText('消息与恢复', { exact: true }).click()
+  await choose('操作反馈')
   const toastTrigger = await open('短暂成功 Toast')
   const toast = page.locator('.ant-message-notice-content:visible')
   await record('message', toast, toast.getByText('已应用本次样例条件', { exact: true }))
+  assert.equal(
+    await toast.evaluate((node) => getComputedStyle(node).overflowWrap),
+    'anywhere',
+    `${label}/Toast 加载共享反馈样式`
+  )
   assert(await toastTrigger.evaluate((node) => node === document.activeElement), '消息不移动焦点')
   await toast.waitFor({ state: 'hidden' })
 
@@ -141,13 +151,17 @@ async function readPreviewPortals(page, stage, label) {
 export async function assertControlPreviewThemeIsolation(page) {
   const stage = page.locator('.erp-control-library-stage')
   const directory = page.getByRole('navigation', { name: '组件设计目录' })
+  for (const name of ['弹窗与抽屉', '操作与反馈', '组合样例']) {
+    const group = directory.getByRole('button', { name, exact: true })
+    if (await group.getAttribute('aria-expanded') === 'false') await group.click()
+  }
   const snapshots = new Map()
   const evidence = []
   for (const rootMode of ['light', 'dark']) {
     await setRootTheme(page, rootMode)
     const rootPreference = await page.evaluate((key) => localStorage.getItem(key), WORKBENCH_APPEARANCE_STORAGE_KEY)
     for (const [localMode, label] of [['light', '浅色'], ['dark', '深色'], ['light', '浅色']]) {
-      await directory.getByRole('button', { name: /^按钮与动作/u }).click()
+      await directory.getByText('按钮', { exact: true }).click()
       await stage.getByRole('button', { name: '保存', exact: true }).waitFor()
       await page.getByLabel('组件样例主题', { exact: true }).getByText(label, { exact: true }).click()
       await waitForFiniteAnimations(page)
@@ -183,8 +197,7 @@ export async function assertControlPreviewThemeIsolation(page) {
       assert.equal(await stage.locator('.ant-select-selection-item').innerText(), '挂件')
 
       const anchored = await readAnchoredOverlays(page, stage, directory, `${rootMode}/${localMode}`)
-      await directory.getByRole('button', { name: /^弹窗与反馈/u }).click()
-      const portals = await readPreviewPortals(page, stage, `${rootMode}/${localMode}`)
+      const portals = await readPreviewPortals(page, stage, directory, `${rootMode}/${localMode}`)
       const result = { surface, primary, hovered, input: inputPaint, popup: popupPaint, option: optionPaint.color, anchored, portals }
       if (snapshots.has(localMode)) {
         assert.deepEqual(result, snapshots.get(localMode), `局部 ${localMode} 主题不应受外层主题或往返切换污染`)

@@ -1,4 +1,5 @@
 import React from 'react'
+import Directory from '@/common/components/navigation/Directory.jsx'
 import Link from '../business-list/BusinessLink.jsx'
 import { getHelpCenterHref } from '../../config/helpManualCatalog.mjs'
 import HelpHandbookChapter from './HelpHandbookChapter'
@@ -51,16 +52,17 @@ export default function HelpReferenceContent({ document, roleKey }) {
         <h4>业务边界</h4>
         <p>{page.boundary}</p>
       </section>
-      <nav className="erp-help-reference-index" aria-label="同章其他词条">
-        <strong>同章其他词条</strong>
-        {page.items
-          .filter((entry) => entry.key !== item.key)
-          .map((entry) => (
-            <Link key={entry.key} to={href(entry.key)}>
-              {entry.title}
-            </Link>
-          ))}
-      </nav>
+      <Directory className="erp-help-reference-index" aria-label="同章其他词条" title={<strong>同章其他词条</strong>}>
+        <div className="erp-directory-list--inline">
+          {page.items
+            .filter((entry) => entry.key !== item.key)
+            .map((entry) => (
+              <Link key={entry.key} to={href(entry.key)} className="erp-directory-item">
+                {entry.title}
+              </Link>
+            ))}
+        </div>
+      </Directory>
     </div>
   )
 }

@@ -14,12 +14,13 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       const panel = guide.locator('[aria-label="流程详情"]')
       assert.equal(await guide.locator('[data-stage-exception]').count(), catalog.fulfillment_flow.reduce((count, step) => count + step.handling.guides.length, 0))
       for (const step of catalog.fulfillment_flow) {
-        await guide.locator(`[data-chain-stage="${step.stage}"]`).click()
+        await guide.locator(`[data-chain-stage="${step.stage}"] [data-stage-card]`).click()
         const normal = guide.locator('[data-stage-normal]')
         if (step.subflow) {
-          await normal.locator('[data-mermaid-status="rendered"]').waitFor()
+          const diagram = normal.getByRole('region', { name: `${step.label}流程图`, exact: true })
+          await diagram.locator('[data-mermaid-status="rendered"]').waitFor()
           for (const node of step.subflow.nodes.filter((item) => !item.exception_guide)) {
-            await normal.getByRole('button', { name: node.label, exact: true }).click()
+            await diagram.locator(`[data-graph-node="${node.key}"]`).click()
             await normal.locator(`[data-selected-substep="${node.key}"]`).waitFor()
           }
         }
@@ -27,16 +28,21 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       }
       for (const source of catalog.exception_guides) {
         await openFulfillmentExceptionDirectory(guide)
-        await guide.locator(`[data-exception-entry="${source.key}"]`).click()
+        await guide.getByRole('combobox', { name: '异常类型', exact: true }).press('ArrowDown')
+        await page.getByRole('option', { name: source.label, exact: true }).click()
+        const exception = panel.locator(`[data-exception-guide="${source.key}"]`)
+        await exception.waitFor({ state: 'visible' })
         assert.equal(new URL(page.url()).searchParams.has('flow_exception_origin'), false)
         for (const plan of source.plans) {
           if (source.plans.length > 1) {
-            await panel.getByRole('combobox', { name: '处理方案' }).click()
-            await page.getByRole('option', { name: plan.label, exact: true }).click()
+            const allPlans = exception.getByRole('button', { name: '查看全部方案', exact: true })
+            if (await allPlans.count()) await allPlans.click()
+            await exception.getByRole('button', { name: plan.label, exact: true }).click()
           }
-          await panel.locator('[data-mermaid-status="rendered"]').waitFor()
+          const diagram = exception.locator(`[data-exception-plan="${plan.key}"] [data-business-flow]`)
+          await diagram.locator('[data-mermaid-status="rendered"]').waitFor()
           for (const step of fulfillmentExceptionPath(source, plan.key).steps) {
-            await panel.getByRole('button', { name: step.label, exact: true }).click()
+            await diagram.locator(`[data-graph-node="${step.key}"]`).click()
             await panel.locator(`[data-selected-exception-node="${step.key}"]`).waitFor()
           }
           await assertFulfillmentDetailGeometry(panel)
@@ -52,11 +58,12 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
     name: 'dev-exception-selector-width',
     path: '/__dev/status-flows?view=chain&chain=all',
     viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
     verify: async (page) => {
       const guide = page.locator('#task-fulfillment-guide')
-      const directorySelect = guide.locator('.erp-dev-exception-directory > .ant-select')
+      const directorySelect = guide.locator('.erp-dev-fulfillment-guide__heading .erp-dev-fulfillment-guide__exception-select')
       const typeSelect = guide.getByRole('combobox', { name: '异常类型', exact: true })
-      const selectedType = guide.locator('.erp-dev-fulfillment-guide__choices > .ant-select').filter({ has: page.getByRole('combobox', { name: '异常类型', exact: true }) })
+      const panel = guide.getByRole('region', { name: '流程详情', exact: true })
       const popup = page.locator('.ant-select-dropdown:visible')
       const assertCompact = async (control, state) => {
         await control.waitFor({ state: 'visible' })
@@ -66,10 +73,10 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
         assert(box.x >= 0 && box.x + box.width <= page.viewportSize().width + 1, `${state}: outside viewport`)
         return box.width
       }
-      for (const width of [1024, 1920, 3840]) {
+      for (const width of [390, 1024, 1920, 3840]) {
         await page.setViewportSize({ width, height: width === 3840 ? 2160 : 1080 })
         await openFulfillmentExceptionDirectory(guide)
-        const sources = width === 3840 ? catalog.exception_guides : catalog.exception_guides.slice(1, 2)
+        const sources = width === 3840 ? catalog.exception_guides : catalog.exception_guides.slice(width === 1920 ? 0 : 1, 2)
         for (const source of sources) {
           const emptyWidth = await assertCompact(directorySelect, `${width}: empty`)
           await typeSelect.click()
@@ -85,20 +92,24 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
           await popup.waitFor({ state: 'hidden' })
           await guide.locator(`[data-exception-guide="${source.key}"]`).waitFor({ state: 'visible' })
           assert.equal(new URL(page.url()).searchParams.get('flow_exception'), source.key)
-          assert(Math.abs(await assertCompact(selectedType, `${width}: selected`) - emptyWidth) <= 2, 'Empty and selected types must keep the same width')
-          for (const control of await guide.locator('.erp-dev-fulfillment-guide__choices > .ant-select').all()) {
-            await assertCompact(control, `${width}: exception choice`)
-          }
-          await selectedType.locator('.ant-select-clear').click()
+          assert(Math.abs(await assertCompact(directorySelect, `${width}: selected`) - emptyWidth) <= 2, 'Empty and selected types must keep the same width')
+          assert.equal(await panel.getByRole('combobox', { name: '处理方案', exact: true }).count(), 0)
+          assert.equal(await panel.getByRole('combobox', { name: '发生环节', exact: true }).count(), 0)
+          const close = directorySelect.locator('.ant-select-clear')
+          await close.click()
           await assertCompact(directorySelect, `${width}: cleared`)
           assert.equal(new URL(page.url()).searchParams.has('flow_exception'), false)
-          if (width === 3840 && source === sources[0]) {
+          if (width === 1920 && source === sources[0]) {
             await page.goBack()
-            await assertCompact(selectedType, 'history restored')
+            await assertCompact(directorySelect, 'history restored')
             assert.equal(new URL(page.url()).searchParams.get('flow_exception'), source.key)
             await page.reload()
-            await assertCompact(selectedType, 'reload restored')
-            await selectedType.locator('.ant-select-clear').click()
+            await assertCompact(directorySelect, 'reload restored')
+            await panel.getByRole('button', { name: '退厂', exact: true }).press('Enter')
+            await panel.getByRole('heading', { name: '退厂', exact: true }).waitFor()
+            await panel.locator('[data-exception-plan="return_to_vendor"] [data-graph-status="rendered"]').waitFor()
+            await page.screenshot({ path: path.join(outputDir, 'exception-purchase-return-4k.png'), scale: 'device' })
+            await close.click()
             await assertCompact(directorySelect, 'cleared after restore')
           }
         }

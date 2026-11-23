@@ -1,5 +1,5 @@
 import { expect } from 'playwright/test'
-import { chooseViewOption, chooseExplorerAction } from './devFlowExplorerControls.mjs'
+import { chooseGranularity, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 
 export async function assertChainDesignKeyboard(page, editor, assert) {
   const canvas = editor.getByRole('region', {
@@ -15,10 +15,10 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     editor.getByRole('button', { name: `查看节点：${name}`, exact: true })
   const working = () =>
     page.evaluate(() => {
-      const { nodes, edges, ideas } = JSON.parse(
+      const { nodes, edges } = JSON.parse(
         sessionStorage.getItem('plush-workbench:business-chain-design:working')
       ).draft
-      return { nodes, edges, ideas }
+      return { nodes, edges }
     })
   // Reload starts a fresh history for the same automatically recorded canvas.
   await page.reload()
@@ -99,7 +99,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
   )
   await page.keyboard.press('Control+z')
 
-  await chooseViewOption(editor, '全部已载入节点')
+  await chooseGranularity(editor, '节点明细')
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()
@@ -140,7 +140,7 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     '尚未加入视图的候选接点不删除其他关系'
   )
   await editor.getByRole('button', { name: '取消连线', exact: true }).click()
-  await chooseViewOption(editor, '业务步骤')
+  await chooseGranularity(editor, '业务步骤')
   await editor
     .getByRole('button', { name: '适应画布全图', exact: true })
     .click()
@@ -174,46 +174,33 @@ export async function assertChainDesignKeyboard(page, editor, assert) {
     firstEdit,
     '输入法组合输入不触发移除、撤销或重做'
   )
-  const checkTextEditing = async (input) => {
-    await input.fill('')
-    await input.pressSequentially('ab')
-    await input.press('Backspace')
-    await expect(input).toHaveValue('a')
-    await input.press('ControlOrMeta+z')
-    await expect(input).toHaveValue('ab')
-    await input.press('ControlOrMeta+Shift+z')
-    await expect(input).toHaveValue('a')
-    await input.press('ControlOrMeta+z')
-    await expect(input).toHaveValue('ab')
-    await input.evaluate((element) => element.setSelectionRange(0, 0))
-    await input.press('Delete')
-    await expect(input).toHaveValue('b')
-    await input.press('Meta+z')
-    await input.press('Control+z')
-    await input.press('Meta+Shift+z')
-    await input.press('Control+Shift+z')
-    assert.deepEqual(
-      await working(),
-      firstEdit,
-      '输入框中的删除、撤销和重做保留视图'
-    )
-  }
   const search = editor.getByRole('textbox', {
-    name: '搜索业务节点',
+    name: '搜索链路或业务节点',
     exact: true,
   })
-  await checkTextEditing(search)
   await search.fill('')
-  await editor
-    .getByRole('button', { name: '更多视图操作', exact: true })
-    .click()
-  await page.getByRole('menuitem', { name: '视图备注', exact: true }).click()
-  await checkTextEditing(
-    editor.getByRole('textbox', { name: '视图备注内容', exact: true })
+  await search.pressSequentially('ab')
+  await search.press('Backspace')
+  await expect(search).toHaveValue('a')
+  await search.press('ControlOrMeta+z')
+  await expect(search).toHaveValue('ab')
+  await search.press('ControlOrMeta+Shift+z')
+  await expect(search).toHaveValue('a')
+  await search.press('ControlOrMeta+z')
+  await expect(search).toHaveValue('ab')
+  await search.evaluate((element) => element.setSelectionRange(0, 0))
+  await search.press('Delete')
+  await expect(search).toHaveValue('b')
+  await search.press('Meta+z')
+  await search.press('Control+z')
+  await search.press('Meta+Shift+z')
+  await search.press('Control+Shift+z')
+  assert.deepEqual(
+    await working(),
+    firstEdit,
+    '输入框中的删除、撤销和重做保留视图'
   )
-  await editor
-    .getByRole('button', { name: '关闭画布说明', exact: true })
-    .click()
+  await search.fill('')
   await pan.focus()
   await page.keyboard.press('Control+z')
   assert.deepEqual(await working(), baseline, '输入后仍能在画布撤销之前的连线编辑')

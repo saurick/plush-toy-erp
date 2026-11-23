@@ -22,6 +22,7 @@ import {
   resolveUIDesignReading,
 } from '../config/devUIDesignReading.mjs'
 import DevUIDesignIllustrations from './DevUIDesignIllustrations.jsx'
+import Directory, { DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 
 function documentHref(href) {
   const [path, anchor = ''] = href.split('#')
@@ -251,36 +252,35 @@ export default function DevUIDesignDocument({ source, specification, view }) {
           className="erp-design-document-sidebar"
           hidden={!directoryOpen}
         >
-          <nav
+          <Directory
             ref={directoryRef}
-            className="erp-design-document-toc"
+            className="erp-directory-list erp-design-document-toc"
             aria-label="设计阅读目录"
+            title={<strong>图解目录</strong>}
           >
             {groups.map((group) => (
-              <div key={group} className="erp-design-topic-group">
-                <h3 className="erp-dev-directory-group-title">{group}</h3>
-                {filtered
-                  .filter((entry) => entry.group === group)
-                  .map((entry) => (
-                    <button
-                      type="button"
-                      key={entry.key}
-                      className="erp-dev-directory-item erp-dev-directory-item--nested erp-design-topic-button"
-                      aria-current={
-                        entry.key === topicKey ? 'page' : undefined
-                      }
-                      onClick={() => {
-                        selectTopic(entry)
-                        if (isNarrowReader()) {
-                          setDirectoryOpen(false)
-                          contentRef.current?.focus({ preventScroll: true })
-                        }
-                      }}
-                    >
-                      <span>{entry.title}</span>
-                    </button>
-                  ))}
-              </div>
+              <section key={group}>
+                <h3 className="erp-directory-group-title">{group}</h3>
+                <DirectoryBranch>
+                  {filtered
+                    .filter((entry) => entry.group === group)
+                    .map((entry) => (
+                      <DirectoryItem
+                        key={entry.key}
+                        aria-current={entry.key === topicKey ? 'page' : undefined}
+                        onClick={() => {
+                          selectTopic(entry)
+                          if (isNarrowReader()) {
+                            setDirectoryOpen(false)
+                            contentRef.current?.focus({ preventScroll: true })
+                          }
+                        }}
+                      >
+                        <span>{entry.title}</span>
+                      </DirectoryItem>
+                    ))}
+                </DirectoryBranch>
+              </section>
             ))}
             {!filtered.length ? (
               <Empty
@@ -291,7 +291,7 @@ export default function DevUIDesignDocument({ source, specification, view }) {
                 </Button>
               </Empty>
             ) : null}
-          </nav>
+          </Directory>
         </aside>
         <div className="erp-design-reader-pane">
           <div

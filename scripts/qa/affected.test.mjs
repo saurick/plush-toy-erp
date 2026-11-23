@@ -253,23 +253,37 @@ test("sales export growth changes select existing checks and an explicit bounded
   assert(!unrelated.followUps.some((item) => item.id === "growth-capacity-validation"));
 });
 
-test("workbench shared patterns retain task acceptance for the sample and real consumers", () => {
+test("workbench shared patterns retain task acceptance in their consumers", () => {
   for (const file of [
     "web/src/dev-workbench/components/WorkbenchPattern.jsx",
-    "web/src/dev-workbench/components/DevWorkbenchStandards.jsx",
     "web/src/dev-workbench/styles/dev-workbench-pattern.css",
-    "web/src/dev-workbench/styles/dev-workbench-standards.css",
-    "web/src/dev-workbench/styles/dev-ui-design.css",
-    "web/src/dev-workbench/pages/DevUIDesignPage.jsx",
-    "web/scripts/style-l1/devWorkbenchPatternScenarios.mjs",
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const text = plan.followUps.find(({ id }) => id === "browser-regression")?.text || "";
-    for (const scenario of ["dev-workbench-patterns-desktop-light", "dev-testing-report-layout-desktop-light", "dev-quality-gates-layout-desktop-light", "dev-server-verification-layout-desktop-light", "dev-data-preparation-workflow-desktop", "dev-data-preparation-4k", "dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete", "dev-project-skills-guidance-desktop-light"]) assert(text.includes(scenario), file);
+    for (const scenario of ["dev-testing-report-layout-desktop-light", "dev-quality-gates-layout-desktop-light", "dev-server-verification-layout-desktop-light", "dev-data-preparation-workflow-desktop", "dev-data-preparation-4k", "dev-flow-state-details-desktop-light", "dev-flow-state-observatory-instance", "dev-flow-rules-complete", "dev-project-skills-guidance-desktop-light"]) assert(text.includes(scenario), file);
     assert(!ids(plan).includes("full"), file);
   }
   const unrelated = buildAffectedPlan(["web/src/erp/utils/businessDate.mjs"], { root: ROOT });
-  assert.doesNotMatch(unrelated.followUps.find(({ id }) => id === "browser-regression")?.text || "", /dev-workbench-patterns/u);
+  assert.doesNotMatch(unrelated.followUps.find(({ id }) => id === "browser-regression")?.text || "", /dev-quality-gates-layout-desktop-light/u);
+});
+
+test("design viewer changes select component samples, reading and full workbench preview", () => {
+  for (const file of [
+    "web/src/dev-workbench/pages/DevUIDesignPage.jsx",
+    "web/src/dev-workbench/styles/dev-ui-design.css",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const text = plan.followUps.find(({ id }) => id === "browser-regression")?.text || "";
+    for (const scenario of ["dev-control-standards", "dev-ui-design-lazy-views", "dev-ui-design-workbench-navigation-sync", "dev-ui-design-preview-modes"]) assert(text.includes(scenario), file);
+    assert(!ids(plan).includes("full"), file);
+  }
+});
+
+test("mobile design toolbar selects device, simulation and role checks", () => {
+  const file = "web/src/dev-workbench/components/DevUIDesignPreviewToolbar.jsx";
+  const plan = buildAffectedPlan([file], { root: ROOT });
+  const text = plan.followUps.find(({ id }) => id === "browser-regression")?.text || "";
+  for (const scenario of ["dev-ui-design-preview-modes", "dev-ui-design-state-select", "dev-ui-design-admin-mobile-review"]) assert(text.includes(scenario), file);
 });
 
 test("workbench header changes retain all-route geometry and view lifecycle checks", () => {
@@ -280,7 +294,7 @@ test("workbench header changes retain all-route geometry and view lifecycle chec
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const text = plan.followUps.find(({ id }) => id === "browser-regression")?.text || "";
-    for (const scenario of ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-workbench-patterns-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]) assert(text.includes(scenario), file);
+    for (const scenario of ["dev-workbench-action-placement-desktop-light", "dev-workbench-density-desktop-light", "dev-ui-design-workbench-navigation-sync", "dev-version-center-tabs-pagination-desktop", "dev-version-center-plan-lifecycle-desktop"]) assert(text.includes(scenario), file);
     assert(selectedTests(plan).includes("web/src/dev-workbench/components/DevPageHeader.test.mjs"), file);
     assert(!ids(plan).includes("full"), file);
   }

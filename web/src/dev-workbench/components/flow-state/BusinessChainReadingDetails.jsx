@@ -18,14 +18,13 @@ const evidenceLabels = {
   browser: '浏览器验证',
 }
 
-export function ChainPurposeDetails({ catalog, chainKey, onRelation, onShowHandoffs, onOpenVerification, restoreEvidence }) {
+export function ChainPurposeDetails({ catalog, chainKey, onRelation, onOpenVerification, restoreEvidence }) {
   const { chain, inputs, outputs, handoffs } = describeBusinessChainReading(catalog, chainKey)
   const [evidenceOpen, setEvidenceOpen] = useState(Boolean(restoreEvidence))
   return (
     <div className="erp-chain-reading-details">
       <strong>用途与交接</strong>
       <p>{chain.summary}</p>
-      {onShowHandoffs && handoffs.length > 0 && <Button type="primary" onClick={onShowHandoffs}>在图上看交接</Button>}
       <WorkbenchFacts items={[
         { label: '从什么开始', value: inputs.map((node) => node.label).join('、') },
         { label: '交出什么结果', value: outputs.map((node) => node.label).join('、') },

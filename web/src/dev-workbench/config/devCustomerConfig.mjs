@@ -583,6 +583,7 @@ function buildModuleStateSummary(
       moduleKey: item.key,
       label: resolveModuleStateLabel(item.label),
       state,
+      defaultState,
       defaultStateLabel: MODULE_STATE_LABELS[defaultState],
       stateLabel: Object.hasOwn(MODULE_STATE_LABELS, state)
         ? MODULE_STATE_LABELS[state]
@@ -639,11 +640,16 @@ function buildFieldVisibilityReview(config, catalog) {
       )?.label || '已登记字段'
       return {
         key: `${surface.key}.${fieldKey}`,
+        surfaceKey: surface.key,
+        fieldKey,
         label: `${moduleLabels.get(surface.moduleKey) || '已登记页面'} · ${fieldLabel}`,
+        defaultVisible,
+        candidateVisible: candidate ? (knownValue ? candidate.visible : undefined) : defaultVisible,
         defaultLabel: visibilityLabel(defaultVisible),
         candidateLabel: candidate ? (knownValue ? visibilityLabel(candidate.visible) : '待校验') : visibilityLabel(defaultVisible),
         sourceLabel: candidate ? '客户包覆盖' : '目录默认',
         overridden: Boolean(candidate),
+        reason: typeof candidate?.reason === 'string' ? candidate.reason.trim() : '',
         impact: protectedField ? '列表与 CSV；受保护，必须显示' : '列表与 CSV',
       }
     })
@@ -856,6 +862,7 @@ export function buildCustomerPackagePreviewSummary(
     })),
     processPolicies: processPolicies.map((item) => ({
       key: item.key,
+      kind: item.kind,
       label: item.label,
       status: item.status,
       ruleCountLabel: `${(item.rules || []).length} 条规则`,
@@ -994,6 +1001,7 @@ export function buildCustomerMenuRuntimeSummary(
       ...brand,
       brandMark: resolveBrandMark(brand, menuConfig.label),
     },
+    displayDeclarations: { brand, desktopMenu: menuConfig.desktopMenu || {} },
     sectionCount: sections.length,
     itemCount,
     routeOnlyItemCount: routeOnlyItemKeys.length,
@@ -1035,6 +1043,10 @@ function buildDraftMenuPreview({ customerKey, label, customerPackageSourcePath }
     itemLabels: Object.fromEntries(
       sidebar.flatMap(({ items }) => items.map(({ key, label }) => [key, label]))
     ),
+    displayDeclarations: {
+      ...(jsonDraft || !matchingConfig ? { label } : { brand: matchingConfig.brand || {} }),
+      desktopMenu: jsonDraft ? customerPackage.desktopMenu || {} : matchingConfig?.desktopMenu || {},
+    },
     sourceLabel: jsonDraft
       ? mapSourcePathLabel(sourcePath)
       : matchingConfig ? '本机草稿前端配置' : '客户名称与产品默认菜单',
@@ -1998,61 +2010,6 @@ export function buildCustomerPackageConsoleSummary({
         label: '审计日志',
         status: 'audit_supported',
         note: '发布、激活、回滚都会写脱敏审计记录。',
-      },
-    ],
-    diffItems: [
-      {
-        key: 'menu-brand',
-        type: '前端展示',
-        current: '中性产品默认包',
-        incoming: menuSummary?.label || '客户菜单配置',
-        impact: '部署包可替换品牌、菜单分组、排序和文案。',
-        status: 'runtime_frontend_only',
-      },
-      {
-        key: 'field-numbering',
-        type: '字段显示',
-        current: '当前业务字段',
-        incoming: `${fieldReviewCount} 个字段 / 编号候选`,
-        impact: '需要人工确认，不自动变成产品核心必填。',
-        status: 'draft_only',
-      },
-      {
-        key: 'workflow-preview',
-        type: '流程编排',
-        current: '当前 WorkflowUsecase',
-        incoming: `${workflowCount} 条工作流预览`,
-        impact: '只做结构预览，不改变当前任务状态规则。',
-        status: 'preview_only',
-      },
-      {
-        key: 'module-states',
-        type: '模块状态',
-        current: '登记模块默认启用',
-        incoming:
-          moduleStateOverrideCount > 0
-            ? `${moduleStateOverrideCount} 个客户包覆盖`
-            : '无客户包覆盖',
-        impact:
-          '只作为后端模块状态控制面输入，不安装 / 卸载模块，也不代表完整关闭流程已交付。',
-        status: 'preview_only',
-      },
-      {
-        key: 'print-template-fields',
-        type: '打印模板',
-        current: '采购合同 / 加工合同',
-        incoming: `${printTemplateCount} 套模板 / ${printFieldTruthCount} 条字段真源`,
-        impact:
-          '只展示当前模板字段真源和缺口，不新增销售订单打印模板，不把客户专属抬头写入产品核心。',
-        status: 'source_grounded',
-      },
-      {
-        key: 'import-tooling',
-        type: '导入工具',
-        current: '试跑证据',
-        incoming: '执行报告门禁',
-        impact: '没有明确批准前不写数据库，不生成业务事实。',
-        status: 'report_gate_only',
       },
     ],
     versionGates: [

@@ -300,6 +300,7 @@ export function createBusinessPageContractScenarios({
           historySelectRoot,
           '历史记录类型'
         )
+        assert.equal(await historySelect.isEditable(), false)
         await historyDropdown
           .locator('.ant-select-item-group')
           .filter({ hasText: '业务单据与版本' })
@@ -470,11 +471,14 @@ export function createBusinessPageContractScenarios({
         const assignmentDrawer = page.locator('.erp-task-action-drawer')
         await assignmentDrawer.waitFor({ state: 'visible', timeout: 10_000 })
         await waitForFiniteAnimations(page)
-        await assignmentDrawer.getByRole('tab', { name: /选择处理/u }).click()
-        await assignmentDrawer.getByRole('radio', { name: /转交任务/u }).click()
-        const assignmentSelect = assignmentDrawer.getByRole('combobox', {
+        await assignmentDrawer.locator('#erp-task-action-step-action-tab').click()
+        await assignmentDrawer.getByRole('button', { name: '更多', exact: true }).click()
+        await page.getByRole('menuitem', { name: '转交任务', exact: true }).click()
+        const transfer = page.getByRole('dialog', { name: '转交任务', exact: true })
+        const assignmentSelect = transfer.getByRole('combobox', {
           name: '转交去向',
         })
+        assert.equal(await assignmentSelect.isEditable(), false)
         await assignmentSelect.click()
         const assignmentDropdown = page.locator('.ant-select-dropdown:visible')
         await assignmentDropdown.waitFor({ state: 'visible', timeout: 10_000 })
@@ -500,12 +504,12 @@ export function createBusinessPageContractScenarios({
           .click()
         assert.equal(
           String(
-            await assignmentDrawer
+            await transfer
               .locator('.erp-task-action-drawer__assignment')
               .locator('.ant-select-selection-item')
               .textContent()
           ).trim(),
-          'warehouse-backup · 仓库'
+          'warehouse-backup'
         )
         await assignmentSelect
           .locator(
@@ -514,8 +518,14 @@ export function createBusinessPageContractScenarios({
           .locator('.ant-select-selector')
           .click()
         await assignmentDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          (await assignmentDropdown.locator('.ant-select-item-option-selected').innerText()).trim(),
+          'warehouse-backup · 仓库'
+        )
         await assignmentSelect.press('Escape')
         await assignmentDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+        await transfer.getByRole('button', { name: '关闭', exact: true }).last().click()
+        await transfer.waitFor({ state: 'hidden', timeout: 10_000 })
         await assignmentDrawer.locator('.ant-drawer-close').click()
         await assignmentDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
       },

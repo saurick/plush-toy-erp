@@ -3,14 +3,17 @@ import { listDocumentProductPreviews } from './attachmentApi.mjs'
 import { getProductionOrder } from './productionOrderApi.mjs'
 import { DOCUMENT_PRODUCT_SOURCES, normalizeGalleryProducts } from '../utils/businessProductGallery.mjs'
 import { DEFAULT_RPC_ERROR_MESSAGES, RpcErrorCode } from '../../common/consts/errorCodes.js'
+import { SalesOrderItemStatus } from '../../common/consts/statuses.generated.mjs'
 
-export async function loadDocumentGalleryProducts(source, documentID, { signal, expectedVersion } = {}) {
+export async function loadDocumentGalleryProducts(source, documentID, { signal, expectedVersion, includeCanceledSalesLines = true } = {}) {
   let items
   switch (source) {
     case DOCUMENT_PRODUCT_SOURCES.SALES_ORDER: {
       const version = expectedVersion ?? (await getSalesOrder({ id: documentID }, { signal }))?.version
       const data = await listAllSalesOrderItems({ sales_order_id: documentID, expected_version: version }, { signal })
-      items = data.sales_order_items
+      items = includeCanceledSalesLines
+        ? data.sales_order_items
+        : data.sales_order_items.filter((item) => item.line_status !== SalesOrderItemStatus.CANCELED)
       break
     }
     case DOCUMENT_PRODUCT_SOURCES.PRODUCTION_ORDER: {

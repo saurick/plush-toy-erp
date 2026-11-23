@@ -55,16 +55,22 @@ func TestBusinessProgressDeliveryLinesUsePostedFactsAndParentScope(t *testing.T)
 		}
 		return result
 	}
+	fullOrder := q
+	fullOrder.Display = ""
+	orderPage := read(fullOrder)
+	if len(orderPage.Rows) != 1 || orderPage.Rows[0].DeliveredLineCount == nil || *orderPage.Rows[0].DeliveredLineCount != 1 || orderPage.Rows[0].ProductCount != 2 || orderPage.Rows[0].ShippedQuantity != nil {
+		t.Fatalf("mixed units must retain actual line completion: %+v", orderPage.Rows)
+	}
 	first := read(q)
 	if first.Total != 2 || first.Counts.Overdue != 1 || first.Counts.Delivery.Delivered != 1 || len(first.Rows) != 1 {
 		t.Fatalf("counts must precede pagination and keep the shipped sibling: %+v", first)
 	}
 	row := first.Rows[0]
-	for _, field := range []string{biz.BusinessProgressSortDueDate, biz.BusinessProgressSortProduct, biz.BusinessProgressSortOrderNo} {
+	for _, field := range []string{biz.BusinessProgressSortDueDate, biz.BusinessProgressSortProduct, biz.BusinessProgressSortOrderNo, biz.BusinessProgressSortRemaining} {
 		ordered := q
 		ordered.SortBy, ordered.SortDirection = field, "desc"
 		firstID, secondID := rabbit.ID, f.salesItemID
-		if field == biz.BusinessProgressSortOrderNo {
+		if field == biz.BusinessProgressSortOrderNo || field == biz.BusinessProgressSortRemaining {
 			firstID, secondID = f.salesItemID, rabbit.ID
 		}
 		for offset, want := range []int{firstID, secondID} {
@@ -268,7 +274,7 @@ func TestBusinessProgressMixedUnitsAndIndependentProduction(t *testing.T) {
 		t.Fatalf("search=%+v err=%v", board, err)
 	}
 	row := board.Rows[0]
-	if row.OrderedQuantity != nil || row.ShippedQuantity != nil || row.ProductCount != 2 || row.ProductionClosed != 1 || !row.Active {
+	if row.OrderedQuantity != nil || row.ShippedQuantity != nil || row.ProductCount != 2 || row.DeliveredLineCount == nil || *row.DeliveredLineCount != 0 || row.ProductionClosed != 1 || !row.Active {
 		t.Fatalf("mixed row=%+v", row)
 	}
 	q.View = "production"

@@ -308,8 +308,13 @@ export function createFilterConflictScenarios(deps) {
       await scope.getByText('流程跟踪', { exact: true }).click()
       const panel = page.locator(phone ? '.mobile-workflow-tracking' : '.erp-workflow-tracking-panel')
       const toolbar = phone ? panel : page.locator('.erp-workflow-tracking-controls')
-      await panel.getByRole('button', { name: '重新读取', exact: true }).click()
-      await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
+      const attention = toolbar.getByRole('group', { name: '关注事项', exact: true })
+      const overdue = attention.getByRole('button', { name: '只看逾期', exact: true })
+      const filterTrigger = toolbar.getByRole('button', { name: phone ? /筛选流程/ : /^筛选/ })
+      const closeLabel = phone ? '关闭筛选' : '收起'
+      const records = phone ? panel : panel.getByRole('region', { name: '流程记录', exact: true })
+      await records.getByRole('button', { name: '重新读取', exact: true }).click()
+      await records.getByText('任务分页记录 1', { exact: true }).waitFor()
       const requests = []
       page.on('request', (request) => {
         if (!request.url().endsWith('/rpc/workflow')) return
@@ -317,12 +322,11 @@ export function createFilterConflictScenarios(deps) {
         if (body?.method === 'list_tracking') requests.push(body.params)
       })
       const filters = page.getByRole('dialog', { name: phone ? '筛选流程' : '筛选条件', exact: true })
-      if (phone) await toolbar.getByRole('button', { name: /筛选流程/ }).click()
-      else await toolbar.getByRole('button', { name: /^筛选/ }).click()
+      await filterTrigger.click()
       await waitForFilters(page, filters)
       if (phone) {
         const titles = await filters.locator('.erp-filter-field > legend').allTextContents()
-        assert(titles.includes('当前岗位') && titles.includes('关注事项'), '手机筛选自行提供各组标题')
+        assert.deepEqual(titles, ['当前岗位'], '手机筛选只展示额外条件')
         const option = await filters.getByRole('group', { name: '当前岗位', exact: true }).getByRole('button', { name: '工程', exact: true }).elementHandle()
         const original = await option.evaluate((node) => node.querySelector('.erp-filter-chip__label').textContent)
         await option.evaluate((node) => { node.querySelector('.erp-filter-chip__label').textContent = '订单与材料协同负责人'.repeat(8) })
@@ -332,37 +336,26 @@ export function createFilterConflictScenarios(deps) {
         await option.evaluate((node, text) => { node.querySelector('.erp-filter-chip__label').textContent = text }, original)
       }
       await choose(page, filters, '当前岗位', '工程')
+      await filters.getByRole('button', { name: closeLabel, exact: true }).click()
+      await filters.waitFor({ state: 'hidden' })
+      await Promise.all([
+        page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.attention === 'overdue'),
+        overdue.click(),
+      ])
+      await attention.getByRole('button', { name: '只看逾期', exact: true, pressed: true }).waitFor()
       await Promise.all([
         page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.status === 'completed'),
-        (async () => {
-          if (phone) {
-            await filters.getByText('只看逾期', { exact: true }).click()
-            await choose(page, filters, '当前岗位', '全部当前岗位')
-            assert.equal(await filters.getByRole('button', { name: '工程', exact: true }).getAttribute('aria-pressed'), 'false')
-            assert.equal(await filters.getByRole('button', { name: '只看逾期', exact: true }).getAttribute('aria-pressed'), 'true')
-            await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-            assert.equal(await panel.getByRole('button', { name: /筛选流程/ }).getAttribute('title'), '关注事项：只看逾期')
-            await panel.getByRole('button', { name: /^已结束，/ }).click()
-            await panel.getByRole('button', { name: /筛选流程/ }).click()
-          } else {
-            await choose(page, filters, '关注事项', '只看逾期')
-            await filters.getByRole('button', { name: '收起', exact: true }).click()
-            await toolbar.getByRole('button', { name: /^已结束，/ }).click()
-            await toolbar.getByRole('button', { name: /^筛选/ }).click()
-          }
-        })(),
+        toolbar.getByRole('button', { name: /^已结束，/ }).click(),
       ])
+      await filterTrigger.click()
       await waitForFilters(page, filters)
       assert.equal(await filters.getByRole('combobox', { name: '当前岗位', exact: true }).count(), 0)
       assert.equal(await filters.getByRole('textbox', { name: '搜索当前岗位', exact: true }).count(), 0)
       assert.equal(await filters.getByRole('group', { name: '当前岗位', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.length > 0 && buttons.every((button) => button.disabled)), true)
-      if (phone) {
-        assert.equal(await filters.getByRole('group', { name: '关注事项', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.length > 0 && buttons.every((button) => button.disabled)), true)
-        await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-      } else {
-        assert.equal(await filters.getByRole('group', { name: '关注事项', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.length > 0 && buttons.every((button) => button.disabled)), true)
-        await filters.getByRole('button', { name: '收起', exact: true }).click()
-      }
+      assert.equal(await filters.getByRole('group', { name: '关注事项', exact: true }).count(), 0)
+      await filters.getByRole('button', { name: closeLabel, exact: true }).click()
+      assert.equal(await overdue.getAttribute('aria-pressed'), 'false')
+      assert.equal(await attention.getByRole('button').evaluateAll((buttons) => buttons.length === 2 && buttons.every((button) => button.disabled)), true)
       assert(requests.some((query) => query.status === 'completed' && !query.attention && !query.owner_role_key))
       await page.reload()
       await Promise.all([
@@ -382,6 +375,7 @@ export function createFilterConflictScenarios(deps) {
     verify: async (page) => {
       const root = page.getByRole('region', { name: '组件设计', exact: true })
       const directory = root.getByRole('navigation', { name: '组件设计目录' })
+      await directory.getByRole('button', { name: '组合样例', exact: true }).click()
       const sample = root.getByRole('region', { name: '交互样例', exact: true })
       await directory.getByRole('button', { name: /^筛选与搜索/u }).click()
       const risks = root.getByRole('group', { name: '演示风险筛选', exact: true })
@@ -425,9 +419,9 @@ export function createFilterConflictScenarios(deps) {
       await page.waitForURL((url) => url.searchParams.get('controlq') === 'BusinessChainDesignPicker')
       await directory.getByRole('button', { name: /^筛选与搜索/u }).waitFor({ state: 'detached' })
       const pickerTopic = directory.getByRole('button', { name: /^分组选择（单选／多选）/u })
-      await pickerTopic.getByText('BusinessChainDesignPicker', { exact: true }).waitFor()
       await pickerTopic.click()
       await page.waitForURL((url) => url.searchParams.get('control') === 'chain-view-picker')
+      assert.equal(await root.locator('.erp-control-library-heading code').textContent(), 'BusinessChainDesignPicker')
       await page.reload()
 
       const scopeTrigger = sample.getByRole('button', { name: /^流程范围：/u })
@@ -512,7 +506,6 @@ export function createFilterConflictScenarios(deps) {
     ...desktop,
     name: 'erp-progress-production-filter-conflicts',
     path: '/erp/business-dashboard',
-    adminProfile: { ...desktop.adminProfile, roles: [] },
     effectiveSession: {
       ...desktop.effectiveSession,
       actions: desktop.effectiveSession.actions.filter((action) => !action.startsWith('sales_order')),
@@ -848,9 +841,21 @@ payload: {},
       const trigger = page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ })
       const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
       const results = (count) => page.getByText(`第 1-${count} 条 / 共 ${count} 条`, { exact: true }).waitFor()
+      const emptyEntry = filters.getByRole('button', { name: '截止时间：不限', exact: true })
+      const assertEmptyEntry = async () => {
+        const geometry = await emptyEntry.evaluate((node) => {
+          const box = node.getBoundingClientRect()
+          const control = node.parentElement.getBoundingClientRect()
+          const arrow = node.querySelector('.erp-filter-date-trigger__arrow').getBoundingClientRect()
+          return { widthDifference: control.width - box.width, arrowGap: box.right - arrow.right, leftPadding: getComputedStyle(node).paddingInlineStart }
+        })
+        assert(Math.abs(geometry.widthDifference) <= 1 && Math.abs(geometry.arrowGap - 9) <= 1 && geometry.leftPadding === '8px',
+          `日期不限时整框可点，箭头靠右：${JSON.stringify(geometry)}`)
+      }
       await results(4)
       await trigger.click()
       await waitForFilters(page, filters)
+      await assertEmptyEntry()
       const range = await openDateFilter(page, filters)
       for (const label of ['今天', '近 7 天', '近 30 天', '未来 7 天']) await dateFilterButton(range, label).waitFor()
       const { from, to } = await manualDateInputs(range)
@@ -873,20 +878,29 @@ payload: {},
       await to.fill(lastDay)
       await dateFilterButton(range, '应用日期').click()
       await results(2)
-      const desktop = page.viewportSize()
-      await page.setViewportSize({ width: 460, height: 700 })
       const entry = filters.locator('.erp-filter-date-trigger')
       const clear = filters.getByRole('button', { name: '清除截止时间', exact: true })
+      await clear.waitFor({ state: 'visible' })
+      await waitForFiniteAnimations(page)
+      const desktopClear = await clear.boundingBox()
+      assert(desktopClear && desktopClear.width === 36 && desktopClear.height === 34, '桌面整块清除点击区为 36×34 px')
+      const desktop = page.viewportSize()
+      await page.setViewportSize({ width: 460, height: 700 })
       await clear.scrollIntoViewIfNeeded()
       await waitForFiniteAnimations(page)
-      const [clearBox, arrowBox] = await Promise.all([clear.boundingBox(), entry.locator('.erp-filter-date-trigger__arrow').boundingBox()])
-      assert(clearBox && arrowBox && clearBox.x + clearBox.width <= arrowBox.x + 1, '清除点击区位于箭头左边')
+      const [entryBox, clearBox] = await Promise.all([entry.boundingBox(), clear.boundingBox()])
+      assert(entryBox && clearBox && Math.abs(entryBox.x + entryBox.width - clearBox.x) <= 1
+        && Math.abs(entryBox.height - clearBox.height) <= 1, '清除和日历入口并排且同高')
+      await entry.click({ position: { x: entryBox.width - 4, y: 4 } })
+      await range.waitFor({ state: 'visible' })
+      await dateFilterButton(range, '取消').click()
+      await waitForFilters(page, filters)
+
       const frames = page.evaluate(() => new Promise((resolve) => {
         const samples = []
         const sample = () => {
           const panel = document.querySelector('[role="dialog"][aria-label="筛选条件"]')
-          const fields = ['.erp-filter-date-trigger', '.erp-filter-date-trigger__text', '.erp-filter-date-trigger__arrow']
-          const geometry = [panel, ...fields.map((selector) => panel?.querySelector(selector))].map((node) => {
+          const geometry = [panel, panel?.querySelector('.erp-filter-date-control')].map((node) => {
             const box = node?.getBoundingClientRect()
             return box ? [box.x, box.y, box.width, box.height] : []
           })
@@ -896,15 +910,23 @@ payload: {},
         }
         requestAnimationFrame(sample)
       }))
-      await clear.click()
-      await filters.getByRole('button', { name: '截止时间：不限', exact: true }).waitFor()
+      await clear.click({ position: { x: clearBox.width - 4, y: 4 } })
+      await emptyEntry.waitFor()
       await results(4)
       const samples = await frames
-      assert(samples.every(({ geometry, datePanel }) => !datePanel && geometry.every((box, i) => box.length === 4 && box.every((value, j) => Math.abs(value - samples[0].geometry[i][j]) <= 1))), '清除期间保留气泡、文字区和箭头位置')
+      const initialGeometry = samples[0].geometry
+      const moved = samples.find(({ geometry, datePanel }) => datePanel || geometry.some((box, i) => (
+        box.length !== 4 || box.some((value, j) => Math.abs(value - initialGeometry[i][j]) > 1)
+      )))
+      assert(!moved, `清除期间筛选气泡和日期框保持原位：${JSON.stringify({ initialGeometry, moved })}`)
       assert.equal(await clear.count(), 0)
       assert.equal(await entry.evaluate((node) => node === document.activeElement), true)
+      await assertEmptyEntry()
+      const emptyBox = await emptyEntry.boundingBox()
+      assert(emptyBox, '清空后日期入口可见')
+      await emptyEntry.click({ position: { x: emptyBox.width - 4, y: emptyBox.height / 2 } })
+      await range.waitFor({ state: 'visible' })
       await page.setViewportSize(desktop)
-      await openDateFilter(page, filters)
       await dateFilterButton(range, '未设置到期').click()
       await results(1)
       assert.equal(new URL(page.url()).searchParams.has('due_date_from'), false)

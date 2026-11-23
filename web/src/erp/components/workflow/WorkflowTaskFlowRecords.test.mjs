@@ -107,4 +107,13 @@ test('flow records use the shared scope switch without replacing it across loadi
   )
   assert.match(container.textContent, /处理记录加载失败/u)
   assert.match(container.textContent, /重新读取/u)
+
+  await render({ flow: { items: events.slice(0, 1), status: 'ready', truncated: false } })
+  assert.equal(Boolean(container.querySelector('.workflow-task-event-trail__scope')), false)
+  assert.equal(container.querySelector('h3').textContent.trim(), '本任务处理记录')
+  assert.equal(container.querySelectorAll('.workflow-task-event-trail__item').length, 1)
+  assert.equal(container.querySelectorAll('.workflow-task-event-trail__source').length, 0)
+
+  await render({ flow: { items: events.slice(0, 1), status: 'ready', truncated: true } })
+  assert.equal(Boolean(container.querySelector('.workflow-task-event-trail__scope')), true)
 })

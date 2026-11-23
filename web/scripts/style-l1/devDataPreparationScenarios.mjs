@@ -1,3 +1,4 @@
+import { expect } from 'playwright/test'
 import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION, LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION } from '../../../scripts/qa/manual-acceptance-target-policy.mjs'
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../../scripts/qa/manual-acceptance-core-contract.mjs'
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
@@ -311,7 +312,16 @@ export function createDevDataPreparationScenarios({ assert, assertNoHorizontalOv
         assert.equal(await page.getByRole('tab', { name: '当前批次' }).count(), 0)
         await detail.getByRole('heading', { name: firstChain.label, exact: true }).waitFor()
         assert.equal(await directory.getByRole('button').count(), workflow.summary.acceptancePlan.chainCount)
-        await detail.getByText(`1. ${firstChain.steps[0].label}`, { exact: true }).click()
+        const branches = detail.getByRole('group', { name: '业务步骤分支图' })
+        assert.equal(await branches.getByRole('button').count(), firstChain.stepCount)
+        const rejected = firstChain.steps.find((step) => !step.scenarioKinds.includes('happy_path') && step.scenarioKinds.includes('interruption_recovery'))
+        const origin = branches.getByRole('group', { name: rejected.fromLabel, exact: true })
+        const choice = origin.getByRole('button', { name: rejected.label, exact: true })
+        await choice.press('Enter')
+        await expect(origin.locator('li[data-branch]').filter({ hasText: rejected.label })).toContainText(rejected.toLabel)
+        await expect(origin.getByText(rejected.responsibleRole, { exact: true })).toBeVisible()
+        await branches.getByRole('button', { name: firstChain.steps[0].label, exact: true }).click()
+        await expect(choice).toHaveAttribute('aria-expanded', 'false')
         await detail.getByText('责任岗位', { exact: true }).waitFor()
         const readsBeforeChainChange = workflow.reads.length
         await directory.getByRole('button', { name: nextChain.label, exact: true }).click()
@@ -433,7 +443,7 @@ export function createDevDataPreparationScenarios({ assert, assertNoHorizontalOv
         assert.equal(afterSelection.history, beforeSelection.history, '切换业务链不增加返回历史')
         assert.equal(afterSelection.focused, true, '键盘切链后焦点留在原项')
         assert.equal(new URL(page.url()).searchParams.get('planChain'), lastChain.key)
-        await fullDetail.getByText(`1. ${lastChain.steps[0].label}`, { exact: true }).click()
+        await fullDetail.getByRole('button', { name: lastChain.steps[0].label, exact: true }).click()
         const roleLabel = fullDetail.getByText('责任岗位', { exact: true })
         await roleLabel.waitFor()
         const roleLabelLines = await roleLabel.evaluate((label) => {

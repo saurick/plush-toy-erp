@@ -17,7 +17,7 @@ func TestWorkflowTrackingFilterContract(t *testing.T) {
 	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard)), workflowUC: biz.NewWorkflowUsecase(repo), customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled")}
 	d.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead)}
 	for _, params := range []map[string]any{
-		{"sort_direction": "unknown"}, {"sort_direction": 2}, {"status": "done"}, {"status": true}, {"owner_role_key": "other"}, {"attention": "urgent"},
+		{"sort_direction": "unknown"}, {"sort_direction": 2}, {"status": "done"}, {"status": true}, {"record_type": "material_review"}, {"record_type": 1}, {"owner_role_key": "other"}, {"attention": "urgent"},
 		{"date_from": "2026-02-30"}, {"date_from": 123}, {"date_to": "2026-10-09T10:00:00Z"},
 		{"date_from": "2026-10-09", "date_to": "2026-10-08"}, {"actor_id": 99, "status": "active"},
 	} {
@@ -30,13 +30,13 @@ func TestWorkflowTrackingFilterContract(t *testing.T) {
 	if repo.calls != 0 {
 		t.Fatalf("invalid filters reached repository: %d", repo.calls)
 	}
-	input, _ := structpb.NewStruct(map[string]any{"scope": "participated", "sort_direction": "asc", "limit": 8, "offset": 24, "source_type": "sales_order", "status": "active", "owner_role_key": "engineering", "attention": "overdue", "date_from": "2026-10-08", "date_to": "2026-10-08"})
+	input, _ := structpb.NewStruct(map[string]any{"scope": "participated", "sort_direction": "asc", "limit": 8, "offset": 24, "source_type": "sales_order", "status": "active", "record_type": "flow", "owner_role_key": "engineering", "attention": "overdue", "date_from": "2026-10-08", "date_to": "2026-10-08"})
 	_, result, err := d.handleWorkflow(workflowJSONRPCAdminContext(), "list_tracking", "filter", input)
 	if err != nil || result == nil || result.Code != errcode.OK.Code {
 		t.Fatalf("result=%v err=%v", result, err)
 	}
 	q := repo.query
-	if q.ActorID != 7 || q.Limit != 8 || q.Offset != 24 || q.Scope != "participated" || q.SortDirection != "asc" || q.SourceID != 0 || q.SourceType != "sales_order" || q.Status != "active" || q.OwnerRoleKey != "engineering" || q.Attention != "overdue" || q.SnapshotAt.IsZero() || q.VisibilityScope == nil {
+	if q.ActorID != 7 || q.Limit != 8 || q.Offset != 24 || q.Scope != "participated" || q.SortDirection != "asc" || q.SourceID != 0 || q.SourceType != "sales_order" || q.Status != "active" || q.RecordType != "flow" || q.OwnerRoleKey != "engineering" || q.Attention != "overdue" || q.SnapshotAt.IsZero() || q.VisibilityScope == nil {
 		t.Fatalf("query=%#v", q)
 	}
 	if q.DateFrom == nil || q.DateTo == nil || q.DateFrom.UTC().Format(time.RFC3339) != "2026-10-07T16:00:00Z" || !q.DateTo.Equal(q.DateFrom.Add(24*time.Hour-time.Microsecond)) {

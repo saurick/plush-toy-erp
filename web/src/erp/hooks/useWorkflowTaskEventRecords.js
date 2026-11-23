@@ -115,8 +115,8 @@ export default function useWorkflowTaskEventRecords({ task, profile }) {
     : ''
   const currentPage = useEventPage(taskID, identity, 'task')
   const flowPage = useEventPage(taskID, identity, 'flow')
-  const [selection, setSelection] = useState({ identity: '', value: 'flow' })
-  const scope = selection.identity === identity ? selection.value : 'flow'
+  const [selection, setSelection] = useState({ identity: '', value: 'task' })
+  const scope = selection.identity === identity ? selection.value : 'task'
   const changeScope = useCallback(
     (value) => {
       if (value === 'task' || value === 'flow') {

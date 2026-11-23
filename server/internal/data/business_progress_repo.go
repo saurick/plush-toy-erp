@@ -100,19 +100,28 @@ func (r *businessProgressRepo) ListBusinessProgressOwners(ctx context.Context, q
 
 func progressListOrder(q biz.BusinessProgressQuery) string {
 	field := map[string]string{
-		biz.BusinessProgressSortOrderNo: "order_no",
-		biz.BusinessProgressSortDueDate: "due_date",
-		biz.BusinessProgressSortProduct: "product_label",
+		biz.BusinessProgressSortOrderNo:   "order_no",
+		biz.BusinessProgressSortDueDate:   "due_date",
+		biz.BusinessProgressSortProduct:   "product_label",
+		biz.BusinessProgressSortRemaining: "remaining_quantity",
+		biz.BusinessProgressSortCompleted: "completed_quantity",
 	}[q.SortBy]
 	if field != "" {
 		direction := " ASC"
 		if q.SortDirection == "desc" {
 			direction = " DESC"
 		}
-		if q.Display == "lines" {
-			return field + direction + " NULLS LAST,order_no,line_no,id"
+		prefix := ""
+		if q.SortBy == biz.BusinessProgressSortRemaining || q.SortBy == biz.BusinessProgressSortCompleted {
+			if q.Display == "lines" {
+				field = "CASE WHEN delivery_status NOT IN ('unknown','canceled') THEN remaining_quantity END"
+			}
+			prefix = "CASE WHEN " + field + " IS NULL THEN 1 ELSE 0 END, unit_name,"
 		}
-		return field + direction + " NULLS LAST,id DESC"
+		if q.Display == "lines" {
+			return prefix + field + direction + " NULLS LAST,order_no,line_no,id"
+		}
+		return prefix + field + direction + " NULLS LAST,id DESC"
 	}
 	if q.Display == "lines" {
 		return `CASE delivery_status
@@ -125,8 +134,8 @@ func progressListOrder(q biz.BusinessProgressQuery) string {
 
 func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.BusinessProgressQuery, cte string, args []any) (out []*biz.BusinessProgressRow, err error) {
 	args = append(append([]any{}, args...), q.Limit, q.Offset)
-	query := cte + ` SELECT id,order_no,status,customer,product,product_count,product_id,sales_owner,CAST(due_date AS TEXT),CAST(updated_at AS TEXT),
- active,unlinked,unit_name,CAST(ordered_quantity AS TEXT),CAST(shipped_quantity AS TEXT),delivery_known,engineering_total,engineering_ready,
+	query := cte + ` SELECT id,order_no,status,customer,product,product_count,linked_product_count,product_id,sales_owner,CAST(due_date AS TEXT),CAST(updated_at AS TEXT),
+ active,unlinked,unit_name,CASE WHEN delivery_known=1 THEN delivered_lines END,CAST(remaining_quantity AS TEXT),CAST(ordered_quantity AS TEXT),CAST(shipped_quantity AS TEXT),delivery_known,engineering_total,engineering_ready,
  overdue,due_soon,blocked,production_orders,production_closed,material_total,material_pending,in_progress_batches,outsourced_batches,
  waiting_batches,rejected_batches,planned_batches,open_tasks,blocked_tasks,unassigned_tasks,attention_task_id,attention_task,
  attention_reason,attention_owner,attention_role,CAST(completed_quantity AS TEXT),current_operation,operation_count FROM filtered` + (" WHERE " + progressFilterCondition(q)) +
@@ -143,13 +152,16 @@ func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.Business
 	out = []*biz.BusinessProgressRow{}
 	for rows.Next() {
 		progressRow := &biz.BusinessProgressRow{View: q.View}
-		var due, updated, ordered, shipped, completed stdsql.NullString
-		err = rows.Scan(&progressRow.ID, &progressRow.OrderNo, &progressRow.Status, &progressRow.Customer, &progressRow.Product, &progressRow.ProductCount, &progressRow.ProductID, &progressRow.SalesOwner, &due, &updated,
-			&progressRow.Active, &progressRow.Unlinked, &progressRow.Unit, &ordered, &shipped, &progressRow.DeliveryKnown, &progressRow.EngineeringTotal, &progressRow.EngineeringReady,
+		var due, updated, ordered, shipped, completed, remaining stdsql.NullString
+		err = rows.Scan(&progressRow.ID, &progressRow.OrderNo, &progressRow.Status, &progressRow.Customer, &progressRow.Product, &progressRow.ProductCount, &progressRow.LinkedProductCount, &progressRow.ProductID, &progressRow.SalesOwner, &due, &updated,
+			&progressRow.Active, &progressRow.Unlinked, &progressRow.Unit, &progressRow.DeliveredLineCount, &remaining, &ordered, &shipped, &progressRow.DeliveryKnown, &progressRow.EngineeringTotal, &progressRow.EngineeringReady,
 			&progressRow.Overdue, &progressRow.DueSoon, &progressRow.Blocked, &progressRow.ProductionOrders, &progressRow.ProductionClosed, &progressRow.MaterialTotal, &progressRow.MaterialPending,
 			&progressRow.InProgressBatches, &progressRow.OutsourcedBatches, &progressRow.WaitingBatches, &progressRow.RejectedBatches, &progressRow.PlannedBatches, &progressRow.OpenTasks, &progressRow.BlockedTasks,
 			&progressRow.UnassignedTasks, &progressRow.AttentionTaskID, &progressRow.AttentionTask, &progressRow.AttentionReason, &progressRow.AttentionOwner, &progressRow.AttentionRole, &completed, &progressRow.CurrentOperation, &progressRow.OperationCount)
 		if err != nil {
+			return nil, err
+		}
+		if progressRow.RemainingQuantity, err = statisticsDecimal(remaining); err != nil {
 			return nil, err
 		}
 		progressRow.DueDate = progressDate(due.String)
@@ -328,7 +340,7 @@ func loadProgressTaskPage(ctx context.Context, tx *stdsql.Tx, q biz.BusinessProg
 		args = append(args, q.TaskRole)
 		scope += fmt.Sprintf(" AND owner_role_key=$%d", len(args))
 	}
-	query := cte + ` SELECT id,task_no,task_name,task_status_key,` + progressDateSQL("due_at", sqlDialect) +
+	query := cte + ` SELECT id,task_no,task_name,task_status_key,task_group,` + progressDateSQL("due_at", sqlDialect) +
 		`,assignee_name,owner_role_key,COALESCE(blocked_reason,''),source_id,COUNT(*) OVER()` + scope +
 		fmt.Sprintf(" ORDER BY attention_rank LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
 	rows, err := tx.QueryContext(ctx, query, append(append([]any{}, args...), q.Limit, q.Offset)...)
@@ -339,7 +351,7 @@ func loadProgressTaskPage(ctx context.Context, tx *stdsql.Tx, q biz.BusinessProg
 	for rows.Next() {
 		record := biz.BusinessProgressRecord{Kind: "task"}
 		var date stdsql.NullString
-		if err := rows.Scan(&record.ID, &record.Number, &record.Label, &record.Status, &date, &record.Owner, &record.Role, &record.Note, &record.ParentID, &page.Total); err != nil {
+		if err := rows.Scan(&record.ID, &record.Number, &record.Label, &record.Status, &record.TaskGroup, &date, &record.Owner, &record.Role, &record.Note, &record.ParentID, &page.Total); err != nil {
 			return nil, errors.Join(err, rows.Close())
 		}
 		record.Date = progressDate(date.String)

@@ -301,3 +301,35 @@ test('deferred form autofocus preserves a field chosen before initialization fin
   await flushFrames()
   assert.equal(document.activeElement === container.querySelector('h1'), true)
 })
+
+test('preloaded task form values stay clean until the business step is visited', async (t) => {
+  const ui = await createReactTestHarness(t)
+  const [{ ERPThemeProvider }, { createMemoryRouter, RouterProvider }, { default: Page }, { TaskBusinessStepVisibleContext }, { Form, Input }] = await Promise.all([
+    import('../../../common/theme/erpTheme.jsx'), import('react-router-dom'), import('./BusinessFormPage.jsx'), import('../../hooks/useBusinessPageContext.js'), import('antd'),
+  ])
+  let form
+  let showBusinessStep
+  function Harness() {
+    const [stepVisible, setStepVisible] = useState(false)
+    const [recordForm] = Form.useForm()
+    showBusinessStep = setStepVisible
+    form = recordForm
+    return createElement(TaskBusinessStepVisibleContext.Provider, { value: stepVisible }, createElement(Page, { open: true, form: recordForm, title: '登记采购到货' }, createElement(Form, { form: recordForm, initialValues: { quantity: '' } }, createElement(Form.Item, { name: 'quantity' }, createElement(Input)))))
+  }
+  const router = createMemoryRouter([{ path: '*', element: createElement(Harness) }])
+  t.after(() => router.dispose())
+  await ui.render(createElement(ERPThemeProvider, null, createElement(RouterProvider, { router, future: { v7_startTransition: true } })))
+  const editor = () => ui.container.querySelector('.erp-business-form-page')
+  const frames = () => ui.act(() => new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))))
+  await frames()
+  await ui.act(async () => form.setFieldValue('quantity', '10'))
+  await frames()
+  assert.equal(editor().dataset.unsaved, 'false')
+  await ui.act(async () => showBusinessStep(true))
+  await frames()
+  assert.equal(editor().dataset.unsaved, 'false')
+  await ui.act(async () => form.setFieldValue('quantity', '8'))
+  await ui.act(async () => showBusinessStep(false))
+  await frames()
+  assert.equal(editor().dataset.unsaved, 'true', 'returning to task information keeps a visited editor protected')
+})

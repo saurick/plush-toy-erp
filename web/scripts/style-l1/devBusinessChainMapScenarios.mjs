@@ -1,5 +1,5 @@
 import { expect } from 'playwright/test'
-import { chooseChainScope, chooseViewOption, chooseExplorerAction } from './devFlowExplorerControls.mjs'
+import { chooseChainScope, chooseGranularity, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 
 export function createDevBusinessChainMapScenarios({
   assert,
@@ -25,7 +25,7 @@ export function createDevBusinessChainMapScenarios({
         const card = editor.locator('.erp-chain-design__card')
         const action = (name) =>
           editor.getByRole('button', { name, exact: true })
-        const detail = (name) => chooseViewOption(editor, name)
+        const detail = (name) => chooseGranularity(editor, name)
         const working = () =>
           page.evaluate(
             () =>
@@ -48,7 +48,7 @@ export function createDevBusinessChainMapScenarios({
         const downstream = action('往后展开一步')
         await expect(upstream).toHaveCount(0)
         await expect(downstream).toHaveCount(0)
-        const search = editor.getByRole('textbox', { name: '搜索业务节点' })
+        const search = editor.getByRole('textbox', { name: '搜索链路或业务节点' })
         await search.fill('提交委外订单')
         await search.press('Enter')
         const source = editor.locator('.erp-chain-design__library-item').filter({ has: page.getByRole('button', { name: '加入：提交委外订单', exact: true }) })
@@ -83,7 +83,7 @@ export function createDevBusinessChainMapScenarios({
         const second = await working()
         assert(second.map.visibleIds.length > first.map.visibleIds.length)
         stable(first, second)
-        await detail('全部已载入节点')
+        await detail('节点明细')
         assert.deepEqual((await working()).nodes, second.nodes, '显示全部已载入节点不新增内容或改变位置')
         assert.deepEqual((await working()).edges, second.edges, '显示切换保留已载入关系')
         assert.deepEqual(
@@ -223,7 +223,7 @@ export function createDevBusinessChainMapScenarios({
         await action('返回来处').click()
         await action('查看节点：采购入库的退货、调整与冲正').click()
         await action('只看这条链路').click()
-        await detail('全部已载入节点')
+        await detail('节点明细')
         await expect(canvas).toHaveAttribute('data-map-scope', 'whole')
         const overviewLayout = await drawn()
         const purchaseAdjustment = action('查看节点：采购入库调整')

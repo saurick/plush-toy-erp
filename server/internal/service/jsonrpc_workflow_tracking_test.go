@@ -274,3 +274,43 @@ func TestWorkflowTrackingAccessUsesFrozenRevisionAndFailsClosed(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkflowTrackingMaterialReviewProjection(t *testing.T) {
+	now := time.Unix(1790384400, 0).UTC()
+	bossAt := now.Add(time.Minute)
+	capability := biz.PermissionEngineeringMaterialFinanceApprove
+	task := &biz.WorkflowTask{
+		ID: 12, TaskGroup: biz.WorkflowMaterialFinanceReviewGroup, TaskName: "审核并批准采购用料", TaskStatusKey: "ready",
+		OwnerRoleKey: biz.FinanceRoleKey, RequiredCapabilityKey: &capability, CreatedAt: bossAt, UpdatedAt: bossAt,
+	}
+	bossID := 22
+	repo := &trackingJSONRPCRepo{entry: &biz.WorkflowTrackingEntry{
+		Ref: biz.WorkflowTrackingRef{Kind: biz.WorkflowTrackingMaterialReviewKind, ID: 51},
+		MaterialRequest: &biz.EngineeringMaterialRequest{
+			ID: 51, SalesOrderID: 101, OrderNo: "SO-MATERIAL-UI", OrderStatus: biz.SalesOrderStatusActive,
+			Status: biz.MaterialRequestBossApproved, SubmittedBy: 7, SubmittedAt: &now, BossReviewedBy: &bossID, BossReviewedAt: &bossAt,
+			Items: []*biz.EngineeringMaterialRequestItem{{MaterialName: "采购敏感明细"}},
+		},
+		Tasks: []*biz.WorkflowTask{task}, People: map[int]string{7: "工程提交人", 22: "老板审核人"},
+	}}
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard)), workflowUC: biz.NewWorkflowUsecase(repo), customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled")}
+	d.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.EngineeringRoleKey}, biz.PermissionWorkflowTaskRead)}
+	input, _ := structpb.NewStruct(map[string]any{"kind": biz.WorkflowTrackingMaterialReviewKind, "id": 51})
+	_, result, err := d.handleWorkflow(workflowJSONRPCAdminContext(), "get_tracking", "material", input)
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
+		t.Fatalf("material tracking: %v %v", result, err)
+	}
+	detail := jsonRPCNestedMap(t, result, "tracking")
+	summary := detail["summary"].(map[string]any)
+	tasks := summary["current_tasks"].([]any)
+	if len(tasks) != 1 || tasks[0].(map[string]any)["owner_role_key"] != biz.FinanceRoleKey || summary["status"] != biz.ProcessStatusActive {
+		t.Fatalf("missing current handoff: %#v", summary)
+	}
+	evidence := detail["material_review"].(map[string]any)
+	access := detail["current_task_access"].([]any)[0].(map[string]any)
+	raw, _ := json.Marshal(detail)
+	if evidence["boss_reviewed_by_name"] != "老板审核人" || evidence["finance_reviewed_at"] != nil ||
+		access["can_read"] != false || access["can_handle"] != false || strings.Contains(string(raw), "采购敏感明细") {
+		t.Fatalf("incorrect material tracking evidence or access: %s", raw)
+	}
+}

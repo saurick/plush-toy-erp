@@ -179,7 +179,7 @@ func explainRolePages(basePermissions, effectiveActions, effectivePages map[stri
 	menus := BuiltinAdminMenus()
 	out := make([]RoleEffectivePageDecision, 0, len(menus))
 	for _, menu := range menus {
-		rbacGranted := AdminMenuRequirementsSatisfied(basePermissions, menu)
+		rbacGranted := AdminMenuRequirementsSatisfied(basePermissions, menu) && (menu.Key != "business-dashboard" || canViewBusinessProgress(basePermissions, []string{role.Key}))
 		_, isEffective := effectivePages[menu.Key]
 		missingAny := missingPermissions(effectiveActions, menu.RequiredAny, true)
 		missingAll := missingPermissions(effectiveActions, menu.RequiredAll, false)

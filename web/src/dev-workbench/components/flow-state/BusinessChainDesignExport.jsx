@@ -60,7 +60,7 @@ export default function BusinessChainDesignExport({ getGraph, open, onClose, tri
       afterOpenChange={(visible) => { if (visible) panel.current?.querySelector('input')?.focus({ preventScroll: true }) }}
     >
       <div className="erp-chain-export" ref={panel}>
-        <span>保留排布，包含屏幕外的图；按当前颗粒度和分支状态导出。</span>
+        <span>按当前展示粒度和分支状态导出，保留排布及屏幕外的内容。</span>
         <Checkbox checked={includeLegend} disabled={Boolean(busy)} onChange={(event) => setIncludeLegend(event.target.checked)}>附带图例</Checkbox>
         <Checkbox checked={includeOperations} disabled={Boolean(busy)} onChange={(event) => setIncludeOperations(event.target.checked)}>附带操作说明</Checkbox>
         <Space wrap>

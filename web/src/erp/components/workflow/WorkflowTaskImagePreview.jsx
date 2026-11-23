@@ -37,7 +37,9 @@ export default function WorkflowTaskImagePreview({
   useOverlayDialog(preview, visible, overlay.scope)
   const [resource, setResource] = useState(null)
   const [attempt, setAttempt] = useState(0)
-  const [productIndex, setProductIndex] = useState(0)
+  const [productIndex, setProductIndex] = useState(() =>
+    Math.max(0, gallery?.products.findIndex((product) => product.productID === item.productID) ?? 0)
+  )
   const [photoIndex, setPhotoIndex] = useState(0)
   const [metadata, setMetadata] = useState(null)
   const [mediaRevision, setMediaRevision] = useState(0)

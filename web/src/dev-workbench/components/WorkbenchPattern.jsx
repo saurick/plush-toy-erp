@@ -7,19 +7,24 @@ import {
   LoadingOutlined,
 } from '@ant-design/icons'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import '../styles/dev-workbench-pattern.css'
 
 // The catalogue stays mounted while its reader changes, so peers remain directly reachable.
 export function WorkbenchReading({ items = [], catalog, value, onChange, label, detailLabel, detailVisible = true, children, className = '' }) {
   return (
     <div className={`erp-workbench-reading${catalog ? ' erp-workbench-reading--custom-catalog' : ''}${detailVisible ? '' : ' erp-workbench-reading--catalog-only'} ${className}`}>
-      <nav className="erp-workbench-reading__catalog" aria-label={label}>
-        {catalog || items.map((item) => (
-          <button key={item.value} type="button" className="erp-dev-directory-item" aria-pressed={value === item.value} onClick={() => onChange(item.value)}>
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <Directory className="erp-workbench-reading__catalog" aria-label={label} title={catalog ? undefined : <strong>{label}</strong>}>
+        {catalog || (
+          <div className="erp-directory-list">
+            {items.map((item) => (
+              <DirectoryItem key={item.value} aria-pressed={value === item.value} onClick={() => onChange(item.value)}>
+                {item.label}
+              </DirectoryItem>
+            ))}
+          </div>
+        )}
+      </Directory>
       {detailVisible ? <section className="erp-workbench-reading__body" aria-label={detailLabel}>{children}</section> : null}
     </div>
   )

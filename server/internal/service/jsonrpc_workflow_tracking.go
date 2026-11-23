@@ -28,7 +28,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 		refID, valid := getRequiredJSONRPCPositiveInt(pm, "id")
 		before, validBefore := getOptionalWorkflowTaskBoardInteger(pm, "before_event_id", 0, 0)
 		kind, res := getOptionalWorkflowTaskBoardString(pm, "kind", 16)
-		if !valid || !validBefore || res != nil || (kind != "process" && kind != "task") {
+		if !valid || !validBefore || res != nil || (kind != "process" && kind != "task" && kind != biz.WorkflowTrackingMaterialReviewKind) {
 			return id, invalidParamResult(), nil
 		}
 		entry, err := d.workflowUC.GetTracking(ctx, q, biz.WorkflowTrackingRef{Kind: kind, ID: refID}, before)
@@ -37,7 +37,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 		}
 		return id, okData(map[string]any{"tracking": d.workflowTrackingDetail(ctx, admin, entry)}), nil
 	}
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "scope", "keyword", "status", "owner_role_key", "attention", "source_type", "source_id", "date_from", "date_to", "sort_direction", "limit", "offset"); res != nil {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "scope", "keyword", "status", "record_type", "owner_role_key", "attention", "source_type", "source_id", "date_from", "date_to", "sort_direction", "limit", "offset"); res != nil {
 		return id, res, nil
 	}
 	var errResult *v1.JsonrpcResult
@@ -56,7 +56,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 	if errResult != nil {
 		return id, errResult, nil
 	}
-	for key, target := range map[string]*string{"status": &q.Status, "owner_role_key": &q.OwnerRoleKey, "attention": &q.Attention, "sort_direction": &q.SortDirection} {
+	for key, target := range map[string]*string{"status": &q.Status, "record_type": &q.RecordType, "owner_role_key": &q.OwnerRoleKey, "attention": &q.Attention, "sort_direction": &q.SortDirection} {
 		*target, errResult = getOptionalWorkflowTaskBoardString(pm, key, 64)
 		if errResult != nil {
 			return id, errResult, nil
@@ -110,10 +110,26 @@ func workflowTrackingPerson(entry *biz.WorkflowTrackingEntry, id *int) string {
 }
 
 func workflowTrackingTask(task *biz.WorkflowTask, entry *biz.WorkflowTrackingEntry) map[string]any {
-	return map[string]any{"task_id": task.ID, "task_name": task.TaskName, "node_instance_id": workflowIntValue(task.ProcessNodeInstanceID), "owner_role_key": task.OwnerRoleKey, "assignee_name": workflowTrackingPerson(entry, task.AssigneeID), "required_capability_key": workflowStringValue(task.RequiredCapabilityKey), "status": task.TaskStatusKey, "created_at": task.CreatedAt.Unix(), "completed_at": optionalTimeUnix(task.CompletedAt), "due_at": optionalTimeUnix(task.DueAt)}
+	result := map[string]any{"task_id": task.ID, "task_name": task.TaskName, "node_instance_id": workflowIntValue(task.ProcessNodeInstanceID), "owner_role_key": task.OwnerRoleKey, "assignee_name": workflowTrackingPerson(entry, task.AssigneeID), "required_capability_key": workflowStringValue(task.RequiredCapabilityKey), "status": task.TaskStatusKey, "created_at": task.CreatedAt.Unix(), "completed_at": optionalTimeUnix(task.CompletedAt), "due_at": optionalTimeUnix(task.DueAt)}
+	if entry.MaterialRequest != nil {
+		result["task_group"] = task.TaskGroup
+	}
+	return result
 }
 
 func workflowTrackingCurrentTasks(entry *biz.WorkflowTrackingEntry) []*biz.WorkflowTask {
+	if request := entry.MaterialRequest; request != nil {
+		current := []*biz.WorkflowTask{}
+		if request.OrderStatus == biz.SalesOrderStatusActive {
+			group := biz.EngineeringMaterialTaskGroup(request.Status)
+			for _, task := range entry.Tasks {
+				if task.TaskGroup == group && !biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
+					current = append(current, task)
+				}
+			}
+		}
+		return current
+	}
 	activeNodes := map[int]bool{}
 	for _, n := range entry.Nodes {
 		if n.Status == biz.ProcessNodeStatusActive || n.Status == biz.ProcessNodeStatusBlocked {
@@ -133,12 +149,20 @@ func workflowTrackingSummary(entry *biz.WorkflowTrackingEntry) map[string]any {
 	result := map[string]any{"kind": entry.Ref.Kind, "id": entry.Ref.ID, "started_at": entry.StartedAt().Unix(), "display_context": workflowTaskDisplayContextToMap(entry.DisplayContext)}
 	result["initiator_role_key"] = entry.InitiatorRoleKey
 	current := []any{}
+	currentTasks := workflowTrackingCurrentTasks(entry)
 	if p := entry.Instance; p != nil {
 		result["process_key"], result["title"] = p.ProcessKey, ""
 		result["source_type"], result["source_id"], result["source_no"] = p.BusinessRefType, p.BusinessRefID, workflowStringValue(p.BusinessRefNo)
 		result["status"], result["resolution_kind"] = p.Status, workflowStringValue(p.ResolutionKind)
 		result["updated_at"], result["completed_at"] = p.UpdatedAt.Unix(), optionalTimeUnix(p.CompletedAt)
 		result["initiator_name"] = workflowTrackingPerson(entry, p.CreatedBy)
+	} else if request := entry.MaterialRequest; request != nil {
+		status, resolution, updateTime, completedAt := workflowTrackingMaterialStatus(entry, currentTasks)
+		result["process_key"], result["title"] = "", "本次用料审批"
+		result["source_type"], result["source_id"], result["source_no"] = biz.WorkflowMaterialRequestSourceType, request.ID, request.OrderNo
+		result["status"], result["resolution_kind"] = status, resolution
+		result["updated_at"], result["completed_at"] = updateTime.Unix(), optionalTimeUnix(completedAt)
+		result["initiator_name"] = workflowTrackingPerson(entry, &request.SubmittedBy)
 	} else {
 		t := entry.Task
 		result["process_key"], result["title"] = "", t.TaskName
@@ -147,11 +171,51 @@ func workflowTrackingSummary(entry *biz.WorkflowTrackingEntry) map[string]any {
 		result["updated_at"], result["completed_at"] = t.UpdatedAt.Unix(), optionalTimeUnix(t.CompletedAt)
 		result["initiator_name"] = workflowTrackingPerson(entry, t.CreatedBy)
 	}
-	for _, t := range workflowTrackingCurrentTasks(entry) {
+	for _, t := range currentTasks {
 		current = append(current, workflowTrackingTask(t, entry))
 	}
 	result["current_tasks"] = current
 	return result
+}
+
+func workflowTrackingMaterialStatus(entry *biz.WorkflowTrackingEntry, current []*biz.WorkflowTask) (string, any, time.Time, *time.Time) {
+	request := entry.MaterialRequest
+	updated := *request.SubmittedAt
+	var revisionCompleted, withdrawnAt *time.Time
+	for _, reviewedAt := range []*time.Time{request.BossReviewedAt, request.FinanceReviewedAt, request.RejectedAt} {
+		if reviewedAt != nil && reviewedAt.After(updated) {
+			updated = *reviewedAt
+		}
+	}
+	for _, t := range entry.Tasks {
+		if t.UpdatedAt.After(updated) {
+			updated = t.UpdatedAt
+		}
+		if t.TaskGroup == biz.WorkflowMaterialRevisionGroup && t.TaskStatusKey == "done" {
+			revisionCompleted = t.CompletedAt
+		}
+		if t.TaskStatusKey == "withdrawn" && t.CompletedAt != nil && (withdrawnAt == nil || t.CompletedAt.After(*withdrawnAt)) {
+			withdrawnAt = t.CompletedAt
+		}
+	}
+	if request.Status == biz.MaterialRequestApproved {
+		return biz.ProcessStatusCompleted, biz.ProcessResolutionSucceeded, updated, request.FinanceReviewedAt
+	}
+	for _, t := range current {
+		if t.TaskStatusKey == "blocked" {
+			return biz.ProcessStatusBlocked, nil, updated, nil
+		}
+	}
+	if request.Status == biz.MaterialRequestRejected && len(current) == 0 {
+		if revisionCompleted == nil {
+			revisionCompleted = request.RejectedAt
+		}
+		return biz.ProcessStatusCompleted, biz.ProcessResolutionRejected, updated, revisionCompleted
+	}
+	if request.OrderStatus != biz.SalesOrderStatusActive {
+		return biz.ProcessStatusCompleted, biz.ProcessResolutionCancelled, updated, withdrawnAt
+	}
+	return biz.ProcessStatusActive, nil, updated, nil
 }
 
 func (d *jsonrpcDispatcher) workflowTrackingTaskAccess(ctx context.Context, admin *biz.AdminUser, task *biz.WorkflowTask) map[string]any {
@@ -202,5 +266,15 @@ func (d *jsonrpcDispatcher) workflowTrackingDetail(ctx context.Context, admin *b
 	if entry.EventsTruncated && len(entry.Events) > 0 {
 		nextEvent = entry.Events[len(entry.Events)-1].ID
 	}
-	return map[string]any{"summary": workflowTrackingSummary(entry), "current_task_access": access, "nodes": nodes, "tasks": tasks, "events": events, "events_truncated": entry.EventsTruncated, "next_event_id": nextEvent}
+	result := map[string]any{"summary": workflowTrackingSummary(entry), "current_task_access": access, "nodes": nodes, "tasks": tasks, "events": events, "events_truncated": entry.EventsTruncated, "next_event_id": nextEvent}
+	if request := entry.MaterialRequest; request != nil {
+		result["material_review"] = map[string]any{
+			"status": request.Status, "order_status": request.OrderStatus,
+			"submitted_at": optionalTimeUnix(request.SubmittedAt), "submitted_by_name": workflowTrackingPerson(entry, &request.SubmittedBy),
+			"boss_reviewed_at": optionalTimeUnix(request.BossReviewedAt), "boss_reviewed_by_name": workflowTrackingPerson(entry, request.BossReviewedBy),
+			"finance_reviewed_at": optionalTimeUnix(request.FinanceReviewedAt), "finance_reviewed_by_name": workflowTrackingPerson(entry, request.FinanceReviewedBy),
+			"rejected_at": optionalTimeUnix(request.RejectedAt), "rejected_by_name": workflowTrackingPerson(entry, request.RejectedBy),
+		}
+	}
+	return result
 }

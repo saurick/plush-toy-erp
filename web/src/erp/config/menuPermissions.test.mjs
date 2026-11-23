@@ -237,7 +237,7 @@ test('menuPermissions: 前端角色预设覆盖工程和系统管理员', () => 
   assert.doesNotMatch(engineeringPreset.description, /岗位任务端/u)
   assert.deepEqual(engineeringPreset.mobileRolePermissions, ['engineering'])
   assert(engineeringPreset.permissions.includes('/erp/task-board'))
-  assert(engineeringPreset.permissions.includes('/erp/business-dashboard'))
+  assert(!engineeringPreset.permissions.includes('/erp/business-dashboard'))
   assert(engineeringPreset.permissions.includes('/erp/master/products'))
   assert(engineeringPreset.permissions.includes('/erp/master/materials'))
   assert(engineeringPreset.permissions.includes('/erp/purchase/material-bom'))

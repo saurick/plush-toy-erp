@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { Alert, Button, Form, Space } from 'antd'
-import { useLocation } from 'react-router-dom'
+import { Alert, Form } from 'antd'
 import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import useResponsiveSwitch from '@/common/components/navigation/useResponsiveSwitch.js'
@@ -155,7 +154,6 @@ export default function PurchaseOrdersPage() {
   const showProcessSubmissionReceipt = useProcessSubmissionReceipt()
   const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
-  const location = useLocation()
   const [searchParams, setSearchParams] = useBusinessSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -174,7 +172,6 @@ export default function PurchaseOrdersPage() {
   const canUpdate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_UPDATE)
   const canReadFollowups = canReadPurchaseFollowups(adminProfile)
   const scopedFollowup = searchParams.get('view') === 'followup' && searchParams.has('sales_order_id')
-  const progressOrigin = adminProfile.id && location.state?.progressOrigin?.adminID === adminProfile.id ? location.state.progressOrigin : null
   const followupSalesID = searchParamPositiveInt(searchParams, 'sales_order_id')
   const canReadScopedFollowup = canReadFollowups && Boolean(followupSalesID) && hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_READ)
   const receiptSourceAccess = sourceActionAccess(adminProfile, PurchaseSourceActions.receipt)
@@ -1229,6 +1226,13 @@ export default function PurchaseOrdersPage() {
     canUpdate,
     order: singleSelectedOrder,
   })
+  useTaskBusinessEditor({
+    record: singleSelectedOrder,
+    enabled: outletContext?.taskBusiness?.task?.task_group === 'handoff_purchase_price' &&
+      singleSelectedOrder?.id === outletContext.taskBusiness.task.source_id &&
+      canUpdate && hasActionPermission(adminProfile, PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ),
+    open: setTermsOrder,
+  })
   useTaskBusinessEditor({ record: singleSelectedOrder, enabled: selectedOrderCanEdit && referenceDataState === 'ready' && outletContext?.taskBusiness?.contract?.actionKeys.includes('purchase-edit'), open: openEditModal })
   const canGenerateInboundDraft = canCreateInboundDraftFromPurchaseOrder({
     canCreatePurchaseReceipt,
@@ -1412,12 +1416,7 @@ export default function PurchaseOrdersPage() {
       />
 
       <SourceActionAccessNotice access={receiptSourceAccess} />
-      {scopedFollowup && (
-        <Space wrap>
-          <span>采购跟进 · {progressOrigin?.orderNo || '当前销售订单'}</span>
-          {progressOrigin && <Button size="small" onClick={() => navigate(-1)}>返回进度看板</Button>}
-        </Space>
-      )}
+      {scopedFollowup && <span>采购跟进 · 当前销售订单</span>}
       <BusinessToolbarWorkspace contentSwitch={purchaseViewSwitch} switching={purchaseViewTransition.pending}>
         {contentView === 'list' && <PurchaseOrderOperationPanel
           showListTools={contentView === 'list'}
@@ -1571,7 +1570,17 @@ export default function PurchaseOrdersPage() {
       {columnOrderModal}
 
       <PurchaseOrderTermsModal key="delivery" deliveryOnly order={deliveryOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setDeliveryOrder(null)} onChanged={refreshPageData} />
-      <PurchaseOrderTermsModal key="terms" order={termsOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setTermsOrder(null)} onChanged={refreshPageData} />
+      <PurchaseOrderTermsModal
+        key="terms"
+        order={termsOrder}
+        customerKey={activeCustomerKey}
+        unitOptions={unitOptions}
+        onClose={() => setTermsOrder(null)}
+        onChanged={async (updated) => {
+          await reportBusinessResult('采购价格与交期已保存', updated)
+          await refreshPageData()
+        }}
+      />
       <PurchaseOrderEditor
         baselineKey={editorRevision}
         importUndo={materialImportUndo}

@@ -2,7 +2,8 @@ package data
 
 import (
 	"context"
-	"sort"
+	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/sql"
 	"time"
 
 	"server/internal/biz"
@@ -63,7 +64,7 @@ func (r *operationalFactRepo) CreatePayableFromPurchaseReceipt(
 	if gate.UnresolvedLines() > 0 {
 		return nil, biz.ErrPurchaseReceiptInboundIncomplete
 	}
-	sourceSnapshot, err := lockAndReadPurchaseReceiptPayableSource(ctx, tx, receipt)
+	sourceSnapshot, err := lockAndReadPurchaseReceiptPayableSource(ctx, tx.client, receipt)
 	if err != nil {
 		return nil, err
 	}
@@ -241,13 +242,13 @@ type financePayableSourceSnapshot struct {
 
 func lockAndReadPurchaseReceiptPayableSource(
 	ctx context.Context,
-	tx *inventoryDBTx,
+	client *ent.Client,
 	receipt *ent.PurchaseReceipt,
 ) (*financePayableSourceSnapshot, error) {
-	if tx == nil || tx.client == nil || receipt == nil || receipt.ID <= 0 || receipt.SupplierID == nil || *receipt.SupplierID <= 0 {
+	if client == nil || receipt == nil || receipt.ID <= 0 || receipt.SupplierID == nil || *receipt.SupplierID <= 0 {
 		return nil, biz.ErrFinanceFactSourceInvalid
 	}
-	receiptItems, err := tx.client.PurchaseReceiptItem.Query().
+	receiptItems, err := client.PurchaseReceiptItem.Query().
 		Where(purchasereceiptitem.ReceiptID(receipt.ID), purchaseReceiptItemPostedPredicate()).
 		Order(ent.Asc(purchasereceiptitem.FieldID)).
 		All(ctx)
@@ -269,10 +270,9 @@ func lockAndReadPurchaseReceiptPayableSource(
 		}
 		receiptItemsBySourceID[itemID] = append(receiptItemsBySourceID[itemID], receiptItem)
 	}
-	sort.Ints(itemIDs)
 	// Commercial completion locks order headers before their lines. Use the same
 	// order here so late pricing and payable creation cannot deadlock each other.
-	orderItems, err := tx.client.PurchaseOrderItem.Query().Where(purchaseorderitem.IDIn(itemIDs...)).All(ctx)
+	orderItems, err := client.PurchaseOrderItem.Query().Where(purchaseorderitem.IDIn(itemIDs...)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -290,20 +290,22 @@ func lockAndReadPurchaseReceiptPayableSource(
 			orderIDSet[item.PurchaseOrderID] = struct{}{}
 		}
 	}
-	sort.Ints(orderIDs)
-	for _, orderID := range orderIDs {
-		if err := lockOperationalFactRow(ctx, tx, "purchase_orders", orderID, biz.ErrFinanceFactSourceInvalid); err != nil {
-			return nil, err
-		}
+	orders, err := client.PurchaseOrder.Query().Where(purchaseorder.IDIn(orderIDs...), lockPurchasePayableSourceRow).Order(ent.Asc(purchaseorder.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
 	}
-	for _, itemID := range itemIDs {
-		if err := lockOperationalFactRow(ctx, tx, "purchase_order_items", itemID, biz.ErrFinanceFactSourceInvalid); err != nil {
-			return nil, err
-		}
-		item, err := tx.client.PurchaseOrderItem.Get(ctx, itemID)
-		if err != nil {
-			return nil, err
-		}
+	if len(orders) != len(orderIDs) {
+		return nil, biz.ErrFinanceFactSourceInvalid
+	}
+	lockedItems, err := client.PurchaseOrderItem.Query().Where(purchaseorderitem.IDIn(itemIDs...), lockPurchasePayableSourceRow).Order(ent.Asc(purchaseorderitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(lockedItems) != len(itemIDs) {
+		return nil, biz.ErrFinanceFactSourceInvalid
+	}
+	for _, item := range lockedItems {
+		itemID := item.ID
 		if _, ok := orderIDSet[item.PurchaseOrderID]; !ok {
 			return nil, biz.ErrFinanceFactSourceInvalid
 		}
@@ -315,17 +317,7 @@ func lockAndReadPurchaseReceiptPayableSource(
 	}
 
 	var snapshot *financePayableSourceSnapshot
-	for _, orderID := range orderIDs {
-		if err := lockOperationalFactRow(ctx, tx, "purchase_orders", orderID, biz.ErrFinanceFactSourceInvalid); err != nil {
-			return nil, err
-		}
-		order, err := tx.client.PurchaseOrder.Query().Where(purchaseorder.ID(orderID)).Only(ctx)
-		if err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrFinanceFactSourceInvalid
-			}
-			return nil, err
-		}
+	for _, order := range orders {
 		if order.SupplierID != *receipt.SupplierID {
 			return nil, biz.ErrFinanceFactSourceInvalid
 		}
@@ -345,6 +337,12 @@ func lockAndReadPurchaseReceiptPayableSource(
 		return nil, biz.ErrFinanceFactSourceInvalid
 	}
 	return snapshot, nil
+}
+
+func lockPurchasePayableSourceRow(s *sql.Selector) {
+	if s.Dialect() == dialect.Postgres {
+		s.ForUpdate()
+	}
 }
 
 func financePayableOrderSnapshot(currency string, paymentTermDays *int) (string, *int, error) {
@@ -495,6 +493,9 @@ func (r *operationalFactRepo) insertDerivedFinanceFactAndCommit(
 				return nil, biz.ErrFinanceFactSourceConflict
 			}
 		}
+		return nil, err
+	}
+	if err := syncFinanceReceiptPayable(ctx, tx.client, row, 0); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {

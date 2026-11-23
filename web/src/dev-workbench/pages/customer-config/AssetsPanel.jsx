@@ -1,8 +1,8 @@
 import { Fragment, useState } from 'react'
 import { Button, Checkbox, Space, Tag, Typography } from 'antd'
+import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import { getBusinessModule } from '@/erp/config/businessModules.mjs'
 import { navigationItemRegistry } from '@/erp/config/seedData.mjs'
-import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
 import { WorkbenchNotice, WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
 import { guardItemLabel, StatusTag } from './presentation.jsx'
 
@@ -86,9 +86,16 @@ export function AssetsPanel({ menuSummary, fieldNumberingSummary, printTemplateS
         title="菜单分组"
         description={`${menuSummary.sections.length} 个分组 · ${menuSummary.itemCount} 个菜单项`}
         tools={menuSummary.sections.length > 0 ? (
-          <Checkbox checked={showMenuKeys} onChange={(event) => setShowMenuKeys(event.target.checked)}>
-            显示菜单标识
-          </Checkbox>
+          <Space size={4}>
+            <Checkbox checked={showMenuKeys} onChange={(event) => setShowMenuKeys(event.target.checked)}>
+              显示菜单代码
+            </Checkbox>
+            <SupplementalHelp
+              label="菜单代码"
+              placement="bottomRight"
+              content={<p>在配置文件里用代码指定菜单项。例如 <code>global-dashboard</code> 是「工作台」的代码。</p>}
+            />
+          </Space>
         ) : null}
         className={wide}
       >
@@ -207,18 +214,6 @@ export function AssetsPanel({ menuSummary, fieldNumberingSummary, printTemplateS
             </table>
           </div>
         ) : <Text type="secondary">暂无登记模板。</Text>}
-        {boundaries.length > 0 ? (
-          <DevStaticGuidance title="页面配置保护规则">
-            <div className="erp-dev-customer-guard-list">
-              {boundaries.map((item) => (
-                <div className="erp-dev-customer-guard" key={item.key}>
-                  <Text>{guardItemLabel(item, '字段编号边界')}</Text>
-                  <Tag color={item.ok ? 'green' : 'red'}>{item.ok ? item.expectedLabel : item.valueLabel}</Tag>
-                </div>
-              ))}
-            </div>
-          </DevStaticGuidance>
-        ) : null}
       </WorkbenchSection>
     </div>
   )

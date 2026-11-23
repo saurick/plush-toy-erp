@@ -271,7 +271,7 @@ function LocalDatabaseMigrationPage() {
           </dl>
         </section>
 
-        {activeOperation ? (
+        {activeOperation && (activeView !== 'migration' || activeOperation !== pathOperation) ? (
           <div className="erp-dev-migration-pending" role="status">
             <Text strong>
               {activeOperation.kind === 'migration'
@@ -295,6 +295,7 @@ function LocalDatabaseMigrationPage() {
           activeOperation={activeOperation}
           activeView={activeView}
           isLatest={isLatest}
+          canPrepare={canPrepare}
           migrationFlow={migrationFlow}
           onViewRuntime={() => selectView('runtime')}
           pathOperation={pathOperation}

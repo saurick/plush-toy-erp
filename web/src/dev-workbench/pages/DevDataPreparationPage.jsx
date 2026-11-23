@@ -27,6 +27,7 @@ import {
   DEV_DATA_PREPARATION_TARGET_KEYS,
   dataPreparationStatusPresentation,
 } from '../config/devDataPreparation.mjs'
+import AcceptanceBranchMap from './data-preparation/AcceptanceBranchMap.jsx'
 import { DATA_VIEW_ITEMS, useDataPreparation } from './data-preparation/useDataPreparation.jsx'
 import { WorkbenchEmpty, WorkbenchFacts, WorkbenchNotice, WorkbenchReading, WorkbenchSection, WorkbenchToolbar } from '../components/WorkbenchPattern.jsx'
 
@@ -90,61 +91,6 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain, regressio
     plan.scenarioKinds.map((scenario) => [scenario.key, scenario.label])
   )
   const chainScenarioLabels = (selectedChain?.scenarioKinds || []).map((kind) => scenarioLabelByKey.get(kind) || kind)
-  const stepItems = (selectedChain?.steps || []).map((step, index) => ({
-    key: step.key,
-    label: `${index + 1}. ${step.label}`,
-    children: (
-      <div className="erp-dev-data-chain-step">
-        <Text type="secondary">
-          {step.fromLabel} → {step.toLabel}
-        </Text>
-        <Descriptions
-          size="small"
-          bordered
-          column={regression ? 1 : { xs: 1, lg: 2 }}
-          classNames={regression ? { label: 'erp-dev-regression-step-label' } : undefined}
-          items={[
-            {
-              key: 'responsibility',
-              label: '责任岗位',
-              children: step.responsibleRole,
-            },
-            {
-              key: 'preconditions',
-              label: '前置状态',
-              children: step.preconditions.join('；'),
-            },
-            {
-              key: 'actions',
-              label: '允许动作',
-              children: step.actions.join('；'),
-            },
-            {
-              key: 'results',
-              label: '结果状态',
-              children: step.results.join('；'),
-            },
-            {
-              key: 'facts',
-              label: regression ? '业务事实' : 'Fact',
-              children: step.facts.join('；'),
-            },
-            {
-              key: 'scenarios',
-              label: regression ? '覆盖场景' : '本步骤场景合同',
-              children: (
-                <Space wrap size={[4, 4]}>
-                  {step.scenarioKinds.map((kind) => (
-                    <Tag key={kind}>{scenarioLabelByKey.get(kind) || kind}</Tag>
-                  ))}
-                </Space>
-              ),
-            },
-          ]}
-        />
-      </div>
-    ),
-  }))
 
   return (
     <div className="erp-dev-data-acceptance-plan">
@@ -157,7 +103,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain, regressio
         onChange={onSelectChain}
       >
         {selectedChain ? (
-          <WorkbenchSection flat headingLevel={3} title={selectedChain.label} description={regression ? `${stepItems.length} 个步骤` : undefined}>
+          <WorkbenchSection flat headingLevel={3} title={selectedChain.label} description={regression ? `${selectedChain.stepCount} 个步骤` : undefined}>
             <Text>{selectedChain.summary}</Text>
             {regression ? (
               <Text type="secondary">覆盖场景：{chainScenarioLabels.join('、')}</Text>
@@ -168,7 +114,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain, regressio
                 ))}
               </Space>
             )}
-            <Collapse key={selectedChain.key} accordion size="small" items={stepItems} />
+            <AcceptanceBranchMap key={selectedChain.key} chain={selectedChain} regression={regression} scenarioLabelByKey={scenarioLabelByKey} />
           </WorkbenchSection>
         ) : <WorkbenchEmpty title="尚无业务链范围" />}
       </WorkbenchReading>

@@ -78,7 +78,9 @@ export function createTaskDetailVariantScenarios({ assert, path, outputDir, cust
             if (task) return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data: { task } } } })
           }
           if (body.method === 'list_task_events') {
-            return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data: { items: [{ id: 70001, event_type: 'created', actor_role_key: role, created_at: current.created_at, task_version: 1, to_status_key: 'ready' }], truncated: false } } } })
+            const eventTask = fixtureTasks.find((item) => item.id === body.params.task_id)
+            const items = eventTask ? [{ id: 70001, event_type: 'created', actor_role_key: eventTask.owner_role_key, created_at: eventTask.created_at, task_version: 1, to_status_key: 'ready', task_id: eventTask.id, task: eventTask }] : []
+            return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data: { items, truncated: false } } } })
           }
           if (body.method === 'explain_action_access') {
             const permitted = kind === 'shipment' ? ['urge'] : ['complete', 'block', 'urge']
@@ -95,23 +97,21 @@ export function createTaskDetailVariantScenarios({ assert, path, outputDir, cust
         await page.getByRole('button', { name: `查看${current.task_name}详情`, exact: true }).click()
         const detail = mobile ? page.getByTestId('mobile-task-detail-screen') : page.locator('.erp-task-action-drawer')
         const chain = detail.locator('.workflow-business-chain[data-view="task"]')
-        await chain.waitFor()
-        await chain.getByText(kind === 'rework' ? '关联待办' : '当前暂无其他关联任务。', { exact: kind !== 'rework' }).waitFor()
+        if (kind === 'rework') await chain.getByRole('region', { name: '关联待办', exact: true }).waitFor()
+        else {
+          await detail.getByRole('button', { name: '查看整单进度', exact: true }).waitFor()
+          await chain.waitFor({ state: 'detached' })
+        }
         assert.equal(await chain.locator('li[aria-current="step"]').count(), 0, '当前任务只在上方摘要展示一次')
         assert.equal(await chain.getByText(current.task_name, { exact: true }).count(), 0)
         assert.equal(await detail.locator('.workflow-task-current').count(), 1)
         assert.equal(processReads, 0, '无正式流程关联时不请求或编造流程步骤')
         assert.equal(chainReads, 1)
         const records = detail.getByTestId('workflow-task-event-trail')
-        await records.locator('details[open]').waitFor()
+        await records.getByRole('heading', { name: '本任务处理记录', exact: true }).waitFor()
         assert.equal(await records.locator('select, [role="combobox"]').count(), 0)
-        const heading = await records.locator('summary').evaluate((el) => {
-          const rect = el.getBoundingClientRect()
-          const label = el.querySelector('.workflow-task-event-trail__heading-label').getBoundingClientRect()
-          const toggle = el.querySelector(':scope > .anticon').getBoundingClientRect()
-          return { display: getComputedStyle(el).display, rightGap: rect.right - toggle.right, labelClear: toggle.left - label.right, within: toggle.top >= rect.top && toggle.bottom <= rect.bottom }
-        })
-        assert.ok(heading.display === 'flex' && heading.rightGap <= 1 && heading.labelClear >= 7 && heading.within, JSON.stringify(heading))
+        assert.equal(await records.getByRole('group', { name: '处理记录范围', exact: true }).count(), 0)
+        await records.getByRole('button', { name: '查看任务已创建记录详情', exact: true }).waitFor()
         await records.screenshot({ path: path.resolve(outputDir, `task-detail-${kind}-${surface}-${themeMode}-records.png`) })
         if (kind === 'rework') {
           const history = chain.locator('.workflow-business-chain__history')
@@ -132,8 +132,8 @@ export function createTaskDetailVariantScenarios({ assert, path, outputDir, cust
           await chain.screenshot({ path: path.resolve(outputDir, `task-progress-nodes-${surface}-${themeMode}.png`) })
           await history.locator('summary').press('Enter')
           assert.equal(await history.getAttribute('open'), null)
-          await detail.getByRole('button', { name: '查看订单全流程', exact: true }).click()
-          await detail.getByRole('heading', { name: '订单全流程', exact: true }).waitFor()
+          await detail.getByRole('button', { name: '查看整单进度', exact: true }).click()
+          await detail.getByRole('heading', { name: '整单进度', exact: true }).waitFor()
           await detail.getByRole('button', { name: '返回本任务', exact: true }).click()
           assert.equal(await history.getAttribute('open'), null, '全流程返回保留关联历史的手动收起')
           await history.locator('summary').click()
@@ -171,7 +171,7 @@ export function createTaskDetailVariantScenarios({ assert, path, outputDir, cust
           await page.screenshot({ path: path.resolve(outputDir, `task-detail-${kind}-${surface}-${themeMode}-source.png`) })
           await page.getByRole('button', { name: '返回原任务', exact: true }).click()
           await detail.waitFor()
-          await detail.getByRole('heading', { name: current.task_name, exact: true }).waitFor()
+          await detail.getByRole('heading', { name: kind === 'rework' ? '处理返工异常' : current.task_name, exact: true }).waitFor()
         }
       },
     }

@@ -81,6 +81,34 @@ test('resolveDevDocsReadingHeading: 阅读位置、底部与短文档各自定�
   )
 })
 
+test('resolveDevDocsReadingHeading: 正文展开后，标题进入阅读区上边距即定位到本章', () => {
+  const headings = [
+    { id: 'example', top: 170 },
+    { id: 'diagrams', top: 490 },
+  ]
+  assert.equal(resolveDevDocsReadingHeading(headings, {
+    scrollTop: 470,
+    clientHeight: 600,
+    scrollHeight: 1800,
+    readingInset: 24,
+  }), 'diagrams')
+})
+
+test('resolveDevDocsReadingHeading: 页尾多个章节共用滚动位置时，保留已定位的可见章节', () => {
+  const headings = [
+    { id: 'intro', top: 24 },
+    { id: 'details', top: 700 },
+    { id: 'end', top: 900 },
+  ]
+  const bottom = { scrollTop: 600, clientHeight: 400, scrollHeight: 1000 }
+  assert.equal(resolveDevDocsReadingHeading(headings, bottom, 'details'), 'details')
+  assert.equal(resolveDevDocsReadingHeading(headings, bottom, 'intro'), 'end')
+  assert.equal(resolveDevDocsReadingHeading(headings, bottom), 'end')
+
+  const short = { scrollTop: 0, clientHeight: 1200, scrollHeight: 1000 }
+  assert.equal(resolveDevDocsReadingHeading(headings, short, 'end'), 'end')
+})
+
 test('buildDevDocsLocation: 同步 path、保留其他 query 并按需清理 hash', () => {
   const location = buildDevDocsLocation({
     pathname: '/__dev/docs',

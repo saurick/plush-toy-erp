@@ -1,78 +1,34 @@
 import { DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY } from '../../config/devCustomerConfig.mjs'
 
-export const VIEW_OVERVIEW = 'overview'
-export const VIEW_PREFLIGHT = 'preflight'
-export const VIEW_DIFF = 'diff'
-export const VIEW_ASSETS = 'assets'
-export const VIEW_IMPORT = 'import'
-export const PREFLIGHT_SECTION_PACKAGE = 'package'
-export const PREFLIGHT_SECTION_RUNTIME = 'runtime'
-export const PREFLIGHT_SECTION_FLOW = 'flow'
-export const PREFLIGHT_SECTION_EXTENSIONS = 'extensions'
-export const PREFLIGHT_SECTION_EVIDENCE = 'evidence'
-export const IMPORT_ACTION_DRY_RUN = 'dry-run'
-export const IMPORT_ACTION_TEST_APPLY = 'test-apply'
-export const IMPORT_ACTION_RELEASE = 'release'
+const VIEW_PREFLIGHT = 'preflight'
+const VIEW_IMPORT = 'import'
+const IMPORT_ACTION_TEST_APPLY = 'test-apply'
+const IMPORT_ACTION_RELEASE = 'release'
+export const REVIEW_TASK = 'review'
+export const VALIDATION_TASK = 'validation'
+export const RELEASE_TASK = 'release'
+export const REVIEW_FIELDS = 'fields'
+export const REVIEW_FLOW = 'flow'
+export const REVIEW_EXTENSIONS = 'extensions'
+export const DETAIL_PREVIEW = 'preview'
+export const DETAIL_EVIDENCE = 'evidence'
+export const DETAIL_STRATEGY = 'strategy'
+export const DETAIL_EXPORT = 'export'
 
-export const CUSTOMER_CONFIG_STEPS = Object.freeze([
-  { value: VIEW_OVERVIEW, label: '配置总览', description: '范围与下一步' },
-  {
-    value: VIEW_PREFLIGHT,
-    label: '检查配置',
-    description: '结构与使用范围',
-    number: 1,
-  },
-  {
-    value: VIEW_DIFF,
-    label: '核对变化',
-    description: '默认值与候选值',
-    number: 2,
-  },
-  {
-    value: VIEW_ASSETS,
-    label: '预览界面',
-    description: '菜单、字段与打印',
-    number: 3,
-  },
-  {
-    value: VIEW_IMPORT,
-    label: '测试验证',
-    description: '样本试跑与本地应用',
-    number: 4,
-  },
-  {
-    value: 'release',
-    label: '发布交接',
-    description: '检查证据后交接',
-    number: 5,
-  },
+export const CUSTOMER_CONFIG_TASKS = Object.freeze([
+  { value: REVIEW_TASK, label: '配置核对' },
+  { value: VALIDATION_TASK, label: '本地验证' },
+  { value: RELEASE_TASK, label: '发布交接' },
 ])
 
-export const PREFLIGHT_SECTION_OPTIONS = Object.freeze([
-  { label: '包结构', value: PREFLIGHT_SECTION_PACKAGE },
-  { label: '运行设置', value: PREFLIGHT_SECTION_RUNTIME },
-  { label: '流程策略', value: PREFLIGHT_SECTION_FLOW },
-  { label: '扩展登记', value: PREFLIGHT_SECTION_EXTENSIONS },
-  { label: '评审依据', value: PREFLIGHT_SECTION_EVIDENCE },
+export const CUSTOMER_CONFIG_REVIEW_TABS = Object.freeze([
+  { value: REVIEW_FIELDS, label: '配置字段' },
+  { value: REVIEW_FLOW, label: '流程与策略' },
+  { value: REVIEW_EXTENSIONS, label: '扩展登记' },
 ])
 
-export const IMPORT_ACTION_OPTIONS = Object.freeze([
-  { label: '样本试跑', value: IMPORT_ACTION_DRY_RUN },
-  { label: '本地配置应用', value: IMPORT_ACTION_TEST_APPLY },
-])
-
-const views = new Set([
-  VIEW_OVERVIEW,
-  VIEW_PREFLIGHT,
-  VIEW_DIFF,
-  VIEW_ASSETS,
-  VIEW_IMPORT,
-])
-const sections = new Set(PREFLIGHT_SECTION_OPTIONS.map((item) => item.value))
-const actions = new Set([
-  ...IMPORT_ACTION_OPTIONS.map((item) => item.value),
-  IMPORT_ACTION_RELEASE,
-])
+const reviewSections = new Set(CUSTOMER_CONFIG_REVIEW_TABS.map(({ value }) => value))
+const reviewDetails = new Set([DETAIL_PREVIEW, DETAIL_EVIDENCE, DETAIL_STRATEGY, DETAIL_EXPORT])
 
 function single(params, key) {
   const values = params.getAll(key)
@@ -82,65 +38,69 @@ function single(params, key) {
 export function resolveCustomerConfigLocation(input) {
   const params = new URLSearchParams(input)
   const requestedView = single(params, 'view')
-  const activeView = views.has(requestedView) ? requestedView : VIEW_OVERVIEW
   const requestedSection = single(params, 'section')
-  const activePreflightSection = sections.has(requestedSection)
-    ? requestedSection
-    : PREFLIGHT_SECTION_PACKAGE
   const requestedAction = single(params, 'action')
-  const activeImportAction = actions.has(requestedAction)
-    ? requestedAction
-    : IMPORT_ACTION_DRY_RUN
+  const requestedDetail = single(params, 'detail')
+  const activeTask = requestedView === VIEW_IMPORT
+    ? (requestedAction === IMPORT_ACTION_RELEASE ? RELEASE_TASK : VALIDATION_TASK)
+    : REVIEW_TASK
+  const activeSection = requestedView === VIEW_PREFLIGHT && reviewSections.has(requestedSection)
+    ? requestedSection
+    : REVIEW_FIELDS
+  const focusTestApply = activeTask === VALIDATION_TASK && requestedAction === IMPORT_ACTION_TEST_APPLY
+  const legacyEvidenceLink = requestedView === VIEW_PREFLIGHT &&
+    (!params.has('section') || ['package', 'evidence'].includes(requestedSection))
+  const legacyDetail = requestedView === 'assets'
+    ? DETAIL_PREVIEW
+    : legacyEvidenceLink ? DETAIL_EVIDENCE : ''
+  const activeDetail = activeTask === REVIEW_TASK
+    ? (reviewDetails.has(requestedDetail) ? requestedDetail : legacyDetail)
+    : ''
   if (
     !params.has('customer') ||
     (params.getAll('customer').length === 1 && !single(params, 'customer'))
   ) {
     params.set('customer', DEFAULT_DEV_CUSTOMER_CONFIG_PAGE_KEY)
   }
-  const canonical = (key, value, omit) => {
-    if (omit) params.delete(key)
-    else params.set(key, value)
-  }
-  canonical('view', activeView, activeView === VIEW_OVERVIEW)
-  canonical(
-    'section',
-    activePreflightSection,
-    activeView !== VIEW_PREFLIGHT ||
-      activePreflightSection === PREFLIGHT_SECTION_PACKAGE
-  )
-  canonical(
-    'action',
-    activeImportAction,
-    activeView !== VIEW_IMPORT || activeImportAction === IMPORT_ACTION_DRY_RUN
-  )
+  const hasReviewSection = activeSection !== REVIEW_FIELDS
+  const view = activeTask !== REVIEW_TASK
+    ? VIEW_IMPORT
+    : hasReviewSection ? VIEW_PREFLIGHT : ''
+  const action = activeTask === RELEASE_TASK
+    ? IMPORT_ACTION_RELEASE
+    : focusTestApply ? IMPORT_ACTION_TEST_APPLY : ''
+  setOptional(params, 'view', view)
+  setOptional(params, 'section', hasReviewSection ? activeSection : '')
+  setOptional(params, 'action', action)
+  setOptional(params, 'detail', activeDetail)
   const requestedReleaseBatch = single(params, 'release')
-  canonical('release', requestedReleaseBatch, !requestedReleaseBatch)
+  setOptional(params, 'release', requestedReleaseBatch)
   return {
-    activeView,
-    activePreflightSection,
-    activeImportAction,
-    activeStep:
-      activeView === VIEW_IMPORT && activeImportAction === IMPORT_ACTION_RELEASE
-        ? 'release'
-        : activeView,
+    activeTask,
+    activeSection,
+    activeDetail,
+    focusTestApply,
     requestedReleaseBatch,
     canonicalSearch: params.toString(),
   }
 }
 
-export function customerConfigStepSearch(input, step) {
-  if (!CUSTOMER_CONFIG_STEPS.some((item) => item.value === step)) {
-    throw new Error('Unknown customer configuration step')
+function setOptional(params, key, value) {
+  if (value) params.set(key, value)
+  else params.delete(key)
+}
+
+export function customerConfigTaskSearch(input, task, section = REVIEW_FIELDS) {
+  if (!CUSTOMER_CONFIG_TASKS.some((item) => item.value === task)) {
+    throw new Error('Unknown customer configuration task')
   }
+  if (!reviewSections.has(section)) throw new Error('Unknown customer configuration section')
   const params = new URLSearchParams(input)
-  params.set('view', step === 'release' ? VIEW_IMPORT : step)
-  if (step === 'release') params.set('action', IMPORT_ACTION_RELEASE)
-  else if (
-    step === VIEW_IMPORT &&
-    params.get('action') === IMPORT_ACTION_RELEASE
-  ) {
-    params.delete('action')
-  }
+  const showReviewSection = task === REVIEW_TASK && section !== REVIEW_FIELDS
+  setOptional(params, 'view', task !== REVIEW_TASK ? VIEW_IMPORT : showReviewSection ? VIEW_PREFLIGHT : '')
+  setOptional(params, 'section', showReviewSection ? section : '')
+  setOptional(params, 'action', task === RELEASE_TASK ? IMPORT_ACTION_RELEASE : '')
+  params.delete('detail')
   return resolveCustomerConfigLocation(params).canonicalSearch
 }
 

@@ -3,11 +3,11 @@ import {
   Button,
   Descriptions,
   Drawer,
-  List,
   Space,
   Tag,
   Typography,
 } from 'antd'
+import Directory, { DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import DevCiWorkflowGuide from '../DevCiWorkflowGuide.jsx'
 
 import { buildCiDiagnosticText } from '../../config/devCiWorkflow.mjs'
@@ -211,52 +211,37 @@ export function ServerJobGuideDrawer({
             先看阶段，再按需查看单个 Job；依赖、状态与耗时仍以对应 GitLab
             流水线为准。
           </Text>
-          {timing.flowGroups.map((group) => (
-            <section
-              key={group.key}
-              className="erp-dev-quality-job-guide-drawer__group"
-            >
-              <div className="erp-dev-quality-job-guide-drawer__group-heading">
-                <Text strong>{SERVER_JOB_GROUP[group.key] || group.key}</Text>
-                <Text type="secondary">{SERVER_JOB_GROUP_HELP[group.key]}</Text>
-              </div>
-              <List
-                size="small"
-                dataSource={group.jobs}
-                renderItem={(job) => {
-                  const guide = guideByName.get(job.name)
-                  if (!guide) return null
-                  return (
-                    <List.Item
-                      actions={[
-                        <Button
-                          key="open"
-                          type="link"
-                          aria-label={`查看 ${job.name} 说明`}
-                          onClick={() => onSelect(job.name)}
-                        >
-                          查看
-                        </Button>,
-                      ]}
-                    >
-                      <List.Item.Meta
-                        title={
-                          <Space size={6} wrap>
-                            <Text strong>{guide.label}</Text>
-                            <Text code>{job.name}</Text>
-                            {!guide.registered ? (
-                              <Tag color="warning">说明待登记</Tag>
-                            ) : null}
-                          </Space>
-                        }
-                        description={guide.summary}
-                      />
-                    </List.Item>
-                  )
-                }}
-              />
-            </section>
-          ))}
+          <Directory aria-label="Job 目录" title={<strong>Job 目录</strong>} className="erp-directory-list">
+            {timing.flowGroups.map((group) => (
+              <section key={group.key} className="erp-dev-quality-job-guide-drawer__group">
+                <h3 className="erp-directory-group-title erp-dev-quality-job-guide-drawer__group-heading">
+                  <strong>{SERVER_JOB_GROUP[group.key] || group.key}</strong>
+                  <Text type="secondary">{SERVER_JOB_GROUP_HELP[group.key]}</Text>
+                </h3>
+                <DirectoryBranch>
+                  {group.jobs.map((job) => {
+                    const guide = guideByName.get(job.name)
+                    if (!guide) return null
+                    return (
+                      <DirectoryItem
+                        key={job.name}
+                        className="erp-directory-item--stacked"
+                        aria-label={`查看 ${job.name} 说明`}
+                        onClick={() => onSelect(job.name)}
+                      >
+                        <span className="erp-dev-quality-job-guide-drawer__identity">
+                          <strong>{guide.label}</strong>
+                          <Text code>{job.name}</Text>
+                          {!guide.registered ? <Tag color="warning">说明待登记</Tag> : null}
+                        </span>
+                        <Text type="secondary">{guide.summary}</Text>
+                      </DirectoryItem>
+                    )
+                  })}
+                </DirectoryBranch>
+              </section>
+            ))}
+          </Directory>
         </div>
       )}
       <details className="erp-dev-disclosure erp-dev-ci-diagnostic">

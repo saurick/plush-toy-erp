@@ -1,11 +1,13 @@
 import { DIAGRAM_DOMAINS, DIAGRAM_NODE_TYPES } from '../../common/components/diagram/diagramSemantics.mjs'
+
 import { ERP_LIGHT_PALETTE } from '../../common/theme/erpThemePalette.mjs'
 
 export const CHAIN_CANVAS_OPERATIONS = '拖空白平移 · Ctrl / ⌘ + 滚轮缩放。全流程地图和阶段排布可切换横竖方向。'
 export const CHAIN_CANVAS_RELATIONS = Object.freeze({
   known: '办理 / 推进',
   exception: '异常分支',
-  unknown: '待核对',
+  correction: '过账后纠正',
+  unknown: '待核对的参考线',
   supplies: '供给关系',
   cross_cuts: '横切影响',
 })
@@ -16,9 +18,11 @@ const muted = '#526259'
 const escape = (value) => String(value).replace(/[&<>"']/gu, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char])
 const number = (value) => Math.round(value * 1000) / 1000
 const relationStyle = (kind) => ({
-  color: kind === 'exception' ? '#ad6800' : muted,
-  dash: ({ exception: '8 5', unknown: '2 5', supplies: '5 4', cross_cuts: '2 4' })[kind] || '',
+  color: ({ exception: ERP_LIGHT_PALETTE.warning, correction: ERP_LIGHT_PALETTE.info })[kind] || muted,
+  arrow: ['exception', 'correction'].includes(kind) ? kind : 'known',
+  dash: ({ exception: '8 5', correction: '9 4 2 4', unknown: '2 5', supplies: '5 4', cross_cuts: '2 4' })[kind] || '',
 })
+const exceptionNodeStroke = `stroke="${relationStyle('exception').color}" stroke-width="3" stroke-dasharray="9 6"`
 const tint = (hex, amount = 0.16) => `#${hex.slice(1).match(/../gu).map((part) => Math.round(parseInt(part, 16) * amount + 255 * (1 - amount)).toString(16).padStart(2, '0')).join('')}`
 
 // Capture the rendered graph in its unscaled coordinates, including off-screen
@@ -76,24 +80,25 @@ export function captureBusinessChainExport(surface, scale) {
       viewBox: icon.getAttribute('viewBox'),
       paths: [...icon.querySelectorAll('path')].map((path) => path.getAttribute('d')),
     }))
-    return { ...rect, id: element.dataset.designNode || element.dataset.handoffChain, type: element.dataset.type || 'group', domain: element.dataset.domain, roleHighlight: element.dataset.roleHighlighted, roleLabel: body.querySelector('[data-role-label]')?.textContent, texts, icons }
+    return { ...rect, id: element.dataset.designNode || element.dataset.handoffChain, type: element.dataset.type || 'group', domain: element.dataset.domain, exception: element.hasAttribute('data-exception-node'), roleHighlight: element.dataset.roleHighlighted, roleLabel: body.querySelector('[data-role-label]')?.textContent, texts, icons }
   })
-  if (!nodes.length) throw new Error('当前范围没有可导出的节点。')
   const edges = [...surface.querySelectorAll('[data-design-edge]')].map((element) => {
     const path = element.querySelector('.erp-chain-design__edge')
     const b = path.getBBox()
     bounds.push({ x: b.x, y: b.y, width: b.width, height: b.height })
     const label = element.querySelector('text')
+    const backdrop = element.querySelector('.erp-chain-design__edge-label rect')?.getBoundingClientRect()
     return {
       from: element.dataset.edgeFrom,
       to: element.dataset.edgeTo,
       kind: ['supplies', 'cross_cuts'].includes(element.dataset.relationKind) ? element.dataset.relationKind : element.dataset.designEdge,
       d: path.getAttribute('d'),
       title: element.querySelector('title')?.textContent || '',
+      labelBox: backdrop?.width ? box(backdrop) : null,
       texts: label ? textRuns(label, relationStyle(element.dataset.designEdge).color) : [],
     }
   })
-  const lanes = [...surface.querySelectorAll('.erp-chain-design__lane')].map((element) => {
+  const lanes = [...surface.querySelectorAll('.erp-chain-design__lane, .erp-chain-design__section-title')].map((element) => {
     const rect = box(element.getBoundingClientRect())
     const style = window.getComputedStyle(element)
     bounds.push(rect)
@@ -123,16 +128,17 @@ function exportGraph(snapshot) {
   }
   for (const edge of snapshot.edges) {
     const style = relationStyle(edge.kind)
-    graph.push(`<g data-export-edge="${escape(edge.kind)}"><title>${escape(edge.title)}</title><path d="${escape(edge.d)}" fill="none" stroke="${style.color}" stroke-width="1.5" stroke-dasharray="${style.dash || 'none'}"${edge.kind !== 'unknown' ? ` marker-end="url(#export-arrow-${edge.kind === 'exception' ? 'exception' : 'known'})"` : ''}/>${edge.texts.map(textSvg).join('')}</g>`)
+    graph.push(`<g data-export-edge="${escape(edge.kind)}"><title>${escape(edge.title)}</title><path d="${escape(edge.d)}" fill="none" stroke="${style.color}" stroke-width="1.5" stroke-dasharray="${style.dash || 'none'}"${edge.kind !== 'unknown' ? ` marker-end="url(#export-arrow-${style.arrow})"` : ''}/>${edge.labelBox ? rectSvg(edge.labelBox, 'fill="white"') : ''}${edge.texts.map(textSvg).join('')}</g>`)
   }
   for (const node of snapshot.nodes) {
     const color = DIAGRAM_DOMAINS[node.domain]?.color || muted
     const rounded = ['business_action', 'system'].includes(node.type)
+    const border = node.exception ? exceptionNodeStroke : `stroke="${color}"`
     const fill = node.roleHighlight ? tint(ERP_LIGHT_PALETTE.info, node.roleHighlight === 'shared' ? 0.21 : 0.10) : tint(color)
     graph.push(`<g data-export-node="${escape(node.id)}">`)
     if (node.roleLabel) graph.push(`<title>${escape(node.roleLabel)}</title>`)
-    graph.push(rectSvg(node, `rx="${rounded ? 22 : 4}" ry="${rounded ? 22 : 4}" fill="${fill}" stroke="${color}"`))
-    if (node.type === 'record') graph.push(rectSvg({ x: node.x + 3, y: node.y + 3, width: node.width - 6, height: node.height - 6 }, `rx="2" fill="none" stroke="${color}"`))
+    graph.push(rectSvg(node, `rx="${rounded ? 22 : 4}" ry="${rounded ? 22 : 4}" fill="${fill}" ${border}`))
+    if (node.type === 'record' && !node.exception) graph.push(rectSvg({ x: node.x + 3, y: node.y + 3, width: node.width - 6, height: node.height - 6 }, `rx="2" fill="none" stroke="${color}"`))
     for (const icon of node.icons) graph.push(`<svg x="${number(icon.x)}" y="${number(icon.y)}" width="${number(icon.width)}" height="${number(icon.height)}" viewBox="${escape(icon.viewBox)}" fill="${muted}">${icon.paths.map((d) => `<path d="${escape(d)}"/>`).join('')}</svg>`)
     graph.push(...node.texts.map(textSvg), '</g>')
   }
@@ -151,10 +157,10 @@ top,
 }
 
 export function renderBusinessChainExport(snapshot, { title, context, exportedAt, includeLegend = true, includeOperations = true }, measureText) {
-  const main = graphBounds(snapshot)
+  const main = snapshot.nodes.length ? graphBounds(snapshot) : null
   const handoffs = snapshot.handoffs && graphBounds(snapshot.handoffs)
   const padding = 28
-  const width = Math.ceil(Math.max(720, Math.max(main.width, handoffs?.width || 0) + padding * 2))
+  const width = Math.ceil(Math.max(720, Math.max(main?.width || 0, handoffs?.width || 0) + padding * 2))
   const blocks = []
   let cursor = padding
   const paragraph = (text, size = 14, weight = '400', color = muted, inset = 0) => {
@@ -178,10 +184,14 @@ export function renderBusinessChainExport(snapshot, { title, context, exportedAt
     paragraph(`对外交接 · ${snapshot.handoffs.edges.length} 条`, 16, '600', ink)
     blocks.push(`<g data-export-handoffs="true" transform="translate(${number(padding - handoffs.left)} ${number(cursor - handoffs.top)})">${exportGraph(snapshot.handoffs)}</g>`)
     cursor += handoffs.height + 22
-    paragraph('链内步骤', 16, '600', ink)
+    if (main) paragraph('链内步骤', 16, '600', ink)
   }
-  blocks.push(`<g data-export-graph="true" transform="translate(${number(padding - main.left)} ${number(cursor - main.top)})">${exportGraph(snapshot)}</g>`)
-  cursor += main.height + 30
+  if (main) blocks.push(`<g data-export-graph="true" transform="translate(${number(padding - main.left)} ${number(cursor - main.top)})">${exportGraph(snapshot)}</g>`)
+  cursor += (main?.height || 0) + 30
+  if (snapshot.related?.length) {
+    paragraph('本链交接', 16, '600', ink)
+    for (const label of snapshot.related) paragraph(label)
+  }
   if (includeLegend || includeOperations) {
     blocks.push(`<path d="M ${padding} ${cursor} H ${width - padding}" stroke="#d5dfda"/>`)
     cursor += 18
@@ -195,22 +205,26 @@ export function renderBusinessChainExport(snapshot, { title, context, exportedAt
       paragraph(entry.label, 13, '400', muted, 22)
     }
     paragraph(`节点类型：${[...new Set(snapshot.nodes.map((node) => DIAGRAM_NODE_TYPES[node.type]))].filter(Boolean).join('、')}`, 13)
+    if (snapshot.nodes.some((node) => node.exception)) {
+      blocks.push(rectSvg({ x: padding, y: cursor + 2, width: 42, height: 16 }, `rx="3" fill="none" ${exceptionNodeStroke}`))
+      paragraph('异常分支节点', 13, '400', muted, 62)
+    }
     for (const kind of new Set([...snapshot.edges, ...(snapshot.handoffs?.edges || [])].map((edge) => edge.kind))) {
       const style = relationStyle(kind)
-      blocks.push(`<path d="M ${padding} ${cursor + 10} h 48" fill="none" stroke="${style.color}" stroke-width="1.5" stroke-dasharray="${style.dash || 'none'}"${kind !== 'unknown' ? ` marker-end="url(#export-arrow-${kind === 'exception' ? 'exception' : 'known'})"` : ''}/>`)
-      paragraph(CHAIN_CANVAS_RELATIONS[kind], 13, '400', muted, 62)
+      blocks.push(`<path d="M ${padding} ${cursor + 10} h 48" fill="none" stroke="${style.color}" stroke-width="1.5" stroke-dasharray="${style.dash || 'none'}"${kind !== 'unknown' ? ` marker-end="url(#export-arrow-${style.arrow})"` : ''}/>`)
+      paragraph(CHAIN_CANVAS_RELATIONS[kind], 13, '400', style.color, 62)
     }
     paragraph('领域颜色用于分类，不代表完成状态；已登记衔接仍需满足办理条件，待核对连线不表示允许或禁止。', 12)
     cursor += 10
   }
   if (includeOperations) {
     paragraph('操作说明（在流程探索页面使用）', 16, '600', ink)
-    paragraph('点击节点或连线查看说明；按需展开分支、切换颗粒度。', 13)
+    paragraph('点击节点或连线查看说明。可展开分支或切换展示粒度。', 13)
     paragraph(CHAIN_CANVAS_OPERATIONS, 13)
-    paragraph('适应全图可查看当前范围；跨链查看后，“返回来处”恢复原有选择与镜头。', 13)
+    paragraph('适应全图可查看当前范围；跨链查看后，“返回来处”恢复原有选择并适应全图。', 13)
   }
   const height = Math.ceil(cursor + padding)
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${escape(font)}"><title>${escape(title || '流程探索')}</title><desc>当前范围的规则示意，保留排布；不代表某笔业务的实际进度。</desc><defs>${['known', 'exception'].map((kind) => `<marker id="export-arrow-${kind}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="${relationStyle(kind).color}"/></marker>`).join('')}</defs><rect width="100%" height="100%" fill="white"/>${blocks.join('')}</svg>`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${escape(font)}"><title>${escape(title || '流程探索')}</title><desc>当前范围的规则示意，保留排布；不代表某笔业务的实际进度。</desc><defs>${['known', 'exception', 'correction'].map((kind) => `<marker id="export-arrow-${kind}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="${relationStyle(kind).color}"/></marker>`).join('')}</defs><rect width="100%" height="100%" fill="white"/>${blocks.join('')}</svg>`
   return { svg, width, height }
 }
 
@@ -254,6 +268,8 @@ export function createBusinessChainExport(surface, scale, options) {
   const snapshot = captureBusinessChainExport(surface, scale)
   const handoffs = surface.closest('.erp-chain-design__canvas-area')?.querySelector('.erp-chain-handoffs__plot')
   if (handoffs) snapshot.handoffs = captureBusinessChainExport(handoffs, 1)
+  snapshot.related = [...(surface.closest('.erp-chain-design__canvas-area')?.querySelectorAll('.erp-chain-design__handoff-links button') || [])].map((button) => button.getAttribute('aria-label'))
+  if (!snapshot.nodes.length && !snapshot.handoffs?.nodes.length && !snapshot.related.length) throw new Error('当前筛选没有可导出的内容。')
   return renderBusinessChainExport(snapshot, options, (text, size, weight) => {
     context.font = `${weight} ${size}px ${font}`
     return context.measureText(text).width

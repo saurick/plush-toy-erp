@@ -187,7 +187,7 @@ test('全部流程整体视图可恢复，草稿加线阻断非法与重复关�
   assert.equal(JSON.stringify(catalog), before)
 })
 
-test('损坏或过时草稿拒绝读取；只持久化节点身份、位置、讨论线和想法', () => {
+test('损坏或过时草稿拒绝读取；只持久化节点身份、位置和讨论线', () => {
   assert.throws(() => parseBusinessChainDraft('{', library))
   const template = showBusinessChainWhole(emptyBusinessChainDraft(), library, 'sales_to_production')
   for (const change of [
@@ -209,9 +209,6 @@ test('损坏或过时草稿拒绝读取；只持久化节点身份、位置、�
     (draft) => {
       draft.edges[0].kind = 'executed'
     },
-    (draft) => {
-      draft.ideas = [{ text: '' }]
-    },
   ]) {
     const draft = structuredClone(template)
     change(draft)
@@ -224,5 +221,5 @@ test('损坏或过时草稿拒绝读取；只持久化节点身份、位置、�
   const restored = parseBusinessChainDraft(JSON.stringify(draft), library)
   assert.equal(restored.nodes[0].label, undefined)
   assert.equal(restored.edges[0].condition, undefined)
-  assert.equal(restored.ideas[0].text, '核对工程资料的前置条件')
+  assert.equal(Object.hasOwn(restored, 'ideas'), false)
 })

@@ -1,16 +1,18 @@
 import React, { Suspense, useState } from 'react'
-import { Alert, Button, Form, Input, Slider } from 'antd'
+import { Alert, App, Button, Form, Input, Slider } from 'antd'
 import Select from '@/common/components/select/AppSelect'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
+import { showCopySuccess } from '@/common/components/feedback/copyFeedback.jsx'
 import { Loading } from '@/common/components/loading'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import { ERP_MODAL_WIDTHS } from '@/erp/utils/modalSizes.mjs'
 import {
+  COPY_SUCCESS_DURATION,
   MESSAGE_CONFIG,
   NOTIFICATION_CONFIG,
 } from '@/common/utils/feedbackConfig.mjs'
-import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
+import DevUIFeedbackExamples, { useDemoFeedback } from './DevUIFeedbackExamples.jsx'
 import '../styles/dev-ui-feedback.css'
 
 const DevUIBusinessExamples = lazyWithDynamicImportRetry(
@@ -290,7 +292,7 @@ const FEEDBACK_CHOICES = {
   toast: [
     'Toast',
     '短暂且无后续动作',
-    '已完成的轻量反馈自动消失，减少长期遮挡。',
+    '连续点选可以体验复制提示叠放，点击 × 关闭其中一条。',
   ],
   notification: [
     '持续通知',
@@ -300,8 +302,27 @@ const FEEDBACK_CHOICES = {
 }
 
 function FeedbackChoice({ rationale }) {
+  const { message, notification, key } = useDemoFeedback()
   const [selected, setSelected] = useState('toast')
   const choice = FEEDBACK_CHOICES[selected]
+  const fieldId = `${key}-subject`
+  const selectChoice = (next, trigger) => {
+    setSelected(next)
+    if (next !== 'toast') message.destroy()
+    if (next !== 'notification') notification.destroy(key)
+    if (next === 'toast') {
+      showCopySuccess('样例编号', trigger, message)
+    }
+    if (next === 'notification') {
+      notification.warning({
+        key,
+        message: '样例导出未完成',
+        description: '当前条件已保留，回到导出区域即可继续处理。',
+        role: 'alert',
+      })
+    }
+  }
+
   return (
     <>
       <div
@@ -309,12 +330,12 @@ function FeedbackChoice({ rationale }) {
         role="group"
         aria-label="反馈选择关系"
       >
-        {Object.entries(FEEDBACK_CHOICES).map(([key, [title, condition]]) => (
+        {Object.entries(FEEDBACK_CHOICES).map(([value, [title, condition]]) => (
           <button
-            key={key}
+            key={value}
             type="button"
-            aria-pressed={selected === key}
-            onClick={() => setSelected(key)}
+            aria-pressed={selected === value}
+            onClick={(event) => selectChoice(value, event.currentTarget)}
           >
             <small>{condition}</small>
             <span>↓</span>
@@ -322,44 +343,31 @@ function FeedbackChoice({ rationale }) {
           </button>
         ))}
       </div>
-      <div className={`erp-feedback-placement is-${selected}`}>
-        <div className="erp-feedback-placement-page">
-          <strong>当前采购说明</strong>
-          <Form layout="vertical">
-            <Form.Item
-              label="说明标题"
-              validateStatus={selected === 'field' ? 'error' : undefined}
-              help={selected === 'field' ? '请填写说明标题' : undefined}
-            >
-              <Input readOnly placeholder="填写内容" />
-            </Form.Item>
-          </Form>
-          {selected === 'region' ? (
-            <Alert
-              showIcon
-              type="error"
-              message="读取失败，当前输入已保留"
-              description="恢复入口与发生问题的区域放在一起。"
+      {selected === 'field' ? (
+        <Form className="erp-feedback-inline-example" layout="vertical">
+          <Form.Item
+            label="说明标题"
+            htmlFor={fieldId}
+            validateStatus="error"
+            help={<span id={`${fieldId}-error`}>请填写说明标题</span>}
+          >
+            <Input
+              id={fieldId}
+              aria-invalid="true"
+              aria-describedby={`${fieldId}-error`}
+              readOnly
             />
-          ) : (
-            <div className="erp-feedback-sketch-lines">
-              <i />
-              <i />
-              <i />
-            </div>
-          )}
-        </div>
-        {selected === 'toast' ? (
-          <div className="erp-feedback-placement-toast">✓ 样例已保存</div>
-        ) : null}
-        {selected === 'notification' ? (
-          <div className="erp-feedback-placement-notification">
-            <strong>导出未完成 ×</strong>
-            <p>当前条件已保留</p>
-            <span>查看恢复入口 →</span>
-          </div>
-        ) : null}
-      </div>
+          </Form.Item>
+        </Form>
+      ) : null}
+      {selected === 'region' ? (
+        <Alert
+          className="erp-feedback-inline-example"
+          showIcon
+          type="error"
+          message="读取失败，当前输入已保留"
+        />
+      ) : null}
       <p>
         <strong>{choice[0]}：</strong>
         {choice[2]}
@@ -368,9 +376,13 @@ function FeedbackChoice({ rationale }) {
         <div>
           <dt>Toast</dt>
           <dd>
-            顶部居中 {MESSAGE_CONFIG.top}px · 默认 {MESSAGE_CONFIG.duration} 秒
+            顶部居中 {MESSAGE_CONFIG.top}px · 普通提示默认 {MESSAGE_CONFIG.duration} 秒
             · 最多 {MESSAGE_CONFIG.maxCount} 条
           </dd>
+        </div>
+        <div>
+          <dt>复制提示</dt>
+          <dd>每条 {COPY_SUCCESS_DURATION} 秒 · 可单独关闭</dd>
         </div>
         <div>
           <dt>长消息</dt>
@@ -484,7 +496,9 @@ export default function DevUIFeedbackGuide({ topic, chapters, view }) {
       ) : topic.key === 'forms' ? (
         <ContainerChoice rationale={rationale} />
       ) : topic.key === 'feedback' ? (
-        <FeedbackChoice rationale={rationale} />
+        <App message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
+          <FeedbackChoice rationale={rationale} />
+        </App>
       ) : (
         <StateGuide topic={topic} chapters={chapters} rationale={rationale} />
       )}

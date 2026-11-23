@@ -1,7 +1,9 @@
 import { writeFile } from 'node:fs/promises'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { assertBusinessListSurfaceSpacing } from './businessTableAssertions.mjs'
+import { assertStickyToolbarSurfaces } from './businessListStickyScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { getBusinessDocumentTitle } from '../../src/erp/config/businessModules.mjs'
 import { INVENTORY_VIEWS, WAREHOUSE_HANDLING_VIEWS } from '../../src/erp/utils/warehouseViews.mjs'
 import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios.mjs'
 
@@ -37,7 +39,7 @@ export function createBusinessToolbarCompositionScenarios({ assert, assertNoHori
   }
   const orderExamples = [
     { key: 'purchase', path: '/erp/purchase/accessories', labels: ['订单列表', '采购跟进'] },
-    { key: 'sales', path: '/erp/sales/project-orders/sales-orders', labels: ['订单列表', '交付进度'] },
+    { key: 'sales', path: '/erp/sales/project-orders/sales-orders', labels: ['销售订单'] },
   ].map((example) => ({
     name: `business-toolbar-composition-${example.key}`,
     path: example.path,
@@ -46,29 +48,35 @@ effectiveSession: session,
     viewport: { width: 1920, height: 1080 },
 deviceScaleFactor: 2,
     verify: async (page) => {
-      const navigation = page.locator('.erp-business-operation-panel__content-switch').getByRole('tablist', { name: '查询视图', exact: true })
-      await navigation.getByRole('tab', { name: example.labels[0], selected: true, exact: true }).waitFor()
-      await navigation.evaluate((element) => { window.__toolbarContentNavigation = element })
+      const navigation = example.labels.length > 1
+        ? page.locator('.erp-business-operation-panel__content-switch').getByRole('tablist', { name: '查询视图', exact: true })
+        : null
+      await navigation?.getByRole('tab', { name: example.labels[0], selected: true, exact: true }).waitFor()
+      await navigation?.evaluate((element) => { window.__toolbarContentNavigation = element })
+      await page.locator('.erp-business-operation-panel__search input').first().waitFor()
       await page.locator('.erp-business-operation-panel__command').first().evaluate((element) => { window.__toolbarCommand = element })
       const evidence = []
       for (const width of [1920, 1366, 820, 390]) {
         await page.setViewportSize({ width, height: 1080 })
-        for (const label of [...example.labels.slice(1), example.labels[0]]) {
-          await navigation.getByRole('tab', { name: label, exact: true }).click()
-          await navigation.getByRole('tab', { name: label, selected: true, exact: true }).waitFor()
+        for (const label of navigation ? [...example.labels.slice(1), example.labels[0]] : example.labels) {
+          await navigation?.getByRole('tab', { name: label, exact: true }).click()
+          await navigation?.getByRole('tab', { name: label, selected: true, exact: true }).waitFor()
           await page.locator('.erp-business-operation-panel__search input').first().waitFor()
-          assert.equal(await navigation.evaluate((element) => element === window.__toolbarContentNavigation), true, `${label} 分类条保持挂载`)
+          if (navigation) assert.equal(await navigation.evaluate((element) => element === window.__toolbarContentNavigation), true, `${label} 分类条保持挂载`)
           assert.equal(await page.locator('.erp-business-operation-panel__command').first().evaluate((element) => element === window.__toolbarCommand), true, `${label} 工具栏保持挂载`)
           evidence.push(await inspect(page, `${example.key}-${label}`, width))
+          await assertStickyToolbarSurfaces(page)
         }
       }
       await page.setViewportSize({ width: 1920, height: 1080 })
       const search = page.locator('.erp-business-operation-panel__search input').first()
       await search.fill('STYLE')
       await search.press('Enter')
-      await navigation.getByRole('tab', { name: example.labels[1], exact: true }).click()
-      await navigation.getByRole('tab', { name: example.labels[0], exact: true }).click()
-      assert.equal(await search.inputValue(), 'STYLE', '往返视图保留本页已提交查询')
+      if (navigation) {
+        await navigation.getByRole('tab', { name: example.labels[1], exact: true }).click()
+        await navigation.getByRole('tab', { name: example.labels[0], exact: true }).click()
+      }
+      assert.equal(await search.inputValue(), 'STYLE', '操作栏保留本页已提交查询')
       const tools = page.getByRole('button', { name: '表格工具', exact: true })
       await tools.click()
       await page.getByRole('menuitem', { name: /列设置/u }).waitFor()
@@ -98,25 +106,26 @@ deviceScaleFactor: 2,
       beforeNavigate: createOutsourcingSummaryScenarios({ assert, assertNoHorizontalOverflow, customerRuntimeEffectiveSession, outputDir })[0].beforeNavigate,
       verify: async (page) => {
         const entries = [
-          { key: 'outsourcing', path: '/erp/purchase/processing-contracts', navigation: '委外订单内容分类', labels: ['加工合同', '加工明细'] },
+          { key: 'outsourcing', path: '/erp/purchase/processing-contracts', navigation: '委外订单内容分类', labels: [getBusinessDocumentTitle('outsourcing_order'), '加工明细'] },
           ...Object.entries(WAREHOUSE_HANDLING_VIEWS).map(([direction, views]) => ({ key: direction, path: `/erp/warehouse/${direction}`, navigation: direction === 'inbound' ? '入库办理分类' : '出库办理分类', labels: views.map(({ label }) => label) })),
           { key: 'inventory', path: '/erp/warehouse/inventory', navigation: '库存查询分类', labels: INVENTORY_VIEWS.map(({ label }) => label) },
           { key: 'purchase', path: '/erp/purchase/accessories', navigation: '查询视图', labels: ['订单列表', '采购跟进'] },
-          { key: 'sales', path: '/erp/sales/project-orders/sales-orders', navigation: '查询视图', labels: ['订单列表', '交付进度'] },
+          { key: 'sales', path: '/erp/sales/project-orders/sales-orders', labels: ['销售订单'] },
         ]
         const evidence = []
         for (const entry of entries) {
           if (new URL(page.url()).pathname !== entry.path) await gotoScenarioPath(page, entry.path, { waitUntil: 'domcontentloaded' })
-          const navigation = page.getByRole('tablist', { name: entry.navigation, exact: true })
-          await navigation.waitFor()
+          const navigation = entry.navigation ? page.getByRole('tablist', { name: entry.navigation, exact: true }) : null
+          await navigation?.waitFor()
           // 往返后重新测量，保留已加载样式及共享工具栏。
-          for (const label of [...entry.labels, entry.labels[0]]) {
-            await navigation.getByRole('tab', { name: label, exact: true }).click()
-            await navigation.getByRole('tab', { name: label, selected: true, exact: true }).waitFor()
+          for (const label of navigation ? [...entry.labels, entry.labels[0]] : entry.labels) {
+            await navigation?.getByRole('tab', { name: label, exact: true }).click()
+            await navigation?.getByRole('tab', { name: label, selected: true, exact: true }).waitFor()
             await page.locator('.erp-business-operation-panel__search input').first().waitFor()
             await waitForFiniteAnimations(page)
             await page.locator('.erp-admin-content').evaluate((node) => { node.scrollTop = 0 })
-            evidence.push(await assertBusinessListSurfaceSpacing(page, `${entry.key}-${label}-${key}`, { tableView: !['采购跟进', '交付进度'].includes(label) }))
+            evidence.push(await assertBusinessListSurfaceSpacing(page, `${entry.key}-${label}-${key}`, { tableView: label !== '采购跟进' }))
+            await assertStickyToolbarSurfaces(page)
             await assertNoHorizontalOverflow(page, `${entry.key}-${label}-${key}`)
           }
           if (['outsourcing', 'inbound', 'outbound'].includes(entry.key)) await page.screenshot({ path: path.join(outputDir, `list-spacing-${entry.key}-${key}.png`) })
@@ -200,7 +209,7 @@ deviceScaleFactor: 2,
         await picker.waitFor()
         assert.equal(await page.locator('.erp-business-operation-panel__content-switch').locator(picker).count(), 1)
         await page.locator('.ant-select').filter({ has: picker }).locator('.ant-select-selector').click()
-        await picker.fill('销售订单')
+        assert.equal(await picker.isEditable(), false)
         await page.locator('.ant-select-dropdown:visible').getByText('销售订单', { exact: true }).click()
         await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
         await page.waitForFunction(() => new URL(location.href).searchParams.get('source') === 'sales_orders')

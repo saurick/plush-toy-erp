@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Calendar, Checkbox, List, Tag } from 'antd'
 import { EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -41,31 +41,43 @@ import {
 } from '../config/devToolbarExample.mjs'
 import '../styles/dev-ui-toolbar-example.css'
 import DevUIBusinessTabComparison from './DevUIBusinessTabComparison.jsx'
+import DevControlUsageTable from './DevControlUsageTable.jsx'
 
 const RESPONSIBILITIES = {
   content: [
-    '内容切换 · 业务决定',
-    '切换所查看的业务内容。少量稳定分类直接展示，较多分类使用搜索选择。',
+    '内容切换',
+    'conditional',
+    '同一业务有不同查看角度时，在查询区左侧提供切换。少量稳定分类直接展示，较多分类使用搜索选择。',
   ],
   view: [
-    '展示方式 · 按需出现',
+    '展示方式',
+    'optional',
     '同一业务范围可以按明细、分布或日历阅读，不新增业务层级。',
   ],
   quick: [
-    '快捷条件 · 业务决定',
+    '快捷条件',
+    'optional',
     '缩小同一份结果；名称、数量和常用项由岗位任务决定。',
   ],
   query: [
-    '查询 · 共用交互',
+    '关键词查询',
+    'optional',
     '输入后按搜索或 Enter 生效；清空、筛选与翻页规则共用。',
   ],
   tools: [
-    '工具 · 共用位置',
+    '表格工具',
+    'optional',
     '导出和列设置复用真实组件；此处仅处理本地演示数据。',
   ],
   primary: [
-    '主动作 · 按权限出现',
+    '主动作',
+    'conditional',
     '仅有相应业务能力时出现；查询页不为了布局补一个新建按钮。',
+  ],
+  record: [
+    '记录动作',
+    'conditional',
+    '选中一条记录后可查看明细，其他动作还需满足相应的状态和权限。',
   ],
 }
 
@@ -84,6 +96,7 @@ function MarkedPart({ role, highlight, children }) {
 
 function ExamplePage({ business, scenario, annotations, active }) {
   const example = TOOLBAR_EXAMPLES.find(({ key }) => key === business)
+  const pageRef = useRef(null)
   const [context] = useState(() => ({
     adminProfile: null,
     moduleWorkspace: null,
@@ -216,6 +229,7 @@ function ExamplePage({ business, scenario, annotations, active }) {
     business === 'inventory' &&
     currentView === 'balances' &&
     presentation === 'distribution'
+  const showSelection = !isCalendar && !isDistribution
   const roles = [
     business === 'tasks' ? 'view' : 'content',
     ...(business === 'inventory' && currentView === 'balances' ? ['view'] : []),
@@ -223,7 +237,18 @@ function ExamplePage({ business, scenario, annotations, active }) {
     'query',
     ...(!isCalendar ? ['tools'] : []),
     ...(hasPrimary ? ['primary'] : []),
+    ...(showSelection ? ['record'] : []),
   ]
+  const locatePart = (role) => {
+    const next = highlight === role ? '' : role
+    setHighlight(next)
+    if (next) {
+      pageRef.current?.querySelector(`[data-toolbar-part="${next}"]`)?.scrollIntoView({
+        block: 'nearest',
+        inline: 'nearest',
+      })
+    }
+  }
   const contentSwitch =
     business === 'tasks'
       ? null
@@ -234,8 +259,7 @@ function ExamplePage({ business, scenario, annotations, active }) {
               aria-label={`${example.label}内容分类`}
               allowClear={false} // 不可清空：内容分类必须保留一个当前视图。
               value={currentView}
-              showSearch
-              optionFilterProp="label"
+              virtual={false}
               onChange={change(setView)}
               options={
                 scenario === 'categories'
@@ -333,35 +357,10 @@ function ExamplePage({ business, scenario, annotations, active }) {
       className="erp-dev-toolbar-example__page"
       aria-label={`${example.label}组合样例`}
       data-business={business}
+      ref={pageRef}
     >
       <ERPPageActionsContext.Provider value={null}>
         <BusinessPageContext.Provider value={context}>
-          {annotations && (
-            <div
-              className="erp-dev-toolbar-example__annotations"
-              aria-label="工具栏职责标注"
-            >
-              <div className="erp-dev-toolbar-example__legend">
-                {roles.map((role) => (
-                  <Button
-                    key={role}
-                    size="small"
-                    aria-pressed={highlight === role}
-                    onClick={() => setHighlight(role)}
-                  >
-                    {RESPONSIBILITIES[role][0]}
-                  </Button>
-                ))}
-              </div>
-              <p>
-                {
-                  RESPONSIBILITIES[
-                    roles.includes(highlight) ? highlight : roles[0]
-                  ][1]
-                }
-              </p>
-            </div>
-          )}
           <BusinessPageLayout>
             <PageHeaderCard title={example.label} compact />
             <BusinessToolbarWorkspace contentSwitch={contentSwitch}>
@@ -477,7 +476,7 @@ function ExamplePage({ business, scenario, annotations, active }) {
                       </ToolbarButton>
                     )
                   }
-                  showSelection={!isCalendar && !isDistribution}
+                  showSelection={showSelection}
                 >
                   <SelectionActionBar
                     selectedCount={visibleSelection ? 1 : 0}
@@ -485,6 +484,8 @@ function ExamplePage({ business, scenario, annotations, active }) {
                   >
                     <ToolbarButton
                       aria-label="查看明细"
+                      data-toolbar-part="record"
+                      data-highlighted={annotations && highlight === 'record'}
                       icon={<EyeOutlined />}
                       disabled={!visibleSelection}
                       onClick={() => setDetails(visibleSelection)}
@@ -580,6 +581,16 @@ function ExamplePage({ business, scenario, annotations, active }) {
           >
             {feedback}
           </p>
+          {annotations && (
+            <DevControlUsageTable
+              label="工具栏职责标注"
+              title="当前组合部位"
+              hint="点整行可高亮样例部位"
+              rows={roles.map((role) => [...RESPONSIBILITIES[role], role])}
+              activeTarget={highlight}
+              onLocate={locatePart}
+            />
+          )}
           <BusinessDetailsModal
             open={active && Boolean(details)}
             record={details}

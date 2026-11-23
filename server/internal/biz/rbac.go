@@ -886,7 +886,7 @@ func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
 var builtinAdminMenus = []AdminMenu{
 	{Key: "global-dashboard", Label: "工作台", Path: "/erp/dashboard", RequiredAny: []string{PermissionERPWorkbenchRead}},
 	{Key: "task-board", Label: "任务管理", Path: "/erp/task-board", RequiredAny: []string{PermissionWorkflowTaskRead}},
-	{Key: "business-dashboard", Label: "进度看板", Path: "/erp/business-dashboard", RequiredAny: []string{PermissionWorkflowTaskRead, PermissionERPBusinessDashboardRead}},
+	{Key: "business-dashboard", Label: "进度看板", Path: "/erp/business-dashboard", RequiredAny: []string{PermissionSalesOrderRead, PermissionERPBusinessDashboardRead}},
 	{Key: "customers", Label: "客户档案", Path: "/erp/master/partners/customers", RequiredAny: []string{PermissionCustomerRead}},
 	{Key: "suppliers", Label: "供应商与加工厂", Path: "/erp/master/partners/suppliers", RequiredAny: []string{PermissionSupplierRead}},
 	{Key: "products", Label: "产品档案", Path: "/erp/master/products", RequiredAny: []string{PermissionProductRead, PermissionProductSKURead}},
@@ -936,7 +936,7 @@ func AdminVisibleMenus(admin *AdminUser) []AdminMenu {
 	permissionSet := PermissionKeySet(admin.Permissions)
 	out := make([]AdminMenu, 0, len(builtinAdminMenus))
 	for _, item := range builtinAdminMenus {
-		if AdminMenuRequirementsSatisfied(permissionSet, item) {
+		if AdminMenuRequirementsSatisfied(permissionSet, item) && (item.Key != "business-dashboard" || canViewBusinessProgress(permissionSet, AdminRoleKeys(admin))) {
 			cloned := item
 			cloned.RequiredAny = append([]string(nil), item.RequiredAny...)
 			cloned.RequiredAll = append([]string(nil), item.RequiredAll...)
@@ -944,6 +944,20 @@ func AdminVisibleMenus(admin *AdminUser) []AdminMenu {
 		}
 	}
 	return out
+}
+
+// A progress menu needs at least one readable delivery, production or statistics view.
+func canViewBusinessProgress(actions map[string]struct{}, roles []string) bool {
+	sales := PermissionSetHasAll(actions, PermissionSalesOrderRead, PermissionSalesOrderItemRead)
+	if PermissionSetHasAny(actions, PermissionERPBusinessDashboardRead) {
+		return sales || PermissionSetHasAny(actions, PermissionPMCPlanRead, PermissionProductionWIPRead) || PermissionSetHasAll(actions, PermissionFinanceReceivableRead, PermissionFieldFinanceSettlementRead)
+	}
+	for _, role := range roles {
+		if role == SalesRoleKey {
+			return sales
+		}
+	}
+	return false
 }
 
 func AdminMenuRequirementsSatisfied(permissionSet map[string]struct{}, menu AdminMenu) bool {

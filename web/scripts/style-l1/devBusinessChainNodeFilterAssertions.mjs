@@ -9,7 +9,7 @@ export async function chooseChainNodeView(page, editor, label) {
 
 export async function assertChainNodeFilters(page, editor, assert) {
   const search = editor.getByRole('textbox', {
-    name: '搜索业务节点',
+    name: '搜索链路或业务节点',
     exact: true,
   })
   const trigger = editor.getByRole('button', { name: /^筛选业务节点 · /u })
@@ -71,9 +71,23 @@ export async function assertChainNodeFilters(page, editor, assert) {
   await expect(search).toHaveValue('')
   await chooseChainNodeView(page, editor, '岗位任务')
   const branch = items.getByRole('button', { name: '选择分支：订单审批', exact: true })
+  await expect(branch).toHaveAttribute('aria-expanded', 'true')
+  await editor.getByRole('complementary', { name: '业务节点库' })
+    .getByRole('button', { name: '收起全部', exact: true }).click()
+  await expect(branch).toHaveAttribute('aria-expanded', 'false')
   await branch.press('Enter')
   await expect(branch).toHaveAttribute('aria-expanded', 'true')
   await expect(branch).toHaveAccessibleDescription(/2 个分支/u)
+  const branchLayout = await branch.evaluate((button) => {
+    const container = button.nextElementSibling
+    const title = (element) => element.querySelector('.erp-chain-design__library-copy').getBoundingClientRect().left
+    return {
+      sharedBranch: container.matches('.erp-directory-branch'),
+      guideWidth: parseFloat(getComputedStyle(container).borderInlineStartWidth),
+      indent: title(container) - title(button),
+    }
+  })
+  assert.deepEqual(branchLayout, { sharedBranch: true, guideWidth: 1, indent: 16 })
   await expect(
     items.getByRole('button', { name: /^加入：订单审批（/u })
   ).toHaveCount(2)

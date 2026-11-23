@@ -813,11 +813,8 @@
   gap: 10px;
 }
 
-.erp-dev-testing-coverage-reading .erp-workbench-reading__catalog > button {
-  display: flex;
+.erp-dev-testing-coverage-reading .erp-workbench-reading__catalog .erp-directory-item {
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
 }
 
 .erp-dev-testing-coverage-reading .erp-workbench-reading__catalog .ant-tag {

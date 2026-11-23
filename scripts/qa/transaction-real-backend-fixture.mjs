@@ -375,7 +375,7 @@ export async function prepareTransactionPurchase(client, options, configHash) {
     code: `${prefix}-SUP`,
     name: `${prefix} 材料供应商`,
     default_payment_term_days: 30,
-    default_payment_method: "BANK_TRANSFER",
+    default_payment_method: "银行转账",
   });
   const { customer } = await rpc("admin", "masterdata", "create_customer", {
     code: `${prefix}-CUS`,

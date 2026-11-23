@@ -82,35 +82,9 @@
   margin-top: 12px;
 }
 .erp-dev-permission-capabilities__groups {
-  display: grid;
-  gap: 6px;
   min-width: 0;
 }
-.erp-dev-permission-capabilities__groups button {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 4px 10px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: 6px;
-  background: var(--erp-surface-bg);
-  color: var(--erp-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.erp-dev-permission-capabilities__groups button[aria-pressed='true'] {
-  border-color: var(--erp-primary);
-  background: var(--erp-primary-soft);
-}
-.erp-dev-permission-capabilities__groups button:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
-}
 .erp-dev-permission-capabilities__groups small {
-  grid-column: 1 / -1;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
 }
@@ -349,7 +323,7 @@
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  .erp-dev-permission-capabilities__groups {
+  .erp-dev-permission-capabilities__groups > .erp-directory-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .erp-dev-permission-capabilities__results .ant-btn {

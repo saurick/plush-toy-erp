@@ -55,23 +55,13 @@
   background: var(--erp-surface-bg);
 }
 
-.erp-dev-product-core-groups {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-
 .erp-dev-product-core-group {
   min-width: 0;
 }
 
-.erp-dev-product-core-group ul {
-  display: grid;
+.erp-dev-product-core-group > .erp-directory-branch {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  column-gap: 16px;
 }
 
 .erp-dev-product-core-detail {
@@ -132,13 +122,13 @@
 }
 
 @media (max-width: 1399px) {
-  .erp-dev-product-core-group ul {
+  .erp-dev-product-core-group > .erp-directory-branch {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 900px) {
-  .erp-dev-product-core-group ul {
+  .erp-dev-product-core-group > .erp-directory-branch {
     grid-template-columns: minmax(0, 1fr);
   }
 }

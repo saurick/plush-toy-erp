@@ -1,12 +1,21 @@
 import { expect } from 'playwright/test'
-import { viewTrigger, chooseChainScope, chooseViewOption, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
+import { grainControl, chooseChainScope, chooseGranularity, chooseLayout, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 import { expectDiagramControlTooltip } from './diagramViewControlsAssertions.mjs'
 
-const contentWithoutCamera = (raw) => {
-  const value = JSON.parse(raw)
-  if (value?.draft?.presentation) delete value.draft.presentation.viewport
-  return value
+export async function expectCanvasFits(editor) {
+  await expect(editor.getByRole('button', { name: '适应画布全图', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(editor.getByRole('button', { name: '重置画布为 100%', exact: true })).toHaveAttribute('aria-pressed', 'false')
+  const canvas = editor.getByRole('region', { name: '流程探索画布', exact: true })
+  await expect.poll(() => canvas.evaluate((area) => {
+    const frame = area.getBoundingClientRect()
+    const items = [...area.querySelectorAll('[data-design-node], [data-design-edge], .erp-chain-design__lane, [data-chain-section]')]
+    return items.length > 0 && items.every((item) => {
+      const box = item.getBoundingClientRect()
+      return box.left >= frame.left - 1 && box.top >= frame.top - 1 &&
+        box.right <= frame.right + 1 && box.bottom <= frame.bottom + 1
+    })
+  }), { message: '当前范围的节点、连线、泳道和分段标题完整显示' }).toBe(true)
 }
 
 export function createDevBusinessChainDesignViewportScenarios({
@@ -40,9 +49,10 @@ export function createDevBusinessChainDesignViewportScenarios({
         await searchWholeLibrary(editor)
         // Object-level gestures remain available through the complete node library.
         await chooseChainNodeView(page, editor, '全部')
-        await chooseViewOption(editor, '全部已载入节点')
+        await chooseGranularity(editor, '节点明细')
         const controls = editor.getByRole('group', { name: '画布视图操作', exact: true })
         const fitAll = controls.getByRole('button', { name: '适应画布全图', exact: true })
+        await expect(controls.getByRole('button', { name: '切换画布为纵向布局' })).toBeDisabled()
         await expect(fitAll).toBeDisabled()
         await fitAll.locator('..').hover()
         await expectDiagramControlTooltip(controls, '适应全图')
@@ -86,7 +96,7 @@ async function assertExpandedChainFitWidth(page, assert) {
   const fitWidth = action('适配画布宽度')
   const fitAll = action('适应画布全图')
   const working = () => page.evaluate(() => sessionStorage.getItem('plush-workbench:business-chain-design:working'))
-  const detail = (name) => chooseViewOption(editor, name)
+  const detail = (name) => chooseGranularity(editor, name)
   const stepIds = () => editor.locator('[data-design-node]:not([data-design-node^="map:"])').evaluateAll((nodes) => nodes.map((node) => node.dataset.designNode))
   const assertReadable = async (ids, label) => {
     await expect(fitWidth).toHaveAttribute('aria-pressed', 'true')
@@ -112,7 +122,7 @@ async function assertExpandedChainFitWidth(page, assert) {
   await detail('链路概览')
   await action('查看节点：采购下单到入库应付').click()
   await action('展开这条链路的步骤').click()
-  await action('展开分支').click()
+  await editor.getByRole('checkbox', { name: '异常与回接', exact: true }).check()
   const purchaseIds = await stepIds()
   assert(purchaseIds.length > 10, '复现有多行步骤的采购链路')
   await fitWidth.click()
@@ -120,27 +130,35 @@ async function assertExpandedChainFitWidth(page, assert) {
   await assertNodeAndEdgeVisualSemantics(editor, assert)
   await fitAll.click()
   await action('折叠为链路卡片').click()
+  await expectCanvasFits(editor)
+  await expect(editor.locator('[data-diagram-zoom-label]')).toHaveText('100%')
+  await action('重置画布为 100%').click()
+  await action('展开链路步骤').click()
+  await expectCanvasFits(editor)
+  await action('折叠为链路卡片').click()
   await fitWidth.click()
   await action('查看节点：采购下单到入库应付').click()
   await action('展开这条链路的步骤').click()
-  await assertReadable(purchaseIds, '先适配宽度再展开，不被自动切回适应全图')
+  await expectCanvasFits(editor)
+  await fitWidth.click()
   const beforeFit = await working()
   for (const width of [1440, 1024, 1920]) {
     await page.setViewportSize({ width, height: 1080 })
     await assertReadable(purchaseIds, `${width}px 窗口`)
   }
   await action('全屏探索').click()
-  await assertReadable(purchaseIds, '进入全屏')
+  await expectCanvasFits(editor)
+  await action('重置画布为 100%').click()
   await action('退出全屏').click()
-  await assertReadable(purchaseIds, '退出全屏')
-  assert.deepEqual(contentWithoutCamera(await working()), contentWithoutCamera(beforeFit), '宽度适配和窗口变化只更新镜头，不改范围、节点或布局')
+  await expectCanvasFits(editor)
+  assert.deepEqual(await working(), beforeFit, '宽度适配和窗口变化只更新镜头，不改范围、节点或布局')
 
   await detail('业务步骤')
-  await expect(action('收起分支')).toHaveAttribute('aria-pressed', 'true')
-  await assertReadable(await stepIds(), '切换业务步骤后保持适配宽度')
+  await expect(editor.getByRole('checkbox', { name: '异常与回接', exact: true })).toBeChecked()
+  await expectCanvasFits(editor)
   await assertNodeAndEdgeVisualSemantics(editor, assert)
   await detail('链路概览')
-  await assertReadable(purchaseIds, '返回概览后保持适配宽度')
+  await expectCanvasFits(editor)
   await chooseChainScope(page, '业务全流程地图')
   await action('展开步骤：委外发料到回货应付').click()
   const outsourceIds = (await stepIds()).filter((id) => !purchaseIds.includes(id))
@@ -164,7 +182,7 @@ async function assertExpandedChainFitWidth(page, assert) {
   await fitWidth.click()
   await assertReadable(purchaseIds, '全图返回采购链路阅读')
   await chooseChainScope(page, '采购下单到入库应付')
-  await assertReadable(purchaseIds, '切换为单条链路范围仍保持宽度适配')
+  await expectCanvasFits(editor)
 }
 
 async function assertNodeAndEdgeVisualSemantics(editor, assert) {
@@ -335,7 +353,7 @@ async function assertChainDesignNavigation(page, editor, assert) {
     await controls
       .locator('button')
       .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
-    ['适应画布全图', '适配画布宽度', '缩小画布', '放大画布', '重置画布为 100%', '全屏探索'],
+    ['切换画布为纵向布局', '适应画布全图', '适配画布宽度', '缩小画布', '放大画布', '重置画布为 100%', '全屏探索'],
     '画布沿用 Mermaid 的工具顺序，比例为独立显示'
   )
   const controlSize = await controls.locator('button').first().boundingBox()
@@ -398,11 +416,11 @@ async function assertChainDesignNavigation(page, editor, assert) {
     '缩放、平移、适应画布不改变节点坐标'
   )
   assert.deepEqual(
-    contentWithoutCamera(await page.evaluate(() =>
+    await page.evaluate(() =>
       sessionStorage.getItem('plush-workbench:business-chain-design:working')
-    )),
-    contentWithoutCamera(stored),
-    '镜头可暂存，查看操作不改画布内容'
+    ),
+    stored,
+    '缩放和平移不写入草稿'
   )
 
   const from = await editor
@@ -437,22 +455,22 @@ async function assertChainDesignNavigation(page, editor, assert) {
   const dropArea = await canvas.boundingBox()
   await canvas.evaluate((element) => {
     element.addEventListener('drop', (event) => {
-      element.dataset.dropPoint = JSON.stringify([event.clientX, event.clientY])
+      const surface = element.querySelector('.erp-chain-design__surface')
+      const rect = surface.getBoundingClientRect()
+      const scale = new DOMMatrix(getComputedStyle(surface).transform).a
+      element.dataset.dropPoint = JSON.stringify([(event.clientX - rect.left) / scale, (event.clientY - rect.top) / scale])
     }, { capture: true, once: true })
   })
   await source.dragTo(canvas, {
     targetPosition: { x: dropArea.width - 80, y: dropArea.height - 50 },
   })
   await expect(nodes).toHaveCount(4)
-  const dropped = await editor
-    .getByRole('button', { name: '查看节点：采购订单', exact: true })
-    .boundingBox()
+  await expectCanvasFits(editor)
+  const dropped = await editor.locator('[data-design-node]').filter({
+    has: editor.page().getByRole('button', { name: '查看节点：采购订单', exact: true }),
+  }).evaluate((node) => [node.offsetLeft + node.offsetWidth / 2, node.offsetTop + node.offsetHeight / 2])
   const [dropX, dropY] = JSON.parse(await canvas.getAttribute('data-drop-point'))
-  assert(
-    Math.abs(dropped.x + dropped.width / 2 - dropX) < 2 &&
-      Math.abs(dropped.y + dropped.height / 2 - dropY) < 2,
-    '缩放和平移后拖入节点仍落在鼠标位置'
-  )
+  assert(Math.abs(dropped[0] - dropX) < 2 && Math.abs(dropped[1] - dropY) < 2, '拖入的节点保留鼠标落点对应的画布坐标')
   await chooseExplorerAction(editor, '撤销')
 
   await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2)
@@ -473,8 +491,8 @@ async function assertChainDesignNavigation(page, editor, assert) {
   await reset.click()
   await expect(zoom).toHaveText('100%')
   await editor.getByRole('button', { name: '回到整体', exact: true }).click()
-  await chooseViewOption(editor, '全部已载入节点')
-  await expect(viewTrigger(editor)).toContainText('全部已载入节点')
+  await chooseGranularity(editor, '节点明细')
+  await expect(grainControl(editor).getByRole('radio', { name: '节点明细' })).toBeChecked()
   assert((await nodes.count()) > 10, '使用完整业务链路验证多个节点的总览')
   for (const width of [1440, 1024]) {
     await page.setViewportSize({ width, height: 900 })
@@ -500,7 +518,7 @@ async function assertChainDesignNavigation(page, editor, assert) {
   }
   await page.setViewportSize({ width: 1920, height: 720 })
   await editor.getByRole('button', { name: '全屏探索', exact: true }).click()
-  await chooseViewOption(editor, '业务泳道')
+  await chooseLayout(editor, '业务泳道')
   await fit.click()
   const beforeFitWidth = await positions()
   const fitAllScale = parseFloat(await zoom.textContent())

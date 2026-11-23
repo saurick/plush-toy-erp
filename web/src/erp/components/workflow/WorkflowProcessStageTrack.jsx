@@ -19,6 +19,9 @@ export default function WorkflowProcessStageTrack({
   focusCurrent = false,
   compact = false,
   hideLinkedCurrent = false,
+  selectedStepID,
+  stepDetailID,
+  onSelectStep,
 }) {
   const [expandedStep, setExpandedStep] = React.useState(null)
   const model = suppliedModel || buildWorkflowProcessStageModel(context)
@@ -28,6 +31,8 @@ export default function WorkflowProcessStageTrack({
       .sort((left, right) => (right.completedAt || 0) - (left.completedAt || 0) || model.items.indexOf(right) - model.items.indexOf(left))
     : []
   const visible = model.items.filter((item) => !history.includes(item) && !(hideLinkedCurrent && item.linked && item.current))
+  const parallel = variant === 'tracking' ? visible.filter((item) => item.current) : []
+  const groups = parallel.length > 1 ? [visible.filter((item) => !item.current), parallel] : [visible]
   const repeatsCurrent = focusCurrent && model.handoffKind === 'role' &&
     model.items.some((item) => item.linked && item.current) &&
     !visible.some((item) => item.current && !item.linked)
@@ -44,8 +49,8 @@ export default function WorkflowProcessStageTrack({
       {!expandable && item.detail ? <span className="workflow-process-stage__meta">{item.responsibilities?.length ? <WorkflowResponsibilities items={item.responsibilities} /> : item.detail}</span> : null}
     </span>
   )
-  const renderItems = (items, label, expandable = false) => (
-    <ol className="workflow-process-stage__list" aria-label={label}>
+  const renderItems = (items, label, expandable = false, parallelGroup = false) => (
+    <ol className="workflow-process-stage__list" aria-label={label} data-parallel={parallelGroup || undefined} data-short-track={!parallelGroup && variant === 'tracking' && items.length > 1 && items.length <= 4 || undefined}>
       {items.map((item) => {
         const sequence = model.items.indexOf(item) + 1
         const stepKey = item.id || item.key
@@ -53,11 +58,15 @@ export default function WorkflowProcessStageTrack({
         return (
           <li
             key={stepKey}
-            className={`workflow-process-stage__item workflow-process-stage__item--${item.tone}${expandable ? ' workflow-process-stage__item--expandable' : ''}`}
+            className={`workflow-process-stage__item workflow-process-stage__item--${item.tone}${expandable || onSelectStep ? ' workflow-process-stage__item--interactive' : ''}`}
             aria-current={item.current ? 'step' : undefined}
             data-linked-task={item.linked ? 'true' : undefined}
           >
-            {expandable ? (
+            {onSelectStep ? (
+              <button type="button" className="workflow-process-stage__choice" aria-controls={stepDetailID} aria-pressed={selectedStepID === stepKey} onClick={() => onSelectStep(stepKey)}>
+                {marker}{renderContent(item, false)}
+              </button>
+            ) : expandable ? (
               <details className="workflow-process-stage__step" open={expandedStep === stepKey}>
                 <summary aria-label={`查看第 ${sequence} 步：${item.label}详情`} onClick={(event) => { event.preventDefault(); setExpandedStep((current) => current === stepKey ? null : stepKey) }}>
                   {marker}{renderContent(item, true)}<RightOutlined className="workflow-process-stage__step-toggle" aria-hidden="true" />
@@ -90,16 +99,22 @@ export default function WorkflowProcessStageTrack({
         .join(' ')}
       data-testid="workflow-process-stage"
       data-handoff-kind={model.handoffKind}
-      data-direction="top-to-bottom"
+      data-direction={variant === 'tracking' ? undefined : 'top-to-bottom'}
     >
-      {!focusCurrent ? (
+      {!focusCurrent && variant !== 'tracking' ? (
         <span className="workflow-process-stage__summary">
           {model.summaryLabel}
           {model.items.length > 1 ? ' · 从早到晚 ↓' : ''}
         </span>
       ) : null}
 
-      {visible.length ? renderItems(visible, `${model.processLabel}执行轨迹`) : null}
+      {groups[0].length ? renderItems(groups[0], `${model.processLabel}执行轨迹`) : null}
+      {groups[1] ? (
+        <div className="workflow-process-stage__history">
+          <p className="workflow-process-stage__history-heading">并行在办</p>
+          {renderItems(groups[1], '并行在办环节', false, true)}
+        </div>
+      ) : null}
 
       {model.handoffLabel && !repeatsCurrent ? <p className="workflow-process-stage__handoff">{model.handoffLabel}</p> : null}
       {history.length ? (

@@ -183,7 +183,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "materials",
         "material-bom",
         "task-board",
-        "business-dashboard",
         "print-center",
       ]),
       capabilityKeys: Object.freeze([
@@ -305,7 +304,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "inbound",
         "quality-inspections",
         "task-board",
-        "business-dashboard",
         "print-center",
       ]),
       capabilityKeys: Object.freeze([
@@ -388,7 +386,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "outbound",
         "shipments",
         "task-board",
-        "business-dashboard",
       ]),
       capabilityKeys: Object.freeze([
         "production.exception.execute",
@@ -468,7 +465,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "inbound",
         "processing-contracts",
         "task-board",
-        "business-dashboard",
       ]),
       capabilityKeys: Object.freeze([
         "erp.workbench.read",
@@ -532,7 +528,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "inbound",
         "shipments",
         "task-board",
-        "business-dashboard",
         "print-center",
       ]),
       capabilityKeys: Object.freeze([
@@ -613,7 +608,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "production-exceptions",
         "production-progress",
         "task-board",
-        "business-dashboard",
         "print-center",
       ]),
       capabilityKeys: Object.freeze([

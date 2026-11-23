@@ -4,7 +4,7 @@ import {
   taskHandlingPolicy,
 } from '../../erp/utils/taskHandlingPolicy.mjs'
 import { SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS } from '../../../../config/catalog/customerPackageCatalog.mjs'
-import { ROLE_DISPLAY_NAMES } from '../../erp/utils/roleKeys.mjs'
+import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from '../../erp/utils/roleKeys.mjs'
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
 import { buildFulfillmentRelations } from './devFulfillmentRelations.mjs'
 import { TASK_HANDLING_DUTIES } from './devTaskHandlingResponsibilities.mjs'
@@ -126,14 +126,31 @@ export function buildTaskHandlingRows(catalog) {
   return [...rows, ...processRows.values(), ...materialRows]
 }
 export const TASK_HANDLING_ROWS = buildTaskHandlingRows(DEV_FLOW_STATE_CATALOG)
-export const TASK_HANDLING_ROLE_KEYS = [
-  ...new Set(TASK_HANDLING_ROWS.flatMap((row) => row.roleKeys)),
+const roleKeys = [...new Set(TASK_HANDLING_ROWS.flatMap((row) => row.roleKeys))]
+export const TASK_HANDLING_FILTERS = [
+  {
+    key: 'role',
+    label: '办理岗位',
+    options: roleKeys.map((value) => ({ value, label: getRoleDisplayName(value) })),
+  },
+  {
+    key: 'kind',
+    label: '办理类型',
+    options: Object.entries(TASK_HANDLING_KINDS)
+      .filter(([key]) => key !== 'automatic')
+      .map(([value, item]) => ({ value, label: item.label })),
+  },
+  {
+    key: 'mobile',
+    label: '手机支持',
+    options: Object.entries(MOBILE_HANDLING_LABELS)
+      .filter(([key]) => key !== 'observe')
+      .map(([value, label]) => ({ value, label })),
+  },
 ]
 const queryChoices = {
-  role: TASK_HANDLING_ROLE_KEYS,
-  kind: Object.keys(TASK_HANDLING_KINDS).filter((key) => key !== 'automatic'),
-  mobile: Object.keys(MOBILE_HANDLING_LABELS).filter(
-    (key) => key !== 'observe'
+  ...Object.fromEntries(
+    TASK_HANDLING_FILTERS.map(({ key, options }) => [key, options.map(({ value }) => value)])
   ),
   stage: TASK_HANDLING_ROWS.map((row) => row.key),
 }

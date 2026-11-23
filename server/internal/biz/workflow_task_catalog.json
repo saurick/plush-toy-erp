@@ -131,6 +131,7 @@
       "module": "finance",
       "chain": "finance",
       "groups": [
+        "handoff_receipt_payable",
         "purchase_payable_registration",
         "outsource_payable_registration"
       ]
@@ -593,6 +594,7 @@
     {
       "key": "purchasing",
       "label": "采购下单与审批",
+      "groups": ["handoff_purchase_price"],
       "group": "采购与来料",
       "module": "purchase",
       "chain": "fulfillment",

@@ -30,10 +30,6 @@
   background: var(--erp-surface-bg);
 }
 
-.erp-dev-project-relationships__catalog section {
-  margin-top: 12px;
-}
-
 .erp-dev-project-relationships__catalog > .ant-select {
   width: 100%;
 }
@@ -103,12 +99,17 @@
   }
 
   .erp-dev-project-relationships__catalog {
-    display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    column-gap: 8px;
   }
 
-  .erp-dev-project-relationships__catalog section + section {
-    margin-top: 0;
+  .erp-dev-project-relationships__catalog > :is(.erp-directory-header, .ant-select) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .erp-dev-project-relationships__catalog {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

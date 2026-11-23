@@ -284,6 +284,9 @@ func buildEffectiveSessionFromRevision(
 	// original admin permissions here would keep pages from a customer-disabled
 	// role visible even though its actions and work pools were removed.
 	pageProjectionAdmin := &AdminUser{Permissions: actions, IsSuperAdmin: admin.IsSuperAdmin}
+	for _, key := range roleKeys {
+		pageProjectionAdmin.Roles = append(pageProjectionAdmin.Roles, AdminRole{Key: key})
+	}
 	pages := effectivePageKeysForEnabledModules(pageProjectionAdmin, revision.CompiledSnapshot, readableModules)
 	if !admin.IsSuperAdmin {
 		pages = effectivePageKeysForRoles(pages, revision.CompiledSnapshot, roleKeys)
@@ -520,17 +523,18 @@ func effectivePageKeysForRoles(pageKeys []string, snapshot map[string]any, roleK
 		if !ok {
 			continue
 		}
+		// The sales line-delivery view is also reachable from the projected sales order workspace.
+		// The global page catalog and effective sales source permissions are checked before this intersection.
+		if roleKey == SalesRoleKey && slices.Contains(projected, "sales-orders") && slices.Contains(pageKeys, "sales-orders") {
+			allowed["business-dashboard"] = struct{}{}
+		}
 		for _, pageKey := range projected {
 			allowed[pageKey] = struct{}{}
 		}
 	}
 	out := make([]string, 0, len(pageKeys))
-	_, roleCanUseTasks := allowed["task-board"]
 	for _, pageKey := range pageKeys {
-		_, explicitlyAllowed := allowed[pageKey]
-		// Role progress is a view of the same work-center tasks. The page must
-		// still pass the account/menu and customer/module checks in pageKeys.
-		if explicitlyAllowed || pageKey == "business-dashboard" && roleCanUseTasks && slices.Contains(pageKeys, "task-board") {
+		if _, ok := allowed[pageKey]; ok {
 			out = append(out, pageKey)
 		}
 	}

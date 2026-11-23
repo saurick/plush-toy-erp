@@ -70,7 +70,7 @@ test('task action drawer shows task-scoped process position without exposing QA-
   assert.match(handlingChainSource, /业务流程/u)
   assert.match(handlingChainSource, /任务处理链/u)
   assert.match(source, /WorkflowTaskSource/u)
-  assert.match(handlingChainSource, /流程状态/u)
+  assert.match(handlingChainSource, /查看此流程详情/u)
   assert.match(handlingChainSource, /暂时无法读取任务处理链/u)
   assert.match(source, /setProcessContextReloadKey/u)
   assert.match(handlingChainSource, />\s*重新读取\s*<\/Button>/u)
@@ -91,11 +91,12 @@ test('an unopened task drawer does not read resources or render task details', a
 })
 
 test('task detail keeps current responsibility ahead of history and groups copy actions', async (t) => {
-  const ui = await mountDrawer(t, { assignmentAccess: { current_assignee: { id: 9, username: 'lin', display_name: '林工' } }, task: { id: 42, version: 1, task_name: '核对材料', task_status_key: 'ready', owner_role_key: 'purchase', assignee_id: 9, source_type: 'purchase_order', source_no: 'PO-42' } })
+  const ui = await mountDrawer(t, { assignmentAccess: { current_assignee: { id: 9, username: 'lin', display_name: '林工' } }, task: { id: 42, version: 1, task_name: '核对材料 PO-42', task_status_key: 'ready', owner_role_key: 'purchase', assignee_id: 9, source_type: 'purchase_order', source_no: 'PO-42' } })
   const summary = document.querySelector('.workflow-task-info-card[aria-label="任务信息"]')
   const current = summary.querySelector('.workflow-task-current')
   assert.match(current.textContent, /采购.*林工/u)
-  assert.match(summary.textContent, /PO-42/u)
+  assert.equal(summary.querySelector('h2').textContent, '核对材料')
+  assert.equal(summary.textContent.match(/PO-42/gu)?.length, 1)
   assert.ok(document.querySelector('.ant-drawer-header button[aria-label="更多操作"]'))
   assert.equal(summary.querySelector('button[aria-label="更多操作"]'), null)
   assert.equal(summary.querySelector('button[aria-label="复制任务链接"]'), null)

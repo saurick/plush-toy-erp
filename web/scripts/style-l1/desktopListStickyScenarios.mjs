@@ -8,14 +8,16 @@ import { createOutsourcingSummaryScenarios } from './outsourcingSummaryScenarios
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
 import { createBusinessProgressScenarios } from './businessProgressScenarios.mjs'
 import { createBusinessStatisticsScenarios } from './businessStatisticsScenarios.mjs'
-import { assertStickyGeometry } from './businessListStickyScenarios.mjs'
+import { assertStickyGeometry, assertStickyToolbarSurfaces, verifyStickyToolbarFilter } from './businessListStickyScenarios.mjs'
 import { createWorkCenterTableScenarios } from './workCenterTableScenarios.mjs'
+import { workflowExceptionScenario } from './workflowExceptionScenario.mjs'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 const extraViews = [
   { key: 'outsourcing-items', path: '/erp/purchase/processing-contracts?view=items' },
   { key: 'workbench-sales-summary', path: '/erp/dashboard?view=summary&summary=sales-orders' },
   { key: 'workbench-materials-summary', path: '/erp/dashboard?view=summary&summary=materials' },
+  { key: 'workbench-payment-summary', path: '/erp/dashboard?view=summary&summary=payments' },
   { key: 'progress-production', path: '/erp/business-dashboard?view=production' },
   { key: 'progress-statistics', path: '/erp/business-dashboard?view=statistics&display=table' },
   { key: 'progress-receivables', path: '/erp/business-dashboard?view=statistics&report=receivables&display=table' },
@@ -25,17 +27,19 @@ const extraViews = [
   { key: 'purchase-arrival', path: '/erp/purchase/accessories', tab: '采购跟进' },
   { key: 'product-specifications', path: '/erp/master/products?catalog=product_skus' },
   { key: 'product-catalog', path: '/erp/master/products?catalog=products' },
-  { key: 'permission-accounts', path: '/erp/system/permissions?tab=admins' },
-  { key: 'permission-approvals', path: '/erp/system/permissions?tab=approvals' },
+  { key: 'production-execution', path: '/erp/production/progress?display=process' },
+  { key: 'permission-accounts', path: '/erp/system/permissions?tab=admins', stickyToolbar: true },
+  { key: 'permission-approvals', path: '/erp/system/permissions?tab=approvals', viewportHeight: 530, stickyToolbar: true },
   { key: 'permission-navigation', path: '/erp/system/permissions?tab=navigation' },
   { key: 'permission-page-access', path: '/erp/system/permissions?tab=navigation', tab: '页面访问' },
   { key: 'permission-role-impact', path: '/erp/system/permissions?tab=navigation', tab: '页面访问', impact: true },
   { key: 'history', path: '/erp/history' },
   { key: 'help', path: '/erp/help-center' },
+  { key: 'task-exceptions', path: '/erp/task-board?view=exceptions', readySelector: '.workflow-exceptions__overview' },
 ]
 
 const widthReviewViews = [
-  { key: 'task-tracking', path: '/erp/task-board?tracking=visible' },
+  { key: 'task-tracking', path: '/erp/task-board?tracking=visible', readySelector: '[data-tracking-entry]' },
   { key: 'progress-statistics-products', path: '/erp/business-dashboard?view=statistics&display=table&group=product' },
   { key: 'inventory-operations', path: '/erp/warehouse/inventory?workspace=operations' },
   { key: 'receivables-due', path: '/erp/finance/receivables?workspace=due', selectedTab: '到期顺序' },
@@ -202,7 +206,8 @@ async function collectWidthEvidence(page) {
 export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSession, outputDir }) {
   const deps = { assert, customerRuntimeEffectiveSession, outputDir }
   const outsourcing = createOutsourcingSummaryScenarios(deps)[0]
-  const summaries = createWorkbenchSummaryScenarios(deps)[0]
+  const summaryScenarios = createWorkbenchSummaryScenarios(deps)
+  const summaries = summaryScenarios[0]
   const progress = createBusinessProgressScenarios(deps)[0]
   const statistics = createBusinessStatisticsScenarios(deps)[0]
   const workCenter = createWorkCenterTableScenarios({ ...deps, path })
@@ -210,9 +215,11 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
     'global-dashboard': summaries,
     'task-board': workCenter.find(({ name }) => name === 'work-center-table-tasks-light'),
     'task-tracking': workCenter.find(({ name }) => name === 'work-center-table-tracking'),
+    'task-exceptions': workflowExceptionScenario({ ...deps, path }),
     'outsourcing-items': outsourcing,
     'workbench-sales-summary': summaries,
     'workbench-materials-summary': summaries,
+    'workbench-payment-summary': summaryScenarios.find(({ name }) => name === 'erp-workbench-payment-summary'),
     'business-dashboard': progress,
     'progress-production': progress,
     'progress-statistics': statistics,
@@ -229,7 +236,7 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
     adminProfile: fixtures[entry.key]?.adminProfile,
     workflowTaskFixtures: fixtures[entry.key]?.workflowTaskFixtures,
     beforeNavigate: fixtures[entry.key]?.beforeNavigate,
-    viewport: { width: 1440, height: entry.key.startsWith('progress-statistics') || entry.key === 'progress-receivables' || entry.impact ? 600 : 900 },
+    viewport: { width: 1440, height: entry.viewportHeight ?? (entry.key.startsWith('progress-statistics') || entry.key === 'progress-receivables' || entry.impact ? 600 : 900) },
     verify: async (page) => {
       await page.locator('.erp-admin-content').waitFor()
       if (entry.tab) {
@@ -239,7 +246,11 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
       if (entry.selectedTab) await page.getByRole('tab', { name: entry.selectedTab, exact: true, selected: true }).waitFor()
       if (entry.impact) await page.locator('.erp-role-permission-impact > summary').click()
       await page.waitForFunction(() => [...document.querySelectorAll('.erp-admin-content .ant-spin-spinning, .erp-admin-content [aria-busy="true"]')].every((node) => !node.checkVisibility()))
-      if (fixtures[entry.key]) await page.locator('.erp-admin-content tbody tr:not(.ant-table-measure-row)').first().waitFor()
+      const readySelector = entry.readySelector || (fixtures[entry.key] ? 'tbody tr:not(.ant-table-measure-row)' : '')
+      if (readySelector) await page.locator(`.erp-admin-content ${readySelector}`).first().waitFor()
+      if (entry.stickyToolbar) await page.locator('.erp-admin-content .ant-table-sticky-holder:visible').first().waitFor()
+      const hasStickyTable = await page.locator('.erp-admin-content .erp-business-data-table-card--sticky:visible').count() > 0
+      const toolbarSurfaces = await assertStickyToolbarSurfaces(page, entry.stickyToolbar || hasStickyTable)
       const tables = page.locator('.erp-admin-content .ant-table-wrapper, .erp-admin-content table:not(.ant-table-wrapper table)')
       const results = []
       for (let index = 0; !entry.widthOnly && index < await tables.count(); index += 1) {
@@ -299,7 +310,7 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
         results.push(result)
       }
       const widths = await collectWidthEvidence(page)
-      await writeFile(path.join(outputDir, `desktop-list-sticky-${entry.key}.json`), JSON.stringify({ path: entry.path, tables: results, widths }, null, 2))
+      await writeFile(path.join(outputDir, `desktop-list-sticky-${entry.key}.json`), JSON.stringify({ path: entry.path, toolbarSurfaces, tables: results, widths }, null, 2))
       assertFocusedColumnFit(entry, widths)
       if (entry.impact) await verifyPermissionImpactScroll(page)
       if (entry.widthOnly) return
@@ -349,11 +360,7 @@ export function createDesktopListStickyScenarios({ customerRuntimeEffectiveSessi
         }
         await root.evaluate((node) => { node.scrollTop = node.scrollHeight })
         await assertStickyGeometry(page)
-        await page.getByRole('button', { name: '筛选', exact: true }).click()
-        const filter = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        await filter.waitFor()
-        await page.keyboard.press('Escape')
-        await filter.waitFor({ state: 'hidden' })
+        await verifyStickyToolbarFilter(page)
         await assertStickyGeometry(page)
         await page.screenshot({ path: path.join(outputDir, `desktop-list-sticky-${kind}-scrolled-4k.png`) })
         await page.setViewportSize({ width: 1280, height: 600 })

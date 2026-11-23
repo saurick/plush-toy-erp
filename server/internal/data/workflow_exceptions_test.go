@@ -41,7 +41,7 @@ func testWorkflowExceptionProjection(t *testing.T, f productionOrderTestFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if board.Total != 1 || len(board.Items) != 1 || board.Open != 1 || board.Closed != 0 || board.PendingTasks != 4 || board.AffectedOrders != 1 || len(board.Items[0].TaskIDs) != 4 {
+	if board.Total != 1 || len(board.Items) != 1 || board.Open != 1 || board.PendingPlan != 1 || board.Executing != 0 || board.Closed != 0 || board.PendingTasks != 4 || board.AffectedOrders != 1 || len(board.Items[0].TaskIDs) != 4 {
 		t.Fatalf("event/task/order dedupe=%+v", board)
 	}
 	query.Offset = 1
@@ -106,10 +106,17 @@ func testWorkflowExceptionProjection(t *testing.T, f productionOrderTestFixture)
 		t.Fatal(err)
 	}
 	query.Visibility = &biz.WorkflowTaskVisibilityScope{StandaloneAllowAllOwnerRoles: true}
+	query.State = biz.WorkflowExceptionFilterExecuting
 	board, err = repo.ListWorkflowExceptions(ctx, query)
-	if err != nil || board.Total != 1 || board.Closed != 0 || board.Items[0].State != "executing" {
+	if err != nil || board.Total != 1 || board.Executing != 1 || board.PendingPlan != 0 || board.Closed != 0 || len(board.Items) != 1 || board.Items[0].State != "executing" {
 		t.Fatalf("approval incorrectly closed incident: %+v %v", board, err)
 	}
+	query.State = biz.WorkflowExceptionFilterPendingPlan
+	board, err = repo.ListWorkflowExceptions(ctx, query)
+	if err != nil || board.Total != 0 || board.ViewTotal != 0 || len(board.Items) != 0 || board.Executing != 1 {
+		t.Fatalf("status filter changed the distribution or selected other states: %+v %v", board, err)
+	}
+	query.State = ""
 	applied, err := factRepo.executeProductionException(ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "实际执行报废"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -148,10 +155,30 @@ func testWorkflowExceptionProjection(t *testing.T, f productionOrderTestFixture)
 	lot := f.client.InventoryLot.Create().SetLotNo("EX-CORR-" + suffix).SetSubjectType("MATERIAL").SetSubjectID(f.materialID).SaveX(ctx)
 	root := f.client.QualityInspection.Create().SetInspectionNo("IQC-ROOT-" + suffix).SetInventoryLotID(lot.ID).SetWarehouseID(warehouse.ID).SetStatus("REJECTED").SetResult("REJECT").SetInspectedAt(time.Now()).SaveX(ctx)
 	f.client.WorkflowTask.Create().SetTaskCode("EX-CORR-" + suffix).SetTaskGroup("handoff_receipt_quality").SetTaskName("复核来料检验").SetSourceType("quality_inspection").SetSourceID(root.ID).SetOwnerRoleKey("quality").SetTaskStatusKey("done").SaveX(ctx)
-	f.client.QualityInspection.Create().SetInspectionNo("IQC-CORRECT-" + suffix).SetCorrectionOfInspectionID(root.ID).SetInventoryLotID(lot.ID).SetWarehouseID(warehouse.ID).SetStatus("PASSED").SetResult("PASS").SetInspectedAt(time.Now()).SaveX(ctx)
+	correction := f.client.QualityInspection.Create().SetInspectionNo("IQC-CORRECT-" + suffix).SetCorrectionOfInspectionID(root.ID).SetInventoryLotID(lot.ID).SetWarehouseID(warehouse.ID).SetStatus("PASSED").SetResult("PASS").SetInspectedAt(time.Now()).SaveX(ctx)
+	attachment := func(ownerID int, name, mime string) *ent.BusinessAttachmentCreate {
+		digest := fmt.Sprintf("%064x", len(name))
+		return f.client.BusinessAttachment.Create().SetOwnerType(biz.BusinessAttachmentOwnerQualityInspection).
+			SetOwnerID(ownerID).SetFileName(name).SetMimeType(mime).SetFileSize(123).
+			SetSha256(digest).SetObjectKey("attachments/" + digest)
+	}
+	attachment(root.ID, "original-photo.png", "image/png").SaveX(ctx)
+	attachment(correction.ID, "withdrawn-photo.png", "image/png").SetWithdrawnAt(time.Now()).SetWithdrawnBy(f.actorID).SetWithdrawalReason("照片与本次复查无关").SaveX(ctx)
+	attachment(correction.ID, "report.pdf", "application/pdf").SaveX(ctx)
+	query.State = biz.WorkflowExceptionFilterClosed
+	query.IncludeQualityPhotoSources = true
 	board, err = repo.ListWorkflowExceptions(ctx, query)
-	if err != nil || board.Total != 2 || board.Closed != 1 || board.Items[0].State != "corrected" {
+	if err != nil || board.Total != 1 || board.Executing != 1 || board.Closed != 1 || len(board.Items) != 1 || board.Items[0].State != "corrected" {
 		t.Fatalf("inspection correction lost event identity or closure: %+v %v", board, err)
+	}
+	sources := board.Items[0].QualityPhotoSources
+	if len(sources) != 1 || sources[0].ID != root.ID || sources[0].Number != root.InspectionNo {
+		t.Fatalf("photo sources did not preserve the original qualified evidence: %+v", sources)
+	}
+	query.IncludeQualityPhotoSources = false
+	board, err = repo.ListWorkflowExceptions(ctx, query)
+	if err != nil || len(board.Items) != 1 || len(board.Items[0].QualityPhotoSources) != 0 {
+		t.Fatalf("photo references exposed without photo read scope: %+v %v", board, err)
 	}
 }
 

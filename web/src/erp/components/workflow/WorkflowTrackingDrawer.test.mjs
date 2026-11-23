@@ -83,7 +83,9 @@ test('tracking hides unauthorized entries, keeps footer actions separate and can
   assert.equal(closed, 1, 'header back returns to the caller')
   assert.doesNotMatch(document.querySelector('.ant-drawer-header').textContent, /刷新进度/)
   assert.ok(refreshButton(), 'tracking refresh remains in the fixed footer even without task access')
-  assert.match(document.querySelector('[aria-label="流程概况"] [aria-label="当前进度"]').textContent, /当前：订单审批.*岗位：老板.*待审批/)
+  assert.match(document.querySelector('[aria-label="流程概况"] [aria-label="当前进度"]').textContent, /订单审批.*岗位：老板.*待审批.*下一步.*核对单据并给出审批结果/u)
+  assert.equal(document.querySelector('.erp-workflow-tracking-history').open, false)
+  assert.equal(document.querySelector('[aria-label="已发生的流程节点"] button')?.getAttribute('aria-pressed'), 'true')
   assert.equal(document.querySelector('[aria-label="当前进度"] button'), null)
   assert.deepEqual(calls, ['get_tracking'], 'summary-only access must not probe the task endpoint')
   await act(async () => refreshButton().click())
@@ -138,7 +140,7 @@ test('tracking exceptions load only when expanded, keep exact scope and cancel s
     if (method === 'get_tracking') return { data: { tracking: { ...detail, summary: { ...detail.summary, id: params.id }, nodes: detail.nodes.map((node) => ({ ...node, process_instance_id: params.id })) } } }
     assert.equal(method, 'list_exceptions')
     if (mode === 'failure') throw new Error('unavailable')
-    const data = { items: mode === 'empty' ? [] : [{ key: 'quality:1', number: 'EX-CONTEXT', state: 'open', tasks: [], task_ids: [], orders: [] }], tasks: [], orders: [], total: mode === 'empty' ? 0 : 1, view_total: mode === 'empty' ? 0 : 1, pending_tasks: 0, affected_orders: 0, open: 1, closed: 0 }
+    const data = { items: mode === 'empty' ? [] : [{ key: 'quality:1', number: 'EX-CONTEXT', state: 'open', tasks: [], task_ids: [], orders: [], quality_photo_sources: [] }], tasks: [], orders: [], total: mode === 'empty' ? 0 : 1, view_total: mode === 'empty' ? 0 : 1, pending_tasks: 0, affected_orders: 0, open: 1, closed: 0, pending_plan: 1, executing: 0 }
     if (mode === 'pending') return new Promise((resolve) => { pending = { signal: options.signal, resolve: () => resolve({ data }) } })
     return { data }
   }

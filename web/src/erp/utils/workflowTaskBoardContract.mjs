@@ -30,6 +30,17 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
   if (!response || typeof response !== 'object' || Array.isArray(response)) {
     return invalidTaskBoardResponse()
   }
+  if (request.progress_view) {
+    const valid = isNonNegativeSafeInteger(response.snapshot_at) && isNonNegativeSafeInteger(response.total) &&
+      Array.isArray(response.assignees) && Array.isArray(response.rows) && response.rows.length <= request.limit && response.rows.length <= response.total &&
+      new Set(response.rows.map((row) => row?.task?.id)).size === response.rows.length &&
+      ['open', 'due', 'unassigned', 'exception', 'finished'].every((key) => isNonNegativeSafeInteger(response.counts?.[key])) &&
+      response.rows.every((row) => Number.isSafeInteger(row?.task?.id) && row.task.id > 0 &&
+        (request.progress_view === 'finished' ? WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE.finished.has(row.task.task_status_key) : [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(row.task.task_status_key)) &&
+        (!request.owner_role_key || request.owner_role_key === row.task.owner_role_key) &&
+        Number.isSafeInteger(row.task_count) && row.task_count > 0 && (row.date == null || isNonNegativeSafeInteger(row.date)))
+    return valid ? response : invalidTaskBoardResponse()
+  }
   if (
     !isNonNegativeSafeInteger(response.snapshot_at) ||
     !isNonNegativeSafeInteger(response.total) ||

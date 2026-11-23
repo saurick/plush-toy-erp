@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCustomerConfigRoleProgressSharesTaskBoardProjection(t *testing.T) {
+func TestCustomerConfigBusinessProgressRequiresItsOwnPageProjection(t *testing.T) {
 	snapshot := map[string]any{"rolePageProjections": map[string]any{
 		SalesRoleKey: []any{"task-board"}, FinanceRoleKey: []any{"receivables"},
 	}}
@@ -15,7 +15,7 @@ func TestCustomerConfigRoleProgressSharesTaskBoardProjection(t *testing.T) {
 		name, role  string
 		input, want []string
 	}{
-		{"published task workspace", SalesRoleKey, pages, []string{"business-dashboard", "task-board"}},
+		{"published task workspace", SalesRoleKey, pages, []string{"task-board"}},
 		{"dashboard disabled by customer", SalesRoleKey, []string{"task-board"}, []string{"task-board"}},
 		{"task workspace not available", SalesRoleKey, []string{"business-dashboard"}, nil},
 		{"unrelated role", FinanceRoleKey, pages, []string{"receivables"}},
@@ -28,6 +28,23 @@ func TestCustomerConfigRoleProgressSharesTaskBoardProjection(t *testing.T) {
 	}
 }
 
+func TestSalesLineProgressFollowsVisibleSalesOrders(t *testing.T) {
+	snapshot := map[string]any{"rolePageProjections": map[string]any{SalesRoleKey: []any{"task-board", "sales-orders"}}}
+	for _, c := range []struct {
+		pages []string
+		board bool
+	}{
+		{[]string{"task-board", "sales-orders", "business-dashboard"}, true},
+		{[]string{"task-board", "sales-orders"}, false},
+		{[]string{"task-board", "business-dashboard"}, false},
+	} {
+		got := effectivePageKeysForRoles(c.pages, snapshot, []string{SalesRoleKey})
+		if slices.Contains(got, "business-dashboard") != c.board {
+			t.Fatalf("input %v: %v", c.pages, got)
+		}
+	}
+}
+
 func TestCustomerConfigProgressMenuForDefaultBusinessRoles(t *testing.T) {
 	for _, role := range BuiltinRoles() {
 		mobile := MobileRoleAccessPermission(role.Key)
@@ -36,16 +53,14 @@ func TestCustomerConfigProgressMenuForDefaultBusinessRoles(t *testing.T) {
 		}
 		t.Run(role.Key, func(t *testing.T) {
 			global := role.Key == BossRoleKey || role.Key == PMCRoleKey
-			projected := []any{"task-board"}
-			if global {
-				projected = append(projected, "business-dashboard")
-			}
+			wantBoard := global || role.Key == SalesRoleKey
+			projected := []any{"task-board", "business-dashboard"}
 			revision := &CustomerConfigRevision{CompiledSnapshot: map[string]any{
 				"pages":               []any{"task-board", "business-dashboard"},
 				"rolePageProjections": map[string]any{role.Key: projected},
 			}}
 			admin := &AdminUser{ID: 1, Roles: []AdminRole{{Key: role.Key}}, Permissions: role.Permissions}
-			moduleKeys := customerConfigModuleDependencyClosure(append([]string{"workflow_tasks"}, customerConfigModulesForAction(mobile)...))
+			moduleKeys := customerConfigModuleDependencyClosure(append([]string{"workflow_tasks", "sales_orders"}, customerConfigModulesForAction(mobile)...))
 			var modules []DeploymentModuleStateInput
 			for _, key := range moduleKeys {
 				modules = append(modules, DeploymentModuleStateInput{ModuleKey: key, State: "enabled"})
@@ -54,12 +69,17 @@ func TestCustomerConfigProgressMenuForDefaultBusinessRoles(t *testing.T) {
 				{RoleKey: role.Key, CapabilityKey: PermissionWorkflowTaskRead, Enabled: true},
 				{RoleKey: role.Key, CapabilityKey: mobile, Enabled: true},
 			}
+			if wantBoard {
+				for _, k := range []string{PermissionSalesOrderRead, PermissionSalesOrderItemRead} {
+					grants = append(grants, AccessEntitlementInput{RoleKey: role.Key, CapabilityKey: k, Enabled: true})
+				}
+			}
 			if global {
 				grants = append(grants, AccessEntitlementInput{RoleKey: role.Key, CapabilityKey: PermissionERPBusinessDashboardRead, Enabled: true})
 			}
 			session := buildEffectiveSessionFromRevision("yoyoosun", revision, admin, []string{role.Key}, modules,
 				[]RoleProfileInput{{RoleKey: role.Key}}, grants, nil, nil)
-			if !slices.Contains(session.Pages, "business-dashboard") || !slices.Contains(session.Actions, mobile) ||
+			if slices.Contains(session.Pages, "business-dashboard") != wantBoard || !slices.Contains(session.Actions, mobile) ||
 				slices.Contains(session.Actions, PermissionERPBusinessDashboardRead) != global {
 				t.Fatalf("page or scope mismatch for %s: pages=%v actions=%v", role.Key, session.Pages, session.Actions)
 			}

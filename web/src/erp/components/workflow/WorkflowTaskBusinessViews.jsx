@@ -73,7 +73,7 @@ export function WorkflowTaskSourceDetails({ columns, record, busy, children }) {
     <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={record?.id} aria-busy={busy}>
       <Spin spinning={busy && Boolean(record)}>
         {record ? (
-          <><BusinessRecordDetails columns={columns} record={record} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{children}</>
+          <><BusinessRecordDetails columns={columns} record={record} task={taskBusiness.task} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{children}</>
         ) : <Empty state={busy ? 'loading' : 'empty'} description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
       </Spin>
     </section>

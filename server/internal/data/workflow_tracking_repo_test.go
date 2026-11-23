@@ -233,3 +233,89 @@ func TestWorkflowTrackingRejectsMismatchedTaskAnchor(t *testing.T) {
 		t.Fatalf("mismatched task anchor accepted: %v", err)
 	}
 }
+
+func TestWorkflowTrackingMaterialReviewFollowsTheSourceThroughHandoffAndResubmit(t *testing.T) {
+	ctx := context.Background()
+	_, client := openSalesOrderRepoTest(t, "tracking_material_review")
+	defer mustCloseEntClient(t, client)
+	data := &Data{postgres: client}
+	f := prepareMaterialRequestFixture(t, ctx, data, "TRACK-MATERIAL")
+	request := submitMaterialRequestFixture(t, ctx, f)
+	repo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
+	ref := biz.WorkflowTrackingRef{Kind: biz.WorkflowTrackingMaterialReviewKind, ID: request.ID}
+	query := trackingQuery(request.SubmittedBy, "started")
+	query.RecordType, query.SourceType = "flow", biz.WorkflowMaterialRequestSourceType
+
+	page, err := repo.ListWorkflowTracking(ctx, query)
+	if err != nil || page.Total != 1 || len(page.Items) != 1 || page.Items[0].Ref != ref || page.StatusCounts["active"] != 1 {
+		t.Fatalf("new material round: %+v, %v", page, err)
+	}
+	if page.Items[0].DisplayContext == nil || !page.Items[0].DisplayContext.Available {
+		t.Fatal("material tracking dropped source identity")
+	}
+	if _, err := repo.GetWorkflowTracking(ctx, trackingQuery(777, "visible"), ref, 0); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("unrelated viewer can inspect material evidence: %v", err)
+	}
+	tasksOnly := query
+	tasksOnly.RecordType = "task"
+	if page, err := repo.ListWorkflowTracking(ctx, tasksOnly); err != nil || page.Total != 0 {
+		t.Fatalf("material approval appeared as independent work: %+v %v", page, err)
+	}
+
+	boss, err := f.uc.ReviewEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialReview{
+		ID: request.ID, ExpectedVersion: request.Version, ActorID: 22, Action: "BOSS_APPROVE",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	participated := trackingQuery(22, "participated")
+	participated.RecordType = "flow"
+	participated.OwnerRoleKey = biz.FinanceRoleKey
+	page, err = repo.ListWorkflowTracking(ctx, participated)
+	if err != nil || page.Total != 1 || page.Items[0].Ref != ref || len(page.Items[0].Tasks) != 2 {
+		t.Fatalf("boss can no longer follow handoff: %+v %v", page, err)
+	}
+	participated.OwnerRoleKey = biz.BossRoleKey
+	if page, err = repo.ListWorkflowTracking(ctx, participated); err != nil || page.Total != 0 {
+		t.Fatalf("past approver incorrectly matches current role: %+v %v", page, err)
+	}
+	detail, err := repo.GetWorkflowTracking(ctx, trackingQuery(22, "visible"), ref, 0)
+	if err != nil || detail.MaterialRequest.BossReviewedAt == nil || detail.MaterialRequest.FinanceReviewedAt != nil ||
+		detail.MaterialRequest.Status != biz.MaterialRequestBossApproved || len(detail.Tasks) != 2 || len(detail.Nodes) != 0 {
+		t.Fatalf("handoff did not use approval evidence: %+v %v", detail, err)
+	}
+
+	reason := "请补齐规格"
+	if _, err := f.uc.ReviewEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialReview{
+		ID: request.ID, ExpectedVersion: boss.Version, ActorID: 33, Action: "REJECT", ReviewStage: "FINANCE", Note: &reason,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	query.OwnerRoleKey = biz.EngineeringRoleKey
+	if page, err := repo.ListWorkflowTracking(ctx, query); err != nil || page.Total != 1 || page.StatusCounts["active"] != 1 {
+		t.Fatalf("revision is missing from current engineering work: %+v %v", page, err)
+	}
+	revision := materialWorkflowTask(t, ctx, client, biz.WorkflowMaterialRevisionGroup, request.ID, "ready")
+	preview, err := f.uc.GetEngineeringMaterialRequest(ctx, f.order.ID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := f.uc.SubmitEngineeringMaterialRequest(ctx, &biz.EngineeringMaterialSubmit{
+		SalesOrderID: f.order.ID, ExpectedVersion: preview.SourceOrderVersion, ExpectedSourceHash: preview.SourceHash,
+		ActorID: request.SubmittedBy, WorkflowTaskID: revision.ID, ExpectedTaskVersion: revision.Version,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	query.OwnerRoleKey, query.Limit = "", 1
+	page, err = repo.ListWorkflowTracking(ctx, query)
+	if err != nil || page.Total != 2 || len(page.Items) != 1 || page.Items[0].Ref.ID != next.ID ||
+		page.StatusCounts["active"] != 1 || page.StatusCounts["completed"] != 1 {
+		t.Fatalf("tracked rounds or counts are incorrect: %+v %v", page, err)
+	}
+	query.Offset = 1
+	page, err = repo.ListWorkflowTracking(ctx, query)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Ref != ref || page.Items[0].MaterialRequest.Status != biz.MaterialRequestRejected {
+		t.Fatalf("historical round lost after resubmit: %+v %v", page, err)
+	}
+}

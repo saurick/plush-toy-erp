@@ -126,7 +126,20 @@ export function buildBusinessFlowMermaid(
   )
   const vertical = flow.direction === 'TB' || flow.direction === 'TD' || (!flow.direction && edges.length === 0)
   const curve = flow.curve === 'basis' ? 'basis' : 'step'
-  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 28', '    rankSpacing: 24', '    padding: 12', `    curve: ${curve}`, '---', vertical ? 'flowchart TB' : 'flowchart LR']
+  const nodeSpacing = Number.isFinite(flow.nodeSpacing) ? flow.nodeSpacing : 28
+  const groups = flow.groups || []
+  const lines = [
+    '---',
+    'config:',
+    '  flowchart:',
+    `    nodeSpacing: ${nodeSpacing}`,
+    '    rankSpacing: 24',
+    '    padding: 12',
+    `    curve: ${curve}`,
+    ...(groups.length ? ['    subGraphTitleMargin:', '      bottom: 12'] : []),
+    '---',
+    vertical ? 'flowchart TB' : 'flowchart LR',
+  ]
   const layerLabels = {
     source_document: '单据',
     masterdata_lifecycle: '基础资料',
@@ -156,10 +169,13 @@ export function buildBusinessFlowMermaid(
     return `  ${ids.get(node.key)}${node.terminal || node.kind === 'terminal' ? `(["${content}"])` : `["${content}"]`}`
   }
   const grouped = new Set()
-  for (const [index, group] of (flow.groups || []).entries()) {
+  for (const [index, group] of groups.entries()) {
     lines.push(
       `  subgraph G${index}["${escapeBusinessGraphLabel(group.label)}"]`
     )
+    if (['LR', 'RL', 'TB', 'TD', 'BT'].includes(group.direction)) {
+      lines.push(`    direction ${group.direction}`)
+    }
     for (const key of group.nodeKeys) {
       if (!ids.has(key) || grouped.has(key)) {
         throw new Error('Unknown or duplicate business graph group member')

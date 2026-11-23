@@ -1,5 +1,6 @@
 const SUPPORTED_ANCHOR_LINE =
   /^\s*<a\s+(?:id|name)=["']([\p{L}\p{N}][\p{L}\p{M}\p{N}._:-]*)["']\s*><\/a>\s*$/iu
+const COLLAPSE_MARKER = '<!-- dev-docs:collapse -->'
 
 function readFenceStart(line = '') {
   const match = /^(`{3,}|~{3,})/u.exec(String(line).trim())
@@ -26,7 +27,7 @@ function explicitAnchorId(line = '') {
 function anchorsFollowingHeading(lines, anchorIndex) {
   for (let index = anchorIndex + 1; index < lines.length; index += 1) {
     const trimmed = lines[index].trim()
-    if (!trimmed || explicitAnchorId(lines[index])) continue
+    if (!trimmed || explicitAnchorId(lines[index]) || lines[index].trimEnd() === COLLAPSE_MARKER) continue
     return /^(#{1,6})\s+(.+?)\s*$/u.test(trimmed)
   }
   return false
@@ -60,7 +61,7 @@ export function slugifyMarkdownHeading(rawTitle = '') {
   return slug
 }
 
-export function stripSupportedExplicitAnchorLines(markdown = '') {
+export function stripMarkdownReaderDirectives(markdown = '') {
   let fence = null
   const lines = String(markdown || '').split(/\r?\n/u)
   return lines
@@ -74,6 +75,7 @@ export function stripSupportedExplicitAnchorLines(markdown = '') {
         fence = nextFence
         return line
       }
+      if (line.trimEnd() === COLLAPSE_MARKER) return ''
       return explicitAnchorId(line) && anchorsFollowingHeading(lines, index)
         ? ''
         : line
@@ -92,6 +94,7 @@ export function extractMarkdownHeadings(source = '', levels = [2]) {
   let headingOrdinal = 0
   let fence = null
   let pendingAliases = []
+  let collapseNextHeading = false
 
   for (const line of String(source || '').split(/\r?\n/u)) {
     if (fence) {
@@ -103,6 +106,12 @@ export function extractMarkdownHeadings(source = '', levels = [2]) {
     if (nextFence) {
       fence = nextFence
       pendingAliases = []
+      collapseNextHeading = false
+      continue
+    }
+
+    if (line.trimEnd() === COLLAPSE_MARKER) {
+      collapseNextHeading = true
       continue
     }
 
@@ -115,10 +124,15 @@ export function extractMarkdownHeadings(source = '', levels = [2]) {
     const trimmed = line.trim()
     const heading = /^(#{1,6})\s+(.+?)\s*$/u.exec(trimmed)
     if (!heading) {
-      if (trimmed) pendingAliases = []
+      if (trimmed) {
+        pendingAliases = []
+        collapseNextHeading = false
+      }
       continue
     }
 
+    const collapsed = collapseNextHeading
+    collapseNextHeading = false
     headingOrdinal += 1
     const level = heading[1].length
     const title = stripMarkdownHeading(heading[2])
@@ -135,7 +149,9 @@ export function extractMarkdownHeadings(source = '', levels = [2]) {
     pendingAliases = []
 
     if (normalizedLevels.has(level)) {
-      headings.push({ aliases, id, level, title })
+      const section = { aliases, id, level, title }
+      if (collapsed) section.collapsed = true
+      headings.push(section)
     }
   }
 

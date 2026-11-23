@@ -20,6 +20,7 @@ export default function BusinessFlowDiagram({
   runtimeKey,
   relationships = false,
   legend,
+  compactControls,
 }) {
   const [localKey, setLocalKey] = useState(null)
   const [status, setStatus] = useState('loading')
@@ -50,6 +51,7 @@ export default function BusinessFlowDiagram({
     [flow, role, matchingKeys, runtimeKey]
   )
   const selected = selectedKey === undefined ? localKey : selectedKey
+  const printConditions = graph.edges.filter((edge) => edge.description)
   return (
     <section
       className="erp-dev-business-flow"
@@ -83,7 +85,7 @@ export default function BusinessFlowDiagram({
             <MermaidDiagram
               chart={part.chart}
               label={`${label}打印图 ${index + 1}`}
-              initialZoom={1}
+              printSize
               themeMode="light"
               flowchartHtmlLabels={false}
               showSourceOnError={false}
@@ -104,6 +106,7 @@ export default function BusinessFlowDiagram({
         <MermaidDiagram
           chart={graph.chart}
           label={label}
+          compactControls={compactControls}
           showSourceOnError={false}
           interactiveNodes={graph.nodes}
           interactiveEdges={graph.edges}
@@ -134,9 +137,9 @@ export default function BusinessFlowDiagram({
             ? '实线：依赖 · 虚线：分支或纠正 · 点选对象查看条件。'
             : '实线：办理路径 · 虚线：分支或回接。')}
       </p>
-      {graph.edges.some((edge) => edge.description) ? (
+      {printConditions.length ? (
         <dl className="erp-dev-business-flow__print-conditions">
-          {graph.edges.map((edge) => (
+          {printConditions.map((edge) => (
             <div key={edge.key}>
               <dt>
                 {flow.nodes.find((node) => node.key === edge.from)?.label} →{' '}

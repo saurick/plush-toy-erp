@@ -1,6 +1,6 @@
 import React, { useId, useRef, useState } from 'react'
 import { Button, Checkbox } from 'antd'
-import { CheckOutlined, DownOutlined, MenuFoldOutlined, RightOutlined } from '@ant-design/icons'
+import { CheckOutlined, MenuFoldOutlined } from '@ant-design/icons'
 import AnchoredControlPopover, { FilterPopoverButton } from '@/common/components/overlay/AnchoredControlPopover.jsx'
 import FilterPopoverPanel from '@/common/components/overlay/FilterPopoverPanel.jsx'
 import SearchInput from '@/common/components/SearchInput.jsx'
@@ -9,7 +9,10 @@ import FilterField from '@/common/components/navigation/FilterField.jsx'
 import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
 import { diagramDomainStyle } from '@/common/components/diagram/diagramSemantics.mjs'
 import AppEmpty from '@/common/components/empty/AppEmpty.jsx'
+import Directory, { DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
+import useDirectoryExpansion from '@/common/components/navigation/useDirectoryExpansion.js'
 import {
+  CHAIN_CONNECTION_LABELS,
   CHAIN_DESIGN_DOMAINS,
   CHAIN_DESIGN_TYPES,
   assessBusinessChainConnection,
@@ -38,6 +41,7 @@ export default function BusinessChainNodeLibrary({
   connecting,
   onAdd,
   onInspect,
+  onOpenChain,
   onToggle,
   onShowResults,
   children,
@@ -51,7 +55,6 @@ export default function BusinessChainNodeLibrary({
   const [searchReset, setSearchReset] = useState(0)
   const [nextOnly, setNextOnly] = useState(true)
   const [open, setOpen] = useState(false)
-  const [expanded, setExpanded] = useState(null)
   const trigger = useRef(null)
   const panel = useRef(null)
   const id = useId()
@@ -74,6 +77,10 @@ export default function BusinessChainNodeLibrary({
         )
       : null
   const entries = filterBusinessChainEntries(library, effectiveFilters, allowed)
+  const branchKeys = entries.filter(({ nodes }) => nodes.length > 1).map(({ key }) => key)
+  const expansion = useDirectoryExpansion(branchKeys)
+  const term = filters.search.trim()
+  const matchingChains = term && !connecting ? library.chains.filter(({ label }) => label.includes(term)) : []
   const fields = [
     {
       key: 'domain',
@@ -130,9 +137,7 @@ export default function BusinessChainNodeLibrary({
           event.dataTransfer.effectAllowed = 'copy'
         }}
       >
-        <button
-          type="button"
-          className="erp-dev-directory-item"
+        <DirectoryItem
           aria-label={`查看：${actionLabel}`}
           aria-describedby={descriptionId}
           aria-current={selectedNodeId === node.id ? 'true' : undefined}
@@ -145,10 +150,10 @@ export default function BusinessChainNodeLibrary({
               <span>{CHAIN_DESIGN_DOMAINS[node.domain]} · {CHAIN_DESIGN_TYPES[node.type]}</span>
               {!variant && (chainKey === 'all' || nodeScope === 'all') && <span>{node.chainLabel}</span>}
               {node.catalogKind === 'group' && <span>含独立步骤</span>}
-              {status && <span>{{ known: '有接入规则', blocked: '不能直连', unknown: '接点待核对' }[status]}</span>}
+              {status && <span>{CHAIN_CONNECTION_LABELS[status]}</span>}
             </small>
           </span>
-        </button>
+        </DirectoryItem>
         {canAdd && (
           <Button size="small" aria-label={`加入：${actionLabel}`} onClick={() => onAdd(node.id)}>加入</Button>
         )}
@@ -158,8 +163,8 @@ export default function BusinessChainNodeLibrary({
   const searchTools = (
     <div className="erp-chain-design__search-tools" role="group" aria-label="查找节点">
       <SearchInput
-        aria-label="搜索业务节点"
-        placeholder="搜节点库：步骤、单据或岗位"
+        aria-label="搜索链路或业务节点"
+        placeholder="查找链路、步骤、单据或岗位"
         resetKey={`${chainKey}:${searchReset}`}
         value={filters.search}
         onSearch={(search) => change({ search })}
@@ -284,61 +289,75 @@ export default function BusinessChainNodeLibrary({
     </div>
   )
   const resultsPanel = (
-    <aside id={libraryId} hidden={hidden} className="erp-chain-design__library" aria-label="业务节点库">
-      <header className="erp-chain-design__library-heading">
-        <h2>节点库</h2>
-        <span role="status" aria-label="节点筛选结果" title={`全库 ${library.chains.length} 条链路`}>
-          <strong>{entries.length} 项匹配</strong> / 全库 {library.entries.length} 项
-        </span>
-        <Button type="text" icon={<MenuFoldOutlined />} aria-label="收起节点库面板" title="收起节点库" onClick={onToggle} />
-      </header>
+    <Directory
+      as="aside"
+      id={libraryId}
+      hidden={hidden}
+      className="erp-chain-design__library"
+      aria-label="业务节点库"
+      headerClassName="erp-chain-design__library-heading"
+      title={(
+        <>
+          <h2>节点库</h2>
+          <span role="status" aria-label="节点筛选结果" title={`全库 ${library.chains.length} 条链路`}>
+            <strong>{entries.length} 项匹配</strong> / 全库 {library.entries.length} 项
+          </span>
+        </>
+      )}
+      allExpanded={expansion.allExpanded}
+      onToggleAll={branchKeys.length ? expansion.toggleAll : undefined}
+      actions={<Button type="text" icon={<MenuFoldOutlined />} aria-label="收起节点库面板" title="收起节点库" onClick={onToggle} />}
+    >
       <small className="erp-chain-design__library-summary">{chainKey === 'all' || nodeScope === 'all' ? '全库' : '当前链'} · {filterSummary}{filters.search ? ` · “${filters.search}”` : ''}</small>
+      {matchingChains.length > 0 && (
+        <div className="erp-chain-design__chain-results" role="group" aria-label="匹配链路">
+          <span>匹配链路</span>
+          {matchingChains.map(({ value, label }) => <Button key={value} size="small" onClick={() => onOpenChain(value)}>{label}</Button>)}
+        </div>
+      )}
       {connecting && (
         <Checkbox
           checked={nextOnly}
           onChange={(event) => setNextOnly(event.target.checked)}
         >
-          只看有接入规则的下一步
+          只看已登记衔接规则的下一步
         </Checkbox>
       )}
-      <div ref={listRef} className="erp-chain-design__library-list" aria-label="可加入的节点">
-        {entries.map((entry) =>
-          entry.nodes.length === 1 ? (
-            card(entry.nodes[0])
-          ) : (
+      <div ref={listRef} className="erp-chain-design__library-list erp-directory-list" aria-label="可加入的节点">
+        {entries.map((entry) => {
+          if (entry.nodes.length === 1) return card(entry.nodes[0])
+          const expanded = expansion.isExpanded(entry.key)
+          const branchId = `${id}-${entry.key}-branches`
+          return (
             <div
               className="erp-chain-design__library-item"
               data-domain={entry.nodes[0].domain}
               style={diagramDomainStyle(entry.nodes[0].domain)}
               key={entry.key}
             >
-              <button
-                type="button"
-                className="erp-dev-directory-item"
-                aria-expanded={expanded === entry.key}
-                aria-controls={expanded === entry.key ? `${id}-branches` : undefined}
+              <DirectoryItem
+                expanded={expanded}
+                aria-controls={expanded ? branchId : undefined}
+                aria-current={!expanded && entry.nodes.some((node) => node.id === selectedNodeId) ? 'location' : undefined}
                 aria-label={`选择分支：${entry.label}`}
                 aria-describedby={`${id}-entry-${entry.key}`}
-                onClick={() =>
-                  setExpanded(expanded === entry.key ? null : entry.key)
-                }
+                onClick={() => expansion.toggle(entry.key)}
               >
                 <span className="erp-chain-design__library-icon"><DiagramNodeIcon type={entry.nodes[0].type} /></span>
                 <span className="erp-chain-design__library-copy">
                   <strong>{entry.label}</strong>
                   <small id={`${id}-entry-${entry.key}`}>{CHAIN_DESIGN_TYPES[entry.nodes[0].type]} · {entry.nodes.length} 个分支</small>
                 </span>
-                {expanded === entry.key ? <DownOutlined aria-hidden="true" /> : <RightOutlined aria-hidden="true" />}
-              </button>
-              {expanded === entry.key && (
-                <div className="erp-chain-design__library-branches" id={`${id}-branches`}>
+              </DirectoryItem>
+              {expanded && (
+                <DirectoryBranch id={branchId}>
                   {entry.nodes.map((node) => card(node, true))}
-                </div>
+                </DirectoryBranch>
               )}
             </div>
           )
-        )}
-        {!entries.length && (
+        })}
+        {!entries.length && !matchingChains.length && (
           <AppEmpty variant="compact" description="没有匹配节点。">
             <Button
               onClick={() => {
@@ -352,7 +371,7 @@ export default function BusinessChainNodeLibrary({
           </AppEmpty>
         )}
       </div>
-    </aside>
+    </Directory>
   )
   return children(searchTools, resultsPanel)
 }

@@ -12,6 +12,8 @@ const contracts = {
   handoff_receipt_replacement: ['quality-disposition'],
   handoff_receipt_quality: ['submit', 'pass', 'reject'],
   handoff_receipt_inbound: ['post'],
+  handoff_purchase_price: ['purchase-complete-terms'],
+  handoff_receipt_payable: ['create-payable', 'finance-fact-confirm', 'finance-fact-cancel'],
   handoff_receipt_exception: ['quality-disposition'],
   handoff_outsourcing_contract: ['outsourcing-edit', 'lifecycle-submit', 'lifecycle-confirm'],
   handoff_outsourcing_issue: ['related-outsourcing-facts'],
@@ -62,6 +64,7 @@ export function workflowTaskBusinessContract(task) {
   const actions = coordination ? [] : WORKFLOW_TASK_BUSINESS_ACTIONS[task?.task_group] || sourceActions[task?.source_type] || []
   return {
     kind: coordination ? 'coordination' : policy?.kind || null,
+    editorWidth: task?.task_group === 'handoff_receipt_payable' ? 'form' : 'workspace',
     containedBusiness: isEngineeringMaterialTask(task) || (!coordination && policy?.kind !== 'decision'),
     actionKeys: actions,
     relatedKinds: task?.task_group === 'production_scheduling' && task?.source_type === 'sales_order' ? ['production_plan'] : [],

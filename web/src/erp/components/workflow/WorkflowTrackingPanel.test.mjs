@@ -106,13 +106,13 @@ test('tracking pagination cancels stale pages, retries the requested page and co
   assert.equal(new URLSearchParams(location.search).get('track_page_started'), '2')
   await respond(calls[6], 21, '最后一页')
   assert.match(node.textContent, /最后一页-0/)
-  assert.equal(node.querySelectorAll('.ant-table-row').length, 1)
+  assert.equal(node.querySelectorAll('.erp-workflow-tracking-entry').length, 1)
   await go(5)
   await respond(calls[7], 0, '全部移出')
   assert.equal(calls[8].params.offset, 0)
   await respond(calls[8], 0, '无记录')
   assert.equal(new URLSearchParams(location.search).get('track_page_started'), '1')
-  assert.match(node.textContent, /暂无你发起的流程或跟进任务/)
+  assert.match(node.textContent, /暂无你发起的流程记录/)
 })
 
 test('tracking scopes keep their names and clearing a source reloads the current filters from the first page', async (t) => {
@@ -166,7 +166,6 @@ test('tracking scopes keep their names and clearing a source reloads the current
   const initial = '/?tracking=visible&track_source_type=sales_order&track_source_id=12&track_page_visible=2&track_page_started=3&track_page_participated=4&track_search_visible=小熊&track_owner_role_key_visible=engineering&track_search_started=保留其他范围'
   await harness.render(createElement(MemoryRouter, { initialEntries: [initial], future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Probe)))
   assert.equal(calls.at(-1).params.offset, 20)
-  await harness.click([...document.querySelectorAll('button')].find((button) => button.textContent.startsWith('筛选')))
   const scopes = () => document.querySelector('[role="group"][aria-label="跟踪范围"]')
   assert.deepEqual([...scopes().querySelectorAll('button')].map((button) => button.textContent), ['相关流程', '我发起的', '我参与的'])
   const choose = (label) => harness.click([...scopes().querySelectorAll('button')].find((button) => button.textContent === label))
@@ -178,15 +177,63 @@ test('tracking scopes keep their names and clearing a source reloads the current
   assert.equal(calls.at(-1).params.scope, 'visible')
   assert.equal(calls.at(-1).params.source_id, 12)
   assert.equal(calls.at(-1).params.offset, 20)
-  await harness.click(harness.button('收起'))
+  assert.equal(Boolean(document.querySelector('[role="dialog"][aria-label="筛选条件"]')), false)
   const scopedRequest = calls.at(-1)
   await harness.click(harness.button('清除单据范围'))
   assert.equal(scopedRequest.signal.aborted, true)
-  assert.deepEqual(calls.at(-1).params, { scope: 'visible', keyword: '小熊', owner_role_key: 'engineering', limit: 20, offset: 0 })
+  assert.deepEqual(calls.at(-1).params, { scope: 'visible', record_type: 'flow', keyword: '小熊', owner_role_key: 'engineering', limit: 20, offset: 0 })
   assert.equal(search.has('track_source_type'), false)
   assert.equal(search.has('track_source_id'), false)
   for (const scope of ['visible', 'started', 'participated']) assert.equal(search.has(`track_page_${scope}`), false)
   assert.equal(search.get('track_search_started'), '保留其他范围')
   assert.equal(harness.button('清除单据范围'), undefined)
   assert.match(document.querySelector('.erp-workflow-tracking-panel').textContent, /全部范围记录/u)
+})
+
+test('tracking rows pair each current task with its actual handoff and show historical results once', async (t) => {
+  const startedAt = 1791367200
+  const summary = {
+    kind: 'process',
+process_key: 'sales_order_acceptance',
+title: '',
+source_type: 'sales_order',
+    source_id: 12,
+source_no: 'SO-FIRST',
+display_context: null,
+started_at: startedAt,
+    updated_at: startedAt,
+completed_at: null,
+resolution_kind: null,
+initiator_name: '发起人甲',
+initiator_role_key: '',
+  }
+  const current = { node_instance_id: 20, status: 'ready', created_at: startedAt, completed_at: null, due_at: null }
+  const items = [
+    { ...summary,
+id: 1,
+status: 'blocked',
+current_tasks: [
+      { ...current, task_id: 21, task_name: '核对材料', owner_role_key: 'engineering', assignee_name: '工程小李' },
+      { ...current, task_id: 22, task_name: '仓库点数', owner_role_key: 'warehouse', assignee_name: '', status: 'blocked' },
+    ] },
+    { ...summary, id: 2, status: 'completed', source_no: 'SO-HISTORY', completed_at: startedAt, resolution_kind: 'succeeded', current_tasks: [] },
+    { ...summary, id: 3, status: 'active', source_no: 'SO-WAITING', current_tasks: [] },
+  ]
+  const harness = await businessFormHarness(t, { rpc: (method) => {
+    assert.equal(method, 'list_tracking')
+    return { data: { items, total: 3, status_counts: { active: 2, completed: 1 }, limit: 20, offset: 0 } }
+  } })
+  const [{ MemoryRouter }, { default: Panel }] = await Promise.all([
+    import('react-router-dom'), import('./WorkflowTrackingPanel.jsx'),
+  ])
+  await harness.render(createElement(MemoryRouter, { future: { v7_startTransition: true, v7_relativeSplatPath: true } }, createElement(Panel, { scope: 'visible' })))
+  const rows = [...document.querySelectorAll('.erp-workflow-tracking-entry')]
+  assert.equal(rows.length, 3)
+  assert.match(rows[0].querySelector('.erp-workflow-tracking-document').textContent, /销售订单 · SO-FIRST/u)
+  const handoffs = [...rows[0].querySelectorAll('.erp-workflow-tracking-progress-line')].map((line) => line.textContent)
+  assert.deepEqual(handoffs, ['核对材料岗位：工程 · 处理人：工程小李 · 待处理', '仓库点数岗位：仓库已阻塞'])
+  assert.equal(rows[0].querySelector('[data-tracking-entry]').getAttribute('aria-label'), '流程跟踪：SO-FIRST · 销售订单受理')
+  assert.equal(rows[1].querySelector('.erp-workflow-tracking-progress').textContent, '销售订单受理正常结束')
+  assert.equal(rows[2].querySelector('.erp-workflow-tracking-progress').textContent, '销售订单受理等待后续业务处理')
+  assert.doesNotMatch(rows.map((row) => row.textContent).join(''), /发起人甲/u)
 })

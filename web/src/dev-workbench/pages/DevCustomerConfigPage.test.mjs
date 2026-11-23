@@ -10,7 +10,7 @@ import {
   registerJSXTestLoader,
 } from '../../../scripts/test/reactRuntime.mjs'
 import {
-  customerConfigStepSearch,
+  customerConfigTaskSearch,
   releaseHistoryForBatch,
   resolveCustomerConfigLocation,
 } from './customer-config/navigation.mjs'
@@ -79,12 +79,12 @@ test('route defaults preserve explicit invalid customer identity and clear stale
   )
   assert.equal(
     value.canonicalSearch,
-    'customer=yoyoosun&view=diff&release=batch-a'
+    'customer=yoyoosun&release=batch-a'
   )
   assert.equal(
     resolveCustomerConfigLocation('view=assets&view=diff&release=a&release=b')
-      .activeStep,
-    'overview'
+      .activeTask,
+    'review'
   )
   assert.equal(
     resolveCustomerConfigLocation('view=assets&view=diff&release=a&release=b')
@@ -93,22 +93,25 @@ test('route defaults preserve explicit invalid customer identity and clear stale
   )
 })
 
-test('release deep links use the fifth step and returning to validation leaves release mode', () => {
-  const release = customerConfigStepSearch(
+test('validation gets its own task while apply and release keep their deep links', () => {
+  const release = customerConfigTaskSearch(
     'customer=yoyoosun&view=preflight&section=flow&release=batch-a',
     'release'
   )
   const route = resolveCustomerConfigLocation(release)
-  assert.equal(route.activeStep, 'release')
-  assert.equal(route.activeView, 'import')
-  assert.equal(route.activeImportAction, 'release')
+  assert.equal(route.activeTask, 'release')
+  const query = new URLSearchParams(route.canonicalSearch)
+  assert.equal(query.get('view'), 'import')
+  assert.equal(query.get('action'), 'release')
   assert.equal(route.requestedReleaseBatch, 'batch-a')
-  const validation = resolveCustomerConfigLocation(
-    customerConfigStepSearch(release, 'import')
-  )
-  assert.equal(validation.activeStep, 'import')
-  assert.equal(validation.activeImportAction, 'dry-run')
-  assert.throws(() => customerConfigStepSearch('', '__proto__'), /Unknown/u)
+  const validation = resolveCustomerConfigLocation('view=import&action=test-apply')
+  assert.equal(validation.activeTask, 'validation')
+  assert.equal(validation.focusTestApply, true)
+  const normal = customerConfigTaskSearch('view=preflight&section=flow&detail=strategy', 'validation', 'flow')
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(normal)), { customer: 'yoyoosun', view: 'import' })
+  assert.equal(resolveCustomerConfigLocation(normal).activeTask, 'validation')
+  assert.equal(resolveCustomerConfigLocation(normal).focusTestApply, false)
+  assert.throws(() => customerConfigTaskSearch('', '__proto__'), /Unknown/u)
 })
 
 test('preflight keeps strategy and extension states visible with different package contents', async (t) => {
@@ -162,7 +165,7 @@ test('release history is bound to the explicitly selected evidence batch', () =>
   assert.equal(releaseHistoryForBatch([first], 'batch-b'), null)
 })
 
-test('URL is the navigation truth across steps, subviews, back and forward', async () => {
+test('URL restores tasks, review tabs, details, and browser history', async () => {
   const dom = installTestDOM()
   const { useCustomerConfigRoute } =
     await import('./customer-config/useCustomerConfigRoute.mjs')
@@ -191,18 +194,29 @@ test('URL is the navigation truth across steps, subviews, back and forward', asy
         )
       )
     )
-    assert.equal(controls.activeStep, 'import')
-    assert.equal(controls.activeImportAction, 'test-apply')
+    assert.equal(controls.activeTask, 'validation')
+    assert.equal(controls.focusTestApply, true)
     await act(() => controls.navigate('release'))
-    assert.equal(controls.activeStep, 'release')
+    assert.equal(controls.activeTask, 'release')
     await act(() => controls.history(-1))
-    assert.equal(controls.activeImportAction, 'test-apply')
+    assert.equal(controls.activeTask, 'validation')
+    assert.equal(controls.focusTestApply, true)
     await act(() => controls.history(1))
-    assert.equal(controls.activeStep, 'release')
-    await act(() => controls.navigate('preflight'))
+    assert.equal(controls.activeTask, 'release')
+    await act(() => controls.navigate('review'))
     await act(() => controls.selectSection('flow'))
-    assert.equal(controls.activePreflightSection, 'flow')
-    await act(() => controls.navigate('diff'))
+    assert.equal(controls.activeSection, 'flow')
+    await act(() => controls.selectDetail('evidence'))
+    assert.equal(controls.activeDetail, 'evidence')
+    assert.equal(controls.activeSection, 'flow')
+    await act(() => controls.selectDetail(''))
+    await act(() => controls.navigate('validation'))
+    assert.equal(controls.activeTask, 'validation')
+    assert.equal(controls.focusTestApply, false)
+    await act(() => controls.navigate('release'))
+    await act(() => controls.navigate('review'))
+    assert.equal(controls.activeSection, 'flow')
+    await act(() => controls.selectSection('fields'))
     assert.equal(controls.location.search.includes('section='), false)
     await act(() => controls.selectCustomer('unknown'))
     assert.equal(controls.overview.status, 'missing')

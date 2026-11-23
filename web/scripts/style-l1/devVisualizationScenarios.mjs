@@ -16,7 +16,10 @@ export function createDevVisualizationScenarios({ assert, assertNoHorizontalOver
       const active = page.getByRole('region', { name: '当前类别图例', exact: true })
       await expect(directory.getByRole('button')).toHaveCount(9)
       await expect(page.getByText('9 类 · 11 个图例', { exact: true })).toBeVisible()
-      await expect(directory.getByRole('button', { name: '计划安排', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      await expect(directory.getByRole('button', { name: '流程规则', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      await expect(active.getByRole('heading', { name: '采购收货：规则允许怎么走？' })).toBeVisible()
+      await choose('计划安排')
+      await expect(active.getByText(/有计划起止时间可画排程图/u)).toBeVisible()
       const dueDay = active.getByRole('button', { name: '11 月 16 日，1 项待办', exact: true })
       await dueDay.press('Enter')
       await expect(dueDay).toHaveAttribute('aria-pressed', 'true')
@@ -40,7 +43,7 @@ export function createDevVisualizationScenarios({ assert, assertNoHorizontalOver
       await expect(active.getByRole('button', { name: '打印版式，打印核对，失败', exact: true })).toHaveAttribute('aria-pressed', 'true')
 
       await choose('流程规则')
-      const graph = active.locator('[data-mermaid-status="rendered"]')
+      const graph = active.getByRole('region', { name: '采购收货：规则允许怎么走？' }).locator('[data-mermaid-status="rendered"]')
       await expect(graph).toBeVisible()
       const icons = await graph.locator('svg.label-icon').evaluateAll((items) => items.map((icon) => ({
         width: parseFloat(getComputedStyle(icon).width), height: parseFloat(getComputedStyle(icon).height),
@@ -59,8 +62,20 @@ export function createDevVisualizationScenarios({ assert, assertNoHorizontalOver
       await graph.getByRole('button', { name: '采购办理处置', exact: true }).press('Enter')
       await expect(active.getByRole('status')).toContainText('保留原拒收结论')
 
+      await active.getByText('看这笔进度', { exact: true }).click()
+      await expect(active.getByRole('radio', { name: '看这笔进度' })).toBeChecked()
+      await expect(page).toHaveURL(/type=progress/u)
+      await expect(directory.getByRole('button', { name: '办理进度' })).toHaveAttribute('aria-pressed', 'true')
+      await expect(active.getByText('当前 · 仓库确认入库')).toBeVisible()
+      await active.getByText('看收货规则', { exact: true }).click()
+      await expect(active.getByRole('radio', { name: '看收货规则' })).toBeChecked()
+      await expect(page).toHaveURL(/type=flow/u)
+      await expect(active.getByRole('status')).toContainText('保留原拒收结论')
+      await page.goBack()
+      await expect(active.getByRole('heading', { name: '这笔收货走到哪？' })).toBeVisible()
+
       await choose('结构关系')
-      await expect(active.locator('[data-mermaid-status="rendered"]')).toBeVisible()
+      await expect(active.getByRole('region', { name: '工作台：模块归哪一类？' }).locator('[data-mermaid-status="rendered"]')).toBeVisible()
       await expect(active.getByRole('heading', { name: '工作台：模块归哪一类？', exact: true })).toBeVisible()
       await choose('操作步骤')
       await expect(active.getByText('右侧切到所选模板。', { exact: true })).toBeVisible()
@@ -106,8 +121,17 @@ export function createDevVisualizationScenarios({ assert, assertNoHorizontalOver
       await source.click()
       await expect(page).toHaveURL(/#visualization-choices$/u)
       await expect(page.getByRole('heading', { name: /选择表达/u })).toBeVisible()
+      const guide = page.locator('.erp-dev-docs-markdown')
+      await guide.getByRole('heading', { name: /页内理解与上下文/u }).scrollIntoViewIfNeeded()
+      await expect(guide.locator('svg').getByText('恢复筛选、选中项和位置', { exact: true }).first()).toBeVisible()
       await page.goBack()
+      await page.reload()
       await expect(directory.getByRole('button', { name: '计划安排', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      await choose('流程规则')
+      await expect(graph).toBeVisible()
+      await assertNoHorizontalOverflow(page, '采购收货图例对照 805')
+      await page.setViewportSize({ width: 1166, height: 984 })
+      await expect(active.getByText('分支流程图', { exact: true })).toBeVisible()
     },
   }]
 }

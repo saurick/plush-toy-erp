@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React from 'react'
 import {
   DatabaseOutlined,
   InfoCircleOutlined,
@@ -105,18 +105,6 @@ const MEMORY_ITEMS = Object.freeze([
 
 function cleanText(value) {
   return typeof value === 'string' ? value.trim() : ''
-}
-
-function useDefinitionSelectSearch() {
-  const [searchValue, setSearchValue] = useState('')
-  const onOpenChange = useCallback((open) => {
-    if (!open) setSearchValue('')
-  }, [])
-  return {
-    searchValue,
-    onSearch: setSearchValue,
-    onOpenChange,
-  }
 }
 
 function renderDefinitionSelectOption(option) {
@@ -235,7 +223,6 @@ export {
   VIEW_ITEMS,
   VIEW_META,
   cleanText,
-  useDefinitionSelectSearch,
   renderDefinitionSelectOption,
   asArray,
   EvidenceDisclosure,

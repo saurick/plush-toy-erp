@@ -12,7 +12,6 @@ import {
   progressMetricDetails,
   progressDeliveryDetails,
   progressStatusLabel,
-  progressSourcePath,
   progressStages,
   progressAttention,
   progressDue,
@@ -189,21 +188,6 @@ test('URL state preserves filters while bounding paging and ignoring unsupported
     20
   )
 })
-test('source links identify the source record and keep task codes encoded', () => {
-  assert.equal(
-    progressSourcePath({ kind: 'batch', id: 8, parent_id: 4 }),
-    '/erp/production/orders?production_order_id=4&wip_batch_id=8'
-  )
-  assert.equal(
-    progressSourcePath({ kind: 'sales_line', id: 8, parent_id: 4 }),
-    '/erp/sales/project-orders/sales-orders?sales_order_id=4'
-  )
-  assert.equal(
-    progressSourcePath({ kind: 'task', id: 42, number: 'TASK + 1' }),
-    '/erp/task-board?task_id=42'
-  )
-})
-
 test('交期与受阻组合，结束范围清理冲突且恢复时不复现', () => {
   for (const due_status of ['overdue', 'due_soon']) {
     const active = new URLSearchParams({ view: 'orders', scope: 'active', due_status, blocked_only: 'true', q: '小熊' })

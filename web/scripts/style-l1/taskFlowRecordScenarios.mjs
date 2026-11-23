@@ -1,5 +1,4 @@
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
-import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 
 export function createTaskFlowRecordScenarios({
   assert,
@@ -135,7 +134,6 @@ export function createTaskFlowRecordScenarios({
           failOlder = true
           await page.route('**/rpc/workflow', async (route) => {
             const body = route.request().postDataJSON()
-            if (body.method !== 'list_task_events') return route.fallback()
             const reply = (data, code = 0) =>
               route.fulfill({
                 json: {
@@ -144,6 +142,9 @@ export function createTaskFlowRecordScenarios({
                   result: { code, message: code ? '读取失败' : 'OK', data },
                 },
               })
+            if (body.method === 'get_task_handling_chain' && body.params.task_id === task.id)
+              return reply({ items: [task, prior], truncated: false })
+            if (body.method !== 'list_task_events') return route.fallback()
             if (body.params.scope !== 'flow')
               return reply({ items: own, truncated: false })
             if (failFlow) {
@@ -176,8 +177,10 @@ export function createTaskFlowRecordScenarios({
             : page.locator('.erp-task-action-drawer')
           const records = detail.getByTestId('workflow-task-event-trail')
           await records
-            .getByRole('heading', { name: '处理记录', exact: true })
+            .getByRole('heading', { name: '本任务处理记录', exact: true })
             .waitFor()
+          await records.getByRole('button', { name: '含关联任务', exact: true }).click()
+          await records.getByRole('heading', { name: '关联任务处理记录', exact: true }).waitFor()
           await records
             .getByRole('button', { name: '重新读取', exact: true })
             .waitFor()
@@ -239,16 +242,15 @@ export function createTaskFlowRecordScenarios({
           }
           await checkScopeHelp('progress', 2)
           await checkScopeHelp('records', 2)
-          const scopeRoot = records.locator('.workflow-task-event-trail__scope')
+          const scopeRoot = records.getByRole('group', { name: '处理记录范围', exact: true })
+          const ownRecords = scopeRoot.getByRole('button', { name: '只看本任务', exact: true })
+          const relatedRecords = scopeRoot.getByRole('button', { name: '含关联任务', exact: true })
           await scopeRoot.scrollIntoViewIfNeeded()
           const before = await scopeRoot.boundingBox()
           const switchElement = await scopeRoot.elementHandle()
-          await verifyMobileNavigationMotion(
-            page,
-            assert,
-            '.workflow-task-event-trail__scope',
-            1
-          )
+          await ownRecords.press('Enter')
+          await records.getByRole('heading', { name: '本任务处理记录', exact: true }).waitFor()
+          assert.equal(await ownRecords.getAttribute('aria-pressed'), 'true')
           await waitForFiniteAnimations(page)
           assert.equal(
             await records.locator('.workflow-task-event-trail__item').count(),
@@ -275,13 +277,9 @@ export function createTaskFlowRecordScenarios({
             await assertRecordHeaderLayout(records, assert, mobile)
             await page.setViewportSize({ width: 390, height: 844 })
           }
-          await verifyMobileNavigationMotion(
-            page,
-            assert,
-            '.workflow-task-event-trail__scope',
-            0,
-            true
-          )
+          await relatedRecords.click()
+          await records.getByRole('heading', { name: '关联任务处理记录', exact: true }).waitFor()
+          assert.equal(await relatedRecords.getAttribute('aria-pressed'), 'true')
           await records
             .getByRole('button', { name: '重新读取', exact: true })
             .click()

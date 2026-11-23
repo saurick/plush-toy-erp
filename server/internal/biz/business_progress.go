@@ -7,9 +7,11 @@ import (
 )
 
 const (
-	BusinessProgressSortOrderNo = "order_no"
-	BusinessProgressSortDueDate = "due_date"
-	BusinessProgressSortProduct = "product"
+	BusinessProgressSortOrderNo   = "order_no"
+	BusinessProgressSortDueDate   = "due_date"
+	BusinessProgressSortProduct   = "product"
+	BusinessProgressSortRemaining = "remaining_quantity"
+	BusinessProgressSortCompleted = "completed_quantity"
 )
 
 // BusinessProgress is a read projection of source documents and posted facts.
@@ -59,51 +61,54 @@ type BusinessProgressLine struct {
 }
 
 type BusinessProgressRow struct {
-	ID                int                   `json:"id"`
-	View              string                `json:"view"`
-	OrderNo           string                `json:"order_no"`
-	Status            string                `json:"status"`
-	Customer          string                `json:"customer"`
-	Product           string                `json:"product"`
-	ProductCount      int                   `json:"product_count"`
-	ProductTypeCount  int                   `json:"product_type_count,omitempty"`
-	ProductMatchCount int                   `json:"product_match_count,omitempty"`
-	ProductID         int                   `json:"product_id"`
-	SalesOwner        string                `json:"sales_owner"`
-	DueDate           string                `json:"due_date"`
-	UpdatedAt         string                `json:"updated_at"`
-	Active            bool                  `json:"active"`
-	Overdue           bool                  `json:"overdue"`
-	DueSoon           bool                  `json:"due_soon"`
-	Blocked           bool                  `json:"blocked"`
-	Unlinked          bool                  `json:"unlinked"`
-	Unit              string                `json:"unit"`
-	OrderedQuantity   *string               `json:"ordered_quantity"`
-	ShippedQuantity   *string               `json:"shipped_quantity"`
-	CompletedQuantity *string               `json:"completed_quantity"`
-	CurrentOperation  string                `json:"current_operation"`
-	OperationCount    int                   `json:"operation_count"`
-	DeliveryKnown     bool                  `json:"delivery_known"`
-	EngineeringTotal  int                   `json:"engineering_total"`
-	EngineeringReady  int                   `json:"engineering_ready"`
-	ProductionOrders  int                   `json:"production_orders"`
-	ProductionClosed  int                   `json:"production_closed"`
-	MaterialTotal     int                   `json:"material_total"`
-	MaterialPending   int                   `json:"material_pending"`
-	InProgressBatches int                   `json:"in_progress_batches"`
-	OutsourcedBatches int                   `json:"outsourced_batches"`
-	WaitingBatches    int                   `json:"waiting_batches"`
-	RejectedBatches   int                   `json:"rejected_batches"`
-	PlannedBatches    int                   `json:"planned_batches"`
-	OpenTasks         int                   `json:"open_tasks"`
-	BlockedTasks      int                   `json:"blocked_tasks"`
-	UnassignedTasks   int                   `json:"unassigned_tasks"`
-	AttentionTaskID   int                   `json:"attention_task_id"`
-	AttentionTask     string                `json:"attention_task"`
-	AttentionReason   string                `json:"attention_reason"`
-	AttentionOwner    string                `json:"attention_owner"`
-	AttentionRole     string                `json:"attention_role"`
-	Line              *BusinessProgressLine `json:"line,omitempty"`
+	DeliveredLineCount *int                  `json:"delivered_line_count,omitempty"`
+	RemainingQuantity  *string               `json:"remaining_quantity,omitempty"`
+	ID                 int                   `json:"id"`
+	View               string                `json:"view"`
+	OrderNo            string                `json:"order_no"`
+	Status             string                `json:"status"`
+	Customer           string                `json:"customer"`
+	Product            string                `json:"product"`
+	ProductCount       int                   `json:"product_count"`
+	LinkedProductCount int                   `json:"linked_product_count,omitempty"`
+	ProductTypeCount   int                   `json:"product_type_count,omitempty"`
+	ProductMatchCount  int                   `json:"product_match_count,omitempty"`
+	ProductID          int                   `json:"product_id"`
+	SalesOwner         string                `json:"sales_owner"`
+	DueDate            string                `json:"due_date"`
+	UpdatedAt          string                `json:"updated_at"`
+	Active             bool                  `json:"active"`
+	Overdue            bool                  `json:"overdue"`
+	DueSoon            bool                  `json:"due_soon"`
+	Blocked            bool                  `json:"blocked"`
+	Unlinked           bool                  `json:"unlinked"`
+	Unit               string                `json:"unit"`
+	OrderedQuantity    *string               `json:"ordered_quantity"`
+	ShippedQuantity    *string               `json:"shipped_quantity"`
+	CompletedQuantity  *string               `json:"completed_quantity"`
+	CurrentOperation   string                `json:"current_operation"`
+	OperationCount     int                   `json:"operation_count"`
+	DeliveryKnown      bool                  `json:"delivery_known"`
+	EngineeringTotal   int                   `json:"engineering_total"`
+	EngineeringReady   int                   `json:"engineering_ready"`
+	ProductionOrders   int                   `json:"production_orders"`
+	ProductionClosed   int                   `json:"production_closed"`
+	MaterialTotal      int                   `json:"material_total"`
+	MaterialPending    int                   `json:"material_pending"`
+	InProgressBatches  int                   `json:"in_progress_batches"`
+	OutsourcedBatches  int                   `json:"outsourced_batches"`
+	WaitingBatches     int                   `json:"waiting_batches"`
+	RejectedBatches    int                   `json:"rejected_batches"`
+	PlannedBatches     int                   `json:"planned_batches"`
+	OpenTasks          int                   `json:"open_tasks"`
+	BlockedTasks       int                   `json:"blocked_tasks"`
+	UnassignedTasks    int                   `json:"unassigned_tasks"`
+	AttentionTaskID    int                   `json:"attention_task_id"`
+	AttentionTask      string                `json:"attention_task"`
+	AttentionReason    string                `json:"attention_reason"`
+	AttentionOwner     string                `json:"attention_owner"`
+	AttentionRole      string                `json:"attention_role"`
+	Line               *BusinessProgressLine `json:"line,omitempty"`
 }
 
 type BusinessProgressBoard struct {
@@ -119,6 +124,7 @@ type BusinessProgressBoard struct {
 type BusinessProgressRecord struct {
 	ID        int    `json:"id"`
 	Kind      string `json:"kind"`
+	TaskGroup string `json:"task_group,omitempty"`
 	Number    string `json:"number"`
 	Label     string `json:"label"`
 	Status    string `json:"status"`
@@ -202,6 +208,14 @@ func normalizeBusinessProgressQuery(q BusinessProgressQuery) (BusinessProgressQu
 			return q, ErrBadParam
 		}
 	case BusinessProgressSortOrderNo, BusinessProgressSortDueDate:
+	case BusinessProgressSortRemaining:
+		if q.View != "orders" {
+			return q, ErrBadParam
+		}
+	case BusinessProgressSortCompleted:
+		if q.View != "production" {
+			return q, ErrBadParam
+		}
 	case BusinessProgressSortProduct:
 		if q.Display != "lines" {
 			return q, ErrBadParam

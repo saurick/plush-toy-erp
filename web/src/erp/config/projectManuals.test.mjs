@@ -10,6 +10,7 @@ import { getHelpReadingCatalog, searchHelpDocuments } from './helpManualCatalog.
 import { getRoleHelpGuidesForProfile } from './roleHelpContent.mjs'
 import { renderProjectManualHtml } from '../utils/businessHandbookExport.mjs'
 
+const directoryStyles = await readFile(new URL('../../common/components/navigation/directory.css', import.meta.url), 'utf8')
 const manuals = JSON.parse(
   await readFile(
     new URL(
@@ -136,8 +137,10 @@ test('手册章名与使用说明键不冲突，同名章节仍有独立地址',
 
 test('两册离线 HTML 提供完整目录与真实锚点，正文安全且无需网络', () => {
   for (const manual of manuals) {
-    const html = renderProjectManualHtml(manual)
-    assert(html.includes('<nav aria-label="目录">'), manual.key)
+    const html = renderProjectManualHtml(manual, directoryStyles)
+    assert(html.includes('<nav class="erp-directory" aria-label="目录">'), manual.key)
+    assert(html.includes(directoryStyles), manual.key)
+    assert.match(html, /<a class="erp-directory-item" href="#/u)
     assert(!/<script|fetch\(|href="\/erp\//u.test(html), manual.key)
     const anchors = [...html.matchAll(/href="#([^"]+)"/gu)].map((match) => match[1])
     assert.equal(anchors.length, getProjectManualDocuments(manual).length - 1, manual.key)
@@ -146,7 +149,7 @@ test('两册离线 HTML 提供完整目录与真实锚点，正文安全且无�
   }
   const sample = renderProjectManualHtml({
     title: '手册', markdown: '# 手册\n\n## 小节\n\n<script>alert(1)</script>\n\n[跳转](#小节)',
-  })
+  }, directoryStyles)
   assert(sample.includes('&lt;script&gt;'))
   assert(!sample.includes('<script>'))
 })

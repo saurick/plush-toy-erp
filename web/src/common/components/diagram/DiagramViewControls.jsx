@@ -54,9 +54,10 @@ export default function DiagramViewControls({
   exitFullscreenLabel = `退出${label}全屏`,
   disabled = false,
   fitDisabled = false,
+  compact = false,
 }) {
   const nextLayout = ['LR', 'RL'].includes(nextLayoutDirection) ? '横向' : '纵向'
-  return (
+  const controls = (
     <div
       className="erp-diagram-view-controls"
       role="group"
@@ -119,14 +120,14 @@ export default function DiagramViewControls({
         tooltip="重置 100%"
         data-diagram-zoom-action="reset"
         aria-label={`重置${label}为 100%`}
-        aria-pressed={zoomMode === 'manual' && zoom === 1}
+        aria-pressed={zoomMode === 'reset'}
         disabled={disabled}
         onClick={onReset}
       >
         <OneToOneOutlined aria-hidden="true" />
       </DiagramControlButton>
       <DiagramControlButton
-        buttonRef={fullscreenButtonRef}
+        buttonRef={compact ? undefined : fullscreenButtonRef}
         tooltip={fullscreen ? '退出全屏' : '进入全屏'}
         data-diagram-fullscreen-action={fullscreen ? 'close' : 'open'}
         aria-label={fullscreen ? exitFullscreenLabel : fullscreenLabel}
@@ -137,4 +138,10 @@ export default function DiagramViewControls({
       </DiagramControlButton>
     </div>
   )
+  return compact ? (
+    <details className="erp-diagram-view-controls__disclosure">
+      <summary ref={fullscreenButtonRef}>图表工具</summary>
+      {controls}
+    </details>
+  ) : controls
 }

@@ -265,14 +265,16 @@ export function governBusinessChainNodes(catalog, nodes) {
         (item) => item.key === node.processNode.definitionKey
       )
       node.variantLabel = definition.label
-      const triggers = definition.edges
+      const predecessors = definition.edges
         .filter((edge) => edge.to === node.source.key)
         .map((edge) => definition.nodes.find((item) => item.key === edge.from))
-        .filter((item) => item.ownerPool)
+      const triggers = predecessors.filter((item) => item.ownerPool)
       if (node.source.type === 'domain_command' && triggers.length) {
         node.roles = unique(triggers.map((item) => item.ownerPool))
       }
-      if (node.source.permission?.includes(PermissionCode.WORKFLOW_TASK_REJECT)) {
+      const rejects = (source) => source.type === 'domain_command' && source.permission.includes(PermissionCode.WORKFLOW_TASK_REJECT)
+      node.rejectionCommand = rejects(node.source)
+      if (node.rejectionCommand || (node.terminal && predecessors.length && predecessors.every(rejects))) {
         node.exception = true
       }
       if (node.source.type === 'domain_command') {

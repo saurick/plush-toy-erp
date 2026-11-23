@@ -9,6 +9,7 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
+import { DirectoryHeader, DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import { WorkbenchReading } from '../components/WorkbenchPattern.jsx'
 import DevProductCoreRelations from '../components/DevProductCoreRelations.jsx'
 import { DevReadingReturn } from '../components/DevReadingNavigation.jsx'
@@ -238,24 +239,23 @@ export default function DevProductCorePage() {
             detailLabel="当前能力详情"
             detailVisible={Boolean(selectedCapability)}
             catalog={filteredCapabilities.length > 0 ? (
-              <div className="erp-dev-product-core-groups">
+              <div className="erp-directory-list erp-dev-product-core-groups">
+                <DirectoryHeader><strong>产品能力目录</strong></DirectoryHeader>
                 {capabilityGroups.map((group) => (
                   <section className="erp-dev-product-core-group" key={group.key} data-membership={group.key}>
-                    <h2 className="erp-dev-directory-group-title">{group.items[0].membership}</h2>
-                    <ul>
+                    <h2 className="erp-directory-group-title">{group.items[0].membership}</h2>
+                    <DirectoryBranch as="ul">
                       {group.items.map((item) => (
                         <li key={item.key}>
-                          <button
-                            type="button"
-                            className="erp-dev-directory-item erp-dev-directory-item--nested"
+                          <DirectoryItem
                             aria-pressed={selectedCapability?.key === item.key}
                             onClick={(event) => selectCapability(item, event)}
                           >
                             <span>{item.capability}</span>
-                          </button>
+                          </DirectoryItem>
                         </li>
                       ))}
-                    </ul>
+                    </DirectoryBranch>
                   </section>
                 ))}
               </div>

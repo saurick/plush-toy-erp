@@ -1,4 +1,4 @@
-import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
+import { chooseUIDesignScene, openUIDesignMobileTasks, visibleUIDesignFrame } from './devUIDesignNavigation.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
 import { writeFile } from 'node:fs/promises'
 
@@ -77,10 +77,10 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
       await writeFile(path.join(outputDir, `ui-preview-navigation-${mobile ? 'mobile' : 'desktop'}.json`), JSON.stringify(navigation, null, 2))
       assert(navigation.labels.every((label) => label.fits), `预览入口文字不应重叠：${JSON.stringify(navigation)}`)
       await page.getByRole('button', { name: /全屏预览/u }).click()
-      const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+      const frame = page.frameLocator(visibleUIDesignFrame)
       if (mobile) {
         await openUIDesignMobileTasks(frame)
-        await chooseSelectOption(frame.getByLabel('预览身份', { exact: true }), 'admin')
+        await chooseUIDesignScene(page, '预览身份', '超级管理员')
       }
       else await frame.locator('[data-action="board-status"][data-value="all"]').click()
       if (!mobile) {
@@ -91,7 +91,7 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
         const materials = task.getByRole('button', { name: '查看材料汇总', exact: true })
         assert.equal(await materials.evaluate((node) => Boolean(node.closest('.drawer-foot'))), true)
         assert.equal(await task.locator('.drawer-body').getByRole('button', { name: '查看材料汇总', exact: true }).count(), 0)
-        assert.deepEqual((await task.locator('.drawer-foot button').allTextContents()).map((label) => label.trim()), ['查看附件', '查看材料汇总', '查看相关单据', '选择处理方式'])
+        assert.deepEqual((await task.locator('.drawer-foot button').allTextContents()).map((label) => label.trim()), ['查看附件', '查看材料汇总', '任务办理'])
         assert.equal(await task.locator('.task-steps button').count(), 3)
         await materials.click()
         const summary = frame.getByRole('dialog', { name: '材料汇总', exact: true })
@@ -112,19 +112,19 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
           await frame.locator('#board-search').press('Enter')
           await frame.locator(`.task-handling-table button[data-id="${id}"]`).click()
         }
-        await frame.getByRole('heading', { name: '本任务处理进度', exact: true }).waitFor()
-        await frame.locator('.fulfillment-chain-preview').getByText('当前暂无其他关联任务。', { exact: true }).waitFor()
+        const orderAction = frame.getByRole('button', { name: '查看整单进度', exact: true })
+        await orderAction.waitFor()
         assert.equal(await frame.locator('.fulfillment-chain-preview li').count(), 0, '无关联任务时不重复绘制当前任务')
-        await frame.getByRole('button', { name: '查看订单全流程', exact: true }).click()
+        await orderAction.click()
         const chain = frame.locator('.fulfillment-chain-preview')
-        await chain.getByRole('heading', { name: '订单全流程', exact: true }).waitFor()
+        await chain.getByRole('heading', { name: '整单进度', exact: true }).waitFor()
         const taskMarker = await chain.locator('.fulfillment-chain-task-marker').evaluate((node) => ({ width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height, radius: parseFloat(getComputedStyle(node).borderRadius), symbol: node.textContent }))
         assert.ok(taskMarker.width === 26 && taskMarker.height === 26 && taskMarker.radius >= 13 && ['●', '!', '✓'].includes(taskMarker.symbol), JSON.stringify(taskMarker))
         const geometry = await verifyOrderDirection({ assert, frame, exception: id === 'H07' })
         if (id === 'H05' || id === 'H07') {
           const label = `ui-order-direction-${mobile ? 'mobile' : 'desktop'}-${id === 'H07' ? 'exception' : 'main'}`
           if (mobile) {
-            await chain.getByRole('heading', { name: '订单全流程', exact: true }).scrollIntoViewIfNeeded()
+            await chain.getByRole('heading', { name: '整单进度', exact: true }).scrollIntoViewIfNeeded()
             await page.screenshot({ path: path.join(outputDir, `${label}.png`), scale: 'device' })
             await chain.locator('.fulfillment-chain-overview > li').last().scrollIntoViewIfNeeded()
             await page.screenshot({ path: path.join(outputDir, `${label}-end.png`), scale: 'device' })
@@ -140,7 +140,7 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
           await verifyOrderDirection({ assert, frame, exception: id === 'H07', exceptionExpanded: false })
         }
         await frame.getByRole('button', { name: '返回本任务', exact: true }).click()
-        await chain.getByText('当前暂无其他关联任务。', { exact: true }).waitFor()
+        await orderAction.waitFor()
         assert.equal(await chain.locator('li').count(), 0, '返回后恢复本任务关联范围')
         if (mobile) {
           const footer = frame.locator('.rm-action-bar')
@@ -151,6 +151,8 @@ export function createDevTaskGovernanceScenarios({ assert, outputDir, path }) {
           await menu.getByRole('button', { name: '复制任务信息', exact: true }).waitFor()
           await menu.locator('summary').click()
           await footer.locator('[data-action="mobile-open-process"]').click()
+        } else {
+          await frame.locator('.drawer-foot').getByRole('button', { name: '任务办理', exact: true }).click()
         }
       }
       const close = () => frame.locator(mobile ? '[data-action="mobile-return-list"]' : '.drawer-foot [data-action="close-drawer"]').click()

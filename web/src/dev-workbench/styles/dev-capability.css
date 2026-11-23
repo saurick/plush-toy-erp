@@ -79,13 +79,6 @@
   margin: 0 auto;
 }
 
-.erp-dev-customer-overview {
-  display: grid;
-  gap: 12px;
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
 .erp-dev-customer-panel {
   min-width: 0;
   border: 1px solid var(--erp-border);
@@ -410,18 +403,6 @@
   display: grid;
   gap: 10px;
   margin-top: 12px;
-}
-
-.erp-dev-customer-dry-run-result {
-  display: grid;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.erp-dev-customer-dry-run-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .erp-dev-customer-dry-run-paths {

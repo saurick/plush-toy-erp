@@ -1,4 +1,4 @@
-import { chooseSelectOption } from './selectControlActions.mjs'
+import { chooseUIDesignScene } from './devUIDesignNavigation.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 
 export function createDevUIDesignMobileTrackingScenario({
@@ -19,7 +19,7 @@ export function createDevUIDesignMobileTrackingScenario({
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       const phone = frame.locator('.role-mobile-device')
       await phone.getByRole('tab', { name: '流程跟踪', exact: true }).waitFor()
-      await chooseSelectOption(frame.getByLabel('预览身份', { exact: true }), 'admin')
+      await chooseUIDesignScene(page, '预览身份', '超级管理员')
       const document = await (
         await page.locator('iframe[title="ERP 最新可交互设计"]').elementHandle()
       ).contentFrame()
@@ -38,6 +38,17 @@ export function createDevUIDesignMobileTrackingScenario({
       assert.equal(taskGeometry.height, 46)
       assert.deepEqual(progressGeometry, taskGeometry, '设计演示的两组主页面页签同高、同起点')
       await verifyMobileNavigationMotion(preview, assert, '.rm-primary-tabs[aria-label="进度视图"]', 1)
+      await phone.locator('[data-action="mobile-progress-open"][data-id="MP03"]').click()
+      await phone.getByRole('tab', { name: '任务', exact: true }).click()
+      const progressTasks = phone.getByRole('tabpanel')
+      assert.equal(await progressTasks.locator('article').count(), 2)
+      assert.equal(await progressTasks.getByRole('button', { name: /^打开任务详情 /u }).count(), 2)
+      await phone.locator('.rm-action-bar').getByRole('button', { name: '返回进度看板', exact: true }).click()
+      await phone.locator('[data-action="mobile-progress-tasks"][data-id="MP03"]').click()
+      const linkedTasks = phone.getByRole('region', { name: '本单关联任务', exact: true })
+      await linkedTasks.locator('[data-action="mobile-open-task"]').first().click()
+      await phone.getByRole('button', { name: '返回关联任务', exact: true }).first().click()
+      await linkedTasks.getByRole('button', { name: '返回进度看板', exact: true }).click()
       await verifyMobileNavigationMotion(preview, assert, '.rm-primary-tabs[aria-label="进度视图"]', 0, true)
       await phone.locator('[data-action="mobile-main"][data-value="tasks"]').click()
       await verifyMobileNavigationMotion(
@@ -64,18 +75,17 @@ export function createDevUIDesignMobileTrackingScenario({
           .count(),
         3
       )
-      assert.equal(
-        await phone
-          .getByRole('tablist', { name: '跟踪内容', exact: true })
-          .getByRole('tab')
-          .count(),
-        2
+      assert.deepEqual(
+        await phone.getByRole('tablist', { name: '跟踪内容', exact: true }).getByRole('tab').allTextContents(),
+        ['流程进度', '单项跟进', '异常跟踪']
       )
       await tracking.getByRole('button', { name: '筛选流程', exact: true }).click()
       const filters = phone.getByRole('dialog', {
         name: '流转筛选',
         exact: true,
       })
+      const scopes = tracking.getByRole('group', { name: '跟踪范围', exact: true })
+      const record = tracking.getByRole('button', { name: '流程跟踪：SO-20260925-001 · 销售订单受理', exact: true })
       await filters
         .getByRole('group', { name: '当前岗位', exact: true })
         .getByRole('button', { name: '老板', exact: true })
@@ -86,14 +96,9 @@ export function createDevUIDesignMobileTrackingScenario({
       await filters
         .getByRole('button', { name: '关闭筛选', exact: true })
         .click()
-      await tracking.locator('[data-action="mobile-options"]').click()
-      await filters
-        .locator('[data-action="mobile-tracking-scope"][data-value="participated"]')
-        .click()
+      await scopes.getByRole('button', { name: '我参与的', exact: true }).click()
       await filters.waitFor({ state: 'hidden' })
-      await tracking
-        .getByRole('button', { name: '流程跟踪：销售订单受理', exact: true })
-        .waitFor()
+      await record.waitFor()
       assert.deepEqual(
         await tracking
           .getByRole('group', { name: '流转状态', exact: true })
@@ -101,10 +106,12 @@ export function createDevUIDesignMobileTrackingScenario({
           .allTextContents(),
         ['1', '1', '0']
       )
-      await tracking.locator('[data-action="mobile-options"]').click()
-      await filters
-        .locator('[data-action="mobile-tracking-scope"][data-value="visible"]')
-        .click()
+      const blocked = tracking.getByRole('button', { name: '只看受阻', exact: true })
+      await blocked.click()
+      await record.waitFor({ state: 'hidden' })
+      await blocked.click()
+      await record.waitFor()
+      await scopes.getByRole('button', { name: '相关流程', exact: true }).click()
       await filters.waitFor({ state: 'hidden' })
       await tracking
         .getByText('当前筛选下没有匹配记录', { exact: true })
@@ -131,9 +138,7 @@ export function createDevUIDesignMobileTrackingScenario({
           .count(),
         0
       )
-      await tracking
-        .getByRole('button', { name: '流程跟踪：销售订单受理', exact: true })
-        .click()
+      await record.click()
       const drawer = phone.getByRole('dialog', {
         name: '流程跟踪',
         exact: true,
@@ -188,9 +193,7 @@ export function createDevUIDesignMobileTrackingScenario({
       await drawer
         .getByRole('button', { name: '返回列表', exact: true })
         .click()
-      await tracking
-        .getByRole('button', { name: '流程跟踪：销售订单受理', exact: true })
-        .waitFor()
+      await record.waitFor()
       await phone.getByRole('tab', { name: '异常跟踪', exact: true }).click()
       const exceptionTracking = phone.getByRole('region', {
         name: '异常跟踪',

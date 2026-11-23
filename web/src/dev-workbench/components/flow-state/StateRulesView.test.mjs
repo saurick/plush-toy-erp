@@ -24,6 +24,21 @@ test('状态图直接展示完整路径，流程结束在图和详情保持中�
   assert.equal(harness.container.querySelectorAll('[data-path-group="outcome"]').length, 2)
 })
 
+test('对照表逐项显示当前对象和结果维度的编码与含义', async (t) => {
+  const harness = await createReactTestHarness(t)
+  const { StateRulesView } = await import('./StateRulesView.jsx')
+  for (const key of ['fact.finance', 'fact.production_wip_batch', 'master.lifecycle', 'fact.finance_credit_note']) {
+    const flow = catalog.flows.find((item) => item.key === key)
+    await harness.render(h(StateRulesView, { catalog, flow, state: null, onSelectState: () => {} }))
+    const dictionaries = [...harness.container.querySelectorAll('details')].filter((element) =>
+      element.querySelector('summary')?.textContent.endsWith('含义'))
+    assert.deepEqual(dictionaries.map((el) => [...el.querySelectorAll('dl > div')].map((row) => [
+      row.querySelector('code').textContent,
+      row.querySelector('dd').textContent,
+    ])), [flow, ...flow.dimensions].map((item) => item.states.map((state) => [state.key, state.summary])))
+  }
+})
+
 test('状态选择保留完整流转图并只展示适用的办理规则，清空后恢复对象规则', async (t) => {
   const harness = await createReactTestHarness(t)
   const { StateRulesView } = await import('./StateRulesView.jsx')

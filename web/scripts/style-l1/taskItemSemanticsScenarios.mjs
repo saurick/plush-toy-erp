@@ -207,6 +207,7 @@ function createTaskItemLayoutScenarios({ assert }) {
       { id: 97406, task_name: '重新核对关联资料', display_context: { available: false, source_no: 'STALE-SOURCE', items: [{ ...product, name: '不可展示的旧产品', code: 'STALE-CODE' }] } },
       { id: 97407, task_name: '核对联名周年限定礼盒的包装与海外交付资料', blocked_reason: mobile ? '等待客户确认多语言说明、收货地址及包装资料。'.repeat(3) : '', task_status_key: mobile ? 'blocked' : 'ready', display_context: { available: true, source_no: 'SO2026OVERSEASLONGCUSTOMERREFERENCE000000000007ANNIVERSARYLIMITEDCOLLECTION000000007', items: [{ ...product, code: 'PRODUCT2026ANNIVERSARYOVERSEAS000000000007', name: '森林系列刺绣公仔与可拆卸背包配件套装'.repeat(mobile ? 2 : 5) }] } },
       { id: 97408, task_name: '核对产品图片', display_context: { available: true, source_no: 'SHIP-008', items: [{ ...product, product_id: 8, image_attachment_id: 880008, name: '失败重试产品' }] } },
+      { id: 97409, task_name: '核对同款多条明细', display_context: { available: true, source_no: 'SHIP-009', items: [product, product] } },
     ].map((entry, index) => ({ ...base, ...entry, created_at: now - index, task_code: `STYLE-L1-ITEM-LAYOUT-${entry.id}` }))
     const downloads = new Map()
     const actions = ['workflow.task.read', 'mobile.sales.access', ...(risk ? ['erp.workbench.read'] : []), ...(restricted ? [] : ['product.read'])]
@@ -322,6 +323,7 @@ function createTaskItemLayoutScenarios({ assert }) {
         if (restricted) {
           await row(97401).getByLabel('示例狐狸：无图片读取权限', { exact: true }).waitFor()
           assert.equal(await row(97401).getByRole('button', { name: /大图|重试/u }).count(), 0)
+          assert.equal(await row(97402).locator('.erp-product-gallery__stack').count(), 0)
           assert.equal(downloads.size, 0)
           return
         }
@@ -337,6 +339,23 @@ function createTaskItemLayoutScenarios({ assert }) {
           await closePreview.click()
           await closePreview.waitFor({ state: 'hidden' })
         }
+        const sameProduct = row(97409)
+        await sameProduct.scrollIntoViewIfNeeded()
+        await sameProduct.getByRole('button', { name: '查看示例狐狸大图', exact: true }).waitFor()
+        assert.equal(await sameProduct.locator('.erp-product-gallery__stack').count(), 0)
+        const gallery = row(97402).getByRole('button', { name: '查看SHIP-002的 3 款产品图片', exact: true })
+        assert.equal(await gallery.locator('.erp-product-gallery__stack').count(), 1)
+        await gallery.click()
+        const strip = page.getByRole('group', { name: '切换产品', exact: true })
+        await strip.waitFor()
+        assert.equal(await strip.getByRole('button').count(), 3)
+        const rabbitImage = strip.getByRole('button', { name: '查看示例挂兔（RABBIT-2）图片', exact: true })
+        await rabbitImage.click()
+        assert.equal(await rabbitImage.getAttribute('aria-pressed'), 'true')
+        assert.equal(await page.locator('.erp-task-linked-items-modal:visible').count(), 0)
+        await page.getByRole('button', { name: '关闭图片预览', exact: true }).press('Escape')
+        await page.locator('.erp-task-image-preview__stage').waitFor({ state: 'detached' })
+        assert.equal(await gallery.evaluate((node) => node === document.activeElement), true)
         const trigger = row(97402).getByRole('button', { name: '查看3 款产品', exact: true })
         if (!mobile) {
           await assertTaskCopy(page, row(97402).getByRole('button', { name: '复制单据编号', exact: true }), 'SHIP-002')

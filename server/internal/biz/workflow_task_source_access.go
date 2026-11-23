@@ -142,7 +142,15 @@ func ResolveWorkflowTaskSourceAccessContract(task *WorkflowTask) WorkflowTaskSou
 		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true, Kind: WorkflowFollowupTaskGroup, SourceType: sourceType, RequiredAny: spec.ReadPermissions}
 	case IsTrustedFulfillmentTask(task):
 		spec, _ := FulfillmentTaskSpecFor(task.TaskGroup)
-		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true, Kind: "fulfillment", SourceType: sourceType, RequiredAll: []string{spec.ReadCapability}}
+		permissions := []string{spec.ReadCapability}
+		switch task.TaskGroup {
+		case "handoff_receipt_payable":
+			sourcePermissions, _ := SourceActionReadPermissions("operational_fact", "create_payable_from_purchase_receipt")
+			permissions = append(sourcePermissions, PermissionFinancePayableRead, PermissionFieldProcurementCommercialRead)
+		case "handoff_purchase_price":
+			permissions = append(permissions, PermissionFieldProcurementCommercialRead)
+		}
+		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true, Kind: "fulfillment", SourceType: sourceType, RequiredAll: permissions}
 	case IsTrustedEngineeringMaterialTask(task):
 		return WorkflowTaskSourceAccessContract{Applicable: true, Resolved: true,
 			Kind: WorkflowMaterialRequestSourceType, SourceType: sourceType,

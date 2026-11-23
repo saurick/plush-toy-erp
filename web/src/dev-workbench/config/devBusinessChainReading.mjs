@@ -1,6 +1,7 @@
 import {
   arrangeBusinessChainGraph,
   businessChainNodeContext,
+  businessChainRoutePoints,
   CHAIN_DESIGN_NODE_SIZE,
   isBusinessChainStep,
   orientBusinessChainPoint,
@@ -17,6 +18,11 @@ export function businessChainRelationLayer(relation) {
   const layer = CHAIN_READING_LAYERS.find((item) => item.kinds.includes(relation.kind))
   if (!layer) throw new Error(`Unknown chain relationship: ${relation.kind}`)
   return layer.value
+}
+
+export function businessChainHandoffKind(relation) {
+  const layer = businessChainRelationLayer(relation)
+  return layer === 'exception' || layer === 'correction' ? layer : 'known'
 }
 
 export function businessChainHandoffs(catalog, chainKey) {
@@ -106,41 +112,117 @@ function primarySteps(graph, library) {
   })
 }
 
-export function projectBusinessChainReading(graph, library, { scope, mode, layout, expandedNodes = [], showBranches = false, selection, pathIds = [] } = {}) {
-  const stepView = mode === 'mainline' || (mode === 'overview' && graph.scopeSummary)
-  if (scope !== 'whole' || !stepView || graph.nodes.some((node) => node.summary)) return graph
-  const compact = (view, stableNodes) => layout === 'lanes' ? compactBusinessChainLanes(view, library, stableNodes) : view
-  const chains = new Set(graph.nodes.map((node) => library.byId.get(node.id).chainKey))
-  if (showBranches || [...chains].some((key) => ['exception', 'rework', 'reversal'].includes(library.chainDefinitions.get(key).kind))) return compact(graph)
-  const primary = primarySteps(graph, library)
-  if (!primary) return graph
-  const visible = new Set([
-    ...primary.map((node) => node.id), ...expandedNodes,
-    ...graph.nodes.filter((node) => node.manual).map((node) => node.id),
-    ...graph.edges.filter((edge) => edge.kind === 'unknown').flatMap((edge) => [edge.from, edge.to]),
-  ])
-  const stableNodes = graph.nodes.filter((node) => visible.has(node.id))
-  for (const id of pathIds) visible.add(id)
-  if (selection?.nodeId && !selection.detailsOnly && graph.nodes.some((node) => node.id === selection.nodeId)) {
-    visible.add(selection.nodeId)
-    for (const edge of graph.edges) {
-      if ([edge.from, edge.to].includes(selection.nodeId)) {
-        visible.add(edge.from)
-        visible.add(edge.to)
-      }
+// Categories describe the business action. Shared endpoints provide context on either side of it.
+export function businessChainBaseLayer(chain) {
+  if (chain.kind === 'exception' || chain.kind === 'rework') return 'exception'
+  if (chain.key === 'purchase_posting_corrections') return 'correction'
+  return 'normal'
+}
+
+export function businessChainSourceEdgeKind(chain, edge) {
+  if (businessChainBaseLayer(chain) === 'correction' || edge.kind === 'reverses' ||
+    edge.from === 'finance_credit_note' || edge.to === 'finance_credit_note') return 'correction'
+  return ['returns', 'reworks'].includes(edge.kind) ? 'exception' : 'known'
+}
+
+export function businessChainStepLayer(node, library) {
+  const chain = library.chainDefinitions.get(node.chainKey)
+  const base = businessChainBaseLayer(chain)
+  if (base !== 'normal') return base
+  if (node.processNode && node.exception) return 'exception'
+  const { steps } = node
+  if (steps.length && steps.every((step) => chain.edges.some((edge) =>
+    edge.key === step.edgeKey && businessChainSourceEdgeKind(chain, edge) === 'correction'))) return 'correction'
+  const normal = chain.acceptanceScenarios.find((scenario) => scenario.kind === 'happy_path')
+  if (steps.length && normal && steps.every((step) => !step.scenarioKeys.includes(normal.key))) return 'exception'
+  return 'normal'
+}
+
+export function projectBusinessChainReading(graph, library, { scope, mode, layout, layers, expandedNodes = [], selection, pathIds = [] } = {}) {
+  const detailView = mode === 'all' || mode === 'mainline' || (mode === 'overview' && graph.scopeSummary)
+  if (!detailView || graph.nodes.some((node) => node.summary) || (scope !== 'whole' && !layers)) return graph
+  const nodeLayer = new Map(graph.nodes.map(({ id }) => [id, businessChainStepLayer(library.byId.get(id), library)]))
+  const enabled = new Set(layers || ['normal'])
+  const context = new Set([...expandedNodes, ...pathIds])
+  const selected = !selection?.detailsOnly && selection?.nodeId
+  if (selected) context.add(selected)
+  // In the finest view a connected document, record or result follows its visible paths.
+  // An isolated loaded node can still be read by its own category.
+  const connected = mode === 'all' ? new Set(graph.edges.flatMap(({ from, to }) => [from, to])) : null
+  const layerNodes = new Set(graph.nodes.filter(({ id, manual }) => {
+    if (manual) return true
+    if (!enabled.has(nodeLayer.get(id))) return false
+    return !connected?.has(id) || isBusinessChainStep(library.byId.get(id))
+  }).map(({ id }) => id))
+  const visible = new Set([...layerNodes, ...context])
+  const edges = graph.edges.filter((edge) => {
+    const target = nodeLayer.get(edge.to)
+    const endpointLayer = target === 'normal' ? nodeLayer.get(edge.from) : target
+    const category = edge.kind === 'correction' || (mode === 'all' && endpointLayer === 'normal' && edge.kind === 'exception')
+      ? edge.kind : endpointLayer
+    if (enabled.has(category) || edge.kind === 'unknown') {
+      layerNodes.add(edge.from)
+      layerNodes.add(edge.to)
+    } else if (edge.from !== selected && edge.to !== selected && !(context.has(edge.from) && context.has(edge.to))) {
+      return false
     }
-  }
-  return compact({
-    ...graph,
-    nodes: graph.nodes.filter((node) => visible.has(node.id)),
-    edges: graph.edges.filter((edge) => visible.has(edge.from) && visible.has(edge.to)),
-  }, stableNodes)
+    visible.add(edge.from)
+    visible.add(edge.to)
+    return true
+  })
+  const nodes = graph.nodes.filter(({ id }) => visible.has(id))
+  const result = nodes.length === graph.nodes.length && edges.length === graph.edges.length ? graph : { ...graph, nodes, edges }
+  if (graph.wholeDetail) return layoutWholeChainSections(result, library, layout)
+  if (layout !== 'lanes' || scope !== 'whole') return result
+  const stableNodes = nodes.filter(({ id }) => layerNodes.has(id))
+  return compactBusinessChainLanes(result, library, stableNodes, mode !== 'all')
 }
 
 const lanePaddingTop = 30
 const lanePaddingBottom = 14
 const laneGap = 32
 const columnStride = CHAIN_DESIGN_NODE_SIZE.width + 54
+
+// Whole-map detail has its own reading coordinates. Saved local and manual layouts remain in the draft.
+function layoutWholeChainSections(graph, library, layout = 'flow') {
+  const chainOf = (id) => library.byId.get(id).chainKey
+  const regions = []
+  for (const { value, label } of library.chains) {
+    const members = graph.nodes.filter(({ id }) => chainOf(id) === value)
+    if (!members.length) continue
+    const edges = graph.edges.filter(({ from, to }) => chainOf(from) === value && chainOf(to) === value)
+    const positions = arrangeBusinessChainReading({ nodes: members, edges, salesAcceptance: value === 'sales_to_production' }, library, layout)
+    const nodes = members.map((node) => ({ ...node, ...positions.get(node.id) }))
+    const routes = businessChainRoutePoints({ nodes, edges })
+    const points = [...routes.values()].flat()
+    const minX = Math.min(0, ...points.map(({ x }) => x - 16))
+    const minY = Math.min(0, ...points.map(({ y }) => y - 48))
+    const width = Math.max(...nodes.map(({ x }) => x + columnStride), ...points.map(({ x }) => x + 32)) - minX
+    const height = Math.max(...nodes.map(({ y }) => y + CHAIN_DESIGN_NODE_SIZE.height + 100), ...points.map(({ y }) => y + 60)) - minY
+    regions.push({ key: value, label, nodes, routes, minX, minY, width, height })
+  }
+  // Wrap whole chains together, leaving room for their headings in either orientation.
+  const targetWidth = Math.sqrt(2 * regions.reduce((area, region) => area + region.width * region.height, 0))
+  let left = 0
+  let top = 0
+  let rowHeight = 0
+  const routePoints = new Map()
+  const sections = regions.map((region) => {
+    if (left && left + region.width > targetWidth) {
+      top += rowHeight
+      left = 0
+      rowHeight = 0
+    }
+    const offset = (point) => ({ ...point, x: left + point.x - region.minX, y: top + point.y - region.minY })
+    for (const [key, points] of region.routes) routePoints.set(key, points.map(offset))
+    const nodes = region.nodes.map(offset)
+    const routeOrigin = { x: left + 16, y: top + 18 }
+    left += region.width
+    rowHeight = Math.max(rowHeight, region.height)
+    return { key: region.key, label: region.label, nodes, routeOrigin }
+  })
+  return { ...graph, nodes: sections.flatMap((section) => section.nodes), sections, routePoints }
+}
 
 // The existing graph determines order. Same-domain steps can share a column;
 // lanes preserve those columns and separate responsibility without inventing edges.
@@ -212,6 +294,13 @@ export function arrangeBusinessChainReading(graph, library, layout = 'flow') {
   const columns = new Map()
   for (const [id, position] of sorted) {
     const parents = graph.edges.filter((edge) => edge.to === id && columns.has(edge.from) && ordered.get(edge.from).x < position.x)
+    const exceptionParent = graph.salesAcceptance && layout === 'lanes' && parents.find((edge) =>
+      edge.kind === 'exception' && original.get(edge.from)?.sourceIds && original.get(id)?.sourceIds && domain(edge.from) === domain(id)
+    )
+    if (exceptionParent) {
+      columns.set(id, columns.get(exceptionParent.from))
+      continue
+    }
     columns.set(id, parents.length ? Math.max(...parents.map((edge) =>
       columns.get(edge.from) + (layout === 'flow' && domain(edge.from) === domain(id) ? 0 : 1)
     )) : 0)
@@ -246,6 +335,13 @@ export function arrangeBusinessChainReading(graph, library, layout = 'flow') {
 }
 
 export function businessChainLaneBands(graph, library, direction = 'LR') {
+  if (graph.sections) {
+    return graph.sections.flatMap((section) =>
+      businessChainLaneBands({ nodes: section.nodes }, library, direction).map((band) => ({
+        ...band, chainKey: section.key, chainLabel: section.label,
+      }))
+    )
+  }
   const domains = [...new Set(graph.nodes.filter((node) => !node.summary).map((node) => library.byId.get(node.id).domain))]
   return domains.map((domain) => {
     const nodes = graph.nodes.filter((node) => !node.summary && library.byId.get(node.id).domain === domain)
@@ -266,7 +362,7 @@ export function businessChainLaneBands(graph, library, direction = 'LR') {
 }
 
 // Compact only the reading projection, keeping user-placed nodes and the saved layout intact.
-function compactBusinessChainLanes(graph, library, stableNodes = graph.nodes) {
+function compactBusinessChainLanes(graph, library, stableNodes, collapseEmptyColumns) {
   if (!stableNodes.length || graph.nodes.some((node) => node.manual)) return graph
   const domainOf = (node) => library.byId.get(node.id).domain
   const bands = businessChainLaneBands({ ...graph, nodes: stableNodes }, library).sort((a, b) => a.y - b.y)
@@ -278,8 +374,22 @@ function compactBusinessChainLanes(graph, library, stableNodes = graph.nodes) {
     bottom = Math.max(bottom, top + band.height)
   }
 
+  // Remove only whole empty columns. Details revealed by inspection do not shift the base layout.
+  const columns = collapseEmptyColumns
+    ? [...new Set(stableNodes.map(({ x }) => x))].sort((a, b) => a - b)
+    : []
+  const emptySpans = []
+  for (let index = 1; index < columns.length; index++) {
+    const start = columns[index - 1] + columnStride
+    const width = Math.floor((columns[index] - start) / columnStride) * columnStride
+    if (width > 0) emptySpans.push({ start, width })
+  }
+  const xInView = (x) => x - emptySpans.reduce(
+    (removed, { start, width }) => removed + Math.min(width, Math.max(0, x - start)),
+    0
+  )
   const positions = new Map(stableNodes.map((node) => [
-    node.id, { ...node, y: node.y - lanes.get(domainOf(node)).offset },
+    node.id, { ...node, x: xInView(node.x), y: node.y - lanes.get(domainOf(node)).offset },
   ]))
   // Inspection can reveal neighbors while the inspector is open. Use a free column
   // in their lane so opening details keeps the existing steps under the pointer.
@@ -293,7 +403,7 @@ function compactBusinessChainLanes(graph, library, stableNodes = graph.nodes) {
     }
     const lane = lanes.get(domain)
     const y = Math.max(lane.minY, Math.min(node.y - lane.offset, lane.maxY))
-    let { x } = node
+    let x = xInView(node.x)
     const row = [...positions.values()].filter((other) => Math.abs(other.y - y) < CHAIN_DESIGN_NODE_SIZE.height)
     const occupied = (candidateX) => row.some((other) => Math.abs(other.x - candidateX) < columnStride)
     while (occupied(x)) x += columnStride

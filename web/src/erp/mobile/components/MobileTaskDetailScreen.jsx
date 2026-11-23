@@ -4,12 +4,13 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { TaskBusinessInformationContext } from '../../hooks/useBusinessPageContext.js'
+import { TaskBusinessInformationContext, TaskBusinessStepVisibleContext } from '../../hooks/useBusinessPageContext.js'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import WorkflowFollowupDetails, { hasWorkflowFollowupDetails } from '../../components/workflow/WorkflowFollowupDetails.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowTaskInfoCard from '../../components/workflow/WorkflowTaskInfoCard.jsx'
+import WorkflowTaskInformation, { WorkflowTaskInformationSection } from '../../components/workflow/WorkflowTaskInformation.jsx'
 import { taskDeviceNotice, taskNeedsDesktop } from '../../utils/taskHandlingPolicy.mjs'
 import WorkflowTaskCurrentSummary from '../../components/workflow/WorkflowTaskCurrentSummary.jsx'
 import useWorkflowTaskAssignmentAccess from '../../hooks/useWorkflowTaskAssignmentAccess.js'
@@ -75,6 +76,7 @@ export default function MobileTaskDetailScreen({
 }) {
   const { adminProfile } = useOutletContext() || {}
   const information = React.useContext(TaskBusinessInformationContext)
+  const stepVisible = React.useContext(TaskBusinessStepVisibleContext)
   const desktopHandling = taskNeedsDesktop(selectedTask)
   const materialContext = React.useMemo(
     () => getEngineeringMaterialTaskContext(selectedTask),
@@ -245,122 +247,132 @@ export default function MobileTaskDetailScreen({
       />
 
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
-        <WorkflowTaskInfoCard
-          task={selectedTask}
-          title={getWorkflowTaskDisplayName(selectedTask)}
-          status={<span className={`mobile-task-flow-status ${selectedSeverity.badgeClass}`}>{taskStatusLabel}</span>}
-          source={<div className="mobile-detail-source"><WorkflowTaskSource task={selectedTask} label={relatedSource} /></div>}
-          assigneeLabel={assigneeLabel}
-          events={taskEventsState === 'ready' ? taskEvents : []}
-          summary={<WorkflowTaskCurrentSummary appearance="facts" task={selectedTask} roleLabel={ownerRoleLabel} assigneeLabel={assigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={isTaskRisk(selectedTask) ? taskReason : ''} reasonLabel={taskReasonLabel} contact={exceptionContact} guidance={actionGuidance} />}
-          businessInfo={factRows.length > 0 || completeCondition || hasWorkflowFollowupDetails(selectedTask) ? (
-            <>
-              <dl className="mobile-detail-facts">
-                {factRows.map(([label, value]) => <div key={label} className="mobile-detail-fact"><dt>{label}</dt><dd>{mobileFactValueText(value)}</dd></div>)}
-                {completeCondition ? <div className="mobile-detail-fact"><dt>完成条件</dt><dd>{completeCondition}</dd></div> : null}
-              </dl>
-              <WorkflowFollowupDetails task={selectedTask} />
-            </>
-          ) : null}
-        />
+        <WorkflowTaskInformation active={stepVisible !== false}>
+          <WorkflowTaskInformationSection label="概况">
+            <WorkflowTaskInfoCard
+              task={selectedTask}
+              title={getWorkflowTaskDisplayName(selectedTask)}
+              status={<span className={`mobile-task-flow-status ${selectedSeverity.badgeClass}`}>{taskStatusLabel}</span>}
+              source={<div className="mobile-detail-source"><WorkflowTaskSource task={selectedTask} label={relatedSource} /></div>}
+              assigneeLabel={assigneeLabel}
+              events={taskEventsState === 'ready' ? taskEvents : []}
+              summary={<WorkflowTaskCurrentSummary appearance="facts" task={selectedTask} roleLabel={ownerRoleLabel} assigneeLabel={assigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={isTaskRisk(selectedTask) ? taskReason : ''} reasonLabel={taskReasonLabel} contact={exceptionContact} guidance={actionGuidance} />}
+              businessInfo={factRows.length > 0 || completeCondition || hasWorkflowFollowupDetails(selectedTask) ? (
+                <>
+                  <dl className="mobile-detail-facts">
+                    {factRows.map(([label, value]) => <div key={label} className="mobile-detail-fact"><dt>{label}</dt><dd>{mobileFactValueText(value)}</dd></div>)}
+                    {completeCondition ? <div className="mobile-detail-fact"><dt>完成条件</dt><dd>{completeCondition}</dd></div> : null}
+                  </dl>
+                  <WorkflowFollowupDetails task={selectedTask} />
+                </>
+              ) : null}
+            />
 
-        <div ref={information?.setHost} data-testid="workflow-task-business-information">{information?.retained}</div>
-        <section className="workflow-task-info-card">
-          <WorkflowTaskHandlingChain
-            task={selectedTask}
-            onOpenTask={onOpenLinkedTask}
-            profile={adminProfile}
-            processContext={processContext}
-            processContextState={processContextState}
-            onRetryProcess={() =>
-              setProcessContextReloadKey((value) => value + 1)
-            }
-            variant="mobile"
-            focused
-          />
-        </section>
+          </WorkflowTaskInformationSection>
+          <WorkflowTaskInformationSection label="单据资料">
+            <div ref={information?.setHost} data-testid="workflow-task-business-information">{information?.retained}</div>
+          </WorkflowTaskInformationSection>
+          <WorkflowTaskInformationSection label="流转">
+            <WorkflowTaskHandlingChain
+              task={selectedTask}
+              onOpenTask={onOpenLinkedTask}
+              profile={adminProfile}
+              processContext={processContext}
+              processContextState={processContextState}
+              onRetryProcess={() =>
+                setProcessContextReloadKey((value) => value + 1)
+              }
+              variant="mobile"
+              focused
+            />
 
-        {canOpenProductionArrangement ? (
-          <section
-            className="erp-mobile-card mobile-detail-section"
-            data-testid="mobile-production-arrangement-entry"
-          >
-            <h3>返工生产安排</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              为当前返工批次选择本厂生产或外发加工。保存安排后，再回到任务处理页记录本次处理结论。
-            </p>
-            <button
-              type="button"
-              className="mobile-detail-primary mt-4 min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
-              onClick={() => setProductionArrangementOpen(true)}
+          </WorkflowTaskInformationSection>
+
+          {canOpenProductionArrangement ? (
+            <section
+              className="erp-mobile-card mobile-detail-section"
+              data-testid="mobile-production-arrangement-entry"
             >
-              安排本厂 / 外发
-            </button>
-          </section>
-        ) : null}
+              <h3>返工生产安排</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                为当前返工批次选择本厂生产或外发加工。保存安排后，再回到任务处理页记录本次处理结论。
+              </p>
+              <button
+                type="button"
+                className="mobile-detail-primary mt-4 min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
+                onClick={() => setProductionArrangementOpen(true)}
+              >
+                安排本厂 / 外发
+              </button>
+            </section>
+          ) : null}
 
-        {taskDeviceNotice(selectedTask) ? <p>{taskDeviceNotice(selectedTask)}</p> : null}
+          {taskDeviceNotice(selectedTask) ? <p>{taskDeviceNotice(selectedTask)}</p> : null}
 
-        <WorkflowTaskEventTrail
-          records={taskEventRecords}
-          className="mobile-detail-section workflow-task-info-card workflow-task-info-card--records"
-          approvalTask={approvalTask}
-          errorMessage="本任务处理记录加载失败，请刷新后重试。"
-          events={taskEvents}
-          state={taskEventsState}
-          task={selectedTask}
-          truncated={taskEventsTruncated}
-          variant="mobile"
-          showResponsibility={false}
-          compact
-        />
+          <WorkflowTaskInformationSection label="处理记录">
+            <WorkflowTaskEventTrail
+              records={taskEventRecords}
+              className="mobile-detail-section workflow-task-info-card workflow-task-info-card--records"
+              approvalTask={approvalTask}
+              errorMessage="本任务处理记录加载失败，请刷新后重试。"
+              events={taskEvents}
+              state={taskEventsState}
+              task={selectedTask}
+              truncated={taskEventsTruncated}
+              variant="mobile"
+              showResponsibility={false}
+              compact
+            />
 
-        {selectedTask.mobile_exception_report ? (
-          <section className="mobile-role-detail-exception rounded-2xl border border-orange-200 bg-orange-50 px-4 py-4 text-base text-orange-800">
-            <div className="font-semibold">异常上报</div>
-            <div className="mt-2 break-words leading-6">
-              {selectedTask.mobile_exception_report.reason || '已记录异常'}
-            </div>
-          </section>
-        ) : null}
+          </WorkflowTaskInformationSection>
 
-        {relatedDocuments.length > 0 ? (
-          <section className="erp-mobile-card mobile-detail-section">
-            <h3>相关单据（{relatedDocuments.length}）</h3>
-            <div className="mt-4 space-y-2">
-              {relatedDocuments.map((document, index) => (
-                <div
-                  key={`${document}-${index}`}
-                  className="mobile-role-detail-related-item rounded-xl border border-slate-200 px-4 py-3 text-sm leading-6 text-slate-600"
-                >
-                  <span className="break-all">{document}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+          {selectedTask.mobile_exception_report ? (
+            <section className="mobile-role-detail-exception rounded-2xl border border-orange-200 bg-orange-50 px-4 py-4 text-base text-orange-800">
+              <div className="font-semibold">异常上报</div>
+              <div className="mt-2 break-words leading-6">
+                {selectedTask.mobile_exception_report.reason || '已记录异常'}
+              </div>
+            </section>
+          ) : null}
 
-        {savedEvidenceRefs.length > 0 ? (
-          <section
-            data-testid="mobile-role-historical-evidence"
-            className="rounded-xl border border-slate-200 bg-slate-100/70 p-3"
-          >
-            <h2 className="text-sm font-semibold text-slate-600">
-              历史处理线索
-            </h2>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {savedEvidenceRefs.map((ref) => (
-                <span
-                  key={ref}
-                  className="min-w-0 max-w-full break-all rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-600"
-                >
-                  {ref}
-                </span>
-              ))}
-            </div>
-          </section>
-        ) : null}
-        <MobileBackToTop />
+          {relatedDocuments.length > 0 ? (
+            <section className="erp-mobile-card mobile-detail-section">
+              <h3>相关单据（{relatedDocuments.length}）</h3>
+              <div className="mt-4 space-y-2">
+                {relatedDocuments.map((document, index) => (
+                  <div
+                    key={`${document}-${index}`}
+                    className="mobile-role-detail-related-item rounded-xl border border-slate-200 px-4 py-3 text-sm leading-6 text-slate-600"
+                  >
+                    <span className="break-all">{document}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {savedEvidenceRefs.length > 0 ? (
+            <section
+              data-testid="mobile-role-historical-evidence"
+              className="rounded-xl border border-slate-200 bg-slate-100/70 p-3"
+            >
+              <h2 className="text-sm font-semibold text-slate-600">
+                历史处理线索
+              </h2>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {savedEvidenceRefs.map((ref) => (
+                  <span
+                    key={ref}
+                    className="min-w-0 max-w-full break-all rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-600"
+                  >
+                    {ref}
+                  </span>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          <MobileBackToTop />
+        </WorkflowTaskInformation>
       </main>
 
       {productionArrangementContext ? (

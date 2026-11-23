@@ -38,6 +38,5 @@ export function readVisualizationChoices(source) {
 
 export function resolveVisualizationChoice(choices, value) {
   return choices.find((choice) => choice.value === value)
-    ?? choices.find((choice) => choice.value === 'planning')
     ?? choices[0]
 }

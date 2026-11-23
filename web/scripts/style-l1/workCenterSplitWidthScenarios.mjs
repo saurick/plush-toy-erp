@@ -77,7 +77,6 @@ export function createWorkCenterSplitWidthScenarios({ assert, outputDir }) {
         await page.getByRole('button', { name: '分栏', exact: true }).first().click()
         const picker = right.getByRole('combobox', { name: '选择右栏页面' })
         await picker.click()
-        await picker.fill('任务管理')
         await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
         await right.locator('.erp-work-center-table tr[data-task-id]').first().waitFor()
         for (const ratio of [0.32, 0.68, 0.4, 0.32]) await resize(ratio, 'original')

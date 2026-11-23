@@ -2,14 +2,13 @@ import React from 'react'
 import { Button } from 'antd'
 import { CloseOutlined, LeftOutlined } from '@ant-design/icons'
 import { useLocation, useSearchParams } from 'react-router-dom'
-import Empty from '@/common/components/empty/AppEmpty.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList.jsx'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { DEV_FLOW_FINANCE_RELATIONS_TAB, DEV_FLOW_STATE_QUERY_KEYS as queryKeys, readDevFlowRelationFilters, patchDevFlowRelationFilters } from '../../pages/devFlowStateQuery.mjs'
 import { devFlowExplorerChainURL } from '../../config/devRoutes.mjs'
 import { FLOW_READING_CONTEXT_KEYS } from '../../pages/devFlowViewContext.mjs'
 import { buildFulfillmentRelations, buildChainActionRelations, relationMatches, relationFiltersActive } from '../../config/devFulfillmentRelations.mjs'
-import BusinessRelationFilters from './BusinessRelationFilters.jsx'
+import { BusinessChainRoleFilter } from './BusinessRelationFilters.jsx'
 import BusinessActionRelations from './BusinessActionRelations.jsx'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../../common/consts/workflowTaskDiscovery.generated.mjs'
 import {
@@ -18,7 +17,6 @@ import {
   normalizeFulfillmentRole,
 } from '../../../erp/utils/workflowFulfillment.mjs'
 import {
-  buildFulfillmentExceptionDirectory,
   getFulfillmentStageCopy,
   selectFulfillmentException,
 } from '../../config/devFulfillmentPresentation.mjs'
@@ -47,6 +45,25 @@ const structureTabs = [
   { value: 'exceptions', label: '异常处理' },
   { value: DEV_FLOW_FINANCE_RELATIONS_TAB, label: '财务关联概览' },
 ]
+const exceptionOptions = catalog.exception_guides.map(({ key, label }) => ({ value: key, label }))
+
+function ExceptionActionRelations({ actions, selectedKey, restoreOpen, onSelect, onOpenRules }) {
+  const [open, setOpen] = React.useState(() => restoreOpen || actions.some((action) => action.key === selectedKey))
+
+  return (
+    <details className="erp-dev-disclosure" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>关联动作与规则</summary>
+      {open ? (
+        <BusinessActionRelations
+          actions={actions}
+          selectedKey={selectedKey}
+          onSelect={onSelect}
+          onOpenRules={onOpenRules}
+        />
+      ) : null}
+    </details>
+  )
+}
 
 export default function TaskFulfillmentGuide({
   businessCatalog,
@@ -57,32 +74,38 @@ export default function TaskFulfillmentGuide({
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const role = normalizeFulfillmentRole(searchParams.get(queryKeys.role))
-  const openActionRules = onOpenView ? (action) => onOpenView('states', {
-    [queryKeys.flow]: action.machineKeys.length === 1 ? action.machineKeys[0] : null,
-    [queryKeys.relationAction]: action.key,
-  }) : undefined
   const filters = readDevFlowRelationFilters(searchParams)
   const filtered = relationFiltersActive(filters)
   const relations = React.useMemo(() => buildFulfillmentRelations(businessCatalog), [businessCatalog])
   const relationByStage = new Map(relations.map((item) => [item.stage.stage, item]))
-  const allActions = React.useMemo(() => businessCatalog.businessChains.flatMap((chain) => buildChainActionRelations(businessCatalog, chain)), [businessCatalog])
   const detailID = React.useId()
   const overviewRef = React.useRef(null)
-  const detailRef = React.useRef(null)
   const openerRef = React.useRef(null)
-  const revealRef = React.useRef(false)
+  const exceptionTypeRef = React.useRef(null)
   const view = scoped ? 'main' : searchParams.get(queryKeys.roleTab) || 'main'
+  const showMain = view === 'main'
   const showFinance = view === DEV_FLOW_FINANCE_RELATIONS_TAB
   const guideKey = searchParams.get(queryKeys.exception)
+  const restoredFrame = location.state?.flowRestoreFrame
   const selection = guideKey
     ? selectFulfillmentException({
         guideKey,
         planKey: searchParams.get(queryKeys.exceptionDecision),
         originStage: searchParams.get(queryKeys.exceptionOrigin),
         stepKey: searchParams.get(queryKeys.exceptionStep),
-        role,
       })
     : null
+  const openActionRules = onOpenView ? (action) => onOpenView('states', {
+    [queryKeys.flow]: action.machineKeys.length === 1 ? action.machineKeys[0] : null,
+    [queryKeys.relationAction]: action.key,
+    ...(selection?.guide ? {
+      [queryKeys.chain]: action.chainKey,
+      [queryKeys.node]: null,
+      [queryKeys.role]: null,
+      [queryKeys.relationMachine]: null,
+      [queryKeys.relationPermission]: null,
+    } : {}),
+  }) : undefined
   const current =
     steps.find(
       (step) => step.stage === searchParams.get(queryKeys.roleStage)
@@ -95,24 +118,20 @@ export default function TaskFulfillmentGuide({
     : null
   const canReturn = Boolean(selection && current)
   const relatedChainKey = selection?.guide ? selection.guide.business_chain : current?.business_chain
-  const relatedChainKnown = businessCatalog.businessChains.some((chain) => chain.key === relatedChainKey)
+  const relatedChain = businessCatalog.businessChains.find((chain) => chain.key === relatedChainKey)
+  const exceptionActions = selection?.guide && relatedChain ? buildChainActionRelations(businessCatalog, relatedChain) : []
   const detailStep = selection
     ? steps.find((step) => step.stage === selection.origin?.stage) ||
       selection.origin
     : current
-  const showDetail = Boolean(current || selection)
+  const showDetail = Boolean(selection || (showMain && current))
 
-  const exceptionDirectory = buildFulfillmentExceptionDirectory(
-    catalog.exception_guides,
-    'all'
-  ).filter(({ guide }) => !filtered || allActions.some((action) => action.chainKey === guide.business_chain && relationMatches(action, filters)))
-  const filterActions = view === 'main' ? relations.filter((item) => steps.some((step) => step.stage === item.stage.stage)).flatMap((item) => item.actions) : allActions
+  const filterActions = relations.filter((item) => steps.some((step) => step.stage === item.stage.stage)).flatMap((item) => item.actions)
   const matchingStages = new Set(relations.filter((item) => item.actions.some((action) => relationMatches(action, filters))).map((item) => item.stage.stage))
 
-  const update = (change, reveal = false) => {
-    if (reveal) {
+  const update = (change, rememberOpener = false) => {
+    if (rememberOpener) {
       openerRef.current = document.activeElement?.closest('button, [role="button"]')
-      revealRef.current = true
     }
     setSearchParams(
       (previous) => {
@@ -156,16 +175,16 @@ export default function TaskFulfillmentGuide({
       return next
     }, { state: { ...location.state, flowReturnFrames: [], flowRestoreFrame: null } })
   const closeDetail = () => {
-    update((next) =>
+    update((next) => {
       (canReturn ? exceptionKeys : detailKeys).forEach((key) =>
         next.delete(key)
       )
-    )
-    requestAnimationFrame(
-      () =>
-        openerRef.current?.isConnected &&
-        openerRef.current.focus({ preventScroll: true })
-    )
+      if (canReturn) next.delete(queryKeys.roleTab)
+    })
+    requestAnimationFrame(() => {
+      if (openerRef.current?.isConnected) openerRef.current.focus({ preventScroll: true })
+      else exceptionTypeRef.current?.focus({ preventScroll: true })
+    })
   }
   return (
     <section className="erp-dev-fulfillment-guide" id="task-fulfillment-guide">
@@ -180,14 +199,28 @@ export default function TaskFulfillmentGuide({
             onChange={setView}
           />
         )}
-        <BusinessRelationFilters
-          catalog={businessCatalog}
-          actions={filterActions}
-          filters={filters}
-          onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
-        />
+        {showMain ? (
+          <BusinessChainRoleFilter
+            catalog={businessCatalog}
+            actions={filterActions}
+            filters={filters}
+            onChange={(patch) => setSearchParams((previous) => patchDevFlowRelationFilters(previous, patch), { state: location.state })}
+          />
+        ) : view === 'exceptions' ? (
+          <FilterSelect
+            ref={exceptionTypeRef}
+            className="erp-dev-fulfillment-guide__exception-select"
+            label="异常类型"
+            placeholder="请选择"
+            value={selection?.guide?.key}
+            options={exceptionOptions}
+            showSearch={false}
+            virtual={false}
+            onChange={(key) => key ? openException(catalog.exception_guides.find((guide) => guide.key === key)) : closeDetail()}
+          />
+        ) : null}
       </div>
-      {showFinance ? <FinanceRelationshipsView catalog={businessCatalog} role={role} filters={filters} /> : view === 'main' ? (
+      {showFinance ? <FinanceRelationshipsView catalog={businessCatalog} /> : showMain ? (
         <>
           <p className="erp-dev-fulfillment-guide__scope-bar" role="status">
             {filtered
@@ -224,42 +257,11 @@ export default function TaskFulfillmentGuide({
             />
           )}
         </>
-      ) : (
-        <section
-          className="erp-dev-exception-directory"
-          aria-label="异常处理目录"
-        >
-          {!selection ? (
-            <FilterSelect
-              label="异常类型"
-              aria-label="异常类型"
-              placeholder="选择异常类型"
-              value={guideKey}
-              options={exceptionDirectory.map(({ guide }) => ({
-                value: guide.key,
-                label: guide.label,
-              }))}
-              onChange={(key) =>
-                key &&
-                openException(
-                  catalog.exception_guides.find(
-                    (guide) => guide.key === key
-                  )
-                )
-              }
-              virtual={false}
-            />
-          ) : null}
-          {!selection ? (
-            <Empty description="选择异常类型，查看处理分支及回接位置。" />
-          ) : null}
-        </section>
-      )}
+      ) : null}
       {!showFinance && showDetail ? (
         <section
           className="erp-dev-fulfillment-guide__panel"
           aria-label="流程详情"
-          ref={detailRef}
           id={detailID}
         >
           <div className="erp-dev-fulfillment-guide__detail-heading">
@@ -281,7 +283,7 @@ export default function TaskFulfillmentGuide({
                     : currentLabel}
               </h3>
             </div>
-            {!scoped && !canReturn ? (
+            {!scoped && !canReturn && showMain ? (
               <Button
                 type="text"
                 icon={<CloseOutlined />}
@@ -293,13 +295,7 @@ export default function TaskFulfillmentGuide({
           {selection?.invalid ? (
             <div role="alert">
               <p>{selection.invalid}，请重新选择异常类型。</p>
-              <Button
-                onClick={() =>
-                  update((next) =>
-                    exceptionKeys.forEach((key) => next.delete(key))
-                  )
-                }
-              >
+              <Button onClick={closeDetail}>
                 清除并重新选择
               </Button>
             </div>
@@ -307,17 +303,6 @@ export default function TaskFulfillmentGuide({
             <FulfillmentExceptionDetails
               key={selection.guide.key}
               selection={selection}
-              guides={catalog.exception_guides}
-              onSelectGuide={(key) =>
-                key
-                  ? openException(
-                      catalog.exception_guides.find(
-                        (guide) => guide.key === key
-                      )
-                    )
-                  : closeDetail()
-              }
-              role={role}
               onSelectOrigin={(stage) =>
                 update((next) =>
                   stage
@@ -407,13 +392,15 @@ export default function TaskFulfillmentGuide({
               </details>
             </div>
           ) : null}
-          {selection?.guide && !selection.invalid ? <BusinessActionRelations
+          {exceptionActions.length ? <ExceptionActionRelations
+            key={`actions:${selection.guide.key}`}
+            restoreOpen={restoredFrame?.search === searchParams.toString() && restoredFrame.focus === '查看动作规则'}
             onOpenRules={openActionRules}
-            actions={allActions.filter((action) => action.chainKey === selection.guide.business_chain && relationMatches(action, filters))}
+            actions={exceptionActions}
             selectedKey={searchParams.get(queryKeys.relationAction)}
             onSelect={(key) => update((next) => next.set(queryKeys.relationAction, key))}
           /> : null}
-          {!scoped && !selection?.invalid && relatedChainKnown ? (
+          {!scoped && !selection?.invalid && relatedChain ? (
             <>
               <DevReadingLink
                 to={devFlowExplorerChainURL(relatedChainKey)}

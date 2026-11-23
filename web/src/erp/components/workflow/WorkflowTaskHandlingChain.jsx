@@ -12,17 +12,14 @@ import {
   buildCurrentTaskStageModel,
   buildEngineeringMaterialStageModel,
 } from '../../utils/workflowTaskHandlingChain.mjs'
-import {
-  formatProcessStartedAt,
-  getProcessLabel,
-  getProcessStatusLabel,
-} from '../../utils/processRuntimePresentation.mjs'
+import { getProcessLabel } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
 import EngineeringMaterialPurchaseOrders from '../sales-orders/EngineeringMaterialPurchaseOrders.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import WorkflowTrackingDrawer from './WorkflowTrackingDrawer.jsx'
 import WorkflowBusinessChain from './WorkflowBusinessChain.jsx'
 import { supportsWorkflowBusinessChain } from '../../utils/workflowBusinessChain.mjs'
+import { trackingRefForWorkflowTask } from '../../utils/workflowTracking.mjs'
 import WorkflowTaskScopeHelp from './WorkflowTaskScopeHelp.jsx'
 
 export default function WorkflowTaskHandlingChain({
@@ -48,6 +45,15 @@ export default function WorkflowTaskHandlingChain({
   const [reload, setReload] = React.useState(0)
   const [trackingOpen, setTrackingOpen] = React.useState(false)
   const [orderChainTaskID, setOrderChainTaskID] = React.useState(null)
+  const orderButton = React.useRef(null)
+  const restoreOrderFocus = React.useRef(false)
+  const canShowOrderChain = supportsWorkflowBusinessChain(task) && hasActionPermission(profile, PermissionCode.WORKFLOW_TASK_READ)
+  const showOrderChain = canShowOrderChain && orderChainTaskID === task.id
+  React.useLayoutEffect(() => {
+    if (!restoreOrderFocus.current) return
+    restoreOrderFocus.current = false
+    orderButton.current?.focus({ preventScroll: true })
+  }, [showOrderChain])
   React.useEffect(() => setOrderChainTaskID(null), [task?.id, profile?.id])
   React.useEffect(() => setTrackingOpen(false), [task?.id])
   React.useEffect(() => {
@@ -72,8 +78,6 @@ export default function WorkflowTaskHandlingChain({
   }, [sourceKey, processLinked, reload, orderID, requestID, canRead, task])
 
   if (!task) return null
-  const canShowOrderChain = supportsWorkflowBusinessChain(task) && hasActionPermission(profile, PermissionCode.WORKFLOW_TASK_READ)
-  const showOrderChain = canShowOrderChain && orderChainTaskID === task.id
   const current = result?.key === sourceKey ? result : null
   const state = processLinked
     ? processContextState
@@ -88,6 +92,29 @@ export default function WorkflowTaskHandlingChain({
   const retry = processLinked
     ? onRetryProcess
     : () => setReload((value) => value + 1)
+  const relatedTasksOnly = focused && !processLinked && !materialTask && !model
+  const orderAction = canShowOrderChain ? (
+    <Button
+      ref={orderButton}
+      type={focused ? 'link' : 'default'}
+      size="small"
+      onClick={() => {
+      restoreOrderFocus.current = true
+      setOrderChainTaskID(showOrderChain ? null : task.id)
+    }}
+    >
+      {showOrderChain ? '返回本任务' : '查看整单进度'}{focused ? <ArrowRightOutlined aria-hidden="true" /> : null}
+    </Button>
+  ) : null
+  const canTrack = state === 'ready' && (processLinked ? processContext : materialTask && canRead && current?.model)
+  const trackingAction = canTrack && !showOrderChain ? (
+    <Button size="small" type="link" aria-haspopup={onOpenTracking ? undefined : 'dialog'} onClick={onOpenTracking || (() => setTrackingOpen(true))}>
+      查看此流程详情<ArrowRightOutlined aria-hidden="true" />
+    </Button>
+  ) : null
+  const trackingDrawer = canTrack && !onOpenTracking && (
+    <WorkflowTrackingDrawer trackingRef={trackingOpen ? trackingRefForWorkflowTask(task) : null} onClose={() => setTrackingOpen(false)} refreshKey={task.version} closeLabel="返回任务" />
+  )
   if (
     !processLinked &&
     !materialTask &&
@@ -111,10 +138,21 @@ export default function WorkflowTaskHandlingChain({
       </>
     )
   }
+  const heading = (
+    <div className="workflow-business-chain__heading">
+      <div className="workflow-task-scope-heading">
+        {focused && !showOrderChain ? (
+          <span className="workflow-task-detail-flow__label" aria-label="业务流程"><ForkOutlined aria-hidden="true" />{processContext ? getProcessLabel(processContext.process_instance) : model?.processLabel || '相关任务进度'}</span>
+        ) : <h3 className="erp-task-action-drawer__section-title">{showOrderChain ? '整单进度' : '相关任务进度'}</h3>}
+        {!processLinked || canShowOrderChain ? <WorkflowTaskScopeHelp kind="progress" orderView={showOrderChain} /> : null}
+      </div>
+      {trackingAction && orderAction ? <div className="workflow-task-detail-flow__actions">{trackingAction}{orderAction}</div> : trackingAction || orderAction}
+    </div>
+  )
   return (
     <section
       className={
-        focused ? 'workflow-task-detail-flow' : variant === 'mobile'
+        focused ? `workflow-task-detail-flow${relatedTasksOnly && !showOrderChain ? '' : ' workflow-task-info-card'}` : variant === 'mobile'
           ? 'erp-mobile-card mobile-detail-section'
           : 'erp-task-action-drawer__summary'
       }
@@ -126,15 +164,7 @@ export default function WorkflowTaskHandlingChain({
       }
       data-process-state={state}
     >
-      <div className="workflow-business-chain__heading">
-        <div className="workflow-task-scope-heading">
-          {focused && !showOrderChain ? (
-            <span className="workflow-task-detail-flow__label" aria-label="业务流程"><ForkOutlined aria-hidden="true" />{processContext ? getProcessLabel(processContext.process_instance) : model?.processLabel || '相关任务进度'}</span>
-          ) : <h3 className="erp-task-action-drawer__section-title">{showOrderChain ? '整单进度' : '相关任务进度'}</h3>}
-          <WorkflowTaskScopeHelp kind="progress" orderView={showOrderChain} />
-        </div>
-        {canShowOrderChain ? <Button type={focused ? 'link' : 'default'} size="small" onClick={() => setOrderChainTaskID(showOrderChain ? null : task.id)}>{showOrderChain ? '返回本任务' : '查看整单进度'}{focused ? <ArrowRightOutlined aria-hidden="true" /> : null}</Button> : null}
-      </div>
+      {!relatedTasksOnly || showOrderChain ? heading : null}
       {!showOrderChain ? resources : null}
       {showOrderChain ? (
         <WorkflowBusinessChain task={task} profile={profile} view="order" onOpenTask={onOpenTask} showGuidance={variant !== 'mobile'} />
@@ -151,32 +181,18 @@ export default function WorkflowTaskHandlingChain({
                 </Button>
               ) : null}
             </div>
-          ) : processLinked && processContext ? (
-            <>
-              {!focused ? (
-                <div className="erp-task-process-overview" aria-label="业务流程">
-                  <span>{getProcessLabel(processContext.process_instance)}</span>
-                  <span aria-label="流程状态">{getProcessStatusLabel(processContext.process_instance)}</span>
-                </div>
-              ) : null}
-              <WorkflowProcessStageTrack
-                key={task.id}
-                context={processContext}
-                variant={variant}
-                focusCurrent
-                compact={focused}
-                hideLinkedCurrent={focused}
-              />
-              <div className="erp-task-process-footer">
-                <span>{getProcessStatusLabel(processContext.process_instance)} · 发起于 {formatProcessStartedAt(processContext.process_instance.started_at)}</span>
-                <Button size="small" type="link" onClick={onOpenTracking || (() => setTrackingOpen(true))}>查看此流程详情</Button>
-              </div>
-              {!onOpenTracking ? <WorkflowTrackingDrawer trackingRef={trackingOpen ? { kind: 'process', id: task.process_instance_id } : null} onClose={() => setTrackingOpen(false)} refreshKey={task.version} closeLabel="返回任务" /> : null}
-            </>
-          ) : model ? (
+          ) : processLinked ? null : model ? (
             <WorkflowProcessStageTrack key={task.id} model={model} variant={variant} focusCurrent compact={focused} hideLinkedCurrent={focused} />
           ) : !processLinked && !materialTask ? (
-            <WorkflowBusinessChain task={task} profile={profile} onOpenTask={onOpenTask} focused={focused} showGuidance={variant !== 'mobile'} />
+            <WorkflowBusinessChain
+              task={task}
+              profile={profile}
+              onOpenTask={onOpenTask}
+              focused={focused}
+              showGuidance={variant !== 'mobile'}
+              heading={relatedTasksOnly && !showOrderChain ? heading : null}
+              emptyAction={!showOrderChain && orderAction ? <div className="workflow-business-chain__heading">{orderAction}</div> : null}
+            />
           ) : null}
         {state === 'ready' && current?.model ? (
           <EngineeringMaterialPurchaseOrders
@@ -194,6 +210,7 @@ export default function WorkflowTaskHandlingChain({
           </p>
           ) : null}
       </div>
+      {trackingDrawer}
     </section>
   )
 }

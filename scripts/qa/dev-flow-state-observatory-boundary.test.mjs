@@ -123,16 +123,13 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(guide, /<FinanceRelationshipsView/u);
   assert.match(guide, /label: '财务关联概览'/u);
   assert.match(guide, /aria-label="流程视图"/u);
-  assert.match(guide, /relatedChainKnown = businessCatalog\.businessChains\.some\(\(chain\) => chain\.key === relatedChainKey\)/u);
-  assert.match(guide, /!scoped && !selection\?\.invalid && relatedChainKnown/u);
   assert.match(guide, /devFlowExplorerChainURL\(relatedChainKey\)/u);
   assert.doesNotMatch(guide, /按业务查阅|返回完整流程|topic-nodes/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
   assert.match(guide, /aria-label="流程详情"/u);
-  assert.match(guide, /aria-label="异常处理目录"/u);
-  assert.match(guide, /aria-label="异常类型"/u);
+  assert.match(guide, /label="异常类型"/u);
   assert.doesNotMatch(guide, /完整交接与审批说明|按文字选择子步骤/u);
-  assert.match(guide, /<BusinessRelationFilters\s+catalog=\{businessCatalog\}/u);
+  assert.match(guide, /<BusinessChainRoleFilter\s+catalog=\{businessCatalog\}/u);
   assert.match(guide, /fulfillmentStepMatchesRole/u);
   assert.match(guide, /fulfillmentTaskLinks/u);
   assert.match(guide, /订单全流程/u);

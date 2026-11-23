@@ -1,12 +1,17 @@
-export const viewTrigger = (scope) => scope.getByRole('button', { name: /^画布视图：/u })
+export const layoutTrigger = (scope) => scope.getByRole('button', { name: /^(展开后)?布局：/u })
+export const grainControl = (scope) => scope.getByRole('radiogroup', { name: '展示粒度', exact: true })
 
-export async function chooseViewOption(scope, label) {
-  const trigger = viewTrigger(scope)
-  await trigger.click()
-  const panel = trigger.page().getByRole('dialog', { name: '画布视图', exact: true })
-  const radio = panel.getByRole('radio', { name: label, exact: true })
+export async function chooseGranularity(scope, name) {
+  const radio = grainControl(scope).getByRole('radio', { name, exact: true })
   await radio.locator('xpath=ancestor::label[1]').click()
-  await panel.getByRole('button', { name: '关闭视图面板' }).click()
+}
+
+export async function chooseLayout(scope, label) {
+  const trigger = layoutTrigger(scope)
+  await trigger.click()
+  const panel = trigger.page().getByRole('dialog', { name: /^(展开后)?布局$/u })
+  await panel.getByRole('radio', { name: label, exact: true }).locator('xpath=ancestor::label[1]').click()
+  await panel.getByRole('button', { name: '关闭布局面板' }).click()
   await panel.waitFor({ state: 'hidden' })
 }
 

@@ -1,10 +1,11 @@
 import { ToolOutlined } from '@ant-design/icons'
-import { Anchor, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { Typography } from 'antd'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import DevPageHeader from '../../../components/DevPageHeader.jsx'
-import DevDirectoryHeader from '../../../components/DevDirectoryHeader.jsx'
+import Directory, { DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import { CI_WORKFLOW_SECTIONS } from '../../../config/devCiWorkflow.mjs'
+import useDirectoryReading from '../../../hooks/useDirectoryReading.js'
 import {
   MANUAL_GUIDE_CI_SECTION_PREFIX,
   ManualTakeoverGuide,
@@ -53,45 +54,58 @@ const guideChapters = [
   },
 ]
 
-const guideMainChapters = guideChapters.map(({ key, title, href }) => ({ key, title, href }))
-const guideHasSubsections = guideChapters.some(({ children }) => children?.length > 0)
+const guideHeadingIds = guideChapters.flatMap(({ href, children = [] }) => [href, ...children.map((child) => child.href)]).map((href) => href.slice(1))
 
 export default function ManualGuidePage() {
   const { pathname, search, hash } = useLocation()
   const navigate = useNavigate()
+  const contentRef = useRef(null)
   const [sectionsExpanded, setSectionsExpanded] = useState(true)
-  useEffect(() => {
-    if (!hash) return
-    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
-  }, [hash])
+  const { currentId, jumpTo } = useDirectoryReading(guideHeadingIds, contentRef)
+  useLayoutEffect(() => {
+    if (hash) jumpTo(hash.slice(1))
+  }, [hash, jumpTo])
 
-  const selectChapter = useCallback(
-    (event, { href }) => {
-      event.preventDefault()
-      navigate({ pathname, search, hash: href }, { replace: true })
-    },
-    [navigate, pathname, search]
+  const activeHref = `#${currentId}`
+  const visibleHref = sectionsExpanded ? activeHref : guideChapters.find(({ children }) =>
+    children?.some(({ href }) => href === activeHref)
+  )?.href || activeHref
+  const renderLink = ({ title, href }) => (
+    <DirectoryItem
+      href={href}
+      aria-current={visibleHref === href ? 'location' : undefined}
+      onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        event.preventDefault()
+        if (hash === href) jumpTo(href.slice(1))
+        else navigate({ pathname, search, hash: href }, { replace: true })
+      }}
+    >
+      <span>{title}</span>
+    </DirectoryItem>
   )
 
   return (
     <div className="erp-dev-hub-page erp-dev-tool-page erp-dev-version-guide-page">
       <aside className="erp-dev-version-guide-toc">
-        <nav aria-label="操作指引章节目录">
-          <DevDirectoryHeader
-            className="erp-dev-version-guide-toc__header"
-            allExpanded={sectionsExpanded}
-            onToggleAll={guideHasSubsections ? () => setSectionsExpanded((expanded) => !expanded) : undefined}
-          >
-            <Typography.Title level={2}>章节目录</Typography.Title>
-          </DevDirectoryHeader>
-          <Anchor
-            className="erp-dev-directory-anchor"
-            affix={false}
-            offsetTop={16}
-            items={sectionsExpanded ? guideChapters : guideMainChapters}
-            onClick={selectChapter}
-          />
-        </nav>
+        <Directory
+          aria-label="操作指引章节目录"
+          className="erp-directory-list"
+          title={<h2>章节目录</h2>}
+          allExpanded={sectionsExpanded}
+          onToggleAll={() => setSectionsExpanded((expanded) => !expanded)}
+        >
+          {guideChapters.map((chapter) => (
+            <div key={chapter.key}>
+              {renderLink(chapter)}
+              {sectionsExpanded && chapter.children ? (
+                <DirectoryBranch>
+                  {chapter.children.map((child) => <div key={child.key}>{renderLink(child)}</div>)}
+                </DirectoryBranch>
+              ) : null}
+            </div>
+          ))}
+        </Directory>
       </aside>
       <DevPageHeader
         className="erp-dev-hub-header"
@@ -106,7 +120,7 @@ export default function ManualGuidePage() {
           </div>
         }
       />
-      <main className="erp-dev-version-guide-content">
+      <main className="erp-dev-version-guide-content" ref={contentRef}>
         <ManualTakeoverGuide />
       </main>
     </div>

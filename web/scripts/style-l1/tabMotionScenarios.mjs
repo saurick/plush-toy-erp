@@ -298,7 +298,6 @@ function assertActionBarRemountStable(samples, label) {
 }
 
 async function verifyStandardModal(page, controls, outputDir) {
-  await controls.getByRole('radio', { name: '浮层与确认', exact: true }).locator('..').click()
   const trigger = controls.getByRole('button', { name: '打开标准弹窗', exact: true })
   await trigger.press('Enter')
   const dialog = page.getByRole('dialog', { name: '共享标准弹窗', exact: true })
@@ -585,25 +584,25 @@ export function createTabMotionScenarios({ outputDir }) {
         verify: async (page) => {
           const controls = page.getByRole('region', { name: '组件设计', exact: true })
           await controls.getByRole('navigation', { name: '组件设计目录' })
-            .getByRole('button', { name: /弹窗与反馈/ }).click()
-          await controls.getByRole('heading', { name: '弹窗与反馈', exact: true }).waitFor()
+            .getByRole('button', { name: /^通用弹窗/u }).click()
+          await controls.getByRole('heading', { name: '通用弹窗', exact: true }).waitFor()
           await verifyStandardModal(page, controls, outputDir)
         },
       },
       {
         name: 'dev-task-tabs-pointer-focus',
-        path: '/__dev/customer-config?customer=yoyoosun&view=preflight&section=evidence',
+        path: '/__dev/customer-config?customer=yoyoosun&view=preflight&section=flow',
         viewport: { width: 1920, height: 1080 },
         deviceScaleFactor: 2,
         verify: async (page) => {
-          const sections = page.getByRole('tablist', { name: '配置预检任务' })
+          const sections = page.getByRole('tablist', { name: '配置核对内容' })
           await sections.waitFor()
           await assertTaskTabPointerAndFocus(sections)
           await assertContentTabAffordance(sections)
-          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置预检任务"]', (await sections.getByRole('tab').count()) - 1)
-          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置预检任务"]', 0, true)
-          await sections.getByRole('tab', { name: '评审依据', exact: true }).click()
-          await page.waitForURL((url) => url.searchParams.get('section') === 'evidence')
+          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置核对内容"]', (await sections.getByRole('tab').count()) - 1)
+          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置核对内容"]', 0, true)
+          await sections.getByRole('tab', { name: '流程与策略', exact: true }).click()
+          await page.waitForURL((url) => url.searchParams.get('section') === 'flow')
           assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '页签不能撑宽页面')
           await page.reload()
           await sections.getByRole('tab', { selected: true }).waitFor()
@@ -634,8 +633,12 @@ export function createTabMotionScenarios({ outputDir }) {
             await controls.waitFor()
           }
           const search = controls.getByRole('textbox', { name: '搜索组件设计' })
-          const choose = async (name) => {
-            await directory.getByRole('button', { name: new RegExp(name) }).click()
+          const choose = async (name, groupName) => {
+            if (groupName) {
+              const group = directory.getByRole('button', { name: groupName, exact: true })
+              if (await group.getAttribute('aria-expanded') === 'false') await group.click()
+            }
+            await directory.getByRole('button', { name, exact: true }).click()
             await controls.getByRole('heading', { name, exact: true }).waitFor()
           }
           const chooseTheme = async (name) => {
@@ -649,31 +652,34 @@ export function createTabMotionScenarios({ outputDir }) {
             '控件页面不应出现页面级横向溢出'
           )
           await controls.waitFor()
-          assert.equal(await page.getByLabel('设计样例分类', { exact: true }).getByRole('radio', { name: '组件设计' }).isChecked(), true)
+          await page.getByRole('tab', { name: '设计样例', exact: true, selected: true }).waitFor()
+          assert.equal(await page.getByLabel('设计样例分类', { exact: true }).count(), 0)
           assert.equal(await page.getByRole('dialog').count(), 0)
           assert.equal(await page.getByRole('button', { name: '下载 HTML' }).count(), 0)
           await assertFits()
 
           await search.fill('不存在的控件')
           await search.press('Enter')
-          await directory.getByText('没有匹配的专题').waitFor()
+          await directory.getByText('没有匹配的组件或样例').waitFor()
           await directory.getByRole('button', { name: '清除搜索' }).click()
-          await directory.getByRole('button', { name: /弹窗与反馈/ }).waitFor()
+          await directory.getByRole('button', { name: /^业务编辑弹窗/u }).waitFor()
           assert.equal(await search.inputValue(), '')
           await search.fill('搜索')
           await search.press('Enter')
-          await directory.getByRole('button', { name: /弹窗与反馈/ }).waitFor({ state: 'hidden' })
-          await directory.getByRole('button', { name: /页签与视图/ }).waitFor()
-          await directory.getByRole('button', { name: /筛选与搜索/ }).waitFor()
-          assert.deepEqual(await directory.getByRole('button').locator('strong').allTextContents(), ['组件选用', '来源选择', '业务工具栏组合', '基础输入', '分组下拉', '长值与多列', '页签与视图', '筛选与搜索', '页面状态'])
+          await directory.getByRole('button', { name: /^业务编辑弹窗/u }).waitFor({ state: 'hidden' })
+          await directory.getByRole('region', { name: '搜索与筛选', exact: true }).getByRole('button', { name: '搜索框', exact: true }).waitFor()
+          await directory.getByRole('region', { name: '组合样例', exact: true }).getByRole('button', { name: '筛选与搜索', exact: true }).waitFor()
           await choose('筛选与搜索')
-          assert.equal(await search.inputValue(), '')
+          assert.equal(await search.inputValue(), '搜索')
           assert.equal(new URL(page.url()).searchParams.get('control'), 'filters')
+          await search.fill('')
+          await search.press('Enter')
+          await page.waitForURL((url) => !url.searchParams.has('controlq'))
           await page.reload()
           await controls.getByRole('heading', { name: '筛选与搜索', exact: true }).waitFor()
           assert.equal(await directory.getByRole('button', { name: /筛选与搜索/ }).getAttribute('aria-current'), 'page')
-          await choose('页签与视图')
-          await choose('筛选与搜索')
+          await choose('页签与视图', '组合样例')
+          await choose('筛选与搜索', '组合样例')
           await page.goBack()
           await controls.getByRole('heading', { name: '页签与视图', exact: true }).waitFor()
           await page.goForward()
@@ -736,7 +742,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await device.getByText('电脑', { exact: true }).click()
           await page.screenshot({ path: path.join(outputDir, 'control-filters-light.png') })
 
-          await choose('页签与视图')
+          await choose('页签与视图', '组合样例')
           const comparison = controls.getByRole('region', { name: '三类控件对照', exact: true })
           const orderTabs = comparison.getByLabel('订单详情样例', { exact: true })
           const entryModes = comparison.getByLabel('登录工作入口样例', { exact: true })
@@ -752,23 +758,27 @@ export function createTabMotionScenarios({ outputDir }) {
           await comparison.getByText('库存批次：冻结，共 2 条（示例）', { exact: true }).waitFor()
           assert.equal(await orderTabs.getByRole('tab', { name: '产品明细', exact: true }).getAttribute('aria-selected'), 'true', '切入口和筛状态不换订单页签')
           await comparison.screenshot({ path: path.join(outputDir, 'control-navigation-comparison.png') })
-          const segment = controls.getByLabel('进度视图样例', { exact: true })
-          await assertContentTabAffordance(segment)
-          await assertTabsAffordance(controls.getByLabel('订单详情样例', { exact: true }))
+          assert.equal(await controls.getByLabel('进度视图样例', { exact: true }).count(), 0)
+          assert.equal(await controls.getByLabel('二级导航样例', { exact: true }).count(), 0)
           const tabsSelector = '.erp-control-library-stage .ant-tabs-nav-list'
-          const segmentSelector = '.erp-control-library [aria-label="进度视图样例"]'
           await verifyMobileNavigationMotion(page, assert, tabsSelector, 1)
           await controls.getByText('当前：关联任务。订单身份仍在原位置。', { exact: false }).waitFor()
           assert.equal(await controls.getByRole('tab', { name: '无权限' }).getAttribute('aria-disabled'), 'true')
+          await verifyMobileNavigationMotion(page, assert, tabsSelector, 0, true)
+          await chooseTheme('深色')
+          await assertTabsAffordance(orderTabs)
+
+          await choose('受控页签条', '导航与视图')
+          const segment = controls.getByLabel('进度视图样例', { exact: true })
+          const segmentSelector = '.erp-control-library [aria-label="进度视图样例"]'
+          await assertContentTabAffordance(segment)
           await verifyMobileNavigationMotion(page, assert, segmentSelector, 1)
           await controls.getByText('当前查看：生产执行').waitFor()
           await assertContentTabAffordance(controls.getByLabel('二级导航样例', { exact: true }))
           await verifyMobileNavigationMotion(page, assert, segmentSelector, 0, true)
-          await verifyMobileNavigationMotion(page, assert, tabsSelector, 0, true)
-          await chooseTheme('深色')
-          await assertContentTabAffordance(segment)
-          await assertTabsAffordance(controls.getByLabel('订单详情样例', { exact: true }))
           await chooseTheme('浅色')
+          await assertContentTabAffordance(segment)
+          await choose('页签与视图', '组合样例')
           assert.equal(await controls.getByRole('link', { name: '查看图解说明' }).count(), 0)
           await page.getByRole('tab', { name: '设计说明', exact: true }).click()
           await page.waitForURL((url) => url.searchParams.get('view') === 'specification')
@@ -776,7 +786,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await page.getByRole('tab', { name: '设计样例', exact: true }).click()
           await controls.getByRole('heading', { name: '页签与视图', exact: true }).waitFor()
 
-          await choose('按钮与动作')
+          await choose('按钮', '操作与反馈')
           const save = controls.getByRole('button', { name: /^保\s*存$/ })
           // WebKit 的完整控件遍历使用 Option+Tab，与现有筛选键盘场景一致。
           const tabModifier = process.platform === 'darwin' && page.context().browser().browserType().name() === 'webkit' ? 'Alt+' : ''
@@ -798,7 +808,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await page.getByRole('button', { name: /重置演示/ }).click()
           await controls.getByText('选择一个动作，查看就地反馈。').waitFor()
 
-          await choose('页面状态')
+          await choose('页面状态', '组合样例')
           const chooseState = async (label) => {
             await controls.locator('.erp-page-state-examples .ant-select-selector').click()
             await page.locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
@@ -824,17 +834,17 @@ export function createTabMotionScenarios({ outputDir }) {
           await returnToPreview()
           await salesOrderHeading.waitFor()
           await openSamples()
-          await choose('弹窗与反馈')
-          await controls.getByRole('button', { name: '打开编辑弹窗', exact: true }).waitFor()
+          await choose('通用弹窗', '弹窗与抽屉')
           await verifyStandardModal(page, controls, outputDir)
-          await controls.getByRole('radio', { name: '编辑与提交', exact: true }).locator('..').click()
+          await choose('业务编辑弹窗', '弹窗与抽屉')
+          await controls.getByRole('button', { name: '打开编辑弹窗', exact: true }).waitFor()
           await assertFits()
           await page.screenshot({ path: path.join(outputDir, 'control-standards-light.png') })
           await page.setViewportSize({ width: 1024, height: 768 })
           await assertFits()
           const content = controls.locator('.erp-control-library-content')
           await content.evaluate((node) => { node.scrollTop = node.scrollHeight })
-          await choose('页签与视图')
+          await choose('页签与视图', '组合样例')
           assert.equal(await content.evaluate((node) => node.scrollTop), 0)
           await assertFits()
         },

@@ -234,8 +234,6 @@ export default function BusinessChainInstanceView({
           aria-label="选择业务环节或异常分支"
           placeholder="环节或分支"
           allowClear
-          showSearch
-          optionFilterProp="label"
           virtual={false}
           value={activeGroupKey}
           onChange={(value) => {

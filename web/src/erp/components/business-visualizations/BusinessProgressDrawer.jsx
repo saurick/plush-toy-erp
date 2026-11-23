@@ -8,7 +8,6 @@ import React, {
 } from 'react'
 import { Alert, Button, Spin, Tag } from 'antd'
 import {
-  ArrowRightOutlined,
   DownOutlined,
   RightOutlined,
 } from '@ant-design/icons'
@@ -20,19 +19,16 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessProgress } from '../../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 import ProgressRelatedTasks from './ProgressRelatedTasks.jsx'
-import { canReadPurchaseFollowups, salesPurchaseFollowupPath } from '../../utils/purchaseFollowup.mjs'
 import MobileDetailHeader from '../../mobile/components/MobileDetailHeader.jsx'
 import MobileProgressSummary from '../../mobile/components/MobileProgressSummary.jsx'
 import BusinessModal from '../business-list/BusinessModal.jsx'
+import { BusinessCopyField } from '../business-list/BusinessCopyButton.jsx'
 import { ProgressDocumentNumber } from './ProgressCompactContent.jsx'
 import BusinessProgressSummary, {
   BusinessProgressHeader,
 } from './BusinessProgressSummary.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
-import {
-  progressSourcePath,
-  progressStatusLabel,
-} from '../../utils/businessProgress.mjs'
+import { progressStatusLabel } from '../../utils/businessProgress.mjs'
 
 const SECTIONS = [
   { key: 'overview', label: '进度总览' },
@@ -58,17 +54,14 @@ const SUPPRESS_OPEN_MOTION = Object.freeze({
 
 export default function BusinessProgressDrawer({
   selection,
+  sourceOrderNo,
   onClose,
   adminProfile,
-  canOpen,
-  onNavigate,
   mobile = false,
   suppressOpenMotion = false,
-  onOpenTask,
   onOpenProduction,
-  onOpenSalesDelivery,
+  onOpenTask,
   onSectionChange,
-  onRememberContext,
 }) {
   const begin = useLatestRequestCoordinator()
   const [state, setState] = useState(null)
@@ -76,9 +69,12 @@ export default function BusinessProgressDrawer({
   const [error, setError] = useState('')
   const [tab, setTab] = useState('overview')
   const [productionOpen, setProductionOpen] = useState(true)
+  const [stagesExpanded, setStagesExpanded] = useState(false)
   const recordsRef = useRef(null)
   const headingRef = useRef(null)
   const contextRef = useRef(new Map())
+  const pendingTaskFocus = useRef(null)
+  const pendingProductionFocus = useRef(null)
   const tabID = useId()
   const requestKey = selection ? `${selection.view}:${selection.id}` : ''
   const selectedID = selection?.id
@@ -123,17 +119,14 @@ export default function BusinessProgressDrawer({
   useEffect(() => {
     contextRef.current.clear()
   }, [adminProfile])
-  const entryTaskQuery = selection?.taskQuery
   useLayoutEffect(() => {
     const previous = contextRef.current.get(requestKey)
-    if (!mobile && previous && entryTaskQuery) {
-      contextRef.current.set(requestKey, { ...previous, taskQuery: entryTaskQuery })
-    }
     setTab(selection?.section || previous?.section || 'overview')
     setProductionOpen(
       previous?.productionOpen ?? selection?.productionOpen ?? true
     )
-  }, [requestKey, selection?.section, selection?.productionOpen, mobile, entryTaskQuery])
+    setStagesExpanded(previous?.stagesExpanded ?? selection?.stagesExpanded ?? false)
+  }, [requestKey, selection?.section, selection?.productionOpen, selection?.stagesExpanded])
   const data =
     state?.key === requestKey && state?.profile === adminProfile
       ? state.data
@@ -169,7 +162,7 @@ export default function BusinessProgressDrawer({
   )
   const navigationTab =
     mobile && PRODUCTION_SECTIONS.includes(activeTab) ? 'execution' : activeTab
-  const rememberContext = (changes) => {
+  const rememberContext = useCallback((changes) => {
     if (!requestKey) return
     contextRef.current.set(requestKey, {
       ...contextRef.current.get(requestKey),
@@ -178,7 +171,22 @@ export default function BusinessProgressDrawer({
     if (contextRef.current.size > 20) {
       contextRef.current.delete(contextRef.current.keys().next().value)
     }
-  }
+  }, [requestKey])
+  const entryTaskQuery = selection?.taskQuery
+  const entryTaskScroll = selection?.detailScroll?.tasks
+  const entryTaskFocus = selection?.section === 'tasks' ? selection.focusTaskID : null
+  useLayoutEffect(() => {
+    pendingTaskFocus.current = entryTaskFocus
+    if (!entryTaskQuery) return
+    rememberContext({
+      taskQuery: entryTaskQuery,
+      scrolls: { ...contextRef.current.get(requestKey)?.scrolls, tasks: entryTaskScroll ?? 0 },
+    })
+  }, [entryTaskFocus, entryTaskQuery, entryTaskScroll, rememberContext, requestKey])
+  const entryProductionFocus = selection?.focusProductionID
+  useLayoutEffect(() => {
+    pendingProductionFocus.current = entryProductionFocus
+  }, [entryProductionFocus, requestKey])
   const changeSection = (section) => {
     const next =
       section === 'execution'
@@ -199,49 +207,46 @@ export default function BusinessProgressDrawer({
     )
   }
   useLayoutEffect(() => {
-    if (data && recordsRef.current) {
-      recordsRef.current.scrollTop =
-        contextRef.current.get(requestKey)?.scrolls?.[activeTab] ??
-        selection?.detailScroll?.[activeTab] ??
-        0
-      if (activeTab === 'lines' && selection?.lineID && !selection?.detailScroll?.lines) {
-        recordsRef.current.querySelector(`[data-progress-detail-line="${selection.lineID}"]`)?.scrollIntoView({ block: 'nearest' })
-      }
+    const records = recordsRef.current
+    if (!data || !records) return
+    const productionID = activeTab === 'production' ? pendingProductionFocus.current : null
+    records.scrollTop = (productionID
+      ? selection?.detailScroll?.production
+      : contextRef.current.get(requestKey)?.scrolls?.[activeTab] ?? selection?.detailScroll?.[activeTab]) ?? 0
+    if (activeTab === 'lines' && selection?.lineID && !selection?.detailScroll?.lines) {
+      records.querySelector(`[data-progress-detail-line="${selection.lineID}"]`)?.scrollIntoView({ block: 'nearest' })
+    }
+    if (productionID) {
+      const trigger = records.querySelector(`[data-progress-production-id="${productionID}"]`) || records
+      trigger.focus({ preventScroll: true })
+      pendingProductionFocus.current = null
     }
   }, [data, activeTab, requestKey, selection?.detailScroll, selection?.lineID])
-  const currentContext = (extra = {}) => ({
-      taskQuery: contextRef.current.get(requestKey)?.taskQuery || selection?.taskQuery,
-      ...extra,
+  const currentContext = () => {
+    const saved = contextRef.current.get(requestKey)
+    return {
       section: activeTab,
       productionOpen,
+      stagesExpanded,
+      taskQuery: saved?.taskQuery || selection?.taskQuery,
       detailScroll: {
         ...selection?.detailScroll,
-        ...contextRef.current.get(requestKey)?.scrolls,
+        ...saved?.scrolls,
         [activeTab]: recordsRef.current?.scrollTop || 0,
       },
-    })
-  const rememberSelection = () => onRememberContext?.(currentContext())
-  const openTask = (record, taskQuery) => {
-    const context = currentContext({ taskQuery, focusTaskID: record.id })
-    rememberContext({ taskQuery })
-    if (mobile) {
-      onRememberContext?.(context)
-      onOpenTask(record.id)
-    } else {
-      onNavigate(progressSourcePath(record), context)
     }
   }
-  const sourcePath = data ? progressSourcePath(data.row, data.row.view) : ''
-  const sourceAction =
-    !mobile && sourcePath && canOpen(sourcePath) ? (
-      <Button
-        icon={<ArrowRightOutlined />}
-        aria-label="打开原单"
-        onClick={() => onNavigate(sourcePath, currentContext())}
-      >
-        打开原单
-      </Button>
-    ) : null
+  const orderFocus = data?.row.view === 'orders' ? {
+    mobile,
+    stagesExpanded,
+    onToggleStages: () => {
+      const next = !stagesExpanded
+      rememberContext({ stagesExpanded: next })
+      setStagesExpanded(next)
+    },
+  } : undefined
+  const title = selectedView === 'production' ? '生产单进度' : '订单进度'
+  const backLabel = sourceOrderNo ? '返回订单进度' : '返回进度看板'
   const Surface = mobile ? Drawer : BusinessModal
   const footer = (
     <div
@@ -251,22 +256,15 @@ export default function BusinessProgressDrawer({
           : 'erp-progress-detail-actions'
       }
     >
-      <Button onClick={onClose}>返回进度</Button>
-      {!mobile && data?.row.view === 'orders' && onOpenSalesDelivery && (
-        <Button onClick={() => onOpenSalesDelivery(data.row.id)}>跟踪本单</Button>
-      )}
-      {!mobile && data?.row.view === 'orders' && canReadPurchaseFollowups(adminProfile) && canOpen(salesPurchaseFollowupPath(data.row.id)) && (
-        <Button onClick={() => onNavigate(salesPurchaseFollowupPath(data.row.id), currentContext())}>本单采购跟进</Button>
-      )}
-      {!mobile && sourceAction}
+      <Button onClick={onClose}>{backLabel}</Button>
     </div>
   )
   const surfaceProps = mobile
     ? {
         title: (
           <MobileDetailHeader
-            title="进度详情"
-            backLabel="返回进度"
+            title={title}
+            backLabel={backLabel}
             onBack={onClose}
           />
         ),
@@ -290,27 +288,33 @@ export default function BusinessProgressDrawer({
                 {data?.row.order_no?.trim() || selection?.orderNo || '订单'}
               </span>
             </ProgressDocumentNumber>{' '}
-            · 完整进度
+            · {title}
           </>
         ),
         onCancel: onClose,
         afterOpenChange: (open) => {
           if (open) focusHeading()
         },
-        className: 'erp-progress-modal',
+        className: `erp-progress-modal${selectedView === 'orders' ? ' erp-progress-modal--order' : ''}`,
         size: 'localAction',
       }
   const renderRecords = (section) => {
     if (section === 'tasks') {
+      const saved = contextRef.current.get(requestKey)
       return <ProgressRelatedTasks
         key={requestKey}
         detail={data}
         mobile={mobile}
         scrollRef={recordsRef}
-        saved={contextRef.current.get(requestKey)?.taskQuery || selection?.taskQuery}
-        focusTaskID={selection?.focusTaskID}
+        pendingFocus={pendingTaskFocus}
+        saved={{
+          ...(saved?.taskQuery || selection?.taskQuery),
+          scrollTop: saved?.scrolls?.tasks ?? selection?.detailScroll?.tasks,
+        }}
         onRemember={(taskQuery) => rememberContext({ taskQuery })}
-        onOpen={(mobile ? Boolean(onOpenTask) : canOpen('/erp/task-board')) ? openTask : undefined}
+        onOpen={onOpenTask ? (record, taskQuery) => {
+          onOpenTask(record.id, { ...currentContext(), taskQuery, focusTaskID: record.id })
+        } : undefined}
       />
     }
     const records = sectionRecords(section)
@@ -329,7 +333,6 @@ export default function BusinessProgressDrawer({
           />
         ) : (
           records.map((record) => {
-            const path = progressSourcePath(record, selection?.view)
             const productLine =
               record.kind === 'sales_line' || record.kind === 'production_line'
             const recordTitle = record.label || record.number
@@ -378,26 +381,14 @@ export default function BusinessProgressDrawer({
                       {progressStatusLabel(record.status)}
                     </Tag>
                   )}
-                  {!mobile && canOpen(path) && (
-                    <Button
-                      type="link"
-                      size="small"
-                      onClick={() => onNavigate(path, currentContext())}
-                      aria-label={`查看 ${record.number || record.label}`}
-                    >
-                      查看 <ArrowRightOutlined />
-                    </Button>
-                  )}
-                  {mobile &&
-                    record.kind === 'production' &&
+                  {record.kind === 'production' &&
                     onOpenProduction && (
                       <Button
-                        onClick={() => {
-                          rememberSelection()
-                          onOpenProduction(record)
-                        }}
+                        data-progress-production-id={record.id}
+                        aria-label={`查看生产单进度 ${record.number || recordTitle}`}
+                        onClick={() => onOpenProduction(record, { ...currentContext(), focusProductionID: record.id })}
                       >
-                        查看生产进度
+                        查看生产单进度
                       </Button>
                     )}
                 </div>
@@ -406,11 +397,7 @@ export default function BusinessProgressDrawer({
           })
         )}
         {data?.has_more?.[section] && (
-          <p className="erp-progress-hint">
-            {mobile
-              ? '已显示前 100 条'
-              : '此处展示前 100 条，请进入原业务页面查看完整记录。'}
-          </p>
+          <p className="erp-progress-hint">已显示前 100 条</p>
         )}
       </>
     )
@@ -422,6 +409,11 @@ export default function BusinessProgressDrawer({
       destroyOnHidden
       footer={footer}
     >
+      {sourceOrderNo && (
+        <p className="erp-progress-hint erp-progress-source-order">
+          来源订单 <BusinessCopyField label="来源订单号" value={sourceOrderNo} />
+        </p>
+      )}
       {error && (
         <Alert
           type="error"
@@ -439,6 +431,7 @@ export default function BusinessProgressDrawer({
           mobile={mobile}
           row={data.row}
           access={data.access}
+          showOrderConcerns={Boolean(orderFocus)}
           onSelectSection={showSection}
         />
       )}
@@ -484,6 +477,7 @@ export default function BusinessProgressDrawer({
                 <MobileProgressSummary
                   data={data}
                   onSelectSection={showSection}
+                  orderFocus={orderFocus}
                 />
               ) : (
                 <BusinessProgressSummary
@@ -491,6 +485,7 @@ export default function BusinessProgressDrawer({
                   access={data.access}
                   sections={data.sections}
                   onSelectSection={showSection}
+                  orderFocus={orderFocus}
                 />
               )
             ) : mobile && navigationTab === 'execution' ? (

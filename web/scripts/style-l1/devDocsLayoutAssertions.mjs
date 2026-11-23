@@ -213,7 +213,7 @@ export function createDevDocsReadingFixture(keyword) {
       if (index === 7) return `${chapter}\n\n### 另一个主章的小节\n\n${body}`
       if (index !== 4) return chapter
       return [
-        chapter,
+        `<!-- dev-docs:collapse -->\n${chapter}`,
         '### 5.1 有编号小节的完整标题需要在缩进后自然换行',
         body,
         '### 阅读子标题',
@@ -223,6 +223,17 @@ export function createDevDocsReadingFixture(keyword) {
       ].join('\n\n')
     }),
   ].join('\n\n')
+}
+
+async function waitForDevDocsHeadingLanding(page, headingId, currentId = headingId) {
+  await page.waitForFunction(({ headingId, currentId }) => {
+    const article = document.querySelector('.erp-dev-docs-markdown')
+    const heading = document.getElementById(headingId)
+    const target = heading?.closest('summary') ?? heading
+    const current = document.querySelector('.erp-dev-docs-toc [aria-current="location"]')
+    return current?.dataset.devDocHeadingId === currentId && target && article?.contains(target) &&
+      Math.abs(target.getBoundingClientRect().top - article.getBoundingClientRect().top - 8) <= 1
+  }, { headingId, currentId })
 }
 
 export async function verifyDevDocsReadingNavigation(page, assert) {
@@ -236,21 +247,24 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     .waitFor()
   const toc = page.locator('.erp-dev-docs-toc')
   const chapters = toc.locator('[data-dev-doc-heading-id]')
+  const navigation = page.getByRole('navigation', { name: '文档章节', exact: true })
+  const collapseAll = navigation.getByRole('button', { name: '收起全部', exact: true })
+  const expandAll = navigation.getByRole('button', { name: '展开全部', exact: true })
+  const visibleSubsections = toc.locator('.erp-directory-branch button:visible')
   await page.waitForFunction(
     () =>
       document.querySelectorAll('.erp-dev-docs-toc [data-dev-doc-heading-id]')
         .length === 23
   )
-  assert.equal(
-    await chapters.count(),
-    23,
-    '目录显示主章与下一级小节'
+  assert.deepEqual(
+    await chapters.evaluateAll((items) => items.map((item) => item.dataset.devDocHeadingId)),
+    await page.locator('.erp-dev-docs-markdown :is(h2, h3)[data-markdown-anchor="heading"]')
+      .evaluateAll((headings) => headings.map((heading) => heading.id)),
+    '目录按正文顺序包含主章和小节，深层标题留在正文'
   )
-  assert.equal(
-    await chapters.filter({ hasText: '归档全文检索探针' }).count(),
-    0,
-    '文档标题由回到顶部承接'
-  )
+  assert.equal(await collapseAll.count(), 1, '多级目录在标题栏提供一个批量开合按钮')
+  assert.equal(await visibleSubsections.count(), 3, '首次打开目录默认显示所有小节')
+  assert.equal(await toc.locator('button[aria-expanded]').count(), 0, '章节条目只提供跳转')
   const top = page.getByRole('button', { name: '回到顶部', exact: true })
   await page.waitForFunction(
     () =>
@@ -258,44 +272,42 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         .querySelector('.erp-dev-docs-reader__top')
         ?.getAttribute('aria-current') === 'location'
   )
-  const navigation = page.getByRole('navigation', { name: '文档章节', exact: true })
   await navigation.waitFor()
   const chapterLayout = await toc.evaluate((element) => {
-    const branch = element.querySelector('.erp-dev-directory-branch')
-    const first = branch.previousElementSibling.querySelector('span')
-    const nested = branch.querySelector('button span')
-    const { height } = nested.getBoundingClientRect()
-    const nestedIndent = nested.getBoundingClientRect().left - first.getBoundingClientRect().left
+    const longTitle = element.querySelectorAll('[data-dev-doc-heading-id] > span')[4]
+    const chapterBox = longTitle.getBoundingClientRect()
+    const header = element.parentElement.querySelector('.erp-dev-docs-toc__header')
+    const labelBox = header.firstElementChild.getBoundingClientRect()
+    const toggleBox = header.querySelector('button').getBoundingClientRect()
+    const branch = longTitle.closest('li').querySelector(':scope > ul')
+    const subsectionTitles = [
+      ...longTitle.closest('li').querySelectorAll(':scope > ul > li > button > span'),
+    ]
+    const numberedTitle = subsectionTitles[0]
     element.scrollTop = element.scrollHeight
     return {
-      nestedIndent,
-      wraps: height > Number.parseFloat(getComputedStyle(nested).lineHeight) + 1,
+      wraps: chapterBox.height > Number.parseFloat(getComputedStyle(longTitle).lineHeight) + 1,
+      subsectionWraps: numberedTitle.getBoundingClientRect().height >
+        Number.parseFloat(getComputedStyle(numberedTitle).lineHeight) + 1,
+      subsectionIndents: subsectionTitles.map((title) => title.getBoundingClientRect().left - chapterBox.left),
+      branchGuideWidth: getComputedStyle(branch).borderInlineStartWidth,
+      headerControlsFit: toggleBox.height >= 24 && toggleBox.left >= labelBox.right - 1 &&
+        toggleBox.right <= header.getBoundingClientRect().right + 1,
       chapterScroll: element.scrollTop,
       bodyScroll: document.querySelector('.erp-dev-docs-markdown').scrollTop,
       horizontalOverflow: element.scrollWidth > element.clientWidth + 1,
     }
   })
-  assert(chapterLayout.nestedIndent === 16 && chapterLayout.wraps, '小节使用共享缩进，长标题可完整换行')
+  assert(chapterLayout.wraps, '长章节标题可完整换行')
+  assert(chapterLayout.subsectionWraps, '缩进的长小节标题可完整换行')
+  assert.deepEqual(chapterLayout.subsectionIndents, [16, 16], '有编号和无编号的小节使用统一层级缩进')
+  assert.equal(chapterLayout.branchGuideWidth, '1px', '小节使用共用的分支引导线')
+  assert(chapterLayout.headerControlsFit, '标题栏可容纳目录名称和批量开合按钮')
   assert(chapterLayout.chapterScroll > 0 && chapterLayout.bodyScroll === 0, '章节列表可独立滚到末尾')
   assert(!chapterLayout.horizontalOverflow, '长标题在章节栏内换行')
-
-  const nestedChapter = toc.getByRole('button', { name: /^5\.1 有编号小节/u })
-  const parent = chapters.nth(4)
-  const parentId = await parent.getAttribute('data-dev-doc-heading-id')
-  const subsectionId = await nestedChapter.getAttribute('data-dev-doc-heading-id')
-  const current = toc.locator('[aria-current="location"]')
-  await nestedChapter.click()
-  await page.waitForURL((url) => decodeURIComponent(url.hash.slice(1)) === subsectionId)
-  await current.filter({ hasText: /^5\.1 有编号小节/u }).waitFor()
-  await navigation.getByRole('button', { name: '收起全部', exact: true }).click()
-  assert.equal(await current.getAttribute('data-dev-doc-heading-id'), parentId)
-  assert.equal(await toc.locator('.erp-dev-directory-branch button:visible').count(), 0)
-  assert.equal(decodeURIComponent(new URL(page.url()).hash.slice(1)), subsectionId)
-  await navigation.getByRole('button', { name: '展开全部', exact: true }).press('Space')
-  assert.equal(await current.getAttribute('data-dev-doc-heading-id'), subsectionId)
-
   const lastId = await chapters.last().getAttribute('data-dev-doc-heading-id')
   await chapters.last().click()
+  await page.waitForURL((url) => decodeURIComponent(url.hash.slice(1)) === lastId)
   await page.waitForFunction(
     (id) =>
       document.querySelector('.erp-dev-docs-toc [aria-current="location"]')
@@ -305,6 +317,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   assert.equal(decodeURIComponent(new URL(page.url()).hash.slice(1)), lastId)
 
   await top.click()
+  await page.waitForURL((url) => url.hash === '')
   await page.waitForFunction(
     () =>
       document.querySelector('.erp-dev-docs-markdown').scrollTop <= 1 &&
@@ -312,11 +325,76 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         .querySelector('.erp-dev-docs-reader__top')
         ?.getAttribute('aria-current') === 'location'
   )
-  assert.equal(new URL(page.url()).hash, '', '回到顶部仍清理显式章节锚点')
   await page.waitForFunction(() => document.querySelector('.erp-dev-docs-toc').scrollTop <= 1)
+
+  const scrollRegion = page.locator('.erp-dev-docs-markdown')
+  const collapsedChapter = scrollRegion.locator('details.erp-dev-docs-section')
+  const chapter = chapters.nth(4)
+  const chapterId = await chapter.getAttribute('data-dev-doc-heading-id')
+  assert.equal(await collapsedChapter.getAttribute('open'), null)
+  const numberedSubsection = toc.getByRole('button', { name: /^5\.1 有编号小节/u })
+  const subsectionId = await numberedSubsection.getAttribute('data-dev-doc-heading-id')
+  await numberedSubsection.click()
+  await page.waitForURL((url) => decodeURIComponent(url.hash.slice(1)) === subsectionId)
+  await waitForDevDocsHeadingLanding(page, subsectionId)
+  assert.equal(await collapsedChapter.evaluate((element) => element.open), true, '目录直达折叠章节中的小节')
+
+  await collapseAll.click()
+  await waitForDevDocsHeadingLanding(page, subsectionId, chapterId)
+  assert.equal(await visibleSubsections.count(), 0, '批量收起隐藏所有主章的小节')
+  assert.equal(await toc.locator(':scope > li > button').count(), 20, '批量收起后所有主章继续提供跳转')
+  assert.equal(decodeURIComponent(new URL(page.url()).hash.slice(1)), subsectionId)
+
+  await chapter.click()
+  await page.waitForURL((url) => decodeURIComponent(url.hash.slice(1)) === chapterId)
+  await waitForDevDocsHeadingLanding(page, chapterId)
+  assert(await expandAll.isVisible(), '点击主章标题直接跳转并保留目录收起状态')
+
+  const nextSubsectionId = '阅读子标题'
+  const nextScrollDistance = await scrollRegion.evaluate(
+    (article, id) => document.getElementById(id).getBoundingClientRect().top - article.getBoundingClientRect().top - 8,
+    nextSubsectionId
+  )
+  await scrollRegion.hover()
+  await page.mouse.wheel(0, nextScrollDistance)
+  await waitForDevDocsHeadingLanding(page, nextSubsectionId, chapterId)
+  assert.equal(await visibleSubsections.count(), 0, '阅读收起的小节时保持目录收起')
+  await expandAll.press('Space')
+  await waitForDevDocsHeadingLanding(page, nextSubsectionId)
+  assert.equal(await visibleSubsections.count(), 3, '键盘批量展开后恢复所有小节')
+  assert.equal(decodeURIComponent(new URL(page.url()).hash.slice(1)), chapterId, '滚动正文和开合目录保留显式跳转锚点')
+
+  const nextChapter = toc.getByRole('button', { name: '阅读章节 6', exact: true })
+  const nextChapterId = await nextChapter.getAttribute('data-dev-doc-heading-id')
+  const chapterScrollDistance = await scrollRegion.evaluate((article, id) => {
+    const heading = document.getElementById(id)
+    const padding = Number.parseFloat(getComputedStyle(article).paddingBlockStart)
+    return heading.getBoundingClientRect().top - article.getBoundingClientRect().top - padding - 4
+  }, nextChapterId)
+  await page.mouse.wheel(0, chapterScrollDistance)
+  await page.waitForFunction((id) => {
+    const current = document.querySelector('.erp-dev-docs-toc [aria-current="location"]')
+    const title = document.getElementById(id)
+    return current?.dataset.devDocHeadingId === id && title?.dataset.currentSectionTitle === 'true'
+  }, nextChapterId)
+  assert.equal(decodeURIComponent(new URL(page.url()).hash.slice(1)), chapterId, '新主章进入阅读区顶部时接替上一小节，保留显式跳转锚点')
+
+  await top.click()
+  await page.waitForURL((url) => url.hash === '')
+  await page.getByRole('link', { name: '跳到章节内的子标题', exact: true }).click()
+  await page.waitForURL((url) => decodeURIComponent(url.hash.slice(1)) === nextSubsectionId)
+  await waitForDevDocsHeadingLanding(page, nextSubsectionId)
+  await collapseAll.click()
+  await waitForDevDocsHeadingLanding(page, nextSubsectionId, chapterId)
+  await page.reload()
+  await waitForDevDocsHeadingLanding(page, nextSubsectionId)
+  assert.equal(await visibleSubsections.count(), 3, '刷新后按默认展开目录')
+  const highlightedTitle = scrollRegion.locator('details[data-current-section-title="true"] > summary > h2')
+  assert.equal(await highlightedTitle.getAttribute('id'), chapterId, '刷新小节锚点后同步标示所属主章')
 
   const firstId = await chapters.first().getAttribute('data-dev-doc-heading-id')
   await chapters.first().press('Enter')
+  await page.waitForURL((url) => decodeURIComponent(url.hash.slice(1)) === firstId)
   await page.waitForFunction(
     (id) =>
       document.querySelector('.erp-dev-docs-toc [aria-current="location"]')
@@ -334,11 +412,9 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     `键盘定位章节应有清楚焦点：${JSON.stringify(focus)}`
   )
   const hashBeforeScroll = new URL(page.url()).hash
-  await page
-    .locator('.erp-dev-docs-markdown')
-    .evaluate((element) =>
-      element.scrollTo({ top: element.scrollHeight * 0.55 })
-    )
+  const scrollDistance = await scrollRegion.evaluate((element) => element.scrollHeight * 0.55)
+  await scrollRegion.hover()
+  await page.mouse.wheel(0, scrollDistance)
   await page.waitForFunction((id) => {
     const selected = document.querySelector(
       '.erp-dev-docs-toc [aria-current="location"]'
@@ -355,6 +431,8 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     const idle = element.querySelector('button:not([aria-current])')
     const activeStyle = getComputedStyle(selected)
     const idleStyle = getComputedStyle(idle)
+    const activeHeading = document.querySelector('.erp-dev-docs-markdown h2[data-current-section-title="true"]')
+    const idleHeading = document.querySelector('.erp-dev-docs-markdown h2.erp-business-form-heading:not([data-current-section-title])')
     const box = selected.getBoundingClientRect()
     const frame = element.getBoundingClientRect()
     return {
@@ -365,10 +443,15 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
       textDistinct: activeStyle.color !== idleStyle.color,
       shadow: activeStyle.boxShadow,
       weight: activeStyle.fontWeight,
+      headingMatches: activeHeading?.id === selected.dataset.devDocHeadingId,
+      headingHighlighted: activeHeading && idleHeading &&
+        getComputedStyle(activeHeading).backgroundColor !== getComputedStyle(idleHeading).backgroundColor,
+      headingAccentMatches: activeHeading && getComputedStyle(activeHeading).color === activeStyle.color,
       visible: box.top >= frame.top - 1 && box.bottom <= frame.bottom + 1,
     }
   })
   assert.equal(visual.selectedCount, 1)
+  assert(visual.headingMatches && visual.headingHighlighted && visual.headingAccentMatches, '正文标题带随目录同步使用主题色高亮')
   assert(
     visual.backgroundDistinct && visual.textDistinct && visual.weight === '600',
     '当前章节以主题浅底和加粗文字突出'
@@ -397,7 +480,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         const sidebar = root.closest('.erp-dev-docs-shell').querySelector('.erp-dev-docs-sidebar')
         const chapterNav = root.querySelector('.erp-dev-docs-toc-shell')
         const article = root.querySelector('.erp-dev-docs-markdown')
-        const chapter = chapterNav.querySelector('button')
+        const chapter = chapterNav.querySelector('[data-dev-doc-heading-id]')
         const center = (element) => {
           const box = element.getBoundingClientRect()
           return box.top + box.height / 2
@@ -472,6 +555,8 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   await page.getByRole('button', { name: '文档首页', exact: true }).click()
   const home = page.locator('.erp-dev-docs-markdown').getByRole('heading', { name: '文档入口与治理 / docs Guide', exact: true })
   await home.waitFor()
+  await navigation.waitFor()
+  assert.equal(await collapseAll.count() + await expandAll.count(), 0, '一级目录直接展示主章跳转')
   assert.equal(await page.getByRole('textbox', { name: '搜索项目文档' }).inputValue(), '')
   assert.equal(new URL(page.url()).searchParams.get('path'), 'docs/README.md')
   await page.reload()
@@ -527,4 +612,66 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   await expectBookmarkedSection('交互设计')
   await page.reload()
   await expectBookmarkedSection('交互设计')
+
+  await verifyDevDocsCollapsedSections(page, assert)
+}
+
+async function verifyDevDocsCollapsedSections(page, assert) {
+  const auditURL = new URL('/__dev/docs', page.url())
+  auditURL.searchParams.set('path', 'docs/observability/日志链路追踪与审计.md')
+  await page.goto(auditURL.href)
+
+  const article = page.locator('.erp-dev-docs-markdown')
+  const chapters = page.getByRole('navigation', { name: '文档章节', exact: true })
+  const disclosures = article.locator('details.erp-dev-docs-section')
+  const openSections = article.locator('details.erp-dev-docs-section[open]')
+  const auditMatrix = disclosures.filter({ has: page.locator('h2[id="模块级覆盖矩阵"]') })
+  await auditMatrix.locator('summary').waitFor()
+  assert.equal(await disclosures.count(), 1)
+  assert.equal(await auditMatrix.evaluate((section) => section.open), false)
+  await article.getByRole('heading', { name: '关键原则', exact: true }).waitFor()
+
+  for (const [tag, marker] of [['ol', 'decimal'], ['ul', 'disc']]) {
+    const list = article.locator(`.erp-dev-docs-document > ${tag}`).first()
+    const style = await list.evaluate((element) => ({
+      marker: getComputedStyle(element.firstElementChild).listStyleType,
+      indent: parseFloat(getComputedStyle(element).paddingInlineStart),
+    }))
+    assert.equal(style.marker, marker, `正文 ${tag} 应显示原生列表标记`)
+    assert(style.indent > 0, `正文 ${tag} 需要留出标记空间`)
+  }
+
+  const expectOpenAt = (id) => page.waitForFunction((headingId) => {
+    const heading = document.getElementById(headingId)
+    if (!heading?.closest('details.erp-dev-docs-section')?.open) return false
+    const articleTop = heading.closest('.erp-dev-docs-markdown').getBoundingClientRect().top
+    const target = heading.closest('summary') ?? heading
+    return Math.abs(target.getBoundingClientRect().top - articleTop - 8) <= 2
+  }, id)
+
+  await chapters.getByRole('button', { name: '模块级覆盖矩阵', exact: true }).click()
+  await expectOpenAt('模块级覆盖矩阵')
+  await auditMatrix.locator('summary').press('Enter')
+  await article.locator('details.erp-dev-docs-section:not([open])').waitFor()
+
+  auditURL.hash = '库存'
+  await page.goto(auditURL.href)
+  await expectOpenAt('库存')
+  await page.reload()
+  await expectOpenAt('库存')
+
+  const search = page.getByRole('textbox', { name: '搜索项目文档', exact: true })
+  await search.fill('同粒度 ACTIVE 预留')
+  await search.press('Enter')
+  await page.locator('.erp-dev-docs-list__open').filter({ hasText: '业务公式与计算口径' }).click()
+  await article.getByRole('heading', { name: /先看结论/u }).waitFor()
+  await article.getByRole('heading', { name: /通用数值与舍入/u }).waitFor()
+  assert.equal(await disclosures.count(), 7)
+  assert.equal(await openSections.count(), 0)
+
+  const inventoryHeading = '库存预留与来源余量--inventory-and-capacity'
+  await chapters.getByRole('button', { name: '库存、预留与来源余量', exact: true }).click()
+  await expectOpenAt(inventoryHeading)
+  await article.getByRole('heading', { name: '库存可用量（公式 F08）', exact: true }).waitFor()
+  assert.equal(await openSections.count(), 1)
 }

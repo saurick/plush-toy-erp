@@ -1426,7 +1426,7 @@ export async function productionShipmentFlow(
         .getByRole("radio", { name: "审批通过", exact: true })
         .check();
       await action
-        .getByRole("textbox", { name: "审批意见", exact: true })
+        .getByRole("textbox", { name: "审批意见（选填）", exact: true })
         .fill("模拟核对出货来源、数量与收款条件");
       await clickRPC(finance, "complete_task_action", () =>
         action

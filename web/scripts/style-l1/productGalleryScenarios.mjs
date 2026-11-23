@@ -8,6 +8,7 @@ import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 import { assertReadableOnBackground, parseRgb } from './colorAssertions.mjs'
 import { openBusinessTableTool } from './businessTableTools.mjs'
+import { openUIDesignMobileTasks, visibleUIDesignFrame } from './devUIDesignNavigation.mjs'
 
 const photograph = readFileSync(new URL('../../src/erp/data/bom-example-images/product.jpg', import.meta.url)).toString('base64')
 const names = ['模拟蓝熊', '模拟粉熊', '模拟无图兔']
@@ -29,7 +30,7 @@ function images(productID) {
 
 async function installGalleryFixture(page) {
   page.__galleryProbe = { calls: [], failOriginal: false, failMetadata: false, holdProduct: 0, release: null }
-  const currentImages = (productID) => images(productID)
+  const currentImages = (productID) => (page.__galleryProbe.productImages?.(productID) ?? images(productID))
     .filter((image) => !page.__galleryProbe.clearImages && (!page.__galleryProbe.onlySecondary || image.slot_key === 'secondary'))
     .map((image) => page.__galleryProbe.replacePrimary && image.id === 8101 ? { ...image, id: 8103 } : image)
   await page.route('**/rpc/**', async (route) => {
@@ -55,6 +56,14 @@ async function installGalleryFixture(page) {
       if (!params.variant && probe.holdProduct === attachment.owner_id) await new Promise((resolve) => { probe.release = resolve; probe.onHold?.() })
       code = !params.variant && probe.failOriginal ? 50000 : 0
       data = { attachment: { ...attachment, content_base64: photograph } }
+    } else if (method === 'list_sales_order_summary') {
+      data = stylePaginatedRpcData(products.slice(0, 2).map((product) => ({
+        id: product.id, sales_order_item_id: product.id, sales_order_id: 1,
+        order_no: 'SO-GALLERY-001', customer_name: '模拟客户', product_id: product.id,
+        product_name_snapshot: product.name, product_image_attachment_id: 0,
+        ordered_quantity: '10', remaining_quantity: '10', production_quantity: '10',
+        lifecycle_status: 'active', line_status: 'open', unit_name: '只', currency: 'CNY',
+      })), 'items', params)
     } else if (method === 'list_engineering_material_requests') {
       const submission = (id, linked) => ({
         id, sales_order_id: 1, order_no: 'SO-GALLERY-001', order_status: 'active', status: id === 51 ? 'REJECTED' : 'SUBMITTED',
@@ -64,13 +73,22 @@ async function installGalleryFixture(page) {
       data = { total: 2, items: [submission(52, [products[1], products[2]]), submission(51, products.slice(0, 2))] }
     } else if (method === 'list_progress') {
       data = progressFixtureData(params)
-      data.rows = data.rows.map((row) => row.id === 1 ? { ...row, order_no: 'SO-GALLERY-001', product: names[0], product_id: 1, product_count: 3, product_type_count: 3 } : row)
+      const prefix = params.view === 'production' ? 'MO' : 'SO'
+      data.rows = data.rows.map((row) => {
+        if (row.line) return row
+        if (row.id === 1) return { ...row, order_no: `${prefix}-GALLERY-001`, product: names[1], product_id: 2, product_count: 4, linked_product_count: 3, product_type_count: 3 }
+        if (row.id === 2) return { ...row, product: names[0], product_id: 1, product_count: 2, linked_product_count: 1 }
+        return row
+      })
     } else if (method === 'list_products') {
       data = stylePaginatedRpcData(products, 'products', params)
     } else if (method === 'list_sales_orders') {
       data = stylePaginatedRpcData([{ id: 1, order_no: 'SO-GALLERY-001', customer_id: 1, customer_snapshot: { name: '模拟客户' }, currency: 'CNY', lifecycle_status: 'draft', version: 1, item_count: 4, order_date: stamp, updated_at: stamp }], 'sales_orders', params)
     } else if (method === 'list_sales_order_items') {
-      data = stylePaginatedRpcData(lines.map((line) => ({ ...line, sales_order_id: params.sales_order_id })), 'sales_order_items', params)
+      const items = probe.progress
+        ? [...lines, { ...lines[0], id: 5, line_no: 5, product_id: 4, product_name_snapshot: '已取消样品', line_status: 'canceled' }]
+        : lines
+      data = stylePaginatedRpcData(items.map((line) => ({ ...line, sales_order_id: params.sales_order_id })), 'sales_order_items', params)
     } else if (method === 'list_production_orders') {
       data = stylePaginatedRpcData([{ id: 1, order_no: 'MO-GALLERY-001', status: 'DRAFT', version: 1, item_count: 4, created_by: 1, updated_at: stamp }], 'production_orders', params)
     } else if (method === 'get_production_order') {
@@ -162,6 +180,30 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
     ['shipment', '/erp/warehouse/shipments'],
   ]
   return [
+    {
+      ...common,
+      name: 'product-gallery-sales-summary-without-primary',
+      path: '/erp/dashboard?summary=sales-orders',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await installGalleryFixture(page)
+        page.__galleryProbe.productImages = (productID) => productID === 1
+          ? images(productID).filter((entry) => entry.slot_key === 'secondary')
+          : images(productID).map((entry) => ({ ...entry, slot_key: 'supplemental_1' }))
+      },
+      verify: async (page) => {
+        for (const [index, label] of ['辅图', '附图 1'].entries()) {
+          const trigger = page.getByRole('button', { name: `查看产品图：${names[index]}`, exact: true })
+          await trigger.click()
+          await page.getByText(`${label} · 1 / 1 张`, { exact: true }).waitFor()
+          await imageReady(page)
+          assert.equal(await page.getByRole('group', { name: '切换产品', exact: true }).count(), 0)
+          await page.screenshot({ path: path.join(outputDir, `workbench-sales-summary-${index === 0 ? 'secondary' : 'supplemental'}.png`) })
+          await closeAndRestore(page, trigger)
+        }
+      },
+    },
     {
       ...common, name: 'product-gallery-material-submissions', path: '/erp/dashboard?summary=materials', viewport: { width: 1440, height: 900 },
       async verify(page) {
@@ -340,21 +382,43 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
         await verifyDocumentGallery(page, outputDir, `product-gallery-${module}`)
       },
     })),
-    {
-      ...common, name: 'product-gallery-progress', path: '/erp/business-dashboard', viewport: { width: 1440, height: 900 },
+    ...[false, true].map((mobile) => ({
+      ...common,
+      name: mobile ? 'product-gallery-progress-mobile' : 'product-gallery-progress',
+      path: mobile ? '/m/boss/tasks' : '/erp/business-dashboard',
+      viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+      hasTouch: mobile,
+      ...(mobile ? {
+        adminProfile: {
+          is_super_admin: false, roles: [{ role_key: 'boss' }], menus: [],
+          permissions: ['mobile.boss.access', 'workflow.task.read', 'erp.business_dashboard.read',
+            'sales_order.read', 'sales_order_item.read', 'pmc.plan.read', 'production.wip.read', 'product.read'],
+        },
+      } : {}),
       verify: async (page) => {
-        const trigger = page.getByRole('button', { name: `查看${names[0]}大图`, exact: true }).first()
-        await trigger.waitFor()
-        await trigger.click()
-        await imageReady(page)
-        assert.equal(await page.locator('.erp-product-gallery-preview__products button').count(), 3)
-        await page.locator('.erp-product-gallery-preview__products button').nth(1).click()
-        await imageReady(page)
-        assert.equal(await page.locator('.erp-progress-detail:visible').count(), 0, 'viewing product photos does not open progress details')
-        await closeAndRestore(page, trigger)
-        assert.equal(page.__galleryProbe.calls.some((call) => call.method === 'list_document_product_previews'), false, 'progress reuses its existing representative product and count')
+        page.__galleryProbe.progress = true
+        if (mobile) await page.getByTestId('mobile-role-nav-progress').click()
+        for (const [tab, prefix] of [['订单交付', 'SO'], ['生产执行', 'MO']]) {
+          await page.getByRole('tab', { name: tab, exact: true }).click()
+          const trigger = page.getByRole('button', { name: `查看${prefix}-GALLERY-001的 3 款产品图片`, exact: true })
+          await trigger.waitFor()
+          const row = page.locator(mobile ? '.mobile-progress-card' : '.erp-progress-row').filter({ hasText: `${prefix}-0002` })
+          await row.getByRole('button', { name: `查看${names[0]}大图`, exact: true }).waitFor()
+          assert.equal(await row.locator('.erp-product-gallery__stack').count(), 0)
+          assert.equal(await trigger.locator('.erp-product-gallery__stack').count(), 1)
+          await trigger.click()
+          await imageReady(page)
+          const strip = page.getByRole('group', { name: '切换产品', exact: true })
+          assert.equal(await strip.getByRole('button').count(), 3)
+          assert.match(await strip.locator('[aria-pressed="true"]').innerText(), new RegExp(names[1]))
+          await strip.getByRole('button', { name: new RegExp(names[0]) }).click()
+          await imageReady(page)
+          assert.equal(await page.locator('.erp-progress-detail:visible').count(), 0, '点图不会打开进度详情')
+          await closeAndRestore(page, trigger)
+        }
+        assert.equal(page.__galleryProbe.calls.some((call) => call.method === 'list_document_product_previews'), false, '看板列表在本次查询中取得款数')
       },
-    },
+    })),
     ...[
       ['desktop', { width: 1440, height: 900 }, 'light'],
       ['dark', { width: 1440, height: 900 }, 'dark'],
@@ -423,7 +487,7 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
     {
       name: 'product-gallery-design', path: '/__dev/ui-design', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2,
       verify: async (page) => {
-        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        const frame = page.frameLocator(visibleUIDesignFrame)
         await frame.locator('.app').waitFor({ state: 'visible' })
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
         const trigger = frame.locator('[data-action="product-gallery-preview"][data-count="3"]').first()
@@ -449,6 +513,20 @@ export function createProductGalleryScenarios({ outputDir, customerRuntimeEffect
         await preview.locator('.product-image-preview-stage .product-art').waitFor()
         await preview.getByRole('button', { name: '关闭图片预览', exact: true }).click()
         await identity.waitFor({ state: 'visible' })
+        await frame.locator('.business-detail-modal').getByRole('button', { name: '关闭', exact: true }).click()
+        await frame.getByRole('button', { name: '进度看板', exact: true }).click()
+        const stackedProgress = frame.getByRole('button', { name: '查看SO-20260918-015的 3 款产品图片', exact: true })
+        assert.match(await stackedProgress.getAttribute('class'), /product-thumb--stack/u)
+        await stackedProgress.click()
+        await preview.getByRole('button', { name: '查看冬日长耳兔图片', exact: true }).click()
+        await preview.getByText(/产品 2 \/ 3/u).waitFor()
+        await preview.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+        await openUIDesignMobileTasks(frame)
+        const stackedTask = frame.getByRole('button', { name: '查看SR-20260925-006的 3 款产品图片', exact: true })
+        await stackedTask.click()
+        await preview.getByRole('button', { name: '查看冬日小狐狸图片', exact: true }).click()
+        await preview.getByText('该产品暂无图片', { exact: true }).waitFor()
+        await preview.getByRole('button', { name: '关闭图片预览', exact: true }).click()
       },
     },
   ]

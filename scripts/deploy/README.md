@@ -126,6 +126,8 @@ Mac 从当前用户的 Keychain 项 `plush-toy-erp.gitlab-release-api` 读取。
 
 文件必须为当前用户所有的普通文件、权限 `0400 / 0600`，拒绝符号链接。显式 `PLUSH_GITLAB_TOKEN` 仍沿用既有服务端输入合同；命令参数不接受 token，凭据不进入公开输出或仓库。
 
+#### 换发和回收旧令牌
+
 需要换发时，先核对 GitLab 实例和所属组对本项目生效的有效期上限，再通过 GitLab 按允许的最长有效期签发同项目、同角色、同权限范围的令牌。同步 Mac 钥匙串和服务器工作台的受控凭据来源，重新运行 `check-credentials`，并读回工作台实际加载的凭据。
 
 日常只保留一枚有效的项目发布令牌。换发期间可短暂保留旧令牌。各执行端验证新令牌且使用旧令牌的在途操作结束后，通过 GitLab 撤销同用途的旧令牌和已确认无引用的冗余令牌，保留审计记录。CI 制品发布、CI 和版本只读查询、目标机取件分别使用各自的专用凭据。只读查询沿用 `PLUSH_GITLAB_READ_TOKEN`、Mac 的 `plush-toy-erp.gitlab-read-api` 或既有受控只读文件。
@@ -135,6 +137,8 @@ Mac 从当前用户的 Keychain 项 `plush-toy-erp.gitlab-release-api` 读取。
 GitLab 原生 Environments / Deployments 管理 `demo`、`test`、`erp` 的部署身份与结果；环境名、公网入口和 tier 从 `deployment-targets.json` 派生。正式 promotion / rollback CLI 在目标写入前登记 running，执行后回写 success / failed / canceled，并把项目检查证据归档到 Generic Package `plush-deployment-evidence`，版本键为 `<target>-<operation UUID>`。项目原始 operation 与 receipt 继续负责步骤、迁移、备份恢复及结果未证明等细分事实，GitLab 登记由这些事实自动投影，不手工维护另一套结果。
 
 原生状态映射：passed → success，blocked → canceled，failed / not_proven → failed。最后一种仅表示未通过部署验证；原始 not_proven 和检查缺口完整保留，不能推断目标已回滚或业务不可用。重建、制品发布及退役 `test-133` 只归档项目回执，不伪装成现役环境的部署。预检准备记录仍由原 operation 保存；未进入执行的终态可在操作记录中补录。
+
+### 回执与本地归档
 
 Generic Package 保存 `operation.json`、已有的 `receipt.json`、`link.json` 和部署创建前的 `intent.json`。每次上传回读 SHA-256；相同 UUID 幂等复用，内容冲突立即失败。缺失的历史回执和检查证据不补造。历史补录按原始完成时间升序登记，原始开始 / 结束时间不变；GitLab API 不支持回填 created_at，原生登记时间不能用于历史部署频率或耗时统计。
 
@@ -166,23 +170,33 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 同一动作、target、Exact-SHA、版本和发布输入通常只认领一个 operation；不同窗口对未因回滚改变的同一意图会合并。成功回滚后，同版前向部署以该回滚 operation ID 区分新意图，不复用回滚前的部署成功回执；复用已通过的部署回执前还须只读核对目标服务与公网入口确为该 SHA，否则失败关闭。
 
-待确认计划由 `delivery-plan-lifecycle.mjs` 收口：部署、回滚、数据重建的 `ready` 计划可通过版本发布页“放弃计划”进入 `abandoned`；只关闭本地计划，不启动或终止目标执行器。
+`delivery-plan-lifecycle.mjs` 管理部署、回滚和重建的待确认计划。
 
-计划自准备完成起有效 24 小时。摘要核对发现超期、已证明的目标运行版本变化、首次部署环境已存在，或已读到的候选制品不再满足发布条件时，记为 `invalidated` 并保留原因。读取失败或分页目录中未出现候选不等于失效。执行前也检查有效期；正在启动、执行和结果未证明的操作不适用计划放弃或超期收口。
+```mermaid
+flowchart LR
+  ready["计划待确认"] -->|主动放弃| abandoned["保留放弃记录"]
+  ready -->|超期或证实前提变化| invalid["保留失效原因"]
+  ready -->|确认且仍有效| run["启动目标操作"]
+  run -->|读到有效终态| result["保存结果回执"]
+  run -->|Bridge 重启且结果不明| frozen["冻结，核对原操作"]
+  frozen -->|同一操作的终态回执通过校验| result
+```
 
-`abandoned / invalidated` 退出未结束阻断并留在操作历史。用户再次准备同一意图时建立关联的新计划，重复请求仍返回同一结果；这些记录仅能归档为项目证据，不创建 GitLab 环境部署。
-
-`failed / blocked` 只能显式建立父子重试链；`launching / running` 在 Bridge 重启后冻结为 `not_proven`，必须先读回目标，不能自动重试。执行器子进程启动或过早退出时只把 4 KiB 以内的 stderr 转成 240 字符以内的脱敏诊断写入 operation，命令、参数、PID、凭据和真实路径仍不入库。
-
-晋级和数据库重建执行器只允许同一 operation、target、Exact-SHA、版本均匹配且通过完整合同校验的远端终态回执收敛这次冻结；该收敛不是重试，也不会再次写目标。晋级的 SSH 响应丢失或不完整时，仅从固定目标的同一 operation 路径读回原子回执；缺失、损坏或仍为 `not_proven` 的回执继续保留未证明状态。运行版本已更新不能替代历史终态回执。
-
-远端晋级、回滚和重建在锁内发现同一 operation 已有状态文件却没有终态回执时停止。即使状态无法解析，也须先核对旧操作结果。晋级和重建完成恢复演练后，只在创建演练库的同一 PostgreSQL 容器中删除该 operation 专属库并查证不存在；删除或查证失败保留 `not_proven` 回执和诊断，停止后续目标变更。
+| 场景 | 办理条件与结果 |
+| --- | --- |
+| 放弃或失效 | 计划从准备完成起有效 24 小时。可由版本发布页主动放弃。超期、已证实运行版本变化、首次部署环境已存在或已读到制品不合格时失效。读取失败或分页尚未读到候选时保留待核对。 |
+| 计划退出 | `abandoned / invalidated` 留在操作历史并退出未结束阻断，只归档项目证据。再次准备建立关联计划，同一请求只返回原结果。正在启动、执行或结果未证明的操作需按原 operation 核对。 |
+| 执行失败或重启 | `failed / blocked` 可显式建立父子重试。Bridge 重启时 `launching / running` 冻结为 `not_proven`，先读回目标。异常启动只从最多 4 KiB 的 stderr 留最多 240 字符脱敏诊断。 |
+| 回执缺失或响应中断 | 晋级或重建按同一 operation、target、Exact-SHA、版本及完整合同核对终态回执。晋级 SSH 响应缺失时从固定目标与路径读回。缺失、损坏或仍未证明时保持冻结，目标当前版本仅作线索。 |
+| 远端锁内已有操作 | 晋级、回滚、重建发现有状态文件而无终态回执时停止并核对原操作。晋级与重建演练结束后只清理本次专属库，并在原 PostgreSQL 容器确认已删除。清理失败保留 `not_proven`，停止后续目标变更。 |
 
 一个 operation store 的执行编排使用同一常驻工作台服务实例，或在临时 CLI 中完整串行执行准备、执行和终态读回。目标写入未结束时，不启动另一个会执行中断恢复的服务实例；只读现场诊断直接使用固定目标预检。远端在清理临时取件资料后写入成功回执，响应通道失败不会覆盖已经验证的终态。
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 
 历史页通过只读 `GET /__dev/api/delivery/operations` 查询所有留存的已结束操作，先固定 demo / test / erp 的 target，再按动作、结果、版本 / SHA / operation ID 筛选，默认每页 10 条、最多 50 条。未提供 target 默认 demo；`all` 或未知 target 拒绝查询，共享 GitLab / 历史 GitHub 制品发布另列；已退役的 `test-133` 只允许历史查询，不是运行目标别名，也不提供执行或重试。详情的 `target` 绑定由服务端和客户端双重校验。摘要的最近 200 条窗口不再限制历史查询，未结束操作也不受这个窗口截断。计数与成功操作耗时中位数覆盖当前筛选的全部匹配记录；耗时包含准备、等待和结果读回，不能混称为 CI Job 执行耗时。查询失败保留同一筛选的上次结果，切换筛选后不会显示旧条件的数据。
+
+### 执行、重试与恢复依据
 
 升级、初始化、数据库重建和代码回滚执行器先校验目标原始回执，再以 `0600` 原子文件归档到 store 的 `receipts/`，最后保存 operation 终态。同一 operation 的回执只能幂等重读，不能覆盖不同内容。详情按 operation / target / SHA / 版本 / 计划指纹校验归属，只公开检查结果、迁移信息、数据库恢复结论和摘要；完整原始回执及目标日志仍分别留在受控 store 和目标 `operations/<operation-id>/`。缺少回执、字段或检查时明确显示未记录 / 未证明，不根据 operation 成功、当前运行状态或聊天补造历史事实。
 
@@ -204,6 +218,8 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 统一保留合同见 [部署约定](../../docs/部署约定.md#retention-policy)。`retention-server.mjs --preview` 生成固定三环境、GitLab Release / Package 与备份的候选清单；校验摘要缓存记录文件的 device、inode、大小、mtime 和 ctime，任一变化都重新计算 SHA-256。`--execute` 使用相同计划，在所有固定目标 promotion 锁和备份锁空闲时执行。预览只保存完整性校验缓存，不删除文件。
 
+### 定时轮换与回执
+
 `plush-retention.timer` 每小时运行一次；主机和路径固定，不接受浏览器输入命令。GitLab 有运行中或排队 CI 时暂停本轮；操作、保护信息或文件身份不明时保留现场。只通过 GitLab Package File API 删除 `server-image.tar`、`web-image.tar` 和 `source.tar`，Release、tag、manifest、checksum、SBOM、演练、CI 及部署记录继续保留。目标制品只清理预检确认的过期源码、缓存和停止的入口容器；镜像还须无容器引用，不使用全局 prune。
 
 `retention-files.mjs` 供生成任务调用，ERP PG、成套 PG＋附件、GitLab 原生备份与异机副本各自按完整恢复输入保留最近 7 份。`retention-protection.json` 使用 `plush.retention-protection/v1` 与 `protected: {"精确备份标识": ["保护原因"]}` 显式保护升级恢复点，修改须沿对应目标的操作锁核对。部署恢复点自动绑定当前 / 回滚版本及最近成功升级；未闭环引用、历史不完整或归属未确认的输入保留核对。GitLab 服务器加密交接在 GitLab 备份锁下轮换：PD-SSD 核验回执须在 36 小时内，且包内四个密文文件的名称、大小和 SHA-256 与服务器清单一致，才允许淘汰超过最近 3 套的已同步包。缺少有效回执、未同步和显式保护的包保留；离线跨过外盘的七套窗口后，未同步的旧包也需要人工核对。
@@ -222,6 +238,8 @@ Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/releas
 
 不存在静默回退到 Mac 大文件中转的路径。
 
+### 目标缓存与制品复用
+
 正式目标缓存精确包含 GitLab 的七项制品与 `source.tar`。operation 私有 incoming 可以包含控制文件，只有逐项复核过的制品才能写入正式目标缓存。
 
 允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。
@@ -229,6 +247,8 @@ Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/releas
 工作台首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 或同目标 legacy 回滚输入可用；这一核对完成前 operation 保持 `running`，只能从 `running` 直接进入最终 `ready / blocked`，避免新版本成功后才发现旧版本不可回取，也不暴露可误确认的中间 ready。
 
 即使命中缓存，migration、Compose、health、ready、业务 smoke 与对应公网 exact-SHA 仍完整执行。promotion 在已创建权限为 `0600` 的 env 备份后，同时推进 release 固定的 PostgreSQL、Jaeger、Jaeger 内存预算和受管 SeaweedFS 版本；外部附件存储不在该动作中变更。
+
+### 升级确认与受控传输
 
 普通升级确认前，`promotion-service-scope.mjs` 从候选提交的固定执行器读取预期配置，与登记目标实际运行的 PostgreSQL、Jaeger、受管 SeaweedFS 镜像及本机预置镜像内容身份比较。计划列出 Jaeger 内存上限 / 预留，以及候选与当前提交间共用和目标 Compose、PostgreSQL 初始化脚本、Jaeger 配置文件的变化。差异随计划指纹封存；无法核实或执行前出现漂移时，停止并重新准备。旧待确认计划可放弃后重做，历史回执原样可读。固定项一致不代表 Compose 不会重建容器；首次部署无运行基线，按首次部署计划创建基础服务。
 

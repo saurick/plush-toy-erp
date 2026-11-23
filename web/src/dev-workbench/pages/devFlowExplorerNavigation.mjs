@@ -1,4 +1,5 @@
 import { DEV_FLOW_EXPLORER_ROUTE } from '../config/devRoutes.mjs'
+import { businessChainBaseLayer } from '../config/devBusinessChainReading.mjs'
 import {
   addBusinessChainMapNode,
   expandBusinessChainMap,
@@ -43,12 +44,14 @@ export function resolveDevFlowExplorerEntry(params, catalog) {
 export function applyDevFlowExplorerEntry(draft, library, entry) {
   if (!entry.nodeKey) {
     const next = showBusinessChainWhole(draft, library, entry.chainKey)
-    const mode = draft.presentation?.mode
+    const baseLayer = businessChainBaseLayer(library.chainDefinitions.get(entry.chainKey))
+    const { mode, layers = ['normal'] } = draft.presentation || {}
     return {
       ...next,
       presentation: {
         ...draft.presentation,
         mode: !mode || mode === 'overview' ? 'mainline' : mode,
+        layers: [...new Set([...layers, baseLayer])],
       },
     }
   }

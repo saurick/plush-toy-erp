@@ -5,7 +5,7 @@ import Modal from '@/common/components/modal/AppModal.jsx'
 import BusinessChainDesignExport from './BusinessChainDesignExport.jsx'
 import { DEV_FLOW_EXPLORER_BLANK_HREF } from '../../pages/devFlowExplorerNavigation.mjs'
 
-export default function BusinessChainDesignDrafts({ confirmNew, onNew, notesCount, onNotes, onExample, onUndo, onRedo, exportDisabled, getGraph, onNotice }) {
+export default function BusinessChainDesignDrafts({ confirmNew, onNew, onUndo, onRedo, exportDisabled, getGraph, onNotice }) {
   const trigger = useRef(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -29,8 +29,6 @@ export default function BusinessChainDesignDrafts({ confirmNew, onNew, notesCoun
             { key: 'redo', label: '重做', icon: <RedoOutlined aria-hidden="true" />, disabled: !onRedo, onClick: onRedo },
             { key: 'new', label: '新建空白视图', onClick: () => confirmNew ? setConfirming(true) : startNew() },
             { key: 'export', label: '导出当前范围', disabled: exportDisabled, onClick: () => setExportOpen(true) },
-            { key: 'notes', label: notesCount ? `视图备注（${notesCount}）` : '视图备注', onClick: onNotes },
-            { key: 'example', label: '员工定位示例', onClick: onExample },
             { key: 'new-tab', icon: <ExportOutlined />, label: <a href={DEV_FLOW_EXPLORER_BLANK_HREF} target="_blank" rel="noopener noreferrer">在新标签页新建</a> },
           ],
         }}

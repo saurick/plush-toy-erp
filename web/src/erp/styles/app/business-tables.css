@@ -1656,13 +1656,11 @@
     > .erp-business-operation-panel.ant-card,
   [data-page-table-region]:has(.erp-business-data-table-card--sticky)
     > .erp-business-operation-panel.ant-card,
-  [data-page-table-region]:has(.erp-business-data-table-card--sticky)
+  [data-page-table-region]:has(.erp-business-data-table-card--sticky, .erp-work-center-table .ant-table-sticky-holder)
     [data-page-table-toolbar] {
     position: sticky;
     z-index: 5;
     top: calc(-1 * var(--erp-list-scroll-padding, var(--erp-page-padding)));
-    background: var(--erp-surface-bg);
-    box-shadow: 0 2px 4px color-mix(in srgb, var(--erp-border) 60%, transparent);
   }
 
   .erp-business-data-table-card--sticky.ant-card,

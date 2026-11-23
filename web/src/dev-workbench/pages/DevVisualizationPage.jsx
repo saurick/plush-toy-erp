@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Typography } from 'antd'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import source from '../../../../docs/engineering/可视化表达规范.md?raw'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
@@ -12,6 +13,10 @@ import { buildDevDocsLocation } from './devDocsNavigation.mjs'
 import '../styles/dev-visualization.css'
 
 const { Title, Text } = Typography
+const receiptViews = [
+  { value: 'flow', label: '看收货规则' },
+  { value: 'progress', label: '看这笔进度' },
+]
 const choices = readVisualizationChoices(source)
 const catalogReady = choices.length === Object.keys(VISUALIZATION_EXAMPLES).length &&
   choices.every((choice) => Object.hasOwn(VISUALIZATION_EXAMPLES, choice.value))
@@ -57,19 +62,27 @@ export default function DevVisualizationPage() {
               value={value}
               onChange={choose}
             >
-              {choices.filter((choice) => visited.has(choice.value) || choice.value === value).map((choice) => (
-                <section key={choice.value} hidden={choice.value !== value} aria-label={choice.label}>
-                  <WorkbenchSection
-                    flat
-                    title={choice.label}
-                    headingLevel={3}
-                    description={`${choice.question} · ${choice.forms}`}
-                    footer={<p className="erp-dev-visualization__rule"><strong>选用边界：</strong>{choice.rule}</p>}
-                  >
+              <WorkbenchSection
+                flat
+                title={current.label}
+                headingLevel={3}
+                description={current.rule}
+                actions={receiptViews.some((view) => view.value === value) && (
+                  <SlidingSegmented
+                    aria-label="采购收货图例对照"
+                    hierarchy="secondary"
+                    options={receiptViews}
+                    value={value}
+                    onChange={choose}
+                  />
+                )}
+              >
+                {choices.filter((choice) => visited.has(choice.value) || choice.value === value).map((choice) => (
+                  <div key={choice.value} hidden={choice.value !== value}>
                     <VisualizationExamples type={choice.value} />
-                  </WorkbenchSection>
-                </section>
-              ))}
+                  </div>
+                ))}
+              </WorkbenchSection>
             </WorkbenchReading>
           </WorkbenchSection>
         ) : (

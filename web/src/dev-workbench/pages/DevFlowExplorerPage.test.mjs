@@ -79,7 +79,6 @@ async function setup(t) {
 const previousDraft = {
   nodes: [{ id: 'node:sales_order', x: 96, y: 80, manual: true }],
   edges: [],
-  ideas: [{ text: '保留原备注' }],
   presentation: { mode: 'all', highlightedRoles: [] },
 }
 const recent = JSON.stringify({ draft: previousDraft })
@@ -131,7 +130,7 @@ test('新建空白入口优先于原标签页复制的草稿，消费入口后�
   assert.equal(app.location().search, '')
   assert.equal(app.ui.container.querySelectorAll('[data-design-node]').length, 0)
   assert.match(app.ui.container.querySelector('[aria-label="当前探索范围"]').textContent, /尚未加载链路/u)
-  assert.deepEqual(JSON.parse(window.sessionStorage.getItem(workingKey)), { draft: { nodes: [], edges: [], ideas: [], presentation: { mode: 'mainline', highlightedRoles: [], layout: 'lanes', showBranches: false, layers: ['normal'] } } })
+  assert.deepEqual(JSON.parse(window.sessionStorage.getItem(workingKey)), { draft: { nodes: [], edges: [], presentation: { mode: 'mainline', highlightedRoles: [], layout: 'lanes', layers: ['normal'] } } })
   await app.click('更多视图操作')
   const link = document.querySelector('a[href="/__dev/flow-explorer?new=blank"]')
   assert(link)
@@ -181,7 +180,6 @@ test('订单环节直达对应链路，返回来源时恢复环节和筛选', as
   assert.equal(working.draft.map.scope, 'whole')
   assert.equal(working.draft.map.chainKey, 'purchase_to_inventory')
   assert.deepEqual(working.draft.nodes.find((node) => node.id === 'node:sales_order'), previousDraft.nodes[0])
-  assert.deepEqual(working.draft.ideas, previousDraft.ideas)
   await app.back()
   assert.equal(app.location().pathname, '/__dev/status-flows')
   assert.equal(app.location().search, search)
@@ -288,6 +286,6 @@ test('仅有历史收藏时直接进入全流程地图，页头和菜单仅提�
   assert.equal(!!app.ui.container.querySelector('[aria-label="选择收藏视图"]'), false)
   await app.click('更多视图操作')
   const menu = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
-  assert.deepEqual(menu, ['撤销', '重做', '新建空白视图', '导出当前范围', '视图备注', '员工定位示例', '在新标签页新建'])
+  assert.deepEqual(menu, ['撤销', '重做', '新建空白视图', '导出当前范围', '在新标签页新建'])
   assert.equal(window.localStorage.getItem(key), original)
 })

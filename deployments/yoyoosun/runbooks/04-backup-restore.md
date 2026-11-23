@@ -81,15 +81,27 @@ node scripts/deploy/backup-set/cli.mjs restore-check \
   --max-age-hours 36
 ```
 
-恢复检查不连接现有 PG / bucket：在无宿主端口的 Docker internal 网络创建独立 PG 与 S3，先验密文 checksum、解密、拒绝 tar 链接 / 特殊文件 / 路径穿越，再逐文件校验。恢复 PG 后核对迁移、有效客户配置、附件整行摘要，向新 bucket 恢复文件并逐对象验大小与 SHA-256。
+```mermaid
+flowchart LR
+  source["选定异地成套备份"] --> check["验密文并解密"]
+  check --> files["逐文件核对摘要"]
+  files --> restore["在新建 PG 和 S3 恢复"]
+  restore --> verify["读回数据库与逐对象附件"]
+  verify -->|选做| smoke["应用启动与只读业务检查"]
+  verify -->|仅验证恢复| clean["清理临时资源及明文"]
+  smoke --> clean
+  clean --> report["保存同一备份的结果回执"]
+```
 
-临时容器、该次匿名卷、网络及明文均清理成功才写 `plush.backup-set-restore/v1` passed。报告必须为 `sourceKind=offsite-backup-set`、同一 backupId、数量和字节相符、`restoreTarget=temporary-postgres-and-s3-removed`。失败会覆盖本次报告为 failed，不能沿用旧 passed。
+| 证据 | 怎样判断 |
+| --- | --- |
+| 备份与环境 | 拒绝归档内链接、特殊文件和路径穿越。恢复用无宿主端口的 Docker internal 网络和新 PG / S3。读回 migration、有效配置、附件整行摘要、每个对象大小和 SHA-256。 |
+| 恢复报告 | 容器、匿名卷、网络和明文全清理后才写 `plush.backup-set-restore/v1` 的 passed。核对 `sourceKind=offsite-backup-set`、同一 backupId、数量、字节和 `restoreTarget=temporary-postgres-and-s3-removed`。失败写本次 failed。 |
+| 可选业务检查 | 加 `--business-smoke`，凭据由受控环境提供。在同一隔离网按正式角色脚本核对最小权限，启动备份绑定镜像，保留数据库名及 `postgres` 网络别名。恢复客户运行开关，沿用 Compose seccomp 与浏览器 sandbox。业务检查只读，启动和登录审计落在临时副本。 |
+| 业务结果 | 查 health / ready、真实登录、配置版本、单位、销售订单和最多三份未撤回附件的 API 下载哈希。全量附件已在环境恢复检查中逐对象校验。退出会话且清理成功才写同 backupId / releaseSha 的 `businessSmoke.status=passed`，未选择时为 `not-run`。 |
+| 回执交付 | 恢复页从 `output/customers/<customer>/backup-restore-rehearsal/` 读脱敏报告。成套报告用 `backup-set-restore-report.json`，PG 专项用 `backup-restore-report.json`。跨机回传只含脱敏报告及 SHA-256。 |
 
-需要验证恢复后的业务时，在 `restore-check` 增加 `--business-smoke`，由受控进程环境提供 `RESTORE_SMOKE_USERNAME`、`RESTORE_SMOKE_PASSWORD`。该选项在同一个无宿主端口、无外网出口的隔离网络中，按正式角色脚本重建并验证数据库最小权限，保留备份中的数据库名和网络内 `postgres` 别名，再启动备份绑定的原应用镜像。试用配置按备份中的有效产品标识恢复运行开关，仍由原应用执行完整边界检查；Chromium 使用正式 Compose 的 seccomp 策略并保留 sandbox。验证不更改原账号密码，不 bootstrap 或通过业务 API 写入业务事实；应用自身启动及登录审计只作用于临时副本。
-
-业务检查包括 health / ready、真实登录、有效客户配置版本、单位和销售订单读取，以及最多三份未撤回附件的 API 下载与哈希核对；全部附件仍由前面的存储恢复逐对象校验。会话退出、应用容器及其余临时资源清理成功后，`businessSmoke.status=passed` 才能随同一 backupId / releaseSha 输出。未选择该选项仍为 `businessSmoke=not-run`，不能用数据库与附件成功代替业务验证。它不是完整岗位矩阵、业务写入或客户验收。
-
-恢复页从固定的 `output/customers/<customer>/backup-restore-rehearsal/` 读取脱敏回执。成套报告保存为 `backup-set-restore-report.json`；旧专项数据库回执仍使用 `backup-restore-report.json`，两者保留各自证据范围。跨主机取回报告时保留原内容和 SHA-256，不复制 dump、私有资源清单或凭据。
+业务冒烟读取环境中的 `RESTORE_SMOKE_USERNAME` 和 `RESTORE_SMOKE_PASSWORD`，使用备份中的原账户。
 
 灾难恢复可选择一套精确文件，以 `restore --file <absolute-set.tar.age> --identity-file <private-key> --work-dir <private-dir> --report <private-json> --keep` 保留新建隔离 PG / S3。资源名与私有配置目录只写入 0600 报告，仍无宿主端口。
 
@@ -156,11 +168,15 @@ Mac 使用不低于项目最低版本的同一主版本 Node（允许兼容的 m
 4. 运行 `verify --config <private-config.json>`。它从外盘实际副本解密，恢复到无网络、无宿主端口的一次性 PostgreSQL，核对业务表与 Atlas migration；精确清理临时容器、其新建匿名卷及临时明文成功后才保存 passed 回执。首次镜像启动须等待 PID 1 已进入最终 PostgreSQL 进程，避免误用 initdb 的临时服务。
 5. 相关模块验证后运行 `install --config <private-config.json>`。安装器生成固定内容 SHA-256 的独立运行目录及当前用户 launchd 任务，并记录基础提交及真实来源状态；未提交内容记为 `content-snapshot`，不冒充提交版本，也不要求先提交共享工作区。每次运行重新校验制品完整性；共享工作区后续变化不影响已安装版本。安装后读回 launchd 最后退出码，再运行 `check --config <private-config.json>` 核验当前介质、最近同步 / 恢复及新鲜度，不能只凭安装成功或历史 `status` 宣称定时首跑通过。
 
+### 定时运行、首次授权与离线情况
+
 `run` 执行同步及到期的恢复检查。`check` 只读核对当前介质、已复制文件和回执时效，失败不覆盖同步或恢复记录；`sync` 和 `verify` 才分别执行密码学完整性与真实恢复验证。运行版本不兼容等启动失败也会更新最近操作状态，保留最近成功回执。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。外盘读取先在独立进程执行 15 秒限时预检；无法读取时记录 `destination_access_unavailable`，不开始传输或解密。
 
 首次后台访问外盘可能需要在 macOS 提示中允许 Node 访问可移动宗卷；前台运行继承终端 / App 权限，不能证明后台已获准。遇到预检失败须核对介质与系统授权，不能改为内盘目录或关闭系统保护。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；最近恢复尝试单独记录，失败或中断后下次运行重新验证，历史成功回执保留。副本索引在外盘专属目录。SIGTERM / SIGINT 进入同一清理路径；安装器拒绝中断仍在运行的旧备份任务。
 
 Mac 休眠 / 离线期间不会保证取得最新副本，服务器原有自动备份继续独立运行。
+
+### 更换来源与识别旧副本
 
 切换同一数据来源到另一台 SSH 主机时，先复制历史加密文件、checksum 和来源身份标记，修改私有配置的 host / directory，再依次执行 sync、verify 和定时首跑读回。更换外盘时填写新 UUID 并初始化 / 核验专属目录；恢复回执绑定卷 UUID，新介质会重新验证。新链路通过且保留窗口结束后再处理旧目标；不同业务来源使用新的 id 与目录。对象存储等新协议应扩展传输模块，不混入同步及恢复逻辑。
 

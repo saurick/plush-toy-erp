@@ -6,6 +6,22 @@
   gap: 8px;
 }
 
+.erp-diagram-view-controls__disclosure {
+  min-width: 0;
+}
+
+.erp-diagram-view-controls__disclosure > summary {
+  width: max-content;
+  margin-inline-start: auto;
+  color: var(--erp-text);
+  font-size: var(--erp-font-small);
+  cursor: pointer;
+}
+
+.erp-diagram-view-controls__disclosure > .erp-diagram-view-controls {
+  margin-top: 8px;
+}
+
 .erp-diagram-view-controls__trigger {
   position: relative;
   display: inline-flex;

@@ -178,7 +178,9 @@ export default function EngineeringMaterialRequestForm({
   }
 
   const discardThen = (next) => {
-    if (!submitting.current && !saving) next()
+    if (submitting.current || saving) return false
+    if (typeof next === 'function') next()
+    return true
   }
   const title = readOnly
     ? preview

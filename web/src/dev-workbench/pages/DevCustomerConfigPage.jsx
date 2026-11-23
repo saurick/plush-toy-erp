@@ -5,116 +5,49 @@ import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import { canCreateLocalCustomerDraft, DEV_CUSTOMER_CONFIG_ROUTE } from '../config/devCustomerConfig.mjs'
-import { AssetsPanel } from './customer-config/AssetsPanel.jsx'
 import { CustomerDraftDialog } from './customer-config/CustomerDraftDialog.jsx'
-import { DiffPanel } from './customer-config/DiffPanel.jsx'
-import { OverviewPanel } from './customer-config/OverviewPanel.jsx'
-import { PreflightPanel } from './customer-config/PreflightPanel.jsx'
+import { CustomerConfigReview } from './customer-config/CustomerConfigReview.jsx'
 import { ReleasePanel } from './customer-config/ReleasePanel.jsx'
 import { ValidationPanel } from './customer-config/ValidationPanel.jsx'
 import {
   CustomerPackageSelector,
   MissingCustomerPanel,
 } from './customer-config/presentation.jsx'
-import { CUSTOMER_CONFIG_STEPS } from './customer-config/navigation.mjs'
+import { CUSTOMER_CONFIG_TASKS, RELEASE_TASK, VALIDATION_TASK } from './customer-config/navigation.mjs'
 import { useCustomerConfigOperations } from './customer-config/useCustomerConfigOperations.mjs'
 import { useCustomerConfigRoute } from './customer-config/useCustomerConfigRoute.mjs'
 import './customer-config/customer-config-workflow.css'
 
 const { Title } = Typography
-const steps = CUSTOMER_CONFIG_STEPS.map((step) => ({
-  ...step,
-  label: (
-    <span className="erp-dev-customer-step-label">
-      {step.number ? (
-        <span className="erp-dev-customer-step-number" aria-hidden="true">
-          {step.number}
-        </span>
-      ) : null}
-      <span>{step.label}</span>
-    </span>
-  ),
-}))
 
-export default function DevCustomerConfigPage() {
-  const [draftOpen, setDraftOpen] = useState(false)
-  const route = useCustomerConfigRoute()
-  const { overview, activeStep } = route
-  const operations = useCustomerConfigOperations({
-    overview,
-    requestedReleaseBatch: route.requestedReleaseBatch,
-  })
-  const { isMutationRunning, releaseBatch, releaseBatchesState } = operations
-  const isMissingCustomer = overview.status !== 'ready'
-  const canCreateDraft = canCreateLocalCustomerDraft(globalThis.location?.hostname)
-  const selectStep = (step) => {
-    if (!isMutationRunning) route.navigate(step)
-  }
+function CustomerConfigTaskContent({ route, operations }) {
+  const [onlyOverrides, setOnlyOverrides] = useState(true)
+  const { overview, activeTask, focusTestApply } = route
+  const { isMutationRunning } = operations
 
-  useEffect(() => {
-    if (
-      releaseBatchesState.status === 'success' &&
-      route.requestedReleaseBatch &&
-      !releaseBatch
-    ) {
-      route.selectReleaseBatch('', { replace: true })
-    }
-  }, [releaseBatch, releaseBatchesState.status, route])
+  if (overview.status !== 'ready') return <MissingCustomerPanel overview={overview} />
 
-  const panel = {
-    overview: (
-      <OverviewPanel
-        overview={overview}
-        dryRunState={operations.dryRunState}
-        applyState={operations.applyState}
-        onNavigate={selectStep}
-      />
-    ),
-    preflight: (
-      <PreflightPanel
-        consoleSummary={overview.packageConsoleSummary}
-        customerPackageSummary={overview.customerPackageSummary}
-        menuSummary={overview.menuSummary}
-        fieldNumberingSummary={overview.fieldNumberingSummary}
-        activeSection={route.activePreflightSection}
-        onSectionChange={(section) => {
-          if (!isMutationRunning) route.selectSection(section)
-        }}
-      />
-    ),
-    diff: (
-      <DiffPanel
-        consoleSummary={overview.packageConsoleSummary}
-        customerPackageSummary={overview.customerPackageSummary}
-      />
-    ),
-    assets: (
-      <AssetsPanel
-        menuSummary={overview.menuSummary}
-        fieldNumberingSummary={overview.fieldNumberingSummary}
-        printTemplateSummary={overview.printTemplateSummary}
-      />
-    ),
-    import: (
+  if (activeTask === VALIDATION_TASK) {
+    return (
       <ValidationPanel
         importSummary={overview.importSummary}
         dryRunState={operations.dryRunState}
         applyState={operations.applyState}
-        activeAction={route.activeImportAction}
-        onActionChange={(action) => {
-          if (!isMutationRunning) route.selectAction(action)
-        }}
+        focusApply={focusTestApply}
         onRunDryRun={operations.handleRunDryRun}
         onApplyTestConfig={operations.requestApplyTestConfig}
         disabled={isMutationRunning}
       />
-    ),
-    release: (
+    )
+  }
+
+  if (activeTask === RELEASE_TASK) {
+    return (
       <ReleasePanel
         importSummary={overview.importSummary}
         releaseState={operations.releaseState}
-        releaseBatchesState={releaseBatchesState}
-        releaseBatch={releaseBatch}
+        releaseBatchesState={operations.releaseBatchesState}
+        releaseBatch={operations.releaseBatch}
         onReleaseBatchChange={(batch) => {
           if (!isMutationRunning) {
             operations.resetRelease()
@@ -125,8 +58,40 @@ export default function DevCustomerConfigPage() {
         onRetryRead={operations.retryRead}
         disabled={isMutationRunning}
       />
-    ),
-  }[activeStep]
+    )
+  }
+
+  return (
+    <CustomerConfigReview
+      route={route}
+      disabled={isMutationRunning}
+      onlyOverrides={onlyOverrides}
+      onOnlyOverridesChange={setOnlyOverrides}
+    />
+  )
+}
+
+export default function DevCustomerConfigPage() {
+  const [draftOpen, setDraftOpen] = useState(false)
+  const route = useCustomerConfigRoute()
+  const { overview, activeTask } = route
+  const operations = useCustomerConfigOperations({
+    overview,
+    requestedReleaseBatch: route.requestedReleaseBatch,
+  })
+  const { isMutationRunning, releaseBatch, releaseBatchesState } = operations
+  const isMissingCustomer = overview.status !== 'ready'
+  const canCreateDraft = canCreateLocalCustomerDraft(globalThis.location?.hostname)
+
+  useEffect(() => {
+    if (
+      releaseBatchesState.status === 'success' &&
+      route.requestedReleaseBatch &&
+      !releaseBatch
+    ) {
+      route.selectReleaseBatch('', { replace: true })
+    }
+  }, [releaseBatch, releaseBatchesState.status, route])
 
   return (
     <main className="erp-dev-customer-page erp-dev-workspace-page erp-dev-tool-page erp-dev-delivery-workspace">
@@ -149,11 +114,13 @@ export default function DevCustomerConfigPage() {
               compact
               level="primary"
               idPrefix="dev-customer"
-              className="erp-dev-customer-journey erp-dev-customer-stagebar"
+              className="erp-dev-customer-journey"
               ariaLabel="客户配置工作任务"
-              items={steps}
-              value={activeStep}
-              onChange={selectStep}
+              items={CUSTOMER_CONFIG_TASKS}
+              value={activeTask}
+              onChange={(task) => {
+                if (!isMutationRunning) route.navigate(task)
+              }}
               disabled={isMutationRunning}
             />
           ) : null
@@ -170,7 +137,9 @@ export default function DevCustomerConfigPage() {
             }}
             disabled={isMutationRunning}
           />
-          {!isMissingCustomer ? <Tag>工作区配置源</Tag> : null}
+          {!isMissingCustomer ? (
+            <Tag>{overview.customerPackageSummary.status === 'draft' ? '工作区草案' : '工作区候选'}</Tag>
+          ) : null}
           {canCreateDraft ? (
             <Button disabled={isMutationRunning} onClick={() => setDraftOpen(true)}>
               从模板新建草稿
@@ -186,7 +155,7 @@ export default function DevCustomerConfigPage() {
           onClose={() => setDraftOpen(false)}
           onCreate={operations.requestCreateDraft}
           onCreated={(customerKey) => {
-            const query = new URLSearchParams({ customer: customerKey, view: 'preflight' })
+            const query = new URLSearchParams({ customer: customerKey })
             window.location.assign(`${DEV_CUSTOMER_CONFIG_ROUTE}?${query}`)
           }}
         />
@@ -207,17 +176,17 @@ export default function DevCustomerConfigPage() {
       ) : null}
       <section
         className="erp-dev-customer-workspace"
-        id={isMissingCustomer ? undefined : `dev-customer-panel-${activeStep}`}
+        id={isMissingCustomer ? undefined : `dev-customer-panel-${activeTask}`}
         role={isMissingCustomer ? undefined : 'tabpanel'}
         aria-labelledby={
-          isMissingCustomer ? undefined : `dev-customer-tab-${activeStep}`
+          isMissingCustomer ? undefined : `dev-customer-tab-${activeTask}`
         }
       >
-        {isMissingCustomer ? (
-          <MissingCustomerPanel overview={overview} />
-        ) : (
-          panel
-        )}
+        <CustomerConfigTaskContent
+          key={overview.customerKey}
+          route={route}
+          operations={operations}
+        />
       </section>
     </main>
   )

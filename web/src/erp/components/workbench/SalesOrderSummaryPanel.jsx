@@ -21,6 +21,7 @@ import {
 import { SALES_ORDER_DATE_FILTER_OPTIONS } from '../sales-orders/salesOrderPageConfig.mjs'
 import { DateRangeFilter } from '../business-list/BusinessDateInputs.jsx'
 import SalesOrderSummaryPartyFilters from './SalesOrderSummaryPartyFilters.jsx'
+import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
 import WorkflowTaskProductImage from '../workflow/WorkflowTaskProductImage.jsx'
 import useBusinessListExport from '../../hooks/useBusinessListExport.js'
 import { useBusinessColumnOrder } from '../business-list/BusinessListToolbarActions.jsx'
@@ -119,20 +120,37 @@ export default function SalesOrderSummaryPanel({
         title: '产品名称',
         dataIndex: 'product',
         width: 220,
-        render: (_, row) => (
-          <span className="erp-workbench-summaries__product">
+        render: (_, row) => {
+          const name = productName(row)
+          const product = {
+            kind: 'product',
+            name,
+            productID: row.product_id,
+            imageAttachmentID: row.product_image_attachment_id,
+          }
+          const picture = (
             <WorkflowTaskProductImage
-              item={{
-                kind: 'product',
-                name: productName(row),
-                productID: row.product_id,
-                imageAttachmentID: row.product_image_attachment_id,
-              }}
-              preview
+              item={product}
+              preview={false}
+              state={product.imageAttachmentID ? 'empty' : 'album'}
             />
-            <span>{productName(row)}</span>
-          </span>
-        ),
+          )
+          return (
+            <span className="erp-workbench-summaries__product">
+              {product.productID > 0 ? (
+                <BusinessProductGallery
+                  products={[product]}
+                  title={name}
+                  triggerLabel={product.imageAttachmentID ? undefined : `查看产品图：${name}`}
+                  compact
+                >
+                  {picture}
+                </BusinessProductGallery>
+              ) : picture}
+              <span>{name}</span>
+            </span>
+          )
+        },
         exportValue: (record) => productName(record, { emptyText: '' }),
       },
       {

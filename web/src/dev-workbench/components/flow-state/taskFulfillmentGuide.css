@@ -1,6 +1,8 @@
 .erp-dev-fulfillment-guide { display: grid; gap: 16px; padding: 16px; border: 1px solid var(--erp-border); border-radius: 10px; background: var(--erp-surface-bg); container: fulfillment-guide / inline-size; }
-.erp-dev-fulfillment-guide__heading { display: flex; align-items: baseline; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
+.erp-dev-fulfillment-guide__heading { display: flex; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
 .erp-dev-fulfillment-guide__heading > .erp-dev-relation-filters { flex: 1 1 100px; }
+.erp-dev-fulfillment-guide__role-select { width: 176px; max-width: 100%; }
+.erp-dev-fulfillment-guide__exception-select { width: 260px; max-width: 100%; }
 .erp-dev-fulfillment-guide :is(h2,h3) { margin: 0; font-size: 17px; }
 .erp-dev-fulfillment-guide p:where(:not(.erp-markdown-mermaid p)) { margin: 0; line-height: 1.7; }
 .erp-dev-fulfillment-guide__panel { min-width: 0; display: grid; gap: 16px; padding-top: 20px; border-top: 1px solid var(--erp-border); scroll-margin-top: 20px; }
@@ -11,11 +13,9 @@
 @container fulfillment-guide (min-width: 1100px) {
   .erp-dev-fulfillment-guide__subflow { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
 }
-.erp-dev-fulfillment-guide__scope-bar, .erp-dev-fulfillment-guide__hint { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
-.erp-dev-fulfillment-guide__stage-picker, .erp-dev-fulfillment-guide__choices { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.erp-dev-exception-directory > .ant-select,
-.erp-dev-fulfillment-guide__choices > .ant-select { width: 260px; max-width: 100%; }
-.erp-dev-fulfillment-guide__choices > span { color: var(--erp-text-muted); }
+.erp-dev-fulfillment-guide__scope-bar { color: var(--erp-text-muted); font-size: var(--erp-font-small); }
+.erp-dev-fulfillment-guide__stage-picker, .erp-dev-fulfillment-guide__exception-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.erp-dev-fulfillment-guide__exception-toolbar h4 { margin: 0; font-size: var(--erp-font-body); font-weight: 600; }
 .erp-dev-fulfillment-guide__focus { padding: 12px 16px; border-left: 2px solid var(--erp-primary); background: var(--erp-surface-bg-soft); font-size: var(--erp-font-small); line-height: 1.7; }
 .erp-dev-fulfillment-guide__focus strong { display: block; margin-bottom: 4px; font-weight: 500; }
 .erp-dev-fulfillment-guide__focus > .ant-btn { padding-inline: 0; }
@@ -26,12 +26,8 @@
 .erp-dev-fulfillment-guide__links { display: flex; gap: 6px 12px; flex-wrap: wrap; font-size: var(--erp-font-small); }
 .erp-dev-fulfillment-guide__links > span { color: var(--erp-text-muted); }
 .erp-dev-fulfillment-guide__boundary { color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
-.erp-dev-exception-directory { display: grid; gap: 16px; }
-@container fulfillment-guide (max-width: 639px) {
-  .erp-dev-fulfillment-guide__choices > .ant-select { flex: 1 1 220px; width: auto; }
-}
 [data-flow-print-current] .erp-dev-fulfillment-guide { display: block; padding: 0; border: 0; }
-[data-flow-print-current] .erp-dev-fulfillment-guide :is(.ant-segmented, .erp-dev-exception-directory, .erp-dev-fulfillment-guide__detail-actions) { display: none; }
+[data-flow-print-current] .erp-dev-fulfillment-guide :is(.ant-segmented, .erp-dev-fulfillment-guide__exception-select, .erp-dev-fulfillment-guide__exception-toolbar, .erp-dev-fulfillment-guide__detail-actions) { display: none; }
 [data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__stage-main { display: grid; }
 [data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__exception-trigger,
 [data-flow-print-current] .erp-dev-fulfillment-guide .erp-dev-chain__independent button { display: inline-block; }

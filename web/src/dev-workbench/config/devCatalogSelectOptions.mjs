@@ -34,6 +34,10 @@ const PERMISSION_MODULE_GROUPS = [
   },
 ]
 
+function catalogOptionGroup(key, title, options) {
+  return { key: `group:${key}`, title, label: `${title} · ${options.length}`, options }
+}
+
 function groupCatalogOptions(options, groups, otherLabel) {
   const remaining = new Map(options.map((option) => [option.value, option]))
   const grouped = groups.flatMap(({ key, label, values }) => {
@@ -43,10 +47,10 @@ function groupCatalogOptions(options, groups, otherLabel) {
       remaining.delete(value)
       return [option]
     })
-    return members.length ? [{ key: `group:${key}`, label: `${label} · ${members.length}`, options: members }] : []
+    return members.length ? [catalogOptionGroup(key, label, members)] : []
   })
   if (remaining.size) {
-    grouped.push({ key: 'group:other', label: `${otherLabel} · ${remaining.size}`, options: [...remaining.values()] })
+    grouped.push(catalogOptionGroup('other', otherLabel, [...remaining.values()]))
   }
   return grouped
 }
@@ -59,8 +63,4 @@ export function buildIntegrationDomainSelectOptions(entries) {
 export function groupPermissionModuleSelectOptions(moduleOptions) {
   const [overview, ...modules] = moduleOptions
   return [overview, ...groupCatalogOptions(modules, PERMISSION_MODULE_GROUPS, '其他功能')]
-}
-
-export function matchCatalogSelectOption(input, option) {
-  return !option.options && `${option.label} ${option.value}`.toLowerCase().includes(input.toLowerCase())
 }

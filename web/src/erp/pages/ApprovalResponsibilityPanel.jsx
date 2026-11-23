@@ -568,55 +568,54 @@ export default function ApprovalResponsibilityPanel({
 
       {settings ? (
         <>
-          <div
-            className="erp-approval-responsibility__header"
-            data-page-table-toolbar
-          >
-            <div>
-              <Title level={5}>审批责任</Title>
-              <Text type="secondary">
-                设置审批条件，以及主办、备用和升级责任。
-              </Text>
+          <Card className="erp-business-operation-panel erp-approval-responsibility__toolbar" data-page-table-toolbar>
+            <div className="erp-approval-responsibility__header">
+              <div>
+                <Title level={5}>审批责任</Title>
+                <Text type="secondary">
+                  设置审批条件，以及主办、备用和升级责任。
+                </Text>
+              </div>
+              <Space size={6} wrap>
+                <Tag
+                  color={
+                    appliedReceipt || pendingPayload
+                      ? 'blue'
+                      : draftDirty
+                        ? 'orange'
+                        : 'green'
+                  }
+                >
+                  {appliedReceipt || pendingPayload
+                    ? '等待确认'
+                    : settingsNeedInitialization
+                      ? '待初始化'
+                      : draftDirty
+                        ? '有未生效调整'
+                        : '已生效'}
+                </Tag>
+                <SupplementalHelp
+                  label="审批责任"
+                  aria-label="审批责任说明"
+                  placement="bottomRight"
+                  content={
+                    <div className="erp-approval-responsibility__help">
+                      <Text strong>这里设置何时审批、由谁审批</Text>
+                      <Text>
+                        销售和采购订单可按金额触发审批，默认全部审批。岗位权限决定审批资格，本页指定主办、备用和升级责任。
+                      </Text>
+                      <Text>
+                        新设置只影响新启动的流程，在途审批继续使用原责任。
+                      </Text>
+                      <Text type="secondary">
+                        审批通过只推进对应单据，不会代替库存、出货或财务入账。
+                      </Text>
+                    </div>
+                  }
+                />
+              </Space>
             </div>
-            <Space size={6} wrap>
-              <Tag
-                color={
-                  appliedReceipt || pendingPayload
-                    ? 'blue'
-                    : draftDirty
-                      ? 'orange'
-                      : 'green'
-                }
-              >
-                {appliedReceipt || pendingPayload
-                  ? '等待确认'
-                  : settingsNeedInitialization
-                    ? '待初始化'
-                    : draftDirty
-                      ? '有未生效调整'
-                      : '已生效'}
-              </Tag>
-              <SupplementalHelp
-                label="审批责任"
-                aria-label="审批责任说明"
-                placement="bottomRight"
-                content={
-                  <div className="erp-approval-responsibility__help">
-                    <Text strong>这里设置何时审批、由谁审批</Text>
-                    <Text>
-                      销售和采购订单可按金额触发审批，默认全部审批。岗位权限决定审批资格，本页指定主办、备用和升级责任。
-                    </Text>
-                    <Text>
-                      新设置只影响新启动的流程，在途审批继续使用原责任。
-                    </Text>
-                    <Text type="secondary">
-                      审批通过只推进对应单据，不会代替库存、出货或财务入账。
-                    </Text>
-                  </div>
-                }
-              />
-            </Space>
-          </div>
+          </Card>
 
           {!canManage ? (
             <Alert

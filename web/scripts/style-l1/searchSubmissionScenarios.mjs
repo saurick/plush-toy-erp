@@ -69,7 +69,7 @@ export function createSearchSubmissionScenarios(deps) {
         const panel = page.locator('.erp-workflow-tracking-panel')
         const controls = page.locator('.erp-workflow-tracking-controls')
         const search = controls.getByPlaceholder('搜单号、任务、产品')
-        await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
+        await panel.getByRole('region', { name: '流程记录', exact: true }).getByText('SO-FILTER-801', { exact: true }).waitFor()
         const before = page.searchRPCs.length
         await search.fill('小熊')
         await delay(450)

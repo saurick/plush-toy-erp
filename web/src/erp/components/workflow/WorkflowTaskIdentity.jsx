@@ -1,7 +1,12 @@
 import React from 'react'
 import { Button } from 'antd'
 import { FileTextOutlined, FileUnknownOutlined, RightOutlined } from '@ant-design/icons'
+import { PermissionCode } from '@/common/consts/permissions.generated.mjs'
 import BusinessModal from '../business-list/BusinessModal.jsx'
+import BusinessProductGallery from '../business-list/BusinessProductGallery.jsx'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
+import { normalizeGalleryProducts } from '../../utils/businessProductGallery.mjs'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import WorkflowTaskProductImage from './WorkflowTaskProductImage.jsx'
 import { TaskCopyButton, TaskCopyField, WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import { formatWorkflowProductCopy } from '../../utils/workflowTaskCopy.mjs'
@@ -53,10 +58,35 @@ function CompactIdentityCodes({ item, sourceNo, source, copyable, showStyleNo })
   )
 }
 
-function IdentityItem({ item, imageItem = item, copyable = true, codeCopyable = copyable, summaryCopyable = copyable, source = null }) {
+function renderAssociationThumbnail(product) {
+  return <WorkflowTaskProductImage item={{ kind: 'product', ...product }} preview={false} />
+}
+
+function TaskAssociationImage({ identity, title }) {
+  const { adminProfile } = useBusinessPageContext() || {}
+  const { imageItem, items } = identity
+  const products = normalizeGalleryProducts(items)
+  if (products.length < 2 || !hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)) {
+    return <WorkflowTaskProductImage item={imageItem} />
+  }
+  const cover = imageItem.kind === 'product' ? imageItem : products[0]
+  return (
+    <BusinessProductGallery
+      compact
+      products={products}
+      coverProductID={cover.productID}
+      title={title}
+      renderThumbnail={renderAssociationThumbnail}
+    >
+      {renderAssociationThumbnail(cover)}
+    </BusinessProductGallery>
+  )
+}
+
+function IdentityItem({ item, thumbnail, copyable = true, codeCopyable = copyable, summaryCopyable = copyable, source = null }) {
   return (
     <span className="erp-task-identity__row">
-      <WorkflowTaskProductImage item={imageItem} />
+      {thumbnail ?? <WorkflowTaskProductImage item={item} />}
       <span className="erp-task-identity__item">
         {source}
         <span className="erp-task-identity__name">
@@ -123,7 +153,7 @@ export function WorkflowTaskAssociation({ task, keyword = '', copyable = false, 
   return (
     <>
       <span className="erp-task-identity__card-body" aria-label="任务关联内容">
-        <WorkflowTaskProductImage item={identity.imageItem} />
+        <TaskAssociationImage key={sourceKey} identity={identity} title={identity.sourceNo || getWorkflowTaskDisplayName(task)} />
         {renderContent(
           <span className="erp-task-identity__item">
             <span className="erp-task-identity__product">
@@ -223,11 +253,14 @@ export default function WorkflowTaskIdentity({
       </div>
     )
   }
+  const thumbnail = (
+    <TaskAssociationImage key={sourceKey} identity={identity} title={identity.sourceNo || getWorkflowTaskDisplayName(task)} />
+  )
   if (detailView) {
     return (
       <div className="erp-task-identity erp-task-identity--detail" aria-label="任务关联内容">
         <div className="erp-task-identity__summary">
-          <IdentityItem item={identity.first} imageItem={identity.imageItem} copyable={false} codeCopyable={copyable} source={source} />
+          <IdentityItem item={identity.first} thumbnail={thumbnail} copyable={false} codeCopyable={copyable} source={source} />
           {identity.items.length > 1 ? <Button type="link" className="erp-task-identity__count" aria-haspopup="dialog" aria-expanded={openedSourceKey === sourceKey} onClick={(event) => { event.stopPropagation(); event.currentTarget.focus({ preventScroll: true }); setOpenedSourceKey(sourceKey) }}>{identity.associationCountLabel}<RightOutlined aria-hidden="true" /></Button> : null}
         </div>
         <BusinessModal key={sourceKey} title={identity.associationTitle} open={openedSourceKey === sourceKey} onCancel={() => setOpenedSourceKey(null)} footer={null} size="recordDetails" destroyOnHidden className="erp-task-linked-items-modal">
@@ -240,7 +273,7 @@ export default function WorkflowTaskIdentity({
   }
   return (
     <div className="erp-task-identity" aria-label="任务关联内容">
-      <IdentityItem item={identity.first} imageItem={identity.imageItem} copyable={copyable} summaryCopyable={summaryCopyable} />
+      <IdentityItem item={identity.first} thumbnail={thumbnail} copyable={copyable} summaryCopyable={summaryCopyable} />
       {identity.remainingItems.length ? (
         <details key={task?.id} className="erp-task-identity__more">
           <summary>

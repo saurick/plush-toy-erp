@@ -36,7 +36,12 @@
   gap: 6px;
 }
 
-.mobile-workflow-tracking-status .erp-business-status-filters {
+.mobile-workflow-tracking-status > .erp-filter-chip-group {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.mobile-workflow-tracking-status-scroll .erp-business-status-filters {
   flex-wrap: nowrap;
   gap: 6px;
 }
@@ -52,47 +57,9 @@
   gap: var(--erp-work-item-gap);
 }
 
-.mobile-workflow-tracking-footer {
-  display: grid;
-  gap: 4px;
-}
-
-.mobile-workflow-tracking-heading,
-.mobile-workflow-tracking-origin {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.mobile-workflow-tracking-heading strong {
-  min-width: 0;
-  flex: 1;
-  font-size: var(--erp-font-body);
-  overflow-wrap: anywhere;
-}
-
-.mobile-workflow-tracking-heading .ant-tag {
-  margin: 0;
-}
-
-.mobile-workflow-tracking-owner {
-  font-size: var(--erp-font-small);
-}
-
-.mobile-workflow-tracking-origin {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-micro);
-}
-
 .mobile-workflow-tracking-more {
   display: grid;
   justify-items: center;
   gap: 8px;
   text-align: center;
-}
-
-.mobile-filter-panel[data-filter-context='流程'] .ant-select {
-  width: 100%;
 }

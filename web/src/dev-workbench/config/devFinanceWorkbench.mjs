@@ -42,7 +42,7 @@ export const FINANCE_RULES = Object.freeze([
       ],
       [
         '应付为草稿',
-        '先取消冻结来源的应付草稿，再办理退货或数量调整，之后重新生成草稿。',
+        '先取消冻结来源的应付草稿，再办理采购退货或入库调整，之后重新生成草稿。入库调整含移库与批次修正。',
       ],
       [
         '应付已过账或结清',
@@ -456,6 +456,12 @@ export const FINANCE_TOPIC_STEPS = Object.freeze({
       '核销只分配款项；抵扣有误时撤销核销，恢复余额，不产生实际资金流。',
     ],
   ],
+  terms: [
+    ['订单结算快照', '冻结结算方式与天数', '按订单冻结的结算方式与天数计算，默认值变化不重算已有账款。'],
+    ['账款到期日', '月结按月末加约定天数', '月结以业务发生所在中国自然月的月末为基准；实际到期时间取服务端冻结记录。'],
+    ['入账与冲回记录', '按入账、冲回时间取数', '各笔记录按入账、冲回时间归入指定中国日期期间。'],
+    ['期间对账', '核对期初、本期和期末', '按往来方和币种核对期间余额，核销不重复计入收付款金额。'],
+  ],
   permissions: [
     [
       '业务提供来源',
@@ -507,59 +513,132 @@ export function buildFinanceRelationships(catalog) {
   }
 }
 
+export const PURCHASE_FINANCE_STAGES = [
+  { value: 'none', label: '尚未生成' },
+  { value: 'draft', label: '草稿' },
+  { value: 'posted', label: '已过账或结清' },
+]
+
+export const PURCHASE_FINANCE_CHANGES = [
+  { value: 'return', label: '采购退货' },
+  { value: 'increase', label: '数量调增' },
+  { value: 'transfer', label: '移库或批次修正' },
+]
+
+// A step's optional third item labels the condition for moving to the next step.
 export function purchaseFinanceScenario(stage, change) {
-  if (
-    !['none', 'draft', 'posted'].includes(stage) ||
-    !['return', 'increase', 'transfer'].includes(change)
-  ) {
-    return null
-  }
-  if (change === 'transfer') {
+  const stageOption = PURCHASE_FINANCE_STAGES.find(
+    (option) => option.value === stage
+  )
+  const source = PURCHASE_FINANCE_CHANGES.find(
+    (option) => option.value === change
+  )
+  if (!stageOption || !source) return null
+
+  const selection = { stageLabel: stageOption.label, changeLabel: source.label }
+  const stockOnly = change === 'transfer'
+  const sourceStep = stockOnly ? '过账库存修正' : `${source.label}过账`
+  const sourceNote = stockOnly
+    ? '仓库通过采购入库调整修正库存位置或批次，计价仍按原有效数量和确认单价。'
+    : `仓库按库存规则办理${source.label}并过账，正式来源保留本次数量变化。`
+
+  if (stage === 'draft') {
     return {
-      title: '没有账款差额',
-      steps: ['采购入库', '移库或批次修正', '库存结果更新', '账款保持原值'],
-      detail: '数量和确认单价未变化，不进入采购待调整。',
-      impact: '库存位置或批次变化；原应付、核销和实际资金保持原记录。',
+      ...selection,
+      title: `先取消应付草稿，再办理${stockOnly ? '库存修正' : source.label}`,
+      steps: [
+        ['应付草稿', '原应付草稿已冻结入库来源和金额。'],
+        ['取消应付草稿', '财务先取消冻结来源的草稿，原快照和取消原因留存。'],
+        [sourceStep, sourceNote],
+        [
+          '重新生成草稿',
+          stockOnly
+            ? '修正库存后，按有效入库数量和原确认单价重新生成应付草稿。'
+            : `按${source.label}后的净来源和原确认单价重新生成应付草稿。`,
+        ],
+      ],
+      responsibility: `财务取消并重新生成应付草稿，仓库过账${stockOnly ? '库存修正' : source.label}。`,
+      impact: stockOnly
+        ? '库存位置或批次更新，重建草稿沿用原有效数量及确认单价。'
+        : '重新生成的草稿按净来源计价，财务确认后独立过账。',
     }
   }
   if (stage === 'none') {
     return {
-      title: '首次应付纳入净来源',
+      ...selection,
+      title: stockOnly ? '库存修正后，首次应付按原计价' : '首次应付纳入净来源',
       steps: [
-        '已过账入库',
-        change === 'increase' ? '数量调增过账' : '采购退货过账',
-        '净来源金额',
-        '生成应付草稿',
+        ['已过账入库', '首次应付取正式已入库行的有效数量与确认单价。'],
+        [sourceStep, sourceNote],
+        stockOnly
+          ? [
+              '库存位置或批次更新',
+              '修正结果归库存记录，首次应付按原有效入库数量计价。',
+            ]
+          : ['形成净来源金额', '按有效入库、退货和数量调整形成首次计价来源。'],
+        ['生成应付草稿', '按有效来源与确认单价生成草稿，财务确认后独立过账。'],
       ],
-      detail: '按有效入库、退货及数量调整形成净来源金额，确认后独立过账。',
-      impact: '已纳入原应付的差异不再重复列为待调整。',
+      responsibility: `仓库过账${stockOnly ? '库存修正' : source.label}，财务按有效来源生成应付。`,
+      impact: stockOnly
+        ? '首次应付按有效入库数量和确认单价计价。'
+        : '首次应付已包含本次数量变化。',
     }
   }
-  if (stage === 'draft') {
+  if (stockOnly) {
     return {
-      title: '先取消冻结来源的草稿',
-      steps: ['应付草稿', '取消应付草稿', '来源纠错过账', '重新生成草稿'],
-      detail: '草稿保留原快照与取消原因；不直接改写其冻结金额。',
-      impact: '取消草稿不产生收付款、核销或库存变化。',
+      ...selection,
+      title: '修正库存位置或批次，账款差额为零',
+      steps: [
+        ['已过账入库', '已过账的入库记录提供本次库存修正的来源。'],
+        [sourceStep, sourceNote],
+        ['库存位置或批次更新', '新位置或批次通过库存调整记录追溯。'],
+        [
+          '账款差额为零',
+          '本次修正后的有效数量和确认单价相同，账款按原记录查询。',
+        ],
+      ],
+      responsibility: '仓库办理采购入库调整。',
+      impact: '库存位置或批次更新，账款、核销与资金取各自原记录。',
     }
   }
   return change === 'increase'
     ? {
+        ...selection,
         title: '追加调增，可重新打开已结清应付',
         steps: [
-          '数量调增已过账',
-          '采购待调整',
-          '核对来源与重复',
-          '财务确认调增',
+          ['数量调增已过账', sourceNote],
+          ['采购待调整', '已过账的调增进入原应付的待确认来源。'],
+          [
+            '核对来源与重复',
+            '服务端按原确认单价与新增数量重算，同一来源仅确认一次。',
+            '本次差额尚未确认',
+          ],
+          [
+            '财务确认调增',
+            '财务确认差额后增加未结余额，已结清应付可重新打开。',
+          ],
         ],
-        detail: '由后端根据原确认单价与新增数量重算，原应付金额保留。',
-        impact: '增加未结余额；调增余额已被使用时，冲回前先解除后续依赖。',
+        responsibility: '仓库过账数量调增，财务确认账款差额。',
+        impact: '增加未结余额。调增余额已使用时，冲回前先解除后续依赖。',
       }
     : {
+        ...selection,
         title: '调减前核对未核销余额',
-        steps: ['采购退货已过账', '采购待调整', '核对核销依赖', '财务确认调减'],
-        detail: '调减金额超过未核销余额时，先撤销足额核销记录，再确认差额。',
-        impact: '追加调减记录，不自动退款；真实资金退回另建退款单。',
+        steps: [
+          ['采购退货已过账', sourceNote],
+          ['采购待调整', '已过账的退货进入原应付的待确认来源。'],
+          [
+            '核对核销依赖',
+            '调减金额超过未核销余额时，先撤销足额核销记录。',
+            '未核销余额足够',
+          ],
+          [
+            '财务确认调减',
+            '财务对原应付追加调减记录。真实资金退回另建退款单。',
+          ],
+        ],
+        responsibility: '仓库过账采购退货，财务确认账款差额。',
+        impact: '追加调减记录。发生资金退回时单独登记退款。',
       }
 }
 

@@ -12,6 +12,8 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
+	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/workflowbusinessstate"
@@ -33,6 +35,7 @@ type WorkflowSourceTaskBackfillResult struct {
 	ProductionExceptionScanned   int  `json:"production_exception_scanned"`
 	ProductionExceptionCreated   int  `json:"production_exception_created"`
 	ProductionExceptionExisting  int  `json:"production_exception_existing"`
+	PurchasePayablesScanned      int  `json:"purchase_payables_scanned"`
 	FulfillmentProductionScanned int  `json:"fulfillment_production_scanned"`
 	FulfillmentShipmentScanned   int  `json:"fulfillment_shipment_scanned"`
 	ShipmentQualityScanned       int  `json:"shipment_quality_scanned"`
@@ -70,7 +73,7 @@ func BackfillMissingWorkflowSourceTasks(
 	if _, err = sqlTx.ExecContext(ctx, "SET LOCAL lock_timeout = '5s'"); err != nil {
 		return nil, err
 	}
-	if _, err = sqlTx.ExecContext(ctx, "LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, quality_inspections, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+	if _, err = sqlTx.ExecContext(ctx, "LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, quality_inspections, purchase_orders, purchase_order_items, purchase_receipts, purchase_receipt_items, purchase_returns, purchase_receipt_adjustments, purchase_rejection_dispositions, finance_facts, suppliers, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"); err != nil {
 		return nil, err
 	}
 	client := newBusinessEntClient(ent.Driver(entsql.NewDriver(
@@ -100,6 +103,25 @@ func reconcileMissingWorkflowSourceTasksWithClient(
 		return nil, biz.ErrBadParam
 	}
 	result := &WorkflowSourceTaskBackfillResult{}
+	receiptIDs, err := client.PurchaseReceipt.Query().Where(purchasereceipt.Status(biz.PurchaseReceiptStatusPosted)).Order(ent.Asc(purchasereceipt.FieldID)).IDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range receiptIDs {
+		if err := refreshReceiptPayable(ctx, client, id, 0); err != nil {
+			return nil, err
+		}
+	}
+	result.PurchasePayablesScanned = len(receiptIDs)
+	priceOrders, err := client.PurchaseOrder.Query().Where(purchaseorder.LifecycleStatusIn(biz.PurchaseOrderStatusClosed, biz.PurchaseOrderStatusApproved)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, order := range priceOrders {
+		if err := syncPurchasePriceTask(ctx, client, order, 0); err != nil {
+			return nil, err
+		}
+	}
 	handoffOrderIDs := map[int]bool{}
 	orders, err := client.ProductionOrder.Query().
 		Where(productionorder.Status(biz.ProductionOrderStatusReleased)).

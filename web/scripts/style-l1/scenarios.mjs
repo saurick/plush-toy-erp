@@ -57,6 +57,7 @@ import { createWorkCenterSplitWidthScenarios } from './workCenterSplitWidthScena
 import { createScrollEdgeScenarios } from './scrollEdgeScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingScenarios.mjs'
+import { createMaterialReviewTrackingScenarios } from './materialReviewTrackingScenarios.mjs'
 import { createTaskLinkScenarios } from './taskLinkScenarios.mjs'
 import { createMobileInputScenarios } from './mobileInputScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
@@ -89,7 +90,6 @@ import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevQualityGateLayoutScenarios } from './devQualityGateLayoutScenarios.mjs'
 import { createDevQualityGateRulesScenarios } from './devQualityGateRulesScenarios.mjs'
-import { createDevWorkbenchPatternScenarios } from './devWorkbenchPatternScenarios.mjs'
 import { createDevServerVerificationScenarios } from './devServerVerificationScenarios.mjs'
 import { createDevTestingGuideScenarios } from './devTestingGuideScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
@@ -540,7 +540,6 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createDevQualityGateLayoutScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
     ...createDevQualityGateRulesScenarios({ assert, assertNoHorizontalOverflow }),
-    ...createDevWorkbenchPatternScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevServerVerificationScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevTestingGuideScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevVersionCenterScenarios({
@@ -745,6 +744,7 @@ export function createStyleL1Scenarios(deps) {
     ...createMobileTaskConsistencyScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileScrollScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileWorkflowTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createMaterialReviewTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskLinkScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createFilterConflictScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileNavigationBadgeScenarios({

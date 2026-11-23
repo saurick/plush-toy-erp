@@ -37,6 +37,14 @@ import {
 const root = path.resolve(import.meta.dirname, '../../../..')
 const read = (file) => readFileSync(path.join(root, file), 'utf8')
 
+test('standalone design embeds the current shared directory styles', () => {
+  const html = read(UI_DESIGN_ASSET.path)
+  const css = read('web/src/common/components/navigation/directory.css').trimEnd()
+  const blocks = [...html.matchAll(/<style id="shared-directory-style">\n([\s\S]*?)\n<\/style>/gu)]
+  assert.equal(blocks.length, 1)
+  assert.equal(blocks[0][1], css)
+})
+
 test('compact prototype note fields render multiline textareas with two initial rows', () => {
   const html = read(UI_DESIGN_ASSET.path)
   const control = html.match(/function compactActionControl\([\s\S]*?\n {4}\}/u)?.[0]
@@ -444,7 +452,7 @@ test('mobile progress design groups business details without desktop source jump
   const specification = read(UI_DESIGN_ASSET.specificationPath)
   const rationale = read(UI_DESIGN_ASSET.rationalePath)
   const detail = html.match(
-    /function renderMobileProgressDetail\(\) \{([\s\S]*?)\n[ ]{4}\}\n\n[ ]{4}function renderMobileTaskPreview/u
+    /function renderMobileProgressDetail\(\) \{([\s\S]*?)\n[ ]{4}\}/u
   )
 
   assert.ok(detail)
@@ -452,10 +460,12 @@ test('mobile progress design groups business details without desktop source jump
   const panel = html.match(/function renderProgressDesignPanel\([\s\S]*?(?=function renderUnifiedProgressDetail)/u)?.[0]
   assert.match(html, /\['overview','总览'\],\['lines','产品'\],\['execution','生产'\],\['tasks','任务'\]/u)
   assert.match(panel, /name="progress-production-/u)
-  assert.match(panel, /mobile-open-production-progress/u)
+  assert.match(panel, /data-action="progress-open-production"/u)
   assert.doesNotMatch(detail[1], /打开原单|查看业务明细/u)
-  assert.match(specification, /总览、产品、生产、任务/u)
-  assert.match(rationale, /固定分类与独立滚动/u)
+  const mobileRule = specification.split('\n').find((line) => line.startsWith('| 手机完整进度 |')) || ''
+  assert.match(mobileRule, /总览、产品、生产和任务/u)
+  assert.match(mobileRule, /长内容滚动仍能切换分类/u)
+  assert.ok(rationale.includes('总览、产品、生产和任务分类固定'), '设计依据说明手机进度详情的固定分类')
 })
 
 test('UI design keeps persistent page headings concise like the formal ERP', () => {

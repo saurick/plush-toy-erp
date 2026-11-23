@@ -1,97 +1,69 @@
+import { useEffect, useRef } from 'react'
 import { Button } from 'antd'
-import DevTaskNav from '../../components/DevTaskNav.jsx'
-import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
-import { WorkbenchNotice, WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
-import { CustomerConfigPath } from './CustomerConfigPath.jsx'
-import { IMPORT_ACTION_OPTIONS, IMPORT_ACTION_DRY_RUN } from './navigation.mjs'
+import { WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
 import { DryRunSummary } from './DryRunSummary.jsx'
 import { TestApplySummary } from './TestApplySummary.jsx'
-
-const samplePath = [
-  { title: '固定样本' },
-  { title: '匹配与校验' },
-  { title: '本机评审报告' },
-]
-const applyPath = [
-  { title: '编译候选清单' },
-  { title: '写入登记的本地开发库' },
-  { title: '读回有效配置' },
-]
 
 export function ValidationPanel({
   importSummary,
   dryRunState,
   applyState,
-  activeAction,
-  onActionChange,
+  focusApply,
   onRunDryRun,
   onApplyTestConfig,
   disabled,
 }) {
-  const sample = activeAction === IMPORT_ACTION_DRY_RUN
+  const applyRef = useRef(null)
+  useEffect(() => {
+    if (!focusApply) return
+    const section = applyRef.current
+    section?.scrollIntoView({ block: 'start' })
+    section?.focus({ preventScroll: true })
+  }, [focusApply])
+
   return (
-    <div className="erp-dev-customer-panel-grid" data-dev-customer-view="测试验证">
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
-        <DevTaskNav
-          compact
-          ariaLabel="配置验证方式"
-          items={IMPORT_ACTION_OPTIONS}
-          value={activeAction}
-          onChange={onActionChange}
-          disabled={disabled}
+    <WorkbenchSection
+      flat
+      title="本地验证"
+      className="erp-dev-customer-panel"
+      data-dev-customer-view="本地验证"
+    >
+      <section aria-label="样本试跑" className="erp-dev-customer-validation-item">
+        <div className="erp-dev-customer-validation-row">
+          <div>
+            <h3>样本试跑</h3>
+            <p>{importSummary.canRunUiDryRun ? '用固定样本生成本机评审报告。' : '当前客户包未开放样本试跑。'}</p>
+          </div>
+          <Button
+            loading={dryRunState.status === 'running'}
+            disabled={disabled || !importSummary.canRunUiDryRun}
+            onClick={onRunDryRun}
+          >
+            {dryRunState.status === 'success' ? '重新运行样本试跑' : '运行样本试跑'}
+          </Button>
+        </div>
+        <DryRunSummary dryRunState={dryRunState} />
+      </section>
+      <section ref={applyRef} tabIndex={-1} aria-label="应用本地配置" className="erp-dev-customer-validation-item">
+        <div className="erp-dev-customer-validation-row">
+          <div>
+            <h3>应用到本地开发库</h3>
+            <p>写入登记的本地开发库并读回有效配置。</p>
+          </div>
+          <Button
+            loading={applyState.status === 'running'}
+            disabled={disabled || !importSummary.canApplyTestConfig}
+            onClick={onApplyTestConfig}
+          >
+            {applyState.status === 'success' ? '重新应用本地配置' : '应用本地配置'}
+          </Button>
+        </div>
+        <TestApplySummary
+          applyState={applyState}
+          canApplyTestConfig={importSummary.canApplyTestConfig}
+          unavailableReason={importSummary.testApply.note}
         />
       </section>
-      <WorkbenchSection
-        flat
-        title={sample ? '样本导入试跑' : '应用本地测试配置'}
-        description={sample
-          ? '只生成本机评审报告，不写数据库。'
-          : '写入配置与审计记录；仅限登记的本地开发库。'}
-        className="erp-dev-customer-panel erp-dev-customer-panel--wide"
-      >
-        <CustomerConfigPath label={sample ? '样本试跑路径' : '本地配置应用路径'} items={sample ? samplePath : applyPath} />
-        <div>
-          {sample ? (
-            <Button
-              type="primary"
-              loading={dryRunState.status === 'running'}
-              disabled={disabled || !importSummary.canRunUiDryRun}
-              onClick={onRunDryRun}
-            >
-              {dryRunState.status === 'success' ? '重新运行样本试跑' : '运行样本试跑'}
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              loading={applyState.status === 'running'}
-              disabled={disabled || !importSummary.canApplyTestConfig}
-              onClick={onApplyTestConfig}
-            >
-              {applyState.status === 'success' ? '重新应用本地配置' : '应用本地配置'}
-            </Button>
-          )}
-        </div>
-        {sample ? (
-          <>
-            {!importSummary.canRunUiDryRun ? (
-              <WorkbenchNotice tone="warning" title="当前客户包未开放样本试跑" />
-            ) : null}
-            <DryRunSummary dryRunState={dryRunState} />
-          </>
-        ) : (
-          <>
-            <TestApplySummary
-              applyState={applyState}
-              canApplyTestConfig={importSummary.canApplyTestConfig}
-              unavailableReason={importSummary.testApply.note}
-            />
-            <DevStaticGuidance title="写入范围与限制">
-              <p>{importSummary.testApply.writesLabel}</p>
-              <p>{importSummary.testApply.note}</p>
-            </DevStaticGuidance>
-          </>
-        )}
-      </WorkbenchSection>
-    </div>
+    </WorkbenchSection>
   )
 }

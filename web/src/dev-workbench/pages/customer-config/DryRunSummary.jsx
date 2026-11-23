@@ -1,10 +1,13 @@
-import { Alert, Typography } from 'antd'
+import { useState } from 'react'
+import { Alert, Button, Typography } from 'antd'
+import AppModal from '@/common/components/modal/AppModal'
 import DevTimestamp from '../../components/DevTimestamp.jsx'
 import { WorkbenchFacts, WorkbenchNotice } from '../../components/WorkbenchPattern.jsx'
 
 const { Text } = Typography
 
 export function DryRunSummary({ dryRunState }) {
+  const [reportOpen, setReportOpen] = useState(false)
   if (dryRunState.status === 'idle') return null
 
   if (dryRunState.status === 'running') {
@@ -38,19 +41,26 @@ export function DryRunSummary({ dryRunState }) {
 
   return (
     <div className="erp-dev-customer-dry-run-result">
-      <WorkbenchNotice
-        tone={dryRunState.historical ? 'info' : 'success'}
-        title={dryRunState.historical ? '上次样本试跑报告' : '样本试跑报告已生成'}
-        description="供样本匹配评审；配置生效和真实导入另行核验。"
-      />
+      <Text strong role="status">
+        {dryRunState.historical ? '上次样本试跑报告' : '样本试跑报告已生成'}
+      </Text>
       <DevTimestamp
         value={result.generatedAt}
         action="生成于"
         missing="试跑生成时间未证明"
       />
       <WorkbenchFacts items={facts} aria-label="试跑结果" />
-      <details className="erp-dev-disclosure erp-dev-customer-result-details">
-        <summary>报告详情</summary>
+      <Button type="link" aria-haspopup="dialog" onClick={() => setReportOpen(true)}>
+        {dryRunState.historical ? '查看上次报告' : '查看本次报告'}
+      </Button>
+      <AppModal
+        title={dryRunState.historical ? '上次样本试跑报告' : '本次样本试跑报告'}
+        open={reportOpen}
+        onCancel={() => setReportOpen(false)}
+        footer={null}
+        rootClassName="erp-dev-customer-dialog"
+      >
+        <p>本报告用于核对样本匹配情况。正式导入和配置生效需分别核验。</p>
         <div className="erp-dev-customer-dry-run-paths">
           <Text type="secondary">输出目录</Text>
           <Text code copyable={result.outputPath ? { text: result.outputPath, tooltips: ['复制输出目录', '已复制'] } : false}>{result.outputPath || '未生成'}</Text>
@@ -63,7 +73,7 @@ export function DryRunSummary({ dryRunState }) {
               : '未证明'}
           </Text>
         </div>
-      </details>
+      </AppModal>
     </div>
   )
 }

@@ -1,15 +1,16 @@
-import { Alert, Button, Card, Space, Typography } from 'antd'
-import { StatusTag } from './shared.jsx'
+import { Alert, Button, Card, Typography } from 'antd'
 import DevDatabaseMigrationFlow from '../../../components/DevDatabaseMigrationFlow.jsx'
 import DevStaticGuidance from '../../../components/DevStaticGuidance.jsx'
+import { StatusTag } from './shared.jsx'
 import DevTimestamp from '../../../components/DevTimestamp.jsx'
 
-const { Paragraph, Text, Title } = Typography
+const { Text, Title } = Typography
 
 export function MigrationUpgradePanel({
   actionKey,
   activeOperation,
   activeView,
+  canPrepare,
   isLatest,
   migrationFlow,
   onViewRuntime,
@@ -22,6 +23,10 @@ export function MigrationUpgradePanel({
   summaryFresh,
   upgradeState,
 }) {
+  const currentPath = pathOperation && pathOperation === activeOperation
+  const pathTitle = currentPath ? '当前升级步骤' : '最近一次升级路径'
+  const latestEvent = currentPath && !readyOperation && summaryFresh ? pathOperation.events?.at(-1) : null
+
   return (
     <section
       hidden={activeView !== 'migration'}
@@ -34,9 +39,9 @@ export function MigrationUpgradePanel({
           type={summaryFresh ? upgradeState.type : 'info'}
           showIcon
           message={upgradeState.label}
-          description={upgradeState.description}
+          description={canPrepare && !pathOperation ? '选择“检查并准备”，先在隔离库验证候选版本。' : upgradeState.description}
         />
-      ) : summary ? (
+      ) : summary && !readyOperation ? (
         <div className="erp-dev-delivery-decision" role="status">
           <div>
             <Title level={2}>{upgradeState.label}</Title>
@@ -53,46 +58,17 @@ export function MigrationUpgradePanel({
         </DevStaticGuidance>
       ) : (
         <Card
-          title={
-          pathOperation && !activeOperation
-            ? '最近一次升级路径'
-            : '本次升级路径'
-        }
-          extra={
-          pathOperation ? (
-            <Space size={8} wrap>
-              <Text type="secondary">
-                {activeOperation?.kind === 'migration'
-                  ? '当前升级'
-                  : '最近一次升级'}
-                {pathOperation.target?.latestVersion
-                  ? ` · 目标 ${pathOperation.target.latestVersion}`
-                  : ''}
-              </Text>
-              <StatusTag
-                status={pathOperation.status}
-                issues={pathOperation.issues}
-              />
-            </Space>
-          ) : (
-            <Text type="secondary">流程示意</Text>
-          )
-        }
+          size="small"
+          title={pathOperation ? pathTitle : '升级步骤（示意）'}
+          extra={pathOperation && !currentPath ? (
+            <>
+              <StatusTag status={pathOperation.status} issues={pathOperation.issues} />
+              <DevTimestamp value={pathOperation.updatedAt} action="记录更新于" missing="记录更新时间未证明" />
+            </>
+          ) : null}
         >
-          {pathOperation ? (
-          migrationFlow
-        ) : (
-          <div className="erp-dev-migration-start">
-            <Paragraph type="secondary">
-              {isLatest
-                ? '当前没有待执行迁移。进入运行检查核对后端健康与开发工具。'
-                : '先检查候选版本、备份恢复和业务验证，生成计划后再确认升级。'}
-            </Paragraph>
-            <DevStaticGuidance defaultOpen title="查看升级步骤" hint="准备、确认与事务边界">
-              {migrationFlow}
-            </DevStaticGuidance>
-          </div>
-        )}
+          {latestEvent?.message && <p role="status">最近记录 · {latestEvent.message}</p>}
+          {migrationFlow}
           {readyOperation ? (
             <div className="erp-dev-database-migration-ready">
               <Alert
@@ -106,16 +82,16 @@ export function MigrationUpgradePanel({
                     danger
                     disabled={readOnly || !summaryFresh || Boolean(actionKey)}
                     onClick={() => {
-                    setConfirmationOperation(readyOperation)
-                    setConfirmationText('')
-                  }}
+                      setConfirmationOperation(readyOperation)
+                      setConfirmationText('')
+                    }}
                   >
                     确认升级并重启
                   </Button>
-              }
+                }
               />
             </div>
-        ) : null}
+          ) : null}
         </Card>
       )}
       <DevDatabaseMigrationFlow />

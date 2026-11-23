@@ -1,14 +1,10 @@
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
-import { BUSINESS_ROUTE_PATHS, hasActionPermission } from './masterDataOrderView.mjs'
+import { hasActionPermission } from './masterDataOrderView.mjs'
 
 export function canReadPurchaseFollowups(profile) {
   return hasActionPermission(profile, PermissionCode.PURCHASE_ORDER_READ) && (
     hasActionPermission(profile, PermissionCode.PURCHASE_RECEIPT_READ) || hasActionPermission(profile, PermissionCode.WAREHOUSE_INBOUND_READ)
   )
-}
-
-export function salesPurchaseFollowupPath(id) {
-  return `${BUSINESS_ROUTE_PATHS.purchaseOrders}?view=followup&sales_order_id=${id}`
 }
 
 export const PURCHASE_FOLLOWUP_LABELS = {

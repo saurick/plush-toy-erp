@@ -6,7 +6,7 @@ import {
   layoutBusinessChainDraft,
   projectBusinessChainDraft,
 } from './devBusinessChainDesignView.mjs'
-import { arrangeBusinessChainReading, businessChainRelationLayer } from './devBusinessChainReading.mjs'
+import { arrangeBusinessChainReading, businessChainHandoffKind } from './devBusinessChainReading.mjs'
 
 const pair = ({ from, to }) => JSON.stringify([from, to])
 const unique = (values) => [...new Set(values)]
@@ -418,12 +418,22 @@ export function ensureBusinessChainMapLayout(draft, library) {
 function projectVisibleBusinessChainMap(draft, library, map, mode) {
   // Only scope actions load related objects; changing detail never adds unsaved graph content.
   const region = detailedRegion(draft, library, true)
-  const graph = projectBusinessChainDraft(
+  const wholeDetail = map.scope === 'whole' && map.chainKey === 'all' && mode !== 'overview'
+  const salesScope = map.scope === 'whole' && map.chainKey === 'sales_to_production'
+  const terminalIds = (salesScope || wholeDetail) ? region.nodes.filter(({ id }) => {
+    const node = library.byId.get(id)
+    return node.terminal && library.salesAcceptanceVariants.some(({ key }) => key === node.processNode?.definitionKey)
+  }).map(({ id }) => id) : []
+  const raw = projectBusinessChainDraft(
     region,
     library,
     mode === 'all' ? 'all' : 'mainline',
-    map.expandedNodes
+    [...map.expandedNodes, ...terminalIds]
   )
+  if (wholeDetail) {
+    return { ...projectSalesAcceptance(raw, library, undefined, true), wholeDetail: true, salesAcceptance: false }
+  }
+  const graph = salesScope ? projectSalesAcceptance(raw, library, draft.presentation?.salesAcceptanceVariant) : raw
   if (mode !== 'overview') return graph
   const chains = visibleChains(map, library)
   const expanded = new Set(map.expandedChains)
@@ -440,7 +450,7 @@ function projectVisibleBusinessChainMap(draft, library, map, mode) {
     summary: true,
     label: library.chains.find((chain) => chain.value === key).label,
     domain: library.nodes.find((node) => node.chainKey === key)?.domain,
-    count: map.visibleIds.filter(
+    count: salesScope ? graph.nodes.filter(({ id }) => library.byId.get(id).chainKey === key && isBusinessChainStep(library.byId.get(id))).length : map.visibleIds.filter(
       (id) =>
         library.byId.get(id).chainKey === key &&
         isBusinessChainStep(library.byId.get(id))
@@ -448,7 +458,12 @@ function projectVisibleBusinessChainMap(draft, library, map, mode) {
   }))
   if (summaries.length === 1 && summaries[0].chainKey === map.chainKey) {
     // In a single chain the scope bar carries the expanded summary; map coordinates stay cached.
-    return { scopeSummary: summaries[0], nodes: steps.length ? steps : summaries, edges: stepEdges }
+    return {
+      scopeSummary: summaries[0],
+nodes: steps.length ? steps : summaries,
+edges: stepEdges,
+      ...(salesScope && steps.length ? { salesAcceptance: true } : {}),
+    }
   }
   return {
     nodes: [...summaries, ...steps],
@@ -464,9 +479,7 @@ function projectVisibleBusinessChainMap(draft, library, map, mode) {
           key: `map:${edge.fromChainKey}:${edge.toChainKey}`,
           from: `map:${edge.fromChainKey}`,
           to: `map:${edge.toChainKey}`,
-          kind: ['exception', 'correction'].includes(businessChainRelationLayer(edge))
-            ? 'exception'
-            : 'known',
+          kind: businessChainHandoffKind(edge),
           paths: [],
           overview: edge,
         })),
@@ -474,9 +487,73 @@ function projectVisibleBusinessChainMap(draft, library, map, mode) {
   }
 }
 
+// Only the whole-chain reading combines variants. Draft IDs, edits and source paths stay concrete.
+function projectSalesAcceptance(graph, library, variant, autoLayout = false) {
+  const definitions = new Set(library.salesAcceptanceVariants.map(({ key }) => key))
+  const groups = new Map()
+  const visibleId = new Map()
+  const nodes = []
+  for (const node of graph.nodes) {
+    const item = library.byId.get(node.id)
+    const definition = item?.processNode?.definitionKey
+    if (!definitions.has(definition)) {
+      nodes.push(node)
+      visibleId.set(node.id, node.id)
+      continue
+    }
+    if (variant && variant !== definition) continue
+    // A shared title alone does not establish the same command, responsibility or fact boundary.
+    const key = JSON.stringify([node.manual && !autoLayout ? node.id : item.chainKey, item.source, item.roles, item.domain, item.entry, item.terminal, item.exception])
+    let group = groups.get(key)
+    if (!group) {
+      group = { ...node, sourceIds: [] }
+      groups.set(key, group)
+      nodes.push(group)
+    }
+    group.sourceIds.push(node.id)
+    visibleId.set(node.id, group.id)
+  }
+  const edges = new Map()
+  for (const edge of graph.edges) {
+    const from = visibleId.get(edge.from)
+    const to = visibleId.get(edge.to)
+    if (!from || !to) continue
+    const key = JSON.stringify([from, to, edge.kind, edge.dependency])
+    const current = edges.get(key)
+    if (current) current.paths.push(...edge.paths)
+    else edges.set(key, { ...edge, from, to, key, paths: [...edge.paths] })
+  }
+  const visibleEdges = [...edges.values()]
+  for (const edge of visibleEdges) {
+    if (edge.kind !== 'exception') continue
+    const to = library.byId.get(edge.to)
+    if (to.rejectionCommand) edge.readingLabel = '驳回'
+    else if (to.terminal && library.byId.get(edge.from).rejectionCommand) edge.readingLabel = ''
+  }
+  for (const node of groups.values()) {
+    if (node.sourceIds.length < 2) continue
+    const exits = visibleEdges.filter((edge) => edge.from === node.id && edge.kind === 'known' && library.byId.get(edge.to).processNode)
+    if (exits.length < 2) continue
+    for (const edge of exits) {
+      const sources = new Set(edge.paths.map((path) => library.byId.get(path[0].from).processNode?.definitionKey))
+      if (sources.size === 1) {
+        edge.readingLabel = library.salesAcceptanceVariants.find(({ key }) => sources.has(key))?.readingLabel
+      }
+    }
+  }
+  return { ...graph, nodes, edges: visibleEdges, salesAcceptance: true }
+}
+
 export function projectBusinessChainMap(draft, library, mode = 'mainline') {
   const map = businessChainMapState(draft, library)
   const graph = projectVisibleBusinessChainMap(draft, library, map, mode)
+  const layout = draft.presentation?.layout
+  if (layout && graph.salesAcceptance && !draft.nodes.some((node) => node.manual && map.visibleIds.includes(node.id))) {
+    // Use the finest graph as the coordinate source across granularities, including restored drafts.
+    const full = mode === 'all' ? graph : projectVisibleBusinessChainMap(draft, library, map, 'all')
+    const positions = arrangeBusinessChainReading(full, library, layout)
+    return { ...graph, nodes: graph.nodes.map((node) => ({ ...node, ...positions.get(node.id) })) }
+  }
   if (!map.focusPositions) return graph
   const positions = focusPositionsById(map)
   return {

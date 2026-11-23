@@ -33,8 +33,9 @@ import { HELP_VISUAL_EXAMPLES } from '../config/helpScenarioPresentation.mjs'
 import HelpScenarioContent from '../components/help/HelpScenarioContent'
 import HelpReferenceContent from '../components/help/HelpReferenceContent'
 import HelpProjectManualContent from '../components/help/HelpProjectManualContent'
-import HelpManualDirectory from '../components/help/HelpManualDirectory'
-import HelpGuideDirectory from '../components/help/HelpGuideDirectory'
+import { HelpGuideDirectory, HelpManualDirectory } from '../components/help/HelpDirectory.jsx'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
+import directoryStyles from '@/common/components/navigation/directory.css?raw'
 import useProjectManuals from '../hooks/useProjectManuals.js'
 import useHelpContent from '../hooks/useHelpContent.js'
 import HelpContributionPanel from '../components/help/HelpContributionPanel'
@@ -245,7 +246,7 @@ export default function HelpCenterPage() {
     )
     if (directoryOpen) {
       if (outer) outer.scrollTop = 0
-      const selected = directoryRef.current?.querySelector('[aria-current="page"]')
+      const selected = directoryRef.current?.querySelector('[aria-current="location"], [aria-current="page"]')
       selected?.focus({ preventScroll: true })
       selected?.scrollIntoView({ block: 'nearest' })
     } else if (restoreDirectoryFocus.current) {
@@ -256,7 +257,7 @@ export default function HelpCenterPage() {
   }, [directoryOpen])
   useLayoutEffect(() => {
     const sidebar = directoryRef.current
-    const selected = sidebar?.querySelector('[aria-current="page"]')
+    const selected = sidebar?.querySelector('[aria-current="location"], [aria-current="page"]')
     if (selected && window.matchMedia('(min-width: 900px)').matches) {
       const row = selected.getBoundingClientRect()
       const box = sidebar.getBoundingClientRect()
@@ -489,6 +490,7 @@ export default function HelpCenterPage() {
         guides,
         pages: referencePages,
         format,
+        directoryStyles,
         supplements: helpContent.published,
       })
       setDownloadError('')
@@ -530,9 +532,17 @@ export default function HelpCenterPage() {
       </div>
     )
   }
+  const closeDirectory = (
+    <Button className="erp-help-directory-close" type="text" size="small" onClick={toggleDirectory}>
+      {narrowScreen ? '返回正文' : '收起目录'}
+    </Button>
+  )
   const directory =
     view === 'reference' ? (
       <HelpManualDirectory
+        key={requestedBookKey}
+        title="章节目录"
+        actions={closeDirectory}
         chapters={chapters}
         selectedReference={selectedReference}
         onChange={handleReferenceChange}
@@ -540,6 +550,8 @@ export default function HelpCenterPage() {
       />
     ) : (
       <HelpGuideDirectory
+        title="场景目录"
+        actions={closeDirectory}
         sections={guideSections}
         selectedScenario={selectedScenario}
         home={view === 'home'}
@@ -676,12 +688,6 @@ export default function HelpCenterPage() {
           aria-label="帮助目录"
           hidden={searching || (narrowScreen ? !directoryOpen : directoryCollapsed)}
         >
-          <div className="erp-help-directory-heading">
-            <h2>{view === 'reference' ? '章节目录' : '场景目录'}</h2>
-            <Button type="text" size="small" onClick={toggleDirectory}>
-              {narrowScreen ? '返回正文' : '收起目录'}
-            </Button>
-          </div>
           {directory}
         </aside>
         <div
@@ -958,35 +964,28 @@ export default function HelpCenterPage() {
               {references.some(
                 (reference) => reference.id === selectedScenario.pageKey
               ) ? (
-                <nav
+                <Directory
                   className="erp-help-reference-index"
                   aria-label="相关参考词条"
+                  title={<strong>查清字段与规则</strong>}
                 >
-                  <strong>查清字段与规则</strong>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleReferenceChange(selectedScenario.pageKey)
-                    }
-                  >
-                    查看完整参考章节
-                  </button>
-                  {references
-                    .filter(
-                      (reference) =>
-                        reference.page?.key === selectedScenario.pageKey &&
-                        reference.item
-                    )
-                    .map((reference) => (
-                      <button
-                        type="button"
-                        key={reference.id}
-                        onClick={() => handleReferenceChange(reference.id)}
-                      >
-                        {reference.title}
-                      </button>
-                    ))}
-                </nav>
+                  <div className="erp-directory-list--inline">
+                    <DirectoryItem onClick={() => handleReferenceChange(selectedScenario.pageKey)}>
+                      查看完整参考章节
+                    </DirectoryItem>
+                    {references
+                      .filter(
+                        (reference) =>
+                          reference.page?.key === selectedScenario.pageKey &&
+                          reference.item
+                      )
+                      .map((reference) => (
+                        <DirectoryItem key={reference.id} onClick={() => handleReferenceChange(reference.id)}>
+                          {reference.title}
+                        </DirectoryItem>
+                      ))}
+                  </div>
+                </Directory>
               ) : null}
               <details className="erp-help-role-context">
                 <summary>了解岗位交接与提醒</summary>

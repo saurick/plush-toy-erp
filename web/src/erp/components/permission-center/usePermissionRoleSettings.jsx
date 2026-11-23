@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons'
 import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '../business-list/BusinessModal.jsx'
 import {
@@ -701,7 +702,7 @@ export function usePermissionRoleSettings({
       variant="borderless"
     >
       <div className="erp-role-center-layout">
-        <aside className="erp-role-center-sidebar" aria-label="岗位列表">
+        <Directory className="erp-directory-list erp-role-center-sidebar" aria-label="岗位列表">
           {roles.length === 0 ? (
             <Empty
               description="暂无岗位"
@@ -713,18 +714,13 @@ export function usePermissionRoleSettings({
                 roleSummaries.find((item) => item.key === roleKey) || {}
               const selected = roleKey === selectedRoleKey
               return (
-                <button
+                <DirectoryItem
                   key={roleKey}
-                  type="button"
-                  className={`erp-role-template-card${
-                    selected ? ' erp-role-template-card--active' : ''
-                  }`}
+                  className="erp-directory-item--stacked erp-role-template-card"
                   aria-pressed={selected}
                   onClick={() => selectRoleTemplate(roleKey)}
                 >
-                  <span className="erp-role-template-card__main">
-                    <Text strong>{getRoleVisibleName(role)}</Text>
-                  </span>
+                  <span>{getRoleVisibleName(role)}</span>
                   <span className="erp-role-template-card__meta">
                     <Text type="secondary">
                       {summary.permissionSummary?.total || 0} 项功能
@@ -734,11 +730,11 @@ export function usePermissionRoleSettings({
                     </Text>
                     {role.disabled ? <Tag>已停用</Tag> : null}
                   </span>
-                </button>
+                </DirectoryItem>
               )
             })
           )}
-        </aside>
+        </Directory>
 
         <section
           ref={workspaceRef}

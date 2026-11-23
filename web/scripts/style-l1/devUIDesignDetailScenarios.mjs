@@ -9,6 +9,7 @@ import { createDevUIDesignPressureScenarios } from './devUIDesignPressureScenari
 import { createDevUIPageStateScenarios } from './devUIPageStateScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createSearchCompositionScenarios } from './searchCompositionScenarios.mjs'
+import { assertPlainDirectory, assertStaticDirectoryBranches } from './devWorkbenchDirectoryScenarios.mjs'
 
 export function createDevUIDesignDetailScenarios({
   assert,
@@ -39,39 +40,9 @@ export function createDevUIDesignDetailScenarios({
         const assertHierarchy = async () => {
           await directory.getByRole('button').first().waitFor()
           await waitForFiniteAnimations(page, { selector: '.erp-design-document-shell' })
-          const groups = await directory.locator('.erp-design-topic-group').evaluateAll((nodes) => nodes.map((group) => {
-            const heading = group.querySelector('h3')
-            const separator = getComputedStyle(heading, '::after')
-            return {
-              heading: heading.textContent,
-              separatorWidth: parseFloat(separator.width),
-              separatorBorder: parseFloat(separator.borderTopWidth),
-              items: [...group.querySelectorAll('button')].map((button) => {
-                const label = button.querySelector('span')
-                const labelBox = label.getBoundingClientRect()
-                const style = getComputedStyle(button)
-                return {
-                  title: label.textContent,
-                  indent: labelBox.left - heading.getBoundingClientRect().left,
-                  border: parseFloat(style.borderWidth),
-                  shadow: style.boxShadow,
-                  overflow: button.scrollWidth > button.clientWidth + 1,
-                  height: button.getBoundingClientRect().height,
-                }
-              }),
-            }
-          }))
-          assert(groups.length > 0, '目录应有可见分类')
-          for (const group of groups) {
-            assert(group.separatorWidth >= 12 && group.separatorBorder >= 1, `${group.heading}应有分类分隔线`)
-            for (const item of group.items) {
-              assert(item.indent >= 12, `${item.title}应相对分类标题缩进`)
-              assert.equal(item.border, 0, `${item.title}不应单独卡片化`)
-              assert.equal(item.shadow, 'none', `${item.title}不叠加选中底线或阴影`)
-              assert(!item.overflow, `${item.title}的文字不能溢出`)
-              assert(item.height >= 40, `${item.title}应保留可点击高度`)
-            }
-          }
+          await directory.locator('.erp-directory-header').getByText('图解目录', { exact: true }).waitFor()
+          await assertStaticDirectoryBranches(page, '.erp-design-document-toc .erp-directory-group-title', assert)
+          await assertPlainDirectory(page, '.erp-design-document-toc .erp-directory-item', assert)
           assert.equal(await directory.locator('[aria-current="page"]').count(), 1)
           await assertNoHorizontalOverflow(page)
         }
@@ -94,7 +65,7 @@ export function createDevUIDesignDetailScenarios({
         await search.fill('窄屏与动效')
         await search.press('Enter')
         await directory.getByRole('button', { name: '窄屏与动效', exact: true }).waitFor()
-        await page.waitForFunction(() => document.querySelectorAll('.erp-design-document-toc .erp-design-topic-button').length === 1)
+        await page.waitForFunction(() => document.querySelectorAll('.erp-design-document-toc .erp-directory-item').length === 1)
         assert.equal(await directory.getByRole('button').count(), 1)
         await directory.getByRole('button', { name: '窄屏与动效', exact: true }).click()
         await directory.locator('[aria-current="page"]').getByText('窄屏与动效', { exact: true }).waitFor()
@@ -133,6 +104,13 @@ export function createDevUIDesignDetailScenarios({
           await closeRule.click()
           await excerpt.waitFor({ state: 'hidden' })
         }
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.reload()
+        await showDirectory.click()
+        await assertHierarchy()
+        await directory.locator('.erp-directory-item:not([aria-current])').first().click()
+        await directory.waitFor({ state: 'hidden' })
+        assert(await page.locator('.erp-design-document-content').evaluate((panel) => document.activeElement === panel))
       },
     },
     {
@@ -194,24 +172,26 @@ export function createDevUIDesignDetailScenarios({
       verify: async (page) => {
         const cases = [
           { path: '/__dev/project-skills', selector: '.erp-dev-skills__list > button' },
-          { path: '/__dev/ui-design?page=controls', selector: '.erp-control-library-directory nav > button' },
-          { path: '/__dev/development-resources?view=relationships', selector: '.erp-dev-project-relationships__catalog section > button' },
+          { path: '/__dev/ui-design?page=controls&control=business-form-modal', selector: '.erp-control-library-directory nav .erp-directory-item:not([aria-expanded]):visible' },
+          { path: '/__dev/development-resources?view=relationships', selector: '.erp-dev-project-relationships__catalog .erp-directory-branch > button' },
         ]
         const selectedSelector = ':is([aria-current="page"], [aria-pressed="true"])'
         const assertRows = async (selector) => {
           await page.mouse.move(0, 0)
           const rows = await page.locator(selector).evaluateAll((nodes) => nodes.map((node) => {
             const style = getComputedStyle(node)
-            const label = node.querySelector('strong') || node
+            const label = node.firstElementChild || node
+            const labelStyle = getComputedStyle(label)
             return {
               title: label.textContent,
-              shared: node.classList.contains('erp-dev-directory-item'),
+              shared: node.classList.contains('erp-directory-item'),
               selected: node.matches('[aria-current="page"], [aria-pressed="true"]'),
               border: parseFloat(style.borderWidth),
               shadow: style.boxShadow,
               background: style.backgroundColor,
-              fontWeight: getComputedStyle(label).fontWeight,
+              fontWeight: labelStyle.fontWeight,
               height: node.getBoundingClientRect().height,
+              multiline: label.getBoundingClientRect().height > parseFloat(labelStyle.lineHeight) + 1,
               overflow: node.scrollWidth > node.clientWidth + 1,
             }
           }))
@@ -229,7 +209,7 @@ export function createDevUIDesignDetailScenarios({
           if (selector === '.erp-dev-skills__list > button') {
             const gap = await page.locator('.erp-dev-skills__list').evaluate((node) => parseFloat(getComputedStyle(node).rowGap))
             assert(gap <= 4, '目录条目不沿用内容卡片的区块间距')
-            assert(rows.every((row) => row.height === 40), '单行目录采用统一紧凑行高')
+            assert(rows.every((row) => row.multiline ? row.height > 40 : row.height === 40), '单行统一行高，长标题可换行')
           }
           await assertNoHorizontalOverflow(page)
         }
@@ -240,7 +220,7 @@ export function createDevUIDesignDetailScenarios({
           await assertRows(entry.selector)
           if (!index) await page.screenshot({ path: path.join(outputDir, 'project-skills-directory.png') })
           const target = items.nth(1)
-          const label = await target.locator('strong').innerText()
+          const label = await target.evaluate((node) => (node.querySelector('strong') || node).textContent.trim())
           await target.click()
           await page.locator(`${entry.selector}${selectedSelector}`).filter({ hasText: label }).waitFor()
           await page.reload()
@@ -302,6 +282,26 @@ export function createDevUIDesignDetailScenarios({
         await account.waitFor()
         assert.notEqual(await account.inputValue(), 'retained-preview')
         await assertNoHorizontalOverflow(page)
+
+        await page.goto(new URL('/__dev/ui-design?view=specification&read=reference#workbench-patterns', page.url()).href)
+        const examples = page.getByRole('table').filter({
+          has: page.getByRole('columnheader', { name: '真实示例', exact: true }),
+        })
+        const references = [
+          ['质量门禁 · 门禁目录', '/__dev/quality-gates?view=governance&filter=all'],
+          ['质量门禁 · 本机诊断', '/__dev/quality-gates?view=run'],
+          ['测试执行 · 服务器验证', '/__dev/testing?view=server'],
+          ['测试执行 · 覆盖报告', '/__dev/testing?view=coverage'],
+          ['产品能力', '/__dev/product-core'],
+        ]
+        await examples.waitFor()
+        for (const [name, href] of references) {
+          assert.equal(await examples.getByRole('link', { name, exact: true }).getAttribute('href'), href)
+        }
+        await examples.getByRole('link', { name: '产品能力', exact: true }).click()
+        await page.getByRole('heading', { name: '产品能力', exact: true }).waitFor()
+        await page.goBack()
+        await examples.waitFor()
       },
     },
     {
@@ -326,12 +326,19 @@ export function createDevUIDesignDetailScenarios({
           .fill('123456')
         await frame.getByRole('button', { name: '登录', exact: true }).click()
         await frame.locator('.role-mobile-screen').waitFor()
-        await page.getByRole('button', { name: /重置演示/ }).click()
+        const modes = page.getByLabel('设计预览界面', { exact: true })
+        assert(await modes.getByRole('radio', { name: '手机版' }).isChecked())
+        assert.equal(await frame.locator('#sidebar').count(), 0)
+        await frame.getByRole('button', { name: '我的', exact: true }).click()
+        await frame.getByRole('button', { name: '退出登录', exact: true }).click()
         await frame.getByRole('heading', { name: '毛绒玩具管理系统' }).waitFor()
+        assert(await modes.getByRole('radio', { name: '登录页' }).isChecked())
+        await frame.getByRole('radio', { name: '电脑版', exact: true }).click()
         await frame.getByRole('button', { name: '演示账号与验证码' }).click()
         await frame.getByRole('button', { name: '填入演示信息' }).click()
         await frame.getByRole('button', { name: '登录', exact: true }).click()
         await frame.locator('#dashboard-summary-search').waitFor()
+        assert(await modes.getByRole('radio', { name: '桌面 ERP' }).isChecked())
         await frame.locator('.preview-account-trigger').click()
         await frame
           .getByRole('button', { name: '退出登录', exact: true })
@@ -773,7 +780,7 @@ export function createDevUIDesignDetailScenarios({
         await page
           .locator('iframe[title="ERP 最新可交互设计"]')
           .waitFor({ state: 'visible' })
-        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        const frame = page.frameLocator(visibleUIDesignFrame)
         const storageResult = await frame.locator('body').evaluate(() => {
           const key = 'ui-design-browser-verification'
           window.localStorage.setItem(key, 'compact')
@@ -798,7 +805,7 @@ export function createDevUIDesignDetailScenarios({
           .getByRole('button', { name: '销售管理', exact: true })
           .click()
         await frame
-          .getByRole('group', { name: '销售订单视图', exact: true })
+          .getByRole('heading', { name: '销售订单', exact: true })
           .waitFor()
         await page.getByRole('tab', { name: '设计说明', exact: true }).click()
         await page.getByRole('navigation', { name: '设计阅读目录' }).getByRole('button', { name: '页面骨架', exact: true }).click()
@@ -811,7 +818,7 @@ export function createDevUIDesignDetailScenarios({
           .waitFor()
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
         await frame
-          .getByRole('group', { name: '销售订单视图', exact: true })
+          .getByRole('heading', { name: '销售订单', exact: true })
           .waitFor()
         await page.getByRole('button', { name: /全屏预览/ }).click()
         await page

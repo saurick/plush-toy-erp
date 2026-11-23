@@ -1,9 +1,9 @@
 import { Tag, Typography } from 'antd'
-import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
-import { WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
+import { WorkbenchFacts, WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
 import { CustomerConfigFieldGuide } from './CustomerConfigFieldGuide.jsx'
 import {
   CommandList,
+  CompiledCatalogItem,
   guardItemLabel,
   ReviewChecklistItem,
   SourceReference,
@@ -13,7 +13,7 @@ import {
 
 const { Text } = Typography
 
-export function ReviewEvidence({ consoleSummary, customerPackageSummary, menuSummary, blockers }) {
+export function ReviewEvidence({ consoleSummary, customerPackageSummary, menuSummary, fieldNumberingSummary, blockers }) {
   const counts = new Map()
   for (const check of consoleSummary.validationChecks) {
     counts.set(check.status, (counts.get(check.status) || 0) + 1)
@@ -73,30 +73,52 @@ export function ReviewEvidence({ consoleSummary, customerPackageSummary, menuSum
         <div className="erp-dev-customer-review-list">
           {consoleSummary.reviewChecklist.map((item) => <ReviewChecklistItem item={item} key={item.key} />)}
         </div>
-        <DevStaticGuidance title="技术依据" hint="字段、边界、命令与来源">
-          <WorkbenchSection flat headingLevel={3} title="字段说明">
-            <CustomerConfigFieldGuide
-              packageSourcePath={customerPackageSummary.sourcePath}
-              menuSourcePath={menuSummary.sourcePath}
-            />
-          </WorkbenchSection>
-          <WorkbenchSection flat headingLevel={3} title="配置包边界明细" className="erp-dev-customer-package-guards">
-            <div className="erp-dev-customer-guard-list">
-              {customerPackageSummary.boundaries.map((item) => (
-                <div className="erp-dev-customer-guard" key={item.key}>
-                  <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
-                  <Tag color={item.ok ? 'green' : 'red'}>{item.ok ? item.expectedLabel : item.valueLabel}</Tag>
-                </div>
-              ))}
+      </WorkbenchSection>
+      <WorkbenchSection flat title="字段说明" className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+        <CustomerConfigFieldGuide
+          packageSourcePath={customerPackageSummary.sourcePath}
+          menuSourcePath={menuSummary.sourcePath}
+        />
+      </WorkbenchSection>
+      <WorkbenchSection flat title="配置包边界明细" className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-package-guards">
+        <div className="erp-dev-customer-guard-list">
+          {customerPackageSummary.boundaries.map((item) => (
+            <div className="erp-dev-customer-guard" key={item.key}>
+              <Text>{guardItemLabel(item, '客户配置包边界')}</Text>
+              <Tag color={item.ok ? 'green' : 'red'}>{item.ok ? item.expectedLabel : item.valueLabel}</Tag>
             </div>
-          </WorkbenchSection>
-          <WorkbenchSection flat headingLevel={3} title="预检命令与来源路径">
-            <CommandList commands={consoleSummary.qaCommands} />
-            <div className="erp-dev-customer-source-ref-list">
-              {consoleSummary.sourceReferences.map((item) => <SourceReference item={item} key={item.key} />)}
-            </div>
-          </WorkbenchSection>
-        </DevStaticGuidance>
+          ))}
+        </div>
+      </WorkbenchSection>
+      <WorkbenchSection flat title="编译范围与发布资格" className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+        <WorkbenchFacts
+          items={consoleSummary.versionGates.map((gate) => ({
+            key: gate.key,
+            label: gate.label,
+            value: gate.enabled ? '已开启' : '未开启',
+          }))}
+        />
+        <div className="erp-dev-customer-tool-list">
+          {customerPackageSummary.compiledCatalogSummary.map((item) => <CompiledCatalogItem key={item.key} item={item} />)}
+        </div>
+      </WorkbenchSection>
+      {fieldNumberingSummary.boundaries.length > 0 ? (
+        <WorkbenchSection flat title="页面配置保护规则" className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+          <div className="erp-dev-customer-guard-list">
+            {fieldNumberingSummary.boundaries.map((item) => (
+              <div className="erp-dev-customer-guard" key={item.key}>
+                <Text>{guardItemLabel(item, '字段编号边界')}</Text>
+                <Tag color={item.ok ? 'green' : 'red'}>{item.ok ? item.expectedLabel : item.valueLabel}</Tag>
+              </div>
+            ))}
+          </div>
+        </WorkbenchSection>
+      ) : null}
+      <WorkbenchSection flat title="预检命令与来源路径" className="erp-dev-customer-panel erp-dev-customer-panel--wide">
+        <CommandList commands={consoleSummary.qaCommands} />
+        <div className="erp-dev-customer-source-ref-list">
+          {consoleSummary.sourceReferences.map((item) => <SourceReference item={item} key={item.key} />)}
+        </div>
       </WorkbenchSection>
     </>
   )

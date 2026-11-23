@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { CopyOutlined } from '@ant-design/icons'
 import { Alert, Button, Typography } from 'antd'
+import AppModal from '@/common/components/modal/AppModal'
 import DevTimestamp from '../../components/DevTimestamp.jsx'
 import { WorkbenchFacts, WorkbenchNotice } from '../../components/WorkbenchPattern.jsx'
 import { StatusTag, copyText } from './presentation.jsx'
@@ -11,6 +13,7 @@ export function TestApplySummary({
   canApplyTestConfig,
   unavailableReason,
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
   if (applyState.status === 'idle') {
     if (!canApplyTestConfig) {
       return (
@@ -67,8 +70,14 @@ export function TestApplySummary({
         description="已在登记的本地开发库读回有效配置。"
       />
       <WorkbenchFacts items={readback} />
-      <details className="erp-dev-disclosure erp-dev-customer-result-details">
-        <summary>查看执行步骤与身份核对</summary>
+      <Button onClick={() => setDetailsOpen(true)}>查看执行步骤与身份核对</Button>
+      <AppModal
+        title="执行步骤与身份核对"
+        open={detailsOpen}
+        onCancel={() => setDetailsOpen(false)}
+        footer={null}
+        rootClassName="erp-dev-customer-dialog"
+      >
         <div className="erp-dev-customer-test-apply-actions">
           <Button
             icon={<CopyOutlined aria-hidden="true" />}
@@ -140,7 +149,7 @@ export function TestApplySummary({
             />
           </div>
         </div>
-      </details>
+      </AppModal>
     </div>
   )
 }

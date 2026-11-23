@@ -1,4 +1,4 @@
-import { chooseSelectOption } from './selectControlActions.mjs'
+import { chooseUIDesignScene } from './devUIDesignNavigation.mjs'
 import { DESIGN_TASKS, WORK_CENTER_DESIGN_TOPICS } from '../../src/dev-workbench/config/devWorkCenterDesign.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
@@ -152,7 +152,7 @@ export function createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalO
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         const phone = frame.locator('.role-mobile-device')
         await phone.getByRole('tab', { name: '流程跟踪', exact: true }).waitFor()
-        await chooseSelectOption(frame.getByLabel('预览身份', { exact: true }), 'admin')
+        await chooseUIDesignScene(page, '预览身份', '超级管理员')
         const trigger = phone.getByRole('button', { name: '查看3 款产品', exact: true })
         await trigger.click()
         const list = frame.getByRole('dialog', { name: '任务关联内容', exact: true })
@@ -172,8 +172,13 @@ export function createDevWorkCenterDesignScenarios({ assert, assertNoHorizontalO
         await empty.getByText('未关联产品／物料', { exact: true }).waitFor()
         await empty.getByText('未设置截止', { exact: true }).waitFor()
         assert.equal(await empty.locator('.task-association-reference').count(), 0)
-        const heights = await phone.locator('.rm-task-card[data-id="M01"], .rm-task-card[data-id="M14"]').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height))
-        assert(Math.max(...heights) - Math.min(...heights) <= 1, `交互稿常规任务等高：${JSON.stringify(heights)}`)
+        const [product, noProduct] = await phone.locator('.rm-task-card[data-id="M01"], .rm-task-card[data-id="M14"]').evaluateAll((nodes) => nodes.map((node) => ({
+          height: node.getBoundingClientRect().height,
+          body: node.querySelector('.rm-card-body').getBoundingClientRect().height,
+        })))
+        assert.equal(noProduct.body, 64, '无产品的关联区保留标准图片高度')
+        assert(product.body > noProduct.body, '多行关联资料完整占用所需高度')
+        assert.equal(product.height - product.body, noProduct.height - noProduct.body, '两张卡片使用相同的标题、底部和边距')
         const imageSizes = await phone.locator('.rm-task-card .product-thumb, .rm-task-card .rm-card-image').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().width))
         assert(imageSizes.length > 0 && imageSizes.every((size) => size === 64), `交互稿实图和缺图占位尺寸一致：${JSON.stringify(imageSizes)}`)
         await assertNoHorizontalOverflow(page)

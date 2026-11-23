@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Space, Tag } from 'antd'
+import { Alert, Button, Space, Tag, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Select from '@/common/components/select/AppSelect'
 import Pagination from '@/common/components/pagination/AppPagination'
@@ -8,6 +8,7 @@ import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 
 import DevSourceReferences from './DevSourceReferences.jsx'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import {
   getRPCExecutionPresentation,
   parseRPCReviewSearch,
@@ -289,22 +290,26 @@ export default function DevRPCContractReview() {
           <ExampleResult report={report} selected={selected} execution={execution} />
           {report.changes.length ? (
             <div className="erp-dev-rpc-review__workspace">
-              <aside className="erp-dev-rpc-review__methods" aria-label="变更接口">
-                <div className="erp-dev-rpc-review__section-head"><strong>变更接口</strong><span>{report.changes.length} 个方法</span></div>
+              <Directory
+                as="aside"
+                className="erp-dev-rpc-review__methods erp-directory-list"
+                aria-label="变更接口"
+                title={<strong>变更接口</strong>}
+                actions={<Typography.Text type="secondary">{report.changes.length} 个方法</Typography.Text>}
+              >
                 {report.changes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((row) => (
-                  <button
-                    type="button"
+                  <DirectoryItem
                     key={row.key}
-                    className="erp-dev-directory-item erp-dev-directory-item--stacked erp-dev-rpc-review__method"
+                    className="erp-directory-item--stacked erp-dev-rpc-review__method"
                     aria-pressed={selected?.key === row.key}
                     onClick={() => update({ change: row.key })}
                   >
                     <strong>{row.label}</strong><code>{row.key}</code>
                     <span>{KIND_LABELS[row.kind]}{row.fields.length ? ` · ${row.fields.length} 处` : ''}</span>
-                  </button>
+                  </DirectoryItem>
                 ))}
                 <Pagination current={page} pageSize={PAGE_SIZE} total={report.changes.length} onChange={setPage} hideOnSinglePage />
-              </aside>
+              </Directory>
               <section className="erp-dev-rpc-review__detail" aria-label={`${selected.label}变更详情`}>
                 <div className="erp-dev-rpc-review__detail-heading">
                   <strong>{selected.label}</strong><code>{selected.key}</code>

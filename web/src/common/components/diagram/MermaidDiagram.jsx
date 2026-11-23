@@ -14,7 +14,6 @@ import { isolateOverlaySiblings, lockOverlayScroll } from '../overlay/ScopedOver
 import {
   MERMAID_ZOOM,
   normalizeMermaidZoom,
-  getInitialMermaidZoomMode,
   getMermaidDirection,
   toggleMermaidDirection,
   withMermaidDirection,
@@ -77,7 +76,7 @@ export function MermaidDiagram({
   showSourceOnError = true,
   themeMode,
   flowchartHtmlLabels = true,
-  initialZoom = 'fit',
+  printSize = false,
   nativeSize = false,
   interactiveNodes,
   interactiveEdges,
@@ -85,6 +84,7 @@ export function MermaidDiagram({
   onNodeSelect,
   onNodeInspect,
   onStatusChange,
+  compactControls = false,
 }) {
   const [inspection, setInspection] = useState(null)
   const overlay = useOverlayScope()
@@ -105,21 +105,14 @@ export function MermaidDiagram({
   const theme = fixedTheme ? themeMode : appearance.mode
   const accent = fixedTheme ? null : appearance.accent
   const useFlowchartHtmlLabels = flowchartHtmlLabels !== false
-  const initialZoomMode = getInitialMermaidZoomMode(initialZoom)
-  const startingZoom = normalizeMermaidZoom(initialZoom)
+  const initialZoomMode = printSize ? 'manual' : 'fit-all'
   const displayLabel = String(label || '').trim() || '图表'
   const diagramId = useMemo(() => {
     mermaidRenderSequence += 1
     return `erp-markdown-mermaid-${mermaidRenderSequence}`
   }, [])
-  const [zoom, setZoom] = useState(startingZoom)
-  const [fullscreenZoom, setFullscreenZoom] = useState(
-    MERMAID_ZOOM.defaultValue
-  )
-  const [zoomModes, setZoomModes] = useState({
-    inline: initialZoomMode,
-    fullscreen: 'fit-all',
-  })
+  const [zoom, setZoom] = useState(MERMAID_ZOOM.defaultValue)
+  const [zoomMode, setZoomMode] = useState(initialZoomMode)
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
   const [fullscreenPlaceholder, setFullscreenPlaceholder] = useState(null)
   const [inlineViewportHeight, setInlineViewportHeight] = useState()
@@ -150,23 +143,16 @@ export function MermaidDiagram({
     }, 0)
   }, [])
 
-  const activeZoom = fullscreenOpen ? fullscreenZoom : zoom
-  const activeZoomMode = zoomModes[fullscreenOpen ? 'fullscreen' : 'inline']
-  const zoomPercent = Math.round(activeZoom * 100)
-
-  const setNextZoom = useCallback(
-    (nextZoom, { mode = 'manual' } = {}) => {
-      setInspection(null)
-      const nextValue = normalizeMermaidZoom(nextZoom)
-      const scope = fullscreenOpen ? 'fullscreen' : 'inline'
-      setZoomModes((previous) =>
-        previous[scope] === mode ? previous : { ...previous, [scope]: mode }
-      )
-      if (fullscreenOpen) setFullscreenZoom(nextValue)
-      else setZoom(nextValue)
-    },
-    [fullscreenOpen]
-  )
+  const zoomPercent = Math.round(zoom * 100)
+  const setNextZoom = useCallback((nextZoom, { mode = 'manual' } = {}) => {
+    setInspection(null)
+    setZoomMode(mode)
+    setZoom(normalizeMermaidZoom(nextZoom))
+  }, [])
+  const closeFullscreen = useCallback(() => {
+    setZoomMode('fit-all')
+    setFullscreenOpen(false)
+  }, [])
 
   const fitToView = useCallback(
     (mode = 'fit-all') => {
@@ -222,14 +208,14 @@ export function MermaidDiagram({
     if (
       renderState.status !== 'rendered' ||
       renderState.source !== renderedChart ||
-      activeZoomMode === 'manual'
+      (zoomMode === 'manual' || zoomMode === 'reset')
     ) {
       return undefined
     }
     const viewport = viewportRef.current
     if (!viewport) return undefined
     let frame
-    const fit = () => fitToView(activeZoomMode)
+    const fit = () => fitToView(zoomMode)
     const scheduleFit = () => {
       window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(fit)
@@ -247,20 +233,19 @@ export function MermaidDiagram({
     renderState.source,
     renderedChart,
     fullscreenOpen,
-    activeZoomMode,
+    zoomMode,
     fitToView,
   ])
 
   useEffect(() => {
-    setZoom(startingZoom)
-    setFullscreenZoom(MERMAID_ZOOM.defaultValue)
+    setZoom(MERMAID_ZOOM.defaultValue)
     setFullscreenOpen(false)
     setInlineViewportHeight(undefined)
     setDirection('')
-    setZoomModes({ inline: initialZoomMode, fullscreen: 'fit-all' })
+    setZoomMode(initialZoomMode)
     dragRef.current = null
     setPanning(false)
-  }, [chart, startingZoom, initialZoomMode])
+  }, [chart, initialZoomMode])
 
   useLayoutEffect(() => {
     if (!fullscreenOpen || !fullscreenVisible) return undefined
@@ -287,7 +272,7 @@ export function MermaidDiagram({
       if (event.key === 'Escape' && (!overlay?.enabled || root.contains(event.target))) {
         event.preventDefault()
         event.stopPropagation()
-        setFullscreenOpen(false)
+        closeFullscreen()
       }
     }
     document.addEventListener('keydown', closeOnEscape, true)
@@ -302,7 +287,7 @@ export function MermaidDiagram({
       document.removeEventListener('keydown', closeOnEscape, true)
       restoreFullscreenFocus(returnFocusElement)
     }
-  }, [fullscreenOpen, fullscreenVisible, overlay, restoreFullscreenFocus])
+  }, [fullscreenOpen, fullscreenVisible, overlay, restoreFullscreenFocus, closeFullscreen])
 
   useEffect(() => {
     const source = String(renderedChart || '').trim()
@@ -391,7 +376,8 @@ export function MermaidDiagram({
       interactiveNodes,
       onNodeSelect ? (id) => {
         onNodeSelect?.(id)
-        if (fullscreenOpen) setFullscreenOpen(false)
+        if (fullscreenOpen) closeFullscreen()
+        else setZoomMode('fit-all')
       } : undefined,
       selectedNodeId,
       { edges: interactiveEdges, onInspect: inspect }
@@ -406,6 +392,7 @@ export function MermaidDiagram({
     selectedNodeId,
     onNodeSelect,
     fullscreenOpen,
+    closeFullscreen,
   ])
 
   useEffect(() => { onStatusChange?.(renderState.status) }, [onStatusChange, renderState.status])
@@ -418,10 +405,7 @@ export function MermaidDiagram({
     if (!fullscreenOpen) {
       setInlineViewportHeight(viewportRef.current?.clientHeight)
     }
-    setZoomModes((previous) => ({
-      ...previous,
-      [fullscreenOpen ? 'fullscreen' : 'inline']: 'fit-all',
-    }))
+    setZoomMode('fit-all')
     setDirection((previous) =>
       toggleMermaidDirection(previous || getMermaidDirection(chart))
     )
@@ -471,7 +455,7 @@ export function MermaidDiagram({
   const openFullscreen = () => {
     fullscreenReturnFocusRef.current =
       typeof document === 'undefined' ? null : document.activeElement
-    setZoomModes((previous) => ({ ...previous, fullscreen: 'fit-all' }))
+    setZoomMode('fit-all')
     const root = diagramRef.current
     setFullscreenPlaceholder({
       height: root.getBoundingClientRect().height,
@@ -498,8 +482,8 @@ export function MermaidDiagram({
       data-mermaid-direction={activeDirection || undefined}
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}
       data-mermaid-native-size={nativeSize || undefined}
-      data-mermaid-toolbar="full"
-      data-mermaid-zoom-mode={activeZoomMode}
+      data-mermaid-toolbar={compactControls && !fullscreenOpen ? 'compact' : 'full'}
+      data-mermaid-zoom-mode={zoomMode}
       popover={fullscreenOpen ? 'manual' : undefined}
       aria-busy={renderState.status === 'loading'}
       role={fullscreenOpen ? 'dialog' : undefined}
@@ -521,20 +505,21 @@ export function MermaidDiagram({
             aria-label={`${displayLabel}工具`}
           >
             <DiagramViewControls
+              compact={compactControls && !fullscreenOpen}
               label={displayLabel}
-              zoom={activeZoom}
-              zoomMode={activeZoomMode}
+              zoom={zoom}
+              zoomMode={zoomMode}
               minZoom={MERMAID_ZOOM.min}
               maxZoom={MERMAID_ZOOM.max}
               onFit={fitToView}
               nextLayoutDirection={nextDirection}
               onSwitchLayout={switchLayout}
-              onZoomOut={() => setNextZoom(activeZoom - MERMAID_ZOOM.step)}
-              onZoomIn={() => setNextZoom(activeZoom + MERMAID_ZOOM.step)}
-              onReset={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
+              onZoomOut={() => setNextZoom(zoom - MERMAID_ZOOM.step)}
+              onZoomIn={() => setNextZoom(zoom + MERMAID_ZOOM.step)}
+              onReset={() => setNextZoom(MERMAID_ZOOM.defaultValue, { mode: 'reset' })}
               fullscreen={fullscreenOpen}
               fullscreenButtonRef={fullscreenOpen ? fullscreenExitRef : fullscreenOpenRef}
-              onFullscreen={fullscreenOpen ? () => setFullscreenOpen(false) : openFullscreen}
+              onFullscreen={fullscreenOpen ? closeFullscreen : openFullscreen}
             />
           </div>
           {/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- 图内滚动区域需要键盘聚焦，方向键沿用浏览器原生滚动。 */}
@@ -563,7 +548,7 @@ export function MermaidDiagram({
               className="erp-markdown-mermaid__canvas"
               data-mermaid-zoom={zoomPercent}
               style={{
-                '--mermaid-zoom': activeZoom,
+                '--mermaid-zoom': zoom,
                 '--mermaid-intrinsic-width':
                   Number.isFinite(renderState.intrinsicWidth) &&
                   renderState.intrinsicWidth > 0

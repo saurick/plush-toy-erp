@@ -310,7 +310,6 @@ export default function HistoryRecordsPage() {
             prefix="记录类型"
             value={activeSource?.key}
             options={sourceOptions}
-            showSearch
             placeholder="选择记录类型"
             disabled={!availableSources.length}
             onChange={(nextSourceKey) =>

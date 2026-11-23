@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Space, Spin, Tag } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { Text, cleanText } from './FlowStateShared.jsx'
+import { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -113,9 +114,8 @@ function TaskLookupResults({ lookup, onSelectTask, onRetry }) {
           const sourceNo = cleanText(task.source_no) || '未记录来源单号'
           return (
             <li key={task.id}>
-              <button
-                type="button"
-                className="erp-dev-directory-item erp-dev-directory-item--stacked"
+              <DirectoryItem
+                className="erp-directory-item--stacked"
                 onClick={() => onSelectTask(task)}
                 aria-label={`读取任务：${getWorkflowTaskDisplayName(task)}；任务编号：${task.task_code}；来源单号：${sourceNo}`}
               >
@@ -126,7 +126,7 @@ function TaskLookupResults({ lookup, onSelectTask, onRetry }) {
                 <small>任务编号：{task.task_code}</small>
                 <small>来源单号：{sourceNo}</small>
                 <small>负责岗位：{getWorkflowTaskOwnerRoleLabel(task)}</small>
-              </button>
+              </DirectoryItem>
             </li>
           )
         })}

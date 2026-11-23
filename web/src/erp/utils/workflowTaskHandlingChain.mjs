@@ -54,8 +54,17 @@ export function buildEngineeringMaterialStageModel(task, request) {
   ) {
     return null
   }
+  const revisionTask = task.task_group === 'engineering_material_revision' ? task : null
+  return buildEngineeringMaterialReviewStageModel(request, { task, revisionTask })
+}
+
+export function buildEngineeringMaterialReviewStageModel(request, { task, revisionTask, currentTask } = {}) {
+  const tracking = currentTask !== undefined
+  const time = (value) => Number.isSafeInteger(value) && value > 0
+    ? value
+    : typeof value === 'string' ? Date.parse(value) / 1000 || null : null
   const hasTime = (value) =>
-    typeof value === 'string' && Number.isFinite(Date.parse(value))
+    Number.isFinite(time(value))
   const bossApproved = hasTime(request.boss_reviewed_at)
   const financeApproved = hasTime(request.finance_reviewed_at)
   const rejected = request.status === MaterialRequestStatus.REJECTED
@@ -72,20 +81,24 @@ export function buildEngineeringMaterialStageModel(task, request) {
   }
 
   const items = []
-  const append = (key, label, statusLabel, tone, at, note, current = false) =>
+  const append = (key, label, statusLabel, tone, at, note, current = false, actor = '') =>
     items.push({
       key,
       label,
       statusLabel,
       tone,
       current,
-      completedAt: !current && hasTime(at) ? Date.parse(at) / 1000 : null,
-      linked: task.task_group === `engineering_material_${key}`,
+      completedAt: !current && hasTime(at) ? time(at) : null,
+      startedAtLabel: current && hasTime(at) ? formatWorkflowTaskEventTime(at) : '',
+      completedAtLabel: !current && hasTime(at) ? formatWorkflowTaskEventTime(at) : '',
+      linked: task?.task_group === `engineering_material_${key}`,
+      actor,
+      reason: note || '',
       detail: [hasTime(at) ? formatWorkflowTaskEventTime(at) : '', note]
         .filter(Boolean)
         .join(' · '),
     })
-  append('submit', '自动生成用料汇总', '已提交', 'completed', request.submitted_at)
+  append('submit', '自动生成用料汇总', '已提交', 'completed', request.submitted_at, '', false, request.submitted_by_name)
   if (bossApproved) {
     append(
       'boss_review',
@@ -93,7 +106,9 @@ export function buildEngineeringMaterialStageModel(task, request) {
       '已通过',
       'completed',
       request.boss_reviewed_at,
-      request.boss_review_note
+      request.boss_review_note,
+false,
+request.boss_reviewed_by_name
     )
   }
   if (financeApproved) {
@@ -103,7 +118,9 @@ export function buildEngineeringMaterialStageModel(task, request) {
       '已批准采购',
       'completed',
       request.finance_reviewed_at,
-      request.finance_review_note
+      request.finance_review_note,
+false,
+request.finance_reviewed_by_name
     )
   }
   if (rejected) {
@@ -113,36 +130,45 @@ export function buildEngineeringMaterialStageModel(task, request) {
       '已退回',
       'rejected',
       request.rejected_at,
-      request.review_note
+      request.review_note,
+false,
+request.rejected_by_name
     )
   }
 
   const orderClosed = request.order_status && request.order_status !== SalesOrderStatus.ACTIVE
-  if (!orderClosed && [MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.BOSS_APPROVED].includes(request.status)) {
+  if (!orderClosed && (!tracking || currentTask) && [MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.BOSS_APPROVED].includes(request.status)) {
     const finance = request.status === MaterialRequestStatus.BOSS_APPROVED
+    const blocked = currentTask?.task_status_key === WorkflowTaskStatus.BLOCKED
     append(
       finance ? 'finance_review' : 'boss_review',
       finance ? '财务审核' : '老板审核',
-      '待处理',
-      'active',
-      null,
+      blocked ? '受阻' : tracking ? '待审批' : '待处理',
+      blocked ? 'blocked' : 'active',
+      currentTask?.created_at ?? null,
       null,
       true
     )
   }
-  if (task.task_group === 'engineering_material_revision') {
-    const own = buildCurrentTaskStageModel(task).items[0]
+  if (revisionTask) {
+    const own = buildCurrentTaskStageModel(revisionTask).items[0]
     items.push({
       ...own,
+      key: 'revision',
+      linked: Boolean(task),
       label: '工程修改用料',
-      detail: task.completed_at
-        ? formatWorkflowTaskEventTime(task.completed_at)
+      actor: revisionTask.actor,
+      reason: revisionTask.reason,
+      startedAtLabel: revisionTask.created_at ? formatWorkflowTaskEventTime(revisionTask.created_at) : '',
+      completedAtLabel: revisionTask.completed_at ? formatWorkflowTaskEventTime(revisionTask.completed_at) : '',
+      detail: revisionTask.completed_at
+        ? formatWorkflowTaskEventTime(revisionTask.completed_at)
         : '',
     })
   }
   if (
     orderClosed &&
-    task.task_status_key === WorkflowTaskStatus.WITHDRAWN &&
+    task?.task_status_key === WorkflowTaskStatus.WITHDRAWN &&
     !items.some((item) => item.linked)
   ) {
     items.push(buildCurrentTaskStageModel(task).items[0])
@@ -153,8 +179,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
     handoffKind: 'source',
     handoffLabel: orderClosed
       ? '订单已结束，未完成的审批已停止。'
-      : task.task_group === 'engineering_material_revision' &&
-          task.task_status_key === WorkflowTaskStatus.DONE
+      : revisionTask?.task_status_key === WorkflowTaskStatus.DONE
         ? '本轮已退回；资料保存后已自动重新送审，后续审批记录在新的用料汇总中。'
         : rejected
           ? '本轮已退回工程修改。'

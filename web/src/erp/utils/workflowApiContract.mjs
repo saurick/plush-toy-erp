@@ -763,13 +763,18 @@ export function requireWorkflowExceptionsResponse(result) {
       'affected_orders',
       'open',
       'closed',
+      'pending_plan',
+      'executing',
     ].every((key) => Number.isSafeInteger(data[key]) && data[key] >= 0) ||
+    data.pending_plan + data.executing !== data.open ||
     data.items.some(
       (item) =>
         !item.key ||
         !Array.isArray(item.tasks) ||
         !Array.isArray(item.task_ids) ||
-        !Array.isArray(item.orders)
+        !Array.isArray(item.orders) ||
+        !Array.isArray(item.quality_photo_sources) ||
+        item.quality_photo_sources.some((source) => !Number.isSafeInteger(source?.id) || source.id <= 0 || typeof source.number !== 'string' || !source.number.trim())
     )
   ) {
     throw new Error('异常跟踪数据不完整，请重试')

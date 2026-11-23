@@ -1,5 +1,6 @@
 import React from 'react'
 import { DownOutlined } from '@ant-design/icons'
+import { getWorkflowTaskSourceNo } from '../../utils/dashboardTaskDisplay.mjs'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
 import WorkflowTaskClassification from './WorkflowTaskClassification.jsx'
@@ -8,15 +9,17 @@ import './workflowTaskInfoCard.css'
 
 export default function WorkflowTaskInfoCard({ task, title, status, source, summary, resources, events = [], businessInfo, showDetails = true, className = '', titleClassName = '' }) {
   const taskNumber = typeof task?.task_no === 'string' ? task.task_no.trim() : ''
+  const sourceNo = source ? getWorkflowTaskSourceNo(task) : ''
+  const heading = sourceNo && typeof title === 'string' && title.endsWith(` ${sourceNo}`) ? title.slice(0, -sourceNo.length).trimEnd() || title : title
   return (
     <>
       <section className={`workflow-task-info-card ${className}`} aria-label="任务信息">
-        <div className="workflow-task-info-card__heading"><h2 className={titleClassName}>{title}</h2>{status ? <span className="workflow-task-info-card__badges">{status}</span> : null}</div>
+        <div className="workflow-task-info-card__heading"><h2 className={titleClassName}>{heading}</h2>{status ? <span className="workflow-task-info-card__badges">{status}</span> : null}</div>
         <div className="workflow-task-info-card__identity"><WorkflowTaskIdentity task={task} source={source} detailView /></div>
         {summary}
         {showDetails ? (
           <details key={task.id} className="workflow-task-info-card__details">
-            <summary><span>任务信息</span><DownOutlined aria-hidden="true" /></summary>
+            <summary><span>任务编号、分类与时间</span><DownOutlined aria-hidden="true" /></summary>
             <dl className="workflow-task-info-card__number">
               <dt>任务编号</dt>
               <dd><TaskCopyField value={taskNumber} label="任务编号">{taskNumber || '未记录'}</TaskCopyField></dd>

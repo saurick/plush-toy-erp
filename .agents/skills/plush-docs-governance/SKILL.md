@@ -22,7 +22,7 @@ description: 项目文档治理（plush-toy-erp）。Use to review or maintain p
 ## Writing and Organization
 
 - 结论、读者、范围、当前状态和主路径前置。业务文档用岗位语言；T0-T8 是验证层级，L/内部状态键不作普通业务摘要。
-- README 管导航，专题管业务 / 操作，progress 管过程；同一规则集中一处，用稳定章节链接关联。对比 / 清单用表格，操作用编号，命令用代码块，复杂关系才用 Mermaid。
+- 按[文档写法](../../../docs/README.md#文档写法--writing-rules)选择短文、并列清单、编号步骤、对照表或 Mermaid。修订时从读者需要找的答案回查正文，核对条件、例外与来源是否仍在对应位置。
 - 不新增重模板、平行 metadata、过程目录或重复负面清单。frontmatter 仅在真实 viewer / generator / index 消费时使用；命令注明工作目录和有用的成功信号。
 - 长期文档默认中文文件名、中文主体及 English anchor；README / AGENTS / CHANGELOG、archive、生成和外部稳定路径例外，不机械改名。
 - AGENTS 留长期项目特例，业务事实进专题，机械门禁留现有 QA，按需 SOP 进 Skills。删改规则须有具体影响依据，授权语义变化单列说明；体积治理不删除有效保护。

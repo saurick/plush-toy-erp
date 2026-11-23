@@ -10,7 +10,7 @@ export default function MobileWorkflowExceptionPanel({ accessScope, profile, onO
     const query = saved?.accessScope === accessScope ? saved.query : null
     return {
       keyword: String(query?.keyword || '').trim().slice(0, 100),
-      state: ['open', 'closed'].includes(query?.state) ? query.state : '',
+      state: ['open', 'closed', 'pending_plan', 'executing'].includes(query?.state) ? query.state : '',
       view: ['tasks', 'orders'].includes(query?.view) ? query.view : '',
       loadedCount: Number.isSafeInteger(query?.loadedCount) && query.loadedCount > 0 ? query.loadedCount : 20,
       scrollTop: Number.isFinite(query?.scrollTop) && query.scrollTop > 0 ? query.scrollTop : 0,

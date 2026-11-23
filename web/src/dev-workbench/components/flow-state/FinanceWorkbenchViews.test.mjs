@@ -48,14 +48,10 @@ test('十二个财务步骤就近解释，点击与关闭均保留总览和当�
   const { harness, state } = await mountRelationships(t)
   const root = harness.container
   const overview = root.querySelector('[data-finance-overview]')
-  const lanes = [...overview.querySelectorAll('[data-finance-lane]')]
+  const lanes = ['sales', 'purchase', 'outsourcing']
   assert.deepEqual(
-    lanes.map((lane) => lane.getAttribute('aria-label')),
-    ['销售与出货', '采购与仓库', '委外与生产']
-  )
-  assert.deepEqual(
-    lanes.map((lane) =>
-      [...lane.querySelectorAll('[data-finance-node]')].map(
+    lanes.map((key) =>
+      [...overview.querySelectorAll(`[data-finance-lane="${key}"]`)].map(
         (node) => node.getAttribute('aria-label')
       )
     ),
@@ -66,7 +62,7 @@ test('十二个财务步骤就近解释，点击与关闭均保留总览和当�
     ]
   )
   const { location } = state
-  for (const node of overview.querySelectorAll('[data-finance-lane] [data-finance-node]')) {
+  for (const node of overview.querySelectorAll('[data-finance-node]')) {
     await harness.act(() => node.dispatchEvent(new window.MouseEvent('click', { bubbles: true })))
     await harness.flush()
     const note = document.getElementById(
@@ -75,97 +71,132 @@ test('十二个财务步骤就近解释，点击与关闭均保留总览和当�
     assert(note.querySelector('p').textContent.length > 15)
     assert(note.textContent.includes('关联岗位：'))
     assert.equal(node.getAttribute('aria-expanded'), 'true')
-    assert.equal(root.querySelector('[data-finance-overview]'), overview)
-    assert.equal(state.location, location)
+    assert(root.querySelector('[data-finance-overview]') === overview)
+    assert(state.location === location)
     await harness.act(() =>
       note.querySelector('[aria-label="关闭步骤说明"]').click()
     )
     assert.equal(node.getAttribute('aria-expanded'), 'false')
-    assert.equal(document.activeElement, node)
+    assert(document.activeElement === node)
   }
-  assert.equal(
-    overview.querySelectorAll('[aria-label="财务专题"] button').length,
-    3
+  const nav = root.querySelector('[role="tablist"][aria-label="财务关联视图"]')
+  const tabs = [...nav.querySelectorAll('[role="tab"]')]
+  assert.deepEqual(
+    tabs.map((tab) => tab.textContent),
+    ['总览', '采购差额', '月结对账', '审批凭据']
   )
-  assert(!root.textContent.includes('应付阶段'))
-  assert(!root.textContent.includes('返回关联概览'))
+  assert.equal(root.querySelectorAll('[data-business-flow]').length, 1)
+  assert(!root.querySelector('[data-finance-topic]'))
+  assert(!root.querySelector('[data-finance-detail]'))
+  const titles = ['业务怎样连接财务', '采购退货与数量差额', '月结与期间对账', '审批、权限与凭据']
+  for (const [index, tab] of tabs.entries()) {
+    await harness.act(() => tab.click())
+    await harness.flush()
+    const panel = document.getElementById(tab.getAttribute('aria-controls'))
+    assert.equal(tab.getAttribute('aria-selected'), 'true')
+    assert.equal(panel.hidden, false)
+    assert.equal(panel.querySelector('h2').textContent, titles[index])
+    assert.equal(root.querySelectorAll('[data-business-flow]').length, 1)
+    assert(!root.querySelector('[data-finance-detail]'))
+    assert(root.querySelector('[role="tablist"]') === nav)
+  }
 })
 
-test('专题与规则在同一侧栏查看，情景选择只替换 URL 状态且总览保持挂载', async (t) => {
+test('采购页签保存情景，收起说明后继续显示采购图', async (t) => {
   const { harness, state } = await mountRelationships(t)
-  const overview = harness.container.querySelector('[data-finance-overview]')
-  await harness.act(() => button(overview, '采购退货与数量差额').click())
+  const root = harness.container
+  await harness.act(() => button(root, '采购差额').click())
+  const purchase = root.querySelector('[data-finance-topic="purchase"]')
+  const graph = purchase.querySelector('[data-business-flow]')
+  const stage = [...purchase.querySelectorAll('[aria-label="应付阶段"] label')]
+    .find((option) => option.textContent === '草稿')
+  const sourceChoices = [...purchase.querySelectorAll('[aria-label="来源变化"] label')]
+  assert.deepEqual(sourceChoices.map((option) => option.textContent), ['采购退货', '数量调增', '移库或批次修正'])
+  await harness.act(() => stage.click())
+  await harness.act(() => sourceChoices[2].click())
   await harness.flush()
-  const drawer = document.querySelector('.erp-dev-finance-drawer')
-  assert(drawer.textContent.includes('应付阶段'))
+  assert(!root.querySelector('[data-finance-detail]'))
+  assert.match(purchase.querySelector('[data-purchase-scenario-result]').textContent, /草稿 ＋ 移库或批次修正.*先取消应付草稿/)
+  assert.equal(purchase.querySelector('[data-finance-node="purchase-1"]').getAttribute('aria-label'), '取消应付草稿')
+  await harness.act(() =>
+    purchase.querySelector('[data-finance-node="purchase-2"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+  )
+  await harness.flush()
+  const detail = purchase.querySelector('[data-finance-detail="purchase"]')
   assert.equal(state.navigation, 'REPLACE')
   assert.deepEqual(state.location.state, { readingContext: 'preserved' })
-  assert.equal(
-    harness.container.querySelector('[data-finance-overview]'),
-    overview
-  )
-  await harness.act(() => drawer.querySelector('input[value="draft"]').click())
-  await harness.act(() =>
-    drawer.querySelector('[data-finance-node="purchase-2"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
-  )
-  assert(drawer.textContent.includes('先取消冻结来源的草稿'))
+  assert(!root.querySelector('[data-finance-overview]'))
+  assert(detail.textContent.includes('过账库存修正'))
+  assert(detail.textContent.includes('仓库通过采购入库调整修正库存位置或批次'))
   assert.equal(
     new URLSearchParams(state.location.search).get('finance_step'),
     '2'
   )
-  const tabs = drawer.querySelector('[role="tablist"]')
-  await harness.act(() => button(drawer, '查看采购差额规则').click())
-  assert.equal(drawer.querySelector('[role="tablist"]'), tabs)
-  assert(drawer.querySelector('[data-finance-rules]'))
-  assert.equal(drawer.querySelectorAll('a[href]').length, 0)
+  const tabs = detail.querySelector('[role="tablist"]')
+  await harness.act(() => button(detail, '查看采购差额规则').click())
+  assert(detail.querySelector('[role="tablist"]') === tabs)
+  assert(purchase.querySelector('[data-business-flow]') === graph)
+  assert(detail.querySelector('[data-finance-rules]'))
+  assert.equal(detail.querySelectorAll('a[href]').length, 0)
   assert.equal(state.location.pathname, '/__dev/status-flows')
   assert.equal(new URLSearchParams(state.location.search).has('view'), false)
-  await harness.act(() => button(drawer, '关闭').click())
+  await harness.act(() => button(purchase, '收起说明与记录').click())
   assert.equal(
     new URLSearchParams(state.location.search).get('finance_topic'),
-    null
+    'purchase'
   )
+  assert.equal(new URLSearchParams(state.location.search).get('finance_step'), null)
   assert.equal(
     new URLSearchParams(state.location.search).get('finance_stage'),
     'draft'
   )
   assert.equal(state.navigation, 'REPLACE')
-  assert.equal(
-    harness.container.querySelector('[data-finance-overview]'),
-    overview
-  )
+  assert.equal(purchase.querySelector('[data-finance-node="purchase-2"]').getAttribute('aria-pressed'), 'false')
+  assert(purchase.querySelector('[data-business-flow]') === graph)
+  await harness.act(() => button(root, '总览').click())
+  await harness.act(() => button(root, '采购差额').click())
+  assert.equal(root.querySelector('[aria-label="应付阶段"] label:has(input:checked)').textContent, '草稿')
+  assert.equal(root.querySelector('[aria-label="来源变化"] label:has(input:checked)').textContent, '移库或批次修正')
+  assert(!root.querySelector('[data-finance-detail]'))
 })
 
-test('深链接打开侧栏，当前步骤与月结示例均可在保留总览时读取', async (t) => {
+test('专题深链接定位页内步骤，月结到期日与期间对账分别打开对应口径', async (t) => {
   const { harness, state } = await mountRelationships(
     t,
     `${initialURL}&finance_topic=payments&finance_step=3`
   )
-  let drawer = document.querySelector('.erp-dev-finance-drawer')
+  const root = harness.container
+  const payments = root.querySelector('[data-finance-topic="payments"]')
   assert.equal(
-    drawer
+    payments
       .querySelector('[data-finance-node="payments-3"]')
       .getAttribute('aria-pressed'),
     'true'
   )
-  assert(drawer.textContent.includes('恢复余额，不产生实际资金流'))
-  await harness.act(() => button(drawer, '关闭').click())
-  await harness.act(() => button(harness.container, '月结与期间对账').click())
-  drawer = document.querySelector('.erp-dev-finance-drawer')
-  await harness.act(() =>
-    button(drawer, '月结到期日中国自然月月末 ＋ 约定天数').click()
-  )
+  assert(payments.textContent.includes('恢复余额，不产生实际资金流'))
+  await harness.act(() => button(payments, '收起说明与记录').click())
+  assert(!root.querySelector('[data-finance-topic="payments"]'))
+  assert(root.querySelector('[data-finance-overview]'))
+  await harness.act(() => button(root, '月结对账').click())
+  const terms = root.querySelector('[data-finance-topic="terms"]')
+  await harness.act(() => button(terms, '查看说明与记录').click())
+  await harness.act(() => button(terms, '查看月结到期日规则').click())
   assert(
-    drawer
+    terms
       .querySelector('[data-finance-rules]')
       .textContent.includes('2026-11-30')
   )
-  assert(harness.container.querySelector('[data-finance-overview]'))
+  await harness.act(() =>
+    terms.querySelector('[data-finance-node="terms-3"]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+  )
+  await harness.act(() => button(terms, '查看期间对账规则').click())
+  assert(terms.querySelector('[data-finance-rules]').textContent.includes('往来净余额'))
+  assert(!root.querySelector('[data-finance-overview]'))
   assert.equal(state.location.pathname, '/__dev/status-flows')
   assert.equal(new URLSearchParams(state.location.search).has('view'), false)
 })
 
-test('真实账款在所选行下展开，关闭侧栏取消未完成的只读请求', async (t) => {
+test('真实账款在所选行下展开，切换财务页签取消未完成的只读请求', async (t) => {
   const requests = []
   let pendingSignal
   const { harness, state } = await mountRelationships(t)
@@ -201,30 +232,28 @@ test('真实账款在所选行下展开，关闭侧栏取消未完成的只读�
       })
     )
   })
-  await harness.act(() => button(harness.container, '审批、权限与凭据').click())
-  const drawer = document.querySelector('.erp-dev-finance-drawer')
+  await harness.act(() => button(harness.container, '审批凭据').click())
+  const permissions = harness.container.querySelector('[data-finance-topic="permissions"]')
+  await harness.act(() => button(permissions, '查看说明与记录').click())
   assert.deepEqual(requests, [])
-  await harness.act(() => button(drawer, '真实记录').click())
+  await harness.act(() => button(permissions, '真实记录').click())
   await harness.flush()
-  const rowButton = button(drawer, 'AR-9')
+  const rowButton = button(permissions, 'AR-9')
   await harness.act(() => {
     rowButton.focus()
     rowButton.click()
   })
   await harness.flush()
-  const detail = drawer.querySelector('[data-finance-selected-record]')
-  assert.equal(
-    detail.closest('tr').previousElementSibling,
-    rowButton.closest('tr')
-  )
-  assert.equal(document.activeElement, rowButton)
+  const detail = permissions.querySelector('[data-finance-selected-record]')
+  assert(detail.closest('tr').previousElementSibling === rowButton.closest('tr'))
+  assert(document.activeElement === rowButton)
   assert.deepEqual(requests, ['list_finance_facts', 'get_finance_fact'])
   assert.equal(state.location.pathname, '/__dev/status-flows')
   assert.equal(new URLSearchParams(state.location.search).has('view'), false)
-  await harness.act(() => button(drawer, '关闭').click())
+  await harness.act(() => button(harness.container, '总览').click())
   await harness.flush()
   assert.equal(pendingSignal.aborted, true)
-  assert.equal(document.querySelector('[data-finance-trace]'), null)
+  assert(!document.querySelector('[data-finance-trace]'))
 })
 
 test('财务口径保留业务规则与月结示例，移除测试引用', async (t) => {

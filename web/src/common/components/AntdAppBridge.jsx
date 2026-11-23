@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { App as AntdApp } from 'antd'
 import { registerAntdAppApis } from '@/common/utils/antdApp'
+import './feedback/feedback.css'
 
 const AntdAppBridge = () => {
   const { message, modal, notification } = AntdApp.useApp()

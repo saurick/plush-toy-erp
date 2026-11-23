@@ -26,7 +26,7 @@ func progressDeliveryQuery(q biz.BusinessProgressQuery, sqlDialect string) (stri
 	cte += ", base AS (" + progressBase(q) + "), line_values AS (" +
 		`SELECT z.id,j.id AS sales_order_id,j.order_no,j.status,j.customer,z.line_status,z.line_no,
  COALESCE(z.customer_product_no,'') AS customer_product_no,z.product_label,COALESCE(z.product_id,0) AS product_id,
- z.unit_name,z.ordered_quantity,z.shipped_quantity,j.active,z.due_at,` + dueDate + ` AS due_date,
+ z.unit_name,z.ordered_quantity,z.shipped_quantity,z.remaining_quantity,j.active,z.due_at,` + dueDate + ` AS due_date,
  CASE WHEN ` + strings.Join(dateConditions, " AND ") + ` THEN 1 ELSE 0 END AS in_date_range,
  CASE WHEN z.ordered_quantity>0 AND NOT EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=j.id)
  THEN 1 ELSE 0 END AS delivery_known
@@ -91,7 +91,7 @@ func loadBusinessProgressDelivery(ctx context.Context, tx *sql.Tx, q biz.Busines
 	args = append(args, q.Limit, q.Offset)
 	rows, err := tx.QueryContext(ctx, cte+` SELECT id,sales_order_id,line_no,order_no,status,customer,
  product_label,product_id,customer_product_no,CAST(due_date AS TEXT),unit_name,
- CAST(ordered_quantity AS TEXT),CAST(shipped_quantity AS TEXT),active,delivery_known,delivery_status
+ CAST(ordered_quantity AS TEXT),CAST(shipped_quantity AS TEXT),CAST(remaining_quantity AS TEXT),active,delivery_known,delivery_status
  FROM delivery WHERE `+progressDeliveryFilter(q.DeliveryStatus)+
 		fmt.Sprintf(" ORDER BY %s LIMIT $%d OFFSET $%d", progressListOrder(q), len(args)-1, len(args)), args...)
 	if err != nil {
@@ -102,9 +102,9 @@ func loadBusinessProgressDelivery(ctx context.Context, tx *sql.Tx, q biz.Busines
 		line := &biz.BusinessProgressLine{}
 		row := &biz.BusinessProgressRow{View: "orders", Line: line, ProductCount: 1}
 		var due sql.NullString
-		var ordered, shipped string
+		var ordered, shipped, remaining string
 		if err := rows.Scan(&row.ID, &line.OrderID, &line.LineNo, &row.OrderNo, &row.Status, &row.Customer,
-			&row.Product, &row.ProductID, &line.CustomerProductNo, &due, &row.Unit, &ordered, &shipped,
+			&row.Product, &row.ProductID, &line.CustomerProductNo, &due, &row.Unit, &ordered, &shipped, &remaining,
 			&row.Active, &row.DeliveryKnown, &line.DeliveryStatus,
 		); err != nil {
 			return err
@@ -125,8 +125,12 @@ func loadBusinessProgressDelivery(ctx context.Context, tx *sql.Tx, q biz.Busines
 			shippedText := shippedQty.String()
 			row.ShippedQuantity = &shippedText
 			if line.DeliveryStatus != "canceled" {
-				remaining := decimal.Max(orderQty.Sub(shippedQty), decimal.Zero).String()
-				line.RemainingQuantity = &remaining
+				amount, parseErr := decimal.NewFromString(remaining)
+				if parseErr != nil {
+					return parseErr
+				}
+				text := amount.String()
+				line.RemainingQuantity = &text
 			}
 		}
 		result.Rows = append(result.Rows, row)

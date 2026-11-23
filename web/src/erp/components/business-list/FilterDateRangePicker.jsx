@@ -190,7 +190,6 @@ export const DateRangeTrigger = React.forwardRef(({ label, caption, drillIn = fa
       {clearAction?.visible && (
         <Tooltip title={clearAction.label} trigger={['hover', 'focus']}>
           <Button
-            type="text"
             className="erp-filter-date-control__clear"
             aria-label={clearAction.label}
             icon={<CloseCircleFilled aria-hidden="true" />}

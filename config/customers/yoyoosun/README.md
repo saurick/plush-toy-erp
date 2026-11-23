@@ -1,19 +1,10 @@
 # 永绅 yoyoosun 客户配置 / Yoyoosun Customer Config
 
-本目录是 永绅 yoyoosun 客户配置包的落点。
+`yoyoosun` 是永绅的稳定客户 key。本目录维护客户配置草案及已接入的品牌和菜单。部署为单客户实例，无 runtime tenant 或 `tenant_id`。后端 RBAC、Workflow / Fact、Ent schema、迁移和真实导入各按正式合同处理。
 
-当前口径：
+客户工程指导图保存在客户专属 Private 仓库。dev server 和生产 overlay 只发布 `public-assets/` 中经审查的品牌资源。
 
-- `yoyoosun` 是永绅客户的稳定客户 key。
-- 本目录保存客户配置草案和已经接入的低风险前端品牌 / 菜单展示配置。
-- 不代表 SaaS runtime tenant。
-- 不新增 `tenant_id`。
-- 不改变后端 RBAC 动作权限、Workflow / Fact 边界、schema、migration 或真实导入。
-- 不改 Ent schema。
-
-客户工程指导图片已作为私密人工参考资料迁入客户专属 Private 仓库，当前配置包不再保存或发布这些原件。只有 `public-assets/` 中经过审查的品牌资源可以进入 dev server / 生产 overlay。
-
-当前已接入：
+## 品牌、菜单与公开资源
 
 - `menuConfig.mjs`：永绅前端品牌和桌面菜单配置源。部署时把经过审查的 `customer-config.example.js` 发布为静态根路径 `customer-config.js`，并只复制 `public-assets/` 到 `/customer-assets/yoyoosun/`。菜单隐藏不是安全边界，后端仍以 RBAC、active revision、模块状态和业务 usecase 校验为准。
 
@@ -24,9 +15,13 @@
 - `public-assets/`：唯一允许复制到公开前端产物的客户静态资源。桌面端使用蓝色“永”字 favicon（`brand.faviconHref`），手机端使用青绿色“永”字 favicon（`brand.mobileFaviconHref`）；登录页随“电脑版 / 手机版”选择即时切换。未配置手机端图标时沿用 `brand.faviconHref`；打印工作区继续使用模板专属图标。
 - 版本化配置和试用 fixture 不保存真实员工姓名、手机号或签字人；真实合同经办信息由客户 active revision 或本单 `contract_party_snapshot` 受控维护并审计。
 
+## 字段与导入草案
+
 - `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。
 
 - `importConfig.mjs`：永绅 yoyoosun 导入与客户差异配置草案。该文件根据已提取的 Excel evidence、产品核心边界和客户台账收口导入顺序、字段映射分组、人工 review 队列、禁止自动导入目标和 deferred runtime 项；当前 `runtimeEnabled=false`，不嵌入 raw rows，不接 loader，不执行真实导入。
+
+## 本地客户包与权限范围
 
 - `customerPackage.mjs`：永绅客户包声明源。raw 包保持 `runtimeEnabled=false / previewOnly=true`；`localTestApplyEnabled=true` 只允许 `start:yoyoosun` 的 loopback 开发入口编译内容寻址的本地测试版本，并且仍需由本地 Make 入口显式开放的后端 gate 接收。
 
@@ -39,16 +34,13 @@
   - 打印默认值只覆盖采购合同、加工合同的买方 / 委托方抬头，供应商 / 加工方和明细继续来自业务快照。
   - Dry Run 不写数据库；本地测试应用只写共享开发库的客户配置控制面，并要求管理员显式确认。正式发布仍需 release readiness，rollback 只回滚配置 revision，不回滚业务数据或数据库备份。
 
+## 正式发布输入
+
 - `releasePackage.mjs`：显式评审后的正式 manifest 输入，只把同一受控包切换为 `release_ready / runtimeEnabled / publishEnabled`，并关闭本地测试应用标记。
 
   raw 包仍保持草案，正式编译只从该独立登记入口读取；`packageKey` 保持稳定；修改可发布内容（包括编译器生成的快照结构与目录元数据）后，编译器从完整内容自动生成新 revision，无需人工递增包名。已发布版本及其快照保持不变，不用当前编译器重建后覆盖旧版本。
 
-未来可继续放：
-
-- logo / 主题色。
-- 打印模板选择和经确认的甲方 party defaults。
-- 角色模板和权限模板。
-- 初始化数据。
+可继续配置品牌与主题、打印模板及经确认的合同方默认值、角色与权限模板、初始化数据。
 
 ## 校验命令
 

@@ -46,10 +46,16 @@
 - 工作台登录页与全部页面统一使用 `/favicon-dev.svg` 的紫底白色闪电，不按路由切换图标。独立部署时，图标可在登录前通过受信 HTTPS 代理读取；其他工具资源和 API 仍要求工作台会话。
 - 正式 ERP、移动端、产品配置和 Server runtime 不得依赖本目录。
 - 浏览器不得提交任意命令、路径、DSN、目标、SSH 参数或环境变量；写操作必须使用固定动作、幂等、确认、审计和读回。
+
+### 数据准备和模拟场景
+
 - 数据准备摘要只输出数据集版本、安全数据库名、migration、客户配置 revision 和读回时间；不输出凭据、DSN、主机、端口、命令、路径或内部幂等键。本地与 133 的读取失败分别建模，结果未证明时不自动重试或创建 operation。
 - 本地 Core profile 固定执行当前数据合同的角色账号、8 个标准单位与 4 个仓库引用，只允许登记的长期开发库和服务端生成的精确确认；它不再从工作台调用旧 `SIM-PLUSH-CORE` 全量 seed，材料、产品、工序、BOM、Source、Task 与 Fact 由同一 Scenario 数据合同补齐并独立读回。旧批次回执只作历史追溯，不参与当前执行、恢复选择或环境结论。
 - 数据版本、批次和基础数量取自 `server/internal/manualacceptance/contract.json`；Bridge 使用已验证的合同模块，工作台浏览器校验读取同一公开模拟合同，避免前端保留旧版本常量而拒绝当前回执。流程数量按已验证的正式流程实例 ID 去重，不由岗位数或展示任务数推导。
 - 133 Scenario 只能在对应目标卡中准备和二次确认；执行前重新读取固定 target attestation，并创建绑定 exact release / database / migration 的新备份回滚点。备份通过 `erp_backup` 只读角色生成并校验，只向页面返回 alias、hash、大小和时间。
+
+### 接口证据与问题定位
+
 - 接口与集成复用质量门禁的只读 `GET /__dev/api/qa/quality-gates/integration-evidence`；`devIntegrationEvidence.mjs` 只投影既有隔离数据库运行回执和 digest 绑定的 Go JSON。场景与方法关联读取正式 API 文档，源码身份不一致显示历史；缺失、失败、跳过、损坏报告分别保留边界，不接受浏览器传入路径、报告或执行参数。
 - 同一场景证据响应的 `ruleTests` 按关键规则目录投影具名 PostgreSQL 用例，供测试页关联规则、测试和门禁；不新增运行存储或执行入口。普通 Go 用例继续读取覆盖基线，数据库回执还须保留执行前后源码身份和清理读回。
 - 业务数据一致性复用 testing operation 的固定 `business-consistency` 动作，执行登记的前端与 Go 用例并更新覆盖报告，沿用 CSRF、幂等、QA 锁和执行前后源码身份。测试页只接受完整登记、有效执行数和当前身份的证据；PostgreSQL 结果仍由隔离运行回执证明，专项不会迁移共享数据库。
@@ -58,6 +64,9 @@
   样例实际执行通过原 testing operation 的固定 `rpc-examples` 动作调用 `--verify-examples`，沿用 CSRF、幂等、QA 锁及源码身份；回执验证与边界见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md#接口差异与执行证据--rpc-review)。
 - 质量门禁没有显式 database base 时只允许本机 Docker 的固定 `postgres:18.6` 托管模式：每次随机凭据、仅绑定 `127.0.0.1` 动态端口、按 operation 与 repository label 精确清理；不得删除外部容器或占用者。
 - ERP production build、production preview 和业务部署不包含本目录模块、`/__dev` 路由或本机私有路径。独立工具部署使用单独的工作台制品与服务，见 [部署合同](../../server/deploy/workbench/README.md)。
+
+### 迁移准备与失败恢复
+
 - `devDatabaseMigrationRuntime.mjs` 的 source identity 包含迁移 Bridge、高层 CLI 与安全真源；路径或内容变化后，既有迁移 plan 必须失效并重新准备，不保留旧路径兼容。execute 在 apply 前还必须重新验证 operation 绑定的备份文件身份。
 - 数据库迁移准备先检查能力而非绑定操作系统或桌面产品：固定需要兼容 `docker` CLI/socket 的容器运行环境、Atlas v1.3.0、PostgreSQL 18 客户端及备份恢复基础命令。Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack 或提供兼容入口的 Podman 均可；环境不完整时不得先停止后端。
 - 待迁移时，旧后端的健康状态只证明旧版本可用，不阻断重新准备，也不解除恢复模式。工具检查失败直接显示在升级页；核对 Vite 进程实际使用的 `atlas version`，不能以另一个终端临时修改的 PATH 代替。修改开发服务模块后须重新启动对应前端进程，再核对接口返回。
@@ -65,6 +74,8 @@
 - 本地迁移指纹绑定后端、运行配置及明确列出的迁移、审计、恢复执行文件；独立 Vite 页面与无关开发插件不参与计划失效判断。候选仍保留完整快照和制品校验，准备构建与执行前检查使用同一后端边界；恢复页和迁移服务本身的执行文件变化仍使旧计划失效。
 
 调整本目录后至少运行同目录 Node 测试、工作台源码边界测试、production build、制品零残留扫描和 production `/__dev` 浏览器 smoke。
+
+### 本地访问与身份校验
 
 DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有界 JSON 请求解析。各插件显式提供请求大小上限，继续独立维护令牌、动作允许列表和状态机。
 
@@ -88,6 +99,8 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 
 这是显式授权符合网络限制的设备使用开发工具，仅适用于自己控制的内网；ERP 业务登录与后端权限仍按原合同执行。删除配置恢复仅本机免登录，显式设为 `operator` 可启用独立认证。环境变量优先于本地文件，此值不使用 `VITE_*`，不进入浏览器配置。
 
+### 权限关系与项目 Skill 的只读接口
+
 权限关系使用固定 `GET /__dev/api/permission-relationships`，不接受查询参数、请求体或写方法。插件复用本地运行配置的客户选择，以及 `local-database-roles.mjs` 的登记目标、只读审计账号和实际权限核验；缺失或失效时返回读取失败，不借用应用或管理员凭据。
 
 固定 Go 命令 `server/cmd/dev-permission-relationships` 核验开发库集群身份，使用强制只读连接，不执行启动初始化。返回账号识别、岗位及权限关系所需字段，排除手机号、口令、token 和连接信息。未登录、普通 ERP 岗位和切换岗位均不影响工作台读取；正式权限配置仍通过业务接口授权。
@@ -101,6 +114,8 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 `devProjectSkillsPlugin.mjs` 复用 `skill-health.mjs` 的 validator 和 metadata parser，返回名称、适用范围、摘要、正文路径以及带时间的结构诊断；引用有效性仍由同一 validator 检查，不另行提取引用清单或把正文提及的 Skill 生成导航。只在打开页面或显式刷新时检查，不执行 Skill、命令或业务写入，也不采集会话、调用次数或全局 Skill。
 
 源文件继续在仓库维护，正文阅读复用项目文档查看器。
+
+### 内网代理和运行身份
 
 `local` 仅接受真实 loopback 连接和 loopback Host；其他模式可接受符合各自认证要求的私网来源，数字 Host 必须与实际监听 IPv4 地址和端口一致。内网 HTTPS 域名使用下述显式代理配置；其他 DNS 别名、公网、伪造 Host 和跨站元数据均拒绝。POST 继续要求精确同源 Origin、CSRF、固定动作、原有确认、状态和资源预检；直接访问不取消这些控制。
 

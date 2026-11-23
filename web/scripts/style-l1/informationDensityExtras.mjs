@@ -1,4 +1,4 @@
-import { openUIDesignMobileTasks } from './devUIDesignNavigation.mjs'
+import { openUIDesignMobileTasks, visibleUIDesignFrame } from './devUIDesignNavigation.mjs'
 import { captureInformationDensityHelp, createInformationDensityScenarios } from './informationDensityScenarios.mjs'
 
 export function createInformationDensityExtras(deps) {
@@ -61,7 +61,7 @@ export function createInformationDensityExtras(deps) {
         page.setDefaultTimeout(15000)
         await page.getByRole('heading', { name: '交互设计', exact: true }).waitFor()
         await page.getByRole('button', { name: /全屏预览/u }).click()
-        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        const frame = page.frameLocator(visibleUIDesignFrame)
         await openUIDesignMobileTasks(frame)
         await page.setViewportSize({ width, height: 844 })
         await frame.locator('[data-action="mobile-open-task"][data-id="M02"]').waitFor()
@@ -71,10 +71,12 @@ export function createInformationDensityExtras(deps) {
         await page.screenshot({ path: path.join(outputDir, `formal-design-detail-mobile-${width}.png`), animations: 'disabled' })
         const information = frame.locator('.rm-section .task-information').first()
         if (await information.count()) {
-          await information.locator('summary').click()
+          const heading = information.locator(':scope > summary')
+          await heading.click()
+          await information.getByText('分类详情', { exact: true }).click()
           assert.match(await information.innerText(), /订单履约/u)
           await page.screenshot({ path: path.join(outputDir, `formal-design-info-expanded-mobile-${width}.png`), animations: 'disabled' })
-          await information.locator('summary').click()
+          await heading.click()
         }
         await frame.locator('[data-action="mobile-open-process"]').click()
         assert.deepEqual(await frame.locator('.rm-choice-list').first().locator('strong').allTextContents(), ['解除阻塞', '催办'])

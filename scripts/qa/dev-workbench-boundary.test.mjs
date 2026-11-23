@@ -391,7 +391,8 @@ const allowedERPImportsByFile = new Map([
   ["web/src/dev-workbench/config/devFulfillmentRelations.mjs", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandling.mjs", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionPresentation.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandlingResponsibilities.test.mjs", new Set(["utils/roleKeys.mjs"])],
-  ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionFlow.mjs", "utils/workflowTaskActionContract.mjs"])],
+  ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/roleKeys.mjs", "utils/workflowTaskActionFlow.mjs", "utils/workflowTaskActionContract.mjs"])],
+  ["web/src/dev-workbench/components/flow-state/TaskHandlingFilters.jsx", new Set(["components/business-list/BusinessFilterPopoverContent.jsx"])],
   ["web/src/dev-workbench/config/devFlowActionRules.mjs", new Set(["utils/workflowTaskActionFlow.mjs"])],
   ["web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
   ["web/src/dev-workbench/config/devRoleResponsibilities.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
@@ -640,9 +641,10 @@ test("finance trace imports only registered reads and presentation metadata", ()
 
 test("task handling projections keep pure classification helpers consumer scoped", () => {
   for (const file of ["web/src/dev-workbench/config/devTaskHandling.mjs", "web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx"]) {
-    assert.equal(isAllowedERPImport(file, "@/erp/utils/taskHandlingPolicy.mjs"), true);
     assert.equal(isAllowedERPImport(file, "@/erp/api/masterDataOrderApi.mjs"), false);
   }
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/config/devTaskHandling.mjs", "@/erp/utils/taskHandlingPolicy.mjs"), true);
+  assert.equal(isAllowedERPImport("web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", "@/erp/utils/taskHandlingPolicy.mjs"), false);
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/taskHandlingPolicy.mjs"), false);
   assert.equal(isAllowedERPImport("web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", "@/erp/utils/workflowTaskActionFlow.mjs"), true);
   assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", "@/erp/utils/workflowTaskActionFlow.mjs"), false);

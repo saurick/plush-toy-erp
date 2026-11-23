@@ -7,6 +7,7 @@ import {
   WorkbenchNotice,
 } from '../WorkbenchPattern.jsx'
 import {
+  CHAIN_CONNECTION_LABELS,
   CHAIN_DESIGN_DOMAINS,
   CHAIN_DESIGN_TYPES,
   buildBusinessChainDesignLibrary,
@@ -19,6 +20,7 @@ import {
   showBusinessChainWhole,
   arrangeBusinessChainMap,
 } from '../../config/devBusinessChainMap.mjs'
+import { CHAIN_READING_LAYERS, businessChainBaseLayer } from '../../config/devBusinessChainReading.mjs'
 import useBusinessChainDraft from './useBusinessChainDraft.mjs'
 import BusinessChainDesignDrafts from './BusinessChainDesignDrafts.jsx'
 import { CHAIN_CANVAS_OPERATIONS, CHAIN_CANVAS_RELATIONS } from '../../config/devBusinessChainExport.mjs'
@@ -27,7 +29,6 @@ import BusinessChainDesignCanvas from './BusinessChainDesignCanvas.jsx'
 import { CHAIN_DISPLAY_OPTIONS, CHAIN_LAYOUT_OPTIONS } from '../../config/devBusinessChainDesignView.mjs'
 import BusinessChainDesignPicker from './BusinessChainDesignPicker.jsx'
 import BusinessChainNodeLibrary from './BusinessChainNodeLibrary.jsx'
-import BusinessChainEmployeeExample from './BusinessChainEmployeeExample.jsx'
 import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
 import { diagramDomainStyle } from '@/common/components/diagram/diagramSemantics.mjs'
 import { applyDevFlowExplorerEntry } from '../../pages/devFlowExplorerNavigation.mjs'
@@ -51,18 +52,14 @@ export default function BusinessChainDesigner({
     library.chainDefinitions.has(restoredPurpose?.chainKey) ? restoredPurpose : null
   )
   const [notice, setNotice] = useState('')
-  const [frameKey, setFrameKey] = useState(0)
   const [libraryVisible, setLibraryVisible] = useState(false)
   const resultTrigger = useRef(null)
-  const [workspace, setWorkspace] = useState('explore')
   const [filters, setFilters] = useState({ view: 'steps', search: '', domain: '', type: '', role: '', chain: '' })
   const [nodeScope, setNodeScope] = useState('current')
   const libraryList = useRef(null)
   const libraryToggle = useRef(null)
   const [history, setHistory] = useState([])
-  const initialCamera = draft.presentation?.viewport || { x: 0, y: 0, scale: 1, mode: 'manual' }
-  const [camera, setCamera] = useState(initialCamera)
-  const [viewRequest, setViewRequest] = useState({ revision: 0, view: draft.presentation?.viewport || null })
+  const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1, mode: 'fit-all' })
   const [legendOpen, setLegendOpen] = useState(false)
   const legendTrigger = useRef(null)
   const legendPanel = useRef(null)
@@ -80,13 +77,8 @@ export default function BusinessChainDesigner({
     }
     if (!entry || issue || appliedEntry.current === entry) return
     appliedEntry.current = entry
-    // Opening a source changes only reading scope; existing coordinates and notes are preserved.
-    change((previous) => {
-      const next = applyDevFlowExplorerEntry(previous, library, entry)
-      const { viewport: _viewport, ...presentation } = next.presentation || {}
-      return { ...next, presentation }
-    })
-    setFrameKey((value) => value + 1)
+    // Opening a source changes only reading scope; existing coordinates are preserved.
+    change((previous) => applyDevFlowExplorerEntry(previous, library, entry))
     onEntryApplied()
   }, [startBlank, entry, issue, change, library, onEntryApplied, draftModel])
   const { mode: viewMode = 'mainline', highlightedRoles = [] } = draft.presentation || {}
@@ -96,11 +88,13 @@ export default function BusinessChainDesigner({
   const setPresentation = draftModel.changePresentation
   const setViewMode = (mode) => setPresentation({ mode })
   const map = businessChainMapState(draft, library)
-  const globalOverview = map.scope === 'whole' && map.chainKey === 'all'
-  const effectiveMode = globalOverview ? 'overview' : viewMode
+  const globalOverview = map.scope === 'whole' && map.chainKey === 'all' && viewMode === 'overview'
+  const legendRelations = globalOverview || map.showHandoffs
+    ? Object.keys(CHAIN_CANVAS_RELATIONS)
+    : ['known', 'exception', 'correction', 'unknown']
   const projected = useMemo(
-    () => projectBusinessChainMap(draft, library, effectiveMode),
-    [draft, library, effectiveMode]
+    () => projectBusinessChainMap(draft, library, viewMode),
+    [draft, library, viewMode]
   )
   const scope = businessChainMapScope(draft, library)
   const present = new Set(scope.nodes.map((node) => node.id))
@@ -113,23 +107,16 @@ export default function BusinessChainDesigner({
   const onUndo = past.length ? restoreEdit(undo) : undefined
   const onRedo = future.length ? restoreEdit(redo) : undefined
   const resetInteraction = () => {
-    setFrameKey((value) => value + 1)
     setConnecting(null)
     setSelection(null)
     setNotice('')
-  }
-  const restoreCamera = (value, fitMode = 'fit-all') => {
-    setCamera(value || { x: 0, y: 0, scale: 1, mode: fitMode })
-    setViewRequest((previous) => ({ revision: previous.revision + 1, view: value || null }))
   }
   const navigateReading = (next, selected = null, kind = 'focus') => {
     setHistory((previous) => [...previous.slice(-15), {
       draft,
       selection,
-      camera,
       filters,
       nodeScope,
-      workspace,
       libraryVisible,
       scrollTop: libraryList.current?.scrollTop || 0,
       kind,
@@ -137,21 +124,16 @@ export default function BusinessChainDesigner({
     change(next)
     setSelection(selected)
     setConnecting(null)
-    setWorkspace('explore')
     setNotice('')
-    restoreCamera(kind === 'chain' && !selected && camera.mode !== 'fit-width' && next.presentation?.layout === 'lanes' && next.map?.chainKey !== 'all'
-      ? { x: 24, y: 24, scale: 1, mode: 'manual' } : null,
-      kind === 'chain' && !selected && camera.mode === 'fit-width' ? 'fit-width' : 'fit-all')
-    setFrameKey((value) => value + 1)
   }
-  const navigateChain = (key, selected = null) => {
-    const mode = key === 'all' ? 'overview' : map.chainKey === 'all' || selected ? 'mainline' : viewMode
+  const navigateChain = (key, mode = key === 'all' ? 'overview' : globalOverview ? 'mainline' : viewMode) => {
     let next = showBusinessChainWhole(draft, library, key)
     if (!next.nodes.some((node) => node.manual && next.map.visibleIds.includes(node.id))) {
       next = arrangeBusinessChainMap(next, library, mode, layout)
     }
-    const { viewport: _viewport, ...readingOptions } = draft.presentation || {}
-    navigateReading({ ...next, presentation: { ...readingOptions, mode, highlightedRoles, layout, layers } }, selected, 'chain')
+    const defaultLayer = key === 'all' ? 'normal' : businessChainBaseLayer(library.chainDefinitions.get(key))
+    const nextLayers = defaultLayer !== 'normal' && layers.length && !layers.includes(defaultLayer) ? [...layers, defaultLayer] : layers
+    navigateReading({ ...next, presentation: { ...draft.presentation, mode, highlightedRoles, layout, layers: nextLayers } }, null, 'chain')
   }
   const returnReading = (preserveGranularity = false) => {
     const previous = history.at(-1)
@@ -162,21 +144,22 @@ export default function BusinessChainDesigner({
     setFilters(previous.filters)
     setNodeScope(previous.nodeScope)
     setLibraryVisible(previous.libraryVisible)
-    setWorkspace(previous.workspace)
     setConnecting(null)
     setNotice('')
-    restoreCamera(previous.camera)
     requestAnimationFrame(() => {
       if (libraryList.current) libraryList.current.scrollTop = previous.scrollTop
     })
   }
   const addNode = (id, position) => {
+    const item = library.byId.get(id)
+    if (present.has(id) && projected.salesAcceptance && library.salesAcceptanceVariants.some(({ key }) => key === item.processNode?.definitionKey)) {
+      setPresentation({ salesAcceptanceVariant: item.processNode.definitionKey })
+    }
     if (!present.has(id)) {
       change((previous) =>
         addBusinessChainMapNode(previous, library, id, position)
       )
       setNotice(`已加入“${library.byId.get(id).label}”，可逐步展开上下游。`)
-      if (!position) setFrameKey((value) => value + 1)
     }
     setSelection(
       connecting && connecting !== id
@@ -198,12 +181,9 @@ export default function BusinessChainDesigner({
     // A collapsed chain card also needs positions for the steps it will reveal.
     const arrangementMode = projected.scopeSummary ? 'all' : viewMode
     const next = arrangeBusinessChainMap(draft, library, arrangementMode, value)
-    const { viewport: _viewport, ...readingOptions } = draft.presentation || {}
-    const nextCamera = value === 'lanes' ? { x: 24, y: 24, scale: 1, mode: 'manual' } : null
-    change({ ...next, presentation: { ...readingOptions, mode: viewMode, highlightedRoles, layout: value, layers, ...(nextCamera ? { viewport: nextCamera } : {}) } })
+    change({ ...next, presentation: { ...draft.presentation, mode: viewMode, highlightedRoles, layout: value, layers } })
     resetInteraction()
-    restoreCamera(nextCamera)
-    setNotice(value === 'lanes' ? '已按领域分行；可平移查看交接，也可适应全图。' : '已调整当前布局，可撤销；业务关系保持不变。')
+    setNotice(value === 'lanes' ? '已按业务领域划分泳道。' : '已按阶段排布。')
   }
   const showLibrary = libraryVisible && !selection?.detailsOnly
   const renderWorkspace = (searchTools, resultsPanel) => (
@@ -215,9 +195,8 @@ export default function BusinessChainDesigner({
       <DevPageHeader
         className="erp-chain-design__header"
         title={<Typography.Title level={1}>{DEV_PAGE_TITLE_BY_ROUTE[DEV_FLOW_EXPLORER_ROUTE]}</Typography.Title>}
-        navigation={workspace === 'example' ? <Button onClick={() => setWorkspace('explore')}>返回规则探索</Button> : null}
         tools={
-          <div className="erp-chain-design__file-actions" hidden={workspace !== 'explore'}>
+          <div className="erp-chain-design__file-actions">
             {returnToSource}
             <Button
               ref={libraryToggle}
@@ -236,19 +215,12 @@ export default function BusinessChainDesigner({
                 if (!error) {
                   resetInteraction()
                   setHistory([])
-                  restoreCamera(null)
                 }
                 return error
               }}
-              onExample={() => setWorkspace('example')}
               onUndo={onUndo}
               onRedo={onRedo}
-              notesCount={draft.ideas.length}
-              onNotes={() => {
-                setConnecting(null)
-                setSelection({ ideas: true })
-              }}
-              exportDisabled={!scope.nodes.length || workspace !== 'explore'}
+              exportDisabled={!scope.nodes.length}
               onNotice={setNotice}
               getGraph={() => {
                 const chain = library.chains.find(({ value }) => value === map.chainKey)?.label || '业务全流程地图'
@@ -259,10 +231,11 @@ export default function BusinessChainDesigner({
                   context: [
                     `${map.scope === 'whole' ? '整体' : '局部'} · ${chain}`,
                     map.focusId ? library.byId.get(map.focusId)?.label : '',
-                    CHAIN_DISPLAY_OPTIONS[effectiveMode].label,
-                    effectiveMode === 'overview' ? '' : CHAIN_LAYOUT_OPTIONS[layout].label,
+                    CHAIN_DISPLAY_OPTIONS[viewMode].label,
+                    viewMode === 'overview' ? '' : CHAIN_LAYOUT_OPTIONS[layout].label,
+                    projected.salesAcceptance ? library.salesAcceptanceVariants.find(({ key }) => key === draft.presentation?.salesAcceptanceVariant)?.label || '合并共同步骤' : '',
                     selectedRoles.length ? `高亮岗位：${selectedRoles.map(({ label }) => label).join('、')}` : '',
-                    draft.presentation?.showBranches ? '分支已展开' : '',
+                    layers.map((key) => CHAIN_READING_LAYERS.find((layer) => layer.value === key)?.label).join('、'),
                   ].filter(Boolean).join(' · '),
                 }
               }}
@@ -270,23 +243,23 @@ export default function BusinessChainDesigner({
           </div>
         }
       >
-        <div className="erp-chain-design__query-slot" hidden={workspace !== 'explore'}>{searchTools}</div>
+        <div className="erp-chain-design__query-slot">{searchTools}</div>
       </DevPageHeader>
       {issue ? <WorkbenchNotice tone="error" title={issue} action={!draftModel.restoreFailed ? <Button onClick={draftModel.retryPersistence}>重试自动保留</Button> : null} /> : null}
-      <div className="erp-chain-design__workspace" data-library-visible={showLibrary} hidden={workspace !== 'explore'}>
+      <div className="erp-chain-design__workspace" data-library-visible={showLibrary}>
         <BusinessChainDesignCanvas
+          libraryVisible={showLibrary}
           scopeField={scopeField}
           setLayout={setLayout}
-          returnAction={history.length > 0 ? <Button type="text" onClick={returnReading}>{history.at(-1).workspace === 'example' ? '返回员工示例' : '返回来处'}</Button> : null}
+          returnAction={history.length > 0 ? <Button type="text" onClick={returnReading}>返回来处</Button> : null}
           resultTrigger={resultTrigger}
-          frameKey={frameKey}
           fullscreen={fullscreen}
           toggleFullscreen={toggleFullscreen}
           fullscreenButtonRef={buttonRef}
           map={map}
           projected={projected}
           globalOverview={globalOverview}
-          effectiveMode={effectiveMode}
+          viewMode={viewMode}
           setViewMode={setViewMode}
           catalog={catalog}
           library={library}
@@ -304,23 +277,18 @@ export default function BusinessChainDesigner({
           setNotice={setNotice}
           view={camera}
           setView={setCamera}
-          viewRequest={viewRequest}
           onNavigate={navigateReading}
           onNavigateChain={navigateChain}
           onOpenVerification={onOpenVerification}
-          onReturn={history.at(-1)?.kind === 'focus' ? () => returnReading(true) : null}
+          onReturn={() => history.at(-1)?.kind === 'focus' ? returnReading(true) : navigateChain(map.chainKey, viewMode)}
           layers={layers}
           layout={layout}
           setReadingOptions={setPresentation}
-          onCameraCommit={(viewport) => setPresentation({ viewport })}
         />
         {resultsPanel}
       </div>
-      <div hidden={workspace !== 'example'}>
-        <BusinessChainEmployeeExample library={library} onLocate={(value) => navigateChain(value.chainKey, { nodeId: value.nodeId, preview: value.preview })} />
-      </div>
-      <footer className="erp-chain-design__footer" hidden={workspace !== 'explore'}>
-        <span>当前范围已载入：{scope.nodes.length} 个节点 · {scope.edges.length} 条关系</span>
+      <footer className="erp-chain-design__footer">
+        <span>{projected.wholeDetail || projected.salesAcceptance ? '已载入的原始流程' : '当前范围已载入'}：{scope.nodes.length} 个节点 · {scope.edges.length} 条关系</span>
         <Popover
           trigger="click"
           open={legendOpen}
@@ -376,10 +344,14 @@ export default function BusinessChainDesigner({
                     {label}
                   </span>
                 ))}
+                <span className="erp-chain-design__legend-item" data-exception-node>
+                  <i className="erp-chain-design__legend-node" aria-hidden="true" />
+                  异常分支节点
+                </span>
               </div>
               <div>
                 <strong>业务关系</strong>
-                {['known', 'exception', 'unknown'].map((kind) => (
+                {legendRelations.map((kind) => (
                   <span className="erp-chain-design__legend-item" key={kind} data-legend-edge={kind}>
                     <svg
                       className="erp-chain-design__legend-line"
@@ -417,22 +389,10 @@ export default function BusinessChainDesigner({
               <div>
                 <strong>拖线提示</strong>
                 {[
-                  [
-                    'known',
-                    '有接入规则',
-                    '已登记这两个节点的衔接关系；实际办理仍需满足相应条件。',
-                  ],
-                  [
-                    'blocked',
-                    '不能直连',
-                    '现有规则限制直接连接，可能需要经过其他步骤；具体原因见连线说明。',
-                  ],
-                  [
-                    'unknown',
-                    '待核对',
-                    '当前目录尚未登记明确的衔接关系，需要进一步核对。',
-                  ],
-                ].map(([status, label, description]) => (
+                  ['known', '实际办理仍需满足对应条件。'],
+                  ['blocked', '查看连线说明，了解具体原因。'],
+                  ['unknown', '尚未登记这两个节点的衔接规则，可先保留一条无方向的参考线。'],
+                ].map(([status, description]) => (
                   <span
                     className="erp-chain-design__legend-item"
                     key={status}
@@ -442,7 +402,7 @@ export default function BusinessChainDesigner({
                       className="erp-chain-design__legend-node"
                       aria-hidden="true"
                     />
-                    <span><strong>{label}</strong><small>{description}</small></span>
+                    <span><strong>{CHAIN_CONNECTION_LABELS[status]}</strong><small>{description}</small></span>
                   </span>
                 ))}
               </div>
@@ -475,6 +435,11 @@ export default function BusinessChainDesigner({
         selectedNodeId={selection?.nodeId}
         connecting={connecting}
         onAdd={addNode}
+        onOpenChain={(key) => {
+          navigateChain(key)
+          setLibraryVisible(false)
+          setFilters((previous) => ({ ...previous, search: '' }))
+        }}
         onInspect={(nodeId, element) => { resultTrigger.current = element; setConnecting(null); setSelection({ nodeId, detailsOnly: true }) }}
         onToggle={() => {
           setLibraryVisible(false)

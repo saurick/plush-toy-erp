@@ -155,12 +155,13 @@ export default function BusinessFormPage({
   const [, setFormChange] = useState(null)
   const initializedRef = useRef(false)
   const editableSeen = useRef(false)
-  if (open && !readOnly && !loading) editableSeen.current = true
   const baselineIdentity = useRef(baselineKey)
   if (baselineIdentity.current !== baselineKey) {
     baselineIdentity.current = baselineKey
     initializedRef.current = false
+    editableSeen.current = false
   }
+  if (open && stepVisible && !readOnly && !loading) editableSeen.current = true
   const initializing = Boolean(open && form && !readOnly && (!initializedRef.current || baseline === null))
   const focusedRef = useRef(false)
   const [pendingAttachments, setPendingAttachments] = useState(0)
@@ -277,7 +278,8 @@ export default function BusinessFormPage({
       setBaseline(null)
       return
     }
-    if (loading || initializedRef.current) return undefined
+    // Task context can preload an editor while its fields are still being initialized.
+    if (!stepVisible || loading || initializedRef.current) return undefined
     // Form.List registers its defaults after resetFields; capture the initialized form.
     const frame = window.requestAnimationFrame(() => {
       initializedRef.current = true
@@ -290,7 +292,7 @@ export default function BusinessFormPage({
       setFormChange({ baselineRevision: baselineRef.current.revision })
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [form, loading, open, baselineKey])
+  }, [form, loading, open, baselineKey, stepVisible])
 
   const afterOpenChangeRef = useRef(afterOpenChange)
   afterOpenChangeRef.current = afterOpenChange

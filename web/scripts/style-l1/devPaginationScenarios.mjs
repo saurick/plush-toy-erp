@@ -12,7 +12,7 @@ export function createDevPaginationScenarios({ assert, assertNoHorizontalOverflo
       page.on('request', (request) => {
         if (new URL(request.url()).pathname.startsWith('/rpc/')) businessRequests.push(request.url())
       })
-      await page.getByRole('link', { name: '操作列表与分页示例', exact: true }).click()
+      await page.getByRole('link', { name: '操作分页示例', exact: true }).click()
       await page.waitForURL((url) => url.searchParams.get('control') === 'pagination')
       const stage = page.locator('.erp-control-library-stage')
       const pager = stage.locator('.app-pagination')

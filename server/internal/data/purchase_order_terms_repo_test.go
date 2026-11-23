@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/sourceorderlifecycleevent"
+	"server/internal/data/model/ent/workflowtask"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -58,6 +59,10 @@ func TestPurchaseOrderTermsCompletesBeforeAndAfterReceiptWithoutRewritingSnapsho
 			}
 			if stage == "posted_receipt" {
 				postReceipt()
+				assertFulfillmentTask(t, ctx, client, "purchase_price", po.ID, "ready", biz.PurchaseRoleKey)
+				if client.WorkflowTask.Query().Where(workflowtask.TaskCode(biz.WorkflowSourceTaskCode("handoff_receipt_payable", receiptID))).ExistX(ctx) {
+					t.Fatal("missing price must not dispatch finance")
+				}
 			}
 			uc := biz.NewPurchaseOrderUsecase(NewPurchaseOrderRepo(data, log.NewStdLogger(io.Discard)))
 			price := decimal.RequireFromString("2.5")
@@ -87,6 +92,10 @@ func TestPurchaseOrderTermsCompletesBeforeAndAfterReceiptWithoutRewritingSnapsho
 			if stage != "posted_receipt" {
 				postReceipt()
 			}
+			if stage == "posted_receipt" {
+				assertFulfillmentTask(t, ctx, client, "purchase_price", po.ID, "done", biz.PurchaseRoleKey)
+			}
+			assertFulfillmentTask(t, ctx, client, "receipt_payable", receiptID, "ready", biz.FinanceRoleKey)
 			facts := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 			payable, err := facts.CreatePayableFromPurchaseReceipt(ctx, &biz.FinanceFactFromPurchaseReceiptCreate{FactNo: "AP-TERMS", PurchaseReceiptID: receiptID, IdempotencyKey: "terms-payable"})
 			if err != nil {

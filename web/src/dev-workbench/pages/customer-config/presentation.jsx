@@ -238,13 +238,12 @@ export function CustomerPackageSelector({
 
   return (
     <div className="erp-dev-customer-selector">
-      <Text strong>当前客户包</Text>
       {matched && options.length === 1 ? (
         <Text strong>{options[0].label}</Text>
       ) : (
         <Select
           allowClear={false /* 不可清空：配置检查与保存必须绑定一个已登记客户包，不能写入无归属配置。 */}
-          label="客户包选择"
+          label="客户包"
           aria-label="客户包选择"
           value={matched ? overview.customerKey : undefined}
           placeholder="选择已登记客户包"

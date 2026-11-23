@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   BookOutlined,
   CopyOutlined,
@@ -18,11 +18,11 @@ import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
+import BusinessFormSectionTitle from '@/erp/components/business-list/BusinessFormSectionTitle.jsx'
 import { message } from '@/common/utils/antdApp'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import DevDocsLayout from '../components/DevDocsLayout.jsx'
-import DevDirectoryHeader from '../components/DevDirectoryHeader.jsx'
-import { DevDirectoryBranch, DevDirectoryItem } from '../components/DevDirectoryTree.jsx'
+import Directory, { DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
@@ -37,11 +37,11 @@ import {
   DEV_DOCS_SEARCH_SCOPE_TITLE,
   DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
   applyDevDocsPinnedState,
+  applyDevDocsSourceState,
   buildDevDocsItems,
   buildDevDocsTree,
   filterDevDocsByLifecycle,
   filterDevDocsItems,
-  getDevDocsTitle,
   getDevDocsDisplayTitle,
   getDefaultDevDocsPinnedPaths,
   normalizeDevDocsLifecycle,
@@ -59,8 +59,8 @@ import {
 } from './devDocsNavigation.mjs'
 
 const { Text, Title } = Typography
+const DOCS_SECTION_SELECTOR = 'details.erp-dev-docs-section'
 
-const DEFAULT_EXPANDED_DIR_KEYS = Object.freeze([])
 const SEARCH_SCOPE_OPTIONS = Object.freeze([
   { label: '全部', value: DEV_DOCS_SEARCH_SCOPE_ALL },
   { label: '仅标题', value: DEV_DOCS_SEARCH_SCOPE_TITLE },
@@ -117,7 +117,7 @@ const archiveMarkdownModules = import.meta.glob(
   }
 )
 
-const markdownModules = Object.freeze({
+const docs = buildDevDocsItems({
   ...currentMarkdownModules,
   ...archiveMarkdownModules,
 })
@@ -167,23 +167,30 @@ function readLifecycle(docs = [], search = '') {
   }
 }
 
-function scrollMarkdownContainerToHeading(container, headingId) {
-  if (!container || !headingId) {
-    return false
-  }
+function getHeadingScrollTop(container, headingTop) {
+  return Math.max(0, Math.min(headingTop - 8, container.scrollHeight - container.clientHeight))
+}
 
-  const target = findDevDocsMarkdownAnchor(container, headingId)
-  if (!target) {
-    return false
-  }
+function getMarkdownHeadingTop(heading) {
+  const summary = heading.closest(`${DOCS_SECTION_SELECTOR} > summary`)
+  return (summary ?? heading).getBoundingClientRect().top
+}
 
-  const containerRect = container.getBoundingClientRect()
-  const targetRect = target.getBoundingClientRect()
-  container.scrollTo({
-    top: container.scrollTop + targetRect.top - containerRect.top - 8,
-    behavior: 'smooth',
-  })
-  return true
+function scrollMarkdownContainerToHeading(container, headingId, { reveal = false } = {}) {
+  const anchor = headingId ? findDevDocsMarkdownAnchor(container, headingId) : null
+  if (headingId && !anchor) return null
+
+  const target = anchor?.closest('[data-markdown-anchor="heading"]') ?? anchor
+  const section = reveal && target?.closest(DOCS_SECTION_SELECTOR)
+  if (section) section.open = true
+  const scrollTop = target
+    ? getHeadingScrollTop(
+      container,
+      container.scrollTop + getMarkdownHeadingTop(target) - container.getBoundingClientRect().top
+    )
+    : 0
+  container.scrollTo({ top: scrollTop, behavior: 'instant' })
+  return { id: target?.id, scrollTop }
 }
 
 function collectDirectoryKeys(nodes = []) {
@@ -245,10 +252,7 @@ function readSelectedKey(docs = [], search = '') {
 }
 
 function readExpandedKeys(availableKeys = []) {
-  const defaultKeys = normalizeDevDocsExpandedDirKeys(
-    DEFAULT_EXPANDED_DIR_KEYS,
-    availableKeys
-  )
+  const defaultKeys = availableKeys
   if (typeof window === 'undefined') {
     return defaultKeys
   }
@@ -261,10 +265,9 @@ function readExpandedKeys(availableKeys = []) {
       return defaultKeys
     }
     const parsedValue = JSON.parse(rawValue)
-    return normalizeDevDocsExpandedDirKeys(
-      Array.isArray(parsedValue) ? parsedValue : [],
-      availableKeys
-    )
+    return Array.isArray(parsedValue)
+      ? normalizeDevDocsExpandedDirKeys(parsedValue, availableKeys)
+      : defaultKeys
   } catch {
     return defaultKeys
   }
@@ -282,7 +285,7 @@ function DevDocsTreeNode({
     const expanded = expandedKeys.has(node.key)
     return (
       <div className="erp-dev-docs-tree__node">
-        <DevDirectoryItem
+        <DirectoryItem
           data-dev-doc-dir={node.path}
           title={node.path}
           className="erp-dev-docs-tree__row"
@@ -292,9 +295,9 @@ function DevDocsTreeNode({
           {expanded ? <FolderOpenOutlined /> : <FolderOutlined />}
           <span className="erp-dev-docs-tree__name">{node.label}</span>
           <span className="erp-dev-docs-tree__count">{node.docCount}</span>
-        </DevDirectoryItem>
+        </DirectoryItem>
         {expanded ? (
-          <DevDirectoryBranch>
+          <DirectoryBranch>
             {node.children.map((child) => (
               <DevDocsTreeNode
                 key={child.key}
@@ -306,7 +309,7 @@ function DevDocsTreeNode({
                 onSelectDoc={onSelectDoc}
               />
             ))}
-          </DevDirectoryBranch>
+          </DirectoryBranch>
         ) : null}
       </div>
     )
@@ -323,9 +326,8 @@ function DevDocsTreeNode({
           : 'erp-dev-docs-tree__doc-shell'
       }
     >
-      <DevDirectoryItem
+      <DirectoryItem
         className="erp-dev-docs-tree__row erp-dev-docs-tree__doc"
-        reserveDisclosure
         title={`${node.item.title}\n${node.item.path}`}
         aria-current={active ? 'true' : undefined}
         onClick={() => onSelectDoc(node.item.key)}
@@ -336,7 +338,7 @@ function DevDocsTreeNode({
             {getDevDocsDisplayTitle(node.item.title)}
           </span>
         </span>
-      </DevDirectoryItem>
+      </DirectoryItem>
       <Tooltip title={pinned ? '取消置顶' : '置顶文档'}>
         <button
           type="button"
@@ -384,7 +386,7 @@ function DevDocsChapterNavigation({ chapters, activeLocation, onOpenHeading }) {
   }, [chapters, currentItemId, sectionsExpanded])
 
   const renderTocHeading = (heading) => (
-    <DevDirectoryItem
+    <DirectoryItem
       className="erp-dev-docs-toc__item"
       data-dev-doc-heading-id={heading.id}
       aria-current={heading.id === currentItemId ? 'location' : undefined}
@@ -392,59 +394,47 @@ function DevDocsChapterNavigation({ chapters, activeLocation, onOpenHeading }) {
       onClick={() => onOpenHeading(heading.id)}
     >
       <span>{getDevDocsDisplayTitle(heading.title)}</span>
-    </DevDirectoryItem>
+    </DirectoryItem>
   )
 
   if (chapters.length === 0) return null
 
   return (
-    <nav className="erp-dev-docs-toc-shell" aria-label="文档章节">
-      <DevDirectoryHeader
-        className="erp-dev-docs-sidebar__section-head erp-dev-docs-toc__header"
-        allExpanded={sectionsExpanded}
-        onToggleAll={hasSections ? () => setSectionsExpanded((expanded) => !expanded) : undefined}
-      >
-        <Text strong>章节目录</Text>
-      </DevDirectoryHeader>
-      <ul className="erp-dev-directory-list erp-dev-docs-toc" ref={tocRef}>
+    <Directory
+      className="erp-dev-docs-toc-shell"
+      aria-label="文档章节"
+      headerClassName="erp-dev-docs-sidebar__section-head erp-dev-docs-toc__header"
+      title={<Text strong>章节目录</Text>}
+      allExpanded={sectionsExpanded}
+      onToggleAll={hasSections ? () => setSectionsExpanded((expanded) => !expanded) : undefined}
+    >
+      <ul className="erp-directory-list erp-dev-docs-toc" ref={tocRef}>
         {chapters.map(({ heading, sections }) => (
           <li key={heading.id}>
             {renderTocHeading(heading)}
             {sections.length > 0 ? (
-              <DevDirectoryBranch as="ul" hidden={!sectionsExpanded}>
+              <DirectoryBranch as="ul" hidden={!sectionsExpanded}>
                 {sections.map((section) => (
                   <li key={section.id}>{renderTocHeading(section)}</li>
                 ))}
-              </DevDirectoryBranch>
+              </DirectoryBranch>
             ) : null}
           </li>
         ))}
       </ul>
-    </nav>
+    </Directory>
   )
 }
 
 export default function DevDocsPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const docs = useMemo(() => buildDevDocsItems(markdownModules), [])
   const [sourceLoadState, setSourceLoadState] = useState({})
   const [sourceReloadToken, setSourceReloadToken] = useState(0)
-  const sourceLoadRequestedRef = useRef(new Set())
+  const sourceLoadRequestedRef = useRef(new Map())
   const docsWithSources = useMemo(
-    () =>
-      docs.map((item) => {
-        const loaded = sourceLoadState[item.path]
-        if (loaded?.status !== 'ready') {
-          return item
-        }
-        return {
-          ...item,
-          source: loaded.source,
-          title: getDevDocsTitle(loaded.source, item.path),
-        }
-      }),
-    [docs, sourceLoadState]
+    () => applyDevDocsSourceState(docs, sourceLoadState),
+    [sourceLoadState]
   )
   const [pinnedPaths, setPinnedPaths] = useState(() => readPinnedPaths(docs))
   const docsWithPinnedState = useMemo(
@@ -488,25 +478,17 @@ export default function DevDocsPage() {
     () => new Set(readExpandedKeys(allDirectoryKeys))
   )
   const markdownRef = useRef(null)
+  const headingLandingRef = useRef(null)
   const [readingHeading, setReadingHeading] = useState(null)
   const treeRef = useRef(null)
   const pendingTreeRevealRef = useRef('')
 
-  const docsWithSearchText = useMemo(
-    () =>
-      lifecycleDocs.map((item) => ({
-        ...item,
-        searchText: item.source,
-      })),
-    [lifecycleDocs]
-  )
-
   const visibleDocs = useMemo(
     () =>
       sortDevDocsItemsByPinned(
-        filterDevDocsItems(docsWithSearchText, keyword, searchScope)
+        filterDevDocsItems(lifecycleDocs, keyword, searchScope)
       ),
-    [docsWithSearchText, keyword, searchScope]
+    [lifecycleDocs, keyword, searchScope]
   )
   const pinnedDocs = useMemo(
     () => sortDevDocsItemsByPinned(lifecycleDocs.filter((item) => item.pinned)),
@@ -514,7 +496,10 @@ export default function DevDocsPage() {
   )
   const trimmedKeyword = keyword.trim()
   const isSearching = trimmedKeyword.length > 0
-  const fullTextSearchPending = isSearching && searchScope === DEV_DOCS_SEARCH_SCOPE_ALL && lifecycleDocs.some((item) => item.loadSource && !item.source && sourceLoadState[item.path]?.status !== 'error')
+  const fullTextSearchPending =
+    isSearching &&
+    searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
+    lifecycleDocs.some((item) => item.loadSource && !item.source && item.sourceLoad?.status !== 'error')
   const isTitleOnlySearch = searchScope === DEV_DOCS_SEARCH_SCOPE_TITLE
   const allExpanded =
     allDirectoryKeys.length > 0 &&
@@ -526,9 +511,7 @@ export default function DevDocsPage() {
     ) || (isSearching ? undefined : visibleDocs[0] || lifecycleDocs[0])
   const { path: selectedDocPath, source: selectedDocSource } = selectedDoc || {}
   const selectedDocPinned = Boolean(selectedDoc?.pinned)
-  const selectedSourceLoadState = selectedDocPath
-    ? sourceLoadState[selectedDocPath]
-    : undefined
+  const selectedSourceLoadState = selectedDoc?.sourceLoad
   const headings = useMemo(
     () => extractMarkdownHeadings(selectedDocSource || '', [1, 2, 3, 4, 5, 6]),
     [selectedDocSource]
@@ -541,12 +524,74 @@ export default function DevDocsPage() {
     () => buildDevDocsChapterOutline(headings, titleHeadingId),
     [headings, titleHeadingId]
   )
+  const firstHeadingId = headings[0]?.id || ''
+  const requestedHeadingId = readHeadingIdFromHash(location.hash)
   const activeHeadingId =
     readingHeading?.path === selectedDocPath &&
     headings.some((heading) => heading.id === readingHeading.id)
       ? readingHeading.id
-      : readHeadingIdFromHash(location.hash) || headings[0]?.id || ''
+      : requestedHeadingId || firstHeadingId
   const activeLocation = locationByHeadingId.get(activeHeadingId)
+  const activeChapterId = activeLocation?.chapterId
+  const renderChapterHeading = useCallback((heading, { collapsed }) => {
+    const { id } = heading.props
+    if (collapsed || locationByHeadingId.get(id)?.chapterId !== id) return heading
+    return (
+      <BusinessFormSectionTitle
+        as={heading.type}
+        {...heading.props}
+        data-current-section-title={id === activeChapterId ? 'true' : undefined}
+      />
+    )
+  }, [activeChapterId, locationByHeadingId])
+
+  const renderCollapsedSection = useCallback((heading, content) => (
+    <details
+      key={heading.props.id}
+      className="erp-dev-disclosure erp-dev-docs-section"
+      data-current-section-title={heading.props.id === activeChapterId ? 'true' : undefined}
+    >
+      <summary onClick={() => { headingLandingRef.current = null }}>{heading}</summary>
+      <div className="erp-dev-docs-section__content">{content}</div>
+    </details>
+  ), [activeChapterId])
+
+  const markReadingHeading = useCallback((id) => {
+    setReadingHeading((current) =>
+      current?.path === selectedDocPath && current.id === id
+        ? current
+        : { path: selectedDocPath, id }
+    )
+  }, [selectedDocPath])
+
+  const jumpToHeading = useCallback((headingId) => {
+    const container = markdownRef.current
+    if (!container) return
+
+    const landing = scrollMarkdownContainerToHeading(container, headingId, { reveal: true })
+    if (!landing) return
+
+    headingLandingRef.current = landing
+    markReadingHeading(landing.id ?? firstHeadingId)
+  }, [firstHeadingId, markReadingHeading])
+
+  const openHeading = useCallback((headingId) => {
+    if (!selectedDocPath) return
+    jumpToHeading(headingId)
+    if (requestedHeadingId === headingId) return
+
+    navigate(buildDevDocsLocation({
+      pathname: location.pathname,
+      search: location.search,
+      path: selectedDocPath,
+      headingId,
+    }))
+  }, [jumpToHeading, location.pathname, location.search, navigate, requestedHeadingId, selectedDocPath])
+
+  useLayoutEffect(() => {
+    headingLandingRef.current = null
+    jumpToHeading(requestedHeadingId)
+  }, [jumpToHeading, requestedHeadingId, selectedDocSource])
 
   useEffect(() => {
     const container = markdownRef.current
@@ -557,41 +602,72 @@ export default function DevDocsPage() {
     let frame
     const update = () => {
       const { top } = container.getBoundingClientRect()
+      const { scrollTop } = container
+      const positions = anchors
+        .filter((anchor) => {
+          const closedSection = anchor.closest(`${DOCS_SECTION_SELECTOR}:not([open])`)
+          return !closedSection || closedSection.firstElementChild.contains(anchor)
+        })
+        .map((anchor) => ({
+          id: anchor.id,
+          top: getMarkdownHeadingTop(anchor) - top + scrollTop,
+        }))
+      const landing = headingLandingRef.current
+      const target = landing?.id && positions.find((position) => position.id === landing.id)
+      // Delayed content can move the heading or make more of the document scrollable.
+      if (target && Math.abs(getHeadingScrollTop(container, target.top) - landing.scrollTop) > 1) {
+        headingLandingRef.current = scrollMarkdownContainerToHeading(container, landing.id)
+        markReadingHeading(landing.id)
+        return
+      }
+      if (landing && Math.abs(landing.scrollTop - scrollTop) > 1) {
+        headingLandingRef.current = null
+      }
       const { paddingBlockStart, fontSize } = window.getComputedStyle(container)
       const readingInset = Number.parseFloat(paddingBlockStart) + Number.parseFloat(fontSize)
       const id = resolveDevDocsReadingHeading(
-        anchors.map((anchor) => ({
-          id: anchor.id,
-          top: anchor.getBoundingClientRect().top - top + container.scrollTop,
-        })),
+        positions,
         {
-          scrollTop: container.scrollTop,
+          scrollTop,
           clientHeight: container.clientHeight,
           scrollHeight: container.scrollHeight,
           readingInset,
-        }
+        },
+        headingLandingRef.current?.id
       )
       // 阅读位置只更新章节提示，不改写 URL 或增加历史记录。
-      setReadingHeading((current) =>
-        current?.path === selectedDocPath && current.id === id
-          ? current
-          : { path: selectedDocPath, id }
-      )
+      markReadingHeading(id)
     }
     const schedule = () => {
       window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(update)
     }
+    const releaseLanding = () => {
+      headingLandingRef.current = null
+    }
+    const releaseOnScrollKey = ({ key }) => {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(key)) {
+        releaseLanding()
+      }
+    }
     container.addEventListener('scroll', schedule, { passive: true })
+    container.addEventListener('wheel', releaseLanding, { passive: true })
+    container.addEventListener('pointerdown', releaseLanding, { passive: true })
+    container.addEventListener('keydown', releaseOnScrollKey)
     const observer = new ResizeObserver(schedule)
     observer.observe(container)
+    const documentContent = container.firstElementChild
+    if (documentContent) observer.observe(documentContent)
     schedule()
     return () => {
       window.cancelAnimationFrame(frame)
       container.removeEventListener('scroll', schedule)
+      container.removeEventListener('wheel', releaseLanding)
+      container.removeEventListener('pointerdown', releaseLanding)
+      container.removeEventListener('keydown', releaseOnScrollKey)
       observer.disconnect()
     }
-  }, [headings, selectedDocPath, selectedDocSource])
+  }, [headings, markReadingHeading, selectedDocSource])
 
   useEffect(() => {
     pendingTreeRevealRef.current = selectedDocPath || ''
@@ -625,7 +701,7 @@ export default function DevDocsPage() {
     } catch {
       // 本地偏好写入失败时不影响 dev docs 主路径浏览。
     }
-  }, [docs, pinnedPaths])
+  }, [pinnedPaths])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -647,23 +723,23 @@ export default function DevDocsPage() {
     const pendingDocs = searchAllSources
       ? lifecycleDocs
       : [selectedDoc].filter(Boolean)
+    const requested = sourceLoadRequestedRef.current
     for (const item of pendingDocs) {
-      if (
-        !item.loadSource ||
-        item.source ||
-        sourceLoadRequestedRef.current.has(item.path)
-      ) {
+      const { path, loadSource } = item
+      if (!loadSource || item.source || requested.get(path)?.loadSource === loadSource) {
         continue
       }
-      const { path } = item
-      sourceLoadRequestedRef.current.add(path)
-      setSourceLoadState((current) => ({
-        ...current,
-        [path]: { status: 'loading' },
-      }))
+      // HMR replaces the loader for the changed Markdown file.
+      const request = { loadSource }
+      requested.set(path, request)
+      const updateSourceLoad = (value) => {
+        if (requested.get(path) !== request) return
+        setSourceLoadState((current) => ({ ...current, [path]: { ...value, loadSource } }))
+      }
+      updateSourceLoad({ status: 'loading' })
 
       Promise.resolve()
-        .then(() => item.loadSource())
+        .then(() => loadSource())
         .then((value) => {
           const source =
             typeof value === 'string'
@@ -674,19 +750,10 @@ export default function DevDocsPage() {
           if (!source) {
             throw new Error('文档内容为空')
           }
-          setSourceLoadState((current) => ({
-            ...current,
-            [path]: { status: 'ready', source },
-          }))
+          updateSourceLoad({ status: 'ready', source })
         })
         .catch(() => {
-          setSourceLoadState((current) => ({
-            ...current,
-            [path]: {
-              status: 'error',
-              message: '文档正文加载失败，请重试',
-            },
-          }))
+          updateSourceLoad({ status: 'error', message: '文档正文加载失败，请重试' })
         })
     }
   }, [selectedDoc, lifecycleDocs, keyword, searchScope, sourceReloadToken])
@@ -703,7 +770,7 @@ export default function DevDocsPage() {
     } catch {
       // 当前文档偏好写入失败时不影响 dev docs 主路径浏览。
     }
-  }, [docs, selectedDoc?.path])
+  }, [selectedDoc?.path])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -741,19 +808,6 @@ export default function DevDocsPage() {
   ])
 
   useEffect(() => {
-    const headingId = readHeadingIdFromHash(location.hash)
-    if (headingId) {
-      const timeoutId = window.setTimeout(
-        () => scrollMarkdownContainerToHeading(markdownRef.current, headingId),
-        120
-      )
-      return () => window.clearTimeout(timeoutId)
-    }
-    markdownRef.current?.scrollTo({ top: 0 })
-    return undefined
-  }, [location.hash, selectedDoc?.key, selectedDoc?.source])
-
-  useEffect(() => {
     const container = markdownRef.current
     if (!container || !selectedDoc?.path) {
       return undefined
@@ -779,17 +833,8 @@ export default function DevDocsPage() {
         message.warning(`当前查看器未加载文档：${target.path}`)
         return
       }
-      const currentPath = normalizeDevDocsSelectedPath(
-        readSelectedPathFromSearch(location.search),
-        docs
-      )
-      const currentHeadingId = readHeadingIdFromHash(location.hash)
-      if (targetPath === currentPath && target.headingId === currentHeadingId) {
-        if (target.headingId) {
-          scrollMarkdownContainerToHeading(container, target.headingId)
-        } else {
-          container.scrollTo({ top: 0, behavior: 'smooth' })
-        }
+      if (targetPath === selectedDoc.path) {
+        openHeading(target.headingId)
         return
       }
 
@@ -806,11 +851,10 @@ export default function DevDocsPage() {
     container.addEventListener('click', handleMarkdownLinkClick)
     return () => container.removeEventListener('click', handleMarkdownLinkClick)
   }, [
-    docs,
-    location.hash,
     location.pathname,
     location.search,
     navigate,
+    openHeading,
     selectedDoc?.path,
     selectedDoc?.source,
   ])
@@ -842,18 +886,7 @@ export default function DevDocsPage() {
   }
 
   const toggleAllDirectories = () => {
-    setExpandedKeys(
-      allExpanded
-        ? new Set(
-            normalizeDevDocsExpandedDirKeys(
-              DEFAULT_EXPANDED_DIR_KEYS,
-              allDirectoryKeys
-            )
-          )
-        : new Set(
-            normalizeDevDocsExpandedDirKeys(allDirectoryKeys, allDirectoryKeys)
-          )
-    )
+    setExpandedKeys(new Set(allExpanded ? [] : allDirectoryKeys))
   }
 
   const toggleDocPin = (doc) => {
@@ -919,42 +952,6 @@ export default function DevDocsPage() {
       return next
     })
     setSourceReloadToken((current) => current + 1)
-  }
-
-  const scrollReaderToTop = () => {
-    if (!selectedDoc?.path) {
-      return
-    }
-    if (!location.hash) {
-      markdownRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-      return
-    }
-    navigate(
-      buildDevDocsLocation({
-        pathname: location.pathname,
-        search: location.search,
-        path: selectedDoc.path,
-      })
-    )
-  }
-
-  const scrollToHeading = (headingId) => {
-    if (!selectedDoc?.path || !headingId) {
-      return
-    }
-    const currentHeadingId = readHeadingIdFromHash(location.hash)
-    if (currentHeadingId === headingId) {
-      scrollMarkdownContainerToHeading(markdownRef.current, headingId)
-      return
-    }
-    navigate(
-      buildDevDocsLocation({
-        pathname: location.pathname,
-        search: location.search,
-        path: selectedDoc.path,
-        headingId,
-      })
-    )
   }
 
   return (
@@ -1049,7 +1046,7 @@ export default function DevDocsPage() {
                   >
                     <button
                       type="button"
-                      className="erp-dev-directory-item erp-dev-docs-pinned__open"
+                      className="erp-directory-item erp-dev-docs-pinned__open"
                       title={`${item.title}\n${item.path}`}
                       aria-current={
                         item.key === selectedDoc?.key ? 'true' : undefined
@@ -1082,20 +1079,13 @@ export default function DevDocsPage() {
 
           {isSearching ? (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--results">
-              <div className="erp-dev-directory-header erp-dev-docs-sidebar__section-head">
+              <div className="erp-directory-header erp-dev-docs-sidebar__section-head">
                 <Text strong>搜索结果</Text>
                 <Text type="secondary">
                   {visibleDocs.length} / {lifecycleDocs.length}
                 </Text>
               </div>
-              {keyword.trim() &&
-              searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
-              lifecycleDocs.some(
-                (item) =>
-                  item.loadSource &&
-                  !item.source &&
-                  sourceLoadState[item.path]?.status !== 'error'
-              ) ? (
+              {fullTextSearchPending ? (
                 <Space role="status">
                   <Spin size="small" />
                   <Text type="secondary">正在检索完整正文</Text>
@@ -1104,13 +1094,13 @@ export default function DevDocsPage() {
               {keyword.trim() &&
               searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
               lifecycleDocs.some(
-                (item) => sourceLoadState[item.path]?.status === 'error'
+                (item) => item.sourceLoad?.status === 'error'
               ) ? (
                 <Button
                   size="small"
                   onClick={() => {
                     for (const item of lifecycleDocs) {
-                      if (sourceLoadState[item.path]?.status === 'error') {
+                      if (item.sourceLoad?.status === 'error') {
                         sourceLoadRequestedRef.current.delete(item.path)
                       }
                     }
@@ -1134,7 +1124,7 @@ export default function DevDocsPage() {
                     >
                       <button
                         type="button"
-                        className="erp-dev-directory-item erp-dev-directory-item--stacked erp-dev-docs-list__open"
+                        className="erp-directory-item erp-directory-item--stacked erp-dev-docs-list__open"
                         title={item.title}
                         aria-current={
                           item.key === selectedDoc?.key ? 'true' : undefined
@@ -1193,12 +1183,14 @@ export default function DevDocsPage() {
               </div>
             </section>
           ) : (
-            <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--tree" aria-label="文档目录">
-              <DevDirectoryHeader
-                className="erp-dev-docs-sidebar__section-head"
-                allExpanded={allExpanded}
-                onToggleAll={allDirectoryKeys.length > 0 ? toggleAllDirectories : undefined}
-              >
+            <Directory
+              as="section"
+              className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--tree"
+              aria-label="文档目录"
+              headerClassName="erp-dev-docs-sidebar__section-head"
+              allExpanded={allExpanded}
+              onToggleAll={allDirectoryKeys.length > 0 ? toggleAllDirectories : undefined}
+              title={
                 <Space size={6}>
                   <Text strong>目录</Text>
                   <Text
@@ -1208,8 +1200,9 @@ export default function DevDocsPage() {
                     {lifecycleDocs.length}/{docs.length}
                   </Text>
                 </Space>
-              </DevDirectoryHeader>
-              <div ref={treeRef} className="erp-dev-directory-list erp-dev-docs-tree" aria-label="项目文档目录树">
+              }
+            >
+              <div ref={treeRef} className="erp-directory-list erp-dev-docs-tree" aria-label="项目文档目录树">
                 {docTree.map((node) => (
                   <DevDocsTreeNode
                     key={node.key}
@@ -1222,7 +1215,7 @@ export default function DevDocsPage() {
                   />
                 ))}
               </div>
-            </section>
+            </Directory>
           )}
         </aside>
 
@@ -1276,7 +1269,7 @@ export default function DevDocsPage() {
                   className="erp-dev-docs-reader__top"
                   icon={<VerticalAlignTopOutlined aria-hidden="true" />}
                   aria-current={titleHeadingId && activeHeadingId === titleHeadingId ? 'location' : undefined}
-                  onClick={scrollReaderToTop}
+                  onClick={() => openHeading('')}
                 >
                   回到顶部
                 </Button>
@@ -1292,13 +1285,18 @@ export default function DevDocsPage() {
               key={selectedDocPath}
               chapters={chapters}
               activeLocation={activeLocation}
-              onOpenHeading={scrollToHeading}
+              onOpenHeading={openHeading}
             />
 
             {selectedDoc?.source ? (
               <article className="erp-dev-docs-markdown" ref={markdownRef}>
                 <div className="erp-dev-docs-document">
-                  <Markdown source={selectedDoc.source} />
+                  <Markdown
+                    key={selectedDocPath}
+                    source={selectedDoc.source}
+                    renderHeading={renderChapterHeading}
+                    renderCollapsedSection={renderCollapsedSection}
+                  />
                 </div>
               </article>
             ) : selectedDoc && selectedSourceLoadState?.status === 'error' ? (

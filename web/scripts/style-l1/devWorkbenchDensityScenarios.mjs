@@ -12,24 +12,6 @@ import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMo
 import { createDevDisclosureScenarios } from './devDisclosureScenarios.mjs'
 import { assertPlainDirectory, createDevWorkbenchDirectoryScenarios } from './devWorkbenchDirectoryScenarios.mjs'
 
-async function measureCustomerConfigStart(start) {
-  return start.evaluate((element) => {
-    const panel = element.getBoundingClientRect()
-    const copy = element.firstElementChild.getBoundingClientRect()
-    const action = element.querySelector(':scope > button').getBoundingClientRect()
-    return {
-      width: panel.width,
-      height: panel.height,
-      actionWidth: action.width,
-      actionHeight: action.height,
-      actionBelow: action.top >= copy.bottom,
-      actionLeftOffset: action.left - copy.left,
-      inlineGap: action.left - copy.right,
-      centerOffset: (action.top + action.height / 2) - (copy.top + copy.height / 2),
-    }
-  })
-}
-
 async function assertSidebarSelection(page, assert) {
   const selection = await page.locator('.erp-dev-workspace-nav').evaluate(async (nav) => {
     const current = nav.querySelector('[aria-current="page"]')
@@ -105,10 +87,6 @@ export function createDevWorkbenchDensityScenarios({
           if (route === '/__dev/data-preparation') {
             await page.getByRole('tablist', { name: '测试数据视图', exact: true }).waitFor()
           }
-          const customerStart = route === '/__dev/customer-config'
-            ? root.locator('.erp-dev-customer-start')
-            : null
-          if (customerStart) await customerStart.waitFor()
           for (const width of [1024, 1280, 1920]) {
             await page.setViewportSize({ width, height: 1080 })
             const geometry = await root.evaluate((element) => {
@@ -153,12 +131,6 @@ export function createDevWorkbenchDensityScenarios({
             for (const tools of geometry.tools) {
               assert(tools.right >= 12 && tools.right <= 14, `${route}辅助工具保留在右侧：${JSON.stringify(tools)}`)
             }
-            if (customerStart) {
-              geometry.start = await measureCustomerConfigStart(customerStart)
-              const { start } = geometry
-              assert(start.inlineGap >= 8 && Math.abs(start.centerOffset) <= 1, `${width}px 开始检查配置与说明同排：${JSON.stringify(start)}`)
-              assert(start.height <= 90, `${width}px 配置总览首区保持紧凑：${start.height}px`)
-            }
             measurements.push({ route, width, ...geometry })
             await assertNoHorizontalOverflow(page, `${route} ${width}px 操作布局`)
           }
@@ -176,26 +148,18 @@ export function createDevWorkbenchDensityScenarios({
             for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `${route}往返恢复导航${key}`)
             await assertNoHorizontalOverflow(page, `${route}页签往返`)
           }
-          if (customerStart) {
-            const nav = page.getByRole('tablist', { name: '客户配置工作任务', exact: true })
-            const strip = await nav.elementHandle()
-            const before = await nav.boundingBox()
+          if (route === '/__dev/customer-config') {
+            const sections = page.getByRole('tablist', { name: '配置核对内容', exact: true })
+            const strip = await sections.elementHandle()
+            const before = await sections.boundingBox()
             await page.screenshot({ path: path.join(outputDir, 'workbench-customer-config-4k.png') })
-            await page.getByRole('button', { name: '开始检查配置', exact: true }).click()
-            await nav.getByRole('tab', { name: /检查配置/u, selected: true }).waitFor()
-            await nav.getByRole('tab', { name: '配置总览', exact: true }).click()
-            await nav.getByRole('tab', { name: '配置总览', exact: true, selected: true }).waitFor()
-            assert(await strip.evaluate((node) => node.isConnected), '往返切换保留同一页签条')
-            const after = await nav.boundingBox()
-            for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `往返切换保持页签${key}`)
-            const wide = await measureCustomerConfigStart(customerStart)
-            assert(wide.inlineGap >= 8 && Math.abs(wide.centerOffset) <= 1, '返回总览后恢复同排布局')
+            await sections.getByRole('tab', { name: '流程与策略', exact: true }).click()
+            await sections.getByRole('tab', { name: '配置字段', exact: true }).click()
+            assert(await strip.evaluate((node) => node.isConnected), '往返切换保留同一核对页签条')
+            const after = await sections.boundingBox()
+            for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `往返切换保持核对页签${key}`)
             await page.setViewportSize({ width: 390, height: 844 })
-            const narrow = await measureCustomerConfigStart(customerStart)
-            assert(narrow.actionBelow && Math.abs(narrow.actionLeftOffset) <= 1, `窄屏时检查按钮换行且左对齐：${JSON.stringify(narrow)}`)
-            assert(Math.abs(narrow.actionWidth - wide.actionWidth) <= 1 && Math.abs(narrow.actionHeight - wide.actionHeight) <= 1, '窄屏保持检查按钮尺寸')
-            await assertNoHorizontalOverflow(page, '客户配置总览 390px')
-            measurements.push({ route, width: 390, start: narrow })
+            await assertNoHorizontalOverflow(page, '客户配置字段核对 390px')
             await page.setViewportSize({ width: 1920, height: 1080 })
           }
         }

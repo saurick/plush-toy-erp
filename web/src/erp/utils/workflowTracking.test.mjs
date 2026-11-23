@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildTrackingStageModel, requireTrackingDetail, requireTrackingPage, submittedProcessRef, trackingHandoff, trackingResponsibility, trackingStatus, trackingURL } from './workflowTracking.mjs'
+import { buildTrackingCurrentProgress, buildTrackingStageModel, requireTrackingDetail, requireTrackingPage, submittedProcessRef, trackingHandoff, trackingResponsibility, trackingStatus, trackingURL } from './workflowTracking.mjs'
 
 const now = 1791367200
 export function trackingFixture() {
@@ -138,22 +138,56 @@ test('visual steps preserve actual completion, blocked responsibility and routin
     { id: 22, node_key: 'end', node_type: 'end', status: 'waiting' },
   )
   value.nodes[0] = { ...value.nodes[0], status: 'completed', completed_at: now + 10 }
-  value.events.unshift({ ...value.events[0], id: 2, event_type: 'status_changed', to_status_key: 'done', actor_role_key: 'boss', actor_display_name: '实际审批人', created_at: now + 10 })
+  value.events.unshift({ ...value.events[0], id: 2, event_type: 'status_changed', to_status_key: 'done', actor_role_key: 'boss', actor_display_name: '实际审批人', reason: '单据已复核', created_at: now + 10 })
   value.events.unshift({ ...value.events[0], id: 3, event_type: 'payload_refreshed', actor_display_name: '后续刷新人' })
   value.summary.current_tasks = [{ ...value.tasks[0], task_id: 31, node_instance_id: 21, task_name: '工程资料', owner_role_key: 'engineering', assignee_name: '', status: 'blocked' }]
   const model = buildTrackingStageModel(value)
   assert.deepEqual(model.items.map((item) => item.label), ['订单审批', '工程资料'])
-  assert.match(model.items[0].detail, /实际审批人.*老板/)
-  assert.doesNotMatch(model.items[0].detail, /后续刷新人/)
+  assert.match(model.items[0].actor, /实际审批人.*老板/)
+  assert.equal(model.items[0].reason, '单据已复核')
   assert.equal(model.items[0].tone, 'completed')
   assert.equal(model.items[1].tone, 'blocked')
   assert.equal(model.items[1].current, true)
-  assert.equal(model.items[1].detail, '岗位：工程 · 待处理')
+  assert.equal(model.items[1].actor, '')
   value.nodes[0].outcome = 'rejected'
   value.events = []
   const incompleteHistory = buildTrackingStageModel(value)
   assert.equal(incompleteHistory.items[0].tone, 'rejected')
-  assert.doesNotMatch(incompleteHistory.items[0].detail, /审批负责人|实际审批人/)
+  assert.doesNotMatch(incompleteHistory.items[0].actor, /审批负责人|实际审批人/)
+})
+
+test('current progress uses the current block and keeps parallel responsibility distinct', () => {
+  const value = trackingFixture()
+  const [first] = value.summary.current_tasks
+  const blocked = { ...first, task_id: 31, task_name: '工程资料', node_instance_id: 21, owner_role_key: 'engineering', assignee_name: '', status: 'blocked' }
+  value.summary.current_tasks = [first, blocked]
+  value.nodes.push({ id: 21, node_key: 'engineering_data', status: 'blocked' })
+  value.events.unshift(
+    { id: 4, task_id: 31, event_type: 'status_changed', to_status_key: 'blocked', reason: '待确认最新版资料' },
+    { id: 3, task_id: 31, event_type: 'status_changed', to_status_key: 'ready', reason: '早前已收到样品' },
+    { id: 2, task_id: 31, event_type: 'status_changed', to_status_key: 'blocked', reason: '旧原因' },
+  )
+  let progress = buildTrackingCurrentProgress(value)
+  assert.deepEqual(progress.map(({ label }) => label), ['工程资料', '订单审批'])
+  assert.equal(progress[0].nodeID, 21)
+  assert.equal(progress[0].reason, '待确认最新版资料')
+  assert.deepEqual(progress[0].responsibility, ['岗位：工程', '由岗位人员处理'])
+  assert.match(progress[1].responsibility.join(' '), /处理人：审批负责人/u)
+  assert.match(progress[0].nextStep, /解决受阻/u)
+  assert.match(progress[1].nextStep, /提交办理结果/u)
+
+  value.nodes[1].status = 'active'
+  value.summary.current_tasks[1] = { ...blocked, status: 'ready' }
+  progress = buildTrackingCurrentProgress(value)
+  assert.equal(progress[1].reason, '')
+  assert.equal(progress[1].blocked, false)
+
+  value.nodes[1] = { ...value.nodes[1], status: 'blocked', node_type: 'domain_command' }
+  value.summary.current_tasks = []
+  progress = buildTrackingCurrentProgress(value)
+  assert.equal(progress[0].label, '工程资料')
+  assert.deepEqual(progress[0].responsibility, ['系统处理'])
+  assert.match(progress[0].nextStep, /核对.*受阻/u)
 })
 
 test('tracking accepts a complete hundred-row page and rejects overflow or truncated responses', () => {
@@ -170,4 +204,78 @@ test('tracking accepts a complete hundred-row page and rejects overflow or trunc
   assert.equal(requireTrackingPage(last, { limit: 100, offset: 100 }), last)
   assert.throws(() => requireTrackingPage({ ...page, items: page.items.slice(0, 50) }, { limit: 100 }), { isInvalidResponse: true })
   assert.throws(() => requireTrackingPage({ ...page, limit: 101 }, { limit: 101 }), { isInvalidResponse: true })
+})
+
+test('material tracking uses review evidence and the current task from this submission', () => {
+  const id = 51
+  const boss = {
+    task_id: 11,
+task_name: '审核工程用料',
+task_group: 'engineering_material_boss_review',
+    node_instance_id: null,
+owner_role_key: 'boss',
+assignee_name: '',
+status: 'done',
+    created_at: now,
+completed_at: now + 10,
+due_at: null,
+  }
+  const finance = {
+    ...boss,
+task_id: 12,
+task_name: '审核并批准采购用料',
+task_group: 'engineering_material_finance_review',
+    owner_role_key: 'finance',
+assignee_name: '财务核对人',
+status: 'ready',
+created_at: now + 10,
+completed_at: null,
+  }
+  const value = {
+    summary: {
+      ...trackingFixture().summary,
+id,
+kind: 'material_review',
+source_type: 'engineering_material_request',
+source_id: id,
+      process_key: '',
+title: '本次用料审批',
+status: 'active',
+current_tasks: [finance],
+    },
+    tasks: [boss, finance],
+nodes: [],
+events: [],
+events_truncated: false,
+next_event_id: 0,
+    current_task_access: [{ task_id: 12, can_read: false, can_handle: false }],
+    material_review: {
+      status: 'BOSS_APPROVED',
+order_status: 'active',
+submitted_at: now,
+submitted_by_name: '工程提交人',
+      boss_reviewed_at: now + 10,
+boss_reviewed_by_name: '实际审核人',
+      finance_reviewed_at: null,
+finance_reviewed_by_name: '',
+rejected_at: null,
+rejected_by_name: '',
+    },
+  }
+  const ref = { kind: 'material_review', id }
+  assert.equal(requireTrackingDetail(value, ref), value)
+  const stages = buildTrackingStageModel(value).items
+  assert.deepEqual(stages.map(({ key, tone }) => [key, tone]), [['submit', 'completed'], ['boss_review', 'completed'], ['finance_review', 'active']])
+  assert.equal(stages[1].actor, '实际审核人')
+  assert.equal(stages[2].completedAt, null)
+  const [active] = buildTrackingCurrentProgress(value)
+  assert.equal(active.nodeID, 'finance_review')
+  assert.deepEqual(active.responsibility, ['岗位：财务', '处理人：财务核对人'])
+
+  const missingBoss = structuredClone(value)
+  missingBoss.material_review.boss_reviewed_at = null
+  assert.throws(() => requireTrackingDetail(missingBoss, ref), { isInvalidResponse: true })
+  const mismatched = structuredClone(value)
+  mismatched.summary.current_tasks[0].task_group = boss.task_group
+  assert.throws(() => requireTrackingDetail(mismatched, ref), { isInvalidResponse: true })
 })

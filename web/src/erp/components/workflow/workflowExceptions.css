@@ -9,7 +9,7 @@
   align-items: center;
   min-width: 0;
 }
-.workflow-exceptions__controls {
+.workflow-exceptions__controls:not([hidden]) {
   display: grid;
   gap: inherit;
   min-width: 0;
@@ -140,6 +140,244 @@
   font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
+
+.workflow-exceptions--board {
+  container: workflow-exception-board / inline-size;
+  gap: var(--erp-page-gap);
+}
+
+.workflow-exceptions__overview,
+.workflow-exceptions__record,
+.workflow-exceptions--related {
+  min-width: 0;
+  border: 1px solid var(--erp-business-card-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+
+.workflow-exceptions__overview,
+.workflow-exceptions--related {
+  padding: var(--erp-panel-padding-block, 8px) var(--erp-panel-padding-inline, 12px);
+}
+
+.workflow-exceptions__overview-header,
+.workflow-exceptions__record-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.workflow-exceptions__overview-header h3,
+.workflow-exceptions__record-header h3,
+.workflow-exceptions__record h4 {
+  margin: 0;
+  font-size: var(--erp-font-body);
+}
+
+.workflow-exceptions__phase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--erp-work-item-gap);
+}
+
+.workflow-exceptions__phase {
+  display: grid;
+  gap: 4px;
+  min-height: 46px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--erp-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.workflow-exceptions__phase:hover {
+  background: var(--erp-surface-bg-muted);
+}
+
+.workflow-exceptions__phase[aria-pressed='true'] {
+  border-color: var(--erp-interactive-border-focus);
+  background: var(--erp-primary-softer);
+}
+
+.workflow-exceptions__phase:focus-visible {
+  outline: 2px solid var(--erp-interactive-border-focus);
+  outline-offset: 1px;
+}
+
+.workflow-exceptions__phase-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: var(--erp-font-small);
+}
+
+.workflow-exceptions__phase-label b,
+.workflow-exceptions__phase-label small {
+  font-variant-numeric: tabular-nums;
+}
+
+.workflow-exceptions__phase-label small {
+  margin-inline-start: 6px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.workflow-exceptions__phase-track,
+.workflow-exceptions__phase-track > span {
+  display: block;
+  height: 6px;
+  border-radius: 6px;
+}
+
+.workflow-exceptions__phase-track {
+  background: var(--erp-surface-bg-muted);
+}
+
+.workflow-exceptions__phase-track > span {
+  background: color-mix(in srgb, var(--exception-phase-color) 80%, var(--erp-surface-bg));
+}
+
+.workflow-exceptions__phase[data-tone='warning'] {
+  --exception-phase-color: var(--erp-warning-text);
+}
+
+.workflow-exceptions__phase[data-tone='info'] {
+  --exception-phase-color: var(--erp-visual-info-text);
+}
+
+.workflow-exceptions__phase[data-tone='success'] {
+  --exception-phase-color: var(--erp-visual-success-text);
+}
+
+.workflow-exceptions__workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--erp-page-gap);
+  align-items: start;
+}
+
+.workflow-exceptions__workspace--split {
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 31%, 404px);
+}
+
+.workflow-exceptions__list {
+  min-width: 0;
+}
+
+.workflow-exceptions__list .workflow-exceptions__row--selected > td {
+  background: var(--erp-primary-softer);
+}
+
+.workflow-exceptions__record-link.ant-btn {
+  justify-content: flex-start;
+  height: auto;
+  min-height: 28px;
+  max-width: 100%;
+  padding-inline: 0;
+  font-weight: 600;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.workflow-exceptions__subline {
+  display: block;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  overflow-wrap: anywhere;
+}
+
+.workflow-exceptions__record-header {
+  padding: 4px var(--erp-panel-padding-inline, 12px);
+  border-bottom: 1px solid var(--erp-border);
+}
+
+.workflow-exceptions__record-content {
+  display: grid;
+  gap: var(--erp-form-section-gap);
+  padding: 12px;
+}
+
+.workflow-exceptions__current {
+  padding: 8px 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-primary-softer);
+}
+
+.workflow-exceptions__current .workflow-exceptions__task {
+  padding-block: 4px;
+  border-top: 0;
+}
+
+.workflow-exceptions__section-title {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--erp-surface-bg-muted);
+}
+
+.workflow-exceptions__section-title small {
+  color: var(--erp-text-muted);
+  font-weight: 400;
+}
+
+.workflow-exceptions__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 8px 0 0;
+}
+
+.workflow-exceptions__facts dt {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.workflow-exceptions__facts dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.workflow-exceptions__reason {
+  grid-column: 1 / -1;
+}
+
+.workflow-exceptions__photos > summary {
+  min-height: 44px;
+  padding: 10px 0;
+  border-top: 1px solid var(--erp-border);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+@container workflow-exception-board (width < 960px) {
+  .workflow-exceptions__workspace--split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workflow-exceptions__workspace--split .workflow-exceptions__record {
+    grid-row: 1;
+  }
+}
+
+@container workflow-exception-board (width < 540px) {
+  .workflow-exceptions__phase-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 767px) {
   .workflow-exceptions__query > .ant-btn,
   .workflow-exceptions__related-links > .ant-btn,

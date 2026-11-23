@@ -16,14 +16,14 @@ import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listBusinessProgress } from '../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
-import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import { canOpenRelatedDocumentPath } from '../utils/relatedDocumentNavigation.mjs'
 import { BUSINESS_ROUTE_PATHS } from '../utils/masterDataOrderView.mjs'
 import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
 import { openWorkflowTaskRow } from '../utils/workflowTaskEntry.mjs'
 import {
   progressQueryFromURL,
-  progressSourcePath,
+  progressQuantity,
+  progressDeliveryDetails,
   progressExtraFilters,
   progressFilterCount,
   progressFilterReset,
@@ -36,12 +36,13 @@ import BusinessProgressFilterFields, {
   ProgressDeliveryFilters,
   ProgressDeliverySwitch,
 } from '../components/business-visualizations/BusinessProgressFilters.jsx'
+import ProgressMetricHint from '../components/business-visualizations/ProgressMetricHint.jsx'
 import ProgressDeliveryLines from '../components/business-visualizations/ProgressDeliveryLines.jsx'
 import ProgressSortHeader from '../components/business-visualizations/ProgressSortHeader.jsx'
 import { BusinessProgressSort } from '@/common/consts/statuses.generated.mjs'
 import BusinessProgressDrawer from '../components/business-visualizations/BusinessProgressDrawer.jsx'
-import RoleProgressPanel from '../components/business-visualizations/RoleProgressPanel.jsx'
-import { progressBoardAccess, progressBoardViews, scopeProgressBoardQuery } from '../utils/progressBoardAccess.mjs'
+import { getWorkflowWorkbenchRoleKeys } from '../utils/workflowDashboardStats.mjs'
+import { defaultProgressView, progressBoardAccess, progressBoardViews, scopeProgressBoardQuery } from '../utils/progressBoardAccess.mjs'
 import SalesDeliveryWorkspace from '../components/sales-orders/SalesDeliveryWorkspace.jsx'
 import { useSalesDeliveryWorkspace } from '../components/sales-orders/useSalesDeliveryWorkspace.js'
 import {
@@ -49,7 +50,7 @@ import {
   ProgressOpenButton,
   ProgressDocumentStatus,
   ProgressDue,
-  ProgressDelivery,
+  ProgressOrderDelivery,
   ProgressAttention,
 } from '../components/business-visualizations/ProgressCompactContent.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
@@ -74,12 +75,10 @@ export default function BusinessDashboardPage() {
   const openDeliveryProgress = deliveryWorkspace.openProgress
   const views = progressBoardViews(boardAccess)
   const selectedView = params.get('view')
-  const view = views.find(({ value }) => value === selectedView)?.value || views[0]?.value || ''
+  const roleKeys = getWorkflowWorkbenchRoleKeys(adminProfile || {})
+  const view = views.find(({ value }) => value === selectedView)?.value || defaultProgressView(boardAccess, roleKeys.length === 1 ? roleKeys[0] : undefined)
   const statisticsActive = view === 'statistics'
-  const roleActive = view === 'role'
   const listActive = view === 'orders' || view === 'production'
-  const [roleProgressState, setRoleProgressState] = useBusinessPageState('roleProgress', {})
-  const updateRoleProgress = useCallback((changes) => setRoleProgressState((previous) => ({ ...previous, ...changes })), [setRoleProgressState])
   const queryKey = JSON.stringify(scopeProgressBoardQuery(progressQueryFromURL(params), view, boardAccess))
   const query = useMemo(() => JSON.parse(queryKey), [queryKey])
   const [state, setState] = useState(null)
@@ -87,20 +86,18 @@ export default function BusinessDashboardPage() {
   const [error, setError] = useState('')
   const [selection, setSelection] = useState(null)
   const listRef = useRef(null)
-  const navigateFromProgress = (path, detailContext, rowID) => {
+  const openProgressTask = (taskID, { rowID, orderNo, detail }) => {
     const historyState = window.history.state
-    const target = new URL(path, window.location.origin)
-    const returnToDetail = target.searchParams.has('task_id') || target.searchParams.get('view') === 'followup'
     const progressReturn = {
       adminID: adminProfile.id,
       scrollTop: listRef.current?.scrollTop || 0,
       rowID,
-      selection: returnToDetail && selection && detailContext ? {
-        id: selection.id, view: selection.view, lineID: selection.lineID, orderNo: selection.orderNo, ...detailContext,
-      } : null,
+      detail,
     }
     window.history.replaceState({ ...historyState, usr: { ...historyState?.usr, progressReturn } }, '')
-    navigate(path, { state: { progressOrigin: { adminID: adminProfile.id, orderNo: selection?.orderNo, index: historyState?.idx } } })
+    navigate(`/erp/task-board?task_id=${taskID}`, {
+      state: { progressOrigin: { adminID: adminProfile.id, orderNo, fromDetail: Boolean(detail), index: historyState?.idx } },
+    })
   }
   const viewQueries = useRef({})
   const deliveryQueries = useRef({})
@@ -159,7 +156,7 @@ export default function BusinessDashboardPage() {
     keys.forEach((key) => previous.delete(key))
     for (const [key, value] of Object.entries(viewQueries.current[nextView] || {})) previous.set(key, value)
     previous.set('view', nextView)
-    setParams(nextView === 'statistics' || nextView === 'role' ? previous : withProgressFilters(previous, {}))
+    setParams(nextView === 'statistics' ? previous : withProgressFilters(previous, {}))
     setSelection(null)
   }
   const changeDeliveryDisplay = (display) => {
@@ -252,6 +249,7 @@ export default function BusinessDashboardPage() {
         view: row.view,
         orderNo: row.order_no,
         section,
+        fromPendingTasks: section === 'tasks',
         taskQuery: section === 'tasks' ? { status: 'open' } : undefined,
         profile: adminProfile,
       })
@@ -278,6 +276,7 @@ export default function BusinessDashboardPage() {
     },
     [adminProfile, outlet?.allowedMenuPaths]
   )
+  const canOpenTasks = canOpen('/erp/task-board')
   const statistics = useBusinessStatistics({
     active: statisticsActive,
     adminProfile,
@@ -315,8 +314,13 @@ export default function BusinessDashboardPage() {
     if (data && saved?.adminID === adminProfile?.id) {
       pendingProgressReturn.current = null
       if (listRef.current) listRef.current.scrollTop = saved.scrollTop
-      if (saved.selection) setSelection({ ...saved.selection, profile: adminProfile })
-      else if (saved.rowID) listRef.current?.querySelector(`[data-progress-order-id="${Number(saved.rowID)}"] .erp-progress-task-entry`)?.focus({ preventScroll: true })
+      if (saved.rowID) {
+        const row = listRef.current?.querySelector(`[data-progress-${lines ? 'line' : 'order'}-id="${Number(saved.rowID)}"]`)
+        const taskEntry = !saved.detail || saved.detail.fromPendingTasks
+        const trigger = (taskEntry && row?.querySelector('.erp-progress-task-entry')) || row?.querySelector('.erp-progress-row-open')
+        trigger?.focus({ preventScroll: true })
+      }
+      if (saved.detail) setSelection({ ...saved.detail, profile: adminProfile })
       return
     }
     if (
@@ -329,6 +333,26 @@ export default function BusinessDashboardPage() {
         ?.scrollIntoView({ block: 'nearest' })
     }
   }, [selectedKey, selectedID, lines, data, adminProfile])
+  const closeDetail = () => {
+    setSelection((current) => current?.parent ? { ...current.parent, profile: current.profile } : null)
+    if (!selection?.parent && location.state?.progressReturn?.detail) {
+      setParams((previous) => previous, { replace: true })
+    }
+  }
+  const openTaskFromDetail = (taskID, context) => {
+    const { profile: _profile, ...detail } = selection
+    openProgressTask(taskID, { rowID: selectedID, orderNo: detail.orderNo, detail: { ...detail, ...context } })
+  }
+  const openProductionFromDetail = (record, context) => {
+    const { profile, ...orderDetail } = selection
+    setSelection({
+      profile,
+      id: record.id,
+      orderNo: record.number,
+      view: 'production',
+      parent: { ...orderDetail, ...context },
+    })
+  }
   return (
     <section
       className={`erp-progress-board${statisticsActive ? ' erp-progress-board--statistics' : ''}`}
@@ -477,22 +501,7 @@ export default function BusinessDashboardPage() {
           ) : null}
         </div>
       )}
-      {roleActive ? (
-        <RoleProgressPanel
-          active
-          adminProfile={adminProfile}
-          roles={boardAccess.roles}
-          allowGlobal={boardAccess.supervise}
-          state={roleProgressState}
-          onStateChange={updateRoleProgress}
-          registerRefresh={outlet?.registerPageRefresh}
-          onOpenTask={canOpen('/erp/task-board') ? (task) => navigateFromProgress(progressSourcePath({ kind: 'task', id: task.id })) : undefined}
-          onOpenDelivery={deliveryWorkspace.enabled ? openDeliveryProgress : undefined}
-          canOpenSource={canOpen}
-          onOpenSource={navigateFromProgress}
-          suspendDetails={Boolean(deliveryWorkspace.frame)}
-        />
-      ) : statisticsActive ? (
+      {statisticsActive ? (
         statistics.content
       ) : !listActive ? (
         <Empty description="当前账号没有可查看的进度视图" />
@@ -539,11 +548,17 @@ export default function BusinessDashboardPage() {
                         <ProgressSortHeader className="erp-progress-due-cell" field={BusinessProgressSort.DUE_DATE} query={query} onSort={update}>
                           {view === 'orders' ? '交期' : '计划结束'}
                         </ProgressSortHeader>
-                        <th scope="col">
-                          {view === 'orders'
-                            ? '已出货 / 订购'
-                            : '有效完工 / 计划'}
-                        </th>
+                        {view === 'orders' ? (
+                          <ProgressSortHeader field={BusinessProgressSort.REMAINING} query={query} onSort={update} label="剩余待交">
+                            交付进度 <small>按待交量</small>
+                          </ProgressSortHeader>
+                        ) : (
+                          <>
+                            <th scope="col">当前工序</th>
+                            <th scope="col" className="erp-progress-quantity-cell">计划数量</th>
+                            <ProgressSortHeader className="erp-progress-quantity-cell" field={BusinessProgressSort.COMPLETED} query={query} onSort={update}>有效完工</ProgressSortHeader>
+                          </>
+                        )}
                         <th scope="col" className="erp-progress-attention-cell">当前关注 / 处理人</th>
                         <th scope="col" className="erp-progress-action-cell">操作</th>
                       </tr>
@@ -574,21 +589,31 @@ export default function BusinessDashboardPage() {
                                 snapshotAt={data.snapshot_at}
                               />
                             </td>
-                            <td className="erp-progress-delivery-cell">
-                              <ProgressDelivery
-                                row={row}
-                                showProgress
-                                onOpenDetails={() => openDetail(row, 'lines')}
-                              />
-                            </td>
+                            {view === 'orders' ? (
+                              <td className="erp-progress-delivery-cell" data-label="交付进度">
+                                <ProgressOrderDelivery row={row} onOpenDetails={() => openDetail(row, 'lines')} />
+                              </td>
+                            ) : (
+                              <>
+                                <td data-label="当前工序">{row.current_operation || '—'}</td>
+                                <td data-label="计划数量" className="erp-progress-quantity-cell">
+                                  {row.ordered_quantity == null ? <Button size="small" type="link" onClick={() => openDetail(row, 'lines')}>按明细查看</Button> : `${progressQuantity(row.ordered_quantity)} ${row.unit}`}
+                                </td>
+                                <td data-label="有效完工" className="erp-progress-quantity-cell">
+                                  <ProgressMetricHint row={row} metric={progressDeliveryDetails(row)}>
+                                    {progressQuantity(row.completed_quantity)} {row.unit}
+                                  </ProgressMetricHint>
+                                </td>
+                              </>
+                            )}
                             <td className="erp-progress-attention-cell">
                               <ProgressAttention
                                 row={row}
                                 access={access}
                                 showOwnerWithoutTasks={false}
-                                onOpenTask={canOpen('/erp/task-board') ? (taskID) => {
+                                onOpenTask={canOpenTasks ? (taskID) => {
                                   if (taskID) {
-                                    navigateFromProgress(progressSourcePath({ kind: 'task', id: taskID }), null, row.id)
+                                    openProgressTask(taskID, { rowID: row.id, orderNo: row.order_no })
                                   } else {
                                     openDetail(row, 'tasks')
                                   }
@@ -633,14 +658,11 @@ export default function BusinessDashboardPage() {
       )}
       <BusinessProgressDrawer
         selection={selection?.profile === adminProfile ? selection : null}
-        onClose={() => setSelection(null)}
+        sourceOrderNo={selection?.parent?.orderNo}
+        onClose={closeDetail}
         adminProfile={adminProfile}
-        canOpen={canOpen}
-        onNavigate={navigateFromProgress}
-        onOpenSalesDelivery={deliveryWorkspace.enabled ? (id) => {
-          setSelection(null)
-          deliveryWorkspace.openProgress(id)
-        } : undefined}
+        onOpenTask={canOpenTasks ? openTaskFromDetail : undefined}
+        onOpenProduction={boardAccess.production && selection?.view === 'orders' ? openProductionFromDetail : undefined}
       />
       <SalesDeliveryWorkspace workspace={deliveryWorkspace} />
     </section>

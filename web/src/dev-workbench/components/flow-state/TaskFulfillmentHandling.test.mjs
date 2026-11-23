@@ -48,10 +48,17 @@ test('异常详情直达正式链路，财务关联概览使用独立页签', as
   }, h(Guide, { businessCatalog })))
   await render(`flow_tab=exceptions&flow_exception=${exception.key}`)
   const root = harness.container
+  assert(!root.querySelector('[data-relation-filters]'))
+  const relationDisclosure = [...root.querySelectorAll('summary')].find((summary) => summary.textContent === '关联动作与规则')
+  assert(relationDisclosure && !relationDisclosure.parentElement.open)
   const chainLink = [...root.querySelectorAll('a')].find((link) => link.textContent === '在流程探索中查看链路')
   assert.equal(chainLink?.getAttribute('href'), `/__dev/flow-explorer?chain=${exception.business_chain}`)
-  await render('flow_tab=finance')
+  await render('flow_tab=finance&flow_role=purchase')
+  await harness.flush()
   assert.deepEqual([...root.querySelectorAll('[aria-label="流程视图"] [role="tab"]')].map((node) => node.textContent),
     ['订单全流程', '异常处理', '财务关联概览'])
   assert.ok(root.querySelector('[data-finance-relationships]'))
+  assert(!root.querySelector('[data-relation-filters]'))
+  assert.equal(root.querySelectorAll('[data-finance-overview] [data-finance-node]').length, 12)
+  assert(!root.querySelector('[data-finance-overview] [data-role-match]'))
 })

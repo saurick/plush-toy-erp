@@ -755,18 +755,12 @@ body
 }
 
 @media (max-width: 1280px) {
-  .erp-permission-toolbar {
-    flex-wrap: wrap;
-  }
   .erp-role-center-layout {
     grid-template-columns: 210px minmax(0, 1fr);
   }
 }
 
 @media (max-width: 800px) {
-  .erp-permission-toolbar {
-    flex-wrap: wrap;
-  }
   .erp-permission-tabs {
     max-width: 100%;
     overflow-x: auto;
@@ -774,9 +768,6 @@ body
   .erp-permission-tabs > [role='tab'] {
     padding-inline: 8px;
     font-size: var(--erp-font-caption);
-  }
-  .erp-permission-toolbar__account {
-    flex-basis: 100%;
   }
   .erp-permission-section--roles.ant-card .ant-card-body {
     height: auto;

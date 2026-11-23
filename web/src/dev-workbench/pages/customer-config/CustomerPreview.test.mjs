@@ -100,7 +100,7 @@ test('guidance defaults stay closed and migration can opt into an initially open
 })
 
 test('configuration boundary failures are visible with actual and required values and clear on recovery', async () => {
-  const { PreflightPanel } = await import('./PreflightPanel.jsx')
+  const { CustomerConfigReview } = await import('./CustomerConfigReview.jsx')
   const { buildCustomerConfigDevOverviewFromSearch } = await import('../../config/devCustomerConfig.mjs')
   const overview = buildCustomerConfigDevOverviewFromSearch('customer=yoyoosun')
   const boundary = {
@@ -110,65 +110,73 @@ test('configuration boundary failures are visible with actual and required value
     valueLabel: '包含未登记对象',
     expectedLabel: '仅允许已登记配置对象',
   }
-  const props = {
-    consoleSummary: overview.packageConsoleSummary,
+  const blocked = {
+    ...overview,
     customerPackageSummary: { ...overview.customerPackageSummary, boundaries: [boundary] },
-    menuSummary: overview.menuSummary,
-    fieldNumberingSummary: overview.fieldNumberingSummary,
-    activeSection: 'package',
-    onSectionChange() {},
   }
+  const panel = (nextOverview, activeSection) => h(CustomerConfigReview, {
+    route: { overview: nextOverview, activeSection, activeDetail: '' },
+    operations: { dryRunState: { status: 'idle' }, applyState: { status: 'idle' } },
+  })
   await render(async ({ container, update }) => {
-    await update(h(PreflightPanel, props))
+    await update(panel(blocked, 'fields'))
     const alert = container.querySelector('.erp-workbench-notice[role="alert"]')
     assert(alert && !alert.closest('details'))
     for (const text of ['候选配置对象范围', '包含未登记对象', '仅允许已登记配置对象']) {
       assert(alert.textContent.includes(text), `${text} is visible without opening guidance`)
     }
-    await update(h(PreflightPanel, { ...props, activeSection: 'evidence' }))
+    await update(panel(blocked, 'extensions'))
     assert.match(container.querySelector('[role="alert"]').textContent, /包含未登记对象.*仅允许已登记配置对象/u)
-    await update(h(PreflightPanel, {
-      ...props,
-      activeSection: 'evidence',
-      customerPackageSummary: { ...props.customerPackageSummary, boundaries: [{ ...boundary, ok: true }] },
-    }))
+    await update(panel(overview, 'extensions'))
     assert.equal(Boolean(container.querySelector('.erp-workbench-notice[role="alert"]')), false)
   })
 })
 
-test('runtime settings and the comparison both show real overrides and clear them on source changes', async () => {
-  const { RuntimeSettings } = await import('./RuntimeSettings.jsx')
+test('configuration comparison shows paths, record selectors and falsy values from the selected customer', async () => {
   const { DiffPanel } = await import('./DiffPanel.jsx')
   const { buildCustomerConfigDevOverviewFromSearch } = await import('../../config/devCustomerConfig.mjs')
   const overview = buildCustomerConfigDevOverviewFromSearch('customer=yoyoosun')
   const base = overview.customerPackageSummary
-  const [module, ...otherModules] = base.moduleStates
+  const [module, sameAsDefault, ...otherModules] = base.moduleStates
   const changed = {
     ...base,
-    moduleStateOverrideCount: 1,
+    moduleStateOverrideCount: 2,
     moduleStates: [
       { ...module, state: 'read_only', stateLabel: '只读', overridden: true, sourceLabel: '客户包覆盖', reason: '样本原因' },
+      { ...sameAsDefault, state: sameAsDefault.defaultState, stateLabel: sameAsDefault.defaultStateLabel, overridden: true },
       ...otherModules,
     ],
   }
 
   await render(async ({ container, update }) => {
-    await update(h(RuntimeSettings, { summary: changed }))
-    const moduleRows = () => [...container.querySelectorAll('table[aria-label="模块候选取值"] tbody tr')]
-      .filter((row) => !row.closest('details'))
-    assert.equal(moduleRows().length, base.moduleStates.length)
-    assert.match(moduleRows()[0].textContent, /只读客户包覆盖样本原因/u)
-    await update(h(RuntimeSettings, { summary: base }))
-    assert.equal(moduleRows().length, base.moduleStates.length)
-    assert.doesNotMatch(container.textContent, /样本原因/u)
+    await update(h(DiffPanel, { overview: { ...overview, customerPackageSummary: changed } }))
+    const table = () => container.querySelector('table[aria-label="配置字段及影响"]')
+    const values = () => table().querySelector('tbody')
+    const locationCodes = (row) => [...row.querySelectorAll('td[data-customer-value-label="配置文件位置"] code')]
+      .map((node) => node.textContent)
+    const previewValue = (row) => row.querySelector('td[data-customer-value-label="客户包预览值"]').textContent
+    assert.deepEqual([...table().querySelectorAll('thead th')].map((node) => node.textContent.trim()), [
+      '配置字段', '配置文件位置', '系统默认值', '客户包预览值', '用途与影响',
+    ])
+    const row = values().firstElementChild
+    assert.equal(row.querySelector('th').textContent, module.label)
+    assert.deepEqual(locationCodes(row), ['moduleStates[].state', 'moduleKey', module.moduleKey])
+    assert.match(row.textContent, /启用enabled只读read_only.*样本原因/u)
+    assert(!row.closest('details'))
+    const declared = [...values().querySelectorAll('tr')].find((item) => locationCodes(item).includes(sameAsDefault.moduleKey))
+    assert(Boolean(declared), 'a separately configured value is shown even if it equals the default')
+    assert.equal(declared.querySelector('td[data-customer-value-label="系统默认值"]').textContent, previewValue(declared))
 
-    const diff = (summary) => h(DiffPanel, { consoleSummary: overview.packageConsoleSummary, customerPackageSummary: summary })
-    await update(diff(changed))
-    const values = () => container.querySelector('table[aria-label="模块与列表字段候选取值"] tbody')
-    assert.match(values().firstElementChild.textContent, /启用只读客户包覆盖样本原因/u)
-    assert.equal(values().querySelectorAll('tr').length, base.moduleStates.length + base.fieldVisibilityReview.length)
-    await update(diff(base))
+    const reference = buildCustomerConfigDevOverviewFromSearch('customer=reference-customer')
+    await update(h(DiffPanel, { overview: reference }))
     assert.doesNotMatch(values().textContent, /样本原因/u)
-    assert.equal(values().querySelectorAll('tr').length, base.moduleStates.length + base.fieldVisibilityReview.length)
+    const override = [...values().querySelectorAll('tr')].find((item) => item.textContent.includes('supplier_type'))
+    assert.deepEqual(locationCodes(override), [
+      'fieldPolicyOverrides[].visible', 'surfaceKey', 'suppliers.default', 'fieldKey', 'supplier_type',
+    ])
+    assert.equal(previewValue(override), '隐藏false')
+    await update(h(DiffPanel, { overview: reference, onlyOverrides: false }))
+    const inherited = [...values().querySelectorAll('tr')].find((item) => item.textContent.includes('expected_ship_date'))
+    assert.equal(previewValue(inherited), '沿用系统默认true')
   })
 })

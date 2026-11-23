@@ -7,19 +7,26 @@ function VisitedTaskSteps({ activeStep, version, children, panels, overlay }) {
   const visited = useRef({})
   const cachedVersion = useRef(version)
   const elements = useRef({})
+  const positions = useRef(new Map())
   const [header, setHeader] = useState(null)
   const information = useTaskBusinessInformation(version)
   const headerOwner = useMemo(() => ({ step: { detail: 'detail', action: 'process', receipt: 'result' }[activeStep], register: setHeader }), [activeStep])
   if (cachedVersion.current !== version) {
     visited.current = {}
+    positions.current.clear()
     cachedVersion.current = version
   }
   Object.assign(visited.current, panels, { [activeStep]: children })
   useLayoutEffect(() => {
-    elements.current[activeStep]
-      ?.querySelector('h1')
-      ?.focus({ preventScroll: true })
-  }, [activeStep])
+    const pane = elements.current[activeStep]
+    const scroller = pane?.querySelector('.mobile-role-tasks-page__detail-main')
+    pane?.querySelector('h1')?.focus({ preventScroll: true })
+    if (!scroller) return undefined
+    scroller.scrollTop = positions.current.get(activeStep) || 0
+    const save = () => { if (!pane.hidden) positions.current.set(activeStep, scroller.scrollTop) }
+    scroller.addEventListener('scroll', save, { passive: true })
+    return () => scroller.removeEventListener('scroll', save)
+  }, [activeStep, version])
   return (
     <TaskBusinessInformationContext.Provider value={information}>
       <MobileTaskHeaderContext.Provider value={headerOwner}>

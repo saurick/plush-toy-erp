@@ -31,3 +31,13 @@ test('coordination and review tasks use task decisions rather than source docume
   }
   assert.equal(workflowTaskBusinessContract({ source_type: 'unknown' }).actionKeys.length, 0)
 })
+
+test('采购应付复用普通宽度表单与财务确认动作，采购补价保留明细编辑工作区', () => {
+  const payable = workflowTaskBusinessContract({ task_group: 'handoff_receipt_payable' })
+  assert.equal(payable.editorWidth, 'form')
+  assert.equal(workflowTaskBusinessActionAllowed(payable, 'create-payable'), true)
+  assert.equal(workflowTaskBusinessActionAllowed(payable, 'finance-fact-confirm'), true)
+  assert.equal(workflowTaskBusinessActionAllowed(payable, 'finance-fact-cancel'), true)
+  assert.equal(workflowTaskBusinessActionAllowed(payable, 'post'), false)
+  assert.equal(workflowTaskBusinessContract({ task_group: 'handoff_purchase_price' }).editorWidth, 'workspace')
+})

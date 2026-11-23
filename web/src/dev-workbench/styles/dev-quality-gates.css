@@ -84,7 +84,6 @@
 
 .erp-dev-quality-job-guide-drawer__detail,
 .erp-dev-quality-job-guide-drawer__catalog,
-.erp-dev-quality-job-guide-drawer__group,
 .erp-dev-quality-job-guide-drawer__stack {
   display: grid;
   min-width: 0;
@@ -96,40 +95,28 @@
 }
 
 .erp-dev-quality-job-guide-drawer__group {
-  gap: 4px;
+  min-width: 0;
 }
 
-.erp-dev-quality-job-guide-drawer__stack,
-.erp-dev-quality-job-guide-drawer__group-heading {
+.erp-dev-quality-job-guide-drawer__stack {
   gap: 2px;
 }
 
-.erp-dev-quality-job-guide-drawer__group-heading {
-  display: grid;
-  min-width: 0;
-  padding-bottom: 5px;
-  border-bottom: 1px solid var(--erp-border);
+.erp-dev-quality-job-guide-drawer__group-heading,
+.erp-dev-quality-job-guide-drawer__identity {
+  flex-wrap: wrap;
+}
+
+.erp-dev-quality-job-guide-drawer__identity {
+  display: flex;
+  align-items: baseline;
+  gap: 2px 8px;
 }
 
 .erp-dev-quality-job-guide-drawer__detail > .ant-typography,
-.erp-dev-quality-job-guide-drawer__catalog > .ant-typography,
-.erp-dev-quality-job-guide-drawer__group .ant-list-item-meta-title,
-.erp-dev-quality-job-guide-drawer__group .ant-list-item-meta-description {
+.erp-dev-quality-job-guide-drawer__catalog > .ant-typography {
   margin: 0;
   overflow-wrap: anywhere;
-}
-
-.erp-dev-quality-job-guide-drawer__group .ant-list-item {
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.erp-dev-quality-job-guide-drawer__group .ant-list-item-meta {
-  min-width: 0;
-}
-
-.erp-dev-quality-job-guide-drawer__group .ant-list-item-action {
-  margin-inline-start: 4px;
 }
 
 .erp-dev-quality-job-guide-drawer__checks {

@@ -21,6 +21,13 @@ const root = path.resolve(import.meta.dirname, "../..");
 const manualDirectory = path.join(root, "docs/manuals");
 const runtimePath = path.join(root, "server/internal/projectmanuals/content.generated.json");
 const businessPath = path.join(manualDirectory, "业务使用手册.md");
+const directoryStylesPath = "web/src/common/components/navigation/directory.css";
+
+export function renderDesignDirectoryStyle(source, css) {
+  const block = /<style id="shared-directory-style">[\s\S]*?<\/style>/gu;
+  if ([...source.matchAll(block)].length !== 1) throw new Error("交互稿缺少唯一的共用目录样式区");
+  return source.replace(block, () => `<style id="shared-directory-style">\n${css.trimEnd()}\n</style>`);
+}
 
 export function renderHelpDesignSnapshots(source) {
   const declaration = (name) => {
@@ -62,7 +69,7 @@ const digest = (value) => createHash("sha256").update(value).digest("hex");
 async function sourceDigests() {
   return Object.fromEntries(
     await Promise.all(
-      sourcePaths.map(async (file) => [
+      [...sourcePaths, directoryStylesPath].map(async (file) => [
         file,
         digest(await readFile(path.join(root, file))),
       ]),
@@ -116,7 +123,10 @@ export async function generateRuntimeProjectManuals({ check = false } = {}) {
   const { Remarkable } = requireWeb("remarkable");
   const renderer = new Remarkable({ html: false });
   const prototypePath = path.join(root, "docs/product/ui-design/index.html");
-  const prototypeCurrent = await readFile(prototypePath, "utf8");
+  const [prototypeCurrent, directoryStyles] = await Promise.all([
+    readFile(prototypePath, "utf8"),
+    readFile(path.join(root, directoryStylesPath), "utf8"),
+  ]);
   const replaceSnapshot = (source, name, following, value) => {
     const prefix = `    const ${name} = `;
     const start = source.indexOf(prefix);
@@ -125,8 +135,13 @@ export async function generateRuntimeProjectManuals({ check = false } = {}) {
     return source.slice(0, start) + prefix + JSON.stringify(value, null, 2) + source.slice(end);
   };
   const prototypeBooks = values.map(manual => ({ key: manual.key, title: manual.title, summary: manual.summary, sourceHash: manual.source_hash, chapters: getProjectManualDocuments(manual).map(document => ({ id: document.id, title: document.title, html: renderer.render(document.markdown) })) }));
-  const prototypeExpected = replaceSnapshot(replaceSnapshot(renderHelpDesignSnapshots(prototypeCurrent), "handbookIntroductions", "handbookPageAdditions", getBusinessHandbookIntroductions()), "projectManualBooks", "referenceDocs", prototypeBooks);
-  if (check && prototypeCurrent !== prototypeExpected) throw new Error("帮助交互稿的手册快照与正式来源不同步，请重新生成项目手册");
+  const helpExpected = replaceSnapshot(
+    renderHelpDesignSnapshots(prototypeCurrent),
+    "handbookIntroductions", "handbookPageAdditions", getBusinessHandbookIntroductions(),
+  );
+  const booksExpected = replaceSnapshot(helpExpected, "projectManualBooks", "referenceDocs", prototypeBooks);
+  const prototypeExpected = renderDesignDirectoryStyle(booksExpected, directoryStyles);
+  if (check && prototypeCurrent !== prototypeExpected) throw new Error("交互稿的手册或目录样式与正式来源不同步，请重新生成项目手册");
   if (!check && prototypeCurrent !== prototypeExpected) await writeFile(prototypePath, prototypeExpected);
 }
 
@@ -136,6 +151,7 @@ export async function exportProjectManuals() {
   const output = path.join(root, "output/pdf/project-manuals");
   await mkdir(output, { recursive: true });
   const before = await sourceDigests();
+  const directoryStyles = await readFile(path.join(root, directoryStylesPath), "utf8");
   const browser = await chromium.launch({ headless: true });
   const files = [];
   try {
@@ -150,8 +166,8 @@ export async function exportProjectManuals() {
           ? renderBusinessHandbookHtml({
               guides: ROLE_HELP_GUIDES,
               pages: [...BUSINESS_USABILITY_CATALOG, ENGINEERING_MATERIAL_HELP],
-            })
-          : renderProjectManualHtml({ title, markdown: source });
+            }, directoryStyles)
+          : renderProjectManualHtml({ title, markdown: source }, directoryStyles);
       await writeFile(path.join(output, `${title}.html`), html);
       await writeFile(path.join(output, `${title}.md`), source);
       await page.setContent(html, { waitUntil: "load" });
@@ -208,6 +224,7 @@ export async function exportProjectManuals() {
     wrapHandbookHtml(
       "项目手册",
       `<h1>项目手册</h1><p>三册内容按同一工作区生成，来源身份与校验值见 manifest.json。当前包不表示已发布或已通过客户验收。</p><ul>${manuals.map((title) => `<li>${title}：<a href="${title}.html">离线阅读</a> · <a href="${title}.pdf">PDF</a> · <a href="${title}.md">Markdown</a></li>`).join("")}</ul>`,
+      directoryStyles,
     ),
   );
   return output;

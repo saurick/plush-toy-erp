@@ -214,6 +214,7 @@ export function createMobileScrollScenarios(deps) {
           tasks: [],
           task_ids: [],
           orders: [],
+          quality_photo_sources: [],
         }))
         const offset = body.params.offset || 0
         await route.fulfill({
@@ -230,6 +231,8 @@ export function createMobileScrollScenarios(deps) {
                 view_total: 35,
                 open: 35,
                 closed: 0,
+                pending_plan: 35,
+                executing: 0,
                 pending_tasks: 0,
                 affected_orders: 0,
               },

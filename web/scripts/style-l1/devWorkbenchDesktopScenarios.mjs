@@ -138,10 +138,43 @@ export function createDevWorkbenchDesktopScenarios({
         assert.match(await approvalRow.innerText(), /审批通过 \/ 审批退回/u)
         const header = page.locator('.erp-dev-task-handling__header')
         const before = await header.boundingBox()
-        const chooseFilter = (group, option) => page
+        const filter = page.getByRole('region', { name: '任务清单', exact: true }).getByRole('button', { name: /^筛选/u })
+        const panel = page.getByRole('dialog', { name: '筛选条件', exact: true })
+        const clear = panel.locator('header').getByRole('button', { name: '清空筛选', exact: true })
+        const dismiss = panel.locator('footer').getByRole('button', { name: '收起', exact: true })
+        const filterBefore = await filter.boundingBox()
+        const openFilters = async () => {
+          if (await filter.getAttribute('aria-expanded') === 'false') await filter.click()
+          await panel.waitFor()
+        }
+        const filterOption = (group, option) => panel
           .getByRole('group', { name: group, exact: true })
           .getByRole('button', { name: option, exact: true })
-          .click()
+        const clearFilters = async () => {
+          await openFilters()
+          await clear.click()
+          for (const group of ['办理岗位', '办理类型', '手机支持']) {
+            await filterOption(group, '不限').and(page.locator('[aria-pressed="true"]')).waitFor()
+          }
+        }
+        const chooseFilter = async (group, option) => {
+          await openFilters()
+          const choice = filterOption(group, option)
+          await choice.click()
+          await choice.and(page.locator('[aria-pressed="true"]')).waitFor()
+        }
+        assert.equal(await filter.getAttribute('aria-expanded'), 'false')
+        assert.equal(await page.getByRole('button', { name: '清空筛选', exact: true }).count(), 0)
+        assert.equal(await page.getByRole('group', { name: '办理岗位', exact: true }).count(), 0)
+        await openFilters()
+        assert.equal(await clear.count(), 1)
+        assert.equal(await clear.isEnabled(), false)
+        assert.deepEqual(await panel.getByRole('group').evaluateAll((groups) => groups.map((group) => group.getAttribute('aria-label'))),
+          ['办理岗位', '办理类型', '手机支持'])
+        assert.equal(await panel.locator('button[aria-pressed="true"] .anticon-check').count(), 3)
+        await dismiss.press('Escape')
+        await panel.waitFor({ state: 'hidden' })
+        assert(await filter.evaluate((button) => document.activeElement === button))
         assert.equal(await listTab.getAttribute('aria-selected'), 'true')
         assert.deepEqual(await page.locator('.erp-dev-task-catalog').getByRole('columnheader').allTextContents(),
           ['办理事项', '办理岗位', '办理类型', '本次办理', '审批与交接', '电脑', '手机'])
@@ -167,29 +200,60 @@ export function createDevWorkbenchDesktopScenarios({
         await page.reload()
         await expectHeading(page, '任务办理')
         assert.equal(new URL(page.url()).searchParams.get('role'), 'sales')
+        assert.equal(await filter.getAttribute('aria-expanded'), 'false')
+        assert.equal(await page.locator('.erp-dev-task-filter-summary').innerText(), '业务')
         assert.equal(await page.getByRole('alert').count(), 0)
-        await page.getByRole('button', { name: '重置', exact: true }).click()
+        await clearFilters()
         assert.equal(new URL(page.url()).searchParams.has('role'), false)
+        assert.equal(await filter.getAttribute('aria-expanded'), 'true')
         await chooseFilter('办理类型', '审核决策')
         const rows = page.locator('.erp-dev-task-catalog .ant-table-row')
-        for (const role of ['老板', 'PMC', '财务']) assert((await rows.allTextContents()).some((text) => text.includes(role)), `审核清单缺少 ${role}`)
+        for (const role of ['老板', 'PMC', '财务']) await rows.filter({ hasText: role }).first().waitFor()
         await chooseFilter('办理岗位', 'PMC')
+        await chooseFilter('手机支持', '仅查看')
+        assert.equal(await rows.count(), 0)
+        await chooseFilter('手机支持', '不限')
+        assert.equal(await rows.count(), 1)
         await page.reload()
         await page.getByRole('button', { name: '订单评审', exact: true }).waitFor()
         assert.equal(await rows.count(), 1)
         assert.equal(await page.getByRole('alert').count(), 0)
-        await page.getByRole('button', { name: '重置', exact: true }).click()
-        const after = await header.boundingBox()
-        for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(before[key] - after[key]) <= 1, `任务办理页头 ${key} 不应跳动`)
-
+        await clearFilters()
+        await page.locator('.erp-dev-task-filter-summary').waitFor({ state: 'hidden' })
+        for (const [locator, original] of [[header, before], [filter, filterBefore]]) {
+          const after = await locator.boundingBox()
+          for (const key of ['x', 'y', 'width', 'height']) assert(Math.abs(original[key] - after[key]) <= 1, `页头和筛选操作的 ${key} 不应跳动`)
+        }
         await page.setViewportSize({ width: 1024, height: 360 })
+        await openFilters()
+        await waitForFiniteAnimations(page, { selector: '.erp-anchored-control-popover' })
+        const trigger = await filter.boundingBox()
+        const popup = await panel.evaluate((element) => {
+          const bounds = element.closest('.ant-popover').getBoundingClientRect()
+          const titleArea = element.querySelector('header')
+          const footer = element.querySelector('footer')
+          return {
+            top: bounds.top,
+            bottom: bounds.bottom,
+            actionsFit: titleArea.scrollWidth <= titleArea.clientWidth && footer.scrollWidth <= footer.clientWidth,
+          }
+        })
+        assert(popup.top >= trigger.y + trigger.height && popup.bottom <= 360,
+          `短窗口中筛选面板应在入口下方完整显示（入口底部 ${trigger.y + trigger.height}，气泡范围 ${popup.top}–${popup.bottom}）`)
+        assert(popup.actionsFit, '短窗口中筛选标题和操作应完整显示')
+        await chooseFilter('手机支持', '仅查看')
+        const groups = panel.locator('.erp-dev-task-filter-panel__groups')
+        assert(await groups.evaluate((element) => element.scrollTop > 0), '短窗口中应能在面板内滚动到靠后的筛选选项')
+        await clearFilters()
+        await assertNoHorizontalOverflow(page)
+        await dismiss.click()
+        await panel.waitFor({ state: 'hidden' })
+        assert(await filter.evaluate((button) => document.activeElement === button))
+
         await chooseFilter('办理岗位', '仓库')
-        const warehouse = page.getByRole('group', { name: '办理岗位', exact: true })
-          .getByRole('button', { name: '仓库', exact: true })
-        await warehouse.and(page.locator('[aria-pressed="true"]')).waitFor()
+        await dismiss.click()
         const detail = page.getByRole('button', { name: '材料入库', exact: true })
         await detail.click()
-        await detail.and(page.locator('[aria-expanded="true"]')).waitFor()
         const selectedSearch = new URL(page.url()).search
         const tableScroll = page.locator('.erp-dev-task-catalog .ant-table-content')
         const scrollLeft = await tableScroll.evaluate((node) => {
@@ -212,7 +276,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert.equal(await tableScroll.evaluate((node) => node.scrollLeft), scrollLeft)
         assert.equal(new URL(page.url()).search, selectedSearch)
         assert.equal(await detail.getAttribute('aria-expanded'), 'true')
-        assert.equal(await warehouse.getAttribute('aria-pressed'), 'true')
+        assert.equal(await page.locator('.erp-dev-task-filter-summary').innerText(), '仓库')
         await assertNoHorizontalOverflow(page)
       }
       if (item.route === '/__dev') {
@@ -1308,80 +1372,21 @@ export function createDevWorkbenchDesktopScenarios({
         )
       }
       if (item.route === DEV_CUSTOMER_CONFIG_ROUTE) {
-        await page
-          .getByRole('tablist', { name: '客户配置工作任务' })
-          .getByRole('tab', { name: /^检查配置(?:\s|$)/u })
-          .click()
-        const preflight = page.locator('[data-dev-customer-view="包预检"]')
-        await preflight.waitFor({ state: 'visible' })
-        const sections = page.getByRole('tablist', { name: '配置预检任务' })
-        for (const section of [
-          { label: '包结构', key: 'package' },
-          { label: '运行设置', key: 'runtime' },
-          { label: '流程策略', key: 'flow' },
-          { label: '扩展登记', key: 'extensions' },
-          { label: '包结构', key: 'package' },
-        ]) {
-          await sections
-            .getByRole('tab', { name: new RegExp(`^${section.label}`, 'u') })
-            .click()
-          await page.waitForURL(
-            (url) =>
-              url.searchParams.get('view') === 'preflight' &&
-              (url.searchParams.get('section') || 'package') === section.key
-          )
-          if (section.key === 'package') {
-            const map = preflight.getByRole('group', { name: '客户包组成与去向' })
-            await map.getByRole('button', { name: '流程策略与评审草案', exact: true }).getByText('草案仅供预览', { exact: true }).waitFor({ state: 'visible' })
-            await map.getByRole('button', { name: '扩展登记', exact: true }).getByText('暂无扩展登记', { exact: true }).waitFor({ state: 'visible' })
-          } else if (section.key === 'runtime') {
-            await preflight.getByText('编译范围', { exact: true }).click()
-            const catalog = preflight.locator('.erp-dev-customer-tool')
-            assert(
-              (
-                await catalog
-                  .filter({ has: page.getByText('策略目录', { exact: true }) })
-                  .innerText()
-              ).includes('仅声明式预览')
-            )
-            assert(
-              (
-                await catalog
-                  .filter({
-                    has: page.getByText('扩展点目录', { exact: true }),
-                  })
-                  .innerText()
-              ).includes('当前未实现')
-            )
-          } else if (section.key === 'extensions') {
-            await preflight.getByRole('region', { name: '本包扩展登记' }).getByText('暂无扩展登记', { exact: true }).waitFor()
-          } else {
-            await preflight.getByRole('region', { name: '本包的流程与策略' }).getByText('仅预览 · 不执行', { exact: true }).waitFor()
-            await preflight.getByText('查看候选策略与命令声明', { exact: true }).click()
-            const checks = preflight.locator('.erp-dev-customer-formal-gate')
-            await checks
-              .filter({ hasText: '仅声明式预览' })
-              .first()
-              .waitFor({ state: 'visible' })
-            const previews = await checks
-              .filter({ hasText: '仅声明式预览' })
-              .allTextContents()
-            assert(previews.length > 0)
-            assert(previews.every((text) => text.includes('仅预览')))
-          }
-          assert.doesNotMatch(
-            await preflight.innerText(),
-            /已登记绑定|实现来自已登记部署包/u
-          )
-          await assertNoHorizontalOverflow(
-            page,
-            `${item.route} ${section.label}`
-          )
-        }
+        const sections = page.getByRole('tablist', { name: '配置核对内容', exact: true })
+        await sections.getByRole('tab', { name: '配置字段', selected: true }).waitFor()
+        await page.getByRole('table', { name: '配置字段及影响' }).waitFor()
+        await sections.getByRole('tab', { name: '流程与策略', exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('section') === 'flow')
+        const policies = page.getByRole('region', { name: '本包的流程与策略' })
+        await policies.getByRole('table', { name: '发布候选流程' }).waitFor()
+        assert.doesNotMatch(await policies.innerText(), /已登记绑定|实现来自已登记部署包/u)
+        await sections.getByRole('tab', { name: '扩展登记', exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('section') === 'extensions')
+        await page.getByText('暂无扩展登记', { exact: true }).waitFor()
         await page.reload()
-        await preflight.waitFor({ state: 'visible' })
-        assert.equal(new URL(page.url()).searchParams.get('view'), 'preflight')
-        assert.equal(new URL(page.url()).searchParams.get('section'), null)
+        await sections.getByRole('tab', { name: '扩展登记', selected: true }).waitFor()
+        await sections.getByRole('tab', { name: '配置字段', exact: true }).click()
+        await page.waitForURL((url) => !url.searchParams.has('section'))
       }
       await assertNoHorizontalOverflow(page, item.route)
     },

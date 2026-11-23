@@ -4,13 +4,13 @@ import { clearTrackingFilters, readTrackingFilters, writeTrackingFilters, readTr
 
 test('tracking filters preserve peer scopes and source-document deep links', () => {
   const original = new URLSearchParams('track_search_started=小熊&track_source_type=sales_order&track_source_id=12&track_kind=process&track_id=1')
-  const started = writeTrackingFilters(original, 'started', { status: 'active', owner_role_key: 'engineering', date_from: '2026-10-08', date_to: '2026-10-08' })
+  const started = writeTrackingFilters(original, 'started', { status: 'active', attention: 'overdue', owner_role_key: 'engineering', date_from: '2026-10-08', date_to: '2026-10-08' })
   const both = writeTrackingFilters(started, 'participated', { source_type: 'purchase_order', attention: 'blocked', search: '布料' })
   assert.equal(readTrackingFilters(both, 'started').status, 'active')
   assert.equal(readTrackingFilters(both, 'participated').source_type, 'purchase_order')
   const reset = clearTrackingFilters(both, 'started')
-  assert.equal(readTrackingFilters(reset, 'started').status, 'active')
-  assert.ok(Object.entries(readTrackingFilters(reset, 'started')).filter(([key]) => key !== 'status').every(([, value]) => value === ''))
+  assert.deepEqual(readTrackingFilters(reset, 'started'), { status: 'active', attention: 'overdue', owner_role_key: '', source_type: '', date_from: '', date_to: '' })
+  assert.equal(readTrackingFilters(reset, 'participated').attention, 'blocked')
   assert.equal(reset.get('track_search_started'), '小熊')
   assert.equal(reset.get('track_search_participated'), '布料')
   assert.equal(reset.get('track_source_type'), 'sales_order')

@@ -1,3 +1,5 @@
+import { PAYMENT_STATUS_META } from '../../erp/components/finance/financePaymentStatus.mjs'
+import { warehouseProductionStageLabels } from '../../erp/utils/warehouseProductionWork.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   getCustomerPackage,
@@ -95,9 +97,12 @@ export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
     'bom_headers_status_allowed'
   ),
   'master.lifecycle': Object.freeze({
-    kind: 'markdown_inline_set',
-    path: STATUS_INDEX_DOC,
-    marker: 'activation vocabulary:',
+    kind: 'ent_check_agreement',
+    refs: ['material', 'product', 'product_sku', 'customer', 'supplier', 'warehouse', 'contact', 'process', 'unit'].map((name) => ({
+      kind: 'ent_bool_activation',
+      path: `server/internal/data/model/schema/${name}.go`,
+      field: 'is_active',
+    })),
   }),
   'workflow.task': entCheckContract(
     'server/internal/data/model/schema/workflow_task.go',
@@ -232,6 +237,7 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'source.production_order:RELEASED->CANCELLED': pathMetadata(['cancelled']),
   'workflow.task:ready->blocked': pathMetadata(['blocked']),
   'workflow.task:ready->rejected': pathMetadata(['rejected']),
+  'workflow.task:done->ready': pathMetadata(['reopened']),
   'workflow.task:blocked->ready': pathMetadata(['resumed']),
   'workflow.task:ready->withdrawn': pathMetadata(['cancelled']),
   'workflow.task:blocked->withdrawn': pathMetadata(['cancelled']),
@@ -280,6 +286,11 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'fact.finance:POSTED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
   'fact.finance:SETTLED->POSTED': pathMetadata(['reopened']),
   'fact.finance:SETTLED->CANCELLED': pathMetadata(['cancelled']),
+  'fact.production_wip_batch:REJECTED->WAITING_QUALITY': pathMetadata(['resumed']),
+  'fact.production_wip_batch:REJECTED->ACCEPTED': pathMetadata(['resumed']),
+  'fact.production_wip_batch:REJECTED->CANCELLED': pathMetadata(['cancelled']),
+  'fact.production_wip_batch:ACCEPTED->REJECTED': pathMetadata(['reversed']),
+  'fact.production_wip_batch:CANCELLED->REJECTED': pathMetadata(['reversed']),
   'fact.production_wip_batch:PLANNED->CANCELLED': pathMetadata(['cancelled']),
   'fact.production_wip_batch:WAITING_QUALITY->REJECTED': pathMetadata([
     'rejected',
@@ -343,7 +354,7 @@ const evidence = (kind, ref, summary) =>
     status: 'current_source',
   })
 
-const state = (key, label, summary = '') => ({ key, label, summary })
+const state = (key, label, summary) => ({ key, label, summary })
 
 const transition = (
   from,
@@ -411,7 +422,7 @@ function freezeContractRef(value, ownerKey) {
       (!exactNonEmptyString(value.constraint) ||
         !exactNonEmptyString(value.field))) ||
     (value.kind === 'go_const_prefix' && !exactNonEmptyString(value.prefix)) ||
-    (value.kind === 'markdown_inline_set' && !exactNonEmptyString(value.marker))
+    (value.kind === 'ent_bool_activation' && !exactNonEmptyString(value.field))
   ) {
     throw new Error(`${ownerKey} has an invalid contractRef`)
   }
@@ -464,39 +475,98 @@ function normalizeEvidence(items = [], ownerKey = '') {
 }
 
 const RULE_DIMENSIONS = Object.freeze({
+  'source.production_order': [{
+    key: 'material_requirements_state',
+    label: '生产用料依据',
+    guard: '用料依据由生产单明细、绑定的物料清单和已保存的用量逐项核对。',
+    contractRef: goConstContract('server/internal/biz/production_order.go', 'ProductionOrderMaterialRequirements'),
+    states: [
+      state('NOT_REQUIRED', '无需用料快照', '这张生产单的明细都没有绑定物料清单。'),
+      state('READY', '用料依据齐全', '已保存的用料与各行绑定的物料清单对应，可以据此核对领料。'),
+      state('NEEDS_REVIEW', '用料依据待核对', '用料和生产单或物料清单对不上，需要先查清再办理领料。'),
+    ],
+  }],
+  'fact.production_wip_batch': [{
+    key: 'warehouse_production_stage',
+    label: '仓库回货与成品入库进度',
+    guard: '仓库结合回货批次、入库单、待检数量和待包装数量判断当前要办的事。',
+    contractRef: goConstContract('server/internal/biz/warehouse_production_work.go', 'WarehouseProductionStage'),
+    states: [
+      state('AWAITING_RETURN', warehouseProductionStageLabels.AWAITING_RETURN, '外发加工的货要由仓库清点并登记收回数量。'),
+      state('AWAITING_INBOUND', warehouseProductionStageLabels.AWAITING_INBOUND, '成品入库单已开好，等仓库核对实物并入库。'),
+      state('AWAITING_QUALITY', warehouseProductionStageLabels.AWAITING_QUALITY, '还有待品质人员判定的数量。'),
+      state('AWAITING_PACKAGING', warehouseProductionStageLabels.AWAITING_PACKAGING, '还有待查货包装的数量，可查看包材是否已经确认。'),
+      state('READY', warehouseProductionStageLabels.READY, '当前没有待检或待包装数量，可以核对出货条件。'),
+      state('COMPLETED', warehouseProductionStageLabels.COMPLETED, '成品入库已办完，或这批回货已走完当前仓库步骤。'),
+      state('REJECTED', warehouseProductionStageLabels.REJECTED, '关联批次未通过检验，等核对异常处置。'),
+      state('CANCELLED', warehouseProductionStageLabels.CANCELLED, '对应的回货批次或成品入库记录已取消。'),
+    ],
+  }],
   'process.instance': [{
     key: 'resolution_kind',
-label: '流程结束结果',
-    states: [state('succeeded', '成功结束'), state('rejected', '驳回结束'), state('cancelled', '取消结束'), state('compensated', '补偿结束')],
+    label: '流程结束结果',
+    states: [
+      state('succeeded', '成功结束', '这次流程按预期办完。'),
+      state('rejected', '驳回结束', '审批人驳回了本次申请，流程已经结束。'),
+      state('cancelled', '取消结束', '来源业务取消，这次流程随之结束。'),
+      state('compensated', '补偿结束', '先前生效的业务影响已经抵消，流程据此结束。'),
+    ],
     guard: '实例 completed 必须结合结束结果、原因和时间阅读。来源取消或正式补偿可更新已结束实例的结果，不重开或重放领域副作用。',
     contractRef: entCheckContract('server/internal/data/model/schema/process_instance.go', 'process_instances_resolution_allowed', 'resolution_kind'),
   }],
   'process.node': [{
+    key: 'block_kind',
+    label: '流程受阻原因',
+    guard: '查看阻碍的原因，再决定由谁处理或恢复这一步。',
+    contractRef: goConstContract('server/internal/biz/process_runtime.go', 'ProcessBlockKind'),
+    states: [
+      state('manual', '人工暂停', '经办人主动暂停了这一步。'),
+      state('domain_command', '业务操作受阻', '系统办理关联单据时遇到阻碍，需要查对应记录。'),
+      state('overdue', '超过期限', '已超过这一步的办理期限。'),
+      state('rejection_without_route', '退回后无去向', '审批已拒绝，当前流程没有可接着走的退回步骤。'),
+    ],
+  }, {
     key: 'domain_command_result_state',
-label: '领域命令执行结果',
-    states: [state('succeeded', '执行成功'), state('blocked', '执行受阻')],
+    label: '领域命令执行结果',
+    states: [
+      state('succeeded', '执行成功', '系统已记下这次办理成功的结果。'),
+      state('blocked', '执行受阻', '这次办理遇到问题，需要查明原因后再处理。'),
+    ],
     guard: '结果属于一次节点尝试的持久回执；受阻恢复不删除旧回执或假定副作用未发生。',
     contractRef: goConstContract('server/internal/biz/process_runtime.go', 'ProcessDomainCommandResultState'),
     schemaStatusRefs: [schemaStatusRef('server/internal/data/model/schema/process_node_instance.go', 'domain_command_result_state')],
   }, {
     key: 'domain_command_effect_state',
-label: '领域副作用与补偿',
-    states: [state('unknown', '影响待确认'), state('none', '没有业务副作用'), state('applied', '业务影响已生效'), state('compensated', '业务影响已补偿')],
+    label: '领域副作用与补偿',
+    states: [
+      state('unknown', '影响待确认', '还需要查证这次操作是否影响了业务。'),
+      state('none', '没有业务副作用', '已确认这次尝试没有改变业务记录。'),
+      state('applied', '业务影响已生效', '这次操作已经改变了对应业务记录。'),
+      state('compensated', '业务影响已补偿', '先前生效的操作已通过正式的撤销或冲销抵消。'),
+    ],
     guard: '这些是结果维度，不是顺序步骤。已生效影响经正式取消或冲正、精确回执校验后才能记为已补偿；恢复必须验证下游安全并撤回受影响任务，不能重放原命令。',
     contractRef: goConstContract('server/internal/biz/process_runtime.go', 'ProcessDomainCommandEffectState'),
     schemaStatusRefs: [schemaStatusRef('server/internal/data/model/schema/process_node_instance.go', 'domain_command_effect_state')],
   }],
   'fact.quality_inspection': [{
     key: 'result',
-label: '质检判定结果',
-    states: [state('PASS', '合格'), state('REJECT', '不合格'), state('CONCESSION', '让步接收')],
+    label: '质检判定结果',
+    states: [
+      state('PASS', '合格', '检验达到接收标准。'),
+      state('REJECT', '不合格', '本次检验判定不符合接收要求。'),
+      state('CONCESSION', '让步接收', '存在偏差，已按让步条件同意接收。'),
+    ],
     guard: '检验生命周期与判定结果分开：PASSED 可对应 PASS 或 CONCESSION，不能把让步接收显示成普通合格；无结论时不推测结果。',
     contractRef: entCheckContract('server/internal/data/model/schema/quality_inspection.go', 'quality_inspections_result_allowed', 'result'),
   }],
   'control.customer_config_revision': [{
     key: 'module_availability',
-label: '模块可用状态',
-    states: [state('enabled', '可读写'), state('read_only', '只读'), state('disabled', '停用')],
+    label: '模块可用状态',
+    states: [
+      state('enabled', '可读写', '该模块允许按岗位权限查看和办理业务。'),
+      state('read_only', '只读', '该模块只开放查看。'),
+      state('disabled', '停用', '当前配置已停用该模块。'),
+    ],
     guard: '模块可用状态经客户配置发布、切换检查和激活生效，决定入口与动作是否可用；属于配置控制面，不是订单办理步骤。',
     contractRef: { kind: 'go_comparison_set', path: 'server/internal/biz/customer_config_validation.go', selector: 'item.State' },
     schemaStatusRefs: [schemaStatusRef('server/internal/data/model/schema/deployment_module_state.go', 'state')],
@@ -756,7 +826,7 @@ const sourceDocumentEvidence = [
   evidence(
     'doc',
     STATUS_INDEX_DOC,
-    '状态索引登记源单 canonical key 与目标生命周期。'
+    '状态字典提供到业务规则的查阅入口。'
   ),
 ]
 
@@ -766,12 +836,13 @@ const factEvidence = [
     STATUS_BOUNDARY_DOC,
     'Fact 与 Ledger 只能由对应领域 usecase 写入和纠错。'
   ),
-  evidence('doc', STATUS_INDEX_DOC, '状态索引登记各事实对象的精确状态集合。'),
+  evidence('doc', STATUS_INDEX_DOC, '状态字典提供查阅事实对象状态图和正式规则的入口。'),
 ]
 
 function draftPostedCancelledDefinition({
   key,
   label,
+  postedMeaning,
   sourceRefs,
   postAction,
   cancelAction,
@@ -785,9 +856,9 @@ function draftPostedCancelledDefinition({
     label,
     summary: `${label}从草稿过账；取消会保留正式冲销或处置证据。`,
     states: [
-      state('DRAFT', '草稿'),
-      state('POSTED', '已过账'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', `这张${label}单已经填写，等核对后办理。`),
+      state('POSTED', '已过账', postedMeaning),
+      state('CANCELLED', '已取消', `这张${label}单已经撤销，可查原记录和撤销依据。`),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['CANCELLED'],
@@ -822,14 +893,17 @@ function draftPostedCancelledDefinition({
   }
 }
 
-function immutableRedEntryDefinition({ key, label, sourceRefs, summary }) {
+function immutableRedEntryDefinition({ key, label, sourceRefs, summary, postedMeaning, reversedMeaning }) {
   return {
     key,
     scopeKey: 'fact_ledger',
     kind: 'taxonomy',
     label,
     summary,
-    states: [state('POSTED', '已过账'), state('REVERSED', '反向记录')],
+    states: [
+      state('POSTED', '已过账', postedMeaning),
+      state('REVERSED', '反向记录', reversedMeaning),
+    ],
     initialStates: ['POSTED', 'REVERSED'],
     terminalStates: ['POSTED', 'REVERSED'],
     transitions: [],
@@ -854,10 +928,10 @@ const FLOW_DEFINITIONS = [
     summary:
       '按订单和已确认 BOM 冻结应需数量，老板、财务两级审核后按厂商生成采购订单；库存与在途不自动抵扣。',
     states: [
-      state('SUBMITTED', '待老板审核'),
-      state('BOSS_APPROVED', '待财务审核'),
-      state('APPROVED', '已批准采购'),
-      state('REJECTED', '已退回'),
+      state('SUBMITTED', '待老板审核', '工程已提交用料，等老板核准。'),
+      state('BOSS_APPROVED', '待财务审核', '老板已经同意，轮到财务核对用料。'),
+      state('APPROVED', '已批准采购', '财务已批准，系统按供应商生成对应采购单。'),
+      state('REJECTED', '已退回', '审核人退回用料，工程要按原因修改后再提交。'),
     ],
     initialStates: ['SUBMITTED'],
     terminalStates: ['APPROVED', 'REJECTED'],
@@ -913,11 +987,11 @@ const FLOW_DEFINITIONS = [
     label: '销售订单',
     summary: '销售承诺从草稿、提交、生效到关闭或取消。',
     states: [
-      state('draft', '草稿'),
-      state('submitted', '已提交'),
-      state('active', '已生效'),
-      state('closed', '已关闭'),
-      state('canceled', '已取消'),
+      state('draft', '草稿', '销售正在整理客户要什么、多少件、何时交货。'),
+      state('submitted', '已提交', '订单已交给相关岗位受理，等待生效。'),
+      state('active', '已生效', '订单已经确认，可以按单准备生产和交付。'),
+      state('closed', '已关闭', '这张订单的后续履约已结束，记录可供查阅。'),
+      state('canceled', '已取消', '这张订单已撤销，后续不再按它办理。'),
     ],
     initialStates: ['draft'],
     terminalStates: ['closed', 'canceled'],
@@ -982,13 +1056,13 @@ const FLOW_DEFINITIONS = [
     label: '采购订单',
     summary: '采购承诺从草稿、提交、批准到关闭或取消。',
     states: [
-      state('draft', '草稿'),
-      state('submitted', '已提交'),
-      state('approved', '已批准'),
-      state('closed', '已关闭'),
-      state('canceled', '已取消'),
+      state('draft', '草稿', '采购正在填写要买的材料、数量和供应商。'),
+      state('submitted', '已提交', '采购要求已经提交，等审批。'),
+      state('approved', '已批准', '采购已获准，可以按仍开放的明细收货。'),
+      state('closed', '已关闭', '这张采购单已经收尾，剩余明细不再继续收货。'),
+      state('canceled', '已取消', '这张采购单已撤销。'),
     ],
-    initialStates: ['draft'],
+    initialStates: ['draft', 'approved'],
     terminalStates: ['closed', 'canceled'],
     transitions: [
       transition('draft', 'submitted', {
@@ -1051,11 +1125,11 @@ const FLOW_DEFINITIONS = [
     label: '委外订单',
     summary: '委外承诺从草稿、提交、确认到关闭或取消。',
     states: [
-      state('draft', '草稿'),
-      state('submitted', '已提交'),
-      state('confirmed', '已确认'),
-      state('closed', '已关闭'),
-      state('canceled', '已取消'),
+      state('draft', '草稿', '正在拟定外发给哪家工厂、做什么和做多少。'),
+      state('submitted', '已提交', '加工合同已提交，等确认。'),
+      state('confirmed', '已确认', '合同已确认，可按合同办理发料或工序外发。'),
+      state('closed', '已关闭', '这份合同的后续加工业务已经收尾。'),
+      state('canceled', '已取消', '这份加工合同已撤销。'),
     ],
     initialStates: ['draft'],
     terminalStates: ['closed', 'canceled'],
@@ -1119,15 +1193,16 @@ const FLOW_DEFINITIONS = [
     label: '生产订单',
     summary: '生产承诺从草稿发布，随后关闭或受事实门禁取消。',
     states: [
-      state('DRAFT', '草稿'),
-      state('RELEASED', '已发布'),
-      state('CLOSED', '已关闭'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', '正在准备生产任务，尚未下达。'),
+      state('RELEASED', '已发布', '生产任务已经下达，可以安排工序和批次。'),
+      state('CLOSED', '已关闭', '这张生产单已经收尾。'),
+      state('CANCELLED', '已取消', '生产安排已撤销，该单停止执行。'),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['CLOSED', 'CANCELLED'],
     transitions: [
       transition('DRAFT', 'RELEASED', {
+        label: '下达生产单',
         guard: '发布会冻结正式生产需求并校验当前版本。',
         action: 'release_production_order',
         permission: [PermissionCode.PMC_PLAN_UPDATE],
@@ -1180,9 +1255,9 @@ const FLOW_DEFINITIONS = [
     label: '销售 / 采购 / 委外订单行',
     summary: '订单行共享开放、关闭、取消词汇，但不存在跨源单的通用迁移器。',
     states: [
-      state('open', '开放'),
-      state('closed', '已关闭'),
-      state('canceled', '已取消'),
+      state('open', '开放', '这行商品或材料还可按剩余数量继续办理。'),
+      state('closed', '已关闭', '这行已经收尾，余量不再继续履行。'),
+      state('canceled', '已取消', '这一行已撤销，请按单上其他有效明细办理。'),
     ],
     initialStates: ['open'],
     terminalStates: ['closed', 'canceled'],
@@ -1217,9 +1292,9 @@ const FLOW_DEFINITIONS = [
     label: 'BOM 版本',
     summary: 'BOM 版本可以从草稿激活或归档，并允许归档版本重新激活。',
     states: [
-      state('DRAFT', '草稿'),
-      state('ACTIVE', '生效'),
-      state('ARCHIVED', '已归档'),
+      state('DRAFT', '草稿', '工程正在编制这版产品用料。'),
+      state('ACTIVE', '生效', '这版用料清单已生效，可供业务选用。'),
+      state('ARCHIVED', '已归档', '这版清单已收存，历史用料仍可追查。'),
     ],
     initialStates: ['DRAFT'],
     terminalStates: [],
@@ -1261,7 +1336,7 @@ const FLOW_DEFINITIONS = [
       evidence(
         'doc',
         STATUS_INDEX_DOC,
-        '状态索引登记 BOM DRAFT / ACTIVE / ARCHIVED 合同。'
+        '状态字典提供业务规则入口，可在状态流转中选择 BOM 版本。'
       ),
       evidence(
         'code',
@@ -1277,8 +1352,8 @@ const FLOW_DEFINITIONS = [
     label: '主数据启停规则',
     summary: '材料、产品、客户、供应商与仓库按各自后端规则启停；BOM 归档见 BOM 版本规则。',
     states: [
-      state('active', '启用'),
-      state('inactive', '停用'),
+      state('active', '启用', '办理新业务时，可按使用条件选用这条资料。'),
+      state('inactive', '停用', '这条资料已停止供新业务选用，旧单仍可查。'),
     ],
     initialStates: [],
     terminalStates: [],
@@ -1289,7 +1364,7 @@ const FLOW_DEFINITIONS = [
     factBoundary: 'master_data_only',
     sourceRefs: [STATUS_INDEX_DOC],
     evidence: [
-      evidence('doc', STATUS_INDEX_DOC, '状态树明确主数据生命周期为对象专属。'),
+      evidence('doc', STATUS_INDEX_DOC, '状态字典提供业务规则入口，可在状态流转中选择主数据启停规则。'),
     ],
   },
   {
@@ -1299,13 +1374,13 @@ const FLOW_DEFINITIONS = [
     label: 'Workflow 协同任务',
     summary: '任务表达可执行、阻塞、完成、退回或系统撤回；任务完成不替代业务事实。',
     states: [
-      state('ready', '可执行'),
-      state('blocked', '阻塞'),
-      state('done', '已完成'),
-      state('rejected', '已退回'),
-      state('withdrawn', '已撤回'),
+      state('ready', '可执行', '已经轮到对应岗位办理这件事。'),
+      state('blocked', '阻塞', '暂时还办不了，例如正在等来料检验结果。'),
+      state('done', '已完成', '岗位已经办完这件事，实际入库、出货或账款到对应单据查看。'),
+      state('rejected', '已退回', '经办人退回了这件事，可以查看退回原因。'),
+      state('withdrawn', '已撤回', '来源业务或流程已收回这件待办。'),
     ],
-    initialStates: ['ready'],
+    initialStates: ['ready', 'blocked'],
     terminalStates: ['done', 'rejected', 'withdrawn'],
     transitions: [
       transition('ready', 'blocked', {
@@ -1332,6 +1407,13 @@ const FLOW_DEFINITIONS = [
         permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
         factBoundary: 'workflow_only',
       }),
+      transition('done', 'ready', {
+        guard: '仅适用于由来源单据持续同步的待办。例如委外回货发起检验后，若检验草稿被取消，原来的发起检验待办重新可办。',
+        action: 'syncFulfillmentTaskRecord',
+        systemOnly: true,
+        factBoundary: 'workflow_only',
+        sourceRefs: ['server/internal/data/fulfillment_tasks.go', 'server/internal/data/fulfillment_tasks_test.go'],
+      }),
       ...['ready', 'blocked'].map((from) => transition(from, 'withdrawn', {
         guard: '仅来源取消、流程终止或上游补偿恢复由系统撤回；校验来源、任务与节点版本，保留撤回原因；无通用人工撤回入口。',
         action: 'ProcessRuntime internal withdrawal',
@@ -1342,7 +1424,7 @@ const FLOW_DEFINITIONS = [
       })),
     ],
     guard:
-      'task done 不等于 Fact posted；withdrawn 仅由来源取消、流程终止或上游补偿触发；终态任务不重开。',
+      '岗位待办显示谁还需要处理这件事。由单据派发的待办随来源重新核对，图中标有专用恢复动作。库存和欠款分别查看对应单据。',
     factBoundary: 'workflow_only',
     sourceRefs: [
       'server/internal/biz/workflow_metadata.go',
@@ -1414,9 +1496,9 @@ const FLOW_DEFINITIONS = [
     label: 'ProcessRuntime 实例',
     summary: '流程受阻可恢复；结束时另记成功、驳回、取消或补偿结果。',
     states: [
-      state('active', '运行中'),
-      state('completed', '已结束'),
-      state('blocked', '已阻塞'),
+      state('active', '运行中', '这次流程正在推进，可查看目前轮到哪一步。'),
+      state('completed', '已结束', '这次流程已经结束，具体是办成、驳回、取消还是抵消后结束，要看结束结果。'),
+      state('blocked', '已阻塞', '流程遇到了阻碍，等负责岗位处理后继续。'),
     ],
     initialStates: ['active'],
     terminalStates: ['completed'],
@@ -1480,11 +1562,11 @@ const FLOW_DEFINITIONS = [
     label: 'ProcessRuntime 节点 attempt',
     summary: '节点 attempt 从等待激活，可完成、阻塞后恢复，或由运行时撤回。',
     states: [
-      state('waiting', '等待中'),
-      state('active', '运行中'),
-      state('completed', '已完成'),
-      state('blocked', '已阻塞'),
-      state('withdrawn', '已撤回'),
+      state('waiting', '等待中', '前面的步骤还没走到这里。'),
+      state('active', '运行中', '当前轮到这一步办理。'),
+      state('completed', '已完成', '这一步已办完，后续走向取决于办理结果。'),
+      state('blocked', '已阻塞', '这一步遇到了问题，原因和处理进展可查。'),
+      state('withdrawn', '已撤回', '流程已收回这一步待办。'),
     ],
     initialStates: ['waiting'],
     terminalStates: ['completed', 'withdrawn'],
@@ -1555,6 +1637,7 @@ const FLOW_DEFINITIONS = [
     {
       key: 'fact.purchase_receipt',
       label: '采购入库',
+      postedMeaning: '实际接收入库的数量已加入库存。',
       schemaPath: 'server/internal/data/model/schema/purchase_receipt.go',
       postAction: 'post_purchase_receipt',
       cancelAction: 'cancel_purchase_receipt',
@@ -1566,6 +1649,7 @@ const FLOW_DEFINITIONS = [
     {
       key: 'fact.purchase_return',
       label: '采购退货',
+      postedMeaning: '已经按退货明细从采购库存中扣回相应数量。',
       schemaPath: 'server/internal/data/model/schema/purchase_return.go',
       postAction: 'post_purchase_return',
       cancelAction: 'cancel_purchase_return',
@@ -1575,6 +1659,7 @@ const FLOW_DEFINITIONS = [
     {
       key: 'fact.purchase_receipt_adjustment',
       label: '采购入库调整',
+      postedMeaning: '入库数量的差额已计入库存，可查到关联的原入库单。',
       schemaPath:
         'server/internal/data/model/schema/purchase_receipt_adjustment.go',
       postAction: 'post_purchase_receipt_adjustment',
@@ -1589,9 +1674,9 @@ const FLOW_DEFINITIONS = [
     label: item.label,
     summary: `${item.label}使用草稿、过账和取消的正式事实生命周期。`,
     states: [
-      state('DRAFT', '草稿'),
-      state('POSTED', '已过账'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', `这张${item.label}单已经填写，等核对后办理。`),
+      state('POSTED', '已过账', item.postedMeaning),
+      state('CANCELLED', '已取消', `这张${item.label}单已经撤销，可查原记录和撤销依据。`),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['CANCELLED'],
@@ -1603,8 +1688,9 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('DRAFT', 'CANCELLED', {
-        guard:
-          '草稿取消结清待检与零余额预备批次；已入库只能走原有库存冲正动作。',
+        guard: item.draftCancelAction
+          ? '撤回入库草稿时，关联的待检记录和零余额预备批次一并收尾。'
+          : '这张草稿尚未改变库存，经办人可按单据权限取消。',
         action: item.draftCancelAction || item.cancelAction,
         permission: item.draftCancelPermission || item.cancelPermission,
         factBoundary: 'fact_ledger',
@@ -1645,11 +1731,11 @@ const FLOW_DEFINITIONS = [
     summary:
       '来料登记自动建立待检记录；IQC 逐项记录要求、实测、全检或抽检与结果，再办理判定。',
     states: [
-      state('DRAFT', '草稿'),
-      state('SUBMITTED', '已提交'),
-      state('PASSED', '已通过'),
-      state('REJECTED', '不通过'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', '已经开了检验单，等补齐并提交。'),
+      state('SUBMITTED', '已提交', '检验单已提交，等品质人员给出结论。'),
+      state('PASSED', '已通过', '品质已同意接收，具体看结果是合格还是让步接收。'),
+      state('REJECTED', '不通过', '品质判定无法接收，按来源办理退货、返工等处置。'),
+      state('CANCELLED', '已取消', '这次检验已撤销。'),
     ],
     initialStates: ['DRAFT', 'SUBMITTED'],
     terminalStates: ['PASSED', 'REJECTED', 'CANCELLED'],
@@ -1714,9 +1800,9 @@ const FLOW_DEFINITIONS = [
     label: '出货单',
     summary: '出货单由草稿确认出货；取消时写库存 REVERSAL。',
     states: [
-      state('DRAFT', '草稿'),
-      state('SHIPPED', '已出货'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', '仓库已开出货单，等核对货物和放行条件。'),
+      state('SHIPPED', '已出货', '货物已按这张单出库，出货数量和库存扣减已登记。'),
+      state('CANCELLED', '已取消', '这次出货已撤销，若已出库则会留下库存冲回记录。'),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['CANCELLED'],
@@ -1769,6 +1855,7 @@ const FLOW_DEFINITIONS = [
       key: 'fact.production',
       usecaseSource: 'server/internal/biz/operational_fact_production.go',
       label: '生产事实',
+      postedMeaning: '本次领料、完工或返工已按单据类型正式登记，可查到对应数量和批次。',
       postAction: 'post_production_fact',
       cancelAction: 'cancel_production_fact',
       postPermission: [PermissionCode.PRODUCTION_FACT_POST],
@@ -1778,6 +1865,7 @@ const FLOW_DEFINITIONS = [
       key: 'fact.outsourcing',
       usecaseSource: 'server/internal/biz/operational_fact_outsourcing.go',
       label: '委外事实',
+      postedMeaning: '本次委外发料或回货已经登记，相关数量和批次可追查。',
       postAction: 'post_outsourcing_fact',
       cancelAction: 'cancel_outsourcing_fact',
       postPermission: [PermissionCode.OUTSOURCING_FACT_POST],
@@ -1790,9 +1878,9 @@ const FLOW_DEFINITIONS = [
     label: item.label,
     summary: `${item.label}使用草稿、过账和取消生命周期。`,
     states: [
-      state('DRAFT', '草稿'),
-      state('POSTED', '已过账'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', `这张${item.label}单已经填写，等核对后办理。`),
+      state('POSTED', '已过账', item.postedMeaning),
+      state('CANCELLED', '已取消', `这张${item.label}单已经撤销，可查原记录和撤销依据。`),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['CANCELLED'],
@@ -1839,21 +1927,23 @@ const FLOW_DEFINITIONS = [
     label: '库存预留',
     summary: 'ACTIVE 预留只能释放、消费或取消。',
     states: [
-      state('ACTIVE', '生效'),
-      state('RELEASED', '已释放'),
-      state('CONSUMED', '已消耗'),
-      state('CANCELLED', '已取消'),
+      state('ACTIVE', '生效', '库存中的这部分数量已留给指定业务。'),
+      state('RELEASED', '已释放', '原先留用的数量已解除占用。'),
+      state('CONSUMED', '已消耗', '这份预留已用于实际出库。'),
+      state('CANCELLED', '已取消', '这笔预留安排已撤销。'),
     ],
     initialStates: ['ACTIVE'],
     terminalStates: ['RELEASED', 'CONSUMED', 'CANCELLED'],
     transitions: [
       transition('ACTIVE', 'RELEASED', {
+        label: '释放预留库存',
         guard: '释放必须走预留领域 usecase。',
         action: 'release_stock_reservation',
         permission: [PermissionCode.STOCK_RESERVATION_RELEASE],
         factBoundary: 'fact_ledger',
       }),
       transition('ACTIVE', 'CONSUMED', {
+        label: '出库使用预留量',
         guard: '仅正式出货事务可以消费匹配的 ACTIVE 预留。',
         action: 'OperationalFactUsecase.ConsumeStockReservationForShipment',
         permission: [PermissionCode.SHIPMENT_SHIP],
@@ -1890,16 +1980,16 @@ const FLOW_DEFINITIONS = [
     summary:
       '财务事实从草稿过账或取消；对账可显式完成，应收应付由收付款核销、红冲或冲正派生结清，也会在反向动作恢复未结余额后重开。',
     states: [
-      state('DRAFT', '草稿'),
-      state('POSTED', '已过账'),
-      state('SETTLED', '已结清'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', '财务已开单，金额和来源等财务核对。'),
+      state('POSTED', '已过账', '这笔财务记录已正式入账，应收或应付从此计入账款。'),
+      state('SETTLED', '已结清', '应收或应付的剩余金额是 0 元，单笔核对单上的这个状态表示核对完成。'),
+      state('CANCELLED', '已取消', '财务已取消这张单，仍可查到原记录和取消原因。'),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['CANCELLED'],
     transitions: [
       transition('DRAFT', 'POSTED', {
-        guard: '来源、往来方、币种和金额由后端事实 usecase 校验。',
+        guard: '财务核对这笔记录来自哪张业务单，确认往来单位、币种和金额后办理。',
         action: 'post_finance_fact',
         permission: [
           PermissionCode.FINANCE_RECEIVABLE_CONFIRM,
@@ -1910,15 +2000,16 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('DRAFT', 'CANCELLED', {
-        guard: '仅正式来源的财务草稿可取消，校验来源、版本、操作者、非空原因与幂等；不产生收付款、核销或库存影响。',
+        guard: '草稿有明确的来源单据时，财务可以填写原因作废。此时账款尚未生效。',
         action: 'cancel_finance_fact',
         permission: [PermissionCode.FINANCE_RECEIVABLE_CONFIRM, PermissionCode.FINANCE_PAYABLE_CONFIRM, PermissionCode.FINANCE_INVOICE_CONFIRM, PermissionCode.FINANCE_RECONCILIATION_CONFIRM],
         factBoundary: 'fact_ledger',
         sourceRefs: ['server/internal/data/operational_fact_draft_cancellation_test.go'],
       }),
       transition('POSTED', 'SETTLED', {
+        label: '余额归零或完成核对',
         guard:
-          'RECONCILIATION 可显式完成核对；RECEIVABLE / PAYABLE 只能由正式 FinancePayment 分配、CreditNote 或对应冲正结果重算余额；INVOICE 不支持结清。',
+          '应收或应付的剩余金额归零后，系统自动记为已结清。单笔核对由财务确认完成。发票只办理过账或取消。',
         action:
           'settle_finance_fact / execute_finance_payment_post / create_finance_credit_note',
         permission: [
@@ -1929,14 +2020,15 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('SETTLED', 'POSTED', {
+        label: '应收应付恢复余额',
         guard:
-          '仅 RECEIVABLE / PAYABLE 在撤销核销、收付款冲正、反向红冲或采购来源调增后重新出现未结余额时，由同一领域事务更新结清状态；不开放通用重开按钮。',
+          '只适用于应收或应付。撤销原来的抵扣、冲销收付款、冲回账款调整，或调增采购应付后，只要又有金额待收或待付，系统就自动恢复到已过账。',
         action: 'reverse_finance_payment / reverse_finance_credit_note / reverse_finance_allocation / create_finance_source_adjustment',
         permission: [PermissionCode.FINANCE_PAYMENT_REVERSE, PermissionCode.FINANCE_CREDIT_NOTE_REVERSE, PermissionCode.FINANCE_CREDIT_NOTE_CREATE],
         factBoundary: 'fact_ledger',
       }),
       transition('POSTED', 'CANCELLED', {
-        guard: '必须保留 actor、非空原因和原 posted_at。',
+        guard: '先处理仍然有效的单笔核对、款项抵扣和账款调整，再填写原因取消。可以追查原过账时间和取消人。',
         action: 'cancel_finance_fact',
         permission: [
           PermissionCode.FINANCE_RECEIVABLE_CONFIRM,
@@ -1947,7 +2039,8 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('SETTLED', 'CANCELLED', {
-        guard: '仅已完成的 RECONCILIATION；校验权限、版本与原因，保留原 posted_at、settled_at 和完成人审计。',
+        label: '仅取消已完成的核对单',
+        guard: '只适用于已完成的单笔核对。财务填写取消原因，系统保留原过账和完成核对的时间、人员。',
         action: 'cancel_finance_fact',
         permission: [PermissionCode.FINANCE_RECONCILIATION_CONFIRM],
         factBoundary: 'fact_ledger',
@@ -1955,7 +2048,7 @@ const FLOW_DEFINITIONS = [
       }),
     ],
     guard:
-      '真实收付款、核销和红冲另有各自合同，并在本目录分对象登记；不得把它们合并为 finance_fact 状态。',
+      '这张图包括应收、应付、发票和单笔核对。看欠款是否结清时，查应收或应付的剩余金额。实际收了或付了多少钱，看收付款单。',
     factBoundary: 'fact_ledger',
     sourceRefs: [
       'server/internal/biz/operational_fact_finance.go',
@@ -1983,10 +2076,10 @@ const FLOW_DEFINITIONS = [
     label: '库存批次',
     summary: '批次可用、冻结、拒收和停用受余额门禁约束。',
     states: [
-      state('ACTIVE', '可用'),
-      state('HOLD', '冻结'),
-      state('REJECTED', '拒收'),
-      state('DISABLED', '停用'),
+      state('ACTIVE', '可用', '这批货可以按库位、可用数量等条件使用。'),
+      state('HOLD', '冻结', '这批货已被暂时冻结，等检验或处理。'),
+      state('REJECTED', '拒收', '这批货已被拒收，等按原因处置。'),
+      state('DISABLED', '停用', '这个库存批次已停止使用。'),
     ],
     initialStates: ['ACTIVE'],
     terminalStates: ['DISABLED'],
@@ -2055,17 +2148,17 @@ const FLOW_DEFINITIONS = [
     label: '生产在制批次',
     summary: '在制批次由命名工序动作和正式质量关口推进。',
     states: [
-      state('PLANNED', '待安排'),
-      state('SPLIT', '已拆分'),
-      state('IN_PROGRESS', '本厂加工中'),
-      state('OUTSOURCED', '委外加工中'),
-      state('WAITING_QUALITY', '待质量判定'),
-      state('ACCEPTED', '已接收'),
-      state('REJECTED', '不通过'),
-      state('CANCELLED', '已取消'),
+      state('PLANNED', '待安排', '这批在制品等安排到工序。'),
+      state('SPLIT', '已拆分', '原批次已拆为子批，进度看各个子批。'),
+      state('IN_PROGRESS', '本厂加工中', '这批正在本厂的工序加工。'),
+      state('OUTSOURCED', '委外加工中', '这批已经外发，等加工厂回货。'),
+      state('WAITING_QUALITY', '待质量判定', '本工序已交回或完工，等品质给出结论。'),
+      state('ACCEPTED', '已接收', '这批可以交下一步，需检的已判定合格或办妥让步接收。'),
+      state('REJECTED', '不通过', '这批未通过检验，等处理质量问题。'),
+      state('CANCELLED', '已取消', '这批因撤销、报废、返工或重做而停止办理。'),
     ],
     initialStates: ['PLANNED'],
-    terminalStates: ['SPLIT', 'ACCEPTED', 'REJECTED', 'CANCELLED'],
+    terminalStates: ['SPLIT'],
     transitions: [
       transition('PLANNED', 'SPLIT', {
         guard: '拆分数量、来源批次和幂等 receipt 必须通过领域校验。',
@@ -2086,13 +2179,15 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'production_wip',
       }),
       transition('PLANNED', 'CANCELLED', {
-        guard: '仅未开始批次可由命名取消动作终止。',
-        action: 'execute_production_wip_action:CANCEL_BATCH',
-        permission: [PermissionCode.PRODUCTION_WIP_ASSIGN],
+        label: '撤回未开工批次',
+        guard: '有分派权限时可取消未开工批次。生产冲正返工或重做处置时，系统也会撤回该处置创建的未开工批次。',
+        action: 'execute_production_wip_action:CANCEL_BATCH / reverse_production_exception',
+        permission: [PermissionCode.PRODUCTION_WIP_ASSIGN, PermissionCode.PRODUCTION_FACT_POST],
         factBoundary: 'production_wip',
       }),
       ...['IN_PROGRESS', 'OUTSOURCED'].flatMap((from) => [
         transition(from, 'WAITING_QUALITY', {
+          label: from === 'OUTSOURCED' ? '回货后送检' : '完工后送检',
           guard: '工序完成且冻结路线包含必需质量关口。',
           action:
             from === 'IN_PROGRESS'
@@ -2102,6 +2197,7 @@ const FLOW_DEFINITIONS = [
           factBoundary: 'production_wip',
         }),
         transition(from, 'ACCEPTED', {
+          label: from === 'OUTSOURCED' ? '回货后接收' : '完工后接收',
           guard: '工序完成且冻结路线不要求质量关口。',
           action:
             from === 'IN_PROGRESS'
@@ -2111,6 +2207,29 @@ const FLOW_DEFINITIONS = [
           factBoundary: 'production_wip',
         }),
       ]),
+      ...[
+        ['WAITING_QUALITY', '让步后继续检验', '批准的让步只覆盖本次拒收的检验，仍有下一项必检项目时，系统创建下一张待检单。'],
+        ['ACCEPTED', '让步接收', '执行已批准的整批让步方案，且本次已是最后一项必检项目。'],
+        ['CANCELLED', '结束原批次', '执行已批准的报废、返工或重做方案。返工和重做另外创建批次承接后续生产。'],
+      ].map(([to, label, guard]) => transition('REJECTED', to, {
+        label,
+        guard,
+        action: 'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+        responsibilityMode: 'system',
+        permission: [PermissionCode.WORKFLOW_TASK_COMPLETE, PermissionCode.PRODUCTION_FACT_POST],
+        factBoundary: 'production_wip_batch_and_event',
+      })),
+      ...[
+        ['ACCEPTED', '撤销最后一项检验的让步', '仅可冲正原来执行的让步，须核对批次数量、后续使用和检验依据。'],
+        ['CANCELLED', '撤销报废、返工或重做', '冲正原来的处置，并处理对应库存影响。返工或重做还要求新建的批次仍可撤回。'],
+      ].map(([from, label, guard]) => transition(from, 'REJECTED', {
+        label,
+        guard,
+        action: 'reverse_production_exception',
+        responsibilityMode: 'system',
+        permission: [PermissionCode.PRODUCTION_FACT_POST],
+        factBoundary: 'production_wip_batch_and_event',
+      })),
       transition('WAITING_QUALITY', 'ACCEPTED', {
         guard: '品质完成全部适用的冻结质量关口并正式判定 PASS 后，由质检事务自动回写为已接收；没有额外的手工接收步骤。',
         action: 'updateProductionWIPBatchQualityStatus',
@@ -2119,18 +2238,21 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'quality_fact_updates_wip',
       }),
       transition('WAITING_QUALITY', 'REJECTED', {
-        guard: '品质对当前冻结质量关口正式判定 REJECT 后，由质检事务自动回写为不合格。',
-        action: 'updateProductionWIPBatchQualityStatus',
+        label: '判为不合格或撤销上次让步',
+        guard: '品质判本次检验不合格时，系统记为拒收。生产冲正前一次已执行的让步时，下一张检验单必须仍是未办理的草稿，系统撤回它并恢复原批拒收。',
+        action: 'updateProductionWIPBatchQualityStatus / reverse_production_exception',
         responsibilityMode: 'system',
-        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
-        factBoundary: 'quality_fact_updates_wip',
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE, PermissionCode.PRODUCTION_FACT_POST],
+        factBoundary: 'production_wip_batch_and_event',
       }),
     ],
-    guard: 'SPLIT 是已消费父批次；终态不能通过通用状态写入重新打开。',
+    guard: '图中每个节点都指同一批在制品。拆分、返工或重做产生的新批次各自记录进度。',
     factBoundary: 'production_wip',
     sourceRefs: [
       'server/internal/biz/production_wip.go',
       'server/internal/data/production_wip_repo.go',
+      'server/internal/data/production_exception_decision_repo.go',
+      'server/internal/data/production_wip_quality_concession.go',
       'server/internal/data/quality_inspection_repo.go',
       'server/internal/service/jsonrpc_production_wip.go',
     ],
@@ -2154,7 +2276,10 @@ const FLOW_DEFINITIONS = [
     kind: 'state_machine',
     label: '生产包材确认',
     summary: '包材版面确认只允许从待确认推进为已确认。',
-    states: [state('PENDING', '待确认'), state('CONFIRMED', '已确认')],
+    states: [
+      state('PENDING', '待确认', '业务还要核对这批货使用的包材。'),
+      state('CONFIRMED', '已确认', '所用包材已经确认，实际包装进度另看仓库办理记录。'),
+    ],
     initialStates: ['PENDING'],
     terminalStates: ['CONFIRMED'],
     transitions: [
@@ -2188,10 +2313,10 @@ const FLOW_DEFINITIONS = [
     label: '生产异常决策',
     summary: '异常申请在来源单据上记录正式批准、拒绝或取消决定。',
     states: [
-      state('SUBMITTED', '已提交'),
-      state('APPROVED', '已批准'),
-      state('REJECTED', '已拒绝'),
-      state('CANCELLED', '已取消'),
+      state('SUBMITTED', '已提交', '异常处理方案已提交，等审批。'),
+      state('APPROVED', '已批准', '方案已获准，可按批准的数量和方式办理。'),
+      state('REJECTED', '已拒绝', '审批人已拒绝这次方案。'),
+      state('CANCELLED', '已取消', '申请人在审批完成前收回了方案。'),
     ],
     initialStates: ['SUBMITTED'],
     terminalStates: ['APPROVED', 'REJECTED', 'CANCELLED'],
@@ -2241,18 +2366,18 @@ const FLOW_DEFINITIONS = [
     kind: 'state_machine',
     label: '生产异常执行与额度状态',
     summary:
-      '同一来源单据记录报废或在制让步是否执行，以及超领额度是否仍有效或已撤销。',
+      '同一来源单据记录质量处置是否执行，以及超领额度是否仍有效或已撤销。',
     states: [
-      state('PENDING', '待执行或额度有效'),
-      state('APPLIED', '处置已执行'),
-      state('REVERSED', '已冲正'),
+      state('PENDING', '待执行或额度有效', '待批准后执行质量处置，超领按获批额度办理。'),
+      state('APPLIED', '处置已执行', '已按批准的方案办理报废、让步接收、返工或重做。'),
+      state('REVERSED', '已冲正', '这次处置的影响已抵消，或未使用的超领额度已撤销。'),
     ],
     initialStates: ['PENDING'],
     terminalStates: ['REVERSED'],
     transitions: [
       transition('PENDING', 'APPLIED', {
         guard:
-          '决策必须 APPROVED；仅报废或在制让步可经执行任务办理，超领额度不得走执行命令。',
+          '批准后由生产执行报废、让步、返工或重做。超领通过正常领料使用批准额度。',
         action:
           'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
         permission: [PermissionCode.WORKFLOW_TASK_COMPLETE, PermissionCode.PRODUCTION_FACT_POST],
@@ -2267,7 +2392,7 @@ const FLOW_DEFINITIONS = [
       }),
       transition('APPLIED', 'REVERSED', {
         guard:
-          '仅已执行的报废或在制让步可冲正；必须匹配原在制影响、当前 version、actor 和非空原因。',
+          '已执行的质量处置可按原影响申请冲正，须核对在制批次、库存和下游依赖，填写原因。',
         action: 'reverse_production_exception',
         permission: [PermissionCode.PRODUCTION_FACT_POST],
         factBoundary: 'source_document_execution_status_and_wip_reversal',
@@ -2293,6 +2418,7 @@ const FLOW_DEFINITIONS = [
   draftPostedCancelledDefinition({
     key: 'fact.purchase_rejection_disposition',
     label: '采购拒收处置',
+    postedMeaning: '本次退厂或补换处置已按拒收行登记，可查看相应的剩余待处理量。',
     sourceRefs: [
       'server/internal/biz/purchase_rejection_disposition.go',
       'server/internal/data/purchase_rejection_disposition_repo.go',
@@ -2306,6 +2432,7 @@ const FLOW_DEFINITIONS = [
   draftPostedCancelledDefinition({
     key: 'fact.outsourcing_return_disposition',
     label: '委外回货处置',
+    postedMeaning: '委外回货的异常处置已登记，可从回货记录追查处理结果。',
     sourceRefs: [
       'server/internal/biz/outsourcing_return_disposition.go',
       'server/internal/data/outsourcing_return_disposition_repo.go',
@@ -2323,12 +2450,12 @@ const FLOW_DEFINITIONS = [
     label: '收付款单',
     summary: '收付款单先审批或退回，批准后过账并生成核销，已过账单只能冲正。',
     states: [
-      state('DRAFT', '草稿'),
-      state('APPROVED', '已批准'),
-      state('REJECTED', '已退回'),
-      state('POSTED', '已过账'),
-      state('REVERSED', '已冲正'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', PAYMENT_STATUS_META.DRAFT[0], '收款或付款已登记，等审批。'),
+      state('APPROVED', PAYMENT_STATUS_META.APPROVED[0], '审批已通过，等财务确认实际收付并入账。'),
+      state('REJECTED', PAYMENT_STATUS_META.REJECTED[0], '审批人已退回这张收付款单。'),
+      state('POSTED', PAYMENT_STATUS_META.POSTED[0], '财务已把实际收款或付款记入账中。'),
+      state('REVERSED', PAYMENT_STATUS_META.REVERSED[0], '财务已抵消这笔登记的影响，原单和冲销记录都可追查。'),
+      state('CANCELLED', PAYMENT_STATUS_META.CANCELLED[0], '尚未入账的收付款单已经撤销。'),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['REJECTED', 'REVERSED', 'CANCELLED'],
@@ -2386,6 +2513,8 @@ const FLOW_DEFINITIONS = [
   immutableRedEntryDefinition({
     key: 'fact.finance_allocation',
     label: '财务核销记录',
+    postedMeaning: '这笔收付款中的一部分已分到指定账单上，抵掉相应的欠款。',
+    reversedMeaning: '系统另记一笔，撤销原来的抵扣并重新计算欠款。',
     summary: 'POSTED 核销与 REVERSED 反向核销是两条不可变记录，不是单行迁移。',
     sourceRefs: [
       'server/internal/biz/finance_payment.go',
@@ -2396,6 +2525,8 @@ const FLOW_DEFINITIONS = [
   immutableRedEntryDefinition({
     key: 'fact.finance_credit_note',
     label: '财务红冲单',
+    postedMeaning: '财务已登记这笔账款调整，余额按调整方向增加或减少。',
+    reversedMeaning: '系统另记一笔，抵消原来那次调整。',
     summary:
       'POSTED 红冲与 REVERSED 反向红冲是两条不可变记录，原红冲保持不变。',
     sourceRefs: [
@@ -2411,9 +2542,9 @@ const FLOW_DEFINITIONS = [
     label: '出货财务放行',
     summary: '出货单财务放行字段与真实 SHIPPED 状态分开。',
     states: [
-      state('PENDING', '待放行'),
-      state('APPROVED', '已放行'),
-      state('REJECTED', '已拒绝'),
+      state('PENDING', '待放行', '出货前的财务放行还待确认。'),
+      state('APPROVED', '已放行', '财务已同意放行，实际出库要看仓库的出货单。'),
+      state('REJECTED', '已拒绝', '财务已拒绝这次出货放行。'),
     ],
     initialStates: ['PENDING'],
     terminalStates: ['APPROVED', 'REJECTED'],
@@ -2456,12 +2587,12 @@ const FLOW_DEFINITIONS = [
     label: '库存操作单',
     summary: '调拨核对后直接过账；盘点与人工调整必须先提交、由他人复核，再过账。',
     states: [
-      state('DRAFT', '草稿'),
-      state('SUBMITTED', '已提交'),
-      state('APPROVED', '已批准'),
-      state('REJECTED', '已退回'),
-      state('POSTED', '已过账'),
-      state('CANCELLED', '已取消'),
+      state('DRAFT', '草稿', '仓库已填写本次作业，等核对数量和库位。'),
+      state('SUBMITTED', '已提交', '盘点或人工库存调整已提交复核。'),
+      state('APPROVED', '已批准', '盘点或人工调整已获准，等仓库确认结果。'),
+      state('REJECTED', '已退回', '审批人已退回本次盘点或人工调整。'),
+      state('POSTED', '已过账', '仓库已确认结果，有差额就计入库存，零差异盘点只记完成。'),
+      state('CANCELLED', '已取消', '这次库存作业已撤销，已记入库存的变动通过反向记录抵消。'),
     ],
     initialStates: ['DRAFT'],
     terminalStates: ['REJECTED', 'CANCELLED'],
@@ -2540,10 +2671,10 @@ const FLOW_DEFINITIONS = [
     label: '客户配置 Revision',
     summary: '配置 revision 经事务内构建、发布、激活和被后续 revision 替代。',
     states: [
-      state('building', '构建中'),
-      state('published', '已发布'),
-      state('active', '已激活'),
-      state('superseded', '已被替代'),
+      state('building', '构建中', '正在整理这个客户要启用的功能和岗位配置。'),
+      state('published', '已发布', '配置版本已经发布，可以按条件切换使用。'),
+      state('active', '已激活', '系统正在使用这版客户配置。'),
+      state('superseded', '已被替代', '已有其他配置版本接替了这一版。'),
     ],
     initialStates: ['building'],
     terminalStates: [],
@@ -2926,6 +3057,7 @@ export const processDefinitions = Object.freeze(
       variantKey: 'approval_pmc',
       businessRefType: 'sales_order',
       label: '销售订单受理（审批 + PMC）',
+      readingLabel: '直接评审',
       initial: 'submit_sales_order',
       terminal: 'end',
       nodes: salesProcessNodes(false),
@@ -2938,6 +3070,7 @@ export const processDefinitions = Object.freeze(
       variantKey: 'approval_engineering_pmc',
       businessRefType: 'sales_order',
       label: '销售订单受理（审批 + 工程 + PMC）',
+      readingLabel: '先办工程资料',
       initial: 'submit_sales_order',
       terminal: 'end',
       nodes: salesProcessNodes(true),
@@ -3665,7 +3798,7 @@ function normalizeScope(definition) {
         STATUS_BOUNDARY_DOC,
         '正式状态分层与 Workflow / Fact 责任边界。'
       ),
-      evidence('doc', STATUS_INDEX_DOC, 'canonical 状态树与精确合同索引。'),
+      evidence('doc', STATUS_INDEX_DOC, '采购应付状态示例与业务规则入口。'),
     ]),
   })
 }

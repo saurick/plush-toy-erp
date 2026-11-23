@@ -20,7 +20,8 @@ test('visualization choices come from the documented reader questions and limits
   ])
   assert.match(resolveVisualizationChoice(choices, 'planning').rule, /计划起止时间/u)
   assert.match(resolveVisualizationChoice(choices, 'progress').rule, /并行时长不能相加/u)
-  assert.equal(resolveVisualizationChoice(choices, 'unknown').value, 'planning')
+  assert.equal(resolveVisualizationChoice(choices, null).value, 'flow')
+  assert.equal(resolveVisualizationChoice(choices, 'unknown').value, 'flow')
 })
 
 test('a missing choice chapter or a duplicate category is rejected instead of inventing rules', () => {

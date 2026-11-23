@@ -569,6 +569,16 @@ test('devFlowStateCatalog: 覆盖清单固定为 34 个当前对象', () => {
   }
 })
 
+test('devFlowStateCatalog: 状态与关联结果各有一句解释', () => {
+  for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
+    for (const owner of [flow, ...flow.dimensions]) {
+      for (const state of owner.states) {
+        assert.match(state.summary, /^[^。！？]+[。！？]$/u, `${flow.key} / ${owner.key} / ${state.key}`)
+      }
+    }
+  }
+})
+
 test('devFlowStateCatalog: 工程用料审批保持冻结总需求与采购边界', () => {
   const flow = getDevFlowStateMachine('source.engineering_material_request')
   const financeApproval = flow.transitions.find(
@@ -585,6 +595,9 @@ test('devFlowStateCatalog: 工程用料审批保持冻结总需求与采购边�
 
 test('devFlowStateCatalog: 所有生命周期及结果维度与后端 canonical contract 全等', () => {
   for (const flow of DEV_FLOW_STATE_CATALOG.flows.flatMap((item) => [item, ...item.dimensions])) {
+    for (const item of flow.states) {
+      assert(item.summary?.trim() && item.summary !== item.label, `${flow.key}.${item.key} needs a business explanation`)
+    }
     assert.deepEqual(
       flow.states.map((item) => item.key),
       readCanonicalStatusContract(repoRoot, flow.contractRef),
@@ -829,12 +842,19 @@ test('devFlowStateCatalog: Process variant、节点、命令与分支边精确�
 
 test('quality facts own automatic WIP result writes without hiding domain transition contracts', () => {
   const flow = getDevFlowStateMachine('fact.production_wip_batch')
-  for (const to of ['ACCEPTED', 'REJECTED']) {
-    const edge = flow.transitions.find((item) => item.from === 'WAITING_QUALITY' && item.to === to)
-    assert.equal(edge.responsibilityMode, 'system')
-    assert.equal(edge.systemOnly, false)
-    assert.deepEqual(edge.permission, [PermissionCode.QUALITY_INSPECTION_UPDATE])
-    assert.equal(edge.factBoundary, 'quality_fact_updates_wip')
+  const pass = flow.transitions.find((edge) => edge.key === 'WAITING_QUALITY->ACCEPTED')
+  assert.equal(pass.responsibilityMode, 'system')
+  assert.equal(pass.systemOnly, false)
+  assert.deepEqual(pass.permission, [PermissionCode.QUALITY_INSPECTION_UPDATE])
+  assert.equal(pass.factBoundary, 'quality_fact_updates_wip')
+  const reject = flow.transitions.find((edge) => edge.key === 'WAITING_QUALITY->REJECTED')
+  assert.equal(reject.responsibilityMode, 'system')
+  assert.equal(reject.systemOnly, false)
+  assert.deepEqual(reject.permission, [PermissionCode.QUALITY_INSPECTION_UPDATE, PermissionCode.PRODUCTION_FACT_POST])
+  assert.match(reject.action, /updateProductionWIPBatchQualityStatus.*reverse_production_exception/u)
+  for (const target of ['ACCEPTED', 'WAITING_QUALITY', 'CANCELLED']) {
+    assert(flow.transitions.some((edge) => edge.key === `REJECTED->${target}` && edge.action.includes('ExecuteProductionException')))
+    assert(flow.transitions.some((edge) => edge.key === `${target}->REJECTED` && edge.action.includes('reverse_production_exception')))
   }
   const start = flow.transitions.find((item) => item.key === 'PLANNED->IN_PROGRESS')
   assert.equal(start.responsibilityMode, 'human')
@@ -1252,11 +1272,28 @@ test('recovery, withdrawal and draft cancellation remain visible without inventi
     assert.equal(edge.systemOnly, true)
     assert.deepEqual(edge.permission, [])
   }
+  assert.deepEqual(getDevFlowStateMachine('workflow.task').initialStates, ['ready', 'blocked'])
+  assert.deepEqual(getDevFlowStateMachine('source.purchase_order').initialStates, ['draft', 'approved'])
+  const reopen = getDevFlowStateMachine('workflow.task').transitions.find((edge) => edge.key === 'done->ready')
+  assert.equal(reopen.systemOnly, true)
+  assert.deepEqual(reopen.permission, [])
+  assert.equal(reopen.action, 'syncFulfillmentTaskRecord')
   for (const key of ['fact.production', 'fact.outsourcing', 'fact.finance']) {
     assert(canDevFlowStateTransition(key, 'DRAFT', 'CANCELLED'))
   }
   assert(canDevFlowStateTransition('fact.shipment_finance_release', 'PENDING', 'APPROVED'))
   assert(canDevFlowStateTransition('fact.shipment_finance_release', 'PENDING', 'REJECTED'))
   assert.equal(canDevFlowStateTransition('fact.shipment_finance_release', 'REJECTED', 'APPROVED'), false)
-  assert.equal(DEV_FLOW_STATE_CATALOG.flows.flatMap((flow) => flow.dimensions).length, 5)
+  const dimensionKeys = DEV_FLOW_STATE_CATALOG.flows.flatMap((flow) =>
+    flow.dimensions.map((dimension) => `${flow.key}/${dimension.key}`))
+  assert.deepEqual(dimensionKeys.sort(), [
+    'control.customer_config_revision/module_availability',
+    'fact.production_wip_batch/warehouse_production_stage',
+    'fact.quality_inspection/result',
+    'process.instance/resolution_kind',
+    'process.node/block_kind',
+    'process.node/domain_command_effect_state',
+    'process.node/domain_command_result_state',
+    'source.production_order/material_requirements_state',
+  ])
 })

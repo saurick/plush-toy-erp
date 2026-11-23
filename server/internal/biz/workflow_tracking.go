@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const WorkflowTrackingMaterialReviewKind = "material_review"
+
 // Tracking is a read projection of existing processes and standalone tasks.
 // Participation grants this summary only; it never grants task mutation access.
 type WorkflowTrackingQuery struct {
@@ -13,6 +15,7 @@ type WorkflowTrackingQuery struct {
 	Scope           string
 	Keyword         string
 	Status          string
+	RecordType      string
 	OwnerRoleKey    string
 	Attention       string
 	SourceType      string
@@ -34,6 +37,7 @@ type WorkflowTrackingRef struct {
 type WorkflowTrackingEntry struct {
 	Ref              WorkflowTrackingRef
 	Instance         *ProcessInstance
+	MaterialRequest  *EngineeringMaterialRequest
 	Task             *WorkflowTask
 	Nodes            []*ProcessNodeInstance
 	Tasks            []*WorkflowTask
@@ -47,6 +51,9 @@ type WorkflowTrackingEntry struct {
 func (e *WorkflowTrackingEntry) StartedAt() time.Time {
 	if e.Instance != nil {
 		return e.Instance.StartedAt
+	}
+	if e.MaterialRequest != nil {
+		return *e.MaterialRequest.SubmittedAt
 	}
 	return e.Task.CreatedAt
 }
@@ -66,6 +73,7 @@ func normalizeWorkflowTrackingQuery(q WorkflowTrackingQuery) (WorkflowTrackingQu
 	q.Keyword = strings.TrimSpace(q.Keyword)
 	q.SourceType = strings.TrimSpace(q.SourceType)
 	q.Status = strings.TrimSpace(q.Status)
+	q.RecordType = strings.TrimSpace(q.RecordType)
 	q.OwnerRoleKey = NormalizeRoleKey(q.OwnerRoleKey)
 	q.Attention = strings.TrimSpace(q.Attention)
 	if q.ActorID <= 0 || q.VisibilityScope == nil ||
@@ -73,6 +81,7 @@ func normalizeWorkflowTrackingQuery(q WorkflowTrackingQuery) (WorkflowTrackingQu
 		len([]rune(q.Keyword)) > 128 ||
 		(q.SourceID > 0 && q.SourceType == "") || q.SourceID < 0 || len(q.SourceType) > 64 ||
 		(q.Status != "" && q.Status != "active" && q.Status != "completed") ||
+		(q.RecordType != "" && q.RecordType != "flow" && q.RecordType != "task") ||
 		(q.OwnerRoleKey != "" && !isWorkflowTaskBoardOwnerRoleKey(q.OwnerRoleKey)) ||
 		(q.Attention != "" && q.Attention != "overdue" && q.Attention != "blocked") ||
 		(q.SortDirection != "" && q.SortDirection != "asc" && q.SortDirection != "desc") ||
@@ -105,7 +114,7 @@ func (uc *WorkflowUsecase) ListTracking(ctx context.Context, q WorkflowTrackingQ
 }
 
 func (uc *WorkflowUsecase) GetTracking(ctx context.Context, q WorkflowTrackingQuery, ref WorkflowTrackingRef, beforeEventID int) (*WorkflowTrackingEntry, error) {
-	if uc == nil || ref.ID <= 0 || (ref.Kind != "process" && ref.Kind != "task") || beforeEventID < 0 {
+	if uc == nil || ref.ID <= 0 || (ref.Kind != "process" && ref.Kind != "task" && ref.Kind != WorkflowTrackingMaterialReviewKind) || beforeEventID < 0 {
 		return nil, ErrBadParam
 	}
 	q.Scope, q.Limit = "visible", 20

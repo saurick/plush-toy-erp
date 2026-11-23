@@ -44,6 +44,7 @@ batch_no: 'WIP-ENTRY-001',
           reason: '裁片尺寸需要复检',
 occurred_at: '2026-10-12T08:00:00Z',
           task_ids: [task.id, task.id + 10000, task.id + 10001],
+          quality_photo_sources: [],
 tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检验', task_status_key: 'done' }, { ...task, id: task.id + 10001, task_name: '决定质量异常处理方案', task_status_key: 'done' }],
         }
         const total = empty ? 0 : params.keyword === '长文本' ? 123456789 : params.keyword === '多条' ? 45 : 1
@@ -53,7 +54,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
           number: params.keyword === '长文本' ? `EX-${'LONG'.repeat(20)}-${index}` : `EX-ENTRY-${String(index + 1).padStart(3, '0')}`,
           tasks: params.keyword === '长文本' ? [{ ...task, task_name: `复核${'LongTaskName'.repeat(12)}` }] : item.tasks,
         })).slice(params.offset || 0, (params.offset || 0) + params.limit)
-        const selectedTotal = params.state === 'closed' ? 0 : total
+        const selectedTotal = ['closed', 'executing'].includes(params.state) ? 0 : total
         const data = {
           total: selectedTotal,
           view_total: params.view ? (selectedTotal ? 1 : 0) : selectedTotal,
@@ -61,6 +62,8 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
           affected_orders: selectedTotal ? 1 : 0,
           open: total,
           closed: 0,
+          pending_plan: total,
+          executing: 0,
           items: selectedTotal ? items : [],
           tasks: selectedTotal ? [task] : [],
           orders: selectedTotal ? item.orders : [],
@@ -145,11 +148,11 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       const exceptions = page.getByRole('region', { name: '异常跟踪', exact: true })
       await exceptions.getByText('EX-ENTRY-001', { exact: true }).waitFor()
       const counts = () => exceptions.locator('.workflow-exceptions__states .erp-filter-chip__count').allTextContents()
-      assert.deepEqual(await counts(), ['1', '1', '0'])
+      assert.deepEqual(await counts(), ['1', '1', '0', '1', '0'])
       assert.equal(await exceptions.getByText(/共 \d+ 项异常/).count(), 0)
       await exceptions.getByRole('button', { name: /^已处理完/ }).click()
       await exceptions.getByText('当前条件下没有可跟踪的异常', { exact: true }).waitFor()
-      assert.deepEqual(await counts(), ['1', '1', '0'])
+      assert.deepEqual(await counts(), ['1', '1', '0', '1', '0'])
       assert.equal(await exceptions.getByRole('button', { name: /^已处理完/ }).locator('.erp-filter-chip__clear').count(), 1)
       await exceptions.getByRole('button', { name: /^已处理完/ }).click()
       await exceptions.getByText('EX-ENTRY-001', { exact: true }).waitFor()
@@ -208,7 +211,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       await search.fill('多条')
       await search.press('Enter')
       await exceptions.getByText('已显示 20 / 共 45 条', { exact: true }).waitFor()
-      assert.deepEqual(await counts(), ['45', '45', '0'])
+      assert.deepEqual(await counts(), ['45', '45', '0', '45', '0'])
       failNext = true
       await scroll.evaluate((node) => { node.scrollTop = node.scrollHeight })
       await exceptions.getByRole('button', { name: '重新读取更多', exact: true }).waitFor()
@@ -251,7 +254,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       await search.fill('无匹配')
       await search.press('Enter')
       await exceptions.getByText('当前条件下没有可跟踪的异常', { exact: true }).waitFor()
-      assert.deepEqual(await counts(), ['0', '0', '0'])
+      assert.deepEqual(await counts(), ['0', '0', '0', '0', '0'])
       await pullToRefresh(page, scroll)
       await page.waitForFunction(() => document.querySelector('[data-testid="mobile-task-pull-refresh"]')?.dataset.state === 'idle')
       await exceptions.getByRole('button', { name: '清除搜索', exact: true }).click()
@@ -284,7 +287,7 @@ overflow: getComputedStyle(el.querySelector('.mobile-filter-fields')).overflowY,
       await search.fill('长文本')
       await search.press('Enter')
       await exceptions.getByRole('button', { name: /^全部异常\s*123456789$/ }).waitFor()
-      assert.deepEqual(await counts(), ['123456789', '123456789', '0'])
+      assert.deepEqual(await counts(), ['123456789', '123456789', '0', '123456789', '0'])
       await page.setViewportSize({ width: 320, height: 844 })
       const longContent = await exceptions.evaluate((root) => ({ width: root.clientWidth, content: root.scrollWidth, pageWidth: document.documentElement.clientWidth, pageContent: document.documentElement.scrollWidth }))
       assert(longContent.content <= longContent.width + 1 && longContent.pageContent <= longContent.pageWidth + 1, JSON.stringify(longContent))

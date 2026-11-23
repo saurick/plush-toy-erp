@@ -3,8 +3,7 @@ import { Button } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { WorkbenchFacts, WorkbenchSection, WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import Select from '@/common/components/select/AppSelect'
-import { DEFINITION_SELECT_CLASS_NAMES, useDefinitionSelectSearch, renderDefinitionSelectOption } from './FlowStateShared.jsx'
-import { createDevFlowDefinitionOptionFilter } from '../../pages/devFlowDefinitionSearch.mjs'
+import { DEFINITION_SELECT_CLASS_NAMES, renderDefinitionSelectOption } from './FlowStateShared.jsx'
 import { buildFactDefinitionSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
 import { buildFactRuleGraph } from '../../config/devBusinessRuleGraphs.mjs'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
@@ -24,13 +23,8 @@ function FactsView({
     () => ({ ...catalog, factDefinitions: definitions }),
     [catalog, definitions]
   )
-  const searchProps = useDefinitionSelectSearch()
   const options = useMemo(
     () => buildFactDefinitionSelectOptions(scopedCatalog),
-    [scopedCatalog]
-  )
-  const optionFilter = useMemo(
-    () => createDevFlowDefinitionOptionFilter(scopedCatalog, 'facts'),
     [scopedCatalog]
   )
   return (
@@ -40,13 +34,9 @@ function FactsView({
           placeholder="选择事实定义"
           id="dev-flow-fact-select"
           aria-label="选择事实定义"
-          showSearch
           virtual={false}
           popupMatchSelectWidth={false}
-          {...searchProps}
           classNames={DEFINITION_SELECT_CLASS_NAMES}
-          filterOption={optionFilter}
-          notFoundContent="没有匹配的事实定义"
           value={fact?.factKey}
           labelRender={() => fact?.label}
           options={options}

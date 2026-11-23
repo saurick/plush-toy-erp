@@ -35,6 +35,7 @@ export function buildPurchaseOrderColumns({ resolveSupplierName }) {
       title: '采购单号',
       exportTitle: '采购单号',
       dataIndex: 'purchase_order_no',
+      taskDetailRole: 'identity',
       copyable: true,
       detailCopyable: true,
       width: 180,

@@ -23,26 +23,33 @@ type BusinessStatisticsQuery struct {
 	Access                                                       BusinessStatisticsAccess
 }
 
+type DeliveryQuantities struct {
+	Unit      string  `json:"unit"`
+	Ordered   *string `json:"ordered"`
+	Shipped   *string `json:"shipped"`
+	Remaining *string `json:"remaining"`
+}
 type BusinessStatisticsMetrics struct {
-	Count                 int     `json:"count"`
-	Done                  int     `json:"done"`
-	Pending               int     `json:"pending"`
-	Closed                int     `json:"closed"`
-	Unknown               int     `json:"unknown"`
-	Overdue               int     `json:"overdue"`
-	Soon                  int     `json:"soon"`
-	Undated               int     `json:"undated"`
-	Amount                *string `json:"amount"`
-	ShippedAmount         *string `json:"shipped_amount"`
-	MissingAmount         int     `json:"missing_amount"`
-	MissingShipmentAmount int     `json:"missing_shipment_amount"`
-	Balance               *string `json:"balance"`
-	NotDue                *string `json:"not_due"`
-	Late7                 *string `json:"late_7"`
-	Late30                *string `json:"late_30"`
-	Late60                *string `json:"late_60"`
-	LateMore              *string `json:"late_more"`
-	UnknownDue            *string `json:"unknown_due"`
+	Quantities            *DeliveryQuantities `json:"quantities,omitempty"`
+	Count                 int                 `json:"count"`
+	Done                  int                 `json:"done"`
+	Pending               int                 `json:"pending"`
+	Closed                int                 `json:"closed"`
+	Unknown               int                 `json:"unknown"`
+	Overdue               int                 `json:"overdue"`
+	Soon                  int                 `json:"soon"`
+	Undated               int                 `json:"undated"`
+	Amount                *string             `json:"amount"`
+	ShippedAmount         *string             `json:"shipped_amount"`
+	MissingAmount         int                 `json:"missing_amount"`
+	MissingShipmentAmount int                 `json:"missing_shipment_amount"`
+	Balance               *string             `json:"balance"`
+	NotDue                *string             `json:"not_due"`
+	Late7                 *string             `json:"late_7"`
+	Late30                *string             `json:"late_30"`
+	Late60                *string             `json:"late_60"`
+	LateMore              *string             `json:"late_more"`
+	UnknownDue            *string             `json:"unknown_due"`
 }
 
 type BusinessStatisticsGroup struct {

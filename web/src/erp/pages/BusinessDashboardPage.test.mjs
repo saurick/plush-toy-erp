@@ -191,7 +191,7 @@ test('mobile progress restores history details without replaying the drawer open
   )
   assert.match(
     mobilePanel,
-    /const open = \(row, section = null\) => \{[\s\S]*?setSuppressDetailOpenMotion\(false\)/u
+    /const open = \(row, section, sourceOrderNo\) => \{[\s\S]*?setSuppressDetailOpenMotion\(false\)/u
   )
   assert.match(
     mobilePanel,
@@ -203,7 +203,7 @@ test('mobile progress restores history details without replaying the drawer open
   )
 })
 
-test('mobile progress groups business details without desktop source links', async () => {
+test('progress details group records without navigation to source documents', async () => {
   await transformWithEsbuild(drawer, 'BusinessProgressDrawer.jsx', {
     loader: 'jsx',
     jsx: 'automatic',
@@ -213,9 +213,7 @@ test('mobile progress groups business details without desktop source links', asy
     /const MOBILE_TABS = \[[\s\S]*?总览[\s\S]*?产品[\s\S]*?生产[\s\S]*?任务/u
   )
   assert.match(drawer, /const PRODUCTION_SECTIONS = \['production', 'batches', 'materials'\]/u)
-  assert.match(drawer, /!mobile && sourcePath && canOpen\(sourcePath\)/u)
-  assert.match(drawer, /!mobile && canOpen\(path\)/u)
-  assert.doesNotMatch(drawer, /mobile-progress-detail-source/u)
+  assert.doesNotMatch(drawer, /onNavigate|打开原单|跟踪本单|本单采购跟进/u)
   assert.match(
     drawer,
     /mobile-progress-detail-group-trigger[\s\S]*?aria-expanded=\{expanded\}/u

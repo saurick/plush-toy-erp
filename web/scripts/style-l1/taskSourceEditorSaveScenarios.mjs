@@ -212,7 +212,6 @@ reads
       const right = page.locator('.erp-split-pane--right')
       const picker = right.getByRole('combobox', { name: '选择右栏页面' })
       await picker.click()
-      await picker.fill('任务管理')
       await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
       await left.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
       await page.getByRole('tablist', { name: '任务处理步骤', exact: true }).getByRole('tab').nth(1).click()

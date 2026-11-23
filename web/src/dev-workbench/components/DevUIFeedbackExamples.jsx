@@ -3,8 +3,6 @@ import {
   Alert,
   App,
   Button,
-  Drawer,
-  Dropdown,
   Form,
   Input,
   Space,
@@ -18,6 +16,8 @@ import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.js
 import BusinessModal from '@/erp/components/business-list/BusinessModal'
 import AlertDialog from '@/common/components/modal/AlertDialog'
 import AppModal from '@/common/components/modal/AppModal'
+import AppDrawer from '@/common/components/drawer/AppDrawer.jsx'
+import { showCopySuccess } from '@/common/components/feedback/copyFeedback.jsx'
 import {
   MESSAGE_CONFIG,
   NOTIFICATION_CONFIG,
@@ -26,15 +26,16 @@ import { withMessageSemantics } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { ERP_MODAL_WIDTHS } from '@/erp/utils/modalSizes.mjs'
+import DevControlUsageTable from './DevControlUsageTable.jsx'
 import '../styles/dev-ui-feedback.css'
 
-function useDemoFeedback() {
+export function useDemoFeedback() {
   const { message: api, notification } = App.useApp()
   const message = useMemo(() => withMessageSemantics(api), [api])
   const key = useId()
   useEffect(
     () => () => {
-      message.destroy(key)
+      message.destroy()
       notification.destroy(key)
     },
     [key, message, notification]
@@ -64,11 +65,16 @@ function useDemoDelay() {
     })
 }
 
-function EditorExample({ size = 'localAction' }) {
+const PART_HIGHLIGHT = 'erp-control-usage-highlight'
+const EDITOR_DIALOG_SECTIONS = ['header', 'body', 'footer']
+const DEMO_SAVE_FAILURE = '本次样例未保存，输入已保留，请重试。'
+
+function EditorExample({ size = 'localAction', usageRules, usageId }) {
   const [form] = Form.useForm()
   const { message, key } = useDemoFeedback()
   const delay = useDemoDelay()
   const [open, setOpen] = useState(false)
+  const [highlightedPart, setHighlightedPart] = useState(null)
   const [dirty, setDirty] = useState(false)
   const [scenario, setScenario] = useState('success')
   const [state, setState] = useState('editing')
@@ -93,7 +99,9 @@ function EditorExample({ size = 'localAction' }) {
       }
       if (scenario === 'failure' && !failedOnce.current) {
         failedOnce.current = true
-        throw new Error('本次样例未保存，输入已保留，请重试。')
+        setState('failed')
+        setFailure(DEMO_SAVE_FAILURE)
+        return
       }
       setReceipt(`已保存样例：${values.subject}`)
       setDirty(false)
@@ -135,6 +143,25 @@ function EditorExample({ size = 'localAction' }) {
     setAttempts(0)
     failedOnce.current = false
   }
+  const openEditor = (part = null) => {
+    setHighlightedPart(part)
+    setOpen(true)
+  }
+  const locateUsage = (part) => {
+    if (part === 'failure' || part === 'unknown') {
+      const failed = part === 'failure'
+      if (!form.getFieldValue('subject')?.trim()) {
+        form.setFieldsValue({ subject: '确认里布交期' })
+      }
+      setScenario(part)
+      setState(failed ? 'failed' : 'unknown')
+      setFailure(failed ? DEMO_SAVE_FAILURE : '')
+      failedOnce.current = failed
+    } else if (!scenario) {
+      setScenario('success')
+    }
+    openEditor(part)
+  }
   return (
     <div className="erp-feedback-example" data-feedback-example="editor">
       <Space wrap>
@@ -148,6 +175,7 @@ function EditorExample({ size = 'localAction' }) {
           onChange={(value) => {
             reset()
             setScenario(value)
+            setHighlightedPart(null)
           }}
           options={[
             { value: 'success', label: '保存成功' },
@@ -155,16 +183,32 @@ function EditorExample({ size = 'localAction' }) {
             { value: 'unknown', label: '结果未知，先查询' },
           ]}
         />
-        <Button type="primary" disabled={!scenario} onClick={() => setOpen(true)}>
+        <Button type="primary" disabled={!scenario} onClick={() => openEditor()}>
           打开编辑弹窗
         </Button>
-        <Button onClick={reset} disabled={busy}>
+        <Button
+          onClick={() => {
+            reset()
+            setHighlightedPart(null)
+          }}
+          disabled={busy}
+        >
           重置样例
         </Button>
       </Space>
       <p role="status">
         {receipt} · 提交 {attempts} 次
       </p>
+      {usageRules && (
+        <DevControlUsageTable
+          id={usageId}
+          rows={usageRules}
+          hint="点整行可打开弹窗并高亮对应部位或状态"
+          activeTarget={highlightedPart}
+          dialogTargets={usageRules.map((row) => row[3])}
+          onLocate={locateUsage}
+        />
+      )}
       <BusinessFormModal
         title="补充采购说明"
         description="样例采购单 PO-DEMO · 局部操作，保留来源页面"
@@ -174,6 +218,9 @@ function EditorExample({ size = 'localAction' }) {
         size={size}
         dirty={dirty && state !== 'unknown'}
         confirmLoading={busy}
+        classNames={EDITOR_DIALOG_SECTIONS.includes(highlightedPart) ? { [highlightedPart]: PART_HIGHLIGHT } : undefined}
+        styles={highlightedPart === 'footer' ? { footer: { backgroundImage: 'var(--erp-control-usage-fill)' } } : undefined}
+        cancelButtonProps={highlightedPart === 'cancel' ? { className: PART_HIGHLIGHT } : undefined}
         onCancel={() => {
           setOpen(false)
           if (state !== 'unknown') reset()
@@ -182,11 +229,14 @@ function EditorExample({ size = 'localAction' }) {
         okText="保存说明"
         okButtonProps={{ disabled: state === 'unknown' }}
       >
-        {failure ? <Alert type="error" showIcon message={failure} /> : null}
+        {failure ? (
+          <Alert type="error" showIcon message={failure} className={highlightedPart === 'failure' ? PART_HIGHLIGHT : undefined} />
+        ) : null}
         {state === 'unknown' || state === 'querying' ? (
           <Alert
             type="warning"
             showIcon
+            className={highlightedPart === 'unknown' ? PART_HIGHLIGHT : undefined}
             message="还不能确认是否保存成功"
             description="保留本次内容，查询结果后再继续；关闭后重新打开仍保留待确认状态。"
             action={
@@ -268,11 +318,18 @@ function FeedbackExample() {
     <div className="erp-feedback-example" data-feedback-example="feedback">
       <Space wrap>
         <Button
+          data-feedback-part="message"
           onClick={() =>
             message.success({ key, content: '已应用本次样例条件' })
           }
         >
           短暂成功 Toast
+        </Button>
+        <Button
+          data-feedback-part="copy"
+          onClick={(event) => showCopySuccess('样例编号', event.currentTarget, message)}
+        >
+          复制成功 Toast（可关闭）
         </Button>
         <Button
           onClick={() =>
@@ -289,6 +346,7 @@ function FeedbackExample() {
           加载后更新成功
         </Button>
         <Button
+          data-feedback-part="recovery"
           onClick={() =>
             setFailure(
               getActionErrorMessage(new Error('Network error'), '读取样例')
@@ -330,7 +388,7 @@ function FeedbackExample() {
         <Button
           disabled={working}
           onClick={() => {
-            message.destroy(key)
+            message.destroy()
             notification.destroy(key)
             setFailure('')
           }}
@@ -357,137 +415,197 @@ function FeedbackExample() {
   )
 }
 
-function OverlayExample() {
-  const { modal } = App.useApp()
-  const [drawer, setDrawer] = useState(false)
-  const [standard, setStandard] = useState(false)
-  const [preview, setPreview] = useState(false)
-  const [alert, setAlert] = useState(false)
-  const [cancelled, setCancelled] = useState(false)
-  const [files, setFiles] = useState([])
-  const confirmation = useRef(null)
-  useEffect(() => () => confirmation.current?.destroy(), [])
+function StandardModal({ open, close, classNames }) {
   return (
-    <div className="erp-feedback-example" data-feedback-example="overlays">
-      <Space wrap>
-        <Button onClick={() => setStandard(true)}>打开标准弹窗</Button>
-        <Dropdown
-          menu={{
-            items: [
-              {
-                key: 'summary',
-                label: '查看上下文摘要',
-                onClick: () => setDrawer(true),
-              },
-              {
-                key: 'preview',
-                label: '预览所选文件信息',
-                onClick: () => setPreview(true),
-              },
-            ],
-          }}
-          trigger={['click']}
-        >
-          <Button>更多操作</Button>
-        </Dropdown>
-        <Tooltip title="单击查看已有摘要，不离开当前页面">
-          <Button onClick={() => setDrawer(true)}>打开上下文抽屉</Button>
-        </Tooltip>
-        <Button
-          danger
-          disabled={cancelled}
-          onClick={() => {
-            if (confirmation.current) return
-            confirmation.current = modal.confirm({
-              maskClosable: true,
-              title: '作废样例草稿 PO-DEMO？',
-              content:
-                '仅终止这份尚未生效的样例草稿，不改变库存。作废后不能恢复；可重新新建。',
-              width: ERP_MODAL_WIDTHS.confirm,
-              centered: true,
-              autoFocusButton: 'cancel',
-              okText: '作废草稿',
-              cancelText: '保留草稿',
-              okButtonProps: { danger: true },
-              onOk: () => setCancelled(true),
-              afterClose: () => {
-                confirmation.current = null
-              },
-            })
-          }}
-        >
-          危险操作确认
-        </Button>
-        <Button onClick={() => setAlert(true)}>打开单步提示</Button>
-        <Button
-          onClick={() => {
-            setCancelled(false)
-            setFiles([])
-          }}
-        >
-          重置浮层样例
-        </Button>
-      </Space>
-      <p role="status">
-        样例草稿：{cancelled ? '已作废' : '未生效'}；文件：{files.length}{' '}
-        个待上传（仅本地选择）。
-      </p>
-      <Upload
-        beforeUpload={() => false}
-        fileList={files}
-        onChange={({ fileList }) => setFiles(fileList)}
-        onPreview={() => setPreview(true)}
-      >
-        <Button>选择演示附件</Button>
-      </Upload>
-      <AppModal
-        open={standard}
-        title="共享标准弹窗"
-        width={560}
-        onCancel={() => setStandard(false)}
-        footer={<Button onClick={() => setStandard(false)}>关闭</Button>}
-      >
-        <p>系统设置与只读信息使用标准弹窗，尺寸和内容按当前任务提供。</p>
-      </AppModal>
-      <Drawer
-        title="采购单上下文摘要"
-        open={drawer}
-        onClose={() => setDrawer(false)}
-        width={420}
-      >
-        <p>PO-DEMO · 草稿 · 采购说明待补齐</p>
-        <p>摘要关闭后，来源页面的输入和选择仍然保留。</p>
-        <Button onClick={() => setPreview(true)}>打开附件预览</Button>
-      </Drawer>
-      <BusinessModal
-        title="附件预览样例"
-        open={preview}
-        size="recordDetails"
-        onCancel={() => setPreview(false)}
-        footer={<Button onClick={() => setPreview(false)}>关闭预览</Button>}
-      >
-        <p>{files[0]?.name || '尚未选择本地文件'}</p>
-        <p>这里只预览所选文件的名称；未上传，也未读取文件内容。</p>
-      </BusinessModal>
-      <AlertDialog
-        open={alert}
-        title="样例状态已说明"
-        message="单步提示沿用 AppModal 的键盘、背景隔离和焦点恢复。"
-        confirmText="知道了"
-        onClose={() => setAlert(false)}
-      />
+    <AppModal
+      open={open}
+      title="共享标准弹窗"
+      width={560}
+      classNames={classNames}
+      onCancel={close}
+      footer={<Button onClick={close}>关闭</Button>}
+    >
+      <p>系统设置与只读信息使用标准弹窗，尺寸和内容按当前任务提供。</p>
+    </AppModal>
+  )
+}
+
+function ContextDrawer({ open, close, classNames, children }) {
+  return (
+    <AppDrawer title="采购单上下文摘要" open={open} onClose={close} width={420} classNames={classNames}>
+      <p>PO-DEMO · 草稿 · 采购说明待补齐</p>
+      {children}
+    </AppDrawer>
+  )
+}
+
+function RecordModal({ open, close, classNames, children }) {
+  return (
+    <BusinessModal
+      title="附件预览样例"
+      open={open}
+      size="recordDetails"
+      classNames={classNames}
+      onCancel={close}
+      footer={<Button onClick={close}>关闭预览</Button>}
+    >
+      {children}
+    </BusinessModal>
+  )
+}
+
+function SessionAlertExample({ open, close, part }) {
+  return (
+    <AlertDialog
+      open={open}
+      title="登录状态已失效"
+      message="请重新登录后继续使用。"
+      confirmText="重新登录"
+      className={part ? `erp-feedback-alert-part--${part}` : undefined}
+      onClose={close}
+    />
+  )
+}
+
+const STANDALONE_OVERLAYS = {
+  standard: { label: '打开标准弹窗', Component: StandardModal },
+  record: { label: '打开业务弹窗', Component: RecordModal, content: '包装说明 · 演示附件 · 只读预览' },
+  drawer: { label: '打开上下文抽屉', Component: ContextDrawer },
+  alert: { label: '打开会话提示', Component: SessionAlertExample },
+}
+
+const OVERLAY_PARTS = {
+  heading: ['header', 'body'],
+  frame: ['content'],
+  footer: ['footer'],
+  body: ['body'],
+}
+
+function StandaloneOverlayExample({ type, usageId, usageRules, onEditorExample }) {
+  const [open, setOpen] = useState(false)
+  const [part, setPart] = useState(null)
+  const { label, Component, content } = STANDALONE_OVERLAYS[type]
+  const openPart = (nextPart = null) => {
+    if (nextPart === 'editor') {
+      onEditorExample()
+      return
+    }
+    setPart(nextPart)
+    setOpen(true)
+  }
+  const classNames = part && OVERLAY_PARTS[part]
+    ? Object.fromEntries(OVERLAY_PARTS[part].map((name) => [name, PART_HIGHLIGHT]))
+    : undefined
+  return (
+    <div className="erp-feedback-example">
+      <Button onClick={() => openPart()}>{label}</Button>
+      <Component open={open} close={() => setOpen(false)} part={part} classNames={classNames}>
+        {content && <p>{content}</p>}
+      </Component>
+      {usageRules && (
+        <DevControlUsageTable
+          id={usageId}
+          rows={usageRules}
+          hint="点整行可打开样例并高亮对应部位"
+          activeTarget={part}
+          dialogTargets={usageRules.map((row) => row[3]).filter((target) => target !== 'editor')}
+          onLocate={openPart}
+        />
+      )}
     </div>
   )
 }
+
+function AttachmentDrawerExample() {
+  const [drawer, setDrawer] = useState(false)
+  const [preview, setPreview] = useState(false)
+  const [files, setFiles] = useState([])
+  const attachmentName = files[0]?.name ?? '采购说明.txt'
+  return (
+    <div className="erp-feedback-example" data-feedback-example="attachment-drawer">
+      <Tooltip title="单击查看已有摘要，不离开当前页面">
+        <Button onClick={() => setDrawer(true)}>打开上下文抽屉</Button>
+      </Tooltip>
+      <ContextDrawer
+        open={drawer}
+        close={() => {
+          setPreview(false)
+          setDrawer(false)
+        }}
+      >
+        <p>附件：{attachmentName}</p>
+        <Space wrap>
+          <Button onClick={() => setPreview(true)}>打开附件预览</Button>
+          <Upload
+            beforeUpload={() => false}
+            fileList={files}
+            maxCount={1}
+            showUploadList={false}
+            onChange={({ fileList }) => setFiles(fileList)}
+          >
+            <Button>选择演示附件</Button>
+          </Upload>
+        </Space>
+      </ContextDrawer>
+      <RecordModal open={preview} close={() => setPreview(false)}>
+        <p>{attachmentName}</p>
+        <p>示例展示附件名称，文件留在本地。</p>
+      </RecordModal>
+    </div>
+  )
+}
+
+function DangerConfirmExample() {
+  const { modal } = App.useApp()
+  const [voided, setVoided] = useState(false)
+  const confirmation = useRef(null)
+  useEffect(() => () => confirmation.current?.destroy(), [])
+  const confirmVoid = () => {
+    if (confirmation.current) return
+    confirmation.current = modal.confirm({
+      maskClosable: true,
+      title: '作废样例草稿 PO-DEMO？',
+      content: '仅终止这份尚未生效的样例草稿，不改变库存。作废后不能恢复；可重新新建。',
+      width: ERP_MODAL_WIDTHS.confirm,
+      centered: true,
+      autoFocusButton: 'cancel',
+      okText: '作废草稿',
+      cancelText: '保留草稿',
+      okButtonProps: { danger: true },
+      onOk: () => setVoided(true),
+      afterClose: () => {
+        confirmation.current = null
+      },
+    })
+  }
+  return (
+    <div className="erp-feedback-example" data-feedback-example="danger-confirm">
+      <Space wrap>
+        <Button danger disabled={voided} onClick={confirmVoid}>危险操作确认</Button>
+        <Button onClick={() => setVoided(false)}>重置草稿</Button>
+      </Space>
+      <p role="status">样例草稿：{voided ? '已作废' : '未生效'}</p>
+    </div>
+  )
+}
+
+const FEEDBACK_SCENES = {
+  editor: { label: '编辑与提交', Component: EditorExample },
+  feedback: { label: '消息与恢复', Component: FeedbackExample },
+  'attachment-drawer': { label: '抽屉内查看附件', Component: AttachmentDrawerExample },
+  'danger-confirm': { label: '危险操作确认', Component: DangerConfirmExample },
+}
+const SCENE_OPTIONS = Object.entries(FEEDBACK_SCENES).map(([value, { label }]) => ({ value, label }))
 
 function Examples({ topic, size }) {
   const initial =
     topic === 'feedback'
       ? 'feedback'
       : topic === 'closing'
-        ? 'overlays'
+        ? 'attachment-drawer'
         : 'editor'
   const [scene, setScene] = useState(initial)
+  const { Component } = FEEDBACK_SCENES[scene]
   return (
     <section className="erp-feedback-examples" aria-label="真实共享组件演示">
       <div className="erp-feedback-example-heading">
@@ -496,28 +614,19 @@ function Examples({ topic, size }) {
           aria-label="反馈演示场景"
           value={scene}
           onChange={setScene}
-          options={[
-            { value: 'editor', label: '编辑与提交' },
-            { value: 'feedback', label: '消息与恢复' },
-            { value: 'overlays', label: '浮层与确认' },
-          ]}
+          options={SCENE_OPTIONS}
         />
       </div>
-      {scene === 'editor' ? (
-        <EditorExample size={size} />
-      ) : scene === 'feedback' ? (
-        <FeedbackExample />
-      ) : (
-        <OverlayExample />
-      )}
+      <Component size={size} />
     </section>
   )
 }
 
-export default function DevUIFeedbackExamples(props) {
+export default function DevUIFeedbackExamples({ sample, ...props }) {
+  const Sample = FEEDBACK_SCENES[sample]?.Component
   return (
     <App message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
-      <Examples {...props} />
+      {Sample ? <Sample {...props} /> : sample ? <StandaloneOverlayExample type={sample} {...props} /> : <Examples {...props} />}
     </App>
   )
 }

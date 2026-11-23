@@ -1,4 +1,4 @@
-import { Alert } from 'antd'
+import { Alert, Card } from 'antd'
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
@@ -407,15 +407,12 @@ export default function PermissionCenterPage() {
           />
         ) : null}
         <div
-          className="erp-permission-toolbar"
           data-page-table-toolbar
           hidden={activeTabKey !== PERMISSION_CENTER_TAB_KEYS.ADMINS}
         >
-          <div
-            className="erp-permission-toolbar__account"
-            ref={setToolbarContainer}
-            hidden={activeTabKey !== PERMISSION_CENTER_TAB_KEYS.ADMINS}
-          />
+          <Card className="erp-business-operation-panel erp-permission-toolbar">
+            <div className="erp-permission-toolbar__account" ref={setToolbarContainer} />
+          </Card>
         </div>
         <div id="permission-roles-panel" role="tabpanel" hidden={!roleView}>
           {roleTemplateTab}

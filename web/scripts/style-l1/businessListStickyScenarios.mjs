@@ -1,8 +1,47 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { readFile } from 'node:fs/promises'
+import { expect } from 'playwright/test'
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { prepareUIDesignSandboxSource } from '../../src/dev-workbench/config/devUIDesign.mjs'
+import { isTransparentColor, parseRgb } from './colorAssertions.mjs'
+
+export async function assertStickyToolbarSurfaces(page, required = false) {
+  const toolbars = page.locator('.erp-admin-content :is([data-page-table-toolbar], .erp-business-operation-panel.ant-card):visible')
+  const surfaces = await toolbars.evaluateAll((nodes) => nodes
+    .filter((node) => getComputedStyle(node).position === 'sticky')
+    .map((toolbar) => {
+      const panelSelector = '.erp-business-operation-panel.ant-card'
+      const panel = toolbar.matches(panelSelector) ? toolbar : toolbar.querySelector(panelSelector)
+      if (!panel) return { toolbar: toolbar.className, panel: null }
+
+      const wrappers = []
+      for (let node = panel.parentElement; node && toolbar.contains(node); node = node.parentElement) {
+        const style = getComputedStyle(node)
+        wrappers.push({ background: style.backgroundColor, image: style.backgroundImage, shadow: style.boxShadow })
+      }
+      const style = getComputedStyle(panel)
+      return {
+        toolbar: toolbar.className,
+        wrappers,
+        panel: {
+          background: style.backgroundColor,
+          shadow: style.boxShadow,
+          radii: [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomLeftRadius, style.borderBottomRightRadius],
+        },
+      }
+    }))
+
+  if (required) assert(surfaces.length > 0, `${page.url()} 应有可见的吸顶工具栏`)
+  for (const { toolbar, wrappers, panel } of surfaces) {
+    assert(panel, `${page.url()} 的吸顶工具栏 ${toolbar} 应使用共享圆角面板`)
+    assert(wrappers.every(({ background, image, shadow }) => isTransparentColor(background) && image === 'none' && shadow === 'none'),
+      `${page.url()} 的吸顶外层应透出圆角：${JSON.stringify(wrappers)}`)
+    assert(panel.radii.every((radius) => Number.parseFloat(radius) > 0) && parseRgb(panel.background)?.[3] === 1 && panel.shadow !== 'none',
+      `${page.url()} 的圆角面板应绘制完整底色和阴影：${JSON.stringify(panel)}`)
+  }
+  return surfaces
+}
 
 export async function assertStickyGeometry(page) {
   await page.waitForFunction(() => {
@@ -41,6 +80,20 @@ export async function assertStickyGeometry(page) {
   assert(metrics.titleBottom < metrics.top, '模块页头应滚走，操作栏与表头保持吸顶')
   assert(metrics.columnsAligned, `表头和数据列必须对齐: ${JSON.stringify(metrics)}`)
   assert(metrics.documentOverflow <= 1, '页面不能出现横向溢出')
+  await assertStickyToolbarSurfaces(page, true)
+}
+
+export async function verifyStickyToolbarFilter(page) {
+  const trigger = page.getByRole('button', { name: '筛选', exact: true })
+  await trigger.press('Enter')
+  const filter = page.getByRole('dialog', { name: '筛选条件', exact: true })
+  await expect(filter).toBeFocused()
+  const bounds = await filter.boundingBox()
+  assert(bounds && bounds.y >= 0 && bounds.y + bounds.height <= page.viewportSize().height + 1, '吸顶后的筛选内容须可达')
+  await page.keyboard.press('Escape')
+  await filter.waitFor({ state: 'hidden' })
+  await expect(trigger).toBeFocused()
+  return trigger
 }
 
 export function createBusinessListStickyScenarios({ customerRuntimeEffectiveSession, outputDir }) {
@@ -95,13 +148,7 @@ export function createBusinessListStickyScenarios({ customerRuntimeEffectiveSess
         await assertStickyGeometry(page)
         assert((await actions.innerText()).includes(`${prefix}-STICKY-020`), '吸顶栏必须保留选中单号')
 
-        await page.getByRole('button', { name: '筛选', exact: true }).click()
-        const filter = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        await filter.waitFor({ state: 'visible' })
-        const filterBox = await filter.boundingBox()
-        assert(filterBox.y >= 0 && filterBox.y + filterBox.height <= 1081, '吸顶后的筛选内容须可达')
-        await page.keyboard.press('Escape')
-        await filter.waitFor({ state: 'hidden' })
+        const filterButton = await verifyStickyToolbarFilter(page)
 
         await actions.locator('[data-business-action-key="related-tasks"]').click()
         const tasks = page.getByRole('dialog', { name: '相关任务', exact: true })
@@ -113,6 +160,15 @@ export function createBusinessListStickyScenarios({ customerRuntimeEffectiveSess
 
         await page.setViewportSize({ width: 1280, height: 600 })
         await root.evaluate((node) => { node.scrollTop = node.scrollHeight })
+        await assertStickyGeometry(page)
+        const tabKey = process.platform === 'darwin' && page.context().browser().browserType().name() === 'webkit' ? 'Alt+Tab' : 'Tab'
+        await filterButton.press(`Shift+${tabKey}`)
+        assert(await filterButton.evaluate((node) => {
+          const toolbar = node.closest('.erp-business-operation-panel')
+          return toolbar.contains(document.activeElement) && document.activeElement.matches(':focus-visible')
+        }), '窄窗吸顶时可用键盘返回前一个工具栏控件')
+        await page.keyboard.press(tabKey)
+        assert(await filterButton.evaluate((node) => document.activeElement === node && node.matches(':focus-visible')), '正向 Tab 返回可见的筛选焦点')
         await assertStickyGeometry(page)
         const body = table.locator('.ant-table-body')
         await body.evaluate((node) => { node.scrollLeft = node.scrollWidth })

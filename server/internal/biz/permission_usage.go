@@ -386,7 +386,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	}
 	add(PermissionWorkflowTaskCreate, workflowTaskCreateSurfaces...)
 	workflowTaskReadSurfaces = append(workflowTaskReadSurfaces,
-		menuPermissionSurface("business-dashboard", "role-progress", "岗位进度", "my-role-progress", "查看本岗进度", permissionControlPage, "查看本岗临期、受阻、无人接手及处理结果", permissionMethods("workflow", "get_task_board", "get_tracking"), []string{"当前岗位及既有任务责任范围；菜单仍受客户启用范围限制"}))
+		menuPermissionSurface("task-board", "document-tasks", "按单据", "document-task-read", "查看单据任务", permissionControlPage, "查看本岗临期、受阻、无人接手及处理结果", permissionMethods("workflow", "get_task_board", "get_tracking"), []string{"当前岗位及既有任务责任范围；菜单仍受客户启用范围限制"}))
 	add(PermissionWorkflowTaskRead, workflowTaskReadSurfaces...)
 	add(PermissionWorkflowTaskSupervise,
 		menuPermissionSurface("task-board", "task-supervision", "协同任务", "cross-role-task-list", "跨岗位任务监督", permissionControlSection, "允许只读查看其他责任岗位任务", permissionMethods("workflow", "list_tasks", "get_task_board", "get_workbench"), workflowUsageConditions),

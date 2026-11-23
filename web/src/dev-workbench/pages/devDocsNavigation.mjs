@@ -29,9 +29,14 @@ export function buildDevDocsChapterOutline(headings, titleHeadingId) {
 
 export function resolveDevDocsReadingHeading(
   headings = [],
-  { scrollTop = 0, clientHeight = 0, scrollHeight = 0, readingInset = 16 } = {}
+  { scrollTop = 0, clientHeight = 0, scrollHeight = 0, readingInset = 16 } = {},
+  preferredHeadingId = ''
 ) {
   if (headings.length === 0) return ''
+  const preferred = preferredHeadingId && headings.find((heading) => heading.id === preferredHeadingId)
+  if (preferred && preferred.top >= scrollTop - 1 && preferred.top < scrollTop + clientHeight) {
+    return preferred.id
+  }
   if (
     scrollTop > 0 &&
     scrollHeight > clientHeight &&

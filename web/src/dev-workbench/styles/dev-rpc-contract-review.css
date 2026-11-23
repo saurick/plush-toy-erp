@@ -60,7 +60,7 @@
   color: var(--erp-text-muted);
 }
 .erp-dev-rpc-review__methods {
-  padding: 4px;
+  padding: 8px;
 }
 .erp-dev-rpc-review__method code {
   color: var(--erp-text-muted);

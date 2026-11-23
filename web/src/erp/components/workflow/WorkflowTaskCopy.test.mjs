@@ -96,10 +96,22 @@ test('task identity restores the primary number copy without inline summary copi
 test('tracking keeps pure code copies and inline multi-product expansion when the full summary moves to its menu', async (t) => {
   const { container, render, act } = await createReactTestHarness(t)
   const { default: WorkflowTaskIdentity } = await import('./WorkflowTaskIdentity.jsx')
+  const { BusinessPageContext } = await import('../../hooks/useBusinessPageContext.js')
   const writes = []
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => writes.push(value) } })
-  const multi = { ...task, display_context: { ...task.display_context, items: [...task.display_context.items, { kind: 'product', name: '第二件产品', code: 'P-LONG-20261018-000000000002' }] } }
-  await render(createElement(WorkflowTaskIdentity, { task: multi, summaryCopyable: false }))
+  const first = { ...task.display_context.items[0], product_id: 7 }
+  const second = { kind: 'product', product_id: 8, name: '第二件产品', code: 'P-LONG-20261018-000000000002' }
+  const profile = { id: 1, permissions: ['product.read'], effective_session: { actions: ['product.read'] } }
+  const show = (items) => render(createElement(
+    BusinessPageContext.Provider,
+    { value: { adminProfile: profile } },
+    createElement(WorkflowTaskIdentity, {
+      task: { ...task, display_context: { ...task.display_context, items } },
+      summaryCopyable: false,
+    })
+  ))
+  await show([first, second])
+  assert.equal(container.querySelectorAll('.erp-product-gallery__stack').length, 1)
   assert.equal(container.querySelectorAll('.erp-task-copy--label').length, 0)
   const details = container.querySelector('.erp-task-identity__more')
   assert.ok(details, '原行内展开保留，不换成新的弹窗流程')
@@ -109,6 +121,9 @@ test('tracking keeps pure code copies and inline multi-product expansion when th
   assert.equal(copies.length, 2)
   await act(async () => copies[1].click())
   assert.deepEqual(writes, ['P-LONG-20261018-000000000002'])
+  await show([first, { ...first, order_no: 'SO-SECOND-LINE' }])
+  assert.equal(container.querySelectorAll('.erp-product-gallery__stack').length, 0)
+  assert.equal(container.querySelectorAll('.erp-task-identity__row').length, 2)
 })
 
 test('compact card groups code and source beside the image and clears removed associations', async (t) => {

@@ -8,12 +8,10 @@ import Select from '@/common/components/select/AppSelect'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
   Text,
-  useDefinitionSelectSearch,
   renderDefinitionSelectOption,
 } from './FlowStateShared.jsx'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 import { FlowActionRules, MasterLifecycleRules } from './FlowRuleTables.jsx'
-import { createDevFlowDefinitionOptionFilter } from '../../pages/devFlowDefinitionSearch.mjs'
 import { buildStateDefinitionSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
 import {
   buildDevFlowStateNodeSummary,
@@ -23,6 +21,20 @@ import {
   buildDevFlowStateRuleGraph,
 } from '../../pages/devFlowStateRulePresentation.mjs'
 import './stateRules.css'
+
+function StateMeanings({ states, label }) {
+  const items = states.map(({ key, label: name, summary }) => ({
+    key,
+    label: <>{name} <code>{key}</code></>,
+    value: summary,
+  }))
+  return (
+    <details className="erp-dev-disclosure">
+      <summary>{label}</summary>
+      <WorkbenchFacts items={items} />
+    </details>
+  )
+}
 
 function StateTransitionCard({
   flow,
@@ -100,13 +112,8 @@ function StateRulesView({
 }) {
   const flows = projection ? projection.flows : catalog.flows
   const scopedCatalog = useMemo(() => ({ ...catalog, flows }), [catalog, flows])
-  const searchProps = useDefinitionSelectSearch()
   const options = useMemo(
     () => buildStateDefinitionSelectOptions(scopedCatalog),
-    [scopedCatalog]
-  )
-  const optionFilter = useMemo(
-    () => createDevFlowDefinitionOptionFilter(scopedCatalog, 'stateOptions'),
     [scopedCatalog]
   )
   return (
@@ -116,13 +123,9 @@ function StateRulesView({
           placeholder="选择状态对象"
           id="dev-flow-state-select"
           aria-label="选择状态对象"
-          showSearch
           virtual={false}
           popupMatchSelectWidth={false}
-          {...searchProps}
           classNames={DEFINITION_SELECT_CLASS_NAMES}
-          filterOption={optionFilter}
-          notFoundContent="没有匹配的状态对象"
           value={flow?.key}
           labelRender={() => flow?.label}
           options={options}
@@ -181,6 +184,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
         ) : null}
       </div>
       <p>{recordRelationship ? '纠正时另建反向记录，原记录保持不变。' : flow.guard}</p>
+      <StateMeanings states={flow.states} label="查看全部状态含义" />
       <div className="erp-dev-rule-layout" data-split={flow.lifecycleRules.length === 0 || recordRelationship ? 'true' : undefined}>
         <div className="erp-dev-rule-graph">
           {recordRelationship ? (
@@ -193,6 +197,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
           {recordRelationship ? (
             <section className="erp-dev-flow-selected-state" aria-label="记录与纠正规则" aria-live="polite">
               <h3>{state ? recordRelationship.nodes.find((node) => node.key === state.key)?.label : '记录与纠正'}</h3>
+              {state ? <p>{state.summary}</p> : null}
               <WorkbenchFacts items={[
             { label: '原记录', value: '已过账后继续留存，不能更新或删除。' },
             { label: '纠正方式', value: '另建反向记录并引用原记录；不修改原行状态。' },
@@ -206,7 +211,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
           state ? (
             <section className="erp-dev-flow-selected-state" aria-live="polite">
               <div><h3>{state.label}</h3><Text type="secondary">{selectedStateSummary?.positionLabel}</Text></div>
-              <div className="erp-dev-flow-selected-state__meaning"><p>{state.summary || (flow.transitions.length > 0 ? '查看下面允许进入和离开的转换。' : flow.guard)}</p></div>
+              <div className="erp-dev-flow-selected-state__meaning"><p>{state.summary}</p></div>
               {flow.transitions.length > 0 ? (
                 <section className="erp-dev-flow-transitions" aria-label="当前状态的转换条件">
                   {renderTransitions(focusedTransitions)}
@@ -228,6 +233,7 @@ function StateRuleDetail({ catalog, flow, state, onSelectState, onOpenView, rule
               <h3>{dimension.label}</h3>
               <p>{dimension.states.map((item) => item.label).join(' / ')}</p>
               <Text type="secondary">{dimension.guard}</Text>
+              <StateMeanings states={dimension.states} label={`查看${dimension.label}的含义`} />
             </div>
           ))}
         </section>

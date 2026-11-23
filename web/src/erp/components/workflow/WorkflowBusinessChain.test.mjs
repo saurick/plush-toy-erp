@@ -211,7 +211,7 @@ test('focused task details do not duplicate the current task and expose related 
   assert.equal(container.querySelector('.workflow-business-chain__history').open, true)
 })
 
-test('a focused shipment with no related tasks shows one concise empty relationship message', async (t) => {
+test('a focused shipment with no related tasks keeps only the order overview entry', async (t) => {
   const dom = installTestDOM()
   registerJSXTestLoader()
   const [{ createRoot }, { default: Chain }, { JsonRpc }] = await Promise.all([
@@ -224,9 +224,7 @@ test('a focused shipment with no related tasks shows one concise empty relations
   document.body.appendChild(container)
   const root = createRoot(container)
   t.after(async () => { await act(async () => root.unmount()); container.remove(); JsonRpc.prototype.call = original; dom.restore() })
-  await act(async () => root.render(createElement(Chain, { task, focused: true, profile: { id: 12, is_super_admin: true, effective_session: { actions: ['workflow.task.read'] } } })))
-  assert.equal(container.querySelectorAll('li').length, 0)
-  assert.equal(container.querySelector('details'), null)
-  assert.match(container.textContent, /当前暂无其他关联任务/u)
-  assert.doesNotMatch(container.textContent, /准备并办理发货/u)
+  await act(async () => root.render(createElement(Chain, { task, focused: true, emptyAction: createElement('button', null, '查看整单进度'), profile: { id: 12, is_super_admin: true, effective_session: { actions: ['workflow.task.read'] } } })))
+  assert.equal(container.querySelector('.workflow-business-chain'), null)
+  assert.equal(container.textContent, '查看整单进度')
 })

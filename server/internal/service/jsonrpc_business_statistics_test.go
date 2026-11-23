@@ -16,7 +16,11 @@ func (r *statisticsAPIRepo) Statistics(_ context.Context, q biz.BusinessStatisti
 	r.query = q
 	r.calls++
 	amount := "100.01"
-	return &biz.BusinessStatisticsBoard{Report: q.Report, GroupBy: q.GroupBy, SnapshotAt: q.SnapshotAt, Access: q.Access, Totals: biz.BusinessStatisticsMetrics{Amount: &amount}, Groups: []biz.BusinessStatisticsGroup{}}, nil
+	var quantities *biz.DeliveryQuantities
+	if q.Report == "delivery" {
+		quantities = &biz.DeliveryQuantities{}
+	}
+	return &biz.BusinessStatisticsBoard{Report: q.Report, GroupBy: q.GroupBy, SnapshotAt: q.SnapshotAt, Access: q.Access, Counts: biz.BusinessStatisticsMetrics{Quantities: quantities}, Totals: biz.BusinessStatisticsMetrics{Amount: &amount, Quantities: quantities}, Groups: []biz.BusinessStatisticsGroup{}}, nil
 }
 func (r *statisticsAPIRepo) StatisticsSources(_ context.Context, q biz.BusinessStatisticsQuery) (*biz.BusinessStatisticsSources, error) {
 	r.query = q

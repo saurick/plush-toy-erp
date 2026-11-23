@@ -46,7 +46,7 @@ for (const [file, name, ...domains] of [
   ['./processRuntimePresentation.mjs', 'PROCESS_RESOLUTION_LABELS', 'ProcessResolution'],
   ['./processRuntimePresentation.mjs', 'NODE_STATUS_LABELS', 'ProcessNodeStatus'],
   ['./processRuntimePresentation.mjs', 'NODE_TYPE_KEYS', 'ProcessNodeType'],
-  ['../components/finance/financePaymentPresentation.jsx', 'PAYMENT_STATUS_META', 'FinancePaymentStatus'],
+  ['../components/finance/financePaymentStatus.mjs', 'PAYMENT_STATUS_META', 'FinancePaymentStatus'],
   ['../components/finance/financePaymentPresentation.jsx', 'PAYMENT_DIRECTION_OPTIONS', 'FinancePaymentDirection'],
   ['../components/finance/financePaymentPresentation.jsx', 'CREDIT_STATUS_OPTIONS', 'FinanceAllocationStatus'],
   ['../pages/InventoryLedgerPage.jsx', 'INVENTORY_OPERATION_STATUS_LABELS', 'InventoryOperationStatus'],

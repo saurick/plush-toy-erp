@@ -13,6 +13,21 @@
   align-items: start;
 }
 
+.erp-dashboard-page:has(.erp-workflow-tracking-panel[data-layout='split']) {
+  min-height: 0;
+}
+
+.erp-dashboard-task-board-card:has(.erp-workflow-tracking-panel[data-layout='split']) {
+  flex: 1;
+  min-height: 0;
+}
+
+.erp-workflow-tracking-workspace:has(.erp-workflow-tracking-panel[data-layout='split']) {
+  height: 100%;
+  grid-template-rows: auto minmax(240px, 1fr);
+  align-items: stretch;
+}
+
 .erp-task-board-controls {
   display: grid;
   gap: var(--erp-page-gap);
@@ -54,11 +69,11 @@
   padding: 0;
 }
 
-.erp-task-tracking-toolbar:has(.erp-task-tracking-toolbar__controls:empty) .erp-business-operation-panel__view-switch::after {
+.erp-task-tracking-toolbar:has(.erp-task-tracking-toolbar__controls:empty, .workflow-exceptions__controls[hidden]) .erp-business-operation-panel__view-switch::after {
   display: none;
 }
 
-.erp-task-tracking-toolbar .workflow-exceptions__controls {
+.erp-task-tracking-toolbar .workflow-exceptions__controls:not([hidden]) {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -77,7 +92,6 @@
   margin: 12px var(--erp-panel-padding-inline, 12px) var(--erp-panel-padding-block, 10px);
 }
 
-.erp-dashboard-task-board-card .workflow-exceptions,
 .erp-dashboard-task-board-card .erp-work-center-results > .ant-card-body > .ant-alert {
   margin: 0 var(--erp-panel-padding-inline, 12px) var(--erp-panel-padding-block, 10px);
 }
@@ -90,14 +104,6 @@
   .erp-command-center-page [data-page-table-region]:has(.erp-work-center-table .ant-table-sticky-holder),
   .erp-command-center-page .erp-work-center-table {
     overflow: visible;
-  }
-
-  .erp-command-center-page [data-page-table-region]:has(.erp-work-center-table .ant-table-sticky-holder) [data-page-table-toolbar] {
-    position: sticky;
-    top: calc(-1 * var(--erp-list-scroll-padding, var(--erp-page-padding)));
-    z-index: 5;
-    background: var(--erp-surface-bg);
-    box-shadow: 0 1px 0 var(--erp-border);
   }
 
   .erp-work-center-table .ant-table-sticky-holder {

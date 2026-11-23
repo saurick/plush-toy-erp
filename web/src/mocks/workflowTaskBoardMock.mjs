@@ -248,6 +248,39 @@ export function buildWorkflowTaskBoardMock({
       }
       return compareTaskIDDescending(a, b)
     })
+  if (params.progress_view) {
+    const open = filteredTasks.filter((task) => UNSETTLED_TASK_STATUS_KEYS.has(taskStatus(task)))
+    const lanes = {
+      open,
+      exception: open.filter((task) => classifyWorkflowTaskBoardMockLane(task, normalizedSnapshotAt) === 'exception'),
+      due: open.filter((task) => isTaskOverdue(task, normalizedSnapshotAt) || isTaskDueSoon(task, normalizedSnapshotAt)),
+      unassigned: open.filter((task) => !task.assignee_id),
+      finished: filteredTasks.filter((task) => FINISHED_TASK_STATUS_KEYS.has(taskStatus(task))),
+    }
+    const category = params.progress_view
+    const date = (task) => (category === 'finished' ? task.completed_at : task.due_at) || null
+    const source = (task) => task.source_id && task.source_type ? `${getBusinessDocumentTypeKey(task.source_type)}:${task.source_id}` : `task:${task.id}`
+    const groups = new Map()
+    const rank = (task) => task.task_status_key === 'blocked' ? 0 : !task.assignee_id ? 1 : 2
+    const items = lanes[category].sort((a, b) => rank(a) - rank(b) || (date(a) ?? Infinity) - (date(b) ?? Infinity) || a.id - b.id)
+    for (const task of items) {
+      const key = source(task)
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(task)
+    }
+    const anchor = items.find((task) => task.id === params.progress_anchor)
+    const entries = params.progress_anchor ? (anchor ? groups.get(source(anchor)).map((task) => [task]) : []) : [...groups.values()]
+    const rows = entries.map((group) => {
+      const dates = group.map(date).filter((value) => value !== null)
+      return { task: group[0], task_count: group.length, date: dates.length ? (category === 'finished' ? Math.max(...dates) : Math.min(...dates)) : null }
+    })
+    const offset = normalizeOffset(params.offset)
+    return { snapshot_at: normalizedSnapshotAt,
+total: rows.length,
+counts: Object.fromEntries(Object.entries(lanes).map(([key, list]) => [key, list.length])),
+      assignees: [],
+rows: rows.slice(offset, offset + normalizeLimit(params.limit)) }
+  }
   const laneTasks = Object.fromEntries(
     TASK_BOARD_LANE_KEYS.map((key) => [key, []])
   )

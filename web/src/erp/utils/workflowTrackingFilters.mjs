@@ -3,6 +3,7 @@ import { normalizeWorkflowTaskPageSize, TASK_BOARD_ROLE_OPTIONS } from './workfl
 
 export const TRACKING_VIEW_OPTIONS = [
   { value: 'tracking', label: '流程进度' },
+  { value: 'followups', label: '单项跟进' },
   { value: 'exceptions', label: '异常跟踪' },
 ]
 
@@ -20,7 +21,6 @@ export const TRACKING_STATUS_OPTIONS = [
 
 export const TRACKING_ROLE_OPTIONS = [{ value: '', label: '全部当前岗位' }, ...TASK_BOARD_ROLE_OPTIONS]
 export const TRACKING_ATTENTION_OPTIONS = [
-  { value: '', label: '全部情况' },
   { value: 'overdue', label: '只看逾期' },
   { value: 'blocked', label: '只看受阻' },
 ]
@@ -55,7 +55,7 @@ export function writeTrackingFilters(params, scope, changes) {
 }
 
 export function clearTrackingFilters(params, scope) {
-  return writeTrackingFilters(params, scope, Object.fromEntries(FILTER_FIELDS.filter((key) => key !== 'status').map((key) => [key, ''])))
+  return writeTrackingFilters(params, scope, { owner_role_key: '', source_type: '', date_from: '', date_to: '' })
 }
 
 export function readTrackingPagination(params, scope) {

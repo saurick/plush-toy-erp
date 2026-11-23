@@ -17,7 +17,6 @@ import {
   DEFINITION_SELECT_CLASS_NAMES,
   formatQueryTime,
   Text,
-  useDefinitionSelectSearch,
   renderDefinitionSelectOption,
   asArray,
   EvidenceDisclosure,
@@ -37,7 +36,6 @@ import {
   getWorkflowTaskStatusMeta,
 } from '@/erp/utils/workflowTaskBoard.mjs'
 import { getDevFlowStateTaskRuntimeAssociation } from '../../pages/devFlowStateTaskLookup.mjs'
-import { createDevFlowDefinitionOptionFilter } from '../../pages/devFlowDefinitionSearch.mjs'
 import { buildProcessDefinitionSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
 import { buildDevFlowRuntimeResponsibility } from '../../pages/devFlowRuntimeResponsibility.mjs'
 
@@ -181,8 +179,6 @@ function RuntimeView({
 }) {
   const definitions = projection ? projection.processDefinitions : catalog.processDefinitions
   const scopedCatalog = useMemo(() => ({ ...catalog, processDefinitions: definitions }), [catalog, definitions])
-  const searchProps = useDefinitionSelectSearch()
-  const optionFilter = useMemo(() => createDevFlowDefinitionOptionFilter(scopedCatalog, 'runtime'), [scopedCatalog])
   const definitionOptions = useMemo(() => buildProcessDefinitionSelectOptions(scopedCatalog), [scopedCatalog])
   const association = getDevFlowStateTaskRuntimeAssociation(selectedTask)
   const [revision, setRevision] = useState(0)
@@ -207,13 +203,9 @@ function RuntimeView({
                 placeholder="选择流程定义"
                 id="dev-flow-process-select"
                 aria-label="选择流程定义"
-                showSearch
                 virtual={false}
                 popupMatchSelectWidth={false}
                 classNames={DEFINITION_SELECT_CLASS_NAMES}
-                {...searchProps}
-                filterOption={optionFilter}
-                notFoundContent="没有匹配的流程定义"
                 value={definition?.key}
                 labelRender={() => definition?.label}
                 options={definitionOptions}

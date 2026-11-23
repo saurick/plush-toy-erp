@@ -528,9 +528,7 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
     .filter(([, pageKeys]) => pageKeys.includes("business-dashboard"))
     .map(([roleKey]) => roleKey)
     .sort();
-  assert.deepEqual(progressOwners, [
-    "boss", "engineering", "finance", "pmc", "production", "purchase", "quality", "sales", "warehouse",
-  ]);
+  assert.deepEqual(progressOwners, ["boss", "pmc", "sales"]);
   const globalProgressOwners = manifest.access_entitlements
     .filter((item) => item.capability_key === "erp.business_dashboard.read" && item.enabled)
     .map((item) => item.role_key)

@@ -6,8 +6,6 @@ import {
   buildBusinessChainDesignLibrary,
   emptyBusinessChainDraft,
 } from '../config/devBusinessChainDesign.mjs'
-import { projectBusinessChainMap } from '../config/devBusinessChainMap.mjs'
-import { projectBusinessChainReading } from '../config/devBusinessChainReading.mjs'
 import {
   applyDevFlowExplorerEntry,
   resolveDevFlowExplorerEntry,
@@ -53,12 +51,11 @@ test('显式空白入口独立于链路定位，不提供含糊的组合参数',
   )
 })
 
-test('来源节点按现有目录展开分支，保留手动位置和备注', () => {
+test('来源节点按现有目录展开分支，保留手动位置', () => {
   const library = buildBusinessChainDesignLibrary(catalog)
   const draft = {
     ...emptyBusinessChainDraft(),
     nodes: [{ id: 'node:sales_order', x: 32, y: 48, manual: true }],
-    ideas: [{ text: '原有备注' }],
   }
   const sources = library.nodes.filter(
     (node) =>
@@ -75,7 +72,6 @@ test('来源节点按现有目录展开分支，保留手动位置和备注', ()
       result.nodes.find((node) => node.id === 'node:sales_order'),
       draft.nodes[0]
     )
-    assert.deepEqual(result.ideas, draft.ideas)
     assert.equal(result.map.chainKey, source.chainKey)
   }
 })
@@ -98,13 +94,11 @@ test('动作核验仅恢复同一链路内的正式动作', () => {
 test('异常与纠正的直达入口加载该范围及其业务分支', () => {
   const library = buildBusinessChainDesignLibrary(catalog)
   const draft = { ...emptyBusinessChainDraft(), presentation: { mode: 'overview', layers: ['normal'] } }
-  for (const key of ['purchase_quality_disposition', 'purchase_posting_corrections']) {
+  for (const [key, layer] of [['purchase_quality_disposition', 'exception'], ['purchase_posting_corrections', 'correction']]) {
     const result = applyDevFlowExplorerEntry(draft, library, { chainKey: key })
     assert.equal(result.map.chainKey, key)
     assert.equal(result.presentation.mode, 'mainline')
-    const graph = projectBusinessChainMap(result, library, result.presentation.mode)
-    const reading = projectBusinessChainReading(graph, library, { scope: result.map.scope, mode: result.presentation.mode })
-    assert.ok(reading.edges.length)
-    assert.deepEqual([...new Set(reading.nodes.map(({ id }) => library.byId.get(id).chainKey))], [key])
+    assert.ok(result.presentation.layers.includes(layer))
+    assert.ok(result.map.visibleIds.length)
   }
 })

@@ -1,7 +1,7 @@
 import BusinessProgressSummary from '../../components/business-visualizations/BusinessProgressSummary.jsx'
 import MobileProgressRecentRecords from './MobileProgressRecentRecords.jsx'
 
-export default function MobileProgressSummary({ data, onSelectSection }) {
+export default function MobileProgressSummary({ data, onSelectSection, orderFocus }) {
   const { row, access, sections } = data
   const task = access.tasks
     ? sections.tasks?.find((item) => item.label === row.attention_task) ||
@@ -14,6 +14,7 @@ export default function MobileProgressSummary({ data, onSelectSection }) {
         access={access}
         sections={sections}
         onSelectSection={onSelectSection}
+        orderFocus={orderFocus}
       />
       <MobileProgressRecentRecords task={task} canRead={access.tasks} />
     </>

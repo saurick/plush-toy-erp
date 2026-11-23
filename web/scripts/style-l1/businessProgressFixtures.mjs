@@ -36,6 +36,7 @@ export function progressFixtureRow(index = 0, view = 'orders') {
           ? '98765432.1256'
           : '400'
         : null,
+    remaining_quantity: view === 'orders' && index!==2 ? (index===6 ? '24691356.9978' : '400') : null,
     completed_quantity: view === 'production' && index !== 2 ? '560' : null,
     delivery_known: view === 'orders',
     engineering_total: 1,
@@ -106,16 +107,18 @@ export function progressFixtureData(
     }
     const sections = { lines: [record] }
     if (!restricted) {
+      const production = view === 'orders' ? progressFixtureRow(9, 'production') : row
       Object.assign(sections, {
         production: [
           {
             ...record,
-            id: 10,
+            id: production.id,
             kind: 'production',
-            number: 'MO-0010',
+            number: production.order_no,
             label: '',
-            status: 'RELEASED',
+            status: production.status,
             note: '',
+            parent_id: production.id,
           },
         ],
         materials: [
@@ -206,7 +209,7 @@ export function progressFixtureData(
     }
   }
   const base = Array.from({ length: 25 }, (_, i) =>
-    progressFixtureRow(i, view)
+    ({ ...progressFixtureRow(i, view), ...(view === 'orders' && i===2 ? { delivered_line_count: 0 } : {}) })
   ).filter(
     (row) =>
       (!params.id || params.id === row.id) &&

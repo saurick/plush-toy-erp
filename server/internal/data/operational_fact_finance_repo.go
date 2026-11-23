@@ -998,6 +998,9 @@ func (r *operationalFactRepo) changeFinanceFactStatus(ctx context.Context, in *b
 	if err != nil {
 		return nil, err
 	}
+	if err := syncFinanceReceiptPayable(ctx, tx.client, row, in.ActorID); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -1119,6 +1122,9 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, in *b
 		WithCanceller().
 		Only(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := syncFinanceReceiptPayable(ctx, tx.client, row, in.ActorID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {

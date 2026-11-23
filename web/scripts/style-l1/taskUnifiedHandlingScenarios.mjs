@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { assertNoTaskReadFailures, createMobileTaskHandlingCoverageScenarios } from './mobileTaskHandlingCoverageScenarios.mjs'
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
@@ -56,8 +56,8 @@ async function assertCompactTaskDrawer(page, assert) {
 export function createTaskUnifiedHandlingScenarios(deps) {
   const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
   const historyBases = createMobileTaskHandlingCoverageScenarios(deps).filter((scenario) => !scenario.name.endsWith('-pending'))
-  const shipmentDrafts = [false, true].flatMap((mobile) => [{ identity: 'handler' }, { identity: 'supervisor' }, ...(mobile ? [{ identity: 'handler', approved: true }, { identity: 'handler', approved: true, retryShip: true }] : [])].map(({ identity, approved = false, retryShip = false }, index) => {
-    const caseIdentity = `${identity}${approved ? '-approved' : ''}${retryShip ? '-retry' : ''}`
+  const shipmentDrafts = [false, true].flatMap((mobile) => [{ identity: 'handler' }, { identity: 'supervisor' }, ...(mobile ? [{ identity: 'handler', approved: true }, { identity: 'handler', approved: true, retryShip: true }, { identity: 'handler', approved: true, galleryOnly: true }] : [])].map(({ identity, approved = false, retryShip = false, galleryOnly = false }, index) => {
+    const caseIdentity = `${identity}${approved ? '-approved' : ''}${retryShip ? '-retry' : ''}${galleryOnly ? '-gallery' : ''}`
     const base = historyBases.find((scenario) => scenario.name === 'mobile-task-handling-shipment')
     const task = { ...base.workflowTaskFixtures[0], id: 99880 + index, task_status_key: 'ready', completed_at: null, task_group: 'handoff_shipment_execute', task_code: 'source-handoff-shipment-execute-1', owner_role_key: 'sales', process_instance_id: null, discovery: { stage_key: 'shipment' }, payload: { source_task_contract: 'workflow.source-task/v1', source_task_producer: 'fulfillment.source', source_record_id: 1, source_task_intent_hash: 'a'.repeat(64), entry_path: '/erp/warehouse/shipments?shipment_id=1' } }
     const initialRecord = { id: 1, shipment_no: task.source_no, status: 'DRAFT', version: 1, finance_release_status: approved ? 'APPROVED' : 'PENDING', finance_release_version: 1, sales_order_id: 1, customer_id: 1, customer_snapshot: '模拟客户', currency: 'CNY', total_net_weight_g: null, planned_ship_at: 1793116800, shipping_mark: '本次唛头', note: '分批出货', items: Array.from({ length: 25 }, (_, row) => ({ id: row + 11, shipment_id: 1, sales_order_item_id: row + 1, product_id: row % 18 + 1, product_sku_id: 1, warehouse_id: 1, unit_id: 1, lot_id: 1, quantity: '10' })) }
@@ -82,6 +82,30 @@ export function createTaskUnifiedHandlingScenarios(deps) {
         shipAttempts = 0
         releaseFirstShip = null
         await base.beforeNavigate(page)
+        if (galleryOnly) {
+          const preview = await readFile(new URL('../../src/erp/data/bom-example-images/product.jpg', import.meta.url), 'base64')
+          const images = [1, 2, 3].map((productID) => ({
+            id: 8600 + productID, owner_id: productID, owner_type: 'product',
+            attachment_type: 'product_image', mime_type: 'image/jpeg', slot_key: 'primary',
+          }))
+          await page.route('**/rpc/attachment', async (route) => {
+            const { id, method, params = {} } = route.request().postDataJSON()
+            if (method === 'list_product_image_references') return rpcResponder(route, id, {
+              images: params.product_ids.map((productID) => ({
+                product_id: productID,
+                image_attachment_id: images.find((image) => image.owner_id === productID)?.id ?? 0,
+              })),
+            })
+            if (method === 'list_attachments' && params.owner_type === 'product') {
+              return rpcResponder(route, id, { attachments: images.filter((image) => image.owner_id === params.owner_id) })
+            }
+            const image = images.find((entry) => entry.id === params.id)
+            if (method === 'download_attachment' && image) {
+              return rpcResponder(route, id, { attachment: { ...image, content_base64: preview } })
+            }
+            return route.fallback()
+          })
+        }
         await page.route('**/rpc/operational_fact', async (route) => {
           const { id, method, params } = route.request().postDataJSON()
           if (method === 'get_shipment') { reads += 1; return rpcResponder(route, id, { shipment: record }) }
@@ -110,6 +134,26 @@ export function createTaskUnifiedHandlingScenarios(deps) {
       },
       verify: async (page) => {
         const steps = await openTask(page, task, mobile)
+        if (galleryOnly) {
+          await steps.getByRole('tab', { name: '任务办理', exact: true }).click()
+          const checklist = page.getByRole('region', { name: '本次出货明细', exact: true })
+          await checklist.getByRole('heading', { name: '本次出货明细 · 25 项', exact: true }).waitFor()
+          assert.equal(await checklist.locator('.erp-business-row-item-card .erp-product-gallery__thumbnail').count(), 25)
+          assert.equal(await checklist.locator('.erp-product-gallery__stack').count(), 0)
+          const thumbnail = checklist.locator('.erp-product-gallery__trigger').first()
+          await thumbnail.locator('img').waitFor()
+          await page.screenshot({ path: path.join(outputDir, 'shipment-mobile-product-rows.png') })
+          await thumbnail.click()
+          await page.locator('.erp-task-image-preview__stage img').waitFor()
+          assert.equal(await page.getByRole('group', { name: '切换产品', exact: true }).count(), 0)
+          await page.screenshot({ path: path.join(outputDir, 'shipment-mobile-single-product-album.png') })
+          await page.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+          await page.locator('.erp-task-image-preview__stage').waitFor({ state: 'detached' })
+          assert.equal(await thumbnail.evaluate((button) => document.activeElement === button), true)
+          await assertNoHorizontalOverflow(page, 'shipment-review-photos')
+          assert.deepEqual(page.taskUnifiedMutations, [])
+          return
+        }
         const information = page.getByTestId('workflow-task-business-information')
         await information.getByText(task.source_no, { exact: true }).first().waitFor()
         await page.waitForFunction(() => !document.querySelector('.erp-task-action-drawer [data-business-form-page][aria-busy="true"]'))

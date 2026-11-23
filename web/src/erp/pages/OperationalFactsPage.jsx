@@ -64,6 +64,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
+import BusinessRecordDetails from '../components/business-list/BusinessRecordDetails.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import ProductionReworkModal from '../components/production-facts/ProductionReworkModal.jsx'
@@ -954,6 +955,16 @@ export function OperationalFactWorkspace({
 
   return (
     <LayoutRoot {...layoutProps}>
+      {outletContext?.taskBusiness?.task?.task_group === 'handoff_receipt_payable' && activeSelectedRow ? (
+        <BusinessRecordDetails
+          title="本次应付核对"
+          presentation="mobile-task"
+          record={activeSelectedRow}
+          columns={visibleColumns.filter((col) =>
+            ['fact_no', 'counterparty', 'amount', 'currency', 'due_at', 'payment_term'].includes(col.dataIndex || col.key)
+          )}
+        />
+      ) : null}
       {productionRecordsWorkspace || financeWorkspace ? null : (
         <PageHeaderCard
           compact

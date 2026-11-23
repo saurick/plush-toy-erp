@@ -255,6 +255,7 @@ const BusinessAttachmentPanel = forwardRef(
       className = '',
       variant = 'section',
       compact = false,
+      imagesOnly = false,
       allowPendingAttachmentsWithoutOwner = true,
       uploadWithForm = false,
       enablePrintAppendixUpload = false,
@@ -376,11 +377,10 @@ const BusinessAttachmentPanel = forwardRef(
     const queuedAttachments = pendingAttachments.filter(
       (item) => !item.upload_status || item.upload_status === 'pending'
     )
-    const visibleItems = listItems.filter(
-      (item) =>
-        category === 'all' ||
-        (category === 'image') === isBusinessAttachmentImage(item)
-    )
+    const visibleItems = listItems.filter((item) => {
+      if (imagesOnly) return isBusinessAttachmentImage(item) && !isBusinessAttachmentWithdrawn(item)
+      return category === 'all' || (category === 'image') === isBusinessAttachmentImage(item)
+    })
     const categoryOptions = [
       { value: 'all', label: '全部', count: listItems.length },
       {
@@ -1241,12 +1241,12 @@ const BusinessAttachmentPanel = forwardRef(
 
     const toolbar = (
       <div className="business-attachment-panel__toolbar">
-        <FilterChipGroup
+        {imagesOnly ? null : <FilterChipGroup
           aria-label="附件分类"
           options={categoryOptions}
           value={category}
           onChange={setCategory}
-        />
+        />}
         {compact && (!missingOwner || canQueuePending) ? <BusinessHelpLabel iconOnly label={title} description={panelDescription} /> : null}
         {!missingOwner ? (
           <Button
@@ -1284,7 +1284,7 @@ const BusinessAttachmentPanel = forwardRef(
                 ? '正在读取'
                 : loadError
                   ? '读取失败'
-                  : `（${attachments.length}）`}
+                  : `（${imagesOnly ? visibleItems.length : attachments.length}）`}
               {pendingAttachments.length > 0
                 ? ` · ${pendingAttachments.length} 个待处理`
                 : ''}
@@ -1445,7 +1445,7 @@ const BusinessAttachmentPanel = forwardRef(
                   variant={compact ? 'inline' : 'default'}
                   state={loading ? 'loading' : 'empty'}
                   image={<PaperClipOutlined aria-hidden="true" />}
-                  description={loading ? '正在加载附件…' : category === 'all'
+                  description={loading ? '正在加载附件…' : imagesOnly ? '暂无可查看的照片' : category === 'all'
                     ? compact && missingOwner && canQueuePending ? '暂无附件' : emptyDescription
                     : '当前分类没有附件'}
                   detail={!compact && !loading && canUpload && !uploadDisabled

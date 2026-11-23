@@ -433,6 +433,19 @@ test("trial account checklist fixes public 133 test credentials and current navi
   assert.match(trialAccountChecklist, /模块内只显示该账号有权访问的页签/u);
 });
 
+test("trial checklist keeps task and progress entries aligned with each business role", () => {
+  const section = headingSection(trialAccountChecklist, /^3\. 桌面菜单核对$/u);
+  const rows = tableRows(section);
+  for (const { roleKey, menuSurfaces } of yoyoosunRoleFlowMatrix.roles) {
+    const matches = rows.filter(([role]) => role === `\`${roleKey}\``);
+    assert.equal(matches.length, 1, roleKey);
+    const labels = matches[0][1].split("、");
+    for (const [key, label] of [["task-board", "任务管理"], ["business-dashboard", "进度看板"]]) {
+      assert.equal(labels.includes(label), menuSurfaces.includes(key), `${roleKey}: ${label}`);
+    }
+  }
+});
+
 test("customer documentation does not route to the retired delta register", () => {
   for (const document of [
     customerReadme,

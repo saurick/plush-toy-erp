@@ -1,3 +1,4 @@
+import { expect } from 'playwright/test'
 import { DEV_PERMISSION_RELATIONSHIPS_API } from '../../src/dev-workbench/config/devPermissionRelationshipApi.mjs'
 
 const roles = [
@@ -103,6 +104,34 @@ async function selectGraphModule(page, label) {
     .click()
 }
 
+async function verifyPermissionModuleShortcuts(page) {
+  const module = page.getByRole('combobox', { name: '选择关系图功能范围' })
+  const popup = page.locator('.ant-select-dropdown:visible')
+  const navigation = popup.getByRole('navigation', { name: '跳转到功能分组' })
+  const overview = popup.getByRole('option', { name: '权限总览', exact: true })
+  const system = popup.getByText('系统与开发 · 5', { exact: true })
+  const workspace = popup.getByText('基础资料与通用工具 · 6', { exact: true })
+  await module.press('ArrowDown')
+  await expect(module).not.toBeEditable()
+  await expect(navigation.getByRole('button')).toHaveText(['业务办理', '基础资料与通用工具', '系统与开发'])
+  await expect(navigation).toBeInViewport({ ratio: 1 })
+  await navigation.getByRole('button', { name: '业务办理', exact: true }).click()
+  await expect(popup.getByText('业务办理 · 10', { exact: true })).toBeInViewport({ ratio: 1 })
+  await expect(system).not.toBeInViewport()
+  const overviewTop = (await overview.boundingBox()).y
+  await navigation.getByRole('button', { name: '系统与开发', exact: true }).click()
+  await expect(system).toBeInViewport({ ratio: 1 })
+  await expect(overview).toHaveAttribute('aria-selected', 'true')
+  await expect.poll(async () => Math.abs((await overview.boundingBox()).y - overviewTop)).toBeLessThanOrEqual(1)
+  await expect(module).toBeFocused()
+  await module.press('Alt+ArrowUp')
+  await expect(workspace).toBeInViewport({ ratio: 1 })
+  await expect(navigation).toBeVisible()
+  await expect(overview).toHaveAttribute('aria-selected', 'true')
+  await module.press('Escape')
+  await expect(popup).toBeHidden()
+}
+
 export function createPermissionRelationshipScenarios({
   assert,
   assertNoHorizontalOverflow,
@@ -126,6 +155,7 @@ export function createPermissionRelationshipScenarios({
           )
           fixture.accounts[0].account_status = 'active'
           fixture.approval_settings = { items: [] }
+          fixture.permissions[0].module = 'sales_order'
           fixture.permissions.push(
             {
               permission_key: 'debug.business_chain.read',
@@ -138,7 +168,15 @@ export function createPermissionRelationshipScenarios({
               name: '查看库存',
               module: 'warehouse',
               module_name: '仓储',
-            }
+            },
+            ...[
+              ['engineering', '工程用料审批'], ['purchase', '采购'], ['outsourcing', '委外'],
+              ['pmc', '生产计划'], ['production', '生产执行'], ['quality', '品质'],
+              ['shipment', '出货'], ['finance', '财务'], ['masterdata', '基础资料'],
+              ['bom', '物料清单（BOM）'], ['workflow', '任务协同'], ['erp', '工作台与通用工具'],
+              ['mobile', '手机待办'], ['help', '帮助与企业补充'], ['system', '系统管理'],
+              ['customer_config', '客户配置'], ['process_runtime', '异常流程恢复'], ['field', '敏感字段'],
+            ].map(([module, name]) => ({ permission_key: `${module}.catalog.read`, name: `查看${name}`, module, module_name: name }))
           )
           fixture.roles[0].permissions.push('warehouse.inventory.read')
           fixture.access_by_role_key.sales.permissions.push({
@@ -159,12 +197,13 @@ export function createPermissionRelationshipScenarios({
           .getByText('业务未授予“调试工具”模块权限', { exact: true })
           .waitFor()
         assert.equal(await graph.locator('.erp-markdown-mermaid__canvas > svg').count(), 0)
+        await graph.getByRole('button', { name: '查看权限总览', exact: true }).click()
+        await verifyPermissionModuleShortcuts(page)
         const tabs = page.locator('.erp-permission-relationship__tabs > .ant-tabs-nav')
         const originalTabs = await tabs.elementHandle()
         const tabBox = await tabs.boundingBox()
         await selectGraphModule(page, '销售管理')
-        await graph.locator('.erp-markdown-mermaid__canvas > svg').waitFor()
-        assert.match(await graph.innerText(), /查看销售订单/u)
+        await expect(graph).toContainText('查看销售订单')
         await selectGraphModule(page, '仓储')
         await graph.getByText(/功能：查看库存/u).waitFor()
         assert.match(await graph.innerText(), /当前受限/u)

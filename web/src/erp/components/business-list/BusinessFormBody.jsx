@@ -2,6 +2,7 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayo
 import Select from '@/common/components/select/AppSelect'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import { activeFormSectionIndex } from '../../utils/businessFormSections.mjs'
 import { BusinessFormSectionContext } from './BusinessFormSectionContext.js'
 
@@ -252,7 +253,7 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
       style={scrollArea.shared ? { '--erp-form-section-top': `${scrollArea.top}px`, '--erp-form-section-height': `${scrollArea.height}px`, '--erp-form-reading-top': `${scrollArea.readingTop}px` } : undefined}
     >
       {showNavigation ? (
-        <nav
+        <Directory
           className="erp-business-form-page__navigation"
           aria-label="表单分区"
           inert={busy ? '' : undefined}
@@ -279,18 +280,17 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
                 </button>
               ))}
             </SlidingTabList>
-            <div className="erp-business-form-page__section-links" hidden={sectionMode}>
+            <div className="erp-directory-list erp-business-form-page__section-links" hidden={sectionMode}>
               {sections.map((section) => (
-                <button
+                <DirectoryItem
                   key={section.id}
-                  type="button"
                   aria-current={section.id === active ? 'location' : undefined}
                   aria-controls={section.id}
                   onClick={() => navigate(section.id)}
                 >
-                  {section.title}
+                  <span>{section.title}</span>
                   {section.errors > 0 ? <span className="erp-business-form-page__section-errors">{section.errors} 项待修改</span> : null}
-                </button>
+                </DirectoryItem>
               ))}
             </div>
             <label className="erp-business-form-page__section-picker" hidden={sectionMode}>
@@ -313,7 +313,7 @@ const BusinessFormBody = forwardRef(({ open, active: presented = true, loading, 
               />
             </label>
           </div>
-        </nav>
+        </Directory>
       ) : null}
       <div
         ref={bodyRef}

@@ -52,6 +52,7 @@ func (d *jsonrpcDispatcher) handleWorkflowExceptions(ctx context.Context, id str
 		return id, res, nil
 	}
 	query.Visibility = scope
+	query.IncludeQualityPhotoSources = d.requireBusinessAttachmentOwnerPermission(ctx, biz.BusinessAttachmentOwnerQualityInspection, false) == nil
 	board, err := d.workflowUC.ListExceptions(ctx, query)
 	if err != nil {
 		return id, d.mapWorkflowError(ctx, err), nil
@@ -83,7 +84,11 @@ func (d *jsonrpcDispatcher) handleWorkflowExceptions(ctx context.Context, id str
 			ids = append(ids, id)
 		}
 		orders := orderSummaries(item.Orders)
-		items = append(items, map[string]any{"key": item.Key, "number": item.Number, "reason": item.Reason, "state": item.State, "disposition": item.Disposition, "batch_no": item.BatchNo, "occurred_at": item.OccurredAt, "task_ids": ids, "tasks": tasks, "orders": orders})
+		photoSources := make([]any, 0, len(item.QualityPhotoSources))
+		for _, source := range item.QualityPhotoSources {
+			photoSources = append(photoSources, map[string]any{"id": source.ID, "number": source.Number})
+		}
+		items = append(items, map[string]any{"key": item.Key, "number": item.Number, "reason": item.Reason, "state": item.State, "disposition": item.Disposition, "batch_no": item.BatchNo, "occurred_at": item.OccurredAt, "task_ids": ids, "tasks": tasks, "orders": orders, "quality_photo_sources": photoSources})
 	}
-	return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": items, "tasks": taskSummaries(board.Tasks), "orders": orderSummaries(board.Orders), "view_total": board.ViewTotal, "total": board.Total, "open": board.Open, "closed": board.Closed, "pending_tasks": board.PendingTasks, "affected_orders": board.AffectedOrders, "limit": board.Limit, "offset": board.Offset})}, nil
+	return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": items, "tasks": taskSummaries(board.Tasks), "orders": orderSummaries(board.Orders), "view_total": board.ViewTotal, "total": board.Total, "open": board.Open, "closed": board.Closed, "pending_plan": board.PendingPlan, "executing": board.Executing, "pending_tasks": board.PendingTasks, "affected_orders": board.AffectedOrders, "limit": board.Limit, "offset": board.Offset})}, nil
 }

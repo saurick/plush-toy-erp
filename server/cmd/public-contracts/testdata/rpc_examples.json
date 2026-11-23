@@ -2885,7 +2885,13 @@
         "soon": 0,
         "undated": 0,
         "unknown": 0,
-        "unknown_due": null
+        "unknown_due": null,
+        "quantities": {
+          "ordered": null,
+          "shipped": null,
+          "remaining": null,
+          "unit": ""
+        }
       },
       "currency": "",
       "date_from": "",
@@ -2914,7 +2920,13 @@
         "soon": 0,
         "undated": 0,
         "unknown": 0,
-        "unknown_due": null
+        "unknown_due": null,
+        "quantities": {
+          "ordered": null,
+          "shipped": null,
+          "remaining": null,
+          "unit": ""
+        }
       }
     },
     "message": "OK",
@@ -2951,6 +2963,7 @@
         "engineering_total": 1,
         "id": 1,
         "in_progress_batches": 1,
+        "linked_product_count": 1,
         "material_pending": 1,
         "material_total": 1,
         "open_tasks": 1,
@@ -3162,8 +3175,25 @@
   "business.list_progress_tasks": {
     "basis": "handler-fixture",
     "data": {
-      "rows": [],
-      "total": 0
+      "rows": [
+        {
+          "id": 7,
+          "kind": "task",
+          "number": "TASK-0007",
+          "label": "办理出货前检验",
+          "status": "ready",
+          "quantity": "",
+          "unit": "",
+          "date": "",
+          "owner": "",
+          "role": "quality",
+          "note": "",
+          "product_id": 0,
+          "parent_id": 3,
+          "task_group": "handoff_shipment_quality"
+        }
+      ],
+      "total": 1
     },
     "message": "OK",
     "params": {
@@ -22719,38 +22749,23 @@
     "data": {
       "assignees": [],
       "counts": {
-        "actionable": 0,
+        "open": 0,
         "due": 0,
         "exception": 0,
-        "finished": 0
+        "finished": 0,
+        "unassigned": 0
       },
-      "lanes": [
-        {
-          "key": "all",
-          "limit": 20,
-          "offset": 20,
-          "tasks": [],
-          "total": 0
-        }
-      ],
-      "owner_role_keys": [],
+      "rows": [],
       "snapshot_at": 1792670400,
-      "source_types": [],
       "total": 0
     },
     "message": "OK",
     "params": {
-      "keyword": "包装",
-      "lane_key": "all",
-      "limit": 20,
-      "offset": 20,
-      "sort": "time_asc",
-      "todo_only": true,
-      "source_section": "production",
-      "due_date_from": "2026-10-16",
-      "due_date_to": "2026-10-18"
+      "progress_view": "open",
+      "owner_role_key": "warehouse",
+      "limit": 20
     },
-    "test": "TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage"
+    "test": "TestWorkflowProgressRoleScopeAndDocumentResponse"
   },
   "workflow.get_task_create_options": {
     "basis": "handler-fixture",
@@ -22932,13 +22947,25 @@
       "tracking": {
         "current_task_access": [
           {
-            "can_handle": true,
-            "can_read": true,
-            "task_id": 11
+            "can_handle": false,
+            "can_read": false,
+            "task_id": 12
           }
         ],
         "events": [],
         "events_truncated": false,
+        "material_review": {
+          "boss_reviewed_at": 1790384460,
+          "boss_reviewed_by_name": "老板审核人",
+          "finance_reviewed_at": null,
+          "finance_reviewed_by_name": "",
+          "order_status": "active",
+          "rejected_at": null,
+          "rejected_by_name": "",
+          "status": "BOSS_APPROVED",
+          "submitted_at": 1790384400,
+          "submitted_by_name": "工程提交人"
+        },
         "next_event_id": 0,
         "nodes": [],
         "summary": {
@@ -22947,53 +22974,55 @@
             {
               "assignee_name": "",
               "completed_at": null,
-              "created_at": -62135596800,
+              "created_at": 1790384460,
               "due_at": null,
               "node_instance_id": null,
-              "owner_role_key": "engineering",
-              "required_capability_key": null,
+              "owner_role_key": "finance",
+              "required_capability_key": "engineering.material.finance_approve",
               "status": "ready",
-              "task_id": 11,
-              "task_name": "工程资料"
+              "task_group": "engineering_material_finance_review",
+              "task_id": 12,
+              "task_name": "审核并批准采购用料"
             }
           ],
           "display_context": null,
-          "id": 11,
-          "initiator_name": "",
+          "id": 51,
+          "initiator_name": "工程提交人",
           "initiator_role_key": "",
-          "kind": "task",
+          "kind": "material_review",
           "process_key": "",
           "resolution_kind": null,
-          "source_id": 1,
-          "source_no": null,
-          "source_type": "sales_order",
-          "started_at": -62135596800,
-          "status": "ready",
-          "title": "工程资料",
-          "updated_at": -62135596800
+          "source_id": 51,
+          "source_no": "SO-MATERIAL-UI",
+          "source_type": "engineering_material_request",
+          "started_at": 1790384400,
+          "status": "active",
+          "title": "本次用料审批",
+          "updated_at": 1790384460
         },
         "tasks": [
           {
             "assignee_name": "",
             "completed_at": null,
-            "created_at": -62135596800,
+            "created_at": 1790384460,
             "due_at": null,
             "node_instance_id": null,
-            "owner_role_key": "engineering",
-            "required_capability_key": null,
+            "owner_role_key": "finance",
+            "required_capability_key": "engineering.material.finance_approve",
             "status": "ready",
-            "task_id": 11,
-            "task_name": "工程资料"
+            "task_group": "engineering_material_finance_review",
+            "task_id": 12,
+            "task_name": "审核并批准采购用料"
           }
         ]
       }
     },
     "message": "OK",
     "params": {
-      "id": 11,
-      "kind": "task"
+      "id": 51,
+      "kind": "material_review"
     },
-    "test": "TestWorkflowTrackingCurrentTaskAccessMatchesTaskEndpoints"
+    "test": "TestWorkflowTrackingMaterialReviewProjection"
   },
   "workflow.get_workbench": {
     "basis": "handler-fixture",
@@ -23073,6 +23102,7 @@
     "data": {
       "affected_orders": 1,
       "closed": 0,
+      "executing": 0,
       "items": [
         {
           "batch_no": "",
@@ -23086,6 +23116,7 @@
               "number": "SO-2"
             }
           ],
+          "quality_photo_sources": [],
           "reason": "",
           "state": "open",
           "task_ids": [
@@ -23116,6 +23147,7 @@
       "offset": 0,
       "open": 1,
       "orders": [],
+      "pending_plan": 1,
       "pending_tasks": 1,
       "tasks": [],
       "total": 1,
@@ -23253,6 +23285,7 @@
       "limit": 8,
       "offset": 24,
       "owner_role_key": "engineering",
+      "record_type": "flow",
       "scope": "participated",
       "sort_direction": "asc",
       "source_type": "sales_order",

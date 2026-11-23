@@ -5,6 +5,7 @@ import { PermissionCode } from '../../../common/consts/permissions.generated.mjs
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
+import { getWorkflowTaskIdentityPresentation } from '../../utils/workflowTaskIdentity.mjs'
 import { createDocumentProductPreviewLoader, DOCUMENT_PRODUCT_GALLERY_COLUMN, DOCUMENT_PRODUCT_SOURCES } from '../../utils/businessProductGallery.mjs'
 import { listDocumentProductPreviews } from '../../api/attachmentApi.mjs'
 import { loadDocumentGalleryProducts } from '../../api/documentProductGalleryApi.mjs'
@@ -87,10 +88,18 @@ export default function BusinessDocumentProductGallery({ source, record, title, 
 }
 
 export function documentProductGalleryColumn(source, profile, { showIdentity = false } = {}) {
-  return canReadDocumentProductGallery(profile, source) ? [{
+  if (!canReadDocumentProductGallery(profile, source)) return []
+  const render = (_value, record) => <BusinessDocumentProductGallery source={source} record={record} title={record.order_no || record.outsourcing_order_no || '单据产品'} showIdentity={showIdentity} />
+  return [{
     ...DOCUMENT_PRODUCT_GALLERY_COLUMN,
     ...(showIdentity ? { title: '产品 / 款号', align: 'left', width: 320, widthGrow: 2 } : {}),
     className: showIdentity ? 'erp-product-identity-cell' : 'erp-product-gallery-cell',
-    render: (_value, record) => <BusinessDocumentProductGallery source={source} record={record} title={record.order_no || record.outsourcing_order_no || '单据产品'} showIdentity={showIdentity} />,
-  }] : []
+    taskDetailRole: 'media',
+    render,
+    taskDetailValue: (record, task) => {
+      const gallery = render(null, record)
+      if (task?.source_type !== source || task.source_id !== record.id || !getWorkflowTaskIdentityPresentation(task).first?.productID) return gallery
+      return <details key={task.id} className="mobile-task-facts__product-details"><summary>查看单据产品资料</summary>{gallery}</details>
+    },
+  }]
 }

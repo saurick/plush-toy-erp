@@ -70,7 +70,7 @@ const UI_DESIGN_TOPICS = [
     key: 'feedback',
     title: 'Toast 与反馈选择',
     group: '操作与反馈',
-    description: '字段错误、区域提示、Toast 与持续通知放在哪里',
+    description: '点选字段错误、区域提示、Toast 或持续通知，查看实际显示的位置',
     rules: { specification: '反馈选择--feedback-selection', rationale: '反馈持续时间的取舍--feedback-lifetime' },
   },
   {

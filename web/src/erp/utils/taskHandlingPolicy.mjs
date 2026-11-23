@@ -123,6 +123,8 @@ const groupKinds = Object.freeze({
   handoff_purchase_arrival: 'onsite',
   handoff_receipt_replacement: 'onsite',
   handoff_receipt_inbound: 'onsite',
+  handoff_purchase_price: 'authoring',
+  handoff_receipt_payable: 'capture',
   handoff_outsourcing_issue: 'onsite',
   handoff_outsourcing_return: 'onsite',
   handoff_outsourcing_inbound: 'onsite',

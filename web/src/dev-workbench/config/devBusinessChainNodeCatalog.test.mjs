@@ -90,7 +90,7 @@ test('原有 227 个来源逐项有分类和去向；全部当前节点有真实
   }
 })
 
-test('完整保留原节点坐标、关系、备注及阅读模式，无需清空浏览器视图', () => {
+test('完整保留原节点坐标、关系及阅读模式，无需清空浏览器视图', () => {
   const ids = new Set(initialIDs)
   const draft = {
     nodes: initialIDs.map((id, index) => ({
@@ -101,7 +101,6 @@ test('完整保留原节点坐标、关系、备注及阅读模式，无需清�
     edges: library.relations
       .filter((edge) => ids.has(edge.from) && ids.has(edge.to))
       .map(({ from, to }) => ({ from, to, kind: 'known' })),
-    ideas: [{ text: '原有阅读笔记' }],
     presentation: { mode: 'all', highlightedRoles: ['quality'] },
   }
   draft.edges = [
@@ -312,7 +311,7 @@ test('搜索、视角与分组条件取交集；数量按相同候选口径计�
   )
   const anchor = 'action:effective_bom:creates_source:production_order:release'
   const view = expandBusinessChainView(
-    { nodes: [{ id: anchor, x: 601, y: 273 }], edges: [], ideas: [] },
+    { nodes: [{ id: anchor, x: 601, y: 273 }], edges: [] },
     library,
     anchor,
     'both',

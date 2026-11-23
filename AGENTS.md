@@ -128,7 +128,7 @@
 ## 文档与目录同步
 
 - 目录、长期子系统或 Markdown 增删、改名、重分类时同步相关 README、文档清单、引用、入口与测试；仅改正文通常不动清单。`docs/` 长期易误读目录须有 README。
-- 项目聊天说明、文档、工作台和 ERP 页面按[可视化表达规范](docs/engineering/可视化表达规范.md#visualization-choices)选图、表、步骤或短说明；图示保持总览、专题和证据分层，同源生成，控制单图复杂度。
+- 全仓现行文档按[文档写法](docs/README.md#文档写法--writing-rules)组织章节，按读者问题选用短文、清单、步骤、表格或图示。聊天、工作台和 ERP 页面沿用[可视化表达规范](docs/engineering/可视化表达规范.md#visualization-choices)，图示分层、同源并控制单图复杂度。
 - 流程细节、异常细节或后端状态、动作、守卫、结果与恢复路径变化时，同轮核对业务链路四页签及关联测试；状态与流转规则以领域真源为准，按[流程与规则同步](docs/architecture/业务链与运行轨迹边界.md#flow-rule-sync)执行。
 - 长期文档默认中文文件名和中文主体 + English anchor；README/AGENTS/CHANGELOG、archive、生成/外部稳定路径除外。
 - 能力台账仅随产品能力边界、状态或关键阻塞变化更新；客户矩阵仅随客户启用、发布或验收状态变化更新；当前真源索引仅随入口或主路径变化更新。普通修复、重构、测试、样式及文案不更新能力台账。
@@ -148,7 +148,8 @@
 ## 前端、原型与错误
 
 - 页面须简洁、高效、实用、直观；ERP 桌面与手机同权限下的核心信息、动作、追踪和结果一致，布局按设备适配。按 `$plush-page-design-governance` 执行；样式归属以[共享控件样式边界](docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)为准，复用 `pnpm --dir web css` 和浏览器隔离回归，不增加绕过检查的全局文件或页面补丁。
-- 效能工作台页面先按[统一页面样板](docs/product/ui-design/交互设计说明.md#workbench-patterns)选择任务组合并复用共享实现；共享变化同步交互设计样板与真实消费者，按任务路径验收。
+- 新增、替换或调整共享组件、页面布局、导航及用户操作时，同轮按[设计与实现同步](.agents/skills/plush-page-design-governance/references/page-semantics.md#design-sync)核对交互设计的四个页签，更新受影响的内容并验证实际使用入口。
+- 效能工作台页面先按[页面组合](docs/product/ui-design/交互设计说明.md#workbench-patterns)选择任务组合并复用共享实现。共享变化同步设计说明和实际使用页面，按真实任务路径验收。
 - 手机只做任务办理，不跳来源单据；完整单据在电脑查看，仅“切换工作入口”可换端。其余导航保持手机界面，复用 `useBusinessNavigate` / `BusinessLink` 与路由边界。
 - 原型只作设计输入；Draft/To Implement/Current 与代码、测试及 runtime 分别核对。
 - Ant Design 动态表单使用所属 form 实例，不以警告或隐藏实例兜底。

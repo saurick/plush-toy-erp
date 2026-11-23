@@ -5,6 +5,7 @@ import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listBusinessProgressTasks } from '../../api/businessProgressApi.mjs'
 import { SelectFilter } from '../business-list/BusinessListLayout.jsx'
+import { TaskCopyField } from '../workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskPagination from '../workflow/WorkflowTaskPagination.jsx'
 import { getWorkflowTaskOwnerRoleLabel, TASK_BOARD_ROLE_OPTIONS } from '../../utils/workflowTaskBoard.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
@@ -17,21 +18,21 @@ const statusOptions = [
 ]
 const initialQuery = { status: 'all', role: '', size: 20, page: 1 }
 
-export default function ProgressRelatedTasks({ detail, mobile, saved, focusTaskID, scrollRef, onRemember, onOpen }) {
+export default function ProgressRelatedTasks({ detail, source = detail?.row, mobile, saved, scrollRef, pendingFocus, onRemember, onOpen, refreshKey }) {
   const [query, setQuery] = useState(() => ({ ...initialQuery, ...saved }))
   const [result, setResult] = useState(null)
   const [retry, setRetry] = useState(0)
   const tail = useRef(null)
   const cache = useRef(null)
-  const { view, id } = detail.row
+  const { view, id } = source
   const { status, role, size, page } = query
   const group = JSON.stringify([view, id, status, role, size])
   const initial = status === 'all' && !role && size === 20
-  const firstPage = { rows: detail.sections.tasks, total: detail.task_total }
-  const previewRoles = new Set(firstPage.rows.map((record) => record.role))
-  const roles = detail.has_more.tasks ? TASK_BOARD_ROLE_OPTIONS : TASK_BOARD_ROLE_OPTIONS.filter((item) => previewRoles.has(item.value))
-  const local = initial && page === 1
-  const current = result?.detail === detail && result.group === group ? result : null
+  const firstPage = detail ? { rows: detail.sections.tasks, total: detail.task_total } : null
+  const previewRoles = new Set((firstPage?.rows || []).map((record) => record.role))
+  const roles = !detail || detail.has_more.tasks ? TASK_BOARD_ROLE_OPTIONS : TASK_BOARD_ROLE_OPTIONS.filter((item) => previewRoles.has(item.value))
+  const local = Boolean(detail) && initial && page === 1
+  const current = result && result.detail === detail && result.group === group ? result : null
   const shown = local ? firstPage : (mobile || current?.page === page ? current : null)
   const busy = !local && (!current || current.page !== page) && !current?.error
   const change = (patch) => {
@@ -41,17 +42,19 @@ export default function ProgressRelatedTasks({ detail, mobile, saved, focusTaskI
     if (!mobile || next.page === 1) scrollRef.current?.scrollTo({ top: 0 })
   }
   const restoreTop = useRef(saved?.scrollTop)
-  const restoreFocus = useRef(focusTaskID)
   useLayoutEffect(() => {
-    if (!busy && shown && restoreTop.current != null && scrollRef.current) {
-      scrollRef.current.scrollTop = restoreTop.current
+    const list = scrollRef.current
+    if (busy || !shown || !list) return
+    if (restoreTop.current != null) {
+      list.scrollTop = restoreTop.current
       restoreTop.current = null
     }
-    if (!busy && shown && !mobile && restoreFocus.current) {
-      scrollRef.current?.querySelector(`[data-progress-task-id="${Number(restoreFocus.current)}"]`)?.focus({ preventScroll: true })
-      restoreFocus.current = null
+    if (pendingFocus?.current) {
+      const trigger = list.querySelector(`[data-progress-task-id="${pendingFocus.current}"]`) || list
+      trigger.focus({ preventScroll: true })
+      pendingFocus.current = null
     }
-  }, [busy, shown, scrollRef, mobile])
+  }, [busy, shown, scrollRef, pendingFocus])
 
   useEffect(() => {
     if (local) {
@@ -60,8 +63,8 @@ export default function ProgressRelatedTasks({ detail, mobile, saved, focusTaskI
     }
     const controller = new AbortController()
     const previous = cache.current
-    let loaded = mobile && previous?.detail === detail && previous.group === group && previous.page <= page ? previous : null
-    if (mobile && !loaded && initial) loaded = { detail, group, page: 1, rows: detail.sections.tasks, total: detail.task_total }
+    let loaded = mobile && previous && previous.detail === detail && previous.group === group && previous.page <= page ? previous : null
+    if (mobile && !loaded && initial && detail) loaded = { detail, group, page: 1, rows: detail.sections.tasks, total: detail.task_total }
     const load = async () => {
       setResult(loaded ? { ...loaded, error: '' } : null)
       try {
@@ -94,7 +97,7 @@ export default function ProgressRelatedTasks({ detail, mobile, saved, focusTaskI
     }
     load()
     return () => controller.abort()
-  }, [detail, group, id, initial, local, mobile, page, retry, role, size, status, view])
+  }, [detail, group, id, initial, local, mobile, page, retry, role, size, status, view, refreshKey])
 
   const more = mobile && shown && page * size < shown.total
   const append = useRef(null)
@@ -122,13 +125,17 @@ export default function ProgressRelatedTasks({ detail, mobile, saved, focusTaskI
           />
         )}
       </Space>
-      <p className="erp-progress-hint">仅显示当前账号可见的关联任务。任务完成不代表已经生产、入库或出货。</p>
+      {detail && <p className="erp-progress-hint">仅显示当前账号可见的关联任务。任务完成不代表已经生产、入库或出货。</p>}
       {current?.error && !local && <Alert type="error" showIcon message={current.error} action={<Button onClick={() => setRetry((n) => n + 1)}>重新读取</Button>} />}
       {shown?.rows?.map((record) => (
         <article className="erp-progress-record" key={record.id}>
           <div className="erp-progress-record-main">
             <strong>{getWorkflowTaskDisplayName({ task_name: record.label })}</strong>
-            <span>{record.number}</span>
+            {record.number && (
+              <TaskCopyField value={record.number} label="任务编号" failureMessage="复制失败，请选中编号手动复制">
+                {record.number}
+              </TaskCopyField>
+            )}
             {record.note && <p>{record.note}</p>}
             <span>{record.owner || '未分配处理人'} · {getWorkflowTaskOwnerRoleLabel({ owner_role_key: record.role })}</span>
             {record.date && <span>日期 {record.date}</span>}
@@ -140,10 +147,10 @@ export default function ProgressRelatedTasks({ detail, mobile, saved, focusTaskI
                 type={mobile ? 'default' : 'link'}
                 size={mobile ? 'middle' : 'small'}
                 data-progress-task-id={record.id}
-                aria-label={`查看任务 ${record.number || record.label}`}
+                aria-label={`打开任务详情 ${record.number || record.label}`}
                 onClick={() => onOpen(record, { ...query, scrollTop: scrollRef.current?.scrollTop || 0 })}
               >
-                查看任务
+                打开任务详情
               </Button>
             )}
           </div>

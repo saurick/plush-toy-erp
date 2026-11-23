@@ -65,6 +65,8 @@ function validRow(row) {
     ].every((key) => typeof row[key] === 'string') &&
     integer(row.product_id) &&
     counters.every((key) => integer(row[key])) &&
+    (row.linked_product_count === undefined ||
+      (integer(row.linked_product_count) && row.linked_product_count <= row.product_count)) &&
     (row.product_type_count === undefined || integer(row.product_type_count)) &&
     (row.product_match_count === undefined ||
       (integer(row.product_match_count) && row.product_match_count <= row.product_type_count)) &&
@@ -79,6 +81,8 @@ function validRow(row) {
     decimal(row.ordered_quantity) &&
     decimal(row.shipped_quantity) &&
     decimal(row.completed_quantity) &&
+    (row.delivered_line_count === undefined || (row.delivery_known && integer(row.delivered_line_count) && row.delivered_line_count <= row.product_count)) &&
+    (row.remaining_quantity === undefined || decimal(row.remaining_quantity)) &&
     (row.delivery_known || row.shipped_quantity === null)
   )
 }
@@ -142,6 +146,7 @@ export function progressIdentityPresentation(row) {
 }
 function validProgressRecord(row) {
   return row && integer(row.id) && row.id > 0 && integer(row.parent_id) &&
+    (row.task_group === undefined || (row.kind === 'task' && typeof row.task_group === 'string')) &&
     ['kind', 'number', 'label', 'status', 'quantity', 'unit', 'date', 'owner', 'role', 'note']
       .every((field) => typeof row[field] === 'string')
 }
@@ -265,7 +270,8 @@ export function progressQueryFromURL(params) {
   const view = allowed('view', ['orders', 'production'], id || display || customerID ? 'orders' : '')
   const lines = view === 'orders' && display === 'lines'
   const sortBy = allowed('sort_by', [
-    BusinessProgressSort.ORDER_NO, BusinessProgressSort.DUE_DATE, ...(lines ? [BusinessProgressSort.PRODUCT] : []),
+    BusinessProgressSort.ORDER_NO, BusinessProgressSort.DUE_DATE,
+    ...(view === 'production' ? [BusinessProgressSort.COMPLETED] : [BusinessProgressSort.REMAINING]), ...(lines ? [BusinessProgressSort.PRODUCT] : []),
   ], '')
   const direction = allowed('sort_direction', ['asc', 'desc'], '')
   const deliveryStatus = allowed('delivery_status', PROGRESS_DELIVERY_STATUS_OPTIONS.map(({ value }) => value), 'all')
@@ -548,7 +554,9 @@ export function progressDelivery(row) {
   }
   if (!row.delivery_known) return { label: '出货进度', text: '关联待核对' }
   if (row.ordered_quantity === null || row.shipped_quantity === null) {
-    return { label: '出货进度', text: '多单位 · 查看明细' }
+    return { label: '出货进度',
+text: Number.isSafeInteger(row.delivered_line_count)
+      ? `已交齐 ${row.delivered_line_count} / ${row.product_count} 条明细` : '多单位 · 查看明细' }
   }
   const ordered = Number(row.ordered_quantity)
   const shipped = Number(row.shipped_quantity)
@@ -609,30 +617,4 @@ export function progressMetricDetails(row, key, access = {}) {
     return progressDeliveryDetails(row)
   }
   return { label: stage.label, value: stage.text, note: '按已登记的工序批次核对，任务完成不代表生产或质检事实完成。' }
-}
-
-export function progressSourcePath(record, view = 'orders') {
-  if (record.kind === 'task') {
-    return `/erp/task-board?task_id=${record.id}`
-  }
-  if (record.kind === 'sales_line') {
-    return `/erp/sales/project-orders/sales-orders?sales_order_id=${record.parent_id}`
-  }
-  if (record.kind === 'batch') {
-    return `/erp/production/orders?production_order_id=${
-      record.parent_id
-    }&wip_batch_id=${record.id}`
-  }
-  if (record.kind === 'production_line') {
-    return `/erp/production/orders?production_order_id=${
-      record.parent_id
-    }&production_order_item_id=${record.id}`
-  }
-  if (record.kind === 'material') {
-    return `/erp/production/orders?production_order_id=${record.parent_id}`
-  }
-  if (record.kind === 'production' || view === 'production') {
-    return `/erp/production/orders?production_order_id=${record.id}`
-  }
-  return `/erp/sales/project-orders/sales-orders?sales_order_id=${record.id}`
 }

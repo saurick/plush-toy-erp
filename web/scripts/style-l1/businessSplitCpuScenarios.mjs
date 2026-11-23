@@ -131,7 +131,6 @@ export function createBusinessSplitCpuScenarios({ assert, customerRuntimeEffecti
         await page.getByRole('button', { name: '分栏', exact: true }).first().click()
         const picker = right.getByRole('combobox', { name: '选择右栏页面' })
         await picker.click()
-        await picker.fill('材料档案')
         await page.locator('.ant-select-dropdown:visible').getByText('材料档案', { exact: true }).click()
         await right.getByRole('button', { name: '新建材料' }).waitFor()
         await page.waitForLoadState('networkidle')

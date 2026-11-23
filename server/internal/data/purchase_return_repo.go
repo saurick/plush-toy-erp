@@ -334,6 +334,11 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (_
 	if err != nil {
 		return nil, err
 	}
+	if purchaseReturn.PurchaseReceiptID != nil {
+		if err := refreshReceiptPayable(ctx, tx.client, *purchaseReturn.PurchaseReceiptID, 0); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -479,6 +484,11 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 	out, err := purchaseReturnWithItems(ctx, tx.client, purchaseReturn)
 	if err != nil {
 		return nil, err
+	}
+	if purchaseReturn.PurchaseReceiptID != nil {
+		if err := refreshReceiptPayable(ctx, tx.client, *purchaseReturn.PurchaseReceiptID, 0); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err

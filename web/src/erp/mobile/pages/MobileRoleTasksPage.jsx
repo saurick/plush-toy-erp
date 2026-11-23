@@ -58,6 +58,7 @@ import {
   isEngineeringMaterialTask,
 } from '../../utils/engineeringMaterialTask.mjs'
 import MobileTaskActionScreen from '../components/MobileTaskActionScreen.jsx'
+import { documentTaskAccess } from '../../utils/progressBoardAccess.mjs'
 import { mobileProgressAccess } from '../utils/mobileProgress.mjs'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
 import useWorkflowTaskCalendarView from '../../hooks/useWorkflowTaskCalendarView.js'
@@ -142,6 +143,8 @@ export default function MobileRoleTasksPage() {
     () => mobileProgressAccess(adminProfile, activeRoleKey),
     [activeRoleKey, adminProfile]
   )
+  const documentAccess = documentTaskAccess(adminProfile, activeRoleKey)
+  const canGroupTasks = canMountCustomerRuntime(adminProfile) && (documentAccess.supervise || documentAccess.roles.length > 0)
   const runtimeBuildIdentity = useRuntimeBuildIdentity()
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
@@ -149,6 +152,11 @@ export default function MobileRoleTasksPage() {
   const taskAccessIdentity =
     workflowTaskAdminAccessRequestIdentity(adminProfile)
   const taskAccessScopeKey = `${activeRoleKey}|access:${taskAccessIdentity}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
+  const [documentSnapshot, setDocumentSnapshot] = useState(() => window.history.state?.mobileDocumentTasks)
+  const documentState = documentSnapshot?.scope === taskAccessScopeKey ? documentSnapshot.value : {}
+  const changeDocumentState = useCallback((change) => setDocumentSnapshot((current) => ({
+    scope: taskAccessScopeKey, value: { ...(current?.scope === taskAccessScopeKey ? current.value : {}), ...change },
+  })), [taskAccessScopeKey])
   const initialHistoryStateRef = useRef(readMobileTaskHistoryState())
   const initialHistoryCandidate = initialHistoryStateRef.current
   const defaultMainTabKey = progressAccess.enabled && progressAccess.global
@@ -175,7 +183,8 @@ export default function MobileRoleTasksPage() {
   const [requestedMainTabKey, setActiveMainTabKey] = useState(initialMainTabKey)
   const activeMainTabKey =
     (requestedMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS && !progressAccess.enabled)
-    || ([MOBILE_MAIN_TAB_KEYS.TRACKING, MOBILE_MAIN_TAB_KEYS.EXCEPTIONS].includes(requestedMainTabKey) && !canViewTracking)
+    || (requestedMainTabKey === MOBILE_MAIN_TAB_KEYS.DOCUMENTS && !canGroupTasks && !(documentState.linked?.scope === taskAccessScopeKey && canViewTracking))
+    || ([MOBILE_MAIN_TAB_KEYS.TRACKING, MOBILE_MAIN_TAB_KEYS.FOLLOWUPS, MOBILE_MAIN_TAB_KEYS.EXCEPTIONS].includes(requestedMainTabKey) && !canViewTracking)
       ? MOBILE_MAIN_TAB_KEYS.TODO
       : requestedMainTabKey
   const activeTaskQueryPageKey = mobileTaskQueryPageKey(activeMainTabKey)
@@ -719,7 +728,7 @@ export default function MobileRoleTasksPage() {
         isLinkedSelection &&
         selectedTaskID
       ) {
-        return loadLinkedTask(selectedTaskID)
+        return loadLinkedTask(selectedTaskID, options.canonicalTask)
       }
       let currentState = readMobileRoleTaskScopeState(
         taskScopeStateRef.current,
@@ -1211,6 +1220,8 @@ export default function MobileRoleTasksPage() {
   )
 
   const materialDraftRef = useRef(initialHistoryState[MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY] || null)
+  const trackingActionDraftRef = useRef(null)
+  const fromTracking = [MOBILE_MAIN_TAB_KEYS.TRACKING, MOBILE_MAIN_TAB_KEYS.FOLLOWUPS].includes(activeMainTabKey)
   const materialDraftScopeRef = useRef(taskAccessScopeKey)
   const materialBusyRef = useRef(false)
   const materialTaskSettled =
@@ -1306,13 +1317,18 @@ export default function MobileRoleTasksPage() {
         })
         return
       }
+      const saved = trackingActionDraftRef.current
+      const draft = fromTracking && saved?.scope === taskAccessScopeKey &&
+        saved.taskID === selectedTask.id && saved.version === selectedTask.version &&
+        availableActions.includes(saved.action) ? saved : null
       const nextAction = availableActions.includes(preferredAction)
         ? preferredAction
-        : ['resume', 'done', 'blocked', 'rejected', 'urge'].find((action) =>
+        : draft?.action || ['resume', 'done', 'blocked', 'rejected', 'urge'].find((action) =>
             availableActions.includes(action)
           )
       if (!nextAction) return
-      handleTaskAction(selectedTask, nextAction)
+      if (draft?.action === nextAction) restoreActionDraft(draft)
+      else handleTaskAction(selectedTask, nextAction)
       pushMobileTaskScreen({
         action: nextAction,
         screen: 'action',
@@ -1324,10 +1340,13 @@ export default function MobileRoleTasksPage() {
       canProcessMaterial,
       usesMaterialReviewForm,
       canOpenTaskForm,
+      fromTracking,
       handleTaskAction,
       pushMobileTaskScreen,
       retainLinkedTask,
+      restoreActionDraft,
       selectedTask,
+      taskAccessScopeKey,
     ]
   )
 
@@ -1406,13 +1425,24 @@ export default function MobileRoleTasksPage() {
   }, [sharedHandlingID, selectedTask?.id, selectedTaskActionAccess, handleOpenSelectedTaskAction, handleDetailBack])
   const handleActionBack = useCallback(async () => {
     if (materialBusyRef.current) return
+    if (fromTracking && selectedTask && detailAction && !usesMaterialReviewForm && !taskFormMode && !selectedTaskReceipt) {
+      trackingActionDraftRef.current = {
+        scope: taskAccessScopeKey,
+taskID: selectedTask.id,
+version: selectedTask.version,
+        action: detailAction,
+reason: detailReasonValue,
+approvedQuantity: detailApprovedQuantityValue,
+      }
+    }
     flushMobileTaskDraftHistory()
     handleScreenBack('action', () => {
       setTaskFormMode(false)
       setDetailAction(null)
       currentTaskScreenRef.current = 'detail'
     })
-  }, [flushMobileTaskDraftHistory, handleScreenBack])
+  }, [detailAction, detailApprovedQuantityValue, detailReasonValue, flushMobileTaskDraftHistory, fromTracking,
+    handleScreenBack, selectedTask, selectedTaskReceipt, taskAccessScopeKey, taskFormMode, usesMaterialReviewForm])
   const handleReceiptBackToList = useCallback(async () => {
     restoreListStateRef.current = true
     if (typeof window !== 'undefined') {
@@ -1593,6 +1623,11 @@ export default function MobileRoleTasksPage() {
         )
         return
       }
+      const restoredTab = historyState[MOBILE_TASK_HISTORY_MAIN_TAB_KEY]
+      if (restoredTab === MOBILE_MAIN_TAB_KEYS.DOCUMENTS || restoredTab === MOBILE_MAIN_TAB_KEYS.PROGRESS) {
+        setActiveMainTabKey(restoredTab)
+        setDocumentSnapshot(historyState.mobileDocumentTasks)
+      }
       historyLoadedTaskCountsRef.current = readMobileRoleTaskLoadedCounts(
         historyState[MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY],
         { maxItems: MOBILE_TASK_RESTORE_ITEM_LIMIT }
@@ -1757,6 +1792,7 @@ export default function MobileRoleTasksPage() {
     window.history.replaceState(
       {
         ...window.history.state,
+        mobileDocumentTasks: documentSnapshot,
         [MOBILE_TASK_HISTORY_MAIN_TAB_KEY]: activeMainTabKey,
         [MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY]: activeMessageTabKey,
         [MOBILE_TASK_HISTORY_FILTER_KEY]: activeFilterKey,
@@ -1771,6 +1807,7 @@ export default function MobileRoleTasksPage() {
       ''
     )
   }, [
+    documentSnapshot,
     activeMainTabKey,
     activeMessageTabKey,
     activeFilterKey,
@@ -1789,15 +1826,15 @@ export default function MobileRoleTasksPage() {
   ])
 
   const taskDetailBackLabel =
-    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS
+    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DOCUMENTS ? '返回单据任务' : activeMainTabKey === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS
       ? window.history.state?.mobileWorkflowExceptions?.query?.view === 'tasks'
         ? '返回关联待办'
         : '返回异常跟踪'
-      : activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING
+      : fromTracking
       ? '返回流程跟踪'
       : activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
-      ? window.history.state?.mobileProgress?.selection
-        ? '返回进度详情'
+      ? window.history.state?.mobileProgress?.selection?.section === 'tasks'
+        ? '返回关联任务'
         : '返回进度'
       : '返回任务列表'
 
@@ -1973,7 +2010,7 @@ render,
   }
 
   const stepTask = detailTask || actionReceipt?.task || selectedTaskBusinessReceipt?.task
-  const renderTaskStep = (step, content) => <MobileTaskStepPanels scopeKey={`${taskAccessScopeKey}:${stepTask?.id}`} version={stepTask?.version} activeStep={step} panels={canOpenTaskForm && selectedTask && !usesMaterialReviewForm ? { detail: renderTaskDetail(), action: renderTaskAction(true) } : undefined} overlay={collaborationOpen && selectedTask ? <BusinessTaskActions collaborationTask={selectedTask} collaborationAction={collaborationOpen} adminProfile={adminProfile} allowCreate={false} onCollaborationClose={() => { setCollaborationOpen(''); if (collaborationTriggerRef.current?.isConnected) collaborationTriggerRef.current.focus({ preventScroll: true }) }} onCreated={(updated) => { retainLinkedTask(updated); setSelectedLinkedTaskID(updated.id); refreshTasksAfterMutation().catch(() => {}) }} /> : null}>{content}</MobileTaskStepPanels>
+  const renderTaskStep = (step, content) => <MobileTaskStepPanels scopeKey={`${taskAccessScopeKey}:${stepTask?.id}`} version={stepTask?.version} activeStep={step} panels={canOpenTaskForm && selectedTask && !usesMaterialReviewForm ? { detail: renderTaskDetail(), action: renderTaskAction(true) } : undefined} overlay={collaborationOpen && selectedTask ? <BusinessTaskActions collaborationTask={selectedTask} collaborationAction={collaborationOpen} adminProfile={adminProfile} allowCreate={false} onCollaborationClose={() => { setCollaborationOpen(''); if (collaborationTriggerRef.current?.isConnected) collaborationTriggerRef.current.focus({ preventScroll: true }) }} onCreated={(updated) => { retainLinkedTask(updated); setSelectedLinkedTaskID(updated.id); refreshTasksAfterMutation({ canonicalTask: updated }).catch(() => {}) }} /> : null}>{content}</MobileTaskStepPanels>
 
   if (selectedTaskBusinessReceipt && !taskFormMode && detailAction) {
     const current = selectedTaskBusinessReceipt
@@ -2073,6 +2110,9 @@ render,
         calendarState={calendarState}
         key={taskAccessScopeKey}
         progressAccess={progressAccess}
+        canGroupTasks={canGroupTasks}
+        documentState={documentState}
+        onDocumentChange={changeDocumentState}
         accessScopeKey={taskAccessScopeKey}
         activeRoleKey={activeRoleKey}
         onOpenLinkedTask={(taskID) => handleSelectTaskID(taskID, { linked: true })}

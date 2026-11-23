@@ -1,5 +1,5 @@
 import { expect } from 'playwright/test'
-import { viewTrigger, chooseChainScope, chooseViewOption, searchWholeLibrary } from './devFlowExplorerControls.mjs'
+import { grainControl, chooseChainScope, chooseGranularity, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { assertChainNodeFilters } from './devBusinessChainNodeFilterAssertions.mjs'
 import { assertChainDesignKeyboard } from './devBusinessChainDesignKeyboardAssertions.mjs'
 
@@ -28,7 +28,7 @@ export function createDevBusinessChainDesignMainlineScenarios({
         const nodes = editor.locator('[data-design-node]')
         const card = editor.locator('.erp-chain-design__card')
         const search = editor.getByRole('textbox', {
-          name: '搜索业务节点',
+          name: '搜索链路或业务节点',
           exact: true,
         })
         await assertChainNodeFilters(page, editor, assert)
@@ -89,25 +89,19 @@ export function createDevBusinessChainDesignMainlineScenarios({
           .getByRole('button', { name: '关闭画布说明', exact: true })
           .click()
         const beforeGranularity = await working()
-        const view = viewTrigger(editor)
-        await view.focus()
-        await view.press('Enter')
-        const panel = page.getByRole('dialog', { name: '画布视图', exact: true })
-        const allLoaded = panel.getByRole('radio', { name: '全部已载入节点', exact: true })
-        await expect(allLoaded).toHaveAccessibleDescription('同时查看当前范围已载入的单据、记录和任务')
-        await expect(panel.getByRole('radio', { checked: true }).first()).toBeFocused()
-        await page.keyboard.press('Escape')
-        await expect(panel).toBeHidden()
-        await expect(view).toBeFocused()
-        assert.deepEqual(await working(), beforeGranularity, '查看显示说明不改变画布或保存内容')
-        await chooseViewOption(editor, '全部已载入节点')
-        await expect(viewTrigger(editor)).toContainText('全部已载入节点')
+        const granularity = grainControl(editor)
+        const steps = granularity.getByRole('radio', { name: '业务步骤' })
+        await expect(steps).toBeChecked()
+        await steps.focus()
+        assert.deepEqual(await working(), beforeGranularity, '聚焦颗粒度不会修改画布')
+        await steps.press('ArrowRight')
+        await expect(granularity.getByRole('radio', { name: '节点明细' })).toBeChecked()
         await expect(canvas).toHaveAttribute('data-view-mode', 'all')
         const detailed = await working()
         assert.deepEqual(detailed.map, beforeGranularity.map, '颗粒度不扩大范围或改变展开状态')
         assert.deepEqual(detailed.nodes, beforeGranularity.nodes, '颗粒度不新增节点并保留位置')
         assert.deepEqual(detailed.edges, beforeGranularity.edges, '颗粒度切换保留已载入关系')
-        await chooseViewOption(editor, '业务步骤')
+        await chooseGranularity(editor, '业务步骤')
         assert.deepEqual((await working()).nodes, beforeGranularity.nodes, '返回业务步骤保留手动位置')
         await chooseChainScope(page, '销售受理到生产准备')
         await search.fill('')
@@ -133,7 +127,9 @@ export function createDevBusinessChainDesignMainlineScenarios({
         await editor
           .getByRole('button', { name: '适应画布全图', exact: true })
           .click()
-        await expect.poll(async () => (await working()).presentation?.viewport?.mode).toBe('fit-all')
+        await expect(editor.getByRole('button', { name: '适应画布全图' })).toHaveAttribute('aria-pressed', 'true')
+        await editor.locator('button[data-picker="sales-variant"]').click()
+        await page.getByRole('dialog', { name: '选择受理流程' }).getByRole('button', { name: '先办工程资料', exact: true }).click()
         const content = await working()
         await editor
           .locator(
@@ -153,12 +149,12 @@ export function createDevBusinessChainDesignMainlineScenarios({
           .click()
         assert.deepEqual(await working(), content, '查看关联任务不改变视图')
         const count = await nodes.count()
-        await chooseViewOption(editor, '全部已载入节点')
+        await chooseGranularity(editor, '节点明细')
         assert(
           (await nodes.count()) > count,
-          '全部已载入节点显示办理步骤间已载入的单据和业务记录'
+          '节点明细显示办理步骤间已载入的单据和业务记录'
         )
-        await chooseViewOption(editor, '业务步骤')
+        await chooseGranularity(editor, '业务步骤')
         assert.deepEqual(
           (await working()).nodes,
           content.nodes,

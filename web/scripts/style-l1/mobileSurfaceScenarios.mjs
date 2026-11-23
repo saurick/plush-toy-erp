@@ -270,11 +270,10 @@ export function createMobileSurfaceScenarios({
     })),
     {
       name: 'dev-ui-design-mobile-surfaces',
-      path: '/__dev/ui-design',
+      path: '/__dev/ui-design?page=mobile-tasks',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        await frame.getByRole('button', { name: '手机端', exact: true }).click()
         for (const selector of [
           '.rm-query',
           '.rm-quick-filters',

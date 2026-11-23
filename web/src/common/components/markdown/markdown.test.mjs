@@ -90,6 +90,91 @@ test('heading ids count duplicates across levels while filtered outlines stay na
   )
 })
 
+test('chapter title styling preserves native headings and Markdown anchors', async (t) => {
+  const dom = installTestDOM()
+  const [{ createRoot }, { Markdown }, { default: SectionTitle }] = await Promise.all([
+    import('react-dom/client'),
+    import('./index.jsx'),
+    import('../../../erp/components/business-list/BusinessFormSectionTitle.jsx'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    dom.restore()
+  })
+
+  const source = '# 文档\n\n<a id="section-link"></a>\n\n## 主章\n\n### 子标题'
+  const renderHeading = (heading) => heading.type === 'h2'
+    ? createElement(SectionTitle, {
+      ...heading.props,
+      as: heading.type,
+      'data-current-section-title': 'true',
+    })
+    : heading
+  await act(async () => root.render([
+    createElement(Markdown, { key: 'docs', source, renderHeading }),
+    createElement(SectionTitle, { key: 'form', id: 'form-heading' }, '表单分区'),
+  ]))
+
+  const chapter = container.querySelector('h2[data-markdown-anchor="heading"]')
+  assert.equal(chapter?.id, '主章')
+  assert.equal(chapter?.textContent, '主章')
+  assert(chapter?.classList.contains('erp-business-form-heading'))
+  assert.equal(chapter?.dataset.currentSectionTitle, 'true')
+  assert.equal(findDevDocsMarkdownAnchor(container, 'section-link')?.closest('h2')?.id, '主章')
+  assert.equal(container.querySelector('h3')?.classList.contains('erp-business-form-heading'), false)
+  assert(container.querySelector('div#form-heading[role="heading"][aria-level="3"]'))
+})
+
+test('marked sections keep their contents and anchors when rendered as disclosures', async (t) => {
+  const dom = installTestDOM()
+  const [{ createRoot }, { Markdown }] = await Promise.all([
+    import('react-dom/client'),
+    import('./index.jsx'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    dom.restore()
+  })
+
+  const marker = '<!-- dev-docs:collapse -->'
+  const source = [
+    '## 概要',
+    `<a id="section-link"></a>\n${marker}\n## 明细`,
+    '<a id="detail-link"></a>\n### 规则',
+    '可查找的正文',
+    `~~~md\n${marker}\n## fenced heading\n~~~`,
+    '## 规则',
+    '直接可读的下一节',
+  ].join('\n\n')
+  const renderCollapsedSection = (heading, children) => createElement(
+    'details',
+    { key: heading.props.id },
+    createElement('summary', null, heading),
+    children,
+  )
+
+  await act(async () => root.render(createElement(Markdown, { source })))
+  assert.equal(container.querySelector('details'), null)
+  assert(container.querySelector('h2#明细'))
+
+  await act(async () => root.render(createElement(Markdown, { source, renderCollapsedSection })))
+  assert.equal(container.querySelectorAll('details').length, 1)
+  assert(container.querySelector('details:not([open]) > summary > h2#明细 > #section-link'))
+  assert(container.querySelector('details h3#规则 > #detail-link'))
+  assert.match(container.querySelector('details').textContent, /可查找的正文/u)
+  assert.match(container.querySelector('pre').textContent, /<!-- dev-docs:collapse -->/u)
+  assert.equal(container.querySelector('details').nextElementSibling?.id, '规则-1')
+  assert.equal(container.textContent.split(marker).length - 1, 1)
+})
+
 test('long Markdown preserves all blocks, duplicate anchors and replacement without layout wrappers', async (t) => {
   const dom = installTestDOM()
   const [{ createRoot }, { Markdown }] = await Promise.all([

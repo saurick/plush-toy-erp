@@ -1,5 +1,5 @@
 import { expect } from 'playwright/test'
-import { chooseViewOption, chooseExplorerAction, openExplorerActions, searchWholeLibrary } from './devFlowExplorerControls.mjs'
+import { chooseGranularity, chooseLayout, chooseExplorerAction, openExplorerActions, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 import { createDevBusinessChainDesignFullscreenScenarios } from './devBusinessChainDesignFullscreenAssertions.mjs'
 import { createDevBusinessChainDesignViewportScenarios } from './devBusinessChainDesignViewportScenarios.mjs'
@@ -69,13 +69,13 @@ export function createDevBusinessChainDesignScenarios({
         const menu = await openExplorerActions(editor)
         const undo = menu.getByRole('menuitem', { name: '撤销', exact: true })
         await expect(undo).toBeDisabled()
-        await expect(menu.getByRole('menuitem')).toHaveText(['撤销', '重做', '新建空白视图', '导出当前范围', '视图备注', '员工定位示例', '在新标签页新建'])
+        await expect(menu.getByRole('menuitem')).toHaveText(['撤销', '重做', '新建空白视图', '导出当前范围', '在新标签页新建'])
         await more.click()
         await expect(
           page.getByRole('link', { name: '业务规则', exact: true })
         ).toHaveAttribute('href', '/__dev/business-rules')
-        await chooseViewOption(editor, '阶段排布')
-        await chooseViewOption(editor, '全部已载入节点')
+        await chooseLayout(editor, '阶段排布')
+        await chooseGranularity(editor, '节点明细')
         await add('销售订单')
         await add('提交后启动受理')
         await add('销售订单受理流程')
@@ -162,7 +162,7 @@ export function createDevBusinessChainDesignScenarios({
         await expect(editor.locator('[data-design-node]')).toHaveCount(4)
         await expect(editor.locator('[data-design-edge]')).toHaveCount(2)
         const search = editor.getByRole('textbox', {
-          name: '搜索业务节点',
+          name: '搜索链路或业务节点',
           exact: true,
         })
         await search.fill('BOM')
@@ -221,19 +221,6 @@ export function createDevBusinessChainDesignScenarios({
         await expect(editor.locator('[data-design-node]')).toHaveCount(5)
         await expect(page.getByRole('heading', { name: '流程探索', level: 1 })).toBeVisible()
         await expect(page.getByRole('tablist', { name: '流程视图' })).toHaveCount(0)
-        await chooseExplorerAction(editor, '视图备注')
-        await editor
-          .getByRole('textbox', { name: '视图备注内容', exact: true })
-          .fill('核对跨链接点的办理条件')
-        await editor
-          .getByRole('button', { name: '添加备注', exact: true })
-          .click()
-        await expect(editor.locator('.erp-chain-design__card')).toContainText(
-          '核对跨链接点的办理条件'
-        )
-        await editor
-          .getByRole('button', { name: '关闭画布说明', exact: true })
-          .click()
         await page.setViewportSize({ width: 1920, height: 1080 })
         await search.fill('')
         await search.press('Enter')
@@ -251,10 +238,10 @@ export function createDevBusinessChainDesignScenarios({
         await openExplorerActions(editor)
         await expect(undo).toBeInViewport()
         await expect(
-          page.getByRole('menuitem', { name: '视图备注（1）', exact: true })
+          page.getByRole('menuitem', { name: '导出当前范围', exact: true })
         ).toBeInViewport()
         await page.keyboard.press('Escape')
-        await expect(page.getByRole('menuitem', { name: '视图备注（1）', exact: true })).toBeHidden()
+        await expect(page.getByRole('menuitem', { name: '导出当前范围', exact: true })).toBeHidden()
         await expect(
           page.getByRole('dialog', { name: '流程探索全屏', exact: true })
         ).toBeVisible()
@@ -265,13 +252,6 @@ export function createDevBusinessChainDesignScenarios({
         await page.reload()
         await chooseChainNodeView(page, editor, '全部')
         await expect(editor.locator('[data-design-node]')).toHaveCount(5)
-        await chooseExplorerAction(editor, '视图备注（1）')
-        await expect(editor.locator('.erp-chain-design__card')).toContainText(
-          '核对跨链接点的办理条件'
-        )
-        await editor
-          .getByRole('button', { name: '关闭画布说明', exact: true })
-          .click()
         assert.deepEqual(writes.get(page), [], '视图编辑不调用业务写接口')
       },
     },

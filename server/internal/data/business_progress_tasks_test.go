@@ -89,7 +89,7 @@ func TestShipmentQualityBackfillLinksOnlyExistingPendingInspections(t *testing.T
 	q := biz.BusinessProgressQuery{View: "orders", ID: sales.ID, Access: biz.BusinessProgressAccess{Sales: true, Tasks: true},
 		TaskRole: biz.QualityRoleKey, TaskVisibility: &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{biz.QualityRoleKey}}}
 	page, err := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data)).Tasks(ctx, q)
-	if err != nil || page.Total != 1 || page.Rows[0].ID != task.ID {
+	if err != nil || page.Total != 1 || page.Rows[0].ID != task.ID || page.Rows[0].TaskGroup != task.TaskGroup {
 		t.Fatalf("inspection order link=%+v err=%v", page, err)
 	}
 }

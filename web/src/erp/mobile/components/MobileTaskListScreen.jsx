@@ -28,6 +28,8 @@ import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
+import LinkedDocumentTasks from '../../components/workflow/LinkedDocumentTasks.jsx'
+import DocumentTaskPanel from '../../components/workflow/DocumentTaskPanel.jsx'
 import MobileProgressPanel from './MobileProgressPanel'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import MobileWorkflowTrackingPanel from './MobileWorkflowTrackingPanel.jsx'
@@ -92,6 +94,9 @@ export default function MobileTaskListScreen({
   calendarState,
   activeFilterKey,
   progressAccess,
+  canGroupTasks,
+  documentState,
+  onDocumentChange,
   accessScopeKey,
   activeRoleKey,
   onOpenLinkedTask,
@@ -151,7 +156,9 @@ export default function MobileTaskListScreen({
     refreshRevision: authoritativeTaskCounts,
   })
   const isProgress = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
-  const isTracking = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING
+  const isDocuments = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DOCUMENTS
+  const isFollowups = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.FOLLOWUPS
+  const isTracking = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING || isFollowups
   const isExceptions = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS
   const listFeedback = usePageLoadFeedback({
     error: loadError,
@@ -164,11 +171,10 @@ export default function MobileTaskListScreen({
     priority: 10,
   })
   const historyFilterSummary = workflowHistoryFilterSummary(taskHistoryOptions)
-  const isTasks = [
+  const isTasks = isTracking || isExceptions || [
     MOBILE_MAIN_TAB_KEYS.TODO,
+    MOBILE_MAIN_TAB_KEYS.DOCUMENTS,
     MOBILE_MAIN_TAB_KEYS.DONE,
-    MOBILE_MAIN_TAB_KEYS.TRACKING,
-    MOBILE_MAIN_TAB_KEYS.EXCEPTIONS,
   ].includes(activeMainTabKey)
   const canFilterTaskList = [
     MOBILE_MAIN_TAB_KEYS.TODO,
@@ -808,11 +814,32 @@ export default function MobileTaskListScreen({
   }
 
   const renderActiveTabPanel = () => {
+    if (isDocuments && documentState.linked?.scope === accessScopeKey) {
+      return <LinkedDocumentTasks
+        mobile
+        source={documentState.linked}
+        query={documentState.linkedQuery}
+        onQuery={(linkedQuery) => onDocumentChange({ linkedQuery })}
+        onOpen={onOpenLinkedTask}
+        onBack={() => window.history.back()}
+      />
+    }
+    if (isDocuments) { return <DocumentTaskPanel
+      key={accessScopeKey}
+      mobile
+      active
+      adminProfile={adminProfile}
+      mobileRole={activeRoleKey}
+      state={documentState}
+      onStateChange={onDocumentChange}
+      onOpenTask={(task) => onOpenLinkedTask(task.id)}
+    /> }
+
     if (isExceptions) {
       return <MobileWorkflowExceptionPanel key={accessScopeKey} accessScope={accessScopeKey} profile={adminProfile} onOpenTask={onOpenLinkedTask} scrollContainerRef={scrollContainerRef} />
     }
     if (isTracking) {
-      return <MobileWorkflowTrackingPanel accessScope={accessScopeKey} scrollContainerRef={scrollContainerRef} onOpenTask={onOpenLinkedTask} />
+      return <MobileWorkflowTrackingPanel accessScope={accessScopeKey} recordType={isFollowups ? 'task' : 'flow'} scrollContainerRef={scrollContainerRef} onOpenTask={onOpenLinkedTask} />
     }
     if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE) {
       return renderDonePanel()
@@ -904,7 +931,7 @@ export default function MobileTaskListScreen({
             block
             className="mobile-workspace-primary-tabs"
             aria-label="任务状态"
-            value={selectedTaskTab === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS ? MOBILE_MAIN_TAB_KEYS.TRACKING : selectedTaskTab}
+            value={[MOBILE_MAIN_TAB_KEYS.EXCEPTIONS, MOBILE_MAIN_TAB_KEYS.FOLLOWUPS].includes(selectedTaskTab) ? MOBILE_MAIN_TAB_KEYS.TRACKING : selectedTaskTab}
             options={[
               {
                 value: MOBILE_MAIN_TAB_KEYS.TODO,
@@ -924,6 +951,7 @@ export default function MobileTaskListScreen({
                   </>
                 ),
               },
+              ...(canGroupTasks ? [{ value: MOBILE_MAIN_TAB_KEYS.DOCUMENTS, label: '按单据' }] : []),
               ...(canViewTracking ? [{ value: MOBILE_MAIN_TAB_KEYS.TRACKING, label: '流程跟踪' }] : []),
             ]}
             onChange={(key) =>
@@ -975,8 +1003,8 @@ export default function MobileTaskListScreen({
           </div>
         </header>
 
-        <MobileTaskListToolbar scrollContainerRef={scrollContainerRef} hidden={isTracking || isExceptions || activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MINE}>
-          {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE && !isTracking && !isExceptions ? (
+        <MobileTaskListToolbar scrollContainerRef={scrollContainerRef} hidden={isDocuments || isTracking || isExceptions || activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MINE}>
+          {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE && !isDocuments && !isTracking && !isExceptions ? (
             <div className={`mobile-role-task-query erp-mobile-search-row${activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO ? ' mobile-role-task-query--with-layout' : ''}`}>
               <form
                 className="mobile-role-task-search"
@@ -1055,6 +1083,11 @@ export default function MobileTaskListScreen({
           roleKey={activeRoleKey}
           adminProfile={adminProfile}
           onOpenTask={onOpenLinkedTask}
+          onOpenRelatedTasks={(source) => {
+            window.history.pushState({ ...window.history.state }, '')
+            onDocumentChange({ linked: { ...source, scope: accessScopeKey }, linkedQuery: null })
+            setActiveMainTabKey(MOBILE_MAIN_TAB_KEYS.DOCUMENTS)
+          }}
         />
       )}
 

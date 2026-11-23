@@ -47,7 +47,6 @@ export function createBusinessSplitRecoveryScenarios({ assert, customerRuntimeEf
         const secondary = page.locator('.erp-split-pane--right')
         const picker = secondary.getByRole('combobox', { name: '选择右栏页面' })
         await picker.click()
-        await picker.fill('任务管理')
         await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
         const trigger = secondary.getByRole('button', { name: '查看模拟分栏任务 1详情', exact: true })
         await trigger.waitFor()

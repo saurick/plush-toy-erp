@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+const (
+	WorkflowExceptionFilterOpen        = "open"
+	WorkflowExceptionFilterClosed      = "closed"
+	WorkflowExceptionFilterPendingPlan = "pending_plan"
+	WorkflowExceptionFilterExecuting   = "executing"
+)
+
 // Exceptions are a read projection of quality and disposition facts. Task state
 // can describe work remaining, but cannot establish that an incident is closed.
 type WorkflowExceptionQuery struct {
@@ -14,22 +21,29 @@ type WorkflowExceptionQuery struct {
 	Limit, Offset                int
 	Visibility                   *WorkflowTaskVisibilityScope
 	TrackingRef                  *WorkflowTrackingRef
+	IncludeQualityPhotoSources   bool
 }
 
 type WorkflowExceptionItem struct {
-	Key         string                   `json:"key"`
-	Number      string                   `json:"number"`
-	Reason      string                   `json:"reason"`
-	State       string                   `json:"state"`
-	Disposition string                   `json:"disposition"`
-	BatchNo     string                   `json:"batch_no"`
-	OccurredAt  string                   `json:"occurred_at"`
-	TaskIDs     []int                    `json:"task_ids"`
-	Tasks       []*WorkflowTask          `json:"-"`
-	Orders      []WorkflowExceptionOrder `json:"orders"`
+	Key                 string                                `json:"key"`
+	Number              string                                `json:"number"`
+	Reason              string                                `json:"reason"`
+	State               string                                `json:"state"`
+	Disposition         string                                `json:"disposition"`
+	BatchNo             string                                `json:"batch_no"`
+	OccurredAt          string                                `json:"occurred_at"`
+	TaskIDs             []int                                 `json:"task_ids"`
+	Tasks               []*WorkflowTask                       `json:"-"`
+	Orders              []WorkflowExceptionOrder              `json:"orders"`
+	QualityPhotoSources []WorkflowExceptionQualityPhotoSource `json:"quality_photo_sources"`
 }
 
 type WorkflowExceptionOrder struct {
+	ID     int    `json:"id"`
+	Number string `json:"number"`
+}
+
+type WorkflowExceptionQualityPhotoSource struct {
 	ID     int    `json:"id"`
 	Number string `json:"number"`
 }
@@ -42,6 +56,8 @@ type WorkflowExceptionBoard struct {
 	Total          int                      `json:"total"`
 	Open           int                      `json:"open"`
 	Closed         int                      `json:"closed"`
+	PendingPlan    int                      `json:"pending_plan"`
+	Executing      int                      `json:"executing"`
 	PendingTasks   int                      `json:"pending_tasks"`
 	AffectedOrders int                      `json:"affected_orders"`
 	Limit          int                      `json:"limit"`
@@ -56,7 +72,12 @@ func (uc *WorkflowUsecase) ListExceptions(ctx context.Context, q WorkflowExcepti
 	if q.TrackingRef != nil && (q.TrackingRef.ID <= 0 || (q.TrackingRef.Kind != "process" && q.TrackingRef.Kind != "task")) {
 		return nil, ErrBadParam
 	}
-	if uc == nil || q.Visibility == nil || !ValidWorkflowTaskDiscoveryFilter(q.WorkflowTaskDiscoveryFilter) || q.Offset < 0 || q.Limit < 1 || q.Limit > 100 || len([]rune(q.Keyword)) > 100 || strings.TrimSpace(q.Keyword) != q.Keyword || (q.State != "" && q.State != "open" && q.State != "closed") || (q.View != "" && q.View != "tasks" && q.View != "orders") {
+	switch q.State {
+	case "", WorkflowExceptionFilterOpen, WorkflowExceptionFilterClosed, WorkflowExceptionFilterPendingPlan, WorkflowExceptionFilterExecuting:
+	default:
+		return nil, ErrBadParam
+	}
+	if uc == nil || q.Visibility == nil || !ValidWorkflowTaskDiscoveryFilter(q.WorkflowTaskDiscoveryFilter) || q.Offset < 0 || q.Limit < 1 || q.Limit > 100 || len([]rune(q.Keyword)) > 100 || strings.TrimSpace(q.Keyword) != q.Keyword || (q.View != "" && q.View != "tasks" && q.View != "orders") {
 		return nil, ErrBadParam
 	}
 	reader, ok := uc.repo.(WorkflowExceptionReader)

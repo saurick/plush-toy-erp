@@ -21,29 +21,25 @@ GitLab 不与业务 PostgreSQL、测试数据库或现有 Docker 容器共享数
 
 ### Storage retention
 
-服务器本地成套归档和加密交接包分别保留最近 7 份，升级前恢复点额外保护，生成入口用非等待锁串行，先验证真实 RAID5、容器 backup bind、登记 export 目录、来源 marker 与唯一 `age` recipient。只有本地归档和四个加密文件全部完成后才原子发布 export 包；外盘复制成功另由 Mac 回执证明。PD-SSD 独立保留最近 7 份及显式保护项，来源删除不传播。清理只处理完整包的载荷，checksum、回执和轮换账本长期保留；配置备份同时包含轮换记录。自动任务与安装步骤见 [统一轮换](../../../scripts/deploy/README.md#制品与备份自动轮换)。Compose 不自动创建缺失的冷数据目录。
+| 对象 | 保留与处置条件 |
+| --- | --- |
+| GitLab 本地备份与加密交接 | 分别保留最近 7 份，保护升级前恢复点。非等待锁下先核对 RAID5、backup bind、已登记 export 目录、来源标记和唯一 age recipient。四个加密文件与本地归档就绪后原子发布。Compose 由安装流程预备冷目录。 |
+| Mac 外盘副本 | 单独保留最近 7 份及保护项，来源删除不传播。以 Mac 回执证明复制，轮换只清理完整包载荷。checksum、回执和轮换账本长期保留，配置备份包含轮换记录。[统一轮换](../../../scripts/deploy/README.md#制品与备份自动轮换) |
+| 既有数据迁移 | 在 CI 与备份空闲的窗口逐文件校验 Package 后切挂载。GitLab 健康、clone、Package 下载和备份恢复均读回后，才能移除旧副本。切换 Compose 前保存 live config 与回滚文件。 |
+| 已发布候选 | 正式发布或重复发布先核对七资产、Release、源码和演练身份。通过 GitLab API 退役对应 `candidate.tar` 并读回。缺恢复输入、发布未完成或身份不唯一时保留候选。 |
+| Runner 构建别名 | `gitlab-runner-images.mjs` 只接受 `plush-gitlab-runner` 和 `plush-gitlab-runner-esxi`，核对 CI、项目、exact SHA 与完整 commit。只非强制删除本次六个符合条件的别名，tag 变化或有容器引用时停止。构建层由 Docker GC 管理。 |
+| 磁盘缓存 | Runner 工作区、Go/pnpm 和 Docker 构建层在 SSD。Docker builder GC 目标为 40GB，发布镜像及 Go/pnpm 缓存另行保留。VM 使用 `discard=unmap`，guest 每周运行 `fstrim.timer`。 |
+| 在线应用与目标清理 | 先确认 Runner 空闲，维护窗口重启并读回。目标旧镜像和中转包按现存容器、当前版本、回滚及 operation 引用盘点。必要历史存 RAID5，清理沿用项目发布边界并保护业务 volume。 |
 
-已有安装必须在无活动 CI/backup 的维护窗口先复制并逐文件校验 Package，再切换挂载；读回 GitLab 健康、项目 clone、Package 下载和备份恢复后才能移除旧副本。直接覆盖旧 Compose 前还须保留 live config 与回滚文件。
-
-正式发布和重复发布的入口都先校验七资产、Release、源码包与演练身份，再通过 GitLab API 退役对应 `candidate.tar` 并读回，最后通过 `gitlab-runner-images.mjs` 移除本次构建在专属 Runner 中的六个镜像别名。
-
-清理入口只接受可重建默认主机名 `plush-gitlab-runner` 与当前 ESXi 实例主机名 `plush-gitlab-runner-esxi`，并继续同时校验 CI、项目和 exact SHA。每个别名都核对完整 commit，任何现存容器引用或 tag 身份变化都阻止删除；不使用 force，构建层仍受 Docker GC 管理。
-
-缺少任何正式恢复输入、尚未发布或身份不唯一时保留候选；不按文件年龄直接删除 Package 底层目录。
-
-CI 的 Package 删除使用当前 `CI_JOB_TOKEN`，发布发起者须具有本项目 Package 删除权限（Maintainer / Owner）；验证和 Release 读写继续使用原有 Developer 发布账号，不提升其常驻权限。缺失 Job Token 或 API 拒绝删除时停止退役，不降级凭据。
-
-历史候选可使用同一个 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 入口逐份处理；非 CI 运维必须提供本来就有删除权限的 `GITLAB_RELEASE_TOKEN`。
-
-Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。每台 Runner 的 Docker 默认 builder 启用 `40GB` GC 保留目标，为重复构建保留余量；该目标仅作用于 Docker 构建缓存，Go/pnpm 缓存和发布镜像另行保留。VM disk 显式使用 `discard=unmap`，guest 启用每周 `fstrim.timer`。
-
-在线应用配置须先证明 Runner 空闲，在维护窗口重启并读回；不删除业务 volume，不把镜像大小与共享 build cache 相加。目标部署的旧镜像/中转包先按 live 容器、当前版本、回滚和 operation 引用盘点，必要历史归档放 RAID5，精确清理仍走项目发布边界。
+CI 退役候选要求当前 `CI_JOB_TOKEN` 和项目 Maintainer / Owner 的 Package 删除权。Release 仍使用既有 Developer 发布身份。缺令牌或 API 拒绝时停止退役。非 CI 可用原有删除权的 `GITLAB_RELEASE_TOKEN` 通过 `gitlab-release-candidate.mjs retire-candidate --sha <sha> --version <version> --customer yoyoosun --json` 逐份处理。
 
 质量 CI 的下载缓存保留、Fastzip 并发和数据库优先顺序由 `.gitlab-ci.yml` 管理，边界见 [QA 执行合同](../../../scripts/qa/README.md#门禁完整性与-ci-边界)。
 
  发布和 PDF monitor 额外复用 policy 绑定的 Trivy 工具 / 漏洞库下载缓存，只有串行 `publish_release` 写回归档；每次仍执行漏洞库更新和镜像扫描，不复用扫描报告。
 
 这些设置不修改 Runner 的槽位、宿主服务或 Docker 配置；效果分别核对 `get_sources`、`restore_cache`、`archive_cache` 与完整流水线关键路径，不能用单个缓存基准代替远端 CI。
+
+#### 虚拟机快照与冷归档
 
 升级前的 VM 内部快照会继续引用旧磁盘块，guest TRIM 成功不等于宿主机已经回收空间。
 
@@ -52,6 +48,8 @@ Runner 的工作区、Go/pnpm 缓存和 Docker 层继续在 SSD。每台 Runner 
 只删除已归档的指定内部快照，再运行 `qemu-img check`、启动 guest、TRIM 和 Runner 验证，并以宿主机 `du` / `df` 读回实际回收量。恢复时先在独立目录解压并核对 backing image 与指定快照，不能直接覆盖运行盘。后续升级复用同一归档路径；正常升级确认后保留最近两次恢复点，额外历史按明确保留需求处理。
 
 旧部署的冷归档使用 `/srv/raid5/cicd-archives/<项目>/`。已完成且超过七天的中转操作可逐文件校验后仅迁走镜像和源码大文件，原 operation 回执与控制文件继续保留；状态不明、活动操作和容器挂载引用的文件不迁走。镜像清理保护所有现存容器引用的版本及其 Server/Web 配对，并额外保留各镜像最近三个版本；每次按精确 tag 列表执行，不扩到其他项目。
+
+#### Runner 资源与并发槽位
 
 Runner VM 的 vCPU、内存和系统盘不是仓库常量，而是 `runner-vm.sh` 创建/重建时彼此独立的必填参数；脚本不设置与工作负载脱节的固定内存下限。`runner-capacity.sh --evidence` 只读回在线 vCPU、MemTotal、swap、根文件系统和槽位配置，证明当前配置身份一致，不把开机快照冒充负载容量结论。
 
@@ -64,6 +62,8 @@ Runner slot 的唯一显式参数名是 `RUNNER_CONCURRENT_SLOTS`，不能由 `n
 Job 内 Node 并发仍为 1；`.gitlab-ci.yml` 统一设置 `GOMAXPROCS=4` 与 `GOFLAGS=-p=4`，限制每个 Go 进程的运行并发和包编译并发，避免每个并行 Job 都按 VM 全部 vCPU 展开。govulncheck 继续完整扫描符号调用路径，并保留 `GOGC=25` 的堆预算。
 
 语言并发参数不是宿主 CPU 硬配额，实际 CPU 峰值与整条关键路径仍须分别实测。PostgreSQL、Docker、Chromium、浏览器锁和 resource-sensitive lane 继续按既有资源边界串行或隔离。只有 VM 资源规格变化，或出现 OOM、swap、持续 iowait、资源残留或清理污染证据时，才重新评估安全上限；不得通过跳过测试保速。
+
+#### 作业隔离与性能测量
 
 GitLab quality 中的 `server-upgrade` 与 `server-postgres` 各自把 PostgreSQL 官方 volume 根目录挂载为独立、上限 1 GiB 的 tmpfs，使临时表数据和 WAL 不再与 Git checkout、编译缓存及 Docker 写层争用 Runner 系统盘。
 

@@ -1,8 +1,18 @@
 import React from 'react'
 import BusinessRowItemCards from '../business-list/BusinessRowItemCards.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import { formatQuantity } from '../../utils/businessLineItems.mjs'
 import { sourceLineProductText } from './ShipmentEditor.jsx'
+
+function renderShipmentProduct(item, productOptions, skuOptions) {
+  const name = item.product_name_snapshot || item.product_name || referenceLabel(productOptions, item.product_id, '产品')
+  return (
+    <ProductIdentity productId={item.product_id} name={name} compact>
+      {sourceLineProductText(item, productOptions, skuOptions)}
+    </ProductIdentity>
+  )
+}
 
 export default function ShipmentTaskItems({
   shipment,
@@ -21,9 +31,7 @@ export default function ShipmentTaskItems({
         <BusinessRowItemCards
           items={items}
           record={shipment}
-          getItemLabel={(item) =>
-            sourceLineProductText(item, productOptions, skuOptions)
-          }
+          getItemLabel={(item) => renderShipmentProduct(item, productOptions, skuOptions)}
           getItemFields={(item) => [
             {
               label: '数量',

@@ -55,14 +55,14 @@ export function ChainDesignEvidence({ evidence }) {
   )
 }
 
-function StatePreview({ catalog, node, preview }) {
+function StatePreview({ catalog, node }) {
   const flows = node.machineKeys
     .map((key) => catalog.flows.find((flow) => flow.key === key))
     .filter(Boolean)
   const references = node.steps.flatMap((step) =>
     node.type === 'system' ? step.resultStateRefs || [] : step.preconditionStateRefs || []
   )
-  const initial = preview || references.find((ref) => flows.some((flow) => flow.key === ref.machineKey))
+  const initial = references.find((ref) => flows.some((flow) => flow.key === ref.machineKey))
   const [flowKey, setFlowKey] = useState(initial?.machineKey || flows[0]?.key)
   const flow = flows.find((item) => item.key === flowKey) || flows[0]
   const [selected, setSelected] = useState(
@@ -146,10 +146,9 @@ export default function BusinessChainDesignDetails({
   onAdd,
   onRelation,
   onHighlight,
-  preview,
   onCanvas,
 }) {
-  const [tab, setTab] = useState(preview ? 'state' : 'neighbors')
+  const [tab, setTab] = useState('neighbors')
   const approvals = useMemo(() => businessChainApprovalChoices(catalog, library, node), [catalog, library, node])
   const handoffs = catalog.businessChainOverview.relations.filter((relation) => relation.fromChainKey === node.chainKey)
   const context = businessChainNodeContext(library, node.id)
@@ -178,7 +177,7 @@ export default function BusinessChainDesignDetails({
         {CHAIN_DESIGN_DOMAINS[node.domain]} · {CHAIN_DESIGN_TYPES[node.type]} ·{' '}
         {node.chainLabel}
       </p>
-      {!onCanvas ? <p className="erp-chain-design__muted">此节点未在当前画布显示；查看详情不会改变颗粒度，可明确展开。</p> : null}
+      {!onCanvas ? <p className="erp-chain-design__muted">当前画布未显示此节点。可按需加入画布或展开上下游。</p> : null}
       {node.definition && ['rules', 'related'].includes(tab) ? <p>{node.definition}</p> : null}
       {node.representedBy ? (
         <p>
@@ -306,7 +305,7 @@ export default function BusinessChainDesignDetails({
       ) : tab === 'approval' ? (
         <ChainApprovalDetails library={library} choices={approvals} onHighlight={onHighlight} />
       ) : tab === 'state' ? (
-        <StatePreview key={node.id} catalog={catalog} node={stateNode} preview={preview} />
+        <StatePreview key={node.id} catalog={catalog} node={stateNode} />
       ) : tab === 'related' ? (
         <div className="erp-chain-design__related">
           {processTasks.length ? (

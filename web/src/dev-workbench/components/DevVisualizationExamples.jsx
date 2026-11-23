@@ -20,7 +20,7 @@ const RECEIPT_RULE = {
     { key: 'quality', diagramType: 'rule', domain: 'quality', label: '核对本行质检', description: '按收货行核对质量结论。' },
     { key: 'inbound', diagramType: 'business_action', domain: 'inventory', label: '仓库确认入库', description: '通过本行质量门禁并确认后，才形成实际入库。' },
     { key: 'waiting', diagramType: 'rule', risk: true, label: '本行暂不入库', description: '待检只阻断对应行；已通过的其他行可先办理入库。' },
-    { key: 'rejected', diagramType: 'business_action', domain: 'purchase', risk: true, label: '采购办理处置', description: '采购办理退厂或补换，保留原拒收结论。' },
+    { key: 'rejected', diagramType: 'business_action', domain: 'purchase', risk: true, label: '采购办理处置', description: '退厂或补换时保留原拒收结论。' },
   ],
   edges: [
     { from: 'receipt', to: 'quality' },
@@ -39,11 +39,11 @@ const WORKBENCH_TREE = {
   edges: areas.map(({ key }) => ({ from: 'root', to: key })),
 }
 
-function GraphExample({ flow, initial, title, legend }) {
+function GraphExample({ flow, initial, title, form, legend }) {
   const [selected, setSelected] = useState(initial)
   const node = flow.nodes.find((item) => item.key === selected)
   return (
-    <WorkbenchSection title={title} headingLevel={4} description="结构与规则示意">
+    <WorkbenchSection title={title} headingLevel={4} description={form}>
       <BusinessFlowDiagram flow={flow} label={title} selectedKey={selected} onSelect={setSelected} legend={legend} />
       <p role="status">{node.label}：{node.description}</p>
     </WorkbenchSection>
@@ -51,15 +51,15 @@ function GraphExample({ flow, initial, title, legend }) {
 }
 
 function ReceiptRuleExample() {
-  return <GraphExample flow={RECEIPT_RULE} initial="inbound" title="采购收货：规则允许怎么走？" legend="连线表示条件与去向。图中没有实际入库状态。" />
+  return <GraphExample flow={RECEIPT_RULE} initial="inbound" title="采购收货：规则允许怎么走？" form="分支流程图" legend="连线标出每项质检结果的去向。" />
 }
 
 function WorkbenchTreeExample() {
-  return <GraphExample flow={WORKBENCH_TREE} initial={DEV_WORKBENCH_AREA_KEYS.developmentResources} title="工作台：模块归哪一类？" legend="连线表示归属；同级责任区没有执行先后。" />
+  return <GraphExample flow={WORKBENCH_TREE} initial={DEV_WORKBENCH_AREA_KEYS.developmentResources} title="工作台：模块归哪一类？" form="分类树" legend="连线表示归属；同级责任区没有执行先后。" />
 }
 
 const TRACE_ITEMS = [
-  { color: 'var(--erp-visual-success-text)', children: <><Text strong>09:10 · 仓库登记到货</Text><p>已登记。</p></> },
+  { color: 'var(--erp-visual-success-text)', children: <Text strong>09:10 · 仓库登记到货</Text> },
   { color: 'var(--erp-visual-success-text)', children: <><Text strong>10:25 · 来料质检</Text><p>该行合格。</p></> },
   { color: 'gray', children: <><Text strong>当前 · 仓库确认入库</Text><p>待办理 · 尚无入库结果。</p></> },
 ]

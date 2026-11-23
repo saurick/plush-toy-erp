@@ -9,7 +9,7 @@ import { formatWorkflowTaskEventTime } from '../../utils/workflowTaskEventPresen
 import WorkflowProgressMarker from './WorkflowProgressMarker.jsx'
 import './workflowBusinessChain.css'
 
-export default function WorkflowBusinessChain({ task, profile, view = 'task', onOpenTask, focused = false, showGuidance = true }) {
+export default function WorkflowBusinessChain({ task, profile, view = 'task', onOpenTask, focused = false, showGuidance = true, heading, emptyAction }) {
   const [result, setResult] = React.useState(null)
   const [offset, setOffset] = React.useState(0)
   const [opening, setOpening] = React.useState(false)
@@ -49,6 +49,8 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
   const taskHistory = current?.model?.tasks.filter((item) => !item.current && !['ready', 'blocked'].includes(item.task_status_key)).sort((a, b) => (b.completed_at || 0) - (a.completed_at || 0) || b.id - a.id) || []
   const currentTasks = current?.model?.tasks.filter((item) => item.current) || []
   const pendingTasks = current?.model?.tasks.filter((item) => !item.current && ['ready', 'blocked'].includes(item.task_status_key)).sort((a, b) => Number(b.task_status_key === 'blocked') - Number(a.task_status_key === 'blocked')) || []
+  const noRelatedTasks = view === 'task' && current?.model && !pendingTasks.length && !taskHistory.length && !current.model.truncated
+  if (focused && noRelatedTasks) return emptyAction || null
   const openTask = async (id) => {
     if (opening) return
     setOpening(true); setOpenError('')
@@ -111,7 +113,7 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
   const unclassifiedGroup = groups.find((group) => group.key === 'unclassified')
   const exceptionView = exceptionGroup ? <section className="workflow-business-chain__exceptions" data-pending={exceptionGroup.open > 0 || undefined} aria-label="异常分支">{renderGroup(exceptionGroup)}</section> : null
 
-  return (
+  const content = (
     <div className={`workflow-business-chain${focused ? ' workflow-business-chain--focused' : ''}`} data-view={view} aria-label={view === 'order' ? '订单任务链' : '本任务处理进度'}>
       {openError ? <p role="alert">{openError}</p> : null}
       {!current ? <p role="status">正在读取关联任务</p> : current.error ? (
@@ -122,7 +124,6 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
       ) : view === 'task' ? (
         <>
           {!focused ? <ul className="workflow-business-chain__tasks">{currentTasks.map(renderTask)}</ul> : null}
-          {focused && !pendingTasks.length && !taskHistory.length && !current.model.truncated ? <p className="workflow-business-chain__hint">当前暂无其他关联任务。</p> : null}
           {pendingTasks.length ? (
             <section className="workflow-business-chain__pending" aria-label="关联待办">
               <p className="workflow-business-chain__section-label">关联待办 <span>{pendingTasks.length}</span></p>
@@ -155,4 +156,5 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
       )}
     </div>
   )
+  return heading ? <div className="workflow-task-info-card workflow-task-detail-flow">{heading}{content}</div> : content
 }

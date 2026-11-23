@@ -35,7 +35,7 @@
   border-block-start: 1px solid var(--erp-border);
 }
 
-.erp-dev-regression-step-label {
+.erp-dev-data-step-label {
   white-space: nowrap;
 }
 
@@ -198,5 +198,69 @@
 
   .erp-dev-data-operation-detail .ant-descriptions-view {
     overflow-x: auto;
+  }
+}
+
+.erp-dev-data-branches {
+  display: grid;
+  gap: 8px;
+  container: data-branches / inline-size;
+}
+
+.erp-dev-data-branches > p {
+  margin: 0;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-data-branch-group {
+  display: grid;
+  grid-template-columns: minmax(7em, 20%) minmax(0, 1fr);
+  align-items: start;
+}
+
+.erp-dev-data-branch-source {
+  padding-block: 7px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-data-branch-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-data-branch-group li {
+  position: relative;
+  padding: 2px 0 2px 18px;
+  border-inline-start: 1px solid var(--erp-border);
+}
+
+.erp-dev-data-branch-group li::before {
+  position: absolute;
+  inset: 18px auto auto 0;
+  width: 14px;
+  border-block-start: 1px solid var(--erp-text-muted);
+  content: '';
+}
+
+.erp-dev-data-branch-group li[data-branch]::before {
+  border-block-start-style: dashed;
+}
+
+.erp-dev-data-branch-route {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-dev-data-branch-route > span {
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+@container data-branches (max-width: 540px) {
+  .erp-dev-data-branch-group {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -10,6 +10,7 @@ import {
   ToolOutlined,
 } from '@ant-design/icons'
 import { useSearchParams, useOutletContext } from 'react-router-dom'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import ERPPageActions from '../components/ERPPageActions.jsx'
 import { BusinessSplitPageTitle } from '../components/BusinessSplitHeader.jsx'
 import { message } from '@/common/utils/antdApp'
@@ -103,20 +104,16 @@ export default function PrintCenterPage() {
           </div>
         </div>
         <div className="erp-print-center-workbench">
-          <nav className="erp-print-center-nav-panel" aria-label="打印模板目录">
-            <h3 className="erp-template-center__nav-title">模板</h3>
-            <div className="erp-print-center-template-list">
+          <Directory className="erp-print-center-nav-panel" aria-label="打印模板目录" title={<strong>模板</strong>}>
+            <div className="erp-directory-list erp-print-center-template-list">
               {printTemplateCatalog.map((template) => {
                 const isActive = template.key === activeTemplate.key
                 const TemplateIcon =
                   PRINT_TEMPLATE_ICONS[template.key] || FileTextOutlined
                 return (
-                  <button
-                    type="button"
+                  <DirectoryItem
                     key={template.key}
-                    className={`erp-print-center-template-btn${
-                      isActive ? ' erp-print-center-template-btn--active' : ''
-                    }`}
+                    className="erp-print-center-template-btn"
                     aria-pressed={isActive}
                     onClick={() => selectTemplate(template)}
                     onDoubleClick={() => handleOpenEditablePrint(template.key)}
@@ -129,11 +126,11 @@ export default function PrintCenterPage() {
                       <span>{template.title}</span>
                     </span>
                     {isActive ? <CheckCircleFilled aria-hidden="true" /> : null}
-                  </button>
+                  </DirectoryItem>
                 )
               })}
             </div>
-          </nav>
+          </Directory>
           <div className="erp-print-center-preview-panel">
             <PrintTemplateGuide
               template={activeTemplate}

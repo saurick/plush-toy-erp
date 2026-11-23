@@ -297,20 +297,6 @@
   background: var(--erp-surface-bg);
 }
 
-.erp-dev-version-guide-toc__header {
-  margin-block-end: 12px;
-}
-
-.erp-dev-version-guide-toc__header h2.ant-typography {
-  margin: 0;
-  font-size: var(--erp-font-emphasis);
-}
-
-.erp-dev-version-guide-toc .ant-anchor-link-title {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
 .erp-dev-version-guide-content {
   min-width: 0;
   padding: 24px;

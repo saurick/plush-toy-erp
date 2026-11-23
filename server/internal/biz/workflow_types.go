@@ -94,6 +94,8 @@ type WorkflowTaskFilter struct {
 }
 
 type WorkflowTaskBoardQuery struct {
+	ProgressView    string
+	ProgressAnchor  int
 	Calendar        *WorkflowTaskCalendarQuery
 	DueDateFrom     string
 	DueDateTo       string
@@ -144,7 +146,20 @@ type WorkflowTaskPerson struct {
 	Name string `json:"name"`
 }
 
+type WorkflowProgressRow struct {
+	Task  *WorkflowTask
+	Count int
+	Date  *time.Time
+}
+
+type WorkflowProgressPage struct {
+	Counts map[string]int
+	Total  int
+	Rows   []WorkflowProgressRow
+}
+
 type WorkflowTaskBoard struct {
+	Progress      *WorkflowProgressPage
 	Calendar      *WorkflowTaskCalendar
 	Assignees     []WorkflowTaskPerson
 	SnapshotAt    time.Time

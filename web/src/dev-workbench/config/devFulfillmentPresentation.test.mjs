@@ -3,7 +3,7 @@ import test from 'node:test'
 import { buildBusinessFlowMermaid } from '../../common/components/diagram/mermaidGraph.mjs'
 import { WorkflowTaskDiscoveryCatalog as catalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import { buildFulfillmentSubflow } from './devFulfillmentSubflow.mjs'
-import { buildFulfillmentExceptionDirectory, buildFulfillmentOverview, getFulfillmentStageContext, getFulfillmentSupplement, selectFulfillmentSubstep, selectFulfillmentException } from './devFulfillmentPresentation.mjs'
+import { buildFulfillmentOverview, getFulfillmentStageContext, getFulfillmentSupplement, selectFulfillmentSubstep, selectFulfillmentException } from './devFulfillmentPresentation.mjs'
 
 const steps = catalog.fulfillment_flow
 const step = (key) => steps.find((item) => item.stage === key)
@@ -50,21 +50,6 @@ test('role focus selects concrete actions while preserving the selected stage an
   assert.deepEqual(diagram.nodes.map((node) => node.label), flow.nodes.map((node) => node.label))
 })
 
-test('the exception directory exposes sources without a main-flow entry and never invents stage bindings', () => {
-  const directory = buildFulfillmentExceptionDirectory(catalog.exception_guides, 'warehouse', 'cutting_issue')
-  assert.equal(directory.length, catalog.exception_guides.length)
-  assert(directory.some((item) => item.guide.key === 'over_issue' && item.roleMatch))
-  assert(directory.some((item) => item.guide.key === 'outsourcing_rejection'))
-  assert(directory.some((item) => item.guide.key === 'posted_purchase'))
-  assert.deepEqual(directory.filter((item) => item.related).map((item) => item.guide.key), ['over_issue'], 'the handling catalog supplies the independent shortcut without inventing an entry stage')
-  for (const item of directory) assert.equal(item.guide, catalog.exception_guides.find((guide) => guide.key === item.guide.key))
-  const related = buildFulfillmentExceptionDirectory(catalog.exception_guides, 'engineering', 'incoming_quality')
-  assert.equal(related[0].guide.key, 'purchase_rejection')
-  assert(related[0].related)
-  assert(related.every((item) => !item.roleMatch), 'unknown approval assignments must not create fixed role duties')
-  assert.equal(related.length, catalog.exception_guides.length, 'a role with no fixed duties can still inspect every exception')
-})
-
 test('supplementary instructions retain uncovered source text without repeating node instructions', () => {
   const issue = step('cutting_issue')
   const supplementaryIssue = getFulfillmentSupplement(issue)
@@ -84,20 +69,23 @@ test('supplementary instructions retain uncovered source text without repeating 
   assert.equal(selected.details.find((detail) => detail.reference === 'handoff:2').text, issue.handoffs[2])
 })
 
-test('all registered plans preserve current business continuations, with no default multi-plan or global origin', () => {
+test('registered plans preserve their continuations and use the default origin only when unique', () => {
   for (const guide of catalog.exception_guides) {
+    const defaultOrigin = guide.entry_stages.length === 1 ? guide.entry_stages[0] : undefined
     const empty = selectFulfillmentException({ guideKey: guide.key })
     assert.equal(empty.plan?.key || null, guide.plans.length === 1 ? guide.plans[0].key : null)
-    assert.equal(empty.origin, null)
+    assert.equal(empty.origin?.stage, defaultOrigin)
     for (const plan of guide.plans) {
       for (const originStage of [...guide.entry_stages, undefined]) {
+        const expectedOrigin = originStage || defaultOrigin
         const selection = selectFulfillmentException({ guideKey: guide.key, planKey: plan.key, originStage })
         assert.equal(selection.plan, plan)
         assert(selection.steps.length)
-        assert.equal(selection.origin?.stage, originStage)
+        assert.equal(selection.origin?.stage, expectedOrigin)
+        assert.equal(selection.graph.origin?.stage, expectedOrigin)
         assert.equal(selection.reentryStage?.stage, plan.continuation.reentry?.stage)
         if (plan.continuation.kind === 'stop') assert.equal(selection.returnStage, null)
-        if (!originStage && ['origin', 'next'].includes(plan.continuation.target)) assert.equal(selection.returnStage, null)
+        if (!expectedOrigin && ['origin', 'next'].includes(plan.continuation.target)) assert.equal(selection.returnStage, null)
       }
     }
   }

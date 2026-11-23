@@ -20,6 +20,8 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .erp-product-gallery__trigger:focus-visible {

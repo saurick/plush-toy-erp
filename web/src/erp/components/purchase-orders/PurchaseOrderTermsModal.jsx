@@ -129,7 +129,7 @@ export default function PurchaseOrderTermsModal({
       message.success(deliveryOnly ? '采购交期已保存' : '采购价格与交期已保存')
       onClose?.()
       try {
-        await onChanged?.()
+        await onChanged?.(updated)
       } catch {
         message.warning('保存已完成，请刷新采购订单查看最新资料')
       }
@@ -148,6 +148,7 @@ export default function PurchaseOrderTermsModal({
   const closed = context?.order.lifecycle_status === 'closed'
   return (
     <BusinessModal
+      taskInline
       open={Boolean(orderID)}
       title={`${deliveryOnly ? '维护交期' : '补齐价格与交期'}${order?.purchase_order_no ? ` · ${order.purchase_order_no}` : ''}`}
       size="localAction"

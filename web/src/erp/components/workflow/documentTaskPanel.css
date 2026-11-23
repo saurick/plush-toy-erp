@@ -1,0 +1,51 @@
+.erp-task-management-views {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--erp-page-gap);
+  min-width: 0;
+}
+.erp-document-tasks,
+.erp-document-tasks-overview:not([hidden]),
+.erp-document-tasks-doc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--erp-page-gap);
+  min-width: 0;
+  min-height: 0;
+}
+.erp-document-tasks { margin-top: var(--erp-page-gap); }
+.erp-document-tasks-toolbar,
+.erp-document-tasks-pagination,
+.erp-document-tasks-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.erp-document-tasks-toolbar {
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  background: var(--erp-surface-bg);
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+}
+.erp-document-tasks-toolbar .erp-search-input { flex: 1 1 200px; }
+.erp-document-tasks-filters { max-width: 100%; overflow-x: auto; }
+.erp-document-tasks-results {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  background: var(--erp-surface-bg);
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+}
+.erp-document-tasks-pagination { justify-content: flex-end; padding: 6px 12px; }
+.mobile-role-tasks-page .erp-document-tasks { padding: 0 8px 8px; }
+
+.erp-document-tasks-document.ant-btn {
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  text-align: start;
+  overflow-wrap: anywhere;
+}

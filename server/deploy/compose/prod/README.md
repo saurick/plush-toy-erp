@@ -207,13 +207,12 @@ git diff --check
 | `managed` | `ATTACHMENT_STORAGE_MODE=managed`、`COMPOSE_PROFILES=attachment-local`；由 ERP Compose 启动 SeaweedFS | 校验 RAID5 实际挂载、固定镜像、健康和管理登录保护 |
 | `external` | `ATTACHMENT_STORAGE_MODE=external`、`COMPOSE_PROFILES=`；填写独立 `ATTACHMENT_S3_*` | 使用已部署服务，校验运行连接、独立 bucket 和凭据；RAID5、备份与管理入口由存储服务负责 |
 
-外部模式不启动 `attachment-store`，无需在 ERP env 中保存存储管理员密码或数据目录。S3 origin 允许 HTTPS 或局域网 HTTP IP 地址，不接受带凭据、文件路径、query 的 URL。Compose profile 只允许表中值，宿主环境仍不得覆盖受控 env。业务服务会在存储不可用时拒绝文件操作，不能用数据库内容回退。
-
-本机模式使用 SeaweedFS `4.47` 固定 digest，所有 volume、filer metadata 和 master 数据均挂载到 `ATTACHMENT_DATA_DIR`。
-
-`ATTACHMENT_RAID_MOUNT=/srv/raid5`；demo 建议目录 `/srv/raid5/plush-toy-erp/demo-133/attachments`、bucket `plush-demo-133-files`，test 使用对应 `customer-test-133` 路径和 bucket。
-
-新目标初始化按这组路径生成独立随机凭据；已存在目标在发布前准备运行 env、目录和固定镜像，不能直接套用新目标初始化。
+| 配置项 | 规则 |
+| --- | --- |
+| 外部 S3 | ERP 只启动业务服务。S3 origin 接受 HTTPS 或局域网 HTTP IP 地址，URL 只含 origin。运行连接异常时直接提示文件操作失败。 |
+| 本机 SeaweedFS | 固定 `4.47` digest，volume、filer metadata 与 master 数据均存 `ATTACHMENT_DATA_DIR`。 |
+| 目标路径和 bucket | `ATTACHMENT_RAID_MOUNT=/srv/raid5`。demo 建议 `/srv/raid5/plush-toy-erp/demo-133/attachments`、`plush-demo-133-files`，test 使用对应的 `customer-test-133` 路径与 bucket。 |
+| 配置和凭据 | 只采纳受控 env 及上表 profile。新目标生成独立随机凭据，已有目标在发布前核对现用 env、目录和固定镜像。 |
 
 目标主机先确认 `/srv/raid5` 已挂载到预期块设备，再创建专用目录并限制权限。启动前执行：
 
@@ -222,11 +221,14 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
   /srv/raid5 /srv/raid5/plush-toy-erp/demo-133/attachments
 ```
 
-本机模式的 Compose 不自动创建缺失的附件目录，也不发布 S3 / filer / master / 管理界面端口；业务容器通过附件私有网络访问存储。`production-preflight --runtime` 会核对实际挂载、服务健康、S3 bucket 访问及管理界面的登录保护和凭据。目标机预装 `.env.example` 中固定的 SeaweedFS 镜像；低配目标不构建镜像。初始化或恢复失败时保留附件目录供核对，不沿用数据库清理脚本删除文件。
+本机模式提前创建附件目录。业务容器通过私有网络读取 S3，filer、master 与管理接口均留在私有网络。目标机预装 `.env.example` 的固定镜像，`production-preflight --runtime` 检查挂载、健康、bucket 和管理登录保护。初始化或恢复失败时保留附件现场。
 
-已有库外置按正式 promotion 的停写窗口进行。发布前保留旧版本、完整 PG 备份及其恢复验证；候选镜像包含 `/app/attachment-storage`。`migrate_online.sh --reconcile-permissions` 和 `--apply` 在同一 Atlas 串行锁范围中导出、逐个读回校验并提供迁移摘要，回执保存在 migration receipt 旁。
-
-纯只读预检遇到待外置数据时会明确阻断，不会自行复制文件。迁移后继续走权限对账、health / ready 和附件上传下载 smoke。若尚未移除旧列，可回到旧版本和旧库；旧列移除后回滚旧代码必须同时恢复配套旧 PG dump，不能只切镜像。
+| 已有库外置阶段 | 完成条件 |
+| --- | --- |
+| 发布前 | 在正式 promotion 的停写窗口办理，保留旧版本、完整 PG 备份及恢复验证。候选镜像带 `/app/attachment-storage`。 |
+| 导出与迁移 | `migrate_online.sh --reconcile-permissions` 和 `--apply` 在同一 Atlas 串行锁下完成导出、逐对象读回和摘要。迁移回执旁存本次导出证据。只读预检发现待外置数据时阻断。 |
+| 改完核对 | 做权限对账、health / ready 以及上传下载冒烟。 |
+| 回滚 | 旧列仍在时可回到旧版本与旧库。旧列移除后，恢复旧代码须同步恢复配套的旧 PG dump。 |
 
 `cmd/attachment-storage` 提供以下维护入口，默认写操作均为 dry-run；实际操作要求 `-execute` 和精确 `-confirm`。连接只从 `POSTGRES_DSN` 与 `ATTACHMENT_S3_*` 环境变量读取，凭据放受控 `0600` 文件或临时进程环境，不进入命令参数、Git 或日志。
 
@@ -243,6 +245,8 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
 
 不要让开发和 demo/test 复用 bucket。
 
+### 怎样取得配套的数据库和附件备份
+
 共享开发库迁移前，停写后执行 `export`，再用 `verify -receipt <file> -pg-options` 的输出设置本次进程的 `PGOPTIONS`，然后按 `make migrate_prepare → make migrate_execute` 的同一 ready 输出执行，完成后 `unset PGOPTIONS`。运行 API 没有 PG 内容回退。
 
 成套入口为 `node scripts/deploy/backup-set/cli.mjs`，参数与恢复步骤见[备份恢复](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)。
@@ -252,6 +256,8 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
 前后核对附件整行摘要、有效客户配置和迁移版本，再恢复原容器并等健康；随后将 manifest、dump 和附件封为单个 `*.tar.age`，原子发布本地与异地校验副本。不要直接打包运行中的 SeaweedFS 原始数据目录。
 
 备份确认串同时表示已安排独占停写窗口：发布、迁移、导入、其它应用实例和对象清理不能并发。工具只管理这一 Compose project 的原 app-server，不能代替外部写入方的维护安排。`scheduled-postgres-backup.sh` 保留为 PG 专用入口，其结果不表示完整系统备份。
+
+### 恢复到隔离目标并核验
 
 恢复先把配套 PG dump 导入隔离目标，再使用新 S3 endpoint / bucket 执行 `restore` 和 `verify`，保留原 key、附件 ID、哈希和审计。全部核对通过后才切业务连接；源对象和旧备份保留到回滚窗口结束。文件服务不可用时上传下载明确失败，附件列表仍读 PG 元数据。
 

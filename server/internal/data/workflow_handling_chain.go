@@ -110,8 +110,12 @@ task_batches AS (
  LEFT JOIN production_exception_decisions e ON e.id=COALESCE(CASE WHEN t.source_type='production_exception_decision' THEN t.source_id END,b.origin_exception_decision_id,
  CASE WHEN t.task_group='handoff_production_exception' THEN (SELECT d.id FROM production_exception_decisions d WHERE d.production_wip_batch_id=b.id ORDER BY d.id DESC LIMIT 1) END)
  LEFT JOIN production_wip_batches eb ON eb.id=e.production_wip_batch_id LEFT JOIN production_order_operations eo ON eo.id=eb.production_order_operation_id
+), anchor_context AS MATERIALIZED (
+ -- Resolve the anchor once instead of scanning task_context for each candidate.
+ SELECT * FROM task_context WHERE id=` + anchor + `
 ), chain_tasks AS (
- SELECT DISTINCT t.* FROM task_context t WHERE t.id IN (SELECT id FROM visible_tasks) AND EXISTS(SELECT 1 FROM task_context a WHERE a.id=` + anchor + ` AND (t.id=a.id OR (` + relation + `)))
+ SELECT DISTINCT t.* FROM task_context t WHERE t.id IN (SELECT id FROM visible_tasks)
+ AND EXISTS(SELECT 1 FROM anchor_context a WHERE t.id=a.id OR (` + relation + `))
 )`
 	return query, args
 }

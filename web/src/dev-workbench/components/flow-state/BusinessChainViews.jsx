@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Space, Spin, Tag } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
-import Select from '@/common/components/select/FilterSelect'
+import AppSelect from '@/common/components/select/AppSelect'
+import FilterField from '@/common/components/navigation/FilterField.jsx'
 import {
   buildDevBusinessChainProjection,
   buildDevBusinessChainRoleGuide,
@@ -10,15 +11,11 @@ import {
 } from '../../config/devBusinessChainProjection.mjs'
 import TaskFulfillmentGuide from './TaskFulfillmentGuide.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
-import { DEFINITION_SELECT_CLASS_NAMES, formatQueryTime, Paragraph, Text, Title, cleanText, useDefinitionSelectSearch, renderDefinitionSelectOption, asArray, KeyValue } from './FlowStateShared.jsx'
+import { DEFINITION_SELECT_CLASS_NAMES, formatQueryTime, Paragraph, Text, Title, cleanText, renderDefinitionSelectOption, asArray, KeyValue } from './FlowStateShared.jsx'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
 
 import { getProcessLabel } from '@/erp/utils/processRuntimePresentation.mjs'
 import { getDevFlowStateTaskRuntimeAssociation } from '../../pages/devFlowStateTaskLookup.mjs'
-import {
-  createDevFlowDefinitionOptionFilter,
-  normalizeDevFlowDefinitionSearchText,
-} from '../../pages/devFlowDefinitionSearch.mjs'
 import { buildBusinessChainSelectOptions } from '../../pages/devFlowDefinitionSelectOptions.mjs'
 import { DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY as ALL_BUSINESS_CHAINS_KEY } from '../../pages/devFlowStateQuery.mjs'
 
@@ -100,55 +97,25 @@ function uniqueStrings(values) {
 }
 
 function BusinessChainSelector({ catalog, value, onChange }) {
-  const searchProps = useDefinitionSelectSearch()
+  const label = '切换业务流程'
   const options = useMemo(
     () => buildBusinessChainSelectOptions(catalog),
     [catalog]
   )
-  const chainOptionFilter = useMemo(
-    () => createDevFlowDefinitionOptionFilter(catalog, 'chains'),
-    [catalog]
-  )
-  const optionFilter = useCallback(
-    (keyword, option) => {
-      if (option?.value !== ALL_BUSINESS_CHAINS_KEY) {
-        return chainOptionFilter(keyword, option)
-      }
-      const normalized = normalizeDevFlowDefinitionSearchText(keyword)
-      if (!normalized) return true
-      const overviewText = normalizeDevFlowDefinitionSearchText(
-        [
-          catalog.businessChainOverview.label,
-          catalog.businessChainOverview.summary,
-          '全部业务链 总链 总图 设计总图',
-        ].join(' ')
-      )
-      return normalized
-        .split(/\s+/u)
-        .every((term) => overviewText.includes(term))
-    },
-    [catalog.businessChainOverview, chainOptionFilter]
-  )
   return (
-    <Select
-      className="erp-dev-flow-chain-selector"
-      label="切换业务流程"
-      labelPlacement="stacked"
-      emptyValue={ALL_BUSINESS_CHAINS_KEY}
-      placeholder="切换业务流程"
-      id="dev-flow-chain-select"
-      aria-label="切换业务流程"
-      showSearch
-      virtual={false}
-      {...searchProps}
-      classNames={DEFINITION_SELECT_CLASS_NAMES}
-      filterOption={optionFilter}
-      notFoundContent="没有匹配的业务链"
-      value={value}
-      options={options}
-      optionRender={renderDefinitionSelectOption}
-      onChange={onChange}
-    />
+    <FilterField label={label} className="erp-dev-flow-chain-selector">
+      <AppSelect
+        placeholder={label}
+        id="dev-flow-chain-select"
+        aria-label={label}
+        virtual={false}
+        classNames={DEFINITION_SELECT_CLASS_NAMES}
+        value={value}
+        options={options}
+        optionRender={renderDefinitionSelectOption}
+        onChange={(key) => onChange(key ?? ALL_BUSINESS_CHAINS_KEY)}
+      />
+    </FilterField>
   )
 }
 

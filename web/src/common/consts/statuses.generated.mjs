@@ -8,9 +8,11 @@ export const BOMLossSource = Object.freeze({
 })
 
 export const BusinessProgressSort = Object.freeze({
+  COMPLETED: 'completed_quantity',
   DUE_DATE: 'due_date',
   ORDER_NO: 'order_no',
   PRODUCT: 'product',
+  REMAINING: 'remaining_quantity',
 })
 
 export const FinanceAdjustmentDirection = Object.freeze({

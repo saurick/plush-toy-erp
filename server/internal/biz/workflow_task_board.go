@@ -132,6 +132,18 @@ func (uc *WorkflowUsecase) GetTaskBoard(ctx context.Context, query WorkflowTaskB
 }
 
 func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTaskBoardQuery, error) {
+	if query.ProgressView != "" {
+		switch query.ProgressView {
+		case "open", "exception", "unassigned", "due", "finished":
+		default:
+			return WorkflowTaskBoardQuery{}, ErrBadParam
+		}
+		if query.Calendar != nil || query.TodoOnly || query.ApprovalOnly || query.LaneKey != "" || query.Status != "" || query.Due != "" || query.SourceType != "" || query.SourceSection != "" || query.Period != "" || query.DateFrom != "" || query.DateTo != "" || query.DueDateFrom != "" || query.DueDateTo != "" || query.WorkflowTaskDiscoveryFilter != (WorkflowTaskDiscoveryFilter{}) {
+			return WorkflowTaskBoardQuery{}, ErrBadParam
+		}
+	} else if query.ProgressAnchor != 0 {
+		return WorkflowTaskBoardQuery{}, ErrBadParam
+	}
 	if query.Calendar != nil {
 		if _, _, err := query.Calendar.Bounds(); err != nil || !query.TodoOnly || query.ApprovalOnly || query.LaneKey != "" || query.Offset != 0 {
 			return WorkflowTaskBoardQuery{}, ErrBadParam
@@ -188,10 +200,12 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	if query.LaneKey != "" && query.LaneKey != WorkflowTaskBoardLaneAll && !isWorkflowTaskBoardLaneKey(query.LaneKey) {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
-	if _, ok := workflowTaskBoardSortKeys[query.Sort]; !ok {
+	sourceSort := query.ProgressView != "" && (query.Sort == "source_asc" || query.Sort == "source_desc")
+	if _, ok := workflowTaskBoardSortKeys[query.Sort]; !ok && !sourceSort {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
-	if query.LaneKey == "" && query.Sort != WorkflowTaskBoardSortSmart {
+	progressTimeSort := query.ProgressView != "" && (query.Sort == WorkflowTaskBoardSortTimeAsc || query.Sort == WorkflowTaskBoardSortTimeDesc)
+	if query.LaneKey == "" && query.Sort != WorkflowTaskBoardSortSmart && !sourceSort && !progressTimeSort {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
 	if query.Limit <= 0 {

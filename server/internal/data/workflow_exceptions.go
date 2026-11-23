@@ -136,11 +136,15 @@ quality_roots(id,root_id) AS (
 		cte += ` AND (LOWER(i.number) LIKE ` + p + ` OR LOWER(i.reason) LIKE ` + p + ` OR LOWER(i.batch_no) LIKE ` + p + ` OR EXISTS(SELECT 1 FROM incident_tasks it JOIN visible_tasks t ON t.id=it.task_id WHERE it.event_key=i.event_key AND (LOWER(t.task_name) LIKE ` + p + ` OR LOWER(COALESCE(t.source_no,'')) LIKE ` + p + ` OR EXISTS(SELECT 1 FROM task_sources ts JOIN sales_orders so ON ts.view_key='orders' AND so.id=ts.board_id WHERE ts.task_id=t.id AND LOWER(so.order_no) LIKE ` + p + `))))`
 	}
 	cte += `), selected_events AS (SELECT * FROM scoped_events`
-	if q.State == "open" {
+	switch q.State {
+	case biz.WorkflowExceptionFilterOpen:
 		cte += ` WHERE state IN ('open','executing')`
-	}
-	if q.State == "closed" {
+	case biz.WorkflowExceptionFilterClosed:
 		cte += ` WHERE state IN ('closed','corrected')`
+	case biz.WorkflowExceptionFilterPendingPlan:
+		cte += ` WHERE state='open'`
+	case biz.WorkflowExceptionFilterExecuting:
+		cte += ` WHERE state='executing'`
 	}
 	return cte + `) `, args
 }
@@ -152,20 +156,29 @@ func (r *workflowRepo) ListWorkflowExceptions(ctx context.Context, q biz.Workflo
 	result := &biz.WorkflowExceptionBoard{Items: []biz.WorkflowExceptionItem{}, Limit: q.Limit, Offset: q.Offset}
 	err := (&businessProgressRepo{data: r.data}).read(ctx, func(tx *stdsql.Tx) error {
 		cte, args := workflowExceptionCTE(q)
-		if err := tx.QueryRowContext(ctx, cte+`SELECT COUNT(*),COALESCE(SUM(CASE WHEN state IN ('open','executing') THEN 1 ELSE 0 END),0),COALESCE(SUM(CASE WHEN state IN ('closed','corrected') THEN 1 ELSE 0 END),0) FROM scoped_events`, args...).Scan(&result.Total, &result.Open, &result.Closed); err != nil {
+		if err := tx.QueryRowContext(ctx, cte+`SELECT COUNT(*) FILTER(WHERE state='open'),
+			COUNT(*) FILTER(WHERE state='executing'), COUNT(*) FILTER(WHERE state IN ('closed','corrected'))
+			FROM scoped_events`, args...).Scan(&result.PendingPlan, &result.Executing, &result.Closed); err != nil {
 			return err
 		}
+		result.Open = result.PendingPlan + result.Executing
 		if err := tx.QueryRowContext(ctx, cte+`SELECT COUNT(DISTINCT t.id) FROM selected_events e JOIN incident_tasks it ON it.event_key=e.event_key JOIN visible_tasks t ON t.id=it.task_id WHERE t.task_status_key IN ('ready','blocked')`, args...).Scan(&result.PendingTasks); err != nil {
 			return err
 		}
 		if err := tx.QueryRowContext(ctx, cte+`SELECT COUNT(DISTINCT s.board_id) FROM selected_events e JOIN incident_tasks it ON it.event_key=e.event_key JOIN task_sources s ON s.task_id=it.task_id WHERE s.view_key='orders'`, args...).Scan(&result.AffectedOrders); err != nil {
 			return err
 		}
-		if q.State == "open" {
+		switch q.State {
+		case biz.WorkflowExceptionFilterOpen:
 			result.Total = result.Open
-		}
-		if q.State == "closed" {
+		case biz.WorkflowExceptionFilterClosed:
 			result.Total = result.Closed
+		case biz.WorkflowExceptionFilterPendingPlan:
+			result.Total = result.PendingPlan
+		case biz.WorkflowExceptionFilterExecuting:
+			result.Total = result.Executing
+		default:
+			result.Total = result.Open + result.Closed
 		}
 		pageArgs := append(append([]any{}, args...), q.Limit, q.Offset)
 		result.ViewTotal = result.Total
@@ -326,7 +339,33 @@ func (r *workflowRepo) ListWorkflowExceptions(ctx context.Context, q biz.Workflo
 			return err
 		}
 
+		if q.IncludeQualityPhotoSources {
+			return loadWorkflowExceptionQualityPhotoSources(ctx, tx, cte, pageEvents, eventArgs, byKey)
+		}
 		return nil
 	})
 	return result, err
+}
+
+func loadWorkflowExceptionQualityPhotoSources(ctx context.Context, tx *stdsql.Tx, cte, pageEvents string, args []any, byKey map[string]*biz.WorkflowExceptionItem) error {
+	// Finalized versions in the same correction chain retain their own evidence.
+	rows, err := tx.QueryContext(ctx, cte+`SELECT e.event_key,q.id,q.inspection_no
+		FROM selected_events e JOIN quality_heads q ON q.root_id=e.quality_root
+		WHERE e.event_key IN (`+pageEvents+`) AND EXISTS (
+			SELECT 1 FROM business_attachments a WHERE a.owner_type='quality_inspection' AND a.owner_id=q.id
+				AND a.withdrawn_at IS NULL AND a.mime_type LIKE 'image/%'
+		) ORDER BY e.event_key,q.id`, args...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var key string
+		var source biz.WorkflowExceptionQualityPhotoSource
+		if err := rows.Scan(&key, &source.ID, &source.Number); err != nil {
+			return err
+		}
+		byKey[key].QualityPhotoSources = append(byKey[key].QualityPhotoSources, source)
+	}
+	return rows.Err()
 }

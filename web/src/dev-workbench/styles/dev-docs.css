@@ -437,7 +437,7 @@
 
 .erp-dev-docs-toc-shell {
   display: flex;
-  flex: 0 0 clamp(148px, 23%, 184px);
+  flex: 0 0 164px;
   flex-direction: column;
   min-height: 0;
   border-inline-end: 1px solid var(--erp-border);
@@ -454,7 +454,7 @@
   margin: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding: 2px 8px 10px;
+  padding: 12px 8px;
   scrollbar-gutter: stable;
   list-style: none;
 }
@@ -489,12 +489,25 @@
   margin-inline: auto;
 }
 
-.erp-dev-docs-document > :is(p, ul, ol, blockquote) {
+:is(.erp-dev-docs-document, .erp-dev-docs-section__content) > :is(p, ul, ol, blockquote) {
   max-width: 50em;
 }
 
-.erp-dev-docs-document > p {
+:is(.erp-dev-docs-document, .erp-dev-docs-section__content) > p {
   margin-block: 12px 18px;
+}
+
+.erp-dev-docs-section {
+  margin-block: 12px;
+}
+
+.erp-dev-docs-section > summary > [data-markdown-anchor='heading'] {
+  margin: 0;
+  font: inherit;
+}
+
+.erp-dev-docs-section[data-current-section-title='true'] > summary {
+  background: var(--erp-primary-softer);
 }
 
 .erp-dev-docs-reader-state {
@@ -502,24 +515,26 @@
   place-items: center;
 }
 
-.erp-dev-docs-markdown h1,
-.erp-dev-docs-markdown h2,
-.erp-dev-docs-markdown h3 {
+.erp-dev-docs-markdown :is(h1, h2, h3):where(:not(.erp-business-form-heading)) {
   color: var(--erp-text);
   line-height: 1.35;
 }
 
-.erp-dev-docs-markdown h1 {
+.erp-dev-docs-markdown h1:where(:not(.erp-business-form-heading)) {
   margin-top: 0;
   font-size: 28px;
 }
 
-.erp-dev-docs-markdown h2 {
+.erp-dev-docs-document > .erp-business-form-heading {
+  margin-block: 32px 14px;
+}
+
+.erp-dev-docs-markdown h2:where(:not(.erp-business-form-heading)) {
   margin-block: 32px 14px;
   font-size: 22px;
 }
 
-.erp-dev-docs-markdown h3 {
+.erp-dev-docs-markdown h3:where(:not(.erp-business-form-heading)) {
   margin-block: 26px 12px;
   font-size: 18px;
 }
@@ -533,6 +548,11 @@
 
 .erp-dev-docs-markdown li + li {
   margin-top: 6px;
+}
+
+.erp-dev-docs-document :where(ul, ol) {
+  padding-inline-start: 2em;
+  list-style: revert;
 }
 
 .erp-dev-docs-markdown a {

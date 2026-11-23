@@ -119,6 +119,7 @@ export function buildSalesOrderColumns() {
       title: '订单号',
       exportTitle: '订单号',
       dataIndex: 'order_no',
+      taskDetailRole: 'identity',
       copyable: true,
       detailCopyable: true,
       width: 160,

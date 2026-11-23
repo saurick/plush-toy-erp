@@ -68,7 +68,8 @@
   border-end-end-radius: 0;
 }
 
-.erp-business-form-section[data-current-form-section='true'] .erp-business-form-heading {
+.erp-business-form-section[data-current-form-section='true'] .erp-business-form-heading,
+.erp-business-form-heading[data-current-section-title='true'] {
   background: color-mix(in srgb, var(--erp-primary) 30%, var(--erp-surface-bg));
 }
 

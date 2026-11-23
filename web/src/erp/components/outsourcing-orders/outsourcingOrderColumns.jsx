@@ -25,6 +25,7 @@ export function buildOutsourcingOrderColumns({ resolveSupplierName }) {
       title: '加工合同号',
       exportTitle: '加工合同号',
       dataIndex: 'outsourcing_order_no',
+      taskDetailRole: 'identity',
       copyable: true,
       detailCopyable: true,
       width: 180,

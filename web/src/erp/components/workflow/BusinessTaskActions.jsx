@@ -315,6 +315,7 @@ export default function BusinessTaskActions({ collaborationTask = null, collabor
       assignmentTarget={assignmentTarget}
       onAssignmentTargetChange={setAssignmentTarget}
       sourceSummary={<EngineeringMaterialTaskSummaryEntry key={task?.id} task={task} profile={adminProfile} />}
+      materialDraftRef={materialDraftRef}
       renderSourceAction={!collaborationTask && task && !actionMode && canProcessEngineeringMaterialTask(adminProfile, task) ? (render) => <EngineeringMaterialTaskAction task={task} profile={adminProfile} render={render} leaveGuardRef={materialLeaveGuardRef} draftRef={materialDraftRef} onBusyChange={setMaterialSaving} onChanged={(value, result) => { setActionReceipt({ successMessage: result.successMessage, actionTitle: result.action === 'REJECT' ? '退回工程' : '审批通过', statusLabel: ENGINEERING_MATERIAL_STATUS[value.status], handoffMessage: result.successMessage }); loadTasks(); onCreated?.(value) }} /> : null}
       canOpenEntry={canOpenEntry}
       onOpenEntry={openEntry}

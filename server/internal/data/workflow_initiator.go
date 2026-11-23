@@ -50,6 +50,9 @@ func loadTrackingInitiators(ctx context.Context, client *ent.Client, entries []*
 			processes[key] = entry
 			keys = append(keys, key)
 		} else if entry.Task != nil && entry.Task.CreatedBy != nil {
+			if entry.MaterialRequest != nil && *entry.Task.CreatedBy != entry.MaterialRequest.SubmittedBy {
+				continue
+			}
 			tasks[entry.Task.ID] = entry
 			ids = append(ids, entry.Task.ID)
 		}

@@ -46,3 +46,38 @@ test('a known multi-product snapshot remains associated even without a represent
   assert.match(container.textContent, /暂无图.*小熊 等 3 项/u)
   assert.doesNotMatch(container.textContent, /未关联产品/u)
 })
+
+test('progress stacks only distinct linked products with gallery access', async (t) => {
+  const { container, render } = await createReactTestHarness(t)
+  const { ProgressIdentity } = await import('./ProgressCompactContent.jsx')
+  const { BusinessPageContext } = await import('../../hooks/useBusinessPageContext.js')
+  const permissions = ['product.read', 'sales_order.read', 'sales_order_item.read']
+  const profile = { id: 1, permissions, effective_session: { actions: permissions } }
+  const row = { ...base, id: 1, view: 'orders', product: '待建档款式', product_id: 0, product_count: 3, linked_product_count: 2 }
+  const show = (record, adminProfile = profile) => render(createElement(BusinessPageContext.Provider, { value: { adminProfile } }, createElement(ProgressIdentity, { row: record })))
+  await show(row)
+  assert.ok(container.querySelector('.erp-product-gallery__stack .erp-task-product-image--placeholder'))
+  assert.match(container.textContent, /待建档款式 等 3 项/u)
+  await show({ ...row, linked_product_count: 1 })
+  assert.equal(container.querySelectorAll('.erp-product-gallery__stack').length, 0)
+  await show(row, { ...profile, permissions: ['product.read'] })
+  assert.equal(container.querySelectorAll('.erp-product-gallery__stack').length, 0)
+})
+
+test('mixed-unit delivery shows completed lines and clears the bar when the link is unknown', async (t) => {
+  const { container, render } = await createReactTestHarness(t)
+  const { ProgressOrderDelivery } = await import('./ProgressCompactContent.jsx')
+  const row = { ...base,
+view: 'orders',
+ordered_quantity: null,
+shipped_quantity: null,
+delivery_known: true,
+    product_count: 4,
+delivered_line_count: 1 }
+  await render(createElement(ProgressOrderDelivery, { row }))
+  assert.equal(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow'), '25')
+  assert.match(container.textContent, /明细交齐 25%/u)
+  await render(createElement(ProgressOrderDelivery, { row: { ...row, delivery_known: false, delivered_line_count: undefined } }))
+  assert.equal(container.querySelectorAll('[role="progressbar"]').length, 0)
+  assert.match(container.textContent, /关联待核对/u)
+})

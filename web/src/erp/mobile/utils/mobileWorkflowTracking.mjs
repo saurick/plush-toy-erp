@@ -6,9 +6,11 @@ import {
   TRACKING_SOURCE_OPTIONS,
   normalizeTrackingFilters,
 } from '../../utils/workflowTrackingFilters.mjs'
+import { isWorkflowTrackingKind } from '../../utils/workflowTracking.mjs'
 
 export const MOBILE_TRACKING_PAGE_SIZE = 20
 export const MOBILE_TRACKING_HISTORY_KEY = 'mobileWorkflowTracking'
+export const mobileTrackingHistoryKey = (recordType) => recordType === 'task' ? 'mobileWorkflowFollowups' : MOBILE_TRACKING_HISTORY_KEY
 
 const allowedValue = (options, value) =>
   options.some((option) => option.value === value) ? value : ''
@@ -32,9 +34,9 @@ export function readMobileTrackingSource(search) {
     ? { source_type: type, source_id: id } : null
 }
 
-export function readMobileTrackingState(history, accessScope, source = null) {
+export function readMobileTrackingState(history, accessScope, source = null, recordType = 'flow') {
   const availableScopes = source ? [{ value: 'visible' }] : TRACKING_SCOPE_OPTIONS
-  const saved = history?.[MOBILE_TRACKING_HISTORY_KEY]
+  const saved = history?.[mobileTrackingHistoryKey(recordType)]
   const state = accessScope && saved?.accessScope === accessScope ? saved : {}
   const scopes = Object.fromEntries(availableScopes.map(({ value }) => {
     const slot = state.scopes?.[value] || {}
@@ -47,7 +49,7 @@ export function readMobileTrackingState(history, accessScope, source = null) {
     }]
   }))
   const candidate = state.selection
-  const selection = ['task', 'process'].includes(candidate?.kind)
+  const selection = isWorkflowTrackingKind(candidate?.kind)
     && Number.isSafeInteger(candidate.id) && candidate.id > 0
     ? { kind: candidate.kind, id: candidate.id } : null
   return {
@@ -57,6 +59,10 @@ export function readMobileTrackingState(history, accessScope, source = null) {
     scopes,
     selection,
     detailEntry: Boolean(state.detailEntry && selection),
+    ...(selection && Number.isFinite(state.detailReturnScroll) && state.detailReturnScroll >= 0
+      ? { detailReturnScroll: state.detailReturnScroll } : {}),
+    ...(selection && (Number.isSafeInteger(state.journeyStep) || ['submit', 'boss_review', 'finance_review', 'revision'].includes(state.journeyStep))
+      ? { journeyStep: state.journeyStep } : {}),
   }
 }
 

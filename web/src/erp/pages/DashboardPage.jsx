@@ -22,6 +22,11 @@ import {
 } from '../components/workflow/WorkflowDashboardViews.jsx'
 import { WORKFLOW_HISTORY_PERIOD_OPTIONS } from '../utils/workflowRoleTaskHistory.mjs'
 import { DateRangeFilter } from '../components/business-list/BusinessDateInputs.jsx'
+import LinkedDocumentTasks from '../components/workflow/LinkedDocumentTasks.jsx'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
+import DocumentTaskPanel from '../components/workflow/DocumentTaskPanel.jsx'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
+import { documentTaskAccess } from '../utils/progressBoardAccess.mjs'
 import WorkflowTaskLinkDrawer from '../components/workflow/WorkflowTaskLinkDrawer.jsx'
 import WorkflowExactTaskEntry from '../components/workflow/WorkflowExactTaskEntry.jsx'
 import WorkflowTaskDiscoveryFilters from '../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
@@ -186,6 +191,7 @@ export default function DashboardPage() {
   const [materialSaving, setMaterialSaving] = useState(false)
   const materialLeaveGuardRef = useRef(null)
   const materialDraftRef = useRef(null)
+  const trackingActionDraftRef = useRef(null)
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [assignmentTarget, setAssignmentTarget] = useState()
@@ -231,7 +237,8 @@ export default function DashboardPage() {
   )
   useEffect(() => {
     materialDraftRef.current = null
-  }, [selectedTask?.id, selectedTask?.version, workflowWorkbenchScopeKey])
+    trackingActionDraftRef.current = null
+  }, [workflowWorkbenchScopeKey])
   const requestedFilters = useMemo(
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
@@ -243,13 +250,25 @@ export default function DashboardPage() {
         : requestedFilters,
     [canViewApprovalInbox, requestedFilters]
   )
+  const [documentRefresh, setDocumentRefresh] = useState(0)
+  const [documentState, setDocumentState] = useBusinessPageState('documentTasks', {})
+  const changeDocumentState = useCallback((change) => setDocumentState((current) => ({ ...current, ...change })), [setDocumentState])
+  const documentAccess = documentTaskAccess(adminProfile)
+  const canGroupTasks = documentAccess.supervise || documentAccess.roles.length > 0
+  const sourceView = searchParams.get('source_view')
+  const sourceID = Number(searchParams.get('source_id'))
+  const linkedSource = searchParams.get('view') === 'documents' && ['orders', 'production'].includes(sourceView) &&
+    Number.isSafeInteger(sourceID) && sourceID > 0 && filters.mode === 'all' && !searchParams.has('tracking')
+  const groupByDocument = (canGroupTasks || linkedSource) && filters.mode === 'all' && searchParams.get('view') === 'documents' && !searchParams.has('tracking')
   const exactTask = searchParams.get('task_id')
   const progressOrigin = location.state?.progressOrigin
-  const fromProgress = exactTask !== null && Boolean(adminProfile.id) && progressOrigin?.adminID === adminProfile.id
+  const fromProgress = !linkedSource && exactTask !== null && Boolean(adminProfile.id) && progressOrigin?.adminID === adminProfile.id
+  const progressBackLabel = progressOrigin?.fromDetail ? '返回关联任务' : '返回进度看板'
   const calendarView =
     !riskView && filters.mode === 'todo' &&
     calendarState.layout === 'calendar'
   const exceptionsView = searchParams.get('view') === 'exceptions'
+  const followupsView = searchParams.get('view') === 'followups'
   const trackingScope =
     !riskView && ['started', 'participated', 'visible'].includes(
       searchParams.get('tracking')
@@ -299,11 +318,13 @@ export default function DashboardPage() {
     scopeKey: workflowWorkbenchScopeKey,
     taskBoardRequest,
     riskRequest,
-    suspended: Boolean(trackingScope || exceptionsView),
+    suspended: Boolean(trackingScope || exceptionsView || groupByDocument),
     onBeforeTaskBoardLoad: preserveTaskBoardTransitionHeight,
   })
 
   useEffect(() => {
+    if (linkedSource) return outletContext?.registerPageRefresh?.(() => setDocumentRefresh((key) => key + 1))
+    if (groupByDocument) return undefined
     if (calendarView) return outletContext?.registerPageRefresh?.(null)
     return outletContext?.registerPageRefresh?.(() => {
       if (trackingScope || exceptionsView)
@@ -316,6 +337,7 @@ export default function DashboardPage() {
     trackingScope,
     exceptionsView,
     calendarView,
+    groupByDocument, linkedSource,
   ])
 
   useEffect(() => {
@@ -643,20 +665,22 @@ export default function DashboardPage() {
     const views = taskViewsRef.current
     if (trackingScope || exceptionsView) {
       if (trackingScope) views.tracking = trackingScope
-      views.trackingView = exceptionsView ? 'exceptions' : 'tracking'
+      views.trackingView = exceptionsView ? 'exceptions' : followupsView ? 'followups' : 'tracking'
     } else views.filters[riskView ? 'risk' : filters.mode] = filters
     if (view === 'tracking' && restoreTrackingView) view = views.trackingView
-    const isTrackingView = view === 'tracking' || view === 'exceptions'
+    const isTrackingView = ['tracking', 'followups', 'exceptions'].includes(view)
     const next = isTrackingView
       ? new URLSearchParams(searchParams)
       : writeWorkflowTaskBoardFiltersToSearch(
           searchParams,
           views.filters[view] || { mode: view === 'risk' ? 'all' : view }
         )
-    if (view === 'exceptions' || view === 'risk') next.set('view', view)
+    if (view === 'exceptions' || view === 'followups' || view === 'risk') next.set('view', view)
     else next.delete('view')
     if (isTrackingView) next.set('tracking', views.tracking)
     else next.delete('tracking')
+    next.delete('source_view')
+    next.delete('source_id')
     next.delete('track_kind')
     next.delete('track_id')
     setSearchParams(next)
@@ -742,10 +766,12 @@ export default function DashboardPage() {
 
   const openTaskDrawer = (task, mode = '') => {
     if (actionSaving) return
-    const nextMode = TASK_ACTION_META[mode] ? mode : ''
+    const saved = trackingActionDraftRef.current
+    const draft = trackingScope && saved?.id === task.id && saved.version === task.version ? saved : null
+    const nextMode = TASK_ACTION_META[mode] ? mode : draft?.mode || ''
     setSelectedTask(task)
     setActionMode(nextMode)
-    setActionReason(nextMode === 'block' ? getWorkflowTaskReason(task) : '')
+    setActionReason(draft?.mode === nextMode ? draft.reason : nextMode === 'block' ? getWorkflowTaskReason(task) : '')
     setAssignmentTarget(undefined)
     setActionReceipt(null)
   }
@@ -773,6 +799,7 @@ export default function DashboardPage() {
     setActionReason('')
     setAssignmentTarget(undefined)
     setActionReceipt(null)
+    if (linkedSource) setDocumentRefresh((key) => key + 1)
     if (fromProgress) {
       const currentIndex = window.history.state?.idx
       const delta = Number.isSafeInteger(currentIndex) && Number.isSafeInteger(progressOrigin.index) && progressOrigin.index < currentIndex
@@ -782,7 +809,7 @@ export default function DashboardPage() {
     else if (exactTask !== null) {
       const next = new URLSearchParams(searchParams)
       next.delete('task_id')
-      setSearchParams(next, { replace: true })
+      setSearchParams(next, { replace: true, state: location.state })
     }
   }
   const closeTaskDrawer = () => {
@@ -957,40 +984,74 @@ export default function DashboardPage() {
     }
   }
 
+  const groupSwitch = !linkedSource && canGroupTasks && filters.mode === 'all' && !trackingScope && !exceptionsView && !riskView ? (
+    <SlidingSegmented
+      hierarchy="secondary"
+      aria-label="全部任务查看方式"
+      value={groupByDocument ? 'documents' : 'tasks'}
+      options={[{ value: 'tasks', label: '按任务' }, { value: 'documents', label: '按单据' }]}
+      onChange={(value) => setSearchParams((current) => {
+        const next = new URLSearchParams(current)
+        if (value === 'documents') next.set('view', value)
+        else next.delete('view')
+        return next
+      })}
+    />
+  ) : null
   return (
     <section ref={taskFocusScopeRef} aria-label="任务管理" className="erp-dashboard-page erp-command-center-page">
       <PageHeaderCard
         compact
         title="任务管理"
         className="erp-task-management-header erp-task-management-scope"
-        viewSwitch={
-          <SlidingTabList
-            className="erp-task-board-scope-filter"
-            aria-label="任务范围"
-            value={
+        viewSwitch={(
+          <div className="erp-task-management-views">
+            <SlidingTabList
+              className="erp-task-board-scope-filter"
+              aria-label="任务范围"
+              value={
                   exceptionsView || trackingScope ? 'tracking' : riskView ? 'risk' : filters.mode
                 }
-            options={TASK_BOARD_SCOPE_OPTIONS.filter(
+              options={TASK_BOARD_SCOPE_OPTIONS.filter(
                   (option) =>
                     (canViewApprovalInbox || option.value !== 'approval') && (canViewRisk || option.value !== 'risk')
                 )}
-            onChange={(view) => selectTaskView(view, true)}
-          />
-            }
+              onChange={(view) => selectTaskView(view, true)}
+            />
+            {groupSwitch}
+          </div>
+        )}
       />
       <div
         className="erp-dashboard-task-board-card"
         data-page-table-region
         data-table-scroll-scope
         style={
-              !riskView && !trackingScope &&
+              !groupByDocument && !riskView && !trackingScope &&
               !exceptionsView &&
               taskBoardTransitionMinHeight > 0
                 ? { minHeight: taskBoardTransitionMinHeight }
                 : undefined
             }
       >
-        {riskView ? (
+        {linkedSource ? <LinkedDocumentTasks
+          refreshKey={documentRefresh}
+          key={`${sourceView}:${sourceID}`}
+          source={{ view: sourceView, id: sourceID, orderNo: progressOrigin?.orderNo }}
+          query={documentState.sourceQuery?.key === `${sourceView}:${sourceID}` ? documentState.sourceQuery.value : undefined}
+          onQuery={(value) => changeDocumentState({ sourceQuery: { key: `${sourceView}:${sourceID}`, value } })}
+          onOpen={(id) => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('task_id', id); return next }, { replace: true, state: location.state })}
+          onBack={() => progressOrigin?.adminID === adminProfile.id ? navigate(-1) : navigate(`/erp/business-dashboard?view=${sourceView}`, { replace: true })}
+        />
+        : groupByDocument ? <DocumentTaskPanel
+            active
+            adminProfile={adminProfile}
+            state={documentState}
+            onStateChange={changeDocumentState}
+            onOpenTask={openTaskDrawer}
+            registerRefresh={outletContext?.registerPageRefresh}
+            suspendDetails={Boolean(selectedTask)}
+        /> : riskView ? (
           <div className="erp-dashboard-block" ref={riskListRef}>
             <div data-page-table-toolbar>
               <BusinessOperationPanel
@@ -1037,14 +1098,14 @@ export default function DashboardPage() {
             ) : !trackingScope && !exceptionsView && taskBoardInitialLoading ? (
               <Card className="erp-business-data-table-card" loading />
             ) : exceptionsView || trackingScope ? (
-              <div className="erp-dashboard-block">
+              <div className={`erp-dashboard-block${exceptionsView ? '' : ' erp-workflow-tracking-workspace'}`}>
                 <Card className="erp-business-operation-panel" data-page-table-toolbar>
                   <div className="erp-task-tracking-toolbar">
                     <div className="erp-business-operation-panel__view-switch">
                       <SlidingTabList
                         className="erp-task-tracking-views"
                         aria-label="跟踪内容"
-                        value={exceptionsView ? 'exceptions' : 'tracking'}
+                        value={exceptionsView ? 'exceptions' : followupsView ? 'followups' : 'tracking'}
                         options={TRACKING_VIEW_OPTIONS}
                         onChange={selectTaskView}
                       />
@@ -1052,40 +1113,39 @@ export default function DashboardPage() {
                     <div className="erp-task-tracking-toolbar__controls" ref={setTrackingToolbarContainer} />
                   </div>
                 </Card>
-                <Card className="erp-business-data-table-card erp-work-center-results">
-                  {trackingToolbarContainer && (exceptionsView ? (
-                    <WorkflowExceptionPanel
-                      key={workflowWorkbenchScopeKey}
-                      toolbarContainer={trackingToolbarContainer}
-                      profile={adminProfile}
-                      onOpenTask={openTaskDrawer}
-                      refreshKey={trackingRefresh}
-                      initialQuery={
-                        exceptionQueryRef.current?.scope ===
-                        workflowWorkbenchScopeKey
-                          ? exceptionQueryRef.current.query
-                          : {}
+                {trackingToolbarContainer && (exceptionsView ? (
+                  <WorkflowExceptionPanel
+                    key={workflowWorkbenchScopeKey}
+                    toolbarContainer={trackingToolbarContainer}
+                    profile={adminProfile}
+                    onOpenTask={openTaskDrawer}
+                    refreshKey={trackingRefresh}
+                    initialQuery={
+                      exceptionQueryRef.current?.scope ===
+                      workflowWorkbenchScopeKey
+                        ? exceptionQueryRef.current.query
+                        : {}
+                    }
+                    onQueryChange={(query) => {
+                      exceptionQueryRef.current = {
+                        scope: workflowWorkbenchScopeKey,
+                        query,
                       }
-                      onQueryChange={(query) => {
-                        exceptionQueryRef.current = {
-                          scope: workflowWorkbenchScopeKey,
-                          query,
-                        }
-                      }}
-                    />
-                  ) : (
-                    <WorkflowTrackingPanel
-                      key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
-                      toolbarContainer={trackingToolbarContainer}
-                      scope={trackingScope}
-                      onScopeChange={selectTrackingScope}
-                      sessionKey={workflowWorkbenchScopeKey}
-                      refreshKey={trackingRefresh}
-                      onOpenTask={openTaskDrawer}
-                      taskHandlingOpen={Boolean(selectedTask)}
-                    />
-                  ))}
-                </Card>
+                    }}
+                  />
+                ) : (
+                  <WorkflowTrackingPanel
+                    key={workflowWorkbenchScopeKey}
+                    toolbarContainer={trackingToolbarContainer}
+                    scope={trackingScope}
+                    recordType={followupsView ? 'task' : 'flow'}
+                    onScopeChange={selectTrackingScope}
+                    sessionKey={workflowWorkbenchScopeKey}
+                    refreshKey={trackingRefresh}
+                    onOpenTask={openTaskDrawer}
+                    taskHandlingOpen={Boolean(selectedTask)}
+                  />
+                ))}
               </div>
             ) : (
               <div className="erp-dashboard-block">
@@ -1300,7 +1360,7 @@ export default function DashboardPage() {
       <WorkflowTaskActionDrawer
         startHandling={sharedHandlingID === selectedTask?.id}
         closeLabel={
-          fromProgress ? '返回进度看板' : exceptionsView
+          fromProgress ? progressBackLabel : groupByDocument ? '返回单据任务' : exceptionsView
             ? exceptionQueryRef.current?.query?.view === 'tasks'
               ? '返回关联待办'
               : '返回异常跟踪'
@@ -1348,6 +1408,13 @@ export default function DashboardPage() {
         actionReceipt={actionReceipt}
         actionMode={actionMode}
         actionReason={actionReason}
+        materialDraftRef={materialDraftRef}
+        trackingDraft={trackingScope && trackingActionDraftRef.current?.id === selectedTask?.id && trackingActionDraftRef.current?.version === selectedTask?.version ? trackingActionDraftRef.current : null}
+        onRememberTrackingDraft={trackingScope ? (quantity) => {
+          trackingActionDraftRef.current = selectedTask && !actionReceipt && actionMode
+            ? { id: selectedTask.id, version: selectedTask.version, mode: actionMode, reason: actionReason, quantity }
+            : null
+        } : undefined}
         actionSaving={actionSaving || materialSaving}
         actionAvailabilityLoading={actionDrawerAccess.loading}
         allowedActionModes={actionDrawerAllowedModes}

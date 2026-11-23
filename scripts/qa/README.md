@@ -176,6 +176,8 @@ DOM 断言只输出有界值：存在性用 `Boolean(container.querySelector(...
 
 ## 门禁完整性与 CI 边界
 
+### 工作台如何发起和取消检查
+
 `/__dev/quality-gates` 通过 development-only Bridge 异步调用固定的 full / strict 正式 runner。
 
 若开发服务已有合规的 loopback `DISPOSABLE_DATABASE_BASE_URL`，继续直接使用；未显式登记时，Bridge 会先核对本机 Docker 和固定 `postgres:18.6` 镜像，再由 `run-gate-with-managed-database.mjs` 为本次 operation 创建随机凭据、`127.0.0.1` 动态端口和精确标签的独立容器。
@@ -188,6 +190,8 @@ DOM 断言只输出有界值：存在性用 `Boolean(container.querySelector(...
 
 页面的最近记录保存在 ignored `output/dev-workbench/quality-gate-operations/**`，每个 profile 只保留最近 20 个已结束 operation；记录不保存日志、DSN、密码、token 或私有路径。
 
+### 本地身份与远端证据
+
 `quality-gate-catalog.mjs` 只登记门禁职责、风险、正式来源引用、证据与退出条件，当前改动映射继续复用 `affected` 真源，阶段与最终结果继续读取同一正式 receipt。
 
 dirty / clean、full / strict 和不同 environment fingerprint 不混算；少于 3 个可比样本时明确报告样本不足，不生成健康分数，也不会自动禁用或删除门禁。
@@ -195,6 +199,8 @@ dirty / clean、full / strict 和不同 environment fingerprint 不混算；少�
 GitLab CI 历史不写入上述本地 operation 目录。
 
 工作台读取当前提交对应的 GitLab Pipeline、原生测试报告摘要及各覆盖率 Job。页面只保留提交、通过/失败、总耗时、首个失败、测试计数与分类覆盖率；完整 DAG、排队、Job 性能与日志直接跳转同一 Pipeline / Job。历史 CI 链接继续保留，本地 operation 不与 GitLab 混算。
+
+### JUnit 报告与任务回执
 
 `ci-native-reports.mjs` 将同一次执行的结果交给 GitLab，不再次运行测试：Node / resource lanes 和 Web 使用 Node 原生 JUnit reporter；Web 同时采集 LCOV 并转换为仓库相对路径的 Cobertura；Go test 的 JSON 与 coverprofile 分别转换为 JUnit 和 Cobertura。Web 数值是已加载源文件的行覆盖，Go 数值是测试包语句覆盖，分别展示，不视为整仓或业务验收比例。数据库、浏览器与专项发布回执仍走原有门禁合同，JUnit 不替代零 skip、真实执行数、exact SHA 或清理读回。
 
@@ -204,6 +210,8 @@ Node JUnit 保留原生 start/result 名称对应关系，使用仓库相对文�
 
 独立工作台只读这些通用 CI 结果，服务端拒绝新建 full / strict 与本地覆盖基线；本地 Vite 入口保留诊断执行。独立端历史、取消和项目专项入口不删除。
 
+### 浏览器分片与资源时限
+
 CI 拆分采用 `90 / 120 / 40 / 20` 性能观察线：最近 5 次受保护 `main` 成功流水线中，实质工作 Job 的目标区间为 45–90 秒；中位数超过 90 秒时分析拆分，至少 3 次超过 120 秒时拆分或记录不可拆原因。新子 Job 原则上不少于 40 秒，且拆分应让关键路径至少缩短 20%；汇总 Job 不适用工作下限，但目标不超过 30 秒。
 
 该规则只触发评审，不因单次波动阻断 CI；数据库、端口、Chromium、临时目录、exact SHA、测试完整性和清理回读无法独立时不得为时长数字强拆。
@@ -211,6 +219,8 @@ CI 拆分采用 `90 / 120 / 40 / 20` 性能观察线：最近 5 次受保护 `ma
 浏览器检查等待 Web 制品、Schema 生成、PostgreSQL 升级和关键数据库检查完成后启动。Schema 生成会由 Atlas 启停 Docker 开发库，升级与关键数据库检查还包含附件集成环境的 Docker 网络创建与清理；这些动作必须先结束，防止同一 Runner 的网络变动中断 Chromium 的 loopback 请求。其余独立检查继续并行。
 
 CI 浏览器场景只执行一次，场景解析与回执校验均拒绝重试成功结果；首个失败直接使浏览器 Job 失败，并保留场景名与实际异常日志，不能先把子任务标绿再由汇总器拒绝。
+
+### Node 分组和资源敏感用例
 
 `node-test-groups.mjs` 将 scripts Node 测试显式登记为 `fast / database / browser / release / resource_sensitive`，新增 tracked 测试未登记、重复登记或路径失效都会阻断。
 
@@ -224,6 +234,8 @@ GitLab 普通 main CI 对外仍固定为 static、Node contracts、Web、Server/
 
 Bootstrap fixture 子进程保留 90 秒硬上限容纳共享 Runner 的进程调度；各场景传入的业务 marker 等待期限不变，子进程超时或启动错误单独报告并失败关闭。
 
+### Web 分片与覆盖核对
+
 Web 内部把 lint/stylelint/测试与 production build 拆为 `checks` / `build`；Server/PostgreSQL 内部拆为 `schema`、`upgrade`、`test_build` 与 `critical_postgres`，只有需要真实 PostgreSQL 的 upgrade 和 critical lane 各自持有并清理独立数据库，只有 test/build lane 消费 Chromium，只有 schema lane 执行并读回 `make data` 零漂移。
 
 所有 Node/resource/Web/Server 内部 lane 的每个 Job 都按 exact SHA、plan/range、完整清单、zero-skip 和清理读回 fan-in 为唯一 `node.json`、`web.json`、`server.json` / `resource.json`。
@@ -231,6 +243,8 @@ Web 内部把 lint/stylelint/测试与 production build 拆为 `checks` / `build
 Browser 另保留一条场景串行 lane，只读复用同一 SHA 的唯一 Web build digest，并按 pipeline/job/lane 隔离端口、Chromium、临时目录、lock 和输出；场景穷尽/互斥、取消/超时清理及 fan-in 仍只产出规范 `browser.json`。外部七类合同不变。
 
 每个可进入 Core CI 的分组 Node 测试因此恰好归属一次；客户交付文档专项仍只按 affected 或显式入口运行，不进入 Core CI。缺少、重复、额外、身份漂移或新 fixture 残留都会阻断，既存 fixture 现场不会被清理。
+
+### 测试进程与 Playwright 缓存
 
 每个 strict 阶段仍只归属一个外部分片，聚合后仍要满足完整分类执行数、零 skip、source integrity、`make data`、依赖审计和资源清理读回，不以并行代替覆盖。
 
@@ -244,6 +258,8 @@ GitLab CI 的 Playwright 运行包固定为 `playwright 1.63.0 / Chromium 153.0.
 
 Runner cache 只保存已校验的原始 ZIP，不信任已解压目录；需要 Chromium 的 job 在自己的 `output/runtime/gitlab/playwright-$CI_JOB_ID` 解压，校验可执行文件后使用，并在成功或失败时精确清理。不得回退到普通 job 的 live `playwright install`、备用 URL、浮动版本或未校验缓存。
 
+### 固定提交、失败重试与外部服务
+
 本地 clean 提交需要 exact-SHA 终态时，只使用上表的受管命令；`--exact-sha` 只接受 40 位小写 SHA，`--main-ref` 只接受 `HEAD`，不能混入 full / strict 或任意命令参数。包装器只负责一次性数据库和进程清理，`exact-sha-gate.mjs` 仍是 terminal / receipt 的唯一真源。
 
 失败终态是该 SHA 与 fingerprint 的最终证据，不得删除、覆盖或重试；修复必须产生新提交和新 SHA 后再运行。
@@ -255,6 +271,8 @@ Runner cache 只保存已校验的原始 ZIP，不信任已解压目录；需要
 Server 阶段在唯一临时数据库中从历史 checkpoint 装载合成存量行，验证 055504 / 055825 两项只读 blocker、克重 kg→g 非空/NULL 存量转换和 latest pending=0；关键 PostgreSQL 矩阵使用同一 GitLab Server 分片中的另一座唯一临时库，完成 migration、测试和 fail-closed 清理，不复用固定开发测试库。
 
 Server 阶段还启用真实 Chromium PDF 安全集成，本机自动发现 Chrome/Chromium，CI 则传入本 job 从已校验运行包解压出的精确可执行路径。安全集成未执行会以 Go skip 阻断 full。
+
+### PostgreSQL 回归与存量审计
 
 fast / full 的固定 Node 与 Go 测试除子进程退出码外，还要求可解析结果、实际执行数大于 0、失败数与跳过数均为 0；缺 summary、零执行或 skip 一律阻断。
 
@@ -268,6 +286,8 @@ GitLab CI 的 Web / Server 测试仍在进程内解析完整 TAP / Go JSON，但
 
 直接运行 full / strict 时，任何 `SKIP_*`、`STRICT_SKIP_*` 或调用者提供的旧 coverage 变量都会得到 `incomplete` 并失败；full 始终真实执行 secrets 与 govulncheck，不接受普通调用者自签 JSON 作为前序成功证明。
 
+### 推送前检查范围与回执
+
 默认单一 `origin/main` 的实际推送地址匹配[项目 GitLab 入口](../lib/gitlab-project.mjs)时，普通 `prepare-push` 签发 `server-ci` 回执：保留聚合范围风险计划、数据库 guard、remote URL、live checks 和 gate-tree 指纹，执行 git-log、严格 secrets 和下述定向 Node 检查。
 
 pre-push hook 在连接后按真实 stdin 重算回执身份与检查清单，再执行 git-log / secrets；同一有效回执覆盖的定向测试不重复运行。其他 remote/ref、多 ref 与显式 `--full` 保持 affected/full 保守合同。
@@ -279,6 +299,8 @@ pre-push hook 在连接后按真实 stdin 重算回执身份与检查清单，�
 此入口不执行数据库、浏览器、发布或资源敏感分组，不扩大到全部 Web 测试、构建或业务浏览器。检查最多 4 个文件并发，macOS 仍由原生保护固定为单并发；整批截止时间按每个选中文件 2 秒计算，最短 120 秒、最长 300 秒。超时中止本次检查进程组并失败，不自动重试或放行。缺 summary、零执行、失败、skip 或前后源码 / 环境 / 远端范围漂移均不签发回执。清单、并发和截止时间绑定计划、签名与 gate-tree 合同，旧合同回执不能覆盖新增检查。
 
 同一次 `prepare-push` 的远端 ref 读回每次尝试都受 20 秒硬超时约束，只对明确的超时、断连、拒绝连接、网络不可达和临时 DNS 失败做最多两次短间隔重试；权限、仓库、ref、响应合同及其他错误立即失败。三次尝试仍不可读时形成该次调用的终态失败，不补跑同一 SHA 的 affected/full，也不得绕过 pre-push hook。
+
+### 开发、候选和发布证据
 
 开发阶段只跑 affected、同名测试和受影响单链浏览器。用户明确授权推送但未指定远端时，只准备并推送 GitLab `origin/main`；GitHub `main` 只接受 GitLab protected-main 的同 SHA mirror，不从本地直接更新，也不运行仓库 CI。
 
@@ -338,12 +360,12 @@ node scripts/qa/business-chain-rule-check.mjs --chain purchase_to_inventory
 node scripts/qa/business-chain-rule-check.mjs --chain purchase_to_inventory --run
 ```
 
-每个命令按精确包名与顶层测试名核对 run / pass / fail / skip 和父终态；源码前后指纹变化、零执行、缺用例、异常退出或跳过均失败。每轮独立写入 `output/qa/business-chain-audit/<batch>/`，保留 `report.json`、冻结图定义、`go-test.json`、`test-results.json`、命令退出结果及 SHA-256 清单，现有工作台按批次只读展示。该入口不连接共享业务库，也不代跑 PostgreSQL / 浏览器门禁；单层通过的交接仍标为未证明，完整链路、真实数据库和客户验收证据分别取得。运行及输出上限固定，后台不驻留；未登记具名规则的动作阻断业务链目录构建。
-
-工作台的“运行本链规则检查”经现有固定 QA 接口提交 `chain-rules` 与 `chainKey`，与其他 QA 共用互斥和操作回执；同一幂等标识不能改为另一条链。服务端从正式目录选测，并用 `--batch rules-<operation-id>` 固定输出批次，不覆盖旧批次。进程退出成功后仍须读回摘要清单、非零具名执行数和完整工作区身份，才能标记该次后端规则检查通过；链路报告里的未执行层级继续保持未证明。
-
-历史数据库报告按原登记集校验计数与唯一标识；当前报告必须覆盖当前全部登记项。历史中缺少当前新增用例时显示未验证，不补造通过，也不把合法历史记录误报为损坏。
-
+| 核对项目 | 通过条件或去向 |
+| --- | --- |
+| 选测与执行 | 目录按正式链路关联具名规则。按精确包名和顶层测试名检查 run / pass / fail / skip 与父终态。源码指纹变化、零执行、缺用例、异常退出或跳过均失败。未登记的动作阻断目录构建。 |
+| 工作台提交 | 固定 QA 接口使用 `chain-rules` 与 `chainKey`，共用互斥、幂等及操作回执。服务端从正式目录选测，输出 `--batch rules-<operation-id>`，每批独立。 |
+| 结果与附件 | 进程成功后读回摘要、非零具名执行数及工作区身份。报告位于 `output/qa/business-chain-audit/<batch>/`，含 `report.json`、冻结图定义、`go-test.json`、`test-results.json`、退出结果和 SHA-256 清单。 |
+| 证据范围 | 只运行关联的后端单元 / SQLite 合同测试，使用固定运行及输出上限。PostgreSQL、浏览器和客户验收分别取证。历史数据库报告按原登记集核对计数及唯一标识，新增项显示未验证。当前报告须覆盖当前登记集。 |
 
 采购链 PostgreSQL 与桌面岗位实测使用同一隔离运行器：
 
@@ -389,6 +411,8 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 
 该范围再执行 8 个独立案例：现有成品预留与释放、销售及采购审批拒绝、人工采购与 IQC 纠正、普通委外回货及应付、出货财务拒绝与已出货撤销、首款退款及部分核销 / 冲正 / 红冲、超领批准额度与后续实际领料、生产异常拒绝 / 取消及报废。每个已登记交接须有本轮请求和来源读回，不能拼接历史批次；执行后复查原两单仍结清。补充财务及出货所需期初成品经受控库存调整与独立审批构造，不作为生产完工证据。拒绝、冲正和反向红冲按预期恢复余额或终止，不能统一套用“全部结清”。
 
+### 选择交易批次与输出目录
+
 完整批次输出到 `output/qa/business-chain-audit/fulfillment-branches-e2e-<run>/`，复用同一报告页、源码冻结、迁移、PostgreSQL、日志 / Trace、时间预算与资源清理。它证明所列 68 个交接的具体案例，不等于所有权限、参数、工艺、并发、手机、打印、开票或客户验收都已覆盖。普通委外按实际合同先回货过账，再创建质检草稿，提交检验时冻结批次，合格后解除冻结且不重复入账；原始红冲记录保留，通过新增反向记录恢复余额。
 
 `--production-recovery` 定向验证生产跨链领料与短关闭补排：仓库分别先过账普通领料、先过账委外发料，另一条链超额时页面须明确拒绝且库存不变；通过正式 API 冲正后，再由浏览器重试过账。PMC 分别关闭零完工和部分完工的生产单，按释放数量创建并发布补排单，回读新在制批次；超额补排不得落库。部分完工前置沿用真实生产、工序质检与入库页面，其他模拟来源与排产待办通过现有正式 API 准备。该范围保留运行身份、真实代理、PostgreSQL、日志关联与资源清理门禁，截图为 1920×1080 视口、DPR 2；不代表手机、其他交易分支或客户签收。
@@ -397,9 +421,13 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 
 `--receiving` 单独选择第 5/6 环节到货点数与材料入库、采购退货异常分支，以及第 8/9 环节相关的委外回货质检；覆盖桌面和手机真实页面、分包差异、权限拒绝、响应丢失重试、退货冲正和复检证据，同样运行 PostgreSQL 与日志 / Trace 门禁，不代表其他浏览器或打印链路通过。默认范围保留原交易与打印链路，并追加源单和到货退货质检验证。
 
+### 浏览器和业务夹具的前置条件
+
 使用仓库锁定的 Node、已安装的 Web 依赖与 Chromium、本机 Go / Atlas / psql，以及已缓存的 `postgres:18.6` 和 `chrislusf/seaweedfs:4.46`；不自动拉取镜像。数据库运行身份与前端代理的认证读回均通过后，才操作页面；正常请求使用 Vite 的真实代理，故障注入仅在后端已成功处理后丢弃响应，不伪造业务返回。
 
 业务夹具走正式 seed、API、审批与岗位范围设置，数据库查询使用只读会话。
+
+### 按分支诊断桌面交易
 
 `--desktop-variants` 定向验证电脑端采购及委外合同预付款、车缝 / 手工委外执行和皮套不合格处置；委外分支同时验证手机任务内的工序办理。它复用相同的隔离资源、运行身份、认证代理、PostgreSQL 与日志门禁，浏览器上限 8 分钟、整个隔离运行上限 15 分钟。完整 PostgreSQL 家族含 HTTP 接入用例，单阶段上限 10 分钟；整轮硬上限仍生效。
 
@@ -411,9 +439,13 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 
  生产异常详情的正常取消必须匹配精确只读接口、请求、执行上下文与最新读取生命周期；独立负例要求无来源 `ERR_ABORTED` 显示错误并经真实刷新恢复，写请求、HTTP错误或无效来源仍失败。上游已确认合同和模拟厂商通过正式 API 准备，受测业务动作由真实页面发起；不将夹具准备描述为客户事实或浏览器验收。
 
+### 执行时限与辅助端口
+
 完整范围主交易批次上限为 12 分钟，整个隔离运行上限为 25 分钟；接单或到货窄范围分别保持 8 分钟批次与 15 分钟总上限。预算覆盖真实任务入口、来源权限读取、业务办理与截图等步骤，不改变任何单步业务等待、数量 / 账本 / 权限断言或失败清理；实际预算记录在 `lifecycle.json.budget`，超时仍使整轮失败。
 
  前端辅助端口在实际启动前分配；后端和 Vite 均复用平台端口表回读本轮确切 PID 的监听端口，再校验认证代理身份；macOS 使用既有原生 socket 表，读取异常或出现其他 PID 仍使运行失败。其他进程页面可达不能作为本轮服务就绪证据。
+
+### 来源单编制与审批证据
 
 接单、采购和委外通过 `transaction-source-orders-browser.mjs` 验证：浏览器打开真实草稿后，另一次正式保存造成版本冲突，页面保留未保存内容且不得覆盖；真实保存和流程提交成功后丢弃响应，再核对数据库唯一结果及重新打开后的回显。
 
@@ -422,6 +454,8 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 证据保存在 `browser/source-orders/**`，对应 PostgreSQL 聚合中途失败、事务回滚与原版本重试测试纳入现有 `TestSourceDocumentPostgres` 门禁。
 
 来源单据编制、工程用料准备和重提在电脑执行，手机样本先确认没有来源编制入口；报告区分编制端与审批端。用料审批覆盖两端的老板退回必填原因、审批顺序与越权拒绝，过期来源和重提仍执行正式后端守卫；财务审批真实成功后丢弃响应，重开与重放只能读到唯一生成的采购单。采购单必须关联该用料汇总及供应商，材料、单位和数量与审核结果一致，单价与金额保持待采购填写。响应丢失的保存、提交和财务审批请求同样必须匹配唯一的完成日志及 Trace，不因浏览器未收到响应而漏验。
+
+### 采购入库、质检和退货
 
 真实 PDF 验证要求本机 `pdfinfo`、`pdffonts` 和 `pdftotext`，默认范围在启动隔离资源前检查工具。文本型业务夹具的每一页都必须非空，同时核对 A4、字体嵌入、中文提取及编辑控件隔离；下载和全文有内容不能代替逐页检查。`--source-orders`、`--receiving` 和 `--desktop-variants` 不执行打印，不要求这三个工具。
 
@@ -433,6 +467,8 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 
 分包收货的点数、逐行质检和部分入库按两端分别办理；拒收处置与后续补价从电脑执行，应付金额通过正式 API 与数据库读回核对。报告显式标记这三项操作的端和证据类型，仍须逐项验证未入库数量、冻结到货快照、补价重试与唯一应付金额。
 
+### 生产、出货和收付款
+
 生产与出货另以独立 SKU 验证 PMC 创建发布、仓库委外发料、裁片回仓及检验、车缝及皮套检验、手工完工、仓库正式成品入库、成品 / 针检 / 抽检、业务确认包材、仓库包装、出货财务审批、实际出货和撤销恢复。正式入库后依次核对待检、待包装和可发货数量；待检时移交包装必须被拒绝，工序与质检重放不得重复扣料或入库，财务放行不得提前出库。
 
 生产计划统一由电脑编制和发布；手机场景先核对任务中没有跨单据新建生产计划入口，再使用该计划完成现场工序与质检。报告明确计划准备端和后续工序实际办理端。
@@ -443,11 +479,15 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 
 样品、工程用料审批、加工合同和模拟来源跟进任务通过正式 API 准备，生产和出货主动作由浏览器完成。每个采购场景使用独立材料，并保留正式单位、库存分类、默认仓库及供应商关系，避免桌面与手机样本互相改写供应商绑定。编制草稿不计为手机现场办理；实际出货进入后端生成的出货任务。应收结算链路仍通过盘点与出货 API 独立准备来源，避免与生产回归共享库存。
 
+### 字段证据与来源追溯
+
 字段核对复用同一隔离环境：先检查生成数据字典零漂移，再保存真实 PostgreSQL 的应用表、列、约束和索引，并逐列比对生成字典的列名、物理类型和可空性。普通 Ent `Size` / `MaxLen` 不等于数据库 `varchar(n)`，显式数据库长度、精度和可空性必须严格匹配。
 
 应用表映射到服务端 17 环节目录；14 个关联页面和 6 个新建表单保存 DOM 表头 / 字段、盒模型及原生 3840×2160 截图（1920×1080 视口，DPR 2）。交易完成后再验证质检和收付款的默认列、开启可选列、刷新保存结果、恢复默认、详情及完整 CSV 导出。
 
 字段证据分别保存为 `browser/field-audit/**` 和 `browser/field-results/**`；机械表结构盘点不等于所有字段都已逐一做删除迁移评审。
+
+### 列表、筛选和打印的验证范围
 
 共享列表、筛选与打印由同一环境中的 `transaction-shared-surfaces-browser.mjs` 继续验证：质检类型切换与恢复默认采购来料、收款及付款方向实际请求后端，逐条匹配数据库记录与可见行，并恢复筛选。
 
@@ -457,6 +497,8 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 
 该专项在操作前后比较 17 环节所关联事实和来源表的内容摘要，确认筛选与打印未改写业务，关闭本轮创建的打印窗口；结果保存在 `browser/shared-surfaces/**`。打印服务沿用现有 Chromium 解析与请求期限，浏览器页面级的留白定位、批量选择、分页和焦点仍由相关 Style L1 场景补充，不能用 RPC fixture PDF 替代真实输出。
 
+### 设备、请求与后端日志的关联
+
 手机回归使用 Chromium 的 390×844 触摸视口，进入 `/m/:roleKey/tasks` 和正式业务办理路由，实际完成审批、处理回执和上述业务表单，并检查页面横向溢出。同一任务页切换来源时通过返回控件办理，避免重新加载恢复已关闭的聚焦表单；提交使用手机底部操作区。质检更正桌面通过页面办理，手机通过正式 API 准备复检，判定均由浏览器完成。
 
 `browser/report.json` 保存各链路、手机任务、工序和真实出货来源结果，`postgres.jsonl` 保存真实数据库测试事件，`lifecycle.json` 绑定源码身份、镜像、迁移和清理结果；共享工作区后续变化不会覆盖快照身份。它不证明手机真机 / Safari、存量数据库升级或客户验收全部完成。
@@ -464,6 +506,8 @@ node scripts/qa/transaction-browser-isolated.mjs --run --fulfillment-branches --
 请求观测复用现有服务端组件：按响应 `X-Request-Id` 核对正常、拒绝和丢失响应请求的唯一完成日志、method、code 与 outcome，并扫描本轮凭据泄漏；报告只保留关联计数与受控字段。`observability.jsonl` 保存现有 Go 日志、Trace 父子关系、异常分类、SQL 脱敏和审计 request ID 合同的实际结果。隔离服务不向共享 Jaeger 导出 Trace，不把合同测试写成目标平台已收到 Trace。
 
 浏览器待处理 RPC 以 Chromium 网络协议的开始、完成和失败事件为准，完成数量必须等于收集的业务响应数量，不把取消的读取记成业务成功。
+
+### 怎样判定读取被正常取消
 
 可解释取消的查询与作用域，以 `transaction-browser-cancellation.mjs` 的 `readOwners` 精确映射为准；同名测试覆盖正常取消、身份不符、真实失败和写入误判，不按方法名前缀放行。
 
@@ -475,6 +519,8 @@ Chromium 整页切换可能不发送网络终止事件，此时还必须收到�
 
 只有新地址、loader、组件卸载或方法名称均不能代替这组证据；已先失败或读完、HTTP 错误、无证据取消、未知查询和写请求仍阻断。原始事件、分类和业务响应分别保留；有界历史之外仍须逐条完成计数核对。
 
+### 取消的正反例与真实写入保护
+
 默认批次的 `transaction-request-cancellation-browser.mjs` 使用真实来源和后端响应，验证桌面新搜索取代列表 / 详情读取、文档重载，以及 390px / 320px 手机返回任务列表时释放权限读取。
 
 它另对当前页面的销售读取和手机权限读取各注入一次浏览器中断，要求报告保留唯一异常、页面显示必要提示、重试恢复且源单 / 事实内容不变；这些定向负例独立保存在 `requestCancellation.cases`，不会豁免主交易批次的异常。该脚本的合同测试拒绝缺场景、零执行、隐藏异常、未恢复或窄屏溢出的报告。
@@ -485,6 +531,8 @@ Chromium 整页切换可能不发送网络终止事件，此时还必须收到�
 
 采购脚本附带 seed 时还须显式提供同库的 `POSTGRES_DSN`。远程试用沿用登记的 manual acceptance 目标流程。
 
+### 归档与覆盖报告的输出位置
+
 数据库归档清理要求一小时内、服务器匹配的完整 inventory；执行前重新扫描当前仓库引用，扫描失败或出现引用均拒绝删除。清理工具不会仅凭旧清单的空引用执行删除。
 
 - 脱敏报告和模拟 evidence 默认写到 `output/**` 或调用方显式指定的 ignored 目录。
@@ -493,6 +541,9 @@ Chromium 整页切换可能不发送网络终止事件，此时还必须收到�
   DEV 接口分别通过固定 GET `/__dev/api/qa/coverage` 和 `/__dev/api/qa/coverage/snapshot` 读取当前工作区与隔离报告；POST 只接受固定 `collect + idempotencyKey`，拒绝调用方命令、参数、路径、环境变量、profile 和 query。
 
   访问沿用开发工作台网络及运维身份边界，执行动作另需同源与本次 DEV 会话 CSRF token。
+
+### 工作台操作身份与并发控制
+
 - 覆盖基线操作状态固定留在私有 ignored 目录 `output/dev-workbench/coverage-operations/**`；开发测试固定动作状态留在 `output/dev-workbench/testing-operations/**`。两者只公开脱敏阶段投影，不保存或返回 stdout、stderr、PID、命令、幂等 key、环境变量或凭据。
 
   同 key 重试复用同一操作，且共同使用 `output/dev-workbench/qa-execution.lock`；覆盖基线、fast、岗位巡检和字段联动同一时间只能有一项运行，避免争用仓库身份和 canonical evidence。
@@ -501,6 +552,9 @@ Chromium 整页切换可能不发送网络终止事件，此时还必须收到�
   公开 operation 不返回底层目标 / apply / 维护确认值、PID、命令、DSN 或真实路径；CLI 与页面执行器只允许登记共享开发库，使用幂等索引和跨进程排他锁，同一计划只 apply 一次，并在 apply 前重新验证准备阶段的备份文件身份。
 
   进程中断或提交结果不明确时先读回而不自动重试；非交互 prepare 的 exit 0 只表示 `ready / writes=0`，execute 读回通过才表示迁移完成。
+
+### 覆盖基线的采集与计数
+
 - baseline 采集器先冻结仓库 identity 与 `affected` 层级，使用仓库锁定的 Node 与 pnpm，先以 `node scripts/gen-error-codes.mjs --check` 证明错误码生成物无漂移，再直接用项目 Node 执行 Web native coverage，统计只包含当前仓库路径下的代码并保留 node_modules 排除，不把外部工具链或临时 fixture 计入项目覆盖率；这些过滤只影响统计，不减少测试执行。
 
   这样也避免 `pnpm test` 的 `pretest` 在采集中改写 tracked 文件。完成 Go / Web / import / field-linkage 后再次核对同一 identity 并自动聚合；字段联动 runner 也先在同目录 staging 生成 TAP 与报告，只有测试、builder 和身份复核均通过才最后提升 canonical 报告，失败时保留上一份。
@@ -515,6 +569,9 @@ Chromium 整页切换可能不发送网络终止事件，此时还必须收到�
   Go 执行数按最末级用例去重，父用例独立失败、跳过或未结束时单列；本域场景全部通过但整体 Go 基线未通过时标为受阻，场景自身的失败、缺失和跳过保留，整体门禁继续阻断。Go / Web 执行计数、业务规则、失败用例与数据库 / 浏览器场景可分别展开，支持“仅看未通过场景”。专项通过不补成完整 gate、真实前后端闭环、exact-SHA CI 或 UAT 通过；来源的范围说明必须随结果保留。
 
 Web 原生覆盖基线与 `pnpm test` 共用[源码测试入口](../../web/scripts/runUnitTests.mjs)；Linux / CI 保持 4 路文件并发，macOS 原生启动保护固定单文件并发并按共享预算排队。发现范围、产物隔离和筛选见[前端脚本说明](../../web/scripts/README.md#源码测试--unit-tests)；覆盖统计、进程检查超时及归属保护保持原合同。
+
+### 隔离归档与报告保留
+
 - 隔离归档必须显式列出项目内的 `--artifact` JSON，且全部携带相同的完整 repository identity；不能混入当前工作区身份、裸 coverage 或 `--write`。写入器与 DEV 读取器共用 `lib/coverage-report-contract.mjs` 的 schema / 身份 / 脱敏校验；归档不参与默认当前报告扫描。
 
   后续业务规则变化只维护采集器原有场景登记、中文标签和对应测试，页面按统一场景结构渲染；失败明细只保留测试标识及安全诊断，不透传原始日志。
@@ -714,6 +771,8 @@ DEV 工作台页面没有同名测试时只补 DEV route/production 边界和桌
 
 工作中心设计样例及其共享身份、图片、复制和时间展示依赖改动时，`affected` 同时选中工作台边界、样例标识约束与高权限上下文渲染测试，并提示 `dev-ui-design-work-center-explanations`、`dev-ui-design-work-center-reading` 浏览器回归。它们核对首次加载、两端切换、关联清单、示例复制与返回恢复不请求业务数据；不以无权限或页面已加载后的零请求代替完整隔离证据。
 
+### 门禁选择与完整检查
+
 `gate-profiles.mjs` 只保存 fast/full/strict 的语义层级、直接入口和可执行位合同，当前 required files 保持小而累积。下游脚本和测试是否存在由真实执行、`node-test-groups.mjs` 的唯一登记以及各领域测试发现证明，不再在 profile 中复制整条传递依赖清单。
 
 `affected` 是开发期快速反馈和非标准目标的保守执行入口；默认 `origin/main` 的 `prepare-push` 会在 clean HEAD 和真实 aggregate range 上独立重算风险，但只签发 `server-ci` 短门禁回执，不在 Mac 执行 affected/full。
@@ -721,6 +780,8 @@ DEV 工作台页面没有同名测试时只补 DEV route/production 边界和桌
 显式 `--full` 只作本地完整诊断；随后必须按准备时相同 remote/ref push，hook 复核短期回执、真实 stdin/range、clean HEAD、gate/environment/TTL，并实时运行 `git log --check` 与逐 range 严格 secrets。
 
 推送后必须由 GitLab exact-SHA 完整 CI Gate 终态成功才能发布、提升制品或进入受保护部署；目标 migration、health/smoke、备份恢复及回滚 evidence 仍独立取得。
+
+### 分片顺序与回执
 
 GitLab 的 Server lane 使用两个互斥资源组：Schema、关键 PostgreSQL 和 Go 测试/构建共享 `quality-server-heavy`，存量升级独占 `quality-server-upgrade`。
 
@@ -731,6 +792,8 @@ GitLab 的 Server lane 使用两个互斥资源组：Schema、关键 PostgreSQL 
 该顺序由 `needs` 保证，不依赖 YAML 排列或资源锁的抢占顺序。四个 Bootstrap 资源敏感分片仍在 `quality_web` 和 `quality_server` 完成后运行，避开依赖安装、构建和数据库测试的磁盘读写峰值；夹具的进程超时、短 marker deadline、身份校验与清理断言保持独立约束。
 
 浏览器回执按计划顺序保存每个场景的真实耗时和重试次数，执行日志可以采用场景目录顺序，但场景集合必须与计划完全一致且不得重复。
+
+### 运行缓存与依赖安装
 
 Runner 的 checkout 保留 `output/cache/gitlab/pnpm-store/`、`output/cache/gitlab/playwright-runtime/` 和 `output/cache/pdf-runtime/` 三类下载缓存，减少重复删除与下载；`node_modules`、Web 构建、临时运行目录、计划与回执仍由 Git 清理并按本次 SHA 重建。
 

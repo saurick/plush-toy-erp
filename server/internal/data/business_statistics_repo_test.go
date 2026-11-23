@@ -53,6 +53,9 @@ func assertStatisticsDelivery(t *testing.T, data *Data, client *ent.Client, keyw
 	if board.Total != 3 || len(board.Groups) != 1 || board.Totals.Count != 3 || board.Totals.Done != 1 || board.Totals.Pending != 1 || board.Totals.Closed != 1 || board.Totals.Overdue != 1 || board.Totals.Amount == nil || *board.Totals.Amount != "300.03" || *board.Totals.ShippedAmount != "80.01" {
 		t.Fatalf("board=%+v metrics=%+v amount=%v shipped=%v", board, board.Totals, board.Totals.Amount, board.Totals.ShippedAmount)
 	}
+	if v := board.Totals.Quantities; v == nil || v.Unit != "" || v.Ordered != nil || v.Shipped != nil || v.Remaining != nil {
+		t.Fatalf("cannot aggregate across units: %+v", v)
+	}
 	q.Status = "overdue"
 	board, err = uc.Board(ctx, q)
 	if err != nil || board.Totals.Count != 1 || board.Counts.Count != 3 {
@@ -71,6 +74,9 @@ func assertStatisticsDelivery(t *testing.T, data *Data, client *ent.Client, keyw
 		t.Fatalf("products=%+v %v", board, err)
 	}
 	q.GroupKey = board.Groups[0].Key
+	if v := board.Groups[0].Quantities; v == nil || v.Ordered == nil || *v.Ordered != "30" || v.Shipped == nil || *v.Shipped != "10" || v.Remaining == nil || *v.Remaining != "10" {
+		t.Fatalf("incorrect product quantities: %+v", v)
+	}
 	q.Limit = 100
 	sources, err = uc.Sources(ctx, q)
 	if err != nil || sources.Total != board.Groups[0].Count || len(sources.Rows) != 3 {

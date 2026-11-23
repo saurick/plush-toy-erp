@@ -363,3 +363,24 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsAllTodoPage(t *testing.T) 
 		t.Fatalf("invalid all page projection: %+v", lanes)
 	}
 }
+
+func TestWorkflowProgressRoleScopeAndDocumentResponse(t *testing.T) {
+	snapshot := time.Unix(1792670400, 0).UTC()
+	repo := &recordingWorkflowTaskBoardJSONRPCRepo{result: &biz.WorkflowTaskBoard{SnapshotAt: snapshot, Progress: &biz.WorkflowProgressPage{Counts: map[string]int{"open": 0, "exception": 0, "due": 0, "unassigned": 0, "finished": 0}}}}
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard)), workflowUC: biz.NewWorkflowUsecase(repo), adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead)}}
+	for _, role := range []string{"sales", "", "warehouse"} {
+		_, res, err := d.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_board", "role-progress", mustJSONRPCStruct(t, map[string]any{"progress_view": "open", "owner_role_key": role, "limit": 20}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if role != "warehouse" {
+			if res.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("unassigned scope %q: %v", role, res.Code)
+			}
+			continue
+		}
+		if res.Code != 0 || res.Data.AsMap()["total"] != float64(0) || repo.query.OwnerRoleKey != role {
+			t.Fatalf("own scope: %+v", res)
+		}
+	}
+}

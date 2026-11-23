@@ -59,12 +59,6 @@ function collectConsoleVisibleText(summary) {
     push(item.label)
     push(item.note)
   }
-  for (const item of summary.diffItems || []) {
-    push(item.type)
-    push(item.current)
-    push(item.incoming)
-    push(item.impact)
-  }
   return values.join('\n')
 }
 
@@ -1009,14 +1003,15 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
   assert.notEqual(unknownBoundary.label, unknownBoundary.key)
 })
 
-test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw key', async () => {
+test('devCustomerConfig: 配置字段直接显示路径和取值，技术状态使用可读文案', async () => {
   const source = (await Promise.all([
     'DevCustomerConfigPage.jsx',
-    ...['AssetsPanel.jsx', 'PreflightPanel.jsx', 'RuntimeSettings.jsx', 'ReviewEvidence.jsx', 'DiffPanel.jsx', 'OverviewPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'CustomerPackageContents.jsx', 'CustomerStrategyReview.jsx', 'CustomerExtensionRegistry.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
+    ...['AssetsPanel.jsx', 'CustomerConfigReview.jsx', 'ReviewEvidence.jsx', 'DiffPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'CustomerPackageContents.jsx', 'CustomerStrategyReview.jsx', 'CustomerExtensionRegistry.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
   ].map((name) => readFile(new URL(`../pages/${name}`, import.meta.url), 'utf8')))).join('\n')
 
-  assert.match(source, /ariaLabel="配置预检任务"/)
-  assert.match(source, /ariaLabel="配置验证方式"/)
+  assert.match(source, /ariaLabel="配置核对内容"/)
+  assert.match(source, /字段路径<\/span><code>\{row\.path\}<\/code>/u)
+  assert.match(source, /记录条件<\/span>\s+<span>\s*\{row\.conditions\.map/u)
 
   assert.doesNotMatch(source, />runtime off</)
   assert.doesNotMatch(source, />handler forbidden</)
@@ -1059,7 +1054,7 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
   assert.doesNotMatch(source, /\(item\.partyDefaultKeys \|\| \[\]\)\.join/)
   assert.match(
     source,
-    /配置来源：\{overview\.sourceLabel\}/u
+    /校验与来源/u
   )
   assert.doesNotMatch(source, /\{overview\.sourcePath\}/u)
   assert.doesNotMatch(source, /\{item\.sourcePath\}/)
@@ -1072,7 +1067,7 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
   assert.match(source, /template\.templateKeyLabel/)
   assert.match(source, /template\.fieldRequirementItems\.map/)
   assert.match(source, /requirement\.requirementKeyLabel/)
-  assert.match(source, /item\.partyDefaultKeysLabel/)
+  assert.match(source, /item\.buyerCompany/)
   assert.match(source, /item\.templateLabel/)
   assert.match(source, /item\.stateCountLabel/)
 })
@@ -1080,7 +1075,7 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
 test('devCustomerConfig: 主操作各有唯一入口并保留写入保护', async () => {
   const source = (await Promise.all([
     'DevCustomerConfigPage.jsx',
-    ...['AssetsPanel.jsx', 'PreflightPanel.jsx', 'DiffPanel.jsx', 'OverviewPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
+    ...['AssetsPanel.jsx', 'CustomerConfigReview.jsx', 'DiffPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
   ].map((name) => readFile(new URL(`../pages/${name}`, import.meta.url), 'utf8')))).join('\n')
   assert.match(source, /level="primary"/u)
   assert.equal(source.match(/onClick=\{onRunDryRun\}/gu)?.length, 1)
@@ -1098,9 +1093,11 @@ test('devCustomerConfig: 视图、子任务和证据批次 query 恢复唯一值
   const { resolveCustomerConfigLocation } = await import('../pages/customer-config/navigation.mjs')
   const value = resolveCustomerConfigLocation('customer=yoyoosun&view=import&action=test-apply&section=flow&release=a&release=b')
   assert.equal(value.canonicalSearch, 'customer=yoyoosun&view=import&action=test-apply')
-  assert.equal(value.activeImportAction, 'test-apply')
-  assert.equal(resolveCustomerConfigLocation('customer=invalid&view=assets').canonicalSearch, 'customer=invalid&view=assets')
-  assert.equal(resolveCustomerConfigLocation('view=diff&view=assets&section=flow').activeView, 'overview')
+  assert.equal(value.activeTask, 'validation')
+  assert.equal(value.focusTestApply, true)
+  assert.equal(resolveCustomerConfigLocation('customer=invalid&view=assets').canonicalSearch, 'customer=invalid&detail=preview')
+  assert.equal(resolveCustomerConfigLocation('view=diff&view=assets&section=flow').activeTask, 'review')
+  assert.equal(resolveCustomerConfigLocation('view=preflight&section=evidence').activeDetail, 'evidence')
 })
 
 test('devCustomerConfig: 打印模板字段只读进入客户配置控制台', () => {
@@ -1264,6 +1261,8 @@ test('devCustomerConfig: 列表字段取值区分覆盖、恢复默认和无效�
     ['显示', '目录默认']
   )
   assert.equal(fieldIn([{ ...override, visible: 'false' }]).candidateLabel, '待校验')
+  assert.equal(fieldIn([{ ...override, visible: 'false' }]).candidateVisible, undefined)
+  assert.equal(fieldIn([{ ...override, reason: { unexpected: true } }]).reason, '')
   assert.equal(fieldIn([override, { ...override, visible: true }]).candidateLabel, '待校验')
 })
 
@@ -1407,17 +1406,6 @@ test('devCustomerConfig: 配置包预检控制台区分本地测试应用与正�
   assert(
     summary.validationChecks.some(
       (item) => item.key === 'print-template-boundary'
-    )
-  )
-  assert(
-    summary.diffItems.every((item) =>
-      [
-        'runtime_frontend_only',
-        'draft_only',
-        'preview_only',
-        'report_gate_only',
-        'source_grounded',
-      ].includes(item.status)
     )
   )
   assert.deepEqual(

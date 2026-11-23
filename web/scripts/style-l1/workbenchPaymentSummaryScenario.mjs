@@ -96,6 +96,7 @@ export function workbenchPaymentSummaryScenario(session) {
       const selector = (label) => region.locator('.ant-select').filter({ has: page.getByRole('combobox', { name: label }) })
       const type = selector('汇总类型')
       const period = region.getByRole('button', { name: /^统计期间：/u })
+      const periodControl = filters.locator('.erp-filter-date-control')
       const select = async (control, option) => {
         await control.locator('.ant-select-selector').click()
         await page.locator('.ant-select-dropdown:visible .ant-select-item-option-content').getByText(option, { exact: true }).click()
@@ -222,7 +223,7 @@ export function workbenchPaymentSummaryScenario(session) {
         return { shape: node.closest('[data-icon]').getAttribute('data-icon'), width, height, color: getComputedStyle(node).color }
       })
       assert.deepEqual(await iconStyle(restoreMonth.locator('svg')), await iconStyle(type.locator('.ant-select-clear svg')), '期间与汇总类型下拉使用同一清除图标')
-      const beforeReset = await period.boundingBox()
+      const beforeReset = await periodControl.boundingBox()
       const beforeResetCalls = calls.length
       await restoreMonth.hover()
       await expect(page.getByRole('tooltip', { name: '恢复本月', exact: true })).toBeVisible()
@@ -234,8 +235,12 @@ export function workbenchPaymentSummaryScenario(session) {
       await expect(currencyRow('CNY')).toHaveText(['CNY', '31.25', '23', '10.023456', '1'])
       assertSummaryCall(monthStart, today)
       assert.equal(calls.length, beforeResetCalls + 1, '恢复本月只发出一次汇总请求')
-      const afterReset = await period.boundingBox()
-      assert(Object.keys(beforeReset).every((key) => Math.abs(beforeReset[key] - afterReset[key]) <= 1), '快速恢复保持日期入口位置与尺寸')
+      const afterReset = await periodControl.boundingBox()
+      assert(beforeReset && afterReset && Object.keys(beforeReset).every((key) => Math.abs(beforeReset[key] - afterReset[key]) <= 1),
+        `快速恢复保持整组日期控件位置与尺寸：${JSON.stringify({ beforeReset, afterReset })}`)
+      const resetArrow = await period.locator('.erp-filter-date-trigger__arrow').boundingBox()
+      assert(resetArrow && Math.abs(afterReset.x + afterReset.width - resetArrow.x - resetArrow.width - 9) <= 1,
+        '恢复本月后箭头与日期框右边对齐')
       await choosePreset('上月')
       await expect(region.getByRole('button', { name: '查看全部历史' })).toHaveCount(0)
       await region.getByRole('button', { name: '重新加载' }).click()
@@ -275,7 +280,7 @@ export function workbenchPaymentSummaryScenario(session) {
       await expect(currencyRow('CNY')).toHaveText(['CNY', '13.00', '2', '0.00', '0'])
 
       await page.setViewportSize({ width: 320, height: 560 })
-      const controlBoxes = await Promise.all([type, period, scope()].map((control) => control.boundingBox()))
+      const controlBoxes = await Promise.all([type, periodControl, scope()].map((control) => control.boundingBox()))
       assert.ok(controlBoxes.every((box) => box && box.x >= 0 && box.x + box.width <= 320), '窄窗期间控件应完整可见')
       assert.equal(await period.locator('.erp-filter-date-trigger__value').evaluate((value) =>
         value.scrollWidth <= value.clientWidth + 1 && value.scrollHeight <= value.clientHeight + 1

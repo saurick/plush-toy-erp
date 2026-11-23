@@ -4,23 +4,20 @@ import { useSearchParams } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
 import AppSelect from '@/common/components/select/AppSelect'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
-import FilterChipGroup from '@/common/components/navigation/FilterChipGroup.jsx'
 import {
   WorkbenchFacts,
   WorkbenchSection,
-  WorkbenchToolbar,
 } from '../WorkbenchPattern.jsx'
 import { WORKFLOW_TASK_COLLABORATION_ACTIONS } from '../../../erp/utils/workflowTaskActionFlow.mjs'
-import { TASK_HANDLING_KINDS } from '../../../erp/utils/taskHandlingPolicy.mjs'
 import { workflowTaskActionInput } from '../../../erp/utils/workflowTaskActionContract.mjs'
 import { getRoleDisplayName } from '../../../erp/utils/roleKeys.mjs'
 import BusinessActionRelations from './BusinessActionRelations.jsx'
+import TaskHandlingFilters from './TaskHandlingFilters.jsx'
 
 import { PermissionCode, PermissionLabel } from '../../../common/consts/permissions.generated.mjs'
 import {
   MOBILE_HANDLING_LABELS,
   TASK_HANDLING_ROWS,
-  TASK_HANDLING_ROLE_KEYS,
   readTaskHandlingSearch,
   patchTaskHandlingSearch,
   taskHandlingActions,
@@ -181,54 +178,15 @@ export default function TaskHandlingMatrix({ businessCatalog, onOpenRules }) {
   ) : null
   const list = (
     <section className="erp-dev-task-matrix" aria-label="任务清单">
-      <WorkbenchToolbar>
-        <FilterChipGroup
-          allowClear
-          label="办理岗位"
-          aria-label="办理岗位"
-          value={role}
-          onChange={(value) => patch('role', value)}
-          options={TASK_HANDLING_ROLE_KEYS.map((key) => ({
-            value: key,
-            label: getRoleDisplayName(key),
-          }))}
-        />
-        <FilterChipGroup
-          allowClear
-          label="办理类型"
-          aria-label="办理类型"
-          value={kind}
-          onChange={(value) => patch('kind', value)}
-          options={Object.entries(TASK_HANDLING_KINDS)
-            .filter(([key]) => key !== 'automatic')
-            .map(([value, item]) => ({ value, label: item.label }))}
-        />
-        <FilterChipGroup
-          allowClear
-          label="手机支持"
-          aria-label="手机支持"
-          value={mobile}
-          onChange={(value) => patch('mobile', value)}
-          options={Object.entries(MOBILE_HANDLING_LABELS)
-            .filter(([key]) => key !== 'observe')
-            .map(([value, label]) => ({ value, label }))}
-        />
-        <Button
-          onClick={() =>
-            setParams((before) =>
-              patchTaskHandlingSearch(before, {
-                role: null,
-                kind: null,
-                mobile: null,
-                stage: null,
-                action: null,
-              })
-            )
-          }
-        >
-          重置
-        </Button>
-      </WorkbenchToolbar>
+      <TaskHandlingFilters
+        values={{ role, kind, mobile }}
+        onChange={patch}
+        onClear={() => setParams((before) => patchTaskHandlingSearch(before, {
+          role: null,
+          kind: null,
+          mobile: null,
+        }))}
+      />
       <p className="erp-dev-task-matrix__scope" role="status">
         {filtered.length} / {rows.length} 项办理 ·
         按本项办理责任筛选；可配置审批列示流程默认岗位，实际以生效配置和任务分派为准。

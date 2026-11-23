@@ -11,6 +11,7 @@ export default function FilterPopoverPanel({
   onClear,
   clearDisabled,
   onDismiss,
+  footerNote,
   children,
 }) {
   return (
@@ -37,6 +38,7 @@ export default function FilterPopoverPanel({
         {children}
       </div>
       <footer>
+        {footerNote && <p className="erp-filter-popover-panel__footer-note">{footerNote}</p>}
         <Button type="primary" onClick={onDismiss}>收起</Button>
       </footer>
     </div>

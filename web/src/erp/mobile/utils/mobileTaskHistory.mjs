@@ -141,7 +141,9 @@ export function mobileTaskHistoryChoice(value, choices, fallback) {
 export function isLinkedTaskTab(tab) {
   return [
     MOBILE_MAIN_TAB_KEYS.PROGRESS,
+    MOBILE_MAIN_TAB_KEYS.DOCUMENTS,
     MOBILE_MAIN_TAB_KEYS.TRACKING,
+    MOBILE_MAIN_TAB_KEYS.FOLLOWUPS,
     MOBILE_MAIN_TAB_KEYS.EXCEPTIONS,
   ].includes(tab)
 }

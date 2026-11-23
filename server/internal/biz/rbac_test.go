@@ -407,7 +407,7 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 			key:         "business-dashboard",
 			label:       "进度看板",
 			path:        "/erp/business-dashboard",
-			permissions: []string{PermissionWorkflowTaskRead, PermissionERPBusinessDashboardRead},
+			permissions: []string{PermissionSalesOrderRead, PermissionERPBusinessDashboardRead},
 		},
 		{
 			key:         "receivables",

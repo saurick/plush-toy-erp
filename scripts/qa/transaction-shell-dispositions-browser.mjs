@@ -84,7 +84,7 @@ export async function shellDispositionsThroughBrowser({ browser, options, client
   assert.deepEqual(originalStock, { quantity: 0, net: 0, txns: 0 });
   const { supplier: alternate } = await client.rpc('admin', 'masterdata', 'create_supplier', {
     code: `${source.prefix}-ALT`, name: `${source.prefix} 模拟接手加工厂`, supplier_type: 'outsourcing',
-    default_payment_term_days: 30, default_payment_method: 'BANK_TRANSFER',
+    default_payment_term_days: 30, default_payment_method: '银行转账',
   });
   assert.ok(alternate.is_active && alternate.id !== source.supplier.id);
   const results = [];

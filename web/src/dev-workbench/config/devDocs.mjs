@@ -1,3 +1,8 @@
+import {
+  extractMarkdownHeadings,
+  slugifyMarkdownHeading,
+} from '../../common/components/markdown/anchors.mjs'
+
 export { DEV_DOCS_ROUTE } from './devRoutes.mjs'
 
 export const DEV_DOCS_HOME_PATH = 'docs/README.md'
@@ -104,18 +109,6 @@ function normalizeGlobPath(modulePath = '') {
   return cleanPath.replace(/^\.?\//, '')
 }
 
-function titleFromMarkdown(source = '', fallbackPath = '') {
-  const match = String(source || '').match(/^#\s+(.+)$/m)
-  if (match) {
-    return stripHeadingMarkdown(match[1])
-  }
-  const filename =
-    String(fallbackPath || '')
-      .split('/')
-      .pop() || fallbackPath
-  return filename.replace(/\.md$/i, '')
-}
-
 function fallbackTitleFromPath(path = '') {
   const segments = String(path || '')
     .split('/')
@@ -127,8 +120,19 @@ function fallbackTitleFromPath(path = '') {
   return String(filename || '').replace(/\.md$/iu, '')
 }
 
-export function getDevDocsTitle(source = '', path = '') {
-  return source ? titleFromMarkdown(source, path) : fallbackTitleFromPath(path)
+export function getDevDocsTitleMetadata(source = '', path = '') {
+  if (!source) return { title: fallbackTitleFromPath(path), titleAliases: [] }
+
+  const text = String(source)
+  const match = text.match(/^#\s+(.+)$/m)
+  if (!match) return { title: filenameForPath(path).replace(/\.md$/iu, ''), titleAliases: [] }
+
+  const throughTitle = text.slice(0, match.index + match[0].length)
+  const [heading] = extractMarkdownHeadings(throughTitle, [1])
+  return {
+    title: stripHeadingMarkdown(match[1]),
+    titleAliases: heading?.aliases ?? [],
+  }
 }
 
 export function getDevDocsLifecycle(path = '') {
@@ -234,9 +238,12 @@ export function buildDevDocsItems(markdownModules = {}) {
       typeof moduleValue === 'function'
         ? moduleValue
         : moduleValue?.loadSource
+    const titleMetadata = moduleValue?.title
+      ? { title: moduleValue.title, titleAliases: moduleValue.titleAliases ?? [] }
+      : getDevDocsTitleMetadata(source, path)
     byPath.set(path, {
       key: keyForPath(path),
-      title: moduleValue?.title || getDevDocsTitle(source, path),
+      ...titleMetadata,
       filename: filenameForPath(path),
       path,
       group: groupForPath(path),
@@ -260,6 +267,20 @@ export function buildDevDocsItems(markdownModules = {}) {
       return left.group.localeCompare(right.group, 'zh-Hans-CN')
     }
     return left.path.localeCompare(right.path, 'zh-Hans-CN')
+  })
+}
+
+export function applyDevDocsSourceState(docs, sourceLoadState) {
+  return docs.map((item) => {
+    const loaded = sourceLoadState[item.path]
+    if (!loaded || loaded.loadSource !== item.loadSource) return item
+    if (loaded.status !== 'ready') return { ...item, sourceLoad: loaded }
+    return {
+      ...item,
+      sourceLoad: loaded,
+      source: loaded.source,
+      ...getDevDocsTitleMetadata(loaded.source, item.path),
+    }
   })
 }
 
@@ -406,12 +427,12 @@ export function filterDevDocsItems(
     return items
   }
 
-  return items.filter((item) =>
-    (scope === DEV_DOCS_SEARCH_SCOPE_TITLE
+  const aliasQuery = slugifyMarkdownHeading(query)
+  return items.filter((item) => {
+    const fields = scope === DEV_DOCS_SEARCH_SCOPE_TITLE
       ? [item.title]
-      : [item.title, item.path, item.group, item.searchText]
-    )
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(query))
-  )
+      : [item.title, item.path, item.group, item.source]
+    return fields.some((value) => value && String(value).toLowerCase().includes(query)) ||
+      Boolean(aliasQuery && item.titleAliases?.some((alias) => alias.toLowerCase().includes(aliasQuery)))
+  })
 }

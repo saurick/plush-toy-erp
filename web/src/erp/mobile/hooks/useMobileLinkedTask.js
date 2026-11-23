@@ -16,10 +16,11 @@ export default function useMobileLinkedTask({
     state?.scope === accessScopeKey && state?.id === taskID ? state : null
 
   const loadLinkedTask = useCallback(
-    async (id) => {
+    async (id, confirmedTask) => {
       if (!enabled || !id) return false
       const request = beginRequest('linked-task')
-      setState({ scope: accessScopeKey, id, loading: true })
+      // A successful write already returned this task. Keep its receipt mounted during the readback.
+      setState({ scope: accessScopeKey, id, loading: true, task: confirmedTask?.id === id ? confirmedTask : null })
       try {
         const task = await getWorkflowTask(id, { signal: request.signal })
         if (!request.isCurrent()) return false

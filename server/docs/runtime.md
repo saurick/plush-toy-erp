@@ -37,36 +37,35 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 
 ## HTTP 入口
 
-当前服务默认暴露以下 HTTP 能力：
+| 入口 | 用途与限制 |
+| --- | --- |
+| `/rpc/{url}` | JSON-RPC 只接受 `POST`。GET 查询参数不能传鉴权信息或调用业务方法。普通请求正文最多 2 MiB，附件入口 7 MiB。已知 `Content-Length` 或分块请求超限都在业务 handler 前返回 413，Web 代理用相同上限。 |
+| `/ping` | 探活，返回 `pong`。 |
+| `/healthz` | 检查进程健康，返回 `ok`。 |
+| `/readyz` | 检查 PostgreSQL 连通性与 PDF 启动预热，就绪返回 `ready`。 |
+| `/metrics` | 只读 Prometheus 指标，包含 Go 堆与 GC、数据库连接池、PDF 渲染占用与队列、附件表大小和估算行数。生产仅允许从回环后端端口或受控采集网络访问。 |
 
-- `/rpc/{url}`
-  - JSON-RPC HTTP 入口，只接受 `POST`；不允许用 GET query 传递鉴权参数或调用业务方法
-  - 普通请求正文最多 2 MiB，附件入口最多 7 MiB；已知 `Content-Length` 和 chunked 超限都在业务 handler 前返回 HTTP 413，Web 代理使用相同上限
-- `/ping`
-  - 最简单的探活接口，返回 `pong`
-- `/healthz`
-  - 进程级健康检查，返回 `ok`
-- `/readyz`
-  - 就绪检查，当前检查 PostgreSQL 连通性和 PDF 启动预热状态；成功返回 `ready`
-- `/metrics`
-  - 只读 Prometheus 文本指标，包含 Go 堆/GC、数据库连接池、PDF 渲染占用与排队、附件表大小和估算行数；生产环境只通过 loopback 后端端口或受控采集网络访问
-- `/templates/render-pdf`
-  - 在线 PDF 渲染入口，请求体只接受 `title`、`file_name`、`template_key`、`html`；客户 key 读取部署环境，客户端不能提交 `customer_key` 或 `base_url`
-  - 路由复用统一管理员认证 middleware；每个请求以实时 session / RBAC 和同一次 active customer revision effective session 检查打印 action 与模板 module
-  - HTML / CSS 只接受静态 allowlist、文档内锚点和受限内嵌位图；Chromium 禁用脚本与缓存、阻断 `data:` / `about:blank` 之外的请求，并为每次渲染创建独立 browser context
-  - 最多 32 张内嵌图片，单图解码后最多 5 MiB、全部图片合计最多 16 MiB；HTML 最多 24 MiB、CSS 文本合计最多 4 MiB、DOM 节点最多 20,000 个、请求体最多 32 MiB、生成 PDF 最多 32 MiB，超限在继续分配或渲染前拒绝
-  - 使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`、以非 root 用户运行且不关闭 sandbox，并精确固定经目标宿主验证的 Debian 包版本。默认并发为 4、等待名额为 2；超过 6 个已接纳请求时立即返回忙碌，不继续读取大请求体。
+### 在线 PDF 渲染 / Online PDF Rendering
 
-    `ERP_PDF_RENDER_CONCURRENCY` 和 `ERP_PDF_QUEUE_CAPACITY` 分别控制执行与等待；正式发布使用 `ERP_PDF_WARMUP=async` 异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前或失败后保持未就绪。`off` 只用于临时故障隔离，发布 smoke 仍必须用受控管理员 token 真实生成非空 PDF
-  - macOS 本地默认优先使用当前架构已安装的 Playwright `chrome-headless-shell`（选择最高下载修订号），避免 PDF 服务额外启动日常 Google Chrome 应用；没有该引擎时沿用系统 Chrome/Chromium。显式 `ERP_PDF_CHROME_PATH` 始终优先，配置无效则报错；生产 Linux 的内置引擎选择不变
-  - macOS / Linux 的 PDF 浏览器通过独立 DevTools pipe 绑定后端进程，后端异常退出或被强制结束时管道关闭，浏览器随之退出；调试 HTTP 仍只监听 loopback。正常停止会在 HTTP 请求结束后关闭浏览器，最多等待 2 秒，再按本次创建的独立进程组强制回收；不操作日常浏览器或其他服务。停止后的管理器拒绝重新启动浏览器，正常回收后移除本次临时 profile；后端被强制结束时临时目录由系统临时目录策略处理
+`/templates/render-pdf` 接收 HTML 快照并返回 PDF。每次渲染使用独立浏览器上下文，按当次账号权限和已生效的客户配置检查打印动作与模板模块。
 
-如果容器内存在静态目录，还会挂载前端静态资源：
+| 接口或资源 | 范围与限制 |
+| --- | --- |
+| 请求字段 | 仅 `title`、`file_name`、`template_key`、`html`。客户 key 取部署环境，拒绝客户端 `customer_key` 和 `base_url`。路由使用统一管理员认证及实时 session / RBAC。 |
+| 渲染内容 | 静态 HTML / CSS 白名单、文档内锚点和内嵌位图。Chromium 关闭脚本与缓存，网络请求仅允许 `data:` 和 `about:blank`。 |
+| 图片 | 最多 32 张，解码后单图最多 5 MiB，合计最多 16 MiB。 |
+| 文档 | HTML 最多 24 MiB、CSS 合计最多 4 MiB、DOM 最多 20,000 个节点。请求体和成品 PDF 各最多 32 MiB，超限在继续分配或渲染前拒绝。 |
+| 并发 | 共享 Headless Chromium，默认并发 4、排队 2。满额后直接返回忙碌，停止读取大请求体。分别由 `ERP_PDF_RENDER_CONCURRENCY` 和 `ERP_PDF_QUEUE_CAPACITY` 设置。 |
 
-- 默认读取环境变量 `STATIC_DIR`
-- 未设置时默认使用 `/app/public`
-- 健康检查路由和静态资源路由当前都已走统一观测包装，不再是裸挂 handler
-- HTTP 层已内置 `request_id` 过滤器，会优先透传 `X-Request-Id`，缺失时自动生成并回写响应头
+**启动、预热与退出**
+
+- 生产 Linux 使用内置 `/usr/bin/chromium`，固定经目标宿主验证的 Debian 版本，非 root 运行并启用 sandbox。macOS 优先用本架构已装的最高修订 Playwright `chrome-headless-shell`，缺失时用系统 Chrome/Chromium。显式 `ERP_PDF_CHROME_PATH` 优先，无效即报错。
+- 发布用 `ERP_PDF_WARMUP=async` 异步预热一次中文合同 PDF。预热未完成或失败时 `/readyz` 保持未就绪。`off` 仅用于临时隔离故障。发布冒烟需持受控管理员 token 生成非空 PDF。
+- macOS / Linux 以独立 DevTools pipe 绑定后端和浏览器，调试 HTTP 只监听 loopback。后端异常退出时管道关闭，浏览器随之退出。正常停止先等待请求结束，关闭浏览器最多等待 2 秒，再回收本次独立进程组。停止后拒绝再启动，正常回收时移除临时 profile，强制结束后的目录由系统清理。日常浏览器与其他服务独立运行。
+
+### 静态资源与请求标识
+
+容器有静态目录才挂载前端资源，先读 `STATIC_DIR`，未配置则读 `/app/public`。健康和静态资源路由都使用统一观测包装。HTTP 层透传 `X-Request-Id`，缺失时生成 `request_id` 并写回响应头。
 
 ## 启动依赖
 
@@ -148,10 +147,9 @@ go run ./cmd/backfill-workflow-source-tasks \
 
 ### 任务治理升级边界 / Task Fulfillment Upgrade
 
-本轮成品收仓改由已完成手工批次提供数量上限，包装通过 `finished_goods_receipt_id` 绑定已过账成品收仓。先记录正式库存，质量或查货包装未完成时禁止发货及普通负向挪用。旧已完成包装来源的过账收仓保持历史事实，并占用手工容量。
+| 查什么 | 从哪里看 |
+| --- | --- |
+| 成品收仓、包装及出货门禁，任务链分页与委外回货 | [接口与升级规则](api.md#任务治理升级边界--task-fulfillment-upgrade) |
+| 升级后重算来源待办 | [来源任务修复](#来源任务修复) |
 
-迁移与来源任务重算分别留痕：正式迁移前先运行只读升级审计，在真实备份的隔离恢复库升级并验证来源任务命令的 dry-run / apply / 重跑；登记共享库需对具体候选确认后才能 apply，随后运行同一候选的 `backfill-workflow-source-tasks`。修复命令不改变库存、质量判定或出货审批。客户岗位配置仍通过发布、转换检查与激活生效，不能仅凭角色 migration 宣称所有岗位菜单已更新。
-
-`workflow.get_task_handling_chain` 仅接受正整数 `task_id`，复用任务可见性和业务进度的来源关联。最多返回 100 项，优先本任务及未完成任务，并显式返回 `truncated`；关联摘要不返回 source payload、财务金额或扩大其他岗位动作权限。异常子批通过正式异常来源归入同一分支。
-
-`RECEIVE_OUTSOURCING_RETURN` 要求字符串 `quantity` 为仓库实际点数，与不可变批量一致后才整批送检。缺失、零、超精度、少收或多收失败关闭；分批回货 / 部分不良拆分尚未提供。公开直接 `REWORK` 命令已移除，质量不合格须由业务提交异常方案审批。
+迁移和待办重算分别留痕。迁移前运行只读升级审计，在真实备份的隔离恢复库升级，验证待办修复的 dry-run、apply 和重跑。登记共享库确认具体迁移候选并 apply 后，运行同一候选的 `backfill-workflow-source-tasks`。修复命令只重算待办，库存、质量判定和出货审批由原领域动作负责。客户岗位菜单以配置发布、转换检查和激活结果为准。

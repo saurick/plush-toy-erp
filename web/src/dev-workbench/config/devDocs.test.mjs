@@ -21,6 +21,7 @@ import {
   DEV_DOCS_SEARCH_SCOPE_TITLE,
   DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
   applyDevDocsPinnedState,
+  applyDevDocsSourceState,
   buildDevDocsItems,
   buildDevDocsTree,
   filterDevDocsByLifecycle,
@@ -60,16 +61,51 @@ test('devDocs: 新访客先读任务入口，目录保留路径且完整标题�
   assert.equal(normalizeDevDocsSelectedPath('README.md', docs), 'README.md')
 })
 
+test('devDocs: 同路径文档热更新后使用新正文，其他文档保留已加载的内容', () => {
+  const changingPath = 'docs/architecture/example.md'
+  const unchangedPath = 'docs/architecture/other.md'
+  const oldLoader = async () => '# 旧例子\n\n旧正文'
+  const newLoader = async () => '# 新例子\n\n新正文'
+  const otherLoader = async () => '# 另一份文档\n\n现有正文'
+  const modules = {
+    [`../../../../${changingPath}`]: { title: '新例子', loadSource: newLoader },
+    [`../../../../${unchangedPath}`]: { title: '另一份文档', loadSource: otherLoader },
+  }
+  const docs = buildDevDocsItems(modules)
+  const loaded = {
+    [changingPath]: { status: 'ready', source: '# 旧例子\n\n旧正文', loadSource: oldLoader },
+    [unchangedPath]: { status: 'ready', source: '# 另一份文档\n\n现有正文', loadSource: otherLoader },
+  }
+
+  const pending = applyDevDocsSourceState(docs, loaded)
+  assert.equal(pending.find((item) => item.path === changingPath)?.source, '')
+  assert.equal(pending.find((item) => item.path === unchangedPath)?.source, '# 另一份文档\n\n现有正文')
+  assert.equal(filterDevDocsItems(pending, '旧正文', DEV_DOCS_SEARCH_SCOPE_ALL).length, 0)
+
+  loaded[changingPath] = { status: 'ready', source: '# 新例子\n\n新正文', loadSource: newLoader }
+  const updated = applyDevDocsSourceState(docs, loaded)
+  assert.equal(filterDevDocsItems(updated, '新正文', DEV_DOCS_SEARCH_SCOPE_ALL)[0]?.path, changingPath)
+})
+
 test('devDocs: document build excludes customer input memos while retaining public documents', async (t) => {
   const declaration = devDocsPageSource.match(/const currentMarkdownModules = import\.meta\.glob\([\s\S]*?\n\)/u)?.[0]
   assert(declaration, 'the document build entry must remain inspectable')
+  const publicPath = 'docs/engineering/public.md'
+  const publicSource = [
+    '<a id="日志审计与-trace--log-audit-and-trace"></a>',
+    '# Public contract',
+    '<a id="detail-only"></a>',
+    '## Appendix',
+    'unique-body-payload-sentinel',
+    '',
+  ].join('\n\n')
   const root = await mkdtemp(path.join(tmpdir(), 'plush-docs-distribution-'))
   let server
   let httpServer
   try {
     for (const [file, source] of Object.entries({
       'web/src/dev-workbench/pages/entry.mjs': `${declaration}\nexport default currentMarkdownModules;\n`,
-      'docs/engineering/public.md': '# Public contract\n\nunique-body-payload-sentinel\n',
+      [publicPath]: publicSource,
       'docs/customers/example/甲方反馈记录.md': '# synthetic-private-memo\n',
       'docs/archive/history.md': '# Deferred archive\n',
       '.agents/skills/plush-example/SKILL.md': '# Skill contract\n\n[Detail](references/detail.md#scope)\n',
@@ -91,7 +127,7 @@ test('devDocs: document build excludes customer input memos while retaining publ
         fs: {
           allow: [
             'web',
-            'docs/engineering/public.md',
+            publicPath,
             '.agents/skills/plush-example/SKILL.md',
             '.agents/skills/plush-example/references/detail.md',
           ].map((file) => path.join(root, file)),
@@ -102,12 +138,17 @@ test('devDocs: document build excludes customer input memos while retaining publ
     const skillDocs = buildDevDocsItems(modules.default)
     assert.equal(skillDocs.find((item) => item.path === '.agents/skills/plush-example/SKILL.md')?.title, 'Skill contract')
     assert.equal(skillDocs.find((item) => item.path === '.agents/skills/plush-example/references/detail.md')?.title, 'Detail')
-    const publicDoc = modules.default['../../../../docs/engineering/public.md']
+    const publicDoc = modules.default[`../../../../${publicPath}`]
     assert.equal(publicDoc.title, 'Public contract')
     assert.equal(typeof publicDoc.loadSource, 'function')
     const items = buildDevDocsItems(modules.default)
-    assert.equal(items[0].source, '')
+    assert.equal(items.find((item) => item.path === publicPath)?.source, '')
     assert.equal(filterDevDocsItems(items, 'Public contract', DEV_DOCS_SEARCH_SCOPE_TITLE).length, 1)
+    assert.deepEqual(
+      filterDevDocsItems(items, '日志、审计与 Trace', DEV_DOCS_SEARCH_SCOPE_TITLE).map((item) => item.path),
+      [publicPath]
+    )
+    assert.equal(filterDevDocsItems(items, 'detail only', DEV_DOCS_SEARCH_SCOPE_TITLE).length, 0)
     let unavailable = true
     httpServer = createHTTPServer((request, response) => {
       if (unavailable) {
@@ -123,7 +164,12 @@ test('devDocs: document build excludes customer input memos while retaining publ
     t.mock.method(globalThis, 'fetch', (url, options) => nativeFetch(new URL(url, origin), options))
     await assert.rejects(publicDoc.loadSource(), /Document request failed/u)
     unavailable = false
-    assert.equal(await publicDoc.loadSource(), '# Public contract\n\nunique-body-payload-sentinel\n')
+    const loadedSource = await publicDoc.loadSource()
+    assert.equal(loadedSource, publicSource)
+    const loadedItems = applyDevDocsSourceState(items, {
+      [publicPath]: { status: 'ready', source: loadedSource, loadSource: publicDoc.loadSource },
+    })
+    assert.equal(filterDevDocsItems(loadedItems, '日志、审计与 Trace', DEV_DOCS_SEARCH_SCOPE_TITLE)[0]?.path, publicPath)
     const privateResponse = await fetch(`/@fs/${path.join(root, 'docs/customers/example/甲方反馈记录.md')}`)
     assert.equal(privateResponse.status, 403, 'excluded private files do not gain filesystem permission')
     assert.equal(Object.keys(modules.default).some((file) => file.endsWith('/甲方反馈记录.md')), false)
@@ -420,13 +466,13 @@ test('devDocs: 支持在全部与仅标题范围之间筛选', () => {
     {
       title: '当前真源',
       path: 'docs/当前真源与交接顺序.md',
-      searchText: 'Current Source Of Truth',
+      source: 'Current Source Of Truth',
     },
     { title: '测试策略', path: 'docs/product/自动化测试策略.md' },
     {
       title: '路线图',
       path: 'docs/product/产品完成路线图.md',
-      searchText: 'Phase V1',
+      source: 'Phase V1',
     },
   ]
 

@@ -77,16 +77,18 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [popupOpen, setPopupOpen] = useState(props.defaultOpen ?? false)
   const currentValue = controlled ? value : uncontrolledValue
+  const showSearch = hasOptionGroups ? false : props.showSearch
+  const searchValue = hasOptionGroups ? '' : props.searchValue
   const selectRef = useRef(null)
   useImperativeHandle(ref, () => selectRef.current)
   const basePrefix = prefix ?? (label && hasSelectValue(currentValue) ? <span className="app-select__label">{label}</span> : undefined)
   const explicitPopupWidth = props.popupMatchSelectWidth ?? props.dropdownMatchSelectWidth
-  const remote = props.showSearch && props.filterOption === false
+  const remote = showSearch && props.filterOption === false
   const fitPopup = Boolean(displayOptions) && !props.mode && !remote && !props.optionRender && !props.popupRender && !props.dropdownRender
   const popupWidth = useSelectPopupWidth(selectRef, {
     open: explicitPopupWidth === undefined && visible && (props.open ?? popupOpen),
     mode: props.mode,
-    showSearch: props.showSearch,
+    showSearch,
     hasIdentity: referenceLayout || identities.size > 0,
     remote,
     textOptions: fitPopup ? displayOptions : undefined,
@@ -103,6 +105,7 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
   const select = (
     <Select
       {...props}
+      {...(hasOptionGroups ? { showSearch, searchValue } : {})}
       transitionName={props.transitionName ?? ''}
       dropdownAlign={dropdownAlign}
       notFoundContent={props.loading ? (
@@ -110,9 +113,9 @@ const AppSelect = React.forwardRef((inputProps, ref) => {
       ) : typeof props.notFoundContent === 'string' ? (
         <Empty variant="compact" description={props.notFoundContent} />
       ) : props.notFoundContent === undefined ? (
-        <Empty variant="compact" description={String(props.searchValue ?? searchKeyword).trim() ? '没有匹配的选项' : '暂无可选项'} />
+        <Empty variant="compact" description={String(searchValue ?? searchKeyword).trim() ? '没有匹配的选项' : '暂无可选项'} />
       ) : props.notFoundContent}
-      onSearch={(props.showSearch ?? Boolean(props.mode)) ? (keyword) => {
+      onSearch={(showSearch ?? Boolean(props.mode)) ? (keyword) => {
         setSearchKeyword(keyword)
         props.onSearch?.(keyword)
       } : undefined}

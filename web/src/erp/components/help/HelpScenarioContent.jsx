@@ -57,7 +57,6 @@ function HelpOverview({
         <MermaidDiagram
           chart={graph.chart}
           label="业务交接与异常恢复图"
-          initialZoom={narrow ? 'fit-width' : 'fit'}
           showSourceOnError={false}
           interactiveNodes={graph.nodes}
           interactiveEdges={graph.edges}

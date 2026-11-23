@@ -1328,17 +1328,7 @@
 
 .erp-permission-toolbar {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 10px 12px;
-  border: 1px solid var(--erp-border);
-  border-radius: var(--erp-business-card-radius);
-  background: var(--erp-surface-bg);
-}
-
-.erp-permission-toolbar[hidden] {
-  display: none;
 }
 
 .erp-permission-tabs {
@@ -1349,12 +1339,7 @@
 }
 
 .erp-permission-toolbar__account {
-  flex: 1;
   min-width: 0;
-}
-
-.erp-permission-toolbar__account[hidden] {
-  display: none;
 }
 
 .erp-role-center-detail__identity .ant-typography {
@@ -1366,17 +1351,9 @@
   line-height: 1.5;
 }
 
-.erp-role-template-card__main .ant-typography {
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
 .erp-role-template-card__meta .ant-typography {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
-  line-height: 1.5;
+  margin: 0;
 }
 
 .erp-role-settings-workspace,
@@ -1423,7 +1400,7 @@
 
 
 
-.erp-permission-section.ant-card .ant-card-body {
+.erp-permission-section.ant-card > .ant-card-body {
   padding: 12px;
 }
 
@@ -1451,10 +1428,6 @@
   overflow: hidden;
 }
 
-.erp-permission-section--approvals.ant-card .ant-card-body {
-  padding: 12px;
-}
-
 .erp-approval-responsibility__header,
 .erp-approval-responsibility__actions {
   display: flex;
@@ -1463,8 +1436,12 @@
   gap: 16px;
 }
 
-.erp-approval-responsibility__header {
+.erp-approval-responsibility__toolbar {
   margin-bottom: 12px;
+}
+
+.erp-approval-responsibility__header {
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
 }
 
 .erp-approval-responsibility__header .ant-typography {
@@ -1574,76 +1551,20 @@
 }
 
 .erp-role-center-sidebar {
-  align-content: start;
-  gap: 4px;
   min-width: 0;
   border-right: 1px solid var(--erp-border);
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--erp-surface-bg);
-  display: grid;
   padding: 8px;
 }
 
-.erp-role-template-card {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--erp-text);
-  text-align: left;
-  cursor: pointer;
-  appearance: none;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease;
-  padding: 8px 12px;
-  gap: 2px;
-  min-height: 60px;
-  border: 0;
-  align-content: center;
-}
-
-@media (hover: hover) {
-  .erp-role-template-card:not(:disabled, [aria-pressed='true']):hover {
-    background: var(--erp-interactive-bg-hover);
-  }
-}
-
-.erp-role-template-card:focus-visible {
-  outline: 2px solid var(--erp-interactive-border-focus);
-  outline-offset: -2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .erp-role-template-card {
-    transition: none;
-  }
-}
-
-.erp-role-template-card--active {
-  border-color: var(--erp-border);
-  background: var(--erp-primary-softer);
-  box-shadow: none;
-}
-
-.erp-role-template-card__main,
 .erp-role-template-card__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-
-.erp-role-template-card__main {
-  justify-content: space-between;
-}
-
-.erp-role-template-card__main .ant-typography,
-.erp-role-template-card__meta .ant-typography {
-  margin: 0;
 }
 
 .erp-role-center-detail {
@@ -2121,9 +2042,4 @@
   flex: 1;
   width: auto;
   min-width: 160px;
-}
-
-.erp-role-template-card--active .erp-role-template-card__main .ant-typography {
-  color: var(--erp-primary);
-  font-weight: 600;
 }

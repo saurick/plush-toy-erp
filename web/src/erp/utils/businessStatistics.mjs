@@ -102,6 +102,11 @@ function requireMetrics(value, report, money) {
   ) {
     fail()
   }
+  if (report === 'delivery') {
+    const q = value.quantities
+    if (!q || typeof q.unit !== 'string' ||
+      ['ordered', 'shipped', 'remaining'].some((k) => !(k in q) || !isMoney(q[k]) || (!q.unit && q[k] !== null))) fail()
+  }
   if (
     report === 'delivery' &&
     (value.count !==

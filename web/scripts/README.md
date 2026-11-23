@@ -64,6 +64,8 @@ pnpm preview:yoyoosun --print-plan
 pnpm preview:yoyoosun
 ```
 
+### 只运行所需场景
+
 `STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归；`STYLE_L1_SCENARIO_MAX_ATTEMPTS` 只接受 `1` 或 `2`，CI 固定为一次；`STYLE_L1_OUTPUT_DIR` 只接受仓库 `output/` 下的受管目录。
 
 `mobile-task-handling-*` 走“任务信息 → 任务办理 → 结果回执”，覆盖历史来源资料、事件回执、步骤往返、手机附件触区及零写入；`mobile-task-handling-sales-pending` 检查未办理时的回执锁定与手机办理限制。来源上下文与流程记录的模拟响应遵循当前接口合同；回执中的“来源业务当前资料”独立读取，与历史办理结论分开核对。实际提交、失败重试和回执恢复复用 `task-unified-onsite-*`、`task-unified-capture-*`，两端来源只读回归复用 `task-unified-history-*`。 `task-unified-authoring-*` 覆盖工程入口的按需打开与 BOM 保存；普通来源场景同时检查未打开工程编辑器时不查询空订单、办理页不存在读取失败占位。
@@ -71,6 +73,8 @@ pnpm preview:yoyoosun
 `business-form-corners-<module>-desktop|mobile|dark|mobile-dark` 沿用现有编辑或只读入口，逐个选择分区并检查四角、边框、标题内圆角与祖先裁切，同时保留背景、输入焦点和草稿状态。销售、采购、加工合同与出货另有 `business-form-corners-<module>-create-<appearance>`，覆盖新建空明细及目录 / 页签两种显示；普通标题带与明细编辑器标题均参与实际叠层检查，`display: contents` 因不生成布局盒不计作祖先裁切。桌面使用 1920×1080、DPR 2，手机使用 390×844、DPR 2；截图与分区几何证据保存到同一受管输出目录。完整模块和场景名以 `businessFormCornerScenarios.mjs` 与现有表单注册为准，平铺短表单不会为检查强行增加分区。
 
 默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
+
+### 宽度、压力与移动导航
 
 `STYLE_L1_BROWSER=chromium|webkit` 选择浏览器引擎，默认 `chromium`，结果 JSON 标记实际引擎。宽度不超过 600px 的场景默认启用移动设备和触摸模拟，可由场景显式覆盖。WebKit 首次运行前执行 `pnpm exec playwright install webkit`；剪贴板场景使用既有受控探针，不能据此确认 iPhone 系统剪贴板权限。
 
@@ -81,6 +85,8 @@ pnpm preview:yoyoosun
 `mobile-task-touch-refresh` 另有原生滚动、手势竞争与取消断言，只能在 Chromium 运行，WebKit 选择场景时须排除它。WebKit 桌面引擎的移动模拟不替代 iPhone Safari / Chrome 真机、软键盘、浏览器工具栏或系统文件选择器验收；两种引擎的报告分别使用不同输出目录。
 
 `mobile-input-controls-light` / `mobile-input-controls-dark` 通过现有 fixture 入口加载真实移动任务处理组件和样式，拦截流程上下文读取，验证多行输入、聚焦字号、必填提示、批准数量的六位小数和可选清空、错误后的焦点与提示关联、动作切换，以及缩小视口后的提交区。fixture 的提交仅写组件本地状态，不写业务数据库；缩小视口的结果不能替代 iPhone 软键盘实测。
+
+### 辅助端口与客户调试入口
 
 受管前端脚本的默认辅助端口按用途分开：共享真实登录 `15210`、采购合同 `15211`、委外合同 `15212`、采购入库 E2E `15213`、移动认证 `15220`、试用浏览器 `15230`、移动 Workflow `15240`，CI Browser 三条隔离 lane 使用 `15250`、`15251`、`15252`。
 
@@ -161,9 +167,11 @@ Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reaso
 
 场景名称、顺序与请求计数的生命周期保持独立；通过 `STYLE_L1_SCENARIOS` 选择受影响场景，完整运行遵循 QA 的高成本授权规则。
 
+### 共享组件与独立工作台
+
 仓储历史回归在延迟列表响应的夹具下，等待目标查询响应、实际行和关联名称显示，再连续五轮后退、前进与刷新，并输出 `inventory-history-refresh.json`。SPA 历史切换不能以文档此前的 `networkidle` 状态作为新视图完成的证据；旧文档卸载期间才发起的 fetch 即使已被捕获，WebKit 仍可能通过自动化通道报告访问控制错误。场景继续保留所有 `pageerror`、控制台错误和失败请求的检查。
 
-`business-toolbar-composition-purchase|sales|history` 核对业务内容分类与查询组合、导航持续挂载、已提交查询恢复、工具菜单及 1920 / 1366 / 820 / 390px 布局。`business-toolbar-form-entry` 检查仓储整页编辑隐藏父工具栏、返回后恢复原分类条；`business-toolbar-dynamic-options-growth` 以 30 个模拟仓库验证可搜索名单不会增加内容分类。它们与仓储分类、分栏、工作台对照、表头吸顶和历史刷新场景分别在 WebKit 与 Chromium 执行；职责说明只在交互设计中表达，不进入业务工具栏。模拟规模只证明对应界面与查询合同，不代表生产容量或业务验收。
+`business-toolbar-composition-purchase|sales|history` 核对业务工具栏、已提交查询、工具菜单及 1920 / 1366 / 820 / 390px 布局。具备内容分类的页面另核对切换、导航持续挂载和查询恢复。`business-toolbar-form-entry` 检查仓储整页编辑隐藏父工具栏、返回后恢复原分类条；`business-toolbar-dynamic-options-growth` 以 30 个模拟仓库验证可搜索名单不会增加内容分类。它们与仓储分类、分栏、工作台对照、表头吸顶和历史刷新场景分别在 WebKit 与 Chromium 执行；职责说明只在交互设计中表达，不进入业务工具栏。模拟规模只证明对应界面与查询合同，不代表生产容量或业务验收。
 
 `dev-ui-toolbar-composition`、`dev-ui-toolbar-category-growth`、`dev-ui-toolbar-data-growth` 对工作台真实组件组合样例做浅色桌面回归，分别在 Chromium / WebKit 核对四业务往返、未提交搜索、筛选 / 分页 / 选择、职责标注开关、真实详情和列设置、本地 CSV、假设分类与 30 项数据名单，以及 1920 / 1366px 下的工具栏边界。业务请求从初始导航起记录并要求为零；高权限与任务上下文隔离另由 `DevUIBusinessToolbarExample.test.mjs` 守住，不以该样例代替业务页面权限或事实写入验收。
 
@@ -172,6 +180,8 @@ Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reaso
 `help-manual-design-prototype` 同时核对客户、供应商、销售和采购的付款帮助，确认共用目录选择规则实际可读，并与 `project-manuals.mjs --check` 和完整帮助快照合同一起防止过期说明回到原型。缩窄窗口时保持阅读及目录返回可用，严格检查 WebKit 的 ResizeObserver 错误；目录重绘由下一帧合并执行，单元检查同时覆盖通知合并、隐藏与移除。
 
 独立工作台的 `test:workbench` 同时执行 `dev-ui-toolbar-composition`，核对固定构建制品中的按需加载、四业务组合、详情、列设置和本地下载；普通 Vite 验证与制品浏览器证据分别保留。
+
+### 业务列表、打印与帮助目录
 
 默认第 1 页切换库存视图时，每次操作只发起一次列表查询；`warehouse-inventory-pagination-view-reset` 另用 51 条批次核对第 2 页保持可用，切换到库存变动记录后按第 1 页读取。
 
@@ -184,6 +194,8 @@ Workflow 计划还核对老板阻塞 / 完成 / 退回、跨角色催办、reaso
 帮助目录的岗位范围由 `help-manual-role-filter-desktop-light` 覆盖，包括切岗搜索、深链恢复和手机章节选择；侧栏、模块页签、账号底部和权限边界由 `sidebarNavigationScenarios.mjs` 覆盖，试用浏览器流程通过 `businessNavigation.mjs` 沿真实导航逐页核对获准页面。
 
 移动导航在短屏下实际滚动菜单后核对底部账号位置，再恢复标准手机视口检查模块与页签跳转；导航与岗位预期按[菜单与正式入口合同](../../docs/product/菜单与正式入口合同.md)和当前配置维护。
+
+### 测试运行时与组件边界
 
 `test/reactRuntime.mjs` 为 Node 组件与 hook 行为测试提供 JSX 加载和可恢复的 DOM 环境。`createReactTestHarness(t)` 统一管理 React root、当前事件循环的刷新及测试后的卸载和环境恢复；完整页面布局、焦点几何和浏览器交互由对应 Style L1 场景验证。这些 helper 不进入产品运行时。
 
@@ -201,6 +213,8 @@ happy-dom 的文本框 computed style 会将 `none` / `hidden` 边框宽度保�
 
 场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。
 
+### 如何单跑场景并复查布局
+
 可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
 
 `global-scroll-edges-surfaces-light` / `global-scroll-edges-surfaces-dark` 通过 `test/ScrollEdgesFixture.jsx` 检查共享滚动提示的双轴边界、固定列、动态内容、缩放与嵌套裁切、弹窗／抽屉、排除区域、卸载恢复、打印和减少动态效果。
@@ -213,7 +227,7 @@ happy-dom 的文本框 computed style 会将 `none` / `hidden` 边框宽度保�
 
 `global-table-alignment-business-pages` 按正式业务模块目录逐页检查表头、单元格、列设置和复制按钮的实际对齐，并覆盖产品规格、库存批次及库存变动视图；复用 Style L1 模拟接口，输出逐页 JSON 证据。
 
-`desktop-list-sticky-*` 从正式桌面菜单和表格子视图取样，附带 1920 与 1024 CSS px 下的表格宽度、末列、对齐和横向滚动证据；专项宽度视图仅记录几何。产品基础信息的 `business-column-width-product-fit` 另验收余宽分配、窄窗及分栏、列设置和空结果恢复。
+`desktop-list-sticky-*` 遍历正式桌面菜单和表格子视图，核对可见吸顶工具栏的外层是否透明、圆角面板是否独立绘制底色和阴影，并记录 1920 与 1024 CSS px 下的表格宽度、末列、对齐和横向滚动。产品基础信息的 `business-column-width-product-fit` 另验收余宽分配、窄窗及分栏、列设置和空结果恢复。
 
 加工环节、历史记录、客户档案和岗位影响分别由 `desktop-list-sticky-processes`、`desktop-list-sticky-history`、`desktop-list-sticky-customers`、`desktop-list-sticky-permission-role-impact` 检查列宽；岗位影响在窄窗另操作表内滚动和展开恢复。
 
@@ -225,31 +239,30 @@ pnpm install
 pnpm start
 ```
 
-默认地址：`http://127.0.0.1:5175`。开发服务器会把 `http://localhost:5175` 自动规范到同一 IPv4 地址。
+本地端口由仓库根目录 `config/dev-ports.env` 管理。主入口把 `http://localhost:5175` 规范到 `http://127.0.0.1:5175`。
 
-本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供。人工终端的 `pnpm start` 固定使用 `5175`，通过同一预检后，若已有同一工作区、后端、客户配置、启动参数、开发服务代码和恢复状态的前端，会输出地址并成功退出，继续使用原服务。
+| 要做什么 | 命令 | 端口与行为 |
+| --- | --- | --- |
+| 启动主前端 | `pnpm start` | 固定 5175。预检通过且已有同工作区、后端、客户配置、参数、开发服务代码及恢复状态的实例时复用。占用不符时提示处理。 |
+| 显式重启主前端 | `pnpm restart` 或 `pnpm start:restart` | 等价于 `pnpm start --local --restart`，用于加载新配置或接管本工作区的旧 Vite。pnpm 的前后生命周期阶段直接返回，重启只执行一次。 |
+| 启动或重启客户前端 | `pnpm start:yoyoosun`。重启用 `pnpm restart:yoyoosun` 或 `pnpm start:yoyoosun --restart` | 默认 15200，可显式指定端口。启动会替换已核实的过期实例，显式重启也可替换同配置实例。固定端口均用 `strictPort`。 |
+| 停止前端 | `pnpm stop`、`pnpm stop:yoyoosun` | 指定辅助端口可用 `pnpm start:yoyoosun --stop --port 15201`。只核对进程归属，数据库故障时也可停前端。后端由自己的入口管理。[服务端入口](../../server/README.md#快速开始) |
 
-实例摘要覆盖 `web/dev-server`、Vite / 启动入口及迁移服务在进程内加载的共享脚本；文档、页面和测试变化不影响复用。其他程序、其他工作区、不同启动配置或旧服务代码的占用会明确阻断并提示重启，保持 `strictPort`，不会自动停止占用者或把主入口顺延。
+实例摘要覆盖 `web/dev-server`、Vite 启动入口与迁移服务加载的共享脚本。文档、页面及测试的变化不影响实例复用，页面和文档继续热更新。竞争失败时只允许复用同配置胜出的实例。
 
-需要重新加载主入口启动配置或接管遗留的本工作区 Vite 时运行 `pnpm restart` / `pnpm start:restart`（等价于 `pnpm start --local --restart`）。
+启动先做运行预检，客户入口另查客户配置。进程核对有超时，连续核对监听 PID、工作目录、Vite 命令和启动时间。macOS 用系统端口表定位，Linux 用 `lsof`。只向已确认的本工作区 Vite 发送 `SIGTERM`。归属不明、现场变化或端口仍占用时停止。
 
-客户辅助入口的 `pnpm start:yoyoosun` 会自动替换过期实例；`pnpm restart:yoyoosun` / `pnpm start:yoyoosun --restart` 也会重启同配置实例。两者都使用指定端口（默认 `15200`），不会顺延到新端口。
+启动、重启及复用均沿用下文浏览器页签策略。
 
-入口先完成运行预检，客户入口还检查客户配置；随后通过共享进程检查连续核对监听 PID、工作目录、Vite 命令和进程启动时间。macOS 从系统端口表定位 PID，避免全机 `lsof` 扫描；Linux 使用 `lsof` 定位监听 PID 和工作目录。逐进程检查均有超时，仅向已确认的本工作区 Vite 发送 `SIGTERM`；归属不明、现场变化或端口未释放时停止，不强制杀进程。
-
-启动竞争失败后的实例查询只允许复用同配置赢家，不触发自动替换。
-
-日常主前端重启使用 `pnpm start:restart`，`pnpm restart` 具有相同的实际行为。人工启动、重启和复用已运行服务均使用下述浏览器页签策略，不因 `--restart` 一律禁开页。pnpm 原生会执行 stop / restart / start 生命周期，启动器仅让 restart 阶段执行完整重启，其前后两个阶段立即返回，防止重复停服或退出后再次启动。
-
-`pnpm stop` 停止主前端，`pnpm stop:yoyoosun` 停止客户辅助前端；指定辅助端口可执行 `pnpm start:yoyoosun --stop --port 15201`。停止入口仅检查端口、PID、工作目录、Vite 命令和启动时间，不运行数据库预检、读取客户包或启动后端；数据库故障不阻断停止前端。
-
-前端停止后后端仍独立管理，状态与停止命令见 [服务端入口](../../server/README.md#快速开始)。
+### 启动故障与恢复入口
 
 修改迁移页服务端插件或上述启动代码后，交付前须在用户实际使用的端口显式重启并复验；页面热更新和辅助端口验证不会更新已运行进程中的 Node 模块。仅刷新浏览器不能加载这些服务端改动。
 
 本机后端未就绪时保留业务页地址与迁移恢复入口；等待与恢复行为见下文 runtime preflight 说明。恢复仍须通过完整检查，原业务请求不会自动重放。
 
 主入口和客户辅助入口在每次迁移准备、执行或后端重启请求前，都会核对本进程加载时的开发服务代码摘要。代码已变化或无法读取时，拒绝动作并提示重新启动当前前端；仍允许查看状态和访问已验证的日常业务。Vite 配置热重载不能更新该摘要，必须重新启动前端进程。`make dev_restart` 只恢复后端，不会更新仍在运行的前端开发服务。
+
+### 辅助端口与 HMR
 
 Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人工临时验证可用 `pnpm start:isolated`。辅助端口只从 `15200-15299` 中选取，终端输出实际 URL，HMR 与监听端口同步；耗尽时阻断。
 
@@ -258,6 +271,8 @@ Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人
 明确需要固定辅助端口时，设置 `ERP_VITE_PORT`；显式端口优先于自动分配。只覆盖 Vite CLI 的 `--port` 会在启动期被拒绝，避免监听端口脱离启动器选定的端口。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
 
 HMR 默认跟随浏览器加载页面模块的协议、主机和端口，因此从服务器 IP、域名或转发端口访问时无需单独配置；端口转发或反向代理须同时转发 WebSocket upgrade。需要显式覆盖时可设置 `ERP_VITE_HMR_HOST` 和 `ERP_VITE_HMR_CLIENT_PORT`；显式客户端端口仍须与 `ERP_VITE_PORT` 一致。普通和客户开发启动器只固定监听端口，不自动注入 HMR 地址。
+
+### 自动化和人工终端的浏览器行为
 
 Codex（`CODEX_THREAD_ID` / `CODEX_CI`）、CI、`NODE_ENV=test` 或 Node 测试进程启动 Vite 时，只输出服务地址，不自动打开系统浏览器；普通入口、客户入口和直接运行 Vite 共用此策略。该策略约束 CLI 与 inline config 合并后的开发和预览配置，显式 `--open` 也不能绕过自动化禁开页边界。
 
@@ -271,6 +286,8 @@ macOS 检查已运行的 Chrome、Edge、Brave、Chromium、Vivaldi 与 Safari�
 
 Windows / WSL 保留已有 Chrome、Edge、Brave 的受管复用方式：仅检查属于本项目的候选标题，再精确核对本机地址和端口；命中时激活、刷新，未命中或 UI Automation 不可用时使用系统默认新页。原生 Linux 有桌面时使用平台默认浏览器，无图形桌面时只输出地址。显式 `BROWSER=none` 或自定义 `BROWSER` 优先；不输出已有页面内容、关闭历史重复标签或修改用户窗口布局。
 
+### 启动预检与受限模式
+
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。
 
 预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。
@@ -280,6 +297,8 @@ Windows / WSL 保留已有 Chrome、Edge、Brave 的受管复用方式：仅检�
 恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。
 
 如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
+
+### 后端切换与 GitLab 只读凭据
 
 普通业务页和开发工作台均从当前工作区加载，Vite 提供热更新；固定运行制品不会截获开发页面。后端代码通过 `make dev_restart` 按需构建并生效；无编译输入变化时复用制品，数据库迁移仍须“检查并准备 → 确认执行”。辅助端口只隔离前端监听，不产生第二个日常数据库。预检或构建失败时保留已有后端，但不会将其标成最新工作区代码。
 
@@ -352,6 +371,8 @@ pnpm start:yoyoosun
 `start:yoyoosun` 固定使用 `15200`（或显式 `--port`），不会因重复启动而顺延端口；同配置服务会被复用，过期的本工作区 Vite 会经核验自动替换，其他程序或工作区占用时会报错。它保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。
 
 启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。
+
+### 本地应用的确认与读回
 
 登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition check / activate or rollback / active readback。
 

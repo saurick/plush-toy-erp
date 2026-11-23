@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { isFileServingAllowed } from 'vite'
-import { getDevDocsTitle } from './src/dev-workbench/config/devDocs.mjs'
+import { getDevDocsTitleMetadata } from './src/dev-workbench/config/devDocs.mjs'
 
 // Keep document titles searchable before the corresponding body is requested.
 export function createDevDocsMetadataPlugin() {
@@ -24,6 +24,7 @@ export function createDevDocsMetadataPlugin() {
       }
       this.addWatchFile(file)
       const source = await readFile(file, 'utf8')
+      const { title, titleAliases } = getDevDocsTitleMetadata(source, file)
       const sourceURL = build
         ? `import.meta.ROLLUP_FILE_URL_${this.emitFile({
             type: 'asset',
@@ -32,7 +33,8 @@ export function createDevDocsMetadataPlugin() {
           })}`
         : JSON.stringify(`/@fs/${file}`)
       return `export default {
-        title: ${JSON.stringify(getDevDocsTitle(source, file))},
+        title: ${JSON.stringify(title)},
+        titleAliases: ${JSON.stringify(titleAliases)},
         loadSource: async () => {
           const response = await fetch(${sourceURL});
           if (!response.ok) throw new Error('Document request failed');

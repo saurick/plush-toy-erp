@@ -4,6 +4,8 @@ const SOURCE_TYPES = Object.freeze({
   purchase_arrival: 'purchase_order',
   receipt_quality: 'quality_inspection',
   receipt_inbound: 'purchase_receipt',
+  purchase_price: 'purchase_order',
+  receipt_payable: 'purchase_receipt',
   receipt_exception: 'purchase_receipt',
   receipt_replacement: 'purchase_rejection_disposition',
   outsourcing_contract: 'outsourcing_order',
@@ -48,6 +50,12 @@ export function fulfillmentTaskEntryPath(task) {
     return ''
   }
   const path = String(payload.entry_path || '')
+  if (kind === 'receipt_payable' && path.startsWith('/erp/finance/payables?')) {
+    const url = new URL(path, 'https://erp.invalid')
+    const factID = Number(url.searchParams.get('fact_id'))
+    return Number.isSafeInteger(factID) && factID > 0 &&
+      path === `/erp/finance/payables?source_type=PURCHASE_RECEIPT&source_id=${id}&fact_id=${factID}` ? path : ''
+  }
   if (kind === 'receipt_exception') {
     return path ===
       `/erp/production/quality-inspections?purchase_receipt_id=${id}`

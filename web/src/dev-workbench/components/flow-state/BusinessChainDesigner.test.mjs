@@ -27,15 +27,14 @@ test('部分载入的视图切换颗粒度只改显示，保留关系、手动�
   const { default: Designer } = await import('./BusinessChainDesigner.jsx')
   const { buildBusinessChainDesignLibrary } = await import('../../config/devBusinessChainDesign.mjs')
   const source = buildBusinessChainDesignLibrary(catalog).nodes.find((node) => node.label === '提交委外订单')
-  const draft = { nodes: [{ id: source.id, x: -80, y: 96, manual: true }], edges: [], ideas: [] }
+  const draft = { nodes: [{ id: source.id, x: -80, y: 96, manual: true }], edges: [] }
   window.localStorage.setItem(workingKey, JSON.stringify({ draft }))
   await harness.render(h(Designer, { catalog }))
   const root = harness.container
   const working = () => JSON.parse(window.sessionStorage.getItem(workingKey)).draft
-  await harness.act(() => root.querySelector('button[data-picker="view"]').click())
-  await harness.flush()
-  for (const [label, mode] of [['全部已载入节点', 'all'], ['链路概览', 'overview'], ['业务步骤', 'mainline']]) {
-    const option = document.querySelector(`[role="dialog"][aria-label="画布视图"] input[value="${mode}"]`)
+  const group = root.querySelector('[role="radiogroup"][aria-labelledby]')
+  for (const [label, mode] of [['节点明细', 'all'], ['链路概览', 'overview'], ['业务步骤', 'mainline']]) {
+    const option = [...group.querySelectorAll('label')].find((item) => item.querySelector('strong')?.textContent === label)?.querySelector('input')
     assert(option, label)
     await harness.act(() => option.click())
     await harness.flush()
@@ -44,8 +43,6 @@ test('部分载入的视图切换颗粒度只改显示，保留关系、手动�
     assert.deepEqual(working().edges, draft.edges)
     assert.equal(working().map, undefined, '切换显示不会隐式初始化范围或载入关联内容')
   }
-  await harness.act(() => document.querySelector('button[aria-label="关闭视图面板"]').click())
-  await harness.flush()
   const undo = (await openActions(harness)).find((node) => node.textContent === '撤销')
   assert(undo)
   assert.equal(undo.getAttribute('aria-disabled'), 'true', '显示切换不占编辑历史')
@@ -85,7 +82,7 @@ for (const layout of ['lanes', 'flow']) {
     assert.deepEqual(lanes(), expectedLanes, '展开步骤后遵循所选布局')
     const expanded = positions()
     const scope = root.querySelector('[aria-label="当前探索范围"]')
-    assert.match(scope.textContent, /19 步/)
+    assert.match(scope.textContent, /14 步/)
     assert.equal(root.querySelector('[data-design-node^="map:"]') !== null, false)
     await click('用途与交接')
     assert.match(root.querySelector('.erp-chain-design__card').textContent, /从什么开始/)
@@ -284,7 +281,7 @@ test('节点库分组筛选即时生效，来源链路联动全库，清空保�
     document.activeElement === findButton(root, '筛选业务节点 · 岗位任务 · 业务领域：工程'),
     true
   )
-  const search = root.querySelector('input[aria-label="搜索业务节点"]')
+  const search = root.querySelector('input[aria-label="搜索链路或业务节点"]')
   await harness.act(() => {
     search.value = '工程'
     Simulate.change(search)
@@ -334,7 +331,7 @@ test('没有匹配节点时查看全部会清掉尚未提交的搜索草稿', as
     onShowResults() {},
   }, (search, results) => h('div', null, search, results)))
   const root = harness.container
-  const search = root.querySelector('input[aria-label="搜索业务节点"]')
+  const search = root.querySelector('input[aria-label="搜索链路或业务节点"]')
   await harness.act(() => {
     search.value = '尚未提交'
     Simulate.change(search)

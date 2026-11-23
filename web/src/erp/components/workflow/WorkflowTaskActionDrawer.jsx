@@ -19,6 +19,7 @@ import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
 import WorkflowFollowupDetails, { hasWorkflowFollowupDetails } from './WorkflowFollowupDetails.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import WorkflowTaskInfoCard from './WorkflowTaskInfoCard.jsx'
+import WorkflowTaskInformation, { WorkflowTaskInformationSection } from './WorkflowTaskInformation.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
 import WorkflowTaskCurrentSummary from './WorkflowTaskCurrentSummary.jsx'
 import {
@@ -157,6 +158,9 @@ export default function WorkflowTaskActionDrawer({
   collaborationPopupOpen = true,
   onCollaborationClosed,
   actionReason = '',
+  trackingDraft,
+  onRememberTrackingDraft,
+  materialDraftRef,
   actionSaving: providedActionSaving = false,
   actionAvailabilityLoading = false,
   allowedActionModes = [],
@@ -224,7 +228,8 @@ export default function WorkflowTaskActionDrawer({
     actionMode && allowedActionModeSet.has(actionMode) && !isTerminal
   )
   const materialTask = isEngineeringMaterialTask(task)
-  const hasBusinessPage = Boolean(WorkflowTaskBusinessWorkspace && resolveMobileTaskBusinessEntry(task)) && workflowTaskBusinessContract(task).containedBusiness && (!approvalTask || materialTask) && !collaborationOnly
+  const businessContract = workflowTaskBusinessContract(task)
+  const hasBusinessPage = Boolean(WorkflowTaskBusinessWorkspace && resolveMobileTaskBusinessEntry(task)) && businessContract.containedBusiness && (!approvalTask || materialTask) && !collaborationOnly
   const renderSourceAction = (materialTask && hasBusinessPage ? null : providedSourceAction) || (hasBusinessPage ? (render) => (
     <WorkflowTaskBusinessWorkspace controls={{
       device: 'desktop',
@@ -234,6 +239,7 @@ roleKey: task.owner_role_key,
       onTaskRead,
       onBack: () => selectStep('context'),
       onOpenTask: onOpenRelatedTask,
+      materialDraftRef,
       registerLeaveGuard: (guard) => { businessLeaveGuard.current = guard },
       registerReceiptAction,
       collaborationExternal: true,
@@ -275,6 +281,7 @@ roleKey: task.owner_role_key,
   const showTaskAction = activeStepKey === 'action' && !(reviewing && !collaborationOpen)
   const leaveTask = async (navigate, ...args) => {
     if (actionSaving || (businessLeaveGuard.current && !(await businessLeaveGuard.current()))) return
+    if (navigate === onReturnToTracking) onRememberTrackingDraft?.(approvedQuantity)
     navigate?.(...args)
   }
   const [sourceFooter, setSourceFooter] = React.useState(null)
@@ -358,13 +365,13 @@ roleKey: task.owner_role_key,
   React.useEffect(() => {
     if (taskIdentity === previousTaskIdentityRef.current) return
     previousTaskIdentityRef.current = taskIdentity
-    setApprovedQuantity('')
+    setApprovedQuantity(trackingDraft?.quantity || '')
     setBusinessReceipt(null)
     primaryDraftRef.current = null
     setCollaborationOpen(!collaborationPopup && workflowTaskCollaborationModes([actionMode]).includes(actionMode))
     setReviewing(false)
-    setActiveStepKey(resolveWorkflowTaskActionInitialStep(actionMode))
-  }, [actionMode, collaborationPopup, taskIdentity])
+    setActiveStepKey(resolveWorkflowTaskActionInitialStep(trackingDraft ? '' : actionMode))
+  }, [actionMode, collaborationPopup, taskIdentity, trackingDraft])
 
   React.useEffect(() => {
     if (!task) {
@@ -685,8 +692,6 @@ roleKey: task.owner_role_key,
                 id="erp-task-assignment-target"
                 value={assignmentTarget}
                 options={assignmentOptions}
-                showSearch
-                optionFilterProp="label"
                 disabled={
                             actionSaving ||
                             !canSubmitAction ||
@@ -915,7 +920,7 @@ roleKey: task.owner_role_key,
           </div>
       }
         extra={task ? <WorkflowTaskCopySummary task={taskWithSource} assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel} compact disabled={actionSaving} /> : null}
-        width={hasBusinessPage && activeStepKey === 'action' ? 'calc(100vw - 24px)' : 720}
+        width={hasBusinessPage && businessContract.editorWidth === 'workspace' && activeStepKey === 'action' ? 'calc(100vw - 24px)' : 720}
         styles={{ wrapper: { maxWidth: 'calc(100vw - 24px)' } }}
         rootClassName="erp-task-action-drawer-root"
         open={Boolean(task)}
@@ -973,17 +978,17 @@ roleKey: task.owner_role_key,
             <WorkflowTaskActionGroup label={activeStepKey === 'action' && !isTerminal ? approvalTask ? '审批办理' : task?.task_group === 'order_review' ? '评审办理' : '任务办理' : null} className="erp-task-action-drawer__footer-primary">
               {activeStepKey === 'action' && isTerminal ? <Button type="primary" onClick={() => selectStep('confirm')}>结果回执</Button> : null}
               {activeStepKey === 'confirm' ? (
-                <Button type="primary" disabled={actionSaving} onClick={() => leaveTask(onClose)}>
-                  {closeLabel}
+                <Button type="primary" disabled={actionSaving} onClick={() => leaveTask(onReturnToTracking || onClose)}>
+                  {onReturnToTracking ? '返回流程' : closeLabel}
                 </Button>
               ) : activeStepKey === 'context' && canChooseActions ? (
                 <Button
                   ref={contextActionRef}
-                  type="primary"
+                  type={!isTerminal && visibleActionModes.length ? 'primary' : 'default'}
                   disabled={actionSaving}
                   onClick={() => selectStep('action')}
                 >
-                  {isTerminal ? '查看办理资料' : '任务办理'}
+                  {!isTerminal && visibleActionModes.length ? '任务办理' : '查看办理资料'}
                 </Button>
               ) : null}
               {!isTerminal && !hasSourceAction && !reviewing && !collaborationOpen &&
@@ -1090,20 +1095,60 @@ roleKey: task.owner_role_key,
       ) : null}
         {task ? (
           <div className="erp-task-action-drawer__body" aria-busy={actionSaving}>
-            {task?.source_type === 'inventory_operation' ? <div hidden={!showTaskContext}><InventoryOperationTaskReview task={task} onReady={setReviewedInventoryID} /></div> : null}
-            <div hidden={!showTaskContext}>
-              <WorkflowTaskInfoCard
-                task={taskWithSource}
-                title={taskDisplayName}
-                titleClassName="erp-task-action-drawer__task-title"
-                status={<Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag>}
-                source={<div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} onOpen={!hasBusinessPage && canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>}
-                assigneeLabel={currentAssigneeLabel}
-                events={taskEventsState === 'ready' ? taskEvents : []}
-                businessInfo={hasWorkflowFollowupDetails(task) ? <WorkflowFollowupDetails task={task} /> : null}
-                summary={<WorkflowTaskCurrentSummary appearance="facts" task={task} roleLabel={ownerRoleLabel} assigneeLabel={currentAssigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={taskReason} contact={exceptionContact} guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''} />}
-              />
-            </div>
+            <section
+              id="erp-task-action-step-context"
+              role="tabpanel"
+              aria-labelledby="erp-task-action-step-context-tab"
+              hidden={!showTaskContext}
+              className="erp-task-action-drawer__step-panel"
+            >
+              <WorkflowTaskInformation key={taskIdentity} active={showTaskContext}>
+                <WorkflowTaskInformationSection label="概况">
+                  <WorkflowTaskInfoCard
+                    task={taskWithSource}
+                    title={taskDisplayName}
+                    titleClassName="erp-task-action-drawer__task-title"
+                    status={<Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag>}
+                    source={<div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} onOpen={!hasBusinessPage && canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>}
+                    assigneeLabel={currentAssigneeLabel}
+                    events={taskEventsState === 'ready' ? taskEvents : []}
+                    businessInfo={hasWorkflowFollowupDetails(task) ? <WorkflowFollowupDetails task={task} /> : null}
+                    summary={<WorkflowTaskCurrentSummary appearance="facts" task={task} roleLabel={ownerRoleLabel} assigneeLabel={currentAssigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={taskReason} contact={exceptionContact} guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''} />}
+                  />
+                </WorkflowTaskInformationSection>
+                <WorkflowTaskInformationSection label="单据资料">
+                  {task.source_type === 'inventory_operation' ? <InventoryOperationTaskReview task={task} onReady={setReviewedInventoryID} /> : null}
+                  <div ref={information.setHost} data-testid="workflow-task-business-information">{information.retained}</div>
+                </WorkflowTaskInformationSection>
+                <WorkflowTaskInformationSection label="流转">
+                  <WorkflowTaskHandlingChain
+                    onOpenTracking={onReturnToTracking && (() => leaveTask(onReturnToTracking))}
+                    onOpenTask={onOpenRelatedTask && ((next) => leaveTask(onOpenRelatedTask, next))}
+                    task={task}
+                    profile={profile}
+                    focused
+                    processContext={processContext}
+                    processContextState={processContextState}
+                    onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
+                  />
+                </WorkflowTaskInformationSection>
+                <WorkflowTaskInformationSection label="处理记录">
+                  <WorkflowTaskEventTrail
+                    records={taskEventRecords}
+                    className="workflow-task-info-card workflow-task-info-card--records"
+                    approvalTask={approvalTask}
+                    errorMessage={taskEventsError}
+                    events={taskEvents}
+                    state={taskEventsState}
+                    task={task}
+                    truncated={taskEventsTruncated}
+                    showResponsibility={false}
+                    compact
+                  />
+                </WorkflowTaskInformationSection>
+              </WorkflowTaskInformation>
+            </section>
+
             {activeStepKey === 'action' && !hasBusinessPage ? (
               <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
                 <div className="erp-task-copy-heading"><Title level={2} className="erp-task-action-drawer__task-title">{taskDisplayName}</Title><Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag></div>
@@ -1111,42 +1156,6 @@ roleKey: task.owner_role_key,
                 {hasActionReceipt ? <div className="erp-task-action-drawer__receipt-context"><WorkflowTaskSource task={taskWithSource} copyable={false} /><span>本次责任岗位：{ownerRoleLabel || '待确认'}</span><WorkflowTaskTiming task={task} detail compact events={taskEventsState === 'ready' ? taskEvents : []} /></div> : null}
               </section>
           ) : null}
-
-            <div hidden={!showTaskContext}><div ref={information.setHost} data-testid="workflow-task-business-information">{information.retained}</div></div>
-
-            <section className="workflow-task-info-card" hidden={!showTaskContext}>
-              <WorkflowTaskHandlingChain
-                onOpenTracking={onReturnToTracking && (() => leaveTask(onReturnToTracking))}
-                onOpenTask={onOpenRelatedTask && ((next) => leaveTask(onOpenRelatedTask, next))}
-                task={task}
-                profile={profile}
-                focused
-                processContext={processContext}
-                processContextState={processContextState}
-                onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
-              />
-            </section>
-
-            <section
-              id="erp-task-action-step-context"
-              role="tabpanel"
-              aria-labelledby="erp-task-action-step-context-tab"
-              hidden={activeStepKey !== 'context'}
-              className="erp-task-action-drawer__step-panel"
-            >
-              <WorkflowTaskEventTrail
-                records={taskEventRecords}
-                className="workflow-task-info-card workflow-task-info-card--records"
-                approvalTask={approvalTask}
-                errorMessage={taskEventsError}
-                events={taskEvents}
-                state={taskEventsState}
-                task={task}
-                truncated={taskEventsTruncated}
-                showResponsibility={false}
-                compact
-              />
-            </section>
 
             <section
               id="erp-task-action-step-action"

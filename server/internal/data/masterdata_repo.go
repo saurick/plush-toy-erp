@@ -317,17 +317,29 @@ func (r *masterDataRepo) populateSupplierPrimaryContacts(ctx context.Context, su
 }
 
 func (r *masterDataRepo) SetSupplierActive(ctx context.Context, id int, active bool) (*biz.Supplier, error) {
-	row, err := r.data.postgres.Supplier.UpdateOneID(id).SetIsActive(active).Save(ctx)
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	row, err := tx.Supplier.UpdateOneID(id).SetIsActive(active).Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrSupplierNotFound
 		}
 		return nil, err
 	}
-	row, err = r.data.postgres.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
+	row, err = tx.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if err := syncSupplierPayableTasks(ctx, tx.Client(), row); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entSupplierToBiz(row), nil
 }
 

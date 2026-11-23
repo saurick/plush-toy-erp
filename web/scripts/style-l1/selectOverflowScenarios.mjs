@@ -6,7 +6,7 @@ import { assertProductFieldLayout } from './productFieldLayoutAssertions.mjs'
 export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverflow, outputDir }) {
   return [{
     name: 'dev-ui-select-overflow',
-    path: '/__dev/ui-design?page=controls&control=select-overflow',
+    path: '/__dev/ui-design?page=controls&control=business-form&example=wide-lines',
     viewport: { width: 1920, height: 1080 },
     deviceScaleFactor: 2,
     verify: async (page) => {
@@ -118,9 +118,11 @@ export function createSelectOverflowScenarios({ assert, assertNoHorizontalOverfl
       assert.equal(await sample.getByRole('checkbox', { name: '窄区域', exact: true }).isChecked(), false)
       await assertNoHorizontalOverflow(page)
       await page.getByRole('navigation', { name: '组件设计目录', exact: true }).getByRole('button', { name: /组件使用指南/u }).click()
-      await page.getByRole('link', { name: '操作长值与多列示例', exact: true }).click()
+      await page.getByRole('link', { name: '操作业务表单与明细示例', exact: true }).click()
+      await page.getByLabel('样例变体', { exact: true }).getByText('多列明细', { exact: true }).click()
       await sample.waitFor()
-      assert.equal(new URL(page.url()).searchParams.get('control'), 'select-overflow', '组件使用指南可回到正式长值样例')
+      assert.equal(new URL(page.url()).searchParams.get('control'), 'business-form')
+      assert.equal(new URL(page.url()).searchParams.get('example'), 'wide-lines', '组件使用指南可进入多列明细')
     },
   }]
 }

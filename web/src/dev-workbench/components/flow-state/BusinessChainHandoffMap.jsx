@@ -1,6 +1,6 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react'
 import { Button } from 'antd'
-import { businessChainRelationLayer } from '../../config/devBusinessChainReading.mjs'
+import { businessChainRelationLayer, businessChainHandoffKind } from '../../config/devBusinessChainReading.mjs'
 
 // Reserve one row for every registered handoff, including hidden layers.
 // Opposite directions share a peer card but always have separate tracks.
@@ -14,7 +14,7 @@ function handoffRows(chainKey, relations) {
   return [...peers].map(([key, edges]) => ({ key, edges }))
 }
 
-export default function BusinessChainHandoffMap({ chainKey, library, relations, layers, onRelation, onChain, onClose, dockRef }) {
+export default function BusinessChainHandoffMap({ chainKey, library, relations, layers, onRelation, onChain, onClose }) {
   const arrows = useId().replaceAll(':', '')
   const plot = useRef(null)
   const [width, setWidth] = useState(0)
@@ -65,14 +65,13 @@ export default function BusinessChainHandoffMap({ chainKey, library, relations, 
   }
   return (
     <section className="erp-chain-handoffs" aria-label="本链对外交接">
-      <div ref={dockRef} className="erp-chain-handoffs__settings" />
       <div className="erp-chain-handoffs__content">
         <header><strong>对外交接</strong><small role="status">本链 {relations.filter(visible).length} / {relations.length} 条交接</small><Button type="text" size="small" onClick={onClose}>收起交接图</Button></header>
         <div ref={plot} className="erp-chain-handoffs__plot" style={{ height }}>
           {width > 0 && (
             <>
               <svg width={width} height={height} className="erp-chain-design__lines" aria-label="本链交接连线">
-                <defs>{['known', 'exception'].map((kind) => (
+                <defs>{['known', 'exception', 'correction'].map((kind) => (
                   <marker key={kind} id={`${arrows}-${kind}`} data-design-arrow={kind} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
                     <path d="M0 0 L10 5 L0 10 Z" />
                   </marker>
@@ -81,7 +80,7 @@ export default function BusinessChainHandoffMap({ chainKey, library, relations, 
                 {rows.flatMap(({ edges, top }) => edges.map((edge, index) => {
                   if (!visible(edge)) return null
                   const layer = businessChainRelationLayer(edge)
-                  const kind = ['exception', 'correction'].includes(layer) ? 'exception' : 'known'
+                  const kind = businessChainHandoffKind(edge)
                   const out = edge.fromChainKey === chainKey
                   const y = top + (index + 0.5) * rowHeight
                   const start = center + Math.max(-30, Math.min(30, edges.length > 1 ? y - center : (y - center) * 0.35))

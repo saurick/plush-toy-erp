@@ -39,7 +39,7 @@ function WorkflowEventAuditDetails({ item }) {
   )
 }
 
-export function WorkflowTaskEventEntries({ items, variant = 'desktop', label = '本任务处理记录' }) {
+export function WorkflowTaskEventEntries({ items, variant = 'desktop', label = '本任务处理记录', showSource = true }) {
   return (
     <ol
       className={`workflow-task-event-trail__list workflow-task-event-trail__list--${variant}`}
@@ -59,7 +59,7 @@ export function WorkflowTaskEventEntries({ items, variant = 'desktop', label = '
               <strong>{item.label}</strong>
               <WorkflowEventAuditDetails item={item} />
             </div>
-            {item.sourceLabel ? <p className="workflow-task-event-trail__source">{item.sourceLabel}</p> : null}
+            {showSource && item.sourceLabel ? <p className="workflow-task-event-trail__source">{item.sourceLabel}</p> : null}
             <p className="workflow-task-event-trail__meta">
               {item.actorName ? (
                 <>
@@ -119,7 +119,8 @@ export default function WorkflowTaskEventTrail({
     task,
   })
   const page = records ? records[records.scope] : { items: events, status: state, truncated }
-  const title = records ? '处理记录' : '本任务处理记录'
+  const showScope = Boolean(records && (records.flow.status !== 'ready' || records.flow.truncated || records.flow.items.some((event) => event.task_id !== task.id)))
+  const title = showScope && records.scope === 'flow' ? '关联任务处理记录' : '本任务处理记录'
   const items = records ? buildWorkflowTaskFlowEventItems({ events: page.items, task, scope: records.scope }) : model.items
   const loading = page.status === 'idle' || page.status === 'loading'
   const summaryText = loading ? '读取中' : page.status === 'error' ? '读取失败' : items.length
@@ -146,11 +147,11 @@ export default function WorkflowTaskEventTrail({
             <h3 id={`workflow-task-event-trail-title-${task.id || 'current'}`}>
               {title}
             </h3>
-            {records ? <WorkflowTaskScopeHelp kind="records" scope={records.scope} /> : null}
+            {showScope ? <WorkflowTaskScopeHelp kind="records" scope={records.scope} /> : null}
             {compact ? summary : null}
           </div>
           {!compact ? summary : null}
-          {records ? <FilterChipGroup className="workflow-task-event-trail__scope" aria-label="处理记录范围" options={[{ label: '含关联任务', value: 'flow' }, { label: '只看本任务', value: 'task' }]} value={records.scope} onChange={records.changeScope} /> : null}
+          {showScope ? <FilterChipGroup className="workflow-task-event-trail__scope" aria-label="处理记录范围" options={[{ label: '含关联任务', value: 'flow' }, { label: '只看本任务', value: 'task' }]} value={records.scope} onChange={records.changeScope} /> : null}
         </div>
 
         {showResponsibility ? (
@@ -180,7 +181,7 @@ export default function WorkflowTaskEventTrail({
         </p>
       ) : items.length > 0 ? (
         <>
-          <WorkflowTaskEventEntries items={items} variant={variant} label={title} />
+          <WorkflowTaskEventEntries items={items} variant={variant} label={title} showSource={showScope && records.scope === 'flow'} />
           {page.truncated ? (
             <p
               className="workflow-task-event-trail__state"

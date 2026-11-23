@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/workflowtask"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -166,6 +167,9 @@ func TestPurchaseReceiptPendingLineCanPassAndPostAfterPartialInbound(t *testing.
 	if err != nil || first.PendingInboundLines != 1 {
 		t.Fatalf("first=%+v err=%v", first, err)
 	}
+	if f.client.WorkflowTask.Query().Where(workflowtask.TaskCode(biz.WorkflowSourceTaskCode("handoff_receipt_payable", f.receipt.ID))).ExistX(t.Context()) {
+		t.Fatal("finance received a partially closed receipt")
+	}
 	facts := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
 	if _, err := facts.CreatePayableFromPurchaseReceipt(t.Context(), &biz.FinanceFactFromPurchaseReceiptCreate{FactNo: "AP-PENDING", PurchaseReceiptID: f.receipt.ID, IdempotencyKey: "ap-pending"}); !errors.Is(err, biz.ErrPurchaseReceiptInboundIncomplete) {
 		t.Fatalf("premature payable=%v", err)
@@ -318,4 +322,34 @@ func testPurchaseReceiptPartialReplacementKeepsExceptionOpen(t *testing.T, data 
 		t.Fatal(err)
 	}
 	assertState(1)
+}
+
+func TestPurchasePayableTaskFollowsFullReturnAndReversal(t *testing.T) {
+	f := newPartialInboundFixture(t, "payable_full_return")
+	f.decide(t, 4, true)
+	f.decide(t, 6, true)
+	receipt, err := f.inv.PostPurchaseReceipt(t.Context(), f.receipt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := assertFulfillmentTask(t, t.Context(), f.client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
+	lines := make([]biz.PurchaseReturnFromReceiptItemCreate, 0, len(receipt.Items))
+	for _, item := range receipt.Items {
+		lines = append(lines, biz.PurchaseReturnFromReceiptItemCreate{PurchaseReceiptItemID: item.ID, Quantity: item.Quantity})
+	}
+	draft, err := f.inv.CreatePurchaseReturnFromReceipt(t.Context(), &biz.PurchaseReturnFromReceiptCreate{ReturnNo: "RT-FULL", PurchaseReceiptID: receipt.ID, ReturnedAt: time.Now().UTC(), IdempotencyKey: "return-full", Items: lines})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.inv.PostPurchaseReturn(t.Context(), draft.ID); err != nil {
+		t.Fatal(err)
+	}
+	assertFulfillmentTask(t, t.Context(), f.client, "receipt_payable", receipt.ID, "withdrawn", biz.FinanceRoleKey)
+	if _, err = f.inv.CancelPostedPurchaseReturn(t.Context(), draft.ID); err != nil {
+		t.Fatal(err)
+	}
+	reopened := assertFulfillmentTask(t, t.Context(), f.client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
+	if reopened.ID != original.ID {
+		t.Fatal("return reversal duplicated the source task")
+	}
 }

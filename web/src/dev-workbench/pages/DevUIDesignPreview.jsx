@@ -1,25 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { DownloadOutlined, FullscreenOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Result, Space } from 'antd'
-import { Link } from 'react-router-dom'
+import { ReloadOutlined } from '@ant-design/icons'
+import { Button, Result } from 'antd'
 import { Loading } from '@/common/components/loading'
 import Select from '@/common/components/select/AppSelect'
-import { DEV_TASK_HANDLING_ROUTE } from '../config/devRoutes.mjs'
-import { getUIDesignStateOptions, prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
+import DevUIDesignPreviewToolbar from '../components/DevUIDesignPreviewToolbar'
+import { getUIDesignStateOptions, prepareUIDesignSandboxSource, UI_DESIGN_PREVIEW_MODES, UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
 
-export default function DevUIDesignPreview({ active, page }) {
-  const [fullscreen, setFullscreen] = useState(false)
+export default function DevUIDesignPreview({ active, page, onModeChange, fullscreen, setFullscreen }) {
   const [previewRevision, setPreviewRevision] = useState(0)
   const previewId = `${page}-${previewRevision}`
   const [previewState, setPreviewState] = useState(null)
   const [simulationState, setSimulationState] = useState(null)
+  const [mobileScene, setMobileScene] = useState(null)
   const previewStatus = previewState?.id === previewId ? previewState.status : 'loading'
   const simulationValue = simulationState?.id === previewId ? simulationState.value : undefined
   const stateOptions = getUIDesignStateOptions(page)
   const frameRef = useRef(null)
   const readerRef = useRef(null)
   const fullscreenButtonRef = useRef(null)
+  const modeChangeRef = useRef(onModeChange)
+  useEffect(() => { modeChangeRef.current = onModeChange }, [onModeChange])
   const source = useMemo(
     () => prepareUIDesignSandboxSource(designHTML, { page, revision: previewRevision }),
     [page, previewRevision]
@@ -46,6 +47,16 @@ export default function DevUIDesignPreview({ active, page }) {
     }
     const onMessage = (event) => {
       if (event.source !== frame?.contentWindow || event.data?.previewId !== previewId) return
+      if (event.data.type === 'ui-design-mobile-scene' && page === 'mobile-tasks') {
+        setMobileScene({ id: previewId, scene: event.data.scene })
+        return
+      }
+      if (event.data.type === 'ui-design-switch-entry') {
+        const { mode } = event.data
+        if (!UI_DESIGN_PREVIEW_MODES.some(({ value }) => value === mode)) return
+        modeChangeRef.current(mode)
+        return
+      }
       if (event.data.type === 'ui-design-data-state-change') {
         if (!getUIDesignStateOptions(page).some(({ key }) => key === event.data.value)) return
         setSimulationState((current) => current?.id === previewId && current.value !== undefined && current.value !== event.data.value
@@ -75,10 +86,6 @@ export default function DevUIDesignPreview({ active, page }) {
   }, [active, page, previewId])
 
   useEffect(() => {
-    if (!active) setFullscreen(false)
-  }, [active])
-
-  useEffect(() => {
     if (!fullscreen) return undefined
     const reader = readerRef.current
     const trigger = fullscreenButtonRef.current
@@ -103,6 +110,7 @@ export default function DevUIDesignPreview({ active, page }) {
     document.body.style.overflow = 'hidden'
     fullscreenButtonRef.current?.focus()
     const onKey = (event) => {
+      if (event.defaultPrevented) return
       if (event.key === 'Escape') {
         event.preventDefault()
         setFullscreen(false)
@@ -142,7 +150,7 @@ export default function DevUIDesignPreview({ active, page }) {
       window.removeEventListener('message', onMessage)
       trigger?.focus({ preventScroll: true })
     }
-  }, [fullscreen])
+  }, [fullscreen, setFullscreen])
 
   const download = () => {
     const url = URL.createObjectURL(
@@ -154,6 +162,7 @@ export default function DevUIDesignPreview({ active, page }) {
     link.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
+  const send = (message) => frameRef.current?.contentWindow?.postMessage({ ...message, previewId }, '*')
 
   return (
     <section
@@ -164,8 +173,18 @@ export default function DevUIDesignPreview({ active, page }) {
       aria-modal={fullscreen ? 'true' : undefined}
       aria-label={fullscreen ? '交互设计全屏预览' : '最新可交互设计'}
     >
-      <div className="erp-dev-ui-design-toolbar">
-        <Space wrap>
+      {active && (
+        <DevUIDesignPreviewToolbar
+          mobile={page === 'mobile-tasks'}
+          scene={mobileScene?.id === previewId ? mobileScene.scene : null}
+          ready={previewStatus === 'ready'}
+          onSceneChange={(field, value) => send({ type: 'ui-design-change-mobile-scene', field, value })}
+          fullscreen={fullscreen}
+          fullscreenButtonRef={fullscreenButtonRef}
+          onFullscreen={() => setFullscreen((value) => !value)}
+          onReset={() => setPreviewRevision((value) => value + 1)}
+          onDownload={download}
+        >
           {stateOptions.length ? (
             <Select
               label="状态模拟"
@@ -178,26 +197,12 @@ export default function DevUIDesignPreview({ active, page }) {
               getPopupContainer={(trigger) => trigger.parentElement}
               onChange={(value) => {
                 setSimulationState({ id: previewId, value })
-                frameRef.current?.contentWindow?.postMessage(
-                  { type: 'ui-design-data-state', value: value ?? 'data' }, '*'
-                )
+                send({ type: 'ui-design-data-state', value: value ?? 'data' })
               }}
             />
           ) : null}
-          {page === 'mobile-tasks' ? <Link to={DEV_TASK_HANDLING_ROUTE}>设备支持范围</Link> : null}
-          <Button icon={<ReloadOutlined />} onClick={() => setPreviewRevision((value) => value + 1)}>
-            重置演示
-          </Button>
-          <Button icon={<DownloadOutlined />} onClick={download}>下载 HTML</Button>
-          <Button
-            ref={fullscreenButtonRef}
-            icon={<FullscreenOutlined />}
-            onClick={() => setFullscreen((value) => !value)}
-          >
-            {fullscreen ? '退出全屏' : '全屏预览'}
-          </Button>
-        </Space>
-      </div>
+        </DevUIDesignPreviewToolbar>
+      )}
       <div
         className="erp-dev-ui-design-stage"
         aria-busy={previewStatus === 'loading'}

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import { expect } from 'playwright/test'
-import { chooseChainScope, chooseViewOption, chooseExplorerAction } from './devFlowExplorerControls.mjs'
+import { chooseChainScope, chooseGranularity, chooseLayout, chooseExplorerAction } from './devFlowExplorerControls.mjs'
 
 const workingKey = 'plush-workbench:business-chain-design:working'
 const draft = {
@@ -10,8 +10,7 @@ const draft = {
     { id: 'node:purchase_lot', x: 900, y: 80, manual: true },
   ],
   edges: [{ from: 'node:sales_order', to: 'node:purchase_lot', kind: 'unknown' }],
-  ideas: [],
-  presentation: { mode: 'all', highlightedRoles: ['sales', 'warehouse', 'boss', 'engineering', 'pmc'], layout: 'lanes', viewport: { x: 40, y: 40, scale: 1, mode: 'manual' } },
+  presentation: { mode: 'all', highlightedRoles: ['sales', 'warehouse', 'boss', 'engineering', 'pmc'], layout: 'lanes' },
 }
 
 export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOverflow, startNoWriteAudit }) {
@@ -34,6 +33,8 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
       await expect(exportButton).toBeEnabled()
       await page.keyboard.press('Escape')
       await expect(page.locator('[data-design-node]')).toHaveCount(3)
+      await expect(page.getByRole('button', { name: '适应画布全图', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      await page.getByRole('button', { name: '重置画布为 100%', exact: true }).click()
       const before = await page.evaluate((key) => ({
         working: sessionStorage.getItem(key),
         surface: document.querySelector('.erp-chain-design__surface').style.transform,
@@ -71,7 +72,7 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
         assert(svg.includes(`fill="${lane.fill}" stroke="${lane.border}"`), '导出沿用屏幕泳道的底色和边框')
       }
       assert(!svg.includes('foreignObject'))
-      assert.match(svg, /data-export-edge="unknown"[^]*?<text[^>]*>待核对<\/text>/u)
+      assert.match(svg, /data-export-edge="unknown"[^]*?<text[^>]*>待核对的参考线<\/text>/u)
       const dimensions = svg.match(/<svg[^>]+width="(\d+)" height="(\d+)"/u)
       assert(dimensions)
       assert(Number(dimensions[2]) > 1528, '包含屏幕外节点以及页尾说明')
@@ -120,8 +121,8 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
       await expect(exportButton).toBeDisabled()
       await page.keyboard.press('Escape')
       await chooseChainScope(page, '销售受理到生产准备')
-      await chooseViewOption(page, '业务泳道')
-      await chooseViewOption(page, '业务步骤')
+      await chooseLayout(page, '业务泳道')
+      await chooseGranularity(page, '业务步骤')
       await expect(page.locator('.erp-chain-design__lane').first()).toBeVisible()
       const count = await page.locator('[data-design-node]').count()
       await openExport()
@@ -133,14 +134,78 @@ export function createFlowExplorerExportScenario({ assert, assertNoHorizontalOve
         await fs.writeFile(`${process.env.STYLE_L1_OUTPUT_DIR}/sales-lanes-export.svg`, salesSvg)
         await fs.writeFile(`${process.env.STYLE_L1_OUTPUT_DIR}/sales-lanes-export.png`, salesPng)
       }
+      await chooseGranularity(page, '节点明细')
+      const exceptions = page.getByRole('checkbox', { name: '异常与回接', exact: true })
+      await exceptions.check()
+      const frames = [
+        ['驳回销售订单', 'dashed'],
+        ['销售订单审批驳回结束', 'dashed'],
+        ['订单审批', 'solid'],
+        ['生效销售订单', 'solid'],
+      ]
+      await openExport()
+      const branchSvg = (await exportFile('SVG')).toString()
+      const exportBorders = await page.evaluate((source) => {
+        const doc = new DOMParser().parseFromString(source, 'image/svg+xml')
+        return Object.fromEntries([...doc.querySelectorAll('[data-export-node]')].map((node) => [
+          node.getAttribute('data-export-node'), node.querySelector('rect').hasAttribute('stroke-dasharray'),
+        ]))
+      }, branchSvg)
+      for (const [label, border] of frames) {
+        const body = page.getByRole('button', { name: `查看节点：${label}`, exact: true }).first()
+        await expect(body).toHaveCSS('border-top-style', border)
+        const id = await body.locator('..').getAttribute('data-design-node')
+        assert.equal(exportBorders[id], border === 'dashed', id)
+      }
+      await exceptions.uncheck()
+      await chooseGranularity(page, '业务步骤')
+      await chooseChainScope(page, '首款、结算与退款')
+      await exceptions.check()
+      const corrections = page.getByRole('checkbox', { name: '过账后纠正', exact: true })
+      await corrections.check()
+      await page.getByRole('button', { name: '图例与操作说明', exact: true }).click()
+      const legend = page.getByRole('dialog', { name: '画布图例', exact: true })
+      for (const [kind, example, label, dash] of [
+        ['correction', '冲正后恢复未结余额', '过账后纠正', '9px, 4px, 2px, 4px'],
+        ['exception', '驳回收付款', '异常分支', '8px, 5px'],
+      ]) {
+        const sample = legend.locator(`[data-legend-edge="${kind}"]`)
+        await expect(sample).toHaveText(label)
+        const color = await sample.evaluate((el) => getComputedStyle(el).color)
+        const edge = page.locator(`[data-design-edge="${kind}"]`).filter({ hasText: example }).first()
+        for (const group of [edge, sample]) {
+          const path = group.locator('.erp-chain-design__edge')
+          await expect(path).toHaveCSS('stroke-dasharray', dash)
+          await expect(path).toHaveCSS('stroke', color)
+          const fill = await path.evaluate((el) => {
+            const id = el.getAttribute('marker-end').slice(5, -1)
+            return getComputedStyle(document.getElementById(id).querySelector('path')).fill
+          })
+          assert.equal(fill, color)
+        }
+        await expect(edge.locator('text')).toHaveCSS('fill', color)
+      }
+      await legend.press('Escape')
+      await openExport()
+      const financeSvg = (await exportFile('SVG')).toString()
+      assert.match(financeSvg, /data-export-edge="correction"[^]*?stroke-dasharray="9 4 2 4" marker-end="url\(#export-arrow-correction\)"/u)
+      assert(financeSvg.includes('>过账后纠正</text>'))
+      await corrections.uncheck()
+      await expect(page.locator('[data-design-edge="correction"]')).toHaveCount(0)
+      await expect(page.locator('[data-design-edge="exception"]').first()).toBeVisible()
+      await exceptions.uncheck()
       await chooseChainScope(page, '采购下单到入库应付')
-      await page.getByRole('button', { name: '用途与交接', exact: true }).click()
-      await page.getByRole('button', { name: '在图上看交接', exact: true }).click()
-      await page.getByRole('button', { name: /^画布视图：/u }).click()
-      const panel = page.getByRole('dialog', { name: '画布视图', exact: true })
-      await panel.getByRole('checkbox', { name: '异常与回接' }).check()
-      await panel.getByRole('checkbox', { name: '主线与供给' }).uncheck()
-      await panel.getByRole('button', { name: '关闭视图面板' }).click()
+      const impact = page.getByRole('checkbox', { name: '横切影响', exact: true })
+      await impact.check()
+      await page.getByRole('checkbox', { name: '主线与供给' }).uncheck()
+      await expect(page.locator('[data-design-node]')).toHaveCount(0)
+      await openExport()
+      const impactSvg = (await exportFile('SVG')).toString()
+      assert(impactSvg.includes('横切修正采购库存') && !impactSvg.includes('NaN') && !impactSvg.includes('Infinity'))
+      await impact.uncheck()
+      await page.getByRole('button', { name: '跨链交接', exact: true }).click()
+      await page.getByRole('checkbox', { name: '异常与回接' }).check()
+      await page.getByRole('checkbox', { name: '主线与供给' }).uncheck()
       await openExport()
       const handoffSvg = (await exportFile('SVG')).toString()
       assert(handoffSvg.includes('data-export-handoffs="true"'))

@@ -15,7 +15,7 @@ func progressTaskSQL(q biz.BusinessProgressQuery) (string, []any) {
 	if q.Access.Tasks {
 		scope = q.TaskVisibility
 	}
-	return workflowTaskVisibilitySQL(scope, workflowtask.FieldID, workflowtask.FieldTaskNo, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceID, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldAssigneeID, workflowtask.FieldDueAt, workflowtask.FieldBlockedReason)
+	return workflowTaskVisibilitySQL(scope, workflowtask.FieldID, workflowtask.FieldTaskNo, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceID, workflowtask.FieldTaskStatusKey, workflowtask.FieldTaskGroup, workflowtask.FieldOwnerRoleKey, workflowtask.FieldAssigneeID, workflowtask.FieldDueAt, workflowtask.FieldBlockedReason)
 }
 
 // Production lines, rather than order headers, are the join key. One production
@@ -110,13 +110,16 @@ shipment_mismatch AS (
  JOIN sales_order_items l ON l.id=i.sales_order_item_id
  WHERE s.status='SHIPPED' AND (s.sales_order_id IS NULL OR l.sales_order_id<>s.sales_order_id)
 ),
-sales_delivery_lines AS (
+sales_delivery_base AS (
  SELECT l.*, COALESCE(l.planned_delivery_date,s.planned_delivery_date) AS due_at,
  COALESCE(d.quantity,0) AS shipped_quantity,
  COALESCE(NULLIF(l.product_name_snapshot,''),NULLIF(l.requested_product_name,''),p.name,'未填写产品') AS product_label,
  u.name AS unit_name FROM sales_order_items l JOIN sales_orders s ON s.id=l.sales_order_id
  LEFT JOIN products p ON p.id=l.product_id JOIN units u ON u.id=l.unit_id
  LEFT JOIN shipped d ON d.sales_order_item_id=l.id
+),
+sales_delivery_lines AS (
+ SELECT *,CASE WHEN ordered_quantity>shipped_quantity THEN ordered_quantity-shipped_quantity ELSE 0 END AS remaining_quantity FROM sales_delivery_base
 ),
 sales_lines AS (
  SELECT * FROM sales_delivery_lines WHERE line_status<>'canceled'
@@ -127,10 +130,12 @@ ranked_sales_lines AS (
 ),
 sales_summary AS (
  SELECT l.sales_order_id, COUNT(*) AS product_count, MIN(l.product_label) AS product,
+ COUNT(DISTINCT l.product_id) AS linked_product_count,
  COALESCE(MAX(CASE WHEN product_rank=1 THEN product_id END),0) AS product_id,
  MIN(CASE WHEN line_status='open' AND shipped_quantity<ordered_quantity THEN due_at END) AS open_due,
  MIN(due_at) AS any_due, COUNT(DISTINCT unit_id) AS unit_count, MIN(unit_name) AS unit_name,
- SUM(ordered_quantity) AS ordered_quantity, SUM(shipped_quantity) AS shipped_quantity,
+ SUM(CASE WHEN ordered_quantity>0 AND shipped_quantity>=ordered_quantity THEN 1 ELSE 0 END) AS delivered_lines,
+ SUM(remaining_quantity) AS remaining_quantity, SUM(ordered_quantity) AS ordered_quantity, SUM(shipped_quantity) AS shipped_quantity,
  SUM(CASE WHEN line_status='open' AND shipped_quantity<ordered_quantity THEN 1 ELSE 0 END) AS unfulfilled,
  SUM(CASE WHEN bom_id IS NOT NULL AND bom_fingerprint IS NOT NULL THEN 1 ELSE 0 END) AS engineering_ready
  FROM ranked_sales_lines l GROUP BY l.sales_order_id
@@ -186,11 +191,13 @@ func progressBase(q biz.BusinessProgressQuery) string {
 		return `SELECT s.id,s.order_no,s.lifecycle_status AS status,s.customer_id,
  COALESCE(NULLIF(s.customer_snapshot->>'name',''),c.name,'') AS customer,
  COALESCE(a.product,'未填写产品') AS product,COALESCE(a.product_count,0) AS product_count,
- COALESCE(a.product_id,0) AS product_id,
+ COALESCE(a.linked_product_count,0) AS linked_product_count,
+ COALESCE(a.product_id,0) AS product_id,a.delivered_lines,
  COALESCE(s.sales_owner,'') AS sales_owner,COALESCE(a.open_due,a.any_due,s.planned_delivery_date) AS due_at,s.updated_at,
  CASE WHEN ` + progressActiveSQL(q.View) + ` THEN 1 ELSE 0 END AS active,0 AS unlinked,
  CASE WHEN a.unit_count=1 THEN a.unit_name ELSE '' END AS unit_name,
  CASE WHEN a.unit_count=1 THEN a.ordered_quantity END AS ordered_quantity,
+ CASE WHEN a.unit_count=1 AND NOT EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=s.id) THEN a.remaining_quantity END AS remaining_quantity,
  CASE WHEN a.unit_count=1 AND NOT EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=s.id) THEN a.shipped_quantity END AS shipped_quantity,
  CASE WHEN a.product_count>0 AND NOT EXISTS(SELECT 1 FROM shipment_mismatch x WHERE x.order_id=s.id) THEN 1 ELSE 0 END AS delivery_known,
  NULL AS completed_quantity,COALESCE(a.product_count,0) AS engineering_total,COALESCE(a.engineering_ready,0) AS engineering_ready
@@ -208,6 +215,7 @@ func progressBase(q biz.BusinessProgressQuery) string {
 	return fmt.Sprintf(`SELECT p.id,p.order_no,p.status,COALESCE(%s,'') AS customer,
  COALESCE(MIN(COALESCE(NULLIF(i.product_name_snapshot,''),pr.name)),'未填写产品') AS product,
  COUNT(i.id) AS product_count,
+ COUNT(DISTINCT i.product_id) AS linked_product_count,
  COALESCE((SELECT i2.product_id FROM production_order_items i2 LEFT JOIN products pr2 ON pr2.id=i2.product_id
  WHERE i2.production_order_id=p.id
  ORDER BY CASE WHEN COALESCE(NULLIF(i2.product_name_snapshot,''),pr2.name) IS NULL THEN 1 ELSE 0 END,
@@ -218,7 +226,7 @@ func progressBase(q biz.BusinessProgressQuery) string {
  CASE WHEN COUNT(DISTINCT i.unit_id)=1 THEN MIN(COALESCE(NULLIF(i.unit_name_snapshot,''),u.name)) ELSE '' END AS unit_name,
  CASE WHEN COUNT(DISTINCT i.unit_id)=1 THEN SUM(i.planned_quantity) END AS ordered_quantity,
  CASE WHEN %s AND COUNT(DISTINCT i.unit_id)=1 AND MIN(COALESCE(done.quantity,0))>=0 THEN SUM(COALESCE(done.quantity,0)) END AS completed_quantity,
- NULL AS shipped_quantity,0 AS delivery_known,0 AS engineering_total,0 AS engineering_ready
+ NULL AS delivered_lines,NULL AS remaining_quantity,NULL AS shipped_quantity,0 AS delivery_known,0 AS engineering_total,0 AS engineering_ready
  FROM production_orders p LEFT JOIN production_order_items i ON i.production_order_id=p.id
  LEFT JOIN products pr ON pr.id=i.product_id LEFT JOIN units u ON u.id=i.unit_id
  LEFT JOIN completed done ON done.source_line_id=i.id%s

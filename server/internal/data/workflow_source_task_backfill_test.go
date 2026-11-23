@@ -171,3 +171,41 @@ func TestWorkflowSourceTaskBackfillDoesNotGuessMissingProjection(t *testing.T) {
 		t.Fatalf("missing state on an existing task must require review, got %v", err)
 	}
 }
+
+func TestPurchasePayableTaskBackfillPostgres(t *testing.T) {
+	ctx := t.Context()
+	db, client := openPurchaseReceiptPostgresTestData(t)
+	f := partialInboundFixtureWithData(t, db, client, createInventoryTestFixtures(t, ctx, client), "APBF-"+postgresTestSuffix())
+	orderID := client.PurchaseOrderItem.GetX(ctx, *f.items[4].PurchaseOrderItemID).PurchaseOrderID
+	client.PurchaseOrder.UpdateOneID(orderID).ClearPaymentTermDays().SaveX(ctx)
+	f.decide(t, 4, true)
+	f.decide(t, 6, true)
+	receipt, err := f.inv.PostPurchaseReceipt(ctx, f.receipt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Model an eligible historical source without changing immutable task events.
+	client.PurchaseOrder.UpdateOneID(orderID).SetPaymentTermDays(0).SaveX(ctx)
+	code := biz.WorkflowSourceTaskCode("handoff_receipt_payable", receipt.ID)
+	if client.WorkflowTask.Query().Where(workflowtask.TaskCode(code)).ExistX(ctx) {
+		t.Fatal("historical fixture already has an obligation")
+	}
+	factsBefore := client.FinanceFact.Query().CountX(ctx)
+	if _, err := BackfillMissingWorkflowSourceTasks(ctx, db.sqldb, false); err != nil {
+		t.Fatal(err)
+	}
+	if client.WorkflowTask.Query().Where(workflowtask.TaskCode(code)).ExistX(ctx) {
+		t.Fatal("dry-run persisted payable task")
+	}
+	if _, err := BackfillMissingWorkflowSourceTasks(ctx, db.sqldb, true); err != nil {
+		t.Fatal(err)
+	}
+	restored := assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
+	if _, err := BackfillMissingWorkflowSourceTasks(ctx, db.sqldb, true); err != nil {
+		t.Fatal(err)
+	}
+	replay := assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
+	if replay.ID != restored.ID || replay.Version != restored.Version || client.FinanceFact.Query().CountX(ctx) != factsBefore {
+		t.Fatal("repeated backfill changed the handoff or financial facts")
+	}
+}

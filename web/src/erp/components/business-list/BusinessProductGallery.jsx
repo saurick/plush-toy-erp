@@ -10,7 +10,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import WorkflowTaskImagePreview from '../workflow/WorkflowTaskImagePreview.jsx'
 import './businessProductGallery.css'
 
-function ProductGallerySession({ products, productCount, title = '产品图片', triggerLabel, loadProducts, renderThumbnail, children, compact = false, onClose }) {
+function ProductGallerySession({ products, productCount, coverProductID, title = '产品图片', triggerLabel, loadProducts, renderThumbnail, children, compact = false, onClose }) {
   const trigger = useRef(null)
   const request = useRef(null)
   const [busy, setBusy] = useState(false)
@@ -19,6 +19,7 @@ function ProductGallerySession({ products, productCount, title = '产品图片',
   const [loadImage] = useState(() => createTaskProductImageLoader(downloadBusinessAttachment))
   const initialProducts = useMemo(() => normalizeGalleryProducts(products), [products])
   const count = productCount ?? initialProducts.length
+  const cover = initialProducts.find((product) => product.productID === coverProductID) ?? initialProducts[0]
   useEffect(() => () => request.current?.abort(), [loadProducts])
 
   const open = async (event) => {
@@ -33,7 +34,7 @@ function ProductGallerySession({ products, productCount, title = '产品图片',
       const result = normalizeGalleryProducts(loadProducts ? await loadProducts({ signal: controller.signal }) : products)
       if (controller.signal.aborted) return
       if (!result.length) setError('当前没有关联产品，请刷新列表后核对')
-      else setOpened({ products: result })
+      else setOpened({ products: result, item: result.find((product) => product.productID === cover?.productID) ?? result[0] })
     } catch (cause) {
       if (!controller.signal.aborted) setError(getActionErrorMessage(cause, '读取产品图片'))
     } finally {
@@ -43,13 +44,13 @@ function ProductGallerySession({ products, productCount, title = '产品图片',
   }
   return (
     <span className={`erp-product-gallery${compact ? ' erp-product-gallery--compact' : ''}`}>
-      <button ref={trigger} type="button" className="erp-product-gallery__trigger" aria-label={triggerLabel || (count > 1 ? `查看${title}的 ${count} 款产品图片` : `查看${initialProducts[0]?.name || title}大图`)} aria-haspopup="dialog" aria-busy={busy} disabled={busy} onClick={open} onDoubleClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}>
+      <button ref={trigger} type="button" className="erp-product-gallery__trigger" aria-label={triggerLabel || (count > 1 ? `查看${title}的 ${count} 款产品图片` : `查看${cover?.name || title}大图`)} aria-haspopup="dialog" aria-busy={busy} disabled={busy} onClick={open} onDoubleClick={(event) => event.stopPropagation()} onKeyDown={(event) => { if (event.key !== 'Escape') event.stopPropagation() }}>
         <span className={count > 1 ? 'erp-product-gallery__stack' : 'erp-product-gallery__thumbnail'}>{children}</span>
-        {compact ? null : <span className="erp-product-gallery__summary"><span>{count > 1 ? `共 ${count} 款产品` : initialProducts[0]?.name || '产品图片'}</span><small>{busy ? '正在读取' : '查看图片'}</small></span>}
+        {compact ? null : <span className="erp-product-gallery__summary"><span>{count > 1 ? `共 ${count} 款产品` : cover?.name || '产品图片'}</span><small>{busy ? '正在读取' : '查看图片'}</small></span>}
       </button>
       {error ? <span className="erp-product-gallery__error" role="alert">{error}</span> : null}
       {opened ? <WorkflowTaskImagePreview
-        item={opened.products[0]}
+        item={opened.item}
         load={loadImage}
         gallery={{ products: opened.products, title, renderThumbnail }}
         onClose={({ restoreFocus = true } = {}) => { setOpened(null); onClose?.(); if (restoreFocus) trigger.current?.focus({ preventScroll: true }) }}
@@ -61,6 +62,6 @@ function ProductGallerySession({ products, productCount, title = '产品图片',
 export default function BusinessProductGallery({ children, products, title, ...props }) {
   const { adminProfile } = useBusinessPageContext() || {}
   if (!hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)) return children || null
-  const scope = `${workflowTaskAdminAccessRequestIdentity(adminProfile)}:${title || ''}:${JSON.stringify(normalizeGalleryProducts(products))}`
+  const scope = `${workflowTaskAdminAccessRequestIdentity(adminProfile)}:${title || ''}:${props.productCount ?? ''}:${props.coverProductID ?? ''}:${JSON.stringify(normalizeGalleryProducts(products))}`
   return <ProductGallerySession key={scope} products={products} title={title} {...props}>{children}</ProductGallerySession>
 }

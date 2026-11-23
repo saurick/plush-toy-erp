@@ -21,7 +21,7 @@ import {
   linkedDocumentContext,
   linkedDocumentRequestKeyword,
 } from '../../utils/relatedDocumentNavigation.mjs'
-import { listAllProductionFacts } from '../../api/operationalFactApi.mjs'
+import { getFinanceFact, listAllProductionFacts } from '../../api/operationalFactApi.mjs'
 import { hasAnyPermission } from './OperationalFactForms.jsx'
 import { resolveOperationalFactRouteRecord } from '../../utils/operationalFactRelatedNavigation.mjs'
 import {
@@ -290,7 +290,16 @@ export function useOperationalFactQuery({
         )
         const exactProductionFactID =
           key === 'production' ? Number(routeFactID || 0) : 0
-        const data =
+        let exactFinanceFact = null
+        if (key === 'finance' && routeFactID && routeSourceType && routeSourceID) {
+          exactFinanceFact = await getFinanceFact({ id: routeFactID })
+          if (!exactFinanceFact || exactFinanceFact.id !== routeFactID ||
+            exactFinanceFact.source_type !== routeSourceType || exactFinanceFact.source_id !== routeSourceID ||
+            (config.listParams?.fact_type && exactFinanceFact.fact_type !== config.listParams.fact_type)) {
+            throw new Error('账款与当前来源不一致，请重新读取任务')
+          }
+        }
+        const data = exactFinanceFact ? { [config.listKey]: [exactFinanceFact], total: 1 } :
           exactProductionFactID > 0
             ? await listAllProductionFacts({
                 keyword: String(exactProductionFactID),
@@ -328,7 +337,7 @@ export function useOperationalFactQuery({
         }
         setStatusCountsByKey((prev) => ({
           ...prev,
-          [key]: resolveBusinessStatusCounts(data, { hasExactContext: exactProductionFactID > 0, exactRecord: nextRows[0] || null }),
+          [key]: resolveBusinessStatusCounts(data, { hasExactContext: exactProductionFactID > 0 || Boolean(exactFinanceFact), exactRecord: nextRows[0] || null }),
         }))
         setRowsByKey((prev) => ({
           ...prev,

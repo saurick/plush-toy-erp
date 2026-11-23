@@ -5,13 +5,8 @@
   container: visualization-examples / inline-size;
 }
 
-.erp-dev-visualization__examples p,
-.erp-dev-visualization__rule {
+.erp-dev-visualization__examples p {
   margin-block: 0;
-}
-
-.erp-dev-visualization__rule {
-  color: var(--erp-text-muted);
 }
 
 @media (min-width: 981px) and (min-height: 440px) {

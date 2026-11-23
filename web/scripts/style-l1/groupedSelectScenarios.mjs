@@ -11,7 +11,7 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
   return [
     ...['light', 'dark'].flatMap((themeMode) => ['desktop', 'mobile'].map((device) => ({
       name: `shared-grouped-select-${themeMode}-${device}`,
-      path: '/__dev/ui-design?page=controls&control=grouped-select',
+      path: '/__dev/ui-design?page=controls&control=select&example=grouped',
       viewport: device === 'desktop' ? { width: 1920, height: 1080 } : { width: 390, height: 844 },
       deviceScaleFactor: 2,
       themeMode,
@@ -37,12 +37,7 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         assert.equal(await stage.getByLabel('分组单选结果').innerText(), '采购订单', '分类和禁用项不改变选择')
         assert(await popup.isVisible(), '点击分类标题保留选项层')
 
-        await single.fill('采购')
-        assert.equal(await popup.locator('.ant-select-item-group').count(), 1, '搜索只保留匹配分类')
-        assert.equal(await popup.locator('.ant-select-item-option').count(), 1)
-        await single.fill('不存在的记录类型')
-        await popup.getByText('没有匹配的记录类型', { exact: true }).waitFor()
-        await single.fill('')
+        await expect(single).not.toBeEditable()
         assert.equal(await popup.locator('.ant-select-item-group').count(), 2)
         await single.press('Escape')
         await popup.waitFor({ state: 'hidden' })
@@ -62,6 +57,7 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         const multiple = page.getByRole('combobox', { name: '多选记录类型', exact: true })
         const multipleControl = stage.locator('.ant-select').filter({ has: multiple })
         await multipleControl.locator('.ant-select-selector').click()
+        await expect(multiple).not.toBeEditable()
         evidence.push(...await assertGroupedSelectHierarchy(popup, `${themeMode}/${device}/多选`))
         assert.equal(await popup.locator('.ant-select-item-option-selected .anticon-check').count(), 2)
         await popup.getByText('销售订单', { exact: true }).click()
@@ -76,7 +72,7 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         await assertNoHorizontalOverflow(page, `分组下拉/${themeMode}/${device}`)
         await writeFile(`${outputDir}/grouped-select-${themeMode}-${device}.json`, JSON.stringify(evidence, null, 2))
 
-        await page.goto(new URL('/__dev/ui-design?page=controls&control=inputs', page.url()).href)
+        await page.goto(new URL('/__dev/ui-design?page=controls&control=select', page.url()).href)
         const flat = page.getByRole('combobox', { name: '产品类别', exact: true })
         await stage.locator('.ant-select').filter({ has: flat }).locator('.ant-select-selector').click()
         await popup.locator('.ant-select-item-option').first().waitFor()
@@ -99,6 +95,7 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
           const input = page.getByRole('combobox', { name: label, exact: true })
           await page.locator('.ant-select').filter({ has: input }).locator('.ant-select-selector').click()
           const popup = page.locator('.ant-select-dropdown:visible')
+          await expect(input).not.toBeEditable()
           evidence[label] = await assertGroupedSelectHierarchy(popup, label)
           const weights = await popup.locator('.erp-dev-flow-definition-option__label').evaluateAll((nodes) => nodes.map((node) => ({
             selected: Boolean(node.closest('.ant-select-item-option-selected')),
@@ -110,7 +107,29 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
           await input.press('Escape')
         }
         await assertNoHorizontalOverflow(page, '业务规则分组下拉')
+
+        await page.goto(new URL('/__dev/status-flows?view=chain&chain=sales_to_production', page.url()).href)
+        const chainInput = page.getByRole('combobox', { name: '切换业务流程', exact: true })
+        const chainControl = page.locator('.ant-select').filter({ has: chainInput }).locator('.ant-select-selector')
+        const popup = page.locator('.ant-select-dropdown:visible')
+        const firstOption = popup.locator('.ant-select-item-option').first()
         const overview = DEV_FLOW_STATE_CATALOG.businessChainOverview
+        await chainControl.click()
+        await firstOption.waitFor()
+        assert.equal((await firstOption.textContent()).trim(), overview.label)
+        assert.deepEqual(await popup.locator('.ant-select-item-group').allTextContents(),
+          overview.lanes.map(({ label, chainKeys }) => `${label} · ${chainKeys.length}`))
+        evidence['切换业务流程'] = await assertGroupedSelectHierarchy(popup, '切换业务流程')
+        await expect(chainInput).not.toBeEditable()
+        await popup.getByRole('option', { name: '采购下单到入库应付', exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('chain') === 'purchase_to_inventory')
+        await chainControl.click()
+        await popup.getByRole('option', { name: overview.label, exact: true }).click()
+        await page.waitForURL((url) => url.searchParams.get('chain') === overview.key)
+        await page.goto(new URL('/__dev/status-flows?view=chain&chain=purchase_to_inventory', page.url()).href)
+        await page.locator('.ant-select').filter({ has: chainInput }).locator('.ant-select-clear').click()
+        await page.waitForURL((url) => url.searchParams.get('chain') === overview.key)
+
         await page.goto(new URL('/__dev/flow-explorer?chain=purchase_to_inventory', page.url()).href)
         const editor = page.getByRole('region', { name: '流程探索', exact: true })
         await searchWholeLibrary(editor)
@@ -185,13 +204,11 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         await assertGroupedSelectHierarchy(popup, '接口清单业务域')
         await expect(popup.getByText('资料与协作 · 5', { exact: true })).toBeInViewport()
         await page.screenshot({ path: `${outputDir}/interface-domains-4k.png` })
-        await domain.fill('sales_order')
-        await expect(popup.getByRole('option')).toHaveText('销售订单')
+        await expect(domain).not.toBeEditable()
         await popup.getByRole('option', { name: '销售订单', exact: true }).click()
         await page.waitForURL((url) => url.searchParams.get('domain') === 'sales_order')
         await expect(domainResults).not.toHaveText(total)
         await open(domain)
-        await domain.fill('协作任务')
         await popup.getByRole('option', { name: '协作任务', exact: true }).click()
         await page.waitForURL((url) => url.searchParams.get('domain') === 'workflow')
         await control(domain).hover()
@@ -212,10 +229,7 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         await assertGroupedSelectHierarchy(popup, '权限关系功能范围')
         await expect(popup.getByText('系统与开发 · 1', { exact: true })).toBeInViewport()
         await page.screenshot({ path: `${outputDir}/permission-modules-4k.png` })
-        await module.fill('不存在的范围')
-        await expect(popup.getByText('没有匹配的选项', { exact: true })).toBeVisible()
-        await module.fill('warehouse')
-        await expect(popup.getByRole('option')).toHaveText('仓储')
+        await expect(module).not.toBeEditable()
         await popup.getByRole('option', { name: '仓储', exact: true }).click()
         await page.waitForURL((url) => url.searchParams.get('module') === 'warehouse')
         await expect(graph.getByText(/未授予“仓储”模块权限/u)).toBeVisible()
@@ -269,21 +283,15 @@ export function createGroupedSelectScenarios({ assert, assertNoHorizontalOverflo
         await frame.locator('#sidebar').getByRole('button', { name: '接口与集成', exact: true }).click()
         const domain = frame.getByRole('combobox', { name: '筛选业务域', exact: true })
         const domainMenu = domain.locator('.design-select-menu:popover-open')
-        const domainSearch = domain.getByRole('textbox', { name: '搜索业务域', exact: true })
         const rows = frame.getByRole('table', { name: '接口清单样例', exact: true }).locator('tbody tr')
         await domain.click()
         await expect(domainMenu.getByRole('group')).toHaveCount(2)
-        await expect(domainSearch).toBeFocused()
-        await domainSearch.fill('找不到的业务域')
-        await expect(domainMenu.getByText('没有匹配的选项', { exact: true })).toBeVisible()
-        await domainSearch.fill('sales_order')
-        await expect(domainMenu.getByRole('option')).toHaveAccessibleName('销售订单')
-        await domainSearch.press('Enter')
+        await expect(domain.getByRole('textbox')).toHaveCount(0)
+        await domainMenu.getByRole('option', { name: '销售订单', exact: true }).click()
         await expect(domain).toHaveAttribute('data-value', 'sales_order')
         await expect(rows).toHaveCount(2)
         await domain.click()
-        await domainSearch.fill('登录')
-        await domainSearch.press('Escape')
+        await domain.press('Escape')
         await expect(domainMenu).toHaveCount(0)
         await expect(domain).toHaveAttribute('data-value', 'sales_order')
         await domain.getByRole('button', { name: '清空筛选业务域', exact: true }).click()

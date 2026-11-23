@@ -189,11 +189,13 @@ function flowCandidates(flow) {
       ...asArray(dimension.states).flatMap((state) => [
         candidate(state.label, `${dimension.label}：${state.label}`),
         candidate(state.key, `${dimension.label}：${state.label}`),
+        candidate(state.summary, `${dimension.label}：${state.label}`),
       ]),
     ]),
     ...asArray(flow.states).flatMap((state) => [
       candidate(state.label, `状态：${state.label}`),
       candidate(state.key, `状态 key：${state.key}`),
+      candidate(state.summary, `状态：${state.label}`),
     ]),
   ]
 }
@@ -334,7 +336,6 @@ function buildDefinitionSearchEntries(catalog) {
       candidates: processCandidates(definition, flowByBusinessRefType),
     })),
     states: flows.map(flowEntry),
-    stateOptions: flows.map(flowEntry),
     facts: factDefinitions.map((definition) => ({
       key: definition.factKey,
       label: definition.label,
@@ -397,19 +398,4 @@ export function buildDevFlowDefinitionSearchGroups(catalog, keyword) {
       items: searchEntries(entries.facts, normalizedQuery),
     },
   ]
-}
-
-export function createDevFlowDefinitionOptionFilter(catalog, groupKey) {
-  const entries = new Map(
-    asArray(buildDefinitionSearchEntries(catalog)[groupKey]).map((entry) => [
-      entry.key,
-      entry,
-    ])
-  )
-  return (keyword, option) => {
-    const normalizedQuery = normalizeDevFlowDefinitionSearchText(keyword)
-    if (!normalizedQuery) return true
-    const entry = entries.get(String(option?.value || ''))
-    return Boolean(entry && findBestMatch(normalizedQuery, entry.candidates))
-  }
 }

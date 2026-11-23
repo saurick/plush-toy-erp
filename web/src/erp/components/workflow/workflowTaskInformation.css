@@ -1,0 +1,23 @@
+.workflow-task-information,
+.workflow-task-information__sections {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.workflow-task-information__sections > :empty {
+  display: none;
+}
+
+.workflow-task-information__navigation {
+  position: sticky;
+  z-index: 2;
+  inset-block-start: var(--erp-task-information-top, 0px);
+  padding: 4px 6px;
+  border-block-end: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg);
+}
+
+.workflow-task-information__navigation[hidden] {
+  display: none;
+}

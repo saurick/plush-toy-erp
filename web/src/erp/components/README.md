@@ -44,12 +44,18 @@
 - 共享组件改动默认按影响面评估：触达 `business-list/*`、`ERPLayout.jsx`、打印壳或通用状态展示时，至少检查受影响页面和 `style:l1` 场景。
 - `workflow/WorkflowTaskImagePlaceholder.jsx` 只按传入状态展示产品／物料的无图、加载、失败或无权限占位，供真实图片组件和工作台样例共用；附件读取、权限判断、缓存、预览与重试仍由 `WorkflowTaskProductImage.jsx` 和 `master-data/ProductIdentity.jsx` 负责。表单通过 `common/theme/erpThemeContext.jsx` 读取外层主题上下文，偏好加载与保存归主题 Provider。
 - 业务导航共用 `../hooks/useBusinessNavigate.js` 与 `business-list/BusinessLink.jsx`；链接和对象式路径在手机中保留当前岗位、查询、锚点及返回原任务的上下文，桌面路径沿用桌面壳。
+
+### 编辑页、弹窗与表单分区
+
 - 菜单主列表的整页编辑复用 `business-list/BusinessFormPage.jsx`，统一管理保存、离开保护及桌面可选全屏。默认保存前校验当前表单；采购需先清理纯空白新行、批量导入需预检全部草稿时，使用 `validateOnSave={false}` 交给保存器整理后校验，仍须调用所属 form 的 `validateFields`；校验失败通过 `errorFields` 复用分区展开和字段聚焦。容器与恢复合同见[桌面业务编辑](../../../../docs/engineering/前端实现与交互约定.md#桌面业务编辑与弹窗约定)。
 - `PurchaseReceiptExceptionModal`、`InventoryOperationModal` 和 `OutsourcingOrderSourceFactModal` 使用整页骨架填写业务草稿；调用页保留列表与来源上下文，异步候选名称刷新不重置输入。委外来源编辑与合同办理页互斥显示，任务中的同一表单继续复用任务底栏。
 - 局部弹窗由 `BusinessFormSectionScope` 提供独立聚焦范围；整页表单仍由 `BusinessFormBody` 提供目录、阅读位置及焦点，已有字段和浮层不重建。已有分组使用 `BusinessFormSection`，普通子标题继续使用 `BusinessFormSectionTitle`；查看、复制、导入及加载 / 空态 / 错误分支均保留标题。
 - 分区定位与聚焦复用 `BusinessFormBody`、`BusinessFormSection`；普通分区及 BOM 标题共用 `business-list/businessFormSections.css` 的 32px 紧凑标题带，以短竖线、主题文字和淡主题色底区分表头及只读框，当前分区底色加深。外观与当前分区不派生业务状态，不改变输入、明细行组或整单保存语义。
 - `BusinessFormBody` 共用“目录 / 页签”导航：目录连续展示整单，页签用 `SlidingTabList` 保持横向导航可见，任务共用滚动区时吸顶；窄屏横滑页签。切换保留字段挂载、阅读位置与整单校验，显示方式统一在账号“外观与密度”中设置，编辑页标题栏不重复提供入口。
 - `BusinessFormSection` 的 `fieldLayout="adaptive"` 按字段内容换行，`erp-business-action-form__field--short` / `__field--wide` 只控制字段区域预算；`fieldLayout="support"` 组织备注与附件，窄区域顺排。默认栅格及 Excel 明细结构保留，样式集中在 `businessFormSections.css`。
+
+### 明细分组与滚动
+
 - `BusinessLineItemsTable` 保持同一表头与滚动区域；`BusinessLineItemGroupHeading` 统一提供整条标题点击、箭头状态及键盘展开收起，保留标题内图片预览的独立操作。出货页用它归组相邻产品身份，`BusinessLineItemRow` 仍逐条维护字段、序号与浮层焦点，不改变 `Form.List` 的顺序和 key。业务归组适用范围见[编辑页归组](../../../../docs/product/ui-design/交互设计说明.md#editor-line-grouping)。
 - 明细标题、组数、批量展开、横向查看和来源操作统一交给 `BusinessLineItemsHeader`；`BusinessGroupedLineItems` 通过 `title`、`headerActions` 接入，BOM 与采购到货保留自身字段结构并复用同一标题组件。滚动入口仅挂入所属明细工具栏，布局与恢复合同见[明细录入](../../../../docs/engineering/前端实现与交互约定.md#明细录入)。
 - 明细与底栏直接放在 `BusinessFormSection` 正文时，由 `businessFormSections.css` 统一提供单列布局；底栏间距与已有容器的复用边界见同一[明细录入合同](../../../../docs/engineering/前端实现与交互约定.md#明细录入)。
@@ -57,9 +63,15 @@
 - BOM 的 `BOMMaterialGroupsForm` 保留专用物料 / 部位表格，通过 `BOMSelectionScope` 在所属 Form.List 生命周期内维护两层单选；按稳定 field key 定位当前对象，使用原 add / remove 和复制快照清理规则。顶部动作区不套用普通明细的中性外观，原字段列序、合并单元格、组尾汇总、精确计算及只读行为保持；移除整组需要确认部位数，表单重置或所选组收起时清除选择。
 - `BusinessGroupedLineItems` 桌面默认平铺，按需启用分组；手机保留原分组。`BusinessLineItemRow` 的资料默认收起，行号旁箭头控制可见性，字段保持挂载；原同步错误展开链路继续使用。采购 `PurchaseOrderLineSummary` 只读取下单名称和颜色，数量与单位共享一列但保留独立字段、精度及快照。生产路线等必要信息及 BOM 编辑器保持原边界。
 - 长明细表通过 [`TableScrollRegion`](../../common/components/table/TableScrollRegion.jsx) 的 `stickyHeader` 接入 [`TableStickyHeader`](../../common/components/table/TableStickyHeader.jsx)，与同一区域的标题工具栏配合吸顶。原表保留唯一字段与无障碍表头；吸顶层仅镜像列名并同步实际列宽、主题及横向位置，离开明细区自动退出。
+
+### 会话、表格与任务表单
+
 - 桌面账号同步首次失败时不挂载业务页；已验证页面遇到临时断连时，由 `SessionRecoveryDialog` 保留本页内存中的编辑内容并隔离交互，JSON-RPC 暂停新的认证业务请求，不排队或重放写操作。恢复必须重新读取账号和有效业务配置；访问范围变化时重建业务页，登录失效或账号切换时清除旧页面。刷新、关闭或离开页面不属于内存保留范围；真实授权始终由后端校验。
 - 业务列表、弹窗明细与研发工作台的 Ant Design 表格共用 [`AppTable`](../../common/components/table/AppTable.jsx)；列对齐和序号规则见[表格对齐](../../../../docs/engineering/前端实现与交互约定.md#表格对齐--table-alignment)。
 - 任务内的办理表单与记录核对复用 `business-list/BusinessFormPage.jsx`，共用操作栏、只读权限、忙碌状态和离开保护。`BusinessModal` 的 `taskInline` 与 `production-records/ProductionRecordDrawer.jsx` 均接入此容器；任务内不再叠加独立办理抽屉。业务页自动进入任务编辑器复用 `useTaskBusinessEditor`；完整来源详情留在任务信息中，预加载不自动弹出查看详情。业务列表通过 `taskDetailColumns` 把获准查看的详情字段交给任务信息。业务表单共用当前步骤的可见状态；表单实例外的输入通过 `hasChanges` 登记未保存修改。
+
+### 弹窗尺寸与内容布局
+
 - 业务弹窗通过 `business-list/BusinessModal.jsx` 共享尺寸、滚动和浮层离开守卫，`BusinessFormModal` 在其上保留表单标题、真实脏状态及焦点恢复。抽屉使用通用层 [`AppDrawer`](../../common/components/drawer/AppDrawer.jsx)，命令式确认使用 `useModal()`；分栏内沿用同一编辑器并在所属栏展示，见[分栏浮层规则](../../../../docs/engineering/前端实现与交互约定.md#desktop-split-workspace)。
 
   尺寸取 [`modalSizes.mjs`](../utils/modalSizes.mjs)：`confirm` 用于简短确认、原因及少量字段（480px），`localAction` 用于需要较宽上下文的局部表单（最大 860px），`recordDetails` 用于复杂表单与摘要详情（最大 1120px），`columnOrder` 用于列排序与图片预览（最大 640px）。BOM 修订与保存回执、生成委外草稿、纠正复检、回货送检、财务来源建草稿、出货建账草稿、质检办理确认、采购应付差额和撤销抵扣共用紧凑档位；保留必要的来源、业务后果及验证错误。明细表、复杂处置和图片标注按内容保留较宽档位。所有档位默认居中，超出可用高度时只滚动正文，底部操作保持可达；分栏内相对所属工作区居中，手机整页办理保持独立布局。
@@ -68,6 +80,9 @@
 - 未收到用户明确的尺寸调整要求时，页面重设计沿用原有尺寸档位；表格改卡片、减少默认字段或当前只有一条明细均不构成降档理由，也不得为新实现放宽既有尺寸验收。采购到货的浏览器回归独立验证 `min(1800px, 94vw, calc(100vw - 32px))` 的实际宽度，覆盖单条、多条、窄屏、超宽屏和暗色。
 - 采购到货使用 `lineItems` 尺寸：上方录入收货信息，下方按采购材料分组，每种材料内追加卷包记录。数量核对与材料实点合计随录入更新，空白记录不提交，已填写记录逐字段校验；辅助说明按需展开。新增卷包后定位数量输入，关闭未保存内容前提醒，保存中禁止关闭和重复提交，材料读取失败可在弹窗内重试。
 - 弹窗高度随内容增长，桌面总高度不超过可视窗口减 64px，窄屏减 28px；正文纵向滚动，标题与底部操作保留在可视区域。宽表统一在表格容器内横向滚动，明细卡片随可用宽度换行。手机材料汇总保留现有全屏与安全区规则。只读详情关闭后释放明细状态，重新打开从第一页读取。
+
+### 多行详情与分页
+
 - 销售、采购、加工与采购入库通过当前记录的“查看详情”打开单头与完整明细；出货、生产订单与 BOM 沿用各自的完整只读查看入口。主列表保留选择与业务操作，查看后返回原列表上下文。共享详情使用 `BusinessRowItemCards`：桌面左侧显示明细编号，右侧按业务关联分行，窄屏编号移到上方；每行随可用宽度排成一、二、四或六列。
 
   多条长明细由 `BusinessDetailItemGroups` 组织：销售按相邻已关联产品，采购及入库按相邻材料与单位，加工合同按相邻对象类型、产品或材料及工序归组；编辑与详情共用 `sourceDocumentLineGroupKeys.mjs` 和 `adjacentLineItemRuns.mjs`，不按名称合并、不重排或合计原行。首组默认展开，分组标题支持键盘和同时展开多组；同页标题栏提供全部展开 / 全部收起。收起后只显示业务标题与条数，数量、单位、金额、日期及普通状态随完整字段一起隐藏，展开后按原权限查看。完整字段和独立图片保持原组件，独立办理入口、读取失败与附件反馈沿用原位置；折叠不改变读取、状态或权限。只有一条明细及未配置 `getItemGroup` 的紧凑详情直接展示。
@@ -76,8 +91,11 @@
 
   总条数固定在底部左侧，右侧依次显示每页条数、方框页码和关闭；手机将总数与条数选择、简洁页码与关闭分成两行。完整明细读取继续遵守权限、单据版本校验、失败重试与取消请求边界。
 - 业务明细中的名称、部位、加工说明、包装说明和备注使用 `business-list/BusinessTextArea.jsx`，默认两行起步，按内容和宽度自动换行增高，保留字段长度限制，不设置内部滚动的行数上限。所有备注（含明细）至少两行；非备注短字段可显式设为一行。数字、日期等结构化控件维持原类型；明细表内已选名称完整换行，整张宽表统一横向滚动。BOM 的多列粘贴仍按列分配，单个加工说明 / 备注内的多行粘贴保留为一个字段。
+
+### 来源资料、字段与打印
+
 - 领域组件可以隐藏未完成入口，但不能在前端本地补造后端事实、状态流转或权限结论。
-- 任务来源资料共用 `business-list/BusinessRecordDetails.jsx` 的紧凑布局：`taskDetailRole` 将单据身份、状态和图片分组，`taskDetailOrder` 排列其余字段，未配置的有值字段继续保留；容器宽度决定标签和值同行或上下排列，复制、图片预览和业务入口沿用原实现。普通选填空值省略，来源列的 `taskDetailEmptyValue(record)` 在真实缺值时返回提示、已有原因和 `tone`，有值时返回 `null`。缺值使用同字号、中等字重的原位文字，需补齐或确认用深橙色，暂未生成和历史未记录用灰色；不使用 Tag，响应未返回的字段不计缺失。资料区不追加办理按钮，沿用任务原有入口，详见[前端实现约定](../../../../docs/engineering/前端实现与交互约定.md)。
+- 任务来源资料共用 `business-list/BusinessRecordDetails.jsx`。`taskDetailRole` 将单据身份、状态和图片分组，`taskDetailOrder` 排列其他字段。确认来源和显示单号都相同后，单号由任务摘要展示；`taskDetailValue` 用于提供任务内的补充资料，例如展开单据产品资料。容器宽度决定标签和值同行或上下排列，复制、图片预览和业务入口沿用原实现。普通选填空值省略，来源列的 `taskDetailEmptyValue(record)` 在真实缺值时返回提示、已有原因和 `tone`，有值时返回 `null`。缺值使用同字号、中等字重的原位文字，需补齐或确认用深橙色，暂未生成和历史未记录用灰色。详见[前端实现约定](../../../../docs/engineering/前端实现与交互约定.md)。
 - 列配置、表单默认值、来源选择、导出 / 打印字段涉及业务字段链路时，必须检查新建、编辑、切换来源、清空来源、列表、详情、打印 / 导出和旧数据回补路径。
 - 打印组件只负责预览和模板渲染；打印留档、合同事实、采购 / 委外 / 出货 / 财务状态仍由后端和正式文档定义。
 - 打印模板与 Excel 格式图示共用 [`DocumentGuide.jsx`](DocumentGuide.jsx) 的编号、范围线、短引线和点击联动；可选 `summary` 展示在说明列顶部。打印中心将模板名与缩放工具条合为一行，启用 `fill`，默认按可用宽高适合整页，提供 25%–150% 页内缩放、比例显示与自动适配恢复，放大后只滚动纸面区域，切换模板保留缩放模式；纸面上下留白各 16px，窄屏说明移到下方，其他图示保持自然布局与原有留白。几何测量与窄图编号避让由 [`documentGuideGeometry.mjs`](documentGuideGeometry.mjs) 维护，标注样式只在 `documentGuide.css` 定义。边界见[图示标注规则](../../../../docs/engineering/可视化表达规范.md#验证与维护--validation)。
@@ -120,7 +138,7 @@ STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
 
   `HelpHandbookChapter` 同源渲染通用与业务章节，使用统一正文卡片与按需展开的章内导航，详细办理内容来自 `businessHandbookOperations.mjs`；`HelpReferenceContent` 保留完整词条深链；首页推荐、账号阅读范围、办理入口权限、地址恢复与离线下载由 `HelpCenterPage` 管理。
 
-  `HelpManualDirectory` 提供三册统一章节目录，`HelpProjectManualContent` 安全渲染受控的管理与运维 Markdown。三册手册入口见[项目手册](../../../../docs/manuals/README.md)。
+  `HelpDirectory.jsx` 用共享 `Directory` 展示办事场景与三册章节，`HelpProjectManualContent` 安全渲染受控的管理与运维 Markdown。三册手册入口见[项目手册](../../../../docs/manuals/README.md)。
 - `permission-center/` 的 `usePermissionCenterData` 负责账号与岗位加载，`usePermissionRoleSettings` 负责岗位草稿和权限预览，`PermissionAdminAccounts` 自持账号表单与弹窗；页面只协调页签与未保存提醒。
 - `workflow/useSourceOrderWorkflowActions.mjs` 供来源单据的“任务协作”入口统一办理 Workflow 动作；入口提供场景标识。
 - `workflow/WorkflowTaskDocumentFilter.jsx` 用共享页签展示模块，所选模块的单据类型按钮自然换行，高度随行数变化。名称与归属使用同源单据目录，查询与分页由任务管理页面和服务端承接。

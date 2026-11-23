@@ -23,18 +23,17 @@ export function BusinessSplitPageTitle({ title }) {
     <AppSelect
       className="erp-split-page-title"
       variant="outlined"
-      showSearch
       allowClear={header.onClear ? { clearIcon: <Tooltip title="清空附加页面（Delete）"><CloseCircleFilled /></Tooltip> } : false}
       onClear={header.onClear}
       onKeyDownCapture={clearFromKeyboard}
       aria-keyshortcuts={header.onClear ? 'Delete' : undefined}
       aria-description={header.onClear ? '按 Delete 清空附加页面' : undefined}
-      optionFilterProp="label"
       aria-label={`选择${header.label}页面`}
       placeholder={title || '选择页面'}
       value={header.path}
       labelRender={renderLabel}
       popupMatchSelectWidth={360}
+      virtual={false}
       options={header.options}
       onChange={header.onNavigate}
     />

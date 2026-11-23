@@ -23,6 +23,9 @@ function task(kind, source, path) {
 
 test('source handoffs open the exact receipt, inspection, contract or production batch', () => {
   for (const [kind, source, path] of [
+    ['purchase_price', 'purchase_order', '/erp/purchase/accessories?purchase_order_id=7'],
+    ['receipt_payable', 'purchase_receipt', '/erp/warehouse/inbound?receipt_id=7'],
+    ['receipt_payable', 'purchase_receipt', '/erp/finance/payables?source_type=PURCHASE_RECEIPT&source_id=7&fact_id=31'],
     [
       'purchase_arrival',
       'purchase_order',
@@ -149,4 +152,12 @@ test('handoff registry, navigation and living process document stay aligned', ()
       `navigation source mismatch: ${kind}`
     )
   }
+})
+
+test('采购应付办理入口核对收货来源和账款标识', () => {
+  for (const path of [
+    '/erp/finance/payables?source_type=PURCHASE_RECEIPT&source_id=8&fact_id=31',
+    '/erp/finance/payables?source_type=SHIPMENT&source_id=7&fact_id=31',
+    '/erp/finance/payables?source_type=PURCHASE_RECEIPT&source_id=7&fact_id=0',
+  ]) assert.equal(fulfillmentTaskEntryPath(task('receipt_payable', 'purchase_receipt', path)), '')
 })

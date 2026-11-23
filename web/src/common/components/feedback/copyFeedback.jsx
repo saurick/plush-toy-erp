@@ -7,12 +7,12 @@ import { COPY_SUCCESS_DURATION } from '../../utils/feedbackConfig.mjs'
 const COPY_FAILURE_KEY = 'clipboard-copy-failure'
 let copySuccessSequence = 0
 
-export function showCopySuccess(label, trigger) {
+export function showCopySuccess(label, trigger, messageApi = message) {
   const key = `clipboard-copy-success-${++copySuccessSequence}`
   const text = `${label}已复制`
   let closeButton
-  message.destroy(COPY_FAILURE_KEY)
-  message.success({
+  messageApi.destroy(COPY_FAILURE_KEY)
+  messageApi.success({
     key,
     duration: COPY_SUCCESS_DURATION,
     className: 'erp-feedback-message--copy-success',
@@ -26,7 +26,7 @@ export function showCopySuccess(label, trigger) {
           icon={<CloseOutlined aria-hidden="true" />}
           aria-label={`关闭「${text}」提示`}
           onMouseDown={(event) => event.preventDefault()}
-          onClick={() => message.destroy(key)}
+          onClick={() => messageApi.destroy(key)}
         />
       </span>
     ),

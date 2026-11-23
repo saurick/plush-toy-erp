@@ -70,7 +70,7 @@ func (r *businessStatisticsRepo) deliveryQuery(q biz.BusinessStatisticsQuery) (s
 ), members AS (
  SELECT d.*,` + groupKey + ` AS group_key,` + groupName + ` AS group_name,
  l.id AS member_id,l.product_label,l.unit_id,l.unit_name AS member_unit,
- l.ordered_quantity AS member_ordered,l.shipped_quantity AS member_shipped,l.amount AS member_amount,
+ l.remaining_quantity AS member_remaining,l.ordered_quantity AS member_ordered,l.shipped_quantity AS member_shipped,l.amount AS member_amount,
  COALESCE(a.amount,0) AS member_shipped_amount,COALESCE(a.missing,0) AS member_shipped_missing
  FROM cohort d LEFT JOIN sales_lines l ON l.sales_order_id=d.id LEFT JOIN shipment_amounts a ON a.sales_order_item_id=l.id
  WHERE 1=1`
@@ -93,6 +93,8 @@ func (r *businessStatisticsRepo) deliveryQuery(q biz.BusinessStatisticsQuery) (s
  MAX(CASE WHEN delivery_status='pending' AND due_date<` + day + ` THEN 1 ELSE 0 END) AS overdue,
  MAX(CASE WHEN delivery_status='pending' AND due_date>=` + day + ` AND due_date<=` + soon + ` THEN 1 ELSE 0 END) AS soon,
  MAX(CASE WHEN due_date IS NULL THEN 1 ELSE 0 END) AS undated,
+ CASE WHEN COUNT(DISTINCT unit_id)=1 AND COUNT(unit_id)=COUNT(*) THEN MIN(unit_id) END AS quantity_unit_id,
+ CASE WHEN MIN(delivery_known)=1 THEN SUM(CASE WHEN delivery_status='closed' THEN 0 ELSE member_remaining END) END AS remaining_quantity,
  CASE WHEN COUNT(DISTINCT unit_id)=1 THEN MIN(member_unit) ELSE '' END AS unit,
  CASE WHEN COUNT(DISTINCT unit_id)=1 THEN SUM(member_ordered) END AS ordered_quantity,
  CASE WHEN COUNT(DISTINCT unit_id)=1 AND MIN(delivery_known)=1 THEN SUM(member_shipped) END AS shipped_quantity,
@@ -157,9 +159,20 @@ func statisticsDecimal(value sql.NullString) (*string, error) {
 }
 
 func scanDeliveryMetrics(s statisticsScanner, m *biz.BusinessStatisticsMetrics, money bool) error {
-	var amount, shipped sql.NullString
-	err := s.Scan(&m.Count, &m.Done, &m.Pending, &m.Closed, &m.Unknown, &m.Overdue, &m.Soon, &m.Undated, &amount, &shipped, &m.MissingAmount, &m.MissingShipmentAmount)
+	var amount, shipped, orderedQty, shippedQty, remainingQty sql.NullString
+	quantities := &biz.DeliveryQuantities{}
+	err := s.Scan(&m.Count, &m.Done, &m.Pending, &m.Closed, &m.Unknown, &m.Overdue, &m.Soon, &m.Undated, &amount, &shipped, &m.MissingAmount, &m.MissingShipmentAmount, &quantities.Unit, &orderedQty, &shippedQty, &remainingQty)
 	if err != nil {
+		return err
+	}
+	m.Quantities = quantities
+	if quantities.Ordered, err = statisticsDecimal(orderedQty); err != nil {
+		return err
+	}
+	if quantities.Shipped, err = statisticsDecimal(shippedQty); err != nil {
+		return err
+	}
+	if quantities.Remaining, err = statisticsDecimal(remainingQty); err != nil {
 		return err
 	}
 	if !money {
@@ -185,7 +198,11 @@ const deliveryMetricsSQL = `COUNT(DISTINCT id),COUNT(DISTINCT CASE WHEN delivery
  COUNT(DISTINCT CASE WHEN delivery_status='pending' THEN id END),COUNT(DISTINCT CASE WHEN delivery_status='closed' THEN id END),
  COUNT(DISTINCT CASE WHEN delivery_status='unknown' THEN id END),COUNT(DISTINCT CASE WHEN overdue=1 THEN id END),
  COUNT(DISTINCT CASE WHEN soon=1 THEN id END),COUNT(DISTINCT CASE WHEN undated=1 THEN id END),
- CAST(SUM(amount) AS TEXT),CAST(COALESCE(SUM(shipped_amount),0) AS TEXT),COALESCE(SUM(missing_amount),0),COALESCE(SUM(missing_shipment_amount),0)`
+ CAST(SUM(amount) AS TEXT),CAST(COALESCE(SUM(shipped_amount),0) AS TEXT),COALESCE(SUM(missing_amount),0),COALESCE(SUM(missing_shipment_amount),0),
+ CASE WHEN COUNT(quantity_unit_id)=COUNT(*) AND COUNT(DISTINCT quantity_unit_id)=1 THEN MIN(unit) ELSE '' END,
+ CASE WHEN COUNT(quantity_unit_id)=COUNT(*) AND COUNT(DISTINCT quantity_unit_id)=1 THEN CAST(SUM(ordered_quantity) AS TEXT) END,
+ CASE WHEN COUNT(quantity_unit_id)=COUNT(*) AND COUNT(DISTINCT quantity_unit_id)=1 AND COUNT(shipped_quantity)=COUNT(*) THEN CAST(SUM(shipped_quantity) AS TEXT) END,
+ CASE WHEN COUNT(quantity_unit_id)=COUNT(*) AND COUNT(DISTINCT quantity_unit_id)=1 AND COUNT(remaining_quantity)=COUNT(*) THEN CAST(SUM(remaining_quantity) AS TEXT) END`
 
 const receivableMetricsSQL = `COUNT(*),COALESCE(SUM(overdue),0),COALESCE(SUM(undated),0),CAST(COALESCE(SUM(balance),0) AS TEXT),
  CAST(COALESCE(SUM(CASE WHEN aging='not_due' THEN balance ELSE 0 END),0) AS TEXT),
@@ -232,7 +249,7 @@ func (r *businessStatisticsRepo) Statistics(ctx context.Context, q biz.BusinessS
 	out := &biz.BusinessStatisticsBoard{Report: q.Report, GroupBy: q.GroupBy, Currency: q.Currency, DateFrom: q.DateFrom, DateTo: q.DateTo, SnapshotAt: q.SnapshotAt, Access: q.Access, Groups: []biz.BusinessStatisticsGroup{}}
 	err := r.reader.read(ctx, func(tx *sql.Tx) error {
 		cte, args := r.query(q)
-		metrics, n := deliveryMetricsSQL, 12
+		metrics, n := deliveryMetricsSQL, 16
 		scan := func(s statisticsScanner, m *biz.BusinessStatisticsMetrics) error {
 			return scanDeliveryMetrics(s, m, q.Access.SalesAmounts)
 		}

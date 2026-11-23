@@ -9,7 +9,7 @@ const equal = (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b)
 function blankState() {
   const draft = {
     ...emptyBusinessChainDraft(),
-    presentation: { mode: 'mainline', highlightedRoles: [], layout: 'lanes', showBranches: false, layers: ['normal'] },
+    presentation: { mode: 'mainline', highlightedRoles: [], layout: 'lanes', layers: ['normal'] },
   }
   return { draft, initialDraft: draft, past: [], future: [], issue: '', restoreFailed: false }
 }

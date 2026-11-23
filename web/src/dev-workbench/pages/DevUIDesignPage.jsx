@@ -20,9 +20,6 @@ const DevUIDesignReading = lazyWithDynamicImportRetry(
 const DevControlStandards = lazyWithDynamicImportRetry(
   () => import('../components/DevControlStandards.jsx')
 )
-const DevWorkbenchStandards = lazyWithDynamicImportRetry(
-  () => import('../components/DevWorkbenchStandards.jsx')
-)
 
 const READING_VIEWS = [
   { key: 'specification', label: '设计说明' },
@@ -35,28 +32,19 @@ const VIEWS = [
   ...READING_VIEWS,
 ]
 
-const DESIGN_SAMPLES = [
-  { value: 'controls', label: '组件设计' },
-  { value: 'workbench', label: '统一页面样板' },
-]
-
 export default function DevUIDesignPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedPage = searchParams.get('page')
   const requestedView = searchParams.get('view')
   const readingView = READING_VIEWS.find(({ key }) => key === requestedView)?.key
   const invalidView = Boolean(requestedView && requestedView !== 'preview' && !readingView)
-  const samplePage = requestedPage === 'controls' ||
-    (requestedPage === 'workbench' && searchParams.get('workbenchMode') !== 'preview')
-    ? requestedPage
-    : null
-  const view = readingView ?? (samplePage ? 'samples' : 'preview')
+  const isControlPage = requestedPage === 'controls'
+  const view = readingView ?? (isControlPage ? 'samples' : 'preview')
   const activePage = view === 'preview' ? resolveUIDesignPreviewPage(requestedPage) : null
   const activeMode = activePage ? resolveUIDesignPreviewMode(activePage) : null
   const [visited, setVisited] = useState({ mode: 'workspace', pages: {} })
-  const [lastSamplePage, setLastSamplePage] = useState(DESIGN_SAMPLES[0].value)
   const [controlRevision, setControlRevision] = useState(0)
-  const [workbenchRevision, setWorkbenchRevision] = useState(0)
+  const [fullscreen, setFullscreen] = useState(false)
 
   useEffect(() => {
     if (!invalidView && !['screen', 'field', 'annotations'].some((key) => searchParams.has(key))) return
@@ -67,15 +55,14 @@ export default function DevUIDesignPage() {
   }, [invalidView, searchParams, setSearchParams])
 
   useEffect(() => {
-    if (!activePage) return
+    if (!activePage) {
+      setFullscreen(false)
+      return
+    }
     setVisited((current) => current.mode === activeMode && current.pages[activeMode] === activePage
       ? current
       : { mode: activeMode, pages: { ...current.pages, [activeMode]: activePage } })
   }, [activeMode, activePage])
-
-  useEffect(() => {
-    if (view === 'samples') setLastSamplePage(samplePage)
-  }, [samplePage, view])
 
   const updateQuery = (updates) => setSearchParams((previous) => {
     const next = new URLSearchParams(previous)
@@ -85,19 +72,26 @@ export default function DevUIDesignPage() {
     }
     return next
   })
-  const openPage = (page, workbenchPreview = false) => updateQuery({
+  const openPage = (page) => updateQuery({
     view: null,
     page: page === 'workspace' ? null : page,
-    workbenchMode: workbenchPreview ? 'preview' : null,
     point: null,
   })
-  const openMode = (mode) => {
-    const page = visited.pages[mode] ?? mode
-    openPage(page, page === 'workbench')
+  const openMode = (mode) => openPage(visited.pages[mode] ?? mode)
+  const switchEntry = (source, target) => {
+    if (source === 'login' || target === 'login') {
+      // 在下次打开时按可见画布重新初始化登录表单或已退出的岗位。
+      setVisited((current) => {
+        const pages = { ...current.pages }
+        delete pages[source]
+        return { ...current, pages }
+      })
+    }
+    if (source === activeMode) openMode(target)
   }
   const openView = (key) => {
-    if (key === 'samples') openPage(samplePage ?? lastSamplePage)
-    else if (key === 'preview' && samplePage) openMode(visited.mode)
+    if (key === 'samples') openPage('controls')
+    else if (key === 'preview' && isControlPage) openMode(visited.mode)
     else updateQuery({ view: key === 'preview' ? null : key })
   }
 
@@ -118,6 +112,14 @@ export default function DevUIDesignPage() {
             onChange={openView}
           />
         }
+        tools={view === 'samples' && searchParams.get('control') !== 'components' ? (
+          <Button
+            icon={<ReloadOutlined aria-hidden="true" />}
+            onClick={() => setControlRevision((value) => value + 1)}
+          >
+            重置演示
+          </Button>
+        ) : null}
       />
 
       <div className="erp-dev-ui-design-preview-shell" hidden={Boolean(readingView)}>
@@ -134,38 +136,23 @@ export default function DevUIDesignPage() {
           {UI_DESIGN_PREVIEW_MODES.map(({ value }) => {
             const active = activeMode === value
             const page = active ? activePage : visited.pages[value]
-            return page ? <DevUIDesignPreview key={value} active={active} page={page} /> : null
+            return page ? (
+              <DevUIDesignPreview
+                key={value}
+                active={active}
+                page={page}
+                onModeChange={(target) => switchEntry(value, target)}
+                fullscreen={active && fullscreen}
+                setFullscreen={setFullscreen}
+              />
+            ) : null
           })}
         </Suspense>
         {view === 'samples' ? (
           <section className="erp-dev-ui-design-reader" aria-label="设计样例">
-            <div className="erp-dev-ui-design-toolbar">
-              <Segmented aria-label="设计样例分类" value={samplePage} options={DESIGN_SAMPLES} onChange={(page) => openPage(page)} />
-              {(samplePage === 'workbench' || searchParams.get('control') !== 'components') && (
-                <Button
-                  icon={<ReloadOutlined aria-hidden="true" />}
-                  onClick={() => {
-                    if (samplePage === 'workbench') {
-                      updateQuery({ sampleState: null })
-                      setWorkbenchRevision((value) => value + 1)
-                    } else setControlRevision((value) => value + 1)
-                  }}
-                >
-                  重置演示
-                </Button>
-              )}
-            </div>
-            {samplePage === 'workbench' ? (
-              <div className="erp-dev-ui-design-patterns">
-                <Suspense fallback={<Loading title="正在加载工作台统一设计" />}>
-                  <DevWorkbenchStandards key={workbenchRevision} />
-                </Suspense>
-              </div>
-            ) : (
-              <Suspense fallback={<Loading title="正在加载组件设计" />}>
-                <DevControlStandards key={controlRevision} />
-              </Suspense>
-            )}
+            <Suspense fallback={<Loading title="正在加载组件设计" />}>
+              <DevControlStandards key={controlRevision} />
+            </Suspense>
           </section>
         ) : null}
       </div>

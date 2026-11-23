@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import React, { useCallback, useId, useRef, useState } from 'react'
 import { Button, ConfigProvider } from 'antd'
 import { CloseOutlined, DownOutlined } from '@ant-design/icons'
 import AnchoredControlPopover from '@/common/components/overlay/AnchoredControlPopover.jsx'
 import './businessChainDesignPopover.css'
 
-export default function BusinessChainDesignPopover({ kind, label, title, modeLabel, closeLabel, current, singleChoice = false, dock, children }) {
+export default function BusinessChainDesignPopover({ kind, label, title, modeLabel, closeLabel, current, singleChoice = false, children }) {
   const { getPopupContainer } = React.useContext(ConfigProvider.ConfigContext)
   const [open, setOpen] = useState(false)
   const panelId = useId()
@@ -49,17 +48,6 @@ export default function BusinessChainDesignPopover({ kind, label, title, modeLab
     focusOption(items[Math.max(0, Math.min(items.length - 1, to))])
   }
   const focusCurrent = useCallback(() => focusOption(list.current?.querySelector('input:checked, [aria-pressed="true"]') || list.current?.querySelector('input, button')), [focusOption])
-  useLayoutEffect(() => {
-    if (open && dock?.current) focusCurrent()
-  }, [open, dock, focusCurrent])
-  useEffect(() => {
-    if (!dock || !open) return undefined
-    const outside = (event) => {
-      if (!dock.current?.contains(event.target) && !trigger.current?.contains(event.target)) setOpen(false)
-    }
-    document.addEventListener('click', outside)
-    return () => document.removeEventListener('click', outside)
-  }, [dock, open])
   const panel = (
     <section
       id={panelId}
@@ -70,7 +58,6 @@ export default function BusinessChainDesignPopover({ kind, label, title, modeLab
       data-picker={kind}
       onKeyDownCapture={onPanelKey}
       onBlur={(event) => {
-        if (dock && event.relatedTarget?.closest('.erp-chain-handoffs')) return
         if (!singleChoice && event.relatedTarget !== trigger.current && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false)
       }}
     >
@@ -89,7 +76,6 @@ export default function BusinessChainDesignPopover({ kind, label, title, modeLab
   const control = (
     <Button
       ref={trigger}
-      onClick={dock ? () => setOpen((previous) => !previous) : undefined}
       id={`${panelId}-trigger`}
       className="erp-chain-design__picker-trigger erp-anchored-control-trigger"
       data-picker={kind}
@@ -114,19 +100,17 @@ export default function BusinessChainDesignPopover({ kind, label, title, modeLab
   return (
     <div className="erp-chain-design__role-filter">
       {label && <label htmlFor={`${panelId}-trigger`}>{label}</label>}
-      {dock ? <>{control}{open && dock.current && createPortal(panel, dock.current)}</> : (
-        <AnchoredControlPopover
-          trigger="click"
-          open={open}
-          onOpenChange={setOpen}
-          placement="bottomLeft"
-          getPopupContainer={(element) => element.closest('.erp-chain-design-shell') ?? getPopupContainer?.() ?? element.ownerDocument.body}
-          afterOpenChange={(visible) => { if (visible && open) focusCurrent() }}
-          content={panel}
-        >
-          {control}
-        </AnchoredControlPopover>
-      )}
+      <AnchoredControlPopover
+        trigger="click"
+        open={open}
+        onOpenChange={setOpen}
+        placement="bottomLeft"
+        getPopupContainer={(element) => element.closest('.erp-chain-design-shell') ?? getPopupContainer?.() ?? element.ownerDocument.body}
+        afterOpenChange={(visible) => { if (visible && open) focusCurrent() }}
+        content={panel}
+      >
+        {control}
+      </AnchoredControlPopover>
     </div>
   )
 }

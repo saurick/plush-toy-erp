@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
+import Directory, { DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import DevProjectGraphView from './DevProjectGraphView.jsx'
 import {
   DEV_PROJECT_GRAPH_EXAMPLES,
@@ -44,7 +45,7 @@ export default function DevProjectRelationships() {
   return (
     <section className="erp-dev-project-relationships" aria-label="项目关系图">
       <div className="erp-dev-project-relationships__workspace">
-        <nav className="erp-dev-project-relationships__catalog" aria-label={modelCatalog ? '图模型分类' : '项目关系主题'}>
+        <Directory className="erp-dev-project-relationships__catalog erp-directory-list" aria-label={modelCatalog ? '图模型分类' : '项目关系主题'} title={<strong>关系图目录</strong>}>
           <FilterSelect
             emptyValue="topics"
             aria-label="关系图目录方式"
@@ -60,25 +61,25 @@ export default function DevProjectRelationships() {
           />
           {(modelCatalog ? DEV_PROJECT_GRAPH_GROUPS : DEV_PROJECT_GRAPH_TOPIC_GROUPS).map((group) => (
             <section key={group.label}>
-              <h2 className="erp-dev-directory-group-title">{group.label}</h2>
-              {(modelCatalog ? group.models : group.examples).map((key) => (
-                <button
-                  type="button"
-                  key={key}
-                  className="erp-dev-directory-item erp-dev-directory-item--nested"
-                  aria-pressed={(modelCatalog ? selected.modelKey : selected.exampleKey) === key}
-                  onClick={() => {
-                    if (modelCatalog) {
-                      if (selected.modelKey !== key) updateSelection({ modelKey: key })
-                    } else selectExample(key)
-                  }}
-                >
-                  <strong>{(modelCatalog ? DEV_PROJECT_GRAPH_MODELS : DEV_PROJECT_GRAPH_EXAMPLES)[key].name}</strong>
-                </button>
-              ))}
+              <h2 className="erp-directory-group-title">{group.label}</h2>
+              <DirectoryBranch>
+                {(modelCatalog ? group.models : group.examples).map((key) => (
+                  <DirectoryItem
+                    key={key}
+                    aria-pressed={(modelCatalog ? selected.modelKey : selected.exampleKey) === key}
+                    onClick={() => {
+                      if (modelCatalog) {
+                        if (selected.modelKey !== key) updateSelection({ modelKey: key })
+                      } else selectExample(key)
+                    }}
+                  >
+                    <span>{(modelCatalog ? DEV_PROJECT_GRAPH_MODELS : DEV_PROJECT_GRAPH_EXAMPLES)[key].name}</span>
+                  </DirectoryItem>
+                ))}
+              </DirectoryBranch>
             </section>
           ))}
-        </nav>
+        </Directory>
         <section className="erp-dev-project-relationships__detail" aria-label="图模型与项目示例">
           {graph ? (
             <div className="erp-dev-project-relationships__heading">

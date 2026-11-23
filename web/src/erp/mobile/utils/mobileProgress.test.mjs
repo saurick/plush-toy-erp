@@ -20,6 +20,7 @@ const profile = {
   is_super_admin: false,
   permissions,
   effective_session: {
+    pages: ['business-dashboard'],
     source: 'active_customer_config_revision',
     customer: { key: 'example' },
     actions: permissions,

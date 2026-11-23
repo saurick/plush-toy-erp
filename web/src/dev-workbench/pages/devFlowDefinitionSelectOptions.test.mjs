@@ -13,15 +13,16 @@ function flattenOptions(options) {
   return options.flatMap((option) => option.options || [option])
 }
 
-test('business topic drilldown keeps the full order first and every topic reachable once', () => {
+test('business topic selector pins the overview and uses the canonical chain groups', () => {
   const options = buildBusinessChainSelectOptions(DEV_FLOW_STATE_CATALOG)
+  const { lanes } = DEV_FLOW_STATE_CATALOG.businessChainOverview
 
   assert.equal(options[0].value, 'all')
   assert.equal(options[0].label, '订单全流程（销售到出货）')
-  assert.ok(options.every((option) => !option.options), '专题入口不再次拆成主链和支撑链分组')
+  assert.equal(options[0].options, undefined)
   assert.deepEqual(
-    flattenOptions(options.slice(1)).map((option) => option.value),
-    DEV_FLOW_STATE_CATALOG.businessChains.map((chain) => chain.key)
+    options.slice(1).map(({ key, label, options }) => ({ key, label, chainKeys: options.map((option) => option.value) })),
+    lanes.map(({ key, label, chainKeys }) => ({ key, label: `${label} · ${chainKeys.length}`, chainKeys }))
   )
   assert(
     flattenOptions(options.slice(1)).every(

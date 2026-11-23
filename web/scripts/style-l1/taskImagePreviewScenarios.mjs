@@ -457,7 +457,6 @@ export function createTaskImagePreviewScenarios({
         assert.equal(await dialog.getAttribute('aria-modal'), 'false')
         const picker = right.getByRole('combobox', { name: '选择右栏页面' })
         await picker.click()
-        await picker.fill('任务管理')
         await page.locator('.ant-select-dropdown:visible').getByText('任务管理', { exact: true }).click()
         await picker.focus()
         await dialog.getByRole('button', { name: '关闭图片预览', exact: true }).evaluate((node) => node.click())

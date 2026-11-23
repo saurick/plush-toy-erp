@@ -5,6 +5,7 @@ import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
+import { progressFixtureData } from './businessProgressFixtures.mjs'
 
 export function createProductionTaskHandlingScenarios(deps) {
   const { assert, assertNoHorizontalOverflow, outputDir, path } = deps
@@ -130,6 +131,14 @@ snapshotAt: 1791658000,
 
 function createQualityTaskFocusScenario(deps, base, shipment = false) {
   const permissions = ['workflow.task.read', 'quality.inspection.read', 'quality.inspection.update', 'production.wip.read']
+  const menus = [
+    { key: 'task-board', path: '/erp/task-board', required_any: ['workflow.task.read'] },
+    { key: 'quality-inspections', path: '/erp/production/quality-inspections', required_any: ['quality.inspection.read'] },
+  ]
+  if (shipment) {
+    permissions.push('erp.business_dashboard.read', 'sales_order.read', 'sales_order_item.read')
+    menus.push({ key: 'business-dashboard', path: '/erp/business-dashboard', required_any: ['erp.business_dashboard.read'] })
+  }
   const entry = '/erp/production/quality-inspections?quality_inspection_id=701'
   const task = { ...base.workflowTaskFixtures[0],
 task_name: shipment ? '办理出货前检验' : '检验当前裁片批次',
@@ -144,22 +153,25 @@ required_capability_key: 'quality.inspection.update',
     payload: { ...base.workflowTaskFixtures[0].payload, source_record_id: 701, entry_path: entry } }
   let inspection
   let submits = 0
+  let decisions = 0
+  const qualityNumber = 'TASK-QC-0701'
   return [{
     ...base,
     name: shipment ? 'shipment-quality-task-progress-entry' : 'production-task-quality-direct-focus',
-    path: shipment ? `/erp/task-board?task_id=${task.id}` : base.path,
+    path: shipment ? '/erp/business-dashboard?view=orders&q=SO-0001' : base.path,
     workflowTaskFixtures: [task],
     adminProfile: { ...base.adminProfile,
 roles: [{ role_key: 'quality', name: '品质' }],
 permissions,
-      menus: [{ key: 'task-board', path: '/erp/task-board', required_any: ['workflow.task.read'] },
-        { key: 'quality-inspections', path: '/erp/production/quality-inspections', required_any: ['quality.inspection.read'] }] },
+      menus },
     effectiveSession: { ...base.effectiveSession,
-pages: ['task-board', 'quality-inspections'],
+pages: menus.map(({ key }) => key),
 actions: permissions,
       workflow_visible_owner_role_keys_by_capability: { 'workflow.task.read': ['quality'] } },
     beforeNavigate: async (page) => {
       submits = 0
+      decisions = 0
+      let currentTask = task
       inspection = { id: 701,
 inspection_no: 'QI-FOCUS-CUTTING',
 status: 'DRAFT',
@@ -180,7 +192,7 @@ quantity: '20',
 unit_name: '只' }
       if (shipment) { inspection = { id: 701,
 inspection_no: 'QC-SHIP-701',
-status: 'DRAFT',
+status: 'SUBMITTED',
 result: '',
         inspection_type: 'FINISHED_GOODS',
 source_type: 'SHIPMENT',
@@ -193,6 +205,60 @@ warehouse_id: 1,
 unit_id: 1,
 unit_name: '只' } }
       await base.beforeNavigate(page)
+      if (shipment) {
+        await page.route('**/rpc/business', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (!['get_progress', 'list_progress', 'list_progress_tasks'].includes(method)) return route.fallback()
+          const detail = method !== 'list_progress'
+          const data = progressFixtureData(params, { detail })
+          const orderRows = detail ? [data.row] : data.rows
+          for (const row of orderRows) {
+            if (row.id !== 1) continue
+            Object.assign(row, {
+              open_tasks: decisions ? 1 : 2,
+              blocked_tasks: 0,
+              blocked: false,
+              attention_task_id: decisions ? 702 : task.id,
+              attention_task: decisions ? '确认采购单价' : task.task_name,
+              attention_reason: decisions ? '' : '成品质检尚未判定',
+              attention_owner: decisions ? '模拟采购员' : '模拟质检员',
+              attention_role: decisions ? 'purchase' : 'quality',
+            })
+          }
+          if (detail) {
+            const fixture = data.sections.tasks[0]
+            const quality = {
+              ...fixture,
+              id: task.id,
+              number: qualityNumber,
+              label: task.task_name,
+              status: decisions ? 'done' : 'ready',
+              task_group: task.task_group,
+              note: decisions ? '质量检验已判定合格' : '成品质检尚未判定',
+              role: 'quality',
+              owner: '模拟质检员',
+            }
+            const purchase = {
+              ...fixture,
+              id: 702,
+              number: 'TASK-PO-0702',
+              label: '确认采购单价',
+              status: 'ready',
+              task_group: 'handoff_purchase_price',
+              note: '采购单 PO-0702 缺少正式单价',
+              owner: '模拟采购员',
+              role: 'purchase',
+            }
+            data.sections.tasks = decisions ? [purchase, quality] : [quality, purchase]
+            data.task_total = data.sections.tasks.length
+          }
+          if (method === 'list_progress_tasks') {
+            const rows = data.sections.tasks.filter((record) => params.task_status !== 'open' || record.status !== 'done')
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ rows, total: rows.length }) } })
+          }
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(data) } })
+        })
+      }
       await page.route('**/rpc/workflow', async (route) => {
         const { id, method } = route.request().postDataJSON()
         if (method === 'explain_action_access') {
@@ -203,7 +269,7 @@ result: styleRpcResult({ task_id: task.id,
             actions: [{ action_key: 'complete', allowed: false, owner_role_matched: true, owner_role_key: 'quality', required_permission: 'quality.inspection.update', reason_code: 'source_generated_only', reason: '在检验单判定后更新待办' }],
           }) } })
         }
-        if (method === 'get_task') return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ task }) } })
+        if (method === 'get_task') return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ task: currentTask }) } })
         return route.fallback()
       })
       await page.route('**/rpc/quality', async (route) => {
@@ -213,6 +279,14 @@ result: styleRpcResult({ task_id: task.id,
           submits += 1
           inspection = { ...inspection, status: 'SUBMITTED' }
           data = { quality_inspection: inspection }
+        } else if (method === 'pass_quality_inspection') {
+          deps.assert.equal(params.id, 701)
+          deps.assert.equal(params.result, 'PASS')
+          deps.assert.equal(params.check_items[0].result, 'PASS')
+          decisions += 1
+          inspection = { ...inspection, status: 'PASSED', result: 'PASS' }
+          currentTask = { ...task, task_status_key: 'done', version: 2, completed_at: 1791648100 }
+          data = { quality_inspection: inspection }
         } else if (method === 'get_quality_inspection') data = { quality_inspection: inspection }
         else if (['list_quality_inspections', 'list_production_stage_quality_inspections'].includes(method)) data = stylePaginatedRpcData([inspection], 'quality_inspections', params)
         else return route.fallback()
@@ -220,12 +294,75 @@ result: styleRpcResult({ task_id: task.id,
       })
     },
     verify: async (page) => {
-      if (shipment) await page.getByRole('heading', { name: task.task_name, exact: true }).waitFor()
-      else await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
+      const rowEntry = page.getByRole('button', { name: '查看进度：SO-0001', exact: true })
+      const progress = page.getByRole('dialog', { name: 'SO-0001 · 订单进度', exact: true })
+      const concerns = page.getByRole('region', { name: '本单卡点' })
+      const stages = concerns.getByRole('button', { name: '阶段追踪', exact: true })
+      const linkedTasks = progress.getByRole('tabpanel', { name: '关联任务', exact: true })
+      if (shipment) {
+        await rowEntry.click()
+        await concerns.getByText('出货放行', { exact: true }).waitFor()
+        await concerns.getByText('应付结算', { exact: true }).waitFor()
+        await concerns.getByText('模拟采购员', { exact: true }).waitFor()
+        deps.assert.equal(await stages.getAttribute('aria-expanded'), 'false')
+        await waitForFiniteAnimations(page, { selector: '.erp-progress-modal' })
+        await page.screenshot({ path: path.join(deps.outputDir, 'shipment-quality-order-concerns.png') })
+        await stages.click()
+        await concerns.getByText('成品质检尚未判定', { exact: true }).waitFor()
+        deps.assert.equal(await concerns.getByRole('button', { name: /^查看任务/u }).count(), 0)
+        await progress.getByRole('button', { name: '返回进度看板', exact: true }).click()
+        await progress.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '2 项待办（SO-0001）', exact: true }).click()
+        await linkedTasks.getByRole('button', { name: `打开任务详情 ${qualityNumber}`, exact: true }).click()
+        await page.waitForURL((url) => url.pathname === '/erp/task-board' && url.searchParams.get('task_id') === String(task.id))
+      } else {
+        await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
+      }
       await page.getByRole('tablist', { name: '任务处理步骤' }).getByRole('tab', { name: /任务办理/ }).click()
       const focus = page.getByRole('region', { name: '办理本次质检', exact: true })
       await focus.getByText(inspection.inspection_no, { exact: true }).waitFor()
-      if (shipment) await focus.getByText('SHIP-701', { exact: true }).waitFor()
+      if (shipment) {
+        await focus.getByText('SHIP-701', { exact: true }).waitFor()
+        deps.assert.equal(decisions, 0, '打开待办时只读取质检单')
+        await page.getByRole('button', { name: '判定合格', exact: true }).click()
+        await page.getByText('未检', { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible').getByText('符合', { exact: true }).click()
+        await page.getByPlaceholder('观察或测量', { exact: true }).fill('成品与出货要求一致')
+        await page.getByRole('combobox', { name: '检查范围', exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible').getByText('全检', { exact: true }).click()
+        await page.getByRole('radio', { name: /0%（未发现不良）/u }).click()
+        await page.getByRole('button', { name: '确认合格', exact: true }).click()
+        await page.getByRole('button', { name: '查看办理结果', exact: true }).click()
+        const receipt = page.getByRole('region', { name: '办理结果', exact: true })
+        await receipt.getByRole('heading', { name: '质量检验已判定合格', exact: true }).waitFor()
+        await receipt.getByText('QC-SHIP-701', { exact: true }).first().waitFor()
+        deps.assert.equal(decisions, 1, '一张检验单只保存一次判定')
+        await page.screenshot({ path: path.join(deps.outputDir, 'shipment-quality-order-receipt.png') })
+        await page.locator('.ant-drawer-footer').getByRole('button', { name: '返回关联任务', exact: true }).click()
+        await linkedTasks.getByRole('button', { name: '待处理', exact: true, pressed: true }).waitFor()
+        await linkedTasks.getByRole('button', { name: '打开任务详情 TASK-PO-0702', exact: true }).waitFor()
+        deps.assert.equal(await linkedTasks.getByRole('button', { name: `打开任务详情 ${qualityNumber}`, exact: true }).count(), 0)
+        deps.assert.equal(new URL(page.url()).searchParams.get('q'), 'SO-0001')
+        await progress.getByRole('button', { name: '返回进度看板', exact: true }).click()
+        await progress.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '确认采购单价（SO-0001）', exact: true }).waitFor()
+        deps.assert.equal(await page.getByRole('button', { name: '2 项待办（SO-0001）', exact: true }).count(), 0)
+        await rowEntry.click()
+        await concerns.getByText('应付结算', { exact: true }).waitFor()
+        deps.assert.equal(await concerns.getByText('出货放行', { exact: true }).count(), 0)
+        await progress.locator('.erp-progress-detail-delivery').getByText(/已出\s*400/u).waitFor()
+        await progress.getByRole('tab', { name: '关联任务', exact: true }).click()
+        await linkedTasks.getByRole('button', { name: '已结束', exact: true }).click()
+        await linkedTasks.getByText('质量检验已判定合格', { exact: true }).waitFor()
+        await linkedTasks.getByText('已完成', { exact: true }).waitFor()
+        await progress.getByRole('button', { name: '返回进度看板', exact: true }).click()
+        await progress.waitFor({ state: 'hidden' })
+        await rowEntry.waitFor()
+        deps.assert.equal(new URL(page.url()).searchParams.get('q'), 'SO-0001')
+        await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '查看进度：SO-0001')
+        await deps.assertNoHorizontalOverflow(page, 'shipment-quality-task-progress-entry')
+        return
+      }
       deps.assert.equal(submits, 0, '任务进入只打开表单，不自动提交质检')
       await page.getByRole('button', { name: '提交质检', exact: true }).click()
       await focus.getByText('待质量判定', { exact: true }).waitFor()

@@ -6,18 +6,14 @@ import { getFulfillmentStageCopy } from '../../config/devFulfillmentPresentation
 
 export default function FulfillmentExceptionDetails({
   selection,
-  role,
   onSelectPlan,
   onSelectStep,
   onSelectOrigin,
   onSelectStage,
-  guides,
-  onSelectGuide,
 }) {
-  const { guide, plan, selected, related, origin } = selection
-  const origins = related.filter((step) =>
-    guide.entry_stages.includes(step.stage)
-  )
+  const { guide, plan, selected, origins, origin } = selection
+  const titleRef = React.useRef(null)
+  const focusTitle = React.useRef(false)
   // Without a chosen plan, the diagram is a menu of registered alternatives.
   const flow = React.useMemo(
     () =>
@@ -30,35 +26,34 @@ export default function FulfillmentExceptionDetails({
       },
     [selection.graph, guide]
   )
-  const [previewKey, setPreviewKey] = React.useState(null)
-  const preview = !plan && guide.plans.find((item) => item.key === previewKey)
-  const menuNode = preview || flow.nodes[0]
-  const selectedNode = plan ? selected : menuNode
-  const selectNode = (key) => (plan ? onSelectStep(key) : setPreviewKey(key))
+  React.useLayoutEffect(() => {
+    if (focusTitle.current) {
+      focusTitle.current = false
+      titleRef.current?.focus({ preventScroll: true })
+    }
+  }, [plan?.key])
+  const showPlan = (key) => {
+    focusTitle.current = true
+    onSelectPlan(key)
+  }
+  const selectNode = (key) => {
+    if (plan) onSelectStep(key)
+    else if (guide.plans.some((item) => item.key === key)) showPlan(key)
+  }
   return (
     <section
       className="erp-dev-fulfillment-guide__exception"
       data-exception-guide={guide.key}
     >
-      <div className="erp-dev-fulfillment-guide__choices">
-        {guides && onSelectGuide ? (
-          <FilterSelect
-            label="异常类型"
-            aria-label="异常类型"
-            placeholder="选择异常类型"
-            value={guide.key}
-            onChange={onSelectGuide}
-            options={guides.map((item) => ({
-              value: item.key,
-              label: item.label,
-            }))}
-            virtual={false}
-          />
+      <div className="erp-dev-fulfillment-guide__exception-toolbar">
+        <h4 ref={titleRef} tabIndex={-1}>{plan?.label || '处理方案'}</h4>
+        {plan && guide.plans.length > 1 ? (
+          <Button onClick={() => showPlan(null)}>查看全部方案</Button>
         ) : null}
-        {origins.length ? (
+        {plan && origins.length > 1 ? (
           <FilterSelect
+            className="erp-dev-fulfillment-guide__exception-select"
             label="发生环节"
-            aria-label="发生环节"
             placeholder="选择发生环节"
             value={origin?.stage}
             onChange={onSelectOrigin}
@@ -66,27 +61,10 @@ export default function FulfillmentExceptionDetails({
               value: step.stage,
               label: getFulfillmentStageCopy(step).label,
             }))}
+            showSearch={false}
             virtual={false}
           />
-        ) : (
-          <span>独立业务</span>
-        )}
-        {guide.plans.length > 1 ? (
-          <FilterSelect
-            label="处理方案"
-            aria-label="处理方案"
-            placeholder="选择处理方案"
-            value={plan?.key}
-            onChange={onSelectPlan}
-            options={guide.plans.map((item) => ({
-              value: item.key,
-              label: item.label,
-            }))}
-            virtual={false}
-          />
-        ) : (
-          <span>{plan.label}</span>
-        )}
+        ) : null}
       </div>
       <p className="erp-dev-business-flow-print-scope">{plan ? `处理方案：${plan.label}` : '方案分支总览'}{origins.length && !origin ? ' · 未指定发生环节' : ''}</p>
       <div
@@ -96,42 +74,31 @@ export default function FulfillmentExceptionDetails({
         <BusinessFlowDiagram
           flow={flow}
           label={`${guide.label}流程图`}
-          selectedKey={selectedNode?.key}
+          selectedKey={selected?.key ?? 'source'}
           onSelect={selectNode}
-          role={role}
+          legend={plan ? undefined : '点选方案查看办理路径。'}
         />
       </div>
-      {selectedNode ? (
+      {selected ? (
         <div
           className="erp-dev-fulfillment-guide__focus"
           aria-live="polite"
-          data-selected-exception-node={plan ? selectedNode.key : undefined}
+          data-selected-exception-node={selected.key}
         >
-          <strong>{selectedNode.label}</strong>
-          <p>
-            {plan
-              ? selectedNode.result || selectedNode.condition
-              : preview?.closure || guide.source}
-          </p>
-          {preview ? (
-            <Button type="link" onClick={() => onSelectPlan(preview.key)}>
-              查看此方案
-            </Button>
-          ) : null}
-          {selectedNode.stage ? (
+          <strong>{selected.label}</strong>
+          <p>{selected.result || selected.condition}</p>
+          {selected.stage ? (
             <Button
               type="link"
               size="small"
-              onClick={() => onSelectStage(selectedNode.stage)}
+              onClick={() => onSelectStage(selected.stage)}
             >
               查看该环节
             </Button>
           ) : null}
         </div>
       ) : (
-        <p className="erp-dev-fulfillment-guide__hint">
-          点选图中的方案，展开办理与回接路径。
-        </p>
+        <p>{guide.source}</p>
       )}
       {plan ? (
         <details

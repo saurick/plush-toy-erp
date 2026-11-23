@@ -11,6 +11,7 @@ import {
   projectBusinessChainDraft,
   businessChainNodeContext,
   orientBusinessChainPoint,
+  placeBusinessChainLabel,
   routeBusinessChainEdges,
 } from './devBusinessChainDesignView.mjs'
 
@@ -47,6 +48,24 @@ function assertRouteClearsCards(points, nodes, message) {
     }
   }
 }
+
+test('连线说明沿本线寻找完整空位，避开卡片、圆点和已排说明', () => {
+  const short = { start: { x: 0, y: 0 }, end: { x: 56, y: 0 }, horizontal: true, length: 56 }
+  assert.equal(placeBusinessChainLabel([short], 108, 15, []), null)
+  const long = { ...short, end: { x: 250, y: 0 }, length: 250 }
+  const card = { left: 80, top: -50, right: 170, bottom: -14 }
+  const port = { left: 0, top: -12, right: 12, bottom: 12 }
+  const placed = placeBusinessChainLabel([short, long], 108, 15, [card, port])
+  assert.deepEqual(placed, { left: 71, top: -7.5, right: 179, bottom: 7.5 })
+  assert.equal(placeBusinessChainLabel([long], 108, 15, [card, port, placed]), null)
+  const line = { left: 0, right: 250, top: 0, bottom: 0 }
+  assert.deepEqual(placeBusinessChainLabel([long], 108, 15, [{ ...line, segment: long }]), placed)
+  assert.equal(placeBusinessChainLabel([long], 108, 15, [line]), null, '不能在另一条重合的线上标注')
+  const vertical = { start: { x: 80, y: 0 }, end: { x: 80, y: 100 }, horizontal: false, length: 100 }
+  const shifted = placeBusinessChainLabel([vertical], 108, 15, [card, { left: -50, top: 36, right: 80, bottom: 70 }])
+  assert.equal(shifted.right, 76)
+  assert.equal(shifted.bottom, 32)
+})
 
 test('11 条主线只归并草稿已有路径，完整保留分支、异常和内部反馈，不写草稿或规则', () => {
   for (const chain of library.chains) {

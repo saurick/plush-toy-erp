@@ -1,5 +1,5 @@
 import { expect } from 'playwright/test'
-import { chooseViewOption, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
+import { chooseGranularity, chooseExplorerAction, searchWholeLibrary } from './devFlowExplorerControls.mjs'
 import { chooseChainNodeView } from './devBusinessChainNodeFilterAssertions.mjs'
 
 export function createDevBusinessChainDesignFullscreenScenarios({
@@ -22,7 +22,7 @@ export function createDevBusinessChainDesignFullscreenScenarios({
         await searchWholeLibrary(editor)
         // Object-level gestures remain available through the complete node library.
         await chooseChainNodeView(page, editor, '全部')
-        await chooseViewOption(editor, '全部已载入节点')
+        await chooseGranularity(editor, '节点明细')
         await expect(
           editor.getByRole('button', { name: '适应画布全图', exact: true })
         ).toBeDisabled()
@@ -60,6 +60,7 @@ export function createDevBusinessChainDesignFullscreenScenarios({
               footer: box('.erp-chain-design__footer'),
               drafts: box('.erp-chain-design__file-actions'),
               tools: box('.erp-chain-design__toolbar'),
+              captionLine: parseFloat(getComputedStyle(element.querySelector('.erp-chain-design__grain-card small')).lineHeight),
               actions: box('.erp-chain-design__canvas-actions'),
               scope: box('.erp-chain-design__role-filter'),
             }
@@ -70,7 +71,7 @@ export function createDevBusinessChainDesignFullscreenScenarios({
           const wrapped = layout.actions.top >= layout.scope.bottom
           assert(layout.actions.bottom <= layout.canvas.top + 1, '全屏时编辑和缩放操作仍在图上方')
           assert(
-            layout.tools.bottom - layout.drafts.top <= (wrapped ? 130 : 90),
+            layout.tools.bottom - layout.drafts.top <= (wrapped ? 130 : 90) + layout.captionLine,
             '全屏编辑时，画布操作按可用宽度同排或换一行'
           )
           assert(layout.footer.height <= 40, '图例按需查看，底部仅占一行')

@@ -469,9 +469,10 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'creates_fact_draft',
         {
           action: 'OperationalFactUsecase.CreatePayableFromPurchaseReceipt',
-          condition: '收货明细已完成入库或不合格处置，采购价格和结算快照完整；仅按已入库行计入应付',
+          condition: '收货行均已入库或完成拒收处置。缺价交采购补齐；结算快照完整且已入库行扣除退货和调整后的净额为正时，财务从待办核对本次收货并生成草稿。',
           factBoundary: 'finance_fact_draft_from_posted_source',
           sourceRefs: [
+            'server/internal/data/purchase_payable_handoff.go',
             'server/internal/biz/operational_fact_finance_source.go',
           ],
         }
@@ -1961,6 +1962,19 @@ function normalizeBusinessChainOverview(rawOverview, chains) {
     allowsActionExecution: false,
     runtimeAuthority: 'design_projection_only',
   })
+}
+
+export function groupBusinessChainOptions(overview, options) {
+  const optionByKey = new Map(options.map((option) => [option.value, option]))
+  return overview.lanes.map(({ key, label, chainKeys }) => ({
+    key,
+    label,
+    options: chainKeys.map((chainKey) => {
+      const option = optionByKey.get(chainKey)
+      if (!option) throw new Error(`missing option for business chain: ${chainKey}`)
+      return option
+    }),
+  }))
 }
 
 function normalizeNode(

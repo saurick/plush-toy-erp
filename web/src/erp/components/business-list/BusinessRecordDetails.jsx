@@ -1,6 +1,7 @@
 import React from 'react'
 import { Descriptions } from 'antd'
 import { resolveBusinessDetailCopyText, resolveBusinessTableCopyLabel } from '../../utils/businessTableCopy.mjs'
+import { getWorkflowTaskSourceNo } from '../../utils/dashboardTaskDisplay.mjs'
 import { getColumnLabel } from './ColumnOrderModal.jsx'
 import { BusinessCopyField } from './BusinessCopyButton.jsx'
 import { visibleDetailValue } from './BusinessRowItemCards.jsx'
@@ -29,13 +30,16 @@ function detailValue(column, record) {
   return rawValue
 }
 
-export default function BusinessRecordDetails({ columns = [], record, column = { xs: 1, sm: 2, lg: 3 }, presentation = 'desktop', title = '本次业务资料' }) {
+export default function BusinessRecordDetails({ columns = [], record, column = { xs: 1, sm: 2, lg: 3 }, presentation = 'desktop', title = '本次业务资料', task }) {
+  const taskPresentation = presentation === 'mobile-task'
+  const sourceNo = taskPresentation && record?.id && task?.source_id === record.id ? getWorkflowTaskSourceNo(task) : ''
   const detailColumns = columns.filter(
     (column) =>
       column &&
       column.hidden !== true &&
       column.hiddenByEffectiveFieldPolicy !== true &&
       column.detailHidden !== true &&
+      !(sourceNo && column.taskDetailRole === 'identity' && readDataIndex(record, column.dataIndex) === sourceNo) &&
       getColumnLabel(column)
   )
 
@@ -48,10 +52,12 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
               ? column.dataIndex.join('.')
               : column.dataIndex) ||
             `${columnLabel}-${index}`
-          const value = visibleDetailValue(detailValue(column, record || {}))
+          const value = visibleDetailValue(taskPresentation && column.taskDetailValue
+            ? column.taskDetailValue(record || {}, task)
+            : detailValue(column, record || {}))
           const copyText = resolveBusinessDetailCopyText(column, record)
           const empty = value === '-' && !copyText
-          const emptyValue = presentation === 'mobile-task'
+          const emptyValue = taskPresentation
             ? column.taskDetailEmptyValue?.(record || {})
             : null
           return {
@@ -76,8 +82,9 @@ export default function BusinessRecordDetails({ columns = [], record, column = {
           }
         })
 
-  if (presentation === 'mobile-task') {
+  if (taskPresentation) {
     const populated = items.filter((item) => !item.empty).sort((left, right) => left.order - right.order)
+    if (!populated.length) return null
     const fields = (rows, className, hideLabels = false) => rows.length ? (
       <dl className={className}>
         {rows.map((item) => (

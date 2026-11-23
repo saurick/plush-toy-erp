@@ -42,7 +42,9 @@ func assertBusinessProgressIdentitySearch(t *testing.T, data *Data, client *ent.
 	// Repeated order lines for the same product remain one style; canceled
 	// requirements cannot make an active order match a product search.
 	client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(4).SetProductID(products[1].ID).SetProductNameSnapshot("饼干小熊").SetUnitID(unitID).SetOrderedQuantity(decimal.NewFromInt(5)).SaveX(ctx)
-	client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(5).SetProductID(products[1].ID).SetProductNameSnapshot("取消专属产品").SetLineStatus("canceled").SetUnitID(unitID).SetOrderedQuantity(decimal.NewFromInt(5)).SaveX(ctx)
+	client.ProductionOrderItem.Create().SetRouteCode(biz.ProductionWIPRoutePlushSewHandV1).SetProductionOrderID(production.ID).SetLineNo(4).SetProductID(products[1].ID).SetProductNameSnapshot("饼干小熊").SetUnitID(unitID).SetPlannedQuantity(decimal.NewFromInt(5)).SaveX(ctx)
+	canceledProduct := createSalesOrderTestProduct(t, ctx, client, unitID, "CANCELED-"+suffix, true)
+	client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(5).SetProductID(canceledProduct.ID).SetProductNameSnapshot("取消专属产品").SetLineStatus("canceled").SetUnitID(unitID).SetOrderedQuantity(decimal.NewFromInt(5)).SaveX(ctx)
 	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(data))
 	for _, view := range []string{"orders", "production"} {
 		id := order.ID
@@ -54,6 +56,9 @@ func assertBusinessProgressIdentitySearch(t *testing.T, data *Data, client *ent.
 		if err != nil || len(baseline.Rows) != 1 {
 			t.Fatalf("%s baseline=%+v err=%v", view, baseline, err)
 		}
+		if row := baseline.Rows[0]; row.ProductCount != 4 || row.LinkedProductCount != 3 {
+			t.Fatalf("%s rows=%d, linked products=%d; want 4 rows and 3 linked products", view, row.ProductCount, row.LinkedProductCount)
+		}
 		for _, search := range []struct {
 			keyword        string
 			count, product int
@@ -64,7 +69,7 @@ func assertBusinessProgressIdentitySearch(t *testing.T, data *Data, client *ent.
 				t.Fatalf("%s search %q board=%+v err=%v", view, search.keyword, board, err)
 			}
 			row := board.Rows[0]
-			if row.ProductMatchCount != search.count || row.ProductTypeCount != 3 || row.ProductID != products[search.product].ID || row.Product != names[search.product] || *row.OrderedQuantity != *baseline.Rows[0].OrderedQuantity {
+			if row.ProductMatchCount != search.count || row.ProductTypeCount != 3 || row.LinkedProductCount != 3 || row.ProductID != products[search.product].ID || row.Product != names[search.product] || *row.OrderedQuantity != *baseline.Rows[0].OrderedQuantity {
 				t.Fatalf("%s search %q row=%+v baseline=%+v", view, search.keyword, row, baseline.Rows[0])
 			}
 		}

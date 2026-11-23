@@ -11,7 +11,7 @@ const (
 	WorkflowMaterialFinanceReviewGroup = "engineering_material_finance_review"
 	WorkflowMaterialRevisionGroup      = "engineering_material_revision"
 	WorkflowMaterialRequestSourceType  = "engineering_material_request"
-	workflowMaterialRequestProducer    = "engineering_material_request.approval"
+	WorkflowMaterialRequestProducer    = "engineering_material_request.approval"
 )
 
 func IsEngineeringMaterialTaskGroup(group string) bool {
@@ -23,7 +23,7 @@ func IsEngineeringMaterialTaskGroup(group string) bool {
 	}
 }
 
-func materialTaskResponsibility(group string) (string, string, string) {
+func EngineeringMaterialTaskResponsibility(group string) (string, string, string) {
 	switch group {
 	case WorkflowMaterialBossReviewGroup:
 		return BossRoleKey, PermissionEngineeringMaterialBossApprove, "审核工程用料"
@@ -36,24 +36,30 @@ func materialTaskResponsibility(group string) (string, string, string) {
 	}
 }
 
+func EngineeringMaterialTaskGroup(status string) string {
+	switch status {
+	case MaterialRequestSubmitted:
+		return WorkflowMaterialBossReviewGroup
+	case MaterialRequestBossApproved:
+		return WorkflowMaterialFinanceReviewGroup
+	case MaterialRequestRejected:
+		return WorkflowMaterialRevisionGroup
+	default:
+		return ""
+	}
+}
+
 // The request owns approval and purchase generation. Tasks only carry the
 // source identity and the human handoff, and never duplicate its material rows.
 func BuildEngineeringMaterialTask(request *EngineeringMaterialRequest) (*WorkflowTaskCreate, error) {
 	if request == nil || request.ID <= 0 || request.SalesOrderID <= 0 || strings.TrimSpace(request.OrderNo) == "" {
 		return nil, ErrBadParam
 	}
-	group := ""
-	switch request.Status {
-	case MaterialRequestSubmitted:
-		group = WorkflowMaterialBossReviewGroup
-	case MaterialRequestBossApproved:
-		group = WorkflowMaterialFinanceReviewGroup
-	case MaterialRequestRejected:
-		group = WorkflowMaterialRevisionGroup
-	default:
+	group := EngineeringMaterialTaskGroup(request.Status)
+	if group == "" {
 		return nil, ErrBadParam
 	}
-	role, capability, name := materialTaskResponsibility(group)
+	role, capability, name := EngineeringMaterialTaskResponsibility(group)
 	products := map[string]bool{}
 	for _, source := range request.Sources {
 		name := ""
@@ -76,7 +82,7 @@ func BuildEngineeringMaterialTask(request *EngineeringMaterialRequest) (*Workflo
 	sort.Strings(productNames)
 	payload := map[string]any{
 		"source_task_contract":            WorkflowSourceTaskContractV1,
-		"source_task_producer":            workflowMaterialRequestProducer,
+		"source_task_producer":            WorkflowMaterialRequestProducer,
 		"engineering_material_request_id": request.ID,
 		"sales_order_id":                  request.SalesOrderID,
 		"order_no":                        request.OrderNo,
@@ -104,12 +110,12 @@ func IsTrustedEngineeringMaterialTask(task *WorkflowTask) bool {
 	if task == nil || !IsEngineeringMaterialTaskGroup(task.TaskGroup) || task.SourceID <= 0 {
 		return false
 	}
-	role, capability, _ := materialTaskResponsibility(task.TaskGroup)
+	role, capability, _ := EngineeringMaterialTaskResponsibility(task.TaskGroup)
 	requestID, found, err := processCommandPositiveIntFromPayload(task.Payload, "engineering_material_request_id")
 	orderID, orderFound, orderErr := processCommandPositiveIntFromPayload(task.Payload, "sales_order_id")
 	return err == nil && found && requestID == task.SourceID && orderErr == nil && orderFound && orderID > 0 &&
 		task.SourceType == WorkflowMaterialRequestSourceType && task.TaskCode == WorkflowSourceTaskCode(task.TaskGroup, task.SourceID) &&
 		task.OwnerRoleKey == role && task.RequiredCapabilityKey != nil && *task.RequiredCapabilityKey == capability &&
 		workflowPayloadString(task.Payload, "source_task_contract") == WorkflowSourceTaskContractV1 &&
-		workflowPayloadString(task.Payload, "source_task_producer") == workflowMaterialRequestProducer && workflowSourceTaskIntentMarkerValid(task.Payload)
+		workflowPayloadString(task.Payload, "source_task_producer") == WorkflowMaterialRequestProducer && workflowSourceTaskIntentMarkerValid(task.Payload)
 }

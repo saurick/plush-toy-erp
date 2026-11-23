@@ -9,6 +9,8 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/sourceorderlifecycleevent"
 
 	"entgo.io/ent/dialect"
@@ -26,6 +28,14 @@ func (r *purchaseOrderRepo) CompletePurchaseOrderTerms(ctx context.Context, in *
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 	action := &biz.SourceOrderLifecycleAction{ID: in.ID, ExpectedVersion: in.ExpectedVersion, ActorID: in.ActorID,
 		ActionKey: in.ActionKey(), IdempotencyKey: in.IdempotencyKey, IntentHash: in.IntentHash}
+	// Receipt posting and payable creation lock the receipt before its order.
+	// Late pricing must acquire existing source receipts in the same order.
+	if !in.DeliveryOnly && r.data.sqlDialect == dialect.Postgres {
+		_, err := tx.PurchaseReceipt.Query().Where(purchasereceipt.StatusNEQ(biz.PurchaseReceiptStatusCancelled), purchasereceipt.HasItemsWith(purchasereceiptitem.HasPurchaseOrderItemWith(purchaseorderitem.PurchaseOrderID(in.ID))), lockPurchasePayableSourceRow).Order(ent.Asc(purchasereceipt.FieldID)).IDs(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(in.ID))
 	if r.data.sqlDialect == dialect.Postgres {
 		query.Where(func(s *sql.Selector) { s.ForUpdate() })
@@ -140,6 +150,11 @@ func (r *purchaseOrderRepo) CompletePurchaseOrderTerms(ctx context.Context, in *
 	row, err := tx.PurchaseOrder.Get(ctx, order.ID)
 	if err != nil {
 		return nil, err
+	}
+	if !in.DeliveryOnly {
+		if err := refreshOrderPayables(ctx, tx.Client(), row, in.ActorID); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

@@ -289,7 +289,6 @@ export function createInventoryPresentationScenarios(deps) {
         const right = page.locator('.erp-split-pane--right')
         const picker = right.getByRole('combobox', { name: '选择右栏页面', exact: true })
         await picker.click()
-        await picker.fill('出库办理')
         await page.locator('.ant-select-dropdown:visible').getByText('出库办理', { exact: true }).click()
         await selectWarehouseView(page, '生产领料', right)
         await left.locator('.erp-business-module-view-tabs [role="tab"][aria-selected="true"]').filter({ hasText: '采购收货' }).waitFor()

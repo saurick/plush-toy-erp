@@ -18,10 +18,17 @@
   margin: 0;
   color: var(--erp-text-muted);
 }
-.erp-dev-task-matrix .erp-workbench-toolbar__controls > .app-select {
-  flex: 0 1 180px;
-  width: 180px;
-  max-width: 100%;
+.erp-dev-task-filter-summary {
+  color: var(--erp-text-muted);
+}
+.erp-dev-task-filter-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(566px, calc(100vw - 56px));
+  max-height: min(480px, var(--erp-filter-available-height, 60dvh));
+}
+.erp-dev-task-filter-panel__groups {
+  overscroll-behavior: contain;
 }
 .erp-dev-task-matrix .ant-table-cell {
   overflow-wrap: anywhere;

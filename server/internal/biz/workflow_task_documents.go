@@ -10,6 +10,10 @@ type WorkflowDocumentType struct {
 	SectionKey string   `json:"section_key"`
 }
 
+func WorkflowDocumentTypes() []WorkflowDocumentType {
+	return append([]WorkflowDocumentType(nil), workflowTaskDiscoveryCatalog.Documents...)
+}
+
 func WorkflowDocumentTypeFor(source string) (WorkflowDocumentType, bool) {
 	for _, document := range workflowTaskDiscoveryCatalog.Documents {
 		for _, member := range document.Sources {

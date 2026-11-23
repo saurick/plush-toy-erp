@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ReloadOutlined,
   SafetyCertificateOutlined,
-  ArrowRightOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Drawer, Tag, Typography } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
@@ -17,6 +16,7 @@ import { Loading } from '@/common/components/loading'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import DevPermissionNavigationOverview from '../components/DevPermissionNavigationOverview.jsx'
 import DevPermissionRelationshipGraph from '../components/DevPermissionRelationshipGraph.jsx'
 import DevRoleResponsibilityGraph from '../components/DevRoleResponsibilityGraph.jsx'
@@ -432,29 +432,31 @@ export default function DevPermissionRelationshipsPage() {
         className="erp-dev-permission-capabilities"
         aria-label="岗位与业务能力"
       >
-        <nav
+        <Directory
           className="erp-dev-permission-capabilities__groups"
           aria-label="业务能力"
+          title={<strong>业务能力</strong>}
         >
-          {groups.map((group) => (
-            <button
-              key={group.key}
-              type="button"
-              aria-pressed={selectedGroup?.key === group.key}
-              onClick={() => updateSearch({ module: group.key })}
-            >
-              <span>{group.label}</span>
-              <ArrowRightOutlined aria-hidden="true" />
-              <small>
-                {group.available ? `${group.available} 项可用` : ''}
-                {group.available && group.restricted ? ' · ' : ''}
-                {group.restricted
-                  ? `${group.restricted} 项${group.items.every((item) => item.status === '未授予') ? '未授予' : '受限'}`
-                  : ''}
-              </small>
-            </button>
-          ))}
-        </nav>
+          <div className="erp-directory-list">
+            {groups.map((group) => (
+              <DirectoryItem
+                key={group.key}
+                className="erp-directory-item--stacked"
+                aria-pressed={selectedGroup?.key === group.key}
+                onClick={() => updateSearch({ module: group.key })}
+              >
+                <span>{group.label}</span>
+                <small>
+                  {group.available ? `${group.available} 项可用` : ''}
+                  {group.available && group.restricted ? ' · ' : ''}
+                  {group.restricted
+                    ? `${group.restricted} 项${group.items.every((item) => item.status === '未授予') ? '未授予' : '受限'}`
+                    : ''}
+                </small>
+              </DirectoryItem>
+            ))}
+          </div>
+        </Directory>
         <section
           className="erp-dev-permission-capabilities__results"
           aria-label="功能与可用结果"

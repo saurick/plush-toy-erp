@@ -1,8 +1,8 @@
-import React, { useRef, useState } from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import { CloseOutlined } from '@ant-design/icons'
-import { Button, Drawer, Popover, Radio } from 'antd'
+import { Button, Popover } from 'antd'
 import { useLocation, useSearchParams } from 'react-router-dom'
-import AppSelect from '@/common/components/select/AppSelect'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { getRoleDisplayName } from '@/erp/utils/roleKeys.mjs'
 import DevTaskNav from '../DevTaskNav.jsx'
 import FinanceRulesView from './FinanceRulesView.jsx'
@@ -11,28 +11,74 @@ import {
   buildFinanceRelationships,
   FINANCE_TOPIC_KEYS,
   FINANCE_TOPIC_STEPS,
+  PURCHASE_FINANCE_CHANGES,
+  PURCHASE_FINANCE_STAGES,
   purchaseFinanceScenario,
 } from '../../config/devFinanceWorkbench.mjs'
 import { DEV_FLOW_STATE_QUERY_KEYS as keys } from '../../pages/devFlowStateQuery.mjs'
 import { WorkbenchFacts, WorkbenchSection } from '../WorkbenchPattern.jsx'
-import {
-  buildChainActionRelations,
-  relationMatches,
-  relationFiltersActive,
-} from '../../config/devFulfillmentRelations.mjs'
+import { buildChainActionRelations } from '../../config/devFulfillmentRelations.mjs'
 import BusinessFlowDiagram from './BusinessFlowDiagram.jsx'
+import { FlowDiagramPrintContext } from './FlowDiagramPrintContext.mjs'
 import './financeWorkbench.css'
 
-function FinanceSteps({ nodes, label, selected, onSelect, preview, edges }) {
+const FINANCE_TOPICS = [
+  { key: 'purchase', label: '采购退货与数量差额', tabLabel: '采购差额' },
+  { key: 'terms', label: '月结与期间对账', tabLabel: '月结对账' },
+  { key: 'permissions', label: '审批、权限与凭据', tabLabel: '审批凭据' },
+]
+
+const FINANCE_TABS = [
+  { value: 'overview', label: '总览' },
+  ...FINANCE_TOPICS.map(({ key, tabLabel }) => ({
+    value: key,
+    label: tabLabel,
+  })),
+]
+
+const TERM_RELATIONSHIPS = [
+  { from: 'terms-0', to: 'terms-1', label: '按冻结账期计算' },
+  { from: 'terms-2', to: 'terms-3', label: '按往来方、币种和中国日期核对' },
+]
+
+const READING_TABS = [
+  { value: 'detail', label: '办理说明' },
+  { value: 'rules', label: '财务口径' },
+  { value: 'records', label: '真实记录' },
+]
+
+function FinanceSteps({
+  nodes,
+  label,
+  selected,
+  onSelect,
+  preview,
+  edges,
+  groups,
+  compactControls,
+  legend,
+}) {
   const root = useRef(null)
-  const active = nodes.find((node) => node.key === preview?.active)
+  const [anchor, setAnchor] = useState(null)
+  const active = nodes.find((node) => node.key === preview.active)
   const graph = {
     direction: 'LR',
+    groups,
+    nodeSpacing: groups ? 16 : undefined,
     nodes: nodes.map((node) => ({
       ...node,
-      summary: [node.description || node.summary, node.roles?.length ? `关联岗位：${node.roles.join('、')}` : ''].filter(Boolean).join('；'),
-      expanded: preview ? preview.active === node.key : undefined,
-      data: { 'finance-node': node.key, financial: node.financial || undefined, match: node.match || undefined },
+      summary: [
+        node.description || node.summary,
+        node.roles?.length ? `关联岗位：${node.roles.join('、')}` : '',
+      ]
+        .filter(Boolean)
+        .join('；'),
+      expanded: preview.active === node.key,
+      data: {
+        'finance-node': node.key,
+        'finance-lane': node.lane,
+        financial: node.financial || undefined,
+      },
     })),
     edges:
       edges ??
@@ -43,96 +89,212 @@ function FinanceSteps({ nodes, label, selected, onSelect, preview, edges }) {
         condition: node.description || node.summary,
       })),
   }
-  const trigger = () => [...root.current.querySelectorAll('[data-finance-node]')].find((node) => node.dataset.financeNode === active?.key)
-  const close = () => { trigger()?.focus({ preventScroll: true }); preview?.setActive(null) }
-  const dismissOnEscape = (event) => { if (event.key === 'Escape') { event.stopPropagation(); close() } }
-  const dismissOnBlur = (event) => {
-    if (!preview) return
-    const explanation = active ? document.getElementById(`finance-note-${active.key}`) : null
-    if (!root.current?.contains(event.relatedTarget) && !explanation?.contains(event.relatedTarget)) preview.setActive(null)
+  const findStep = (key) =>
+    root.current?.querySelector(`[data-finance-node="${key}"]`)
+  const inspect = (key) => {
+    const trigger = findStep(key)
+    if (trigger) {
+      const target = trigger.getBoundingClientRect()
+      const chart = root.current.getBoundingClientRect()
+      setAnchor({
+        left: target.left - chart.left,
+        top: target.top - chart.top,
+        width: target.width,
+        height: target.height,
+      })
+    }
+    preview.setActive(key)
   }
-  const diagram = (
-    <div ref={root} onBlur={dismissOnBlur} onKeyDownCapture={(event) => { if (event.key === 'Escape' && active) close() }}>
+  const close = () => {
+    findStep(active?.key)?.focus({ preventScroll: true })
+    preview.setActive(null)
+  }
+  const dismissOnEscape = (event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation()
+      close()
+    }
+  }
+  const dismissWhenLeaving = (event) => {
+    if (!active) return
+    const explanation = document.getElementById(`finance-note-${active.key}`)
+    if (
+      !root.current?.contains(event.relatedTarget) &&
+      !explanation?.contains(event.relatedTarget)
+    ) {
+      preview.setActive((current) => (current === active.key ? null : current))
+    }
+  }
+  return (
+    <div
+      ref={root}
+      className="erp-dev-finance__step-diagram"
+      onBlur={dismissWhenLeaving}
+      onMouseLeave={dismissWhenLeaving}
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape' && active) close()
+      }}
+    >
       <BusinessFlowDiagram
         relationships
         flow={graph}
+        compactControls={compactControls}
         label={label}
-        selectedKey={preview ? preview.active : nodes[selected]?.key}
-        onInspect={preview ? preview.setActive : undefined}
+        selectedKey={onSelect ? (nodes[selected]?.key ?? null) : preview.active}
+        onInspect={inspect}
         onSelect={(key) => {
           const index = nodes.findIndex((node) => node.key === key)
-          if (preview) preview.setActive(key)
-          else onSelect?.(nodes[index], index)
+          if (onSelect) onSelect(index)
         }}
-        legend="按登记的办理顺序阅读；首款、审批与事实过账仍分别判断。"
+        legend={
+          legend ?? '按登记的办理顺序阅读。首款、审批与事实过账分别判断。'
+        }
       />
+      <Popover
+        open={Boolean(active && anchor)}
+        trigger={[]}
+        placement="bottom"
+        content={
+          active ? (
+            <div
+              role="dialog"
+              tabIndex={-1}
+              id={`finance-note-${active.key}`}
+              className="erp-dev-finance__node-note"
+              aria-label={`${active.label}说明`}
+              onBlur={dismissWhenLeaving}
+              onMouseLeave={dismissWhenLeaving}
+            >
+              <div className="erp-dev-finance__note-heading">
+                <strong>{active.label}</strong>
+                <Button
+                  type="text"
+                  aria-label="关闭步骤说明"
+                  icon={<CloseOutlined aria-hidden="true" />}
+                  onClick={close}
+                  onKeyDown={dismissOnEscape}
+                />
+              </div>
+              <p>{active.description || active.summary}</p>
+              {active.roles?.length ? (
+                <p>关联岗位：{active.roles.join('、')}</p>
+              ) : null}
+              {preview.onExpand ? (
+                <Button
+                  onClick={() => preview.onExpand(active, findStep(active.key))}
+                  onKeyDown={dismissOnEscape}
+                >
+                  展开说明与规则
+                </Button>
+              ) : null}
+            </div>
+          ) : null
+        }
+      >
+        <span
+          aria-hidden="true"
+          className="erp-dev-finance__note-anchor"
+          style={anchor || undefined}
+        />
+      </Popover>
     </div>
-  )
-  if (!preview) return diagram
-  return (
-    <Popover
-      open={Boolean(active)}
-      trigger={['hover']}
-      onOpenChange={(open) => { if (!open) preview.setActive(null) }}
-      placement="bottom"
-      content={active ? (
-        <div role="dialog" tabIndex={-1} id={`finance-note-${active.key}`} className="erp-dev-finance__node-note" aria-label={`${active.label}说明`} onBlur={dismissOnBlur}>
-          <div className="erp-dev-finance__note-heading">
-            <strong>{active.label}</strong>
-            <Button type="text" aria-label="关闭步骤说明" icon={<CloseOutlined aria-hidden="true" />} onClick={close} onKeyDown={dismissOnEscape} />
-          </div>
-          <p>{active.description}</p>
-          {active.roles?.length ? <p>关联岗位：{active.roles.join('、')}</p> : null}
-          <Button onClick={() => preview.onExpand(active, trigger())} onKeyDown={dismissOnEscape}>展开说明与规则</Button>
-        </div>
-      ) : null}
-    >{diagram}
-    </Popover>
   )
 }
 
-export default function FinanceRelationshipsView({
-  catalog,
-  role = 'all',
-  filters = {},
-}) {
+function PurchaseScenarioControls({ stage, change, scenario, onChange }) {
+  return (
+    <>
+      <div className="erp-dev-finance__scenario-controls">
+        <fieldset>
+          <legend>应付阶段</legend>
+          <SlidingSegmented
+            aria-label="应付阶段"
+            value={stage}
+            onChange={(value) => onChange(keys.financeStage, value)}
+            options={PURCHASE_FINANCE_STAGES}
+          />
+        </fieldset>
+        <fieldset>
+          <legend>来源变化</legend>
+          <SlidingSegmented
+            aria-label="来源变化"
+            value={change}
+            onChange={(value) => onChange(keys.financeChange, value)}
+            options={PURCHASE_FINANCE_CHANGES}
+          />
+        </fieldset>
+      </div>
+      <p
+        className="erp-dev-finance__scenario-result"
+        data-purchase-scenario-result
+        role="status"
+      >
+        <span>
+          {scenario.stageLabel} ＋ {scenario.changeLabel}
+        </span>
+        <span aria-hidden="true">→</span>
+        <strong>{scenario.title}</strong>
+      </p>
+    </>
+  )
+}
+
+function getTopicToggle(root, key) {
+  return root?.querySelector(`[data-finance-reading-toggle="${key}"]`)
+}
+
+export default function FinanceRelationshipsView({ catalog }) {
   const [params, setParams] = useSearchParams()
   const { state: locationState } = useLocation()
+  const printing = useContext(FlowDiagramPrintContext)
+  const topic = params.get(keys.financeTopic)
+  const topicTab = FINANCE_TOPICS.find(({ key }) => key === topic)
+  const activeTab = topicTab?.key ?? 'overview'
+  const showOverview = printing || activeTab === 'overview'
+  const readingOpen = Boolean(
+    topic && (!topicTab || params.has(keys.financeStep))
+  )
   const root = useRef(null)
   const opener = useRef(null)
+  const pendingFocus = useRef(
+    readingOpen && !locationState?.flowRestoreFrame ? topic : null
+  )
   const [activeNode, setActiveNode] = useState(null)
   const [panel, setPanel] = useState('detail')
   const [ruleKey, setRuleKey] = useState(null)
   const [factID, setFactID] = useState(null)
-  const topic = params.get(keys.financeTopic)
   const model = buildFinanceRelationships(catalog)
   const selected = model.groups.find((item) => item.key === topic)
-  const activeFilters = { ...filters, role: filters.role || role }
-  const filtered = relationFiltersActive(activeFilters)
-  const lanes = model.lanes.map((lane) => ({
-    ...lane,
-    nodes: lane.nodes.map((node) => {
-      const actions = buildChainActionRelations(catalog, node.chain).filter(
-        (action) =>
-          action.nodeKeys.some((key) =>
-            [node.nodeKey, ...(node.relatedNodeKeys || [])].includes(key)
+  const lanes = showOverview
+    ? model.lanes.map((lane) => ({
+        ...lane,
+        nodes: lane.nodes.map((node) => {
+          const actions = buildChainActionRelations(catalog, node.chain).filter(
+            (action) =>
+              action.nodeKeys.some((key) =>
+                [node.nodeKey, ...(node.relatedNodeKeys || [])].includes(key)
+              )
           )
-      )
-      return {
-        ...node,
-        roles: [...new Set(actions.flatMap((action) => action.roleKeys))].map(
-          (roleKey) => getRoleDisplayName(roleKey)
-        ),
-        match:
-          filtered &&
-          actions.some((action) => relationMatches(action, activeFilters)),
-      }
-    }),
-  }))
+          return {
+            ...node,
+            roles: [
+              ...new Set(actions.flatMap((action) => action.roleKeys)),
+            ].map((roleKey) => getRoleDisplayName(roleKey)),
+          }
+        }),
+      }))
+    : []
   const stage = params.get(keys.financeStage) || 'posted'
   const change = params.get(keys.financeChange) || 'return'
   const step = Number(params.get(keys.financeStep) || 0)
   const scenario = purchaseFinanceScenario(stage, change)
+
+  useEffect(() => {
+    if (!readingOpen || pendingFocus.current !== topic) return
+    pendingFocus.current = null
+    getTopicToggle(root.current, topic)?.focus()
+  }, [readingOpen, topic])
+
   const update = (patch) =>
     setParams(
       (previous) => {
@@ -144,347 +306,313 @@ export default function FinanceRelationshipsView({
       },
       { replace: true, state: locationState }
     )
-  const openTopic = (key, trigger, initialStep = 0) => {
-    opener.current = trigger
+
+  const changeTab = (key) => {
+    if (key === activeTab) return
+    opener.current = null
+    pendingFocus.current = null
     setActiveNode(null)
     setPanel('detail')
-    setRuleKey(
-      model.groups.find((group) => group.key === key)?.rule ||
-        (key === 'terms' ? 'terms' : 'permissions')
-    )
+    setRuleKey(null)
+    setFactID(null)
     update({
-      [keys.financeTopic]: key,
-      [keys.financeStep]: initialStep || null,
+      [keys.financeTopic]: key === 'overview' ? null : key,
+      [keys.financeStep]: null,
     })
   }
-  const closePanel = () => {
-    if (!opener.current?.isConnected) {
-      const fallback = model.lanes
-        .flatMap((lane) => lane.nodes)
-        .find((node) => node.topic === topic)?.key
-      opener.current =
-        root.current?.querySelector(`[data-finance-node="topic-${topic}"]`) ||
-        root.current?.querySelector(`[data-finance-node="${fallback}"]`)
+  const openReading = (key, initialStep = 0, trigger = null) => {
+    if (!readingOpen || topic !== key) {
+      opener.current = trigger
+      pendingFocus.current = trigger ? key : null
+      setFactID(null)
+    } else if (trigger) {
+      opener.current = trigger
+      getTopicToggle(root.current, key)?.focus()
     }
     setActiveNode(null)
+    setPanel('detail')
+    setRuleKey(null)
+    update({
+      [keys.financeTopic]: key,
+      [keys.financeStep]: initialStep,
+    })
+  }
+  const closeReading = () => {
+    const overviewNode = model.lanes
+      .flatMap((lane) => lane.nodes)
+      .find((node) => node.topic === topic)
+    const focusTarget = opener.current?.isConnected
+      ? opener.current
+      : topicTab
+        ? getTopicToggle(root.current, topic)
+        : root.current?.querySelector(
+            `[data-finance-node="${overviewNode?.key}"]`
+          )
+    focusTarget?.focus()
+    opener.current = null
+    setActiveNode(null)
     setFactID(null)
-    update({ [keys.financeTopic]: null, [keys.financeStep]: null })
+    update({
+      [keys.financeTopic]: topicTab?.key ?? null,
+      [keys.financeStep]: null,
+    })
   }
   const openRule = (key) => {
     setRuleKey(key)
     setPanel('rules')
+    root.current?.querySelector('#finance-reading-tab-rules')?.focus()
   }
-  if (topic && !FINANCE_TOPIC_KEYS.includes(topic)) return null
-  const detailTitle =
-    selected?.label ||
-    (topic === 'terms' ? '月结与期间对账' : '审批、权限与凭据')
-  const topicSteps =
-    topic === 'purchase'
-      ? scenario.steps.map((label, index) => ({
-          key: `purchase-${index}`,
-          label,
-          financial: index === 3,
-        }))
-      : (FINANCE_TOPIC_STEPS[topic] || []).map(
-          ([label, summary, description, conditionLabel], index) => ({
-            key: `${topic}-${index}`,
-            label,
-            summary,
-            description,
-            conditionLabel,
-            financial: index >= 2,
-          })
+  const updateScenario = (key, value) => {
+    setActiveNode(null)
+    update({
+      [key]: value,
+      ...(topic === 'purchase' && readingOpen ? { [keys.financeStep]: 0 } : {}),
+    })
+  }
+
+  if ((topic && !FINANCE_TOPIC_KEYS.includes(topic)) || !scenario) return null
+
+  const overviewTopic = topicTab ? null : selected
+  const topics = printing
+    ? [...(overviewTopic ? [overviewTopic] : []), ...FINANCE_TOPICS]
+    : [topicTab || overviewTopic].filter(Boolean)
+  const overviewPreview = {
+    active: activeNode,
+    setActive: setActiveNode,
+    onExpand: (node, trigger) =>
+      openReading(
+        node.topic,
+        node.topic === 'purchase' ? 0 : node.readingStep,
+        trigger
+      ),
+  }
+  // Mermaid stacks disconnected LR groups from the last declaration upward.
+  const overviewGroups = lanes.toReversed().map((lane) => ({
+    label: lane.label,
+    direction: 'LR',
+    nodeKeys: lane.nodes.map((node) => node.key),
+  }))
+  const defaultRule =
+    selected?.rule ?? (topic === 'terms' && step >= 2 ? 'statement' : topic)
+
+  const content = (
+    <>
+      {showOverview ? (
+        <WorkbenchSection title="业务怎样连接财务" flat data-finance-overview>
+          {printing ? (
+            lanes.map((lane) => (
+              <section className="erp-dev-finance__print-lane" key={lane.key}>
+                <h3>{lane.label}</h3>
+                <FinanceSteps
+                  nodes={lane.nodes}
+                  label={`${lane.label}办理顺序`}
+                  preview={overviewPreview}
+                />
+              </section>
+            ))
+          ) : (
+            <FinanceSteps
+              label="跨模块财务关系图"
+              compactControls
+              nodes={lanes.flatMap((lane) =>
+                lane.nodes.map((node) => ({
+                  ...node,
+                  lane: lane.key,
+                }))
+              )}
+              groups={overviewGroups}
+              edges={lanes.flatMap((lane) =>
+                lane.nodes.slice(1).map((node, index) => ({
+                  from: lane.nodes[index].key,
+                  to: node.key,
+                }))
+              )}
+              preview={overviewPreview}
+              legend="每行按箭头方向阅读。悬停、聚焦或点选步骤查看说明。"
+            />
+          )}
+          <div className="erp-dev-finance__boundary">
+            <strong>账款与首款先独立，形成账款后再抵扣</strong>
+            <p>
+              账款以真实出货、入库或验收为来源。首款可先收付。仓库纠错产生的应付差额由财务另行确认，原过账记录保留。
+            </p>
+          </div>
+        </WorkbenchSection>
+      ) : null}
+
+      {topics.map(({ key, label, summary }) => {
+        const isPurchase = key === 'purchase'
+        const isTerms = key === 'terms'
+        const expanded = readingOpen && topic === key
+        const topicSteps = isPurchase
+          ? scenario.steps.map(
+              ([label, description, conditionLabel], index) => ({
+                key: `purchase-${index}`,
+                label,
+                description,
+                conditionLabel,
+                financial: index === 3,
+              })
+            )
+          : FINANCE_TOPIC_STEPS[key].map(
+              ([label, summary, description, conditionLabel], index) => ({
+                key: `${key}-${index}`,
+                label,
+                summary,
+                description,
+                conditionLabel,
+                financial: index >= 2,
+              })
+            )
+        const currentStep = topicSteps[step]
+        const topicEdges =
+          isPurchase || key === 'permissions'
+            ? topicSteps
+                .slice(0, -1)
+                .map(({ key: from, description, conditionLabel }, index) => ({
+                  from,
+                  to: topicSteps[index + 1].key,
+                  label: conditionLabel,
+                  condition: conditionLabel ? description : undefined,
+                }))
+            : isTerms
+              ? TERM_RELATIONSHIPS
+              : undefined
+        const detailID = `finance-reading-${key}`
+
+        return (
+          <WorkbenchSection
+            key={key}
+            title={label}
+            description={summary}
+            flat
+            data-finance-topic={key}
+          >
+            {isPurchase ? (
+              <PurchaseScenarioControls
+                stage={stage}
+                change={change}
+                scenario={scenario}
+                onChange={updateScenario}
+              />
+            ) : null}
+            <FinanceSteps
+              nodes={topicSteps}
+              label={`${label}流程图`}
+              selected={expanded ? step : null}
+              onSelect={(index) => openReading(key, index)}
+              preview={{ active: activeNode, setActive: setActiveNode }}
+              edges={topicEdges}
+              legend={
+                isTerms
+                  ? '月结到期日与期间对账各有自己的计算依据。'
+                  : '点选步骤查看办理说明。'
+              }
+            />
+            <div className="erp-dev-finance__detail-actions">
+              <Button
+                aria-expanded={expanded}
+                aria-controls={expanded ? detailID : undefined}
+                data-finance-reading-toggle={key}
+                onClick={expanded ? closeReading : () => openReading(key)}
+              >
+                {expanded ? '收起说明与记录' : '查看说明与记录'}
+              </Button>
+            </div>
+            {expanded ? (
+              <div
+                className="erp-dev-finance__detail"
+                data-finance-detail={key}
+                id={detailID}
+              >
+                <DevTaskNav
+                  ariaLabel="财务专题内容"
+                  idPrefix="finance-reading"
+                  compact
+                  value={panel}
+                  onChange={setPanel}
+                  items={READING_TABS}
+                />
+                <div
+                  role="tabpanel"
+                  id={`finance-reading-panel-${panel}`}
+                  aria-labelledby={`finance-reading-tab-${panel}`}
+                >
+                  {panel === 'rules' ? (
+                    <FinanceRulesView
+                      ruleKey={ruleKey ?? defaultRule}
+                      onSelectRule={setRuleKey}
+                      onOpenRecords={() => setPanel('records')}
+                    />
+                  ) : panel === 'records' ? (
+                    <FinanceTraceView
+                      factID={factID}
+                      onSelectFact={setFactID}
+                      onOpenRules={() => setPanel('rules')}
+                      inlineDetails
+                    />
+                  ) : (
+                    <>
+                      <div className="erp-dev-finance__explanation">
+                        <h3>{currentStep?.label}</h3>
+                        <p>{currentStep?.description}</p>
+                      </div>
+                      {isPurchase ? (
+                        <WorkbenchFacts
+                          items={[
+                            {
+                              label: '谁来处理',
+                              value: scenario.responsibility,
+                            },
+                            { label: '账款与资金', value: scenario.impact },
+                          ]}
+                        />
+                      ) : null}
+                      <div className="erp-dev-finance__detail-actions">
+                        <Button onClick={() => openRule(defaultRule)}>
+                          {isPurchase
+                            ? '查看采购差额规则'
+                            : isTerms
+                              ? defaultRule === 'terms'
+                                ? '查看月结到期日规则'
+                                : '查看期间对账规则'
+                              : '查看关联规则'}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </WorkbenchSection>
         )
-  const topicEdges =
-    topic === 'permissions'
-      ? topicSteps
-          .slice(0, -1)
-          .map(({ key: from, description, conditionLabel }, index) => ({
-            from,
-            to: topicSteps[index + 1].key,
-            label: conditionLabel,
-            condition: conditionLabel ? description : undefined,
-          }))
-      : undefined
-  const purchaseNotes = scenario && [
-    stage === 'draft'
-      ? '原草稿保留冻结金额与取消原因。'
-      : '以正式入库行的确认单价和本次有效数量形成来源，保留原始记录。',
-    stage === 'draft'
-      ? scenario.impact
-      : change === 'transfer'
-        ? scenario.detail
-        : '区分首次净来源与已过账后的待调整差额，避免同一来源重复确认。',
-    scenario.detail,
-    scenario.impact,
-  ]
+      })}
+    </>
+  )
 
   return (
-    <div
-      ref={root}
-      className="erp-dev-finance erp-dev-finance--relationships"
-      data-finance-relationships
-    >
-      <WorkbenchSection
-        title="业务怎样连接财务"
-        description="悬停或点选步骤查看说明；专题在侧栏展开。"
-        flat
-        data-finance-overview
-      >
-        {filtered &&
-        !lanes.some((lane) => lane.nodes.some((node) => node.match)) ? (
-          <p className="erp-dev-finance__filter-note" role="status">
-            没有匹配当前筛选的财务节点，完整业务链仍保留。可清除筛选后查看。
-          </p>
-        ) : null}
-        <div className="erp-dev-finance__lanes" aria-label="跨模块财务关系图">
-          {lanes.map((lane) => (
-            <section
-              key={lane.key}
-              className="erp-dev-finance__lane"
-              data-finance-lane={lane.key}
-              aria-label={lane.label}
-            >
-              <h3>{lane.label}</h3>
-              <FinanceSteps
-                nodes={lane.nodes}
-                label={`${lane.label}办理顺序`}
-                preview={{
-                  active: activeNode,
-                  setActive: setActiveNode,
-                  onExpand: (node, trigger) =>
-                    openTopic(
-                      node.topic,
-                      trigger,
-                      node.topic === 'purchase' ? 0 : node.readingStep
-                    ),
-                }}
-              />
-            </section>
-          ))}
-        </div>
-        <div className="erp-dev-finance__shortcuts" aria-label="财务专题">
-          {[
-            ['purchase', '采购退货与数量差额'],
-            ['terms', '月结与期间对账'],
-            ['permissions', '审批、权限与凭据'],
-          ].map(([key, label]) => (
-            <Button
-              key={key}
-              data-finance-node={`topic-${key}`}
-              onClick={(event) => openTopic(key, event.currentTarget)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-        <div className="erp-dev-finance__boundary">
-          <strong>账款与首款先独立，形成账款后再抵扣</strong>
-          <p>
-            账款以真实出货、入库或验收为来源；首款可先收付。仓库纠错不会直接改写已过账应付。
-          </p>
-        </div>
-      </WorkbenchSection>
-      <Drawer
-        title={detailTitle}
-        rootClassName="erp-dev-finance-drawer"
-        width="min(900px, 92vw)"
-        open={Boolean(topic)}
-        onClose={closePanel}
-        closable={false}
-        extra={
-          <Button
-            icon={<CloseOutlined aria-hidden="true" />}
-            onClick={closePanel}
-          >
-            关闭
-          </Button>
-        }
-        afterOpenChange={(open) => {
-          if (!open && opener.current?.isConnected) {
-            opener.current.focus({ preventScroll: true })
-            setActiveNode(null)
-          }
-        }}
-        destroyOnHidden
-      >
+    <div ref={root} className="erp-dev-finance" data-finance-relationships>
+      <DevTaskNav
+        ariaLabel="财务关联视图"
+        idPrefix="finance-section"
+        className="erp-dev-finance__tabs"
+        compact
+        items={FINANCE_TABS}
+        value={activeTab}
+        onChange={changeTab}
+      />
+      {FINANCE_TABS.map(({ value }) => (
         <div
-          className="erp-dev-finance erp-dev-finance__detail"
-          data-finance-detail={topic}
+          key={value}
+          className="erp-dev-finance__tab-panel"
+          role="tabpanel"
+          id={`finance-section-panel-${value}`}
+          aria-labelledby={`finance-section-tab-${value}`}
+          hidden={value !== activeTab}
         >
-          <DevTaskNav
-            ariaLabel="财务专题内容"
-            idPrefix="finance-reading"
-            compact
-            value={panel}
-            onChange={setPanel}
-            items={[
-              { value: 'detail', label: '办理说明' },
-              { value: 'rules', label: '财务口径' },
-              { value: 'records', label: '真实记录' },
-            ]}
-          />
-          <div
-            role="tabpanel"
-            id={`finance-reading-panel-${panel}`}
-            aria-labelledby={`finance-reading-tab-${panel}`}
-          >
-            {!topic ? null : panel === 'rules' ? (
-              <FinanceRulesView
-                ruleKey={
-                  ruleKey ??
-                  selected?.rule ??
-                  (topic === 'terms' ? 'terms' : 'permissions')
-                }
-                onSelectRule={setRuleKey}
-                onOpenRecords={() => setPanel('records')}
-              />
-            ) : panel === 'records' ? (
-              <FinanceTraceView
-                factID={factID}
-                onSelectFact={setFactID}
-                onOpenRules={() => setPanel('rules')}
-                inlineDetails
-              />
-            ) : (
-              <WorkbenchSection
-                description={
-                  topic === 'purchase'
-                    ? '按应付阶段区分净来源、冻结草稿和过账后差额。'
-                    : selected?.summary
-                }
-                flat
-              >
-                {topic === 'terms' ? (
-                  <>
-                    <div className="erp-dev-finance__term-choices">
-                      <Button
-                        className="erp-dev-finance__node"
-                        onClick={() => openRule('terms')}
-                      >
-                        <strong>月结到期日</strong>
-                        <span>中国自然月月末 ＋ 约定天数</span>
-                      </Button>
-                      <Button
-                        className="erp-dev-finance__node"
-                        onClick={() => openRule('statement')}
-                      >
-                        <strong>期间对账</strong>
-                        <span>按往来方、币种和中国日期核对余额</span>
-                      </Button>
-                    </div>
-                    <WorkbenchFacts
-                      items={[
-                        {
-                          label: '账期来源',
-                          value:
-                            '订单冻结的结算方式与天数；默认值变化不重算已有账款。',
-                        },
-                        {
-                          label: '对账口径',
-                          value:
-                            '按入账、冲回时间核对期间；核销不重复计入收付款金额。',
-                        },
-                      ]}
-                    />
-                  </>
-                ) : (
-                  <>
-                    {topic === 'purchase' ? (
-                      <div className="erp-dev-finance__scenario-controls">
-                        <fieldset>
-                          <legend>应付阶段</legend>
-                          <Radio.Group
-                            aria-label="应付阶段"
-                            value={stage}
-                            onChange={(event) =>
-                              update({
-                                [keys.financeStage]: event.target.value,
-                                [keys.financeStep]: null,
-                              })
-                            }
-                            options={[
-                              { value: 'none', label: '尚未生成' },
-                              { value: 'draft', label: '草稿' },
-                              { value: 'posted', label: '已过账或结清' },
-                            ]}
-                            optionType="button"
-                          />
-                        </fieldset>
-                        <fieldset>
-                          <legend>来源变化</legend>
-                          <AppSelect
-                            aria-label="来源变化"
-                            allowClear={false} // 不可清空：情景计算必须指定一种来源变化。
-                            value={change}
-                            onChange={(value) =>
-                              update({
-                                [keys.financeChange]: value,
-                                [keys.financeStep]: null,
-                              })
-                            }
-                            options={[
-                              { value: 'return', label: '采购退货' },
-                              { value: 'increase', label: '数量调增' },
-                              { value: 'transfer', label: '移库或批次修正' },
-                            ]}
-                          />
-                        </fieldset>
-                      </div>
-                    ) : null}
-                    <FinanceSteps
-                      nodes={topicSteps}
-                      edges={topicEdges}
-                      label={`${detailTitle}办理顺序`}
-                      selected={step}
-                      onSelect={(_node, index) =>
-                        update({ [keys.financeStep]: index })
-                      }
-                    />
-                    <div className="erp-dev-finance__explanation">
-                      <h3>
-                        {topic === 'purchase'
-                          ? scenario.title
-                          : topicSteps[step]?.label}
-                      </h3>
-                      {topic !== 'purchase' ||
-                      purchaseNotes[step] !== scenario.impact ? (
-                        <p>
-                          {topic === 'purchase'
-                            ? purchaseNotes[step]
-                            : topicSteps[step]?.description}
-                        </p>
-                      ) : null}
-                    </div>
-                    {topic === 'purchase' ? (
-                      <WorkbenchFacts
-                        items={[
-                          {
-                            label: '谁来处理',
-                            value: '仓库维护来源；财务确认账款差额。',
-                          },
-                          { label: '账款与资金', value: scenario.impact },
-                        ]}
-                      />
-                    ) : null}
-                    <div className="erp-dev-finance__detail-actions">
-                      <Button
-                        onClick={() =>
-                          openRule(selected?.rule || 'permissions')
-                        }
-                      >
-                        {topic === 'purchase'
-                          ? '查看采购差额规则'
-                          : '查看关联规则'}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </WorkbenchSection>
-            )}
-          </div>
+          {value === activeTab ? content : null}
         </div>
-      </Drawer>
+      ))}
     </div>
   )
 }

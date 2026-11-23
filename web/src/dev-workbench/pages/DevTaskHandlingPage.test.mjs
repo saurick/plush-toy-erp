@@ -42,15 +42,21 @@ async function mount(t, url = '/__dev/task-handling') {
     await ui.act(() => el.click())
     await ui.flush()
   }
+  const filter = () => ui.container.querySelector('.erp-dev-task-matrix button[aria-haspopup="dialog"]')
   const choose = async (label, option) => {
-    const group = ui.container.querySelector(`[role="group"][aria-label="${label}"]`)
+    const trigger = filter()
+    assert(trigger)
+    if (trigger.getAttribute('aria-expanded') === 'false') await click(trigger)
+    const panel = document.getElementById(trigger.getAttribute('aria-controls'))
+    const group = panel?.querySelector(`[role="group"][aria-label="${label}"]`)
     assert.ok(group, `缺少筛选组：${label}`)
-    const button = [...group.querySelectorAll('button')].find(
+    const choice = [...group.querySelectorAll('button')].find(
       (el) => el.textContent.trim() === option
     )
-    assert.ok(button, `缺少筛选项：${label} / ${option}`)
-    await click(button)
-    assert.equal(button.getAttribute('aria-pressed'), 'true')
+    assert.ok(choice, `缺少筛选项：${label} / ${option}`)
+    await click(choice)
+    assert.equal(choice.getAttribute('aria-pressed'), 'true')
+    assert.equal(trigger.getAttribute('aria-expanded'), 'true')
   }
   const clearSelect = async (label) => {
     const control = ui.container
@@ -65,8 +71,8 @@ async function mount(t, url = '/__dev/task-handling') {
     )
     await ui.flush()
   }
-  const button = (text) =>
-    [...ui.container.querySelectorAll('button')].find(
+  const button = (text, container = ui.container) =>
+    [...container.querySelectorAll('button')].find(
       (el) => el.textContent.replace(/\s/gu, '') === text.replace(/\s/gu, '')
     )
   const go = (value) => ui.act(() => navigate(value))
@@ -76,23 +82,29 @@ async function mount(t, url = '/__dev/task-handling') {
     choose,
     clearSelect,
     button,
+    filter,
     go,
     params: () => new URLSearchParams(location.search),
   }
 }
 
-test('任务办理直接显示清单，筛选清空和历史导航恢复时保留页头', async (t) => {
+test('任务办理默认收起筛选，组合筛选、清空和历史导航恢复时保留页头', async (t) => {
   const v = await mount(t)
   const header = v.container.querySelector('.erp-dev-task-handling__header')
   const tabs = [...v.container.querySelectorAll('[role="tab"]')]
   assert.deepEqual(tabs.map((tab) => tab.textContent), ['任务清单', '操作与填写规则'])
   assert.deepEqual(tabs.map((tab) => tab.getAttribute('aria-selected')), ['true', 'false'])
   assert.doesNotMatch(v.container.textContent, /场景原型|演练任务|重置演练/u)
+  const filterTrigger = v.filter()
+  assert.equal(filterTrigger.getAttribute('aria-expanded'), 'false')
+  assert.equal(Boolean(document.querySelector('.erp-dev-task-filter-panel')), false)
+  assert.equal(Boolean(v.button('清空筛选')), false)
   await v.choose('办理岗位', '业务')
   assert.equal(v.params().get('role'), 'sales')
   assert.equal(v.container.querySelector('[role="alert"]'), null)
   await v.choose('办理类型', '单据与明细编辑')
   await v.choose('手机支持', '仅查看')
+  assert.equal(v.container.querySelector('.erp-dev-task-filter-summary').textContent, '业务 · 单据与明细编辑 · 仅查看')
   assert.equal(v.container.querySelector('[role="alert"]'), null)
   await v.choose('手机支持', '不限')
   assert.equal(v.params().has('mobile'), false)
@@ -103,16 +115,31 @@ test('任务办理直接显示清单，筛选清空和历史导航恢复时保�
   await v.flush()
   assert.equal(v.params().has('mobile'), false)
   assert.equal(
-    v.container.querySelector('.erp-dev-task-handling__header'),
-    header
+    v.container.querySelector('.erp-dev-task-handling__header') === header,
+    true
   )
-  await v.click(v.button('重置'))
+  await v.choose('手机支持', '仅查看')
+  const panel = document.getElementById(filterTrigger.getAttribute('aria-controls'))
+  const clear = v.button('清空筛选', panel.querySelector('header'))
+  assert.equal(clear.disabled, false)
+  await v.click(clear)
+  assert.equal(clear.disabled, true)
+  assert.equal(filterTrigger.getAttribute('aria-expanded'), 'true')
   assert.equal(v.params().has('role'), false)
   assert.equal(v.params().has('kind'), false)
+  assert.equal(v.params().has('mobile'), false)
+  assert.deepEqual(
+    [...panel.querySelectorAll('button[aria-pressed="true"]')].map((button) => button.textContent.trim()),
+    ['不限', '不限', '不限']
+  )
+  assert.equal(Boolean(v.container.querySelector('.erp-dev-task-filter-summary')), false)
   assert.equal(
     v.container.querySelectorAll('.erp-dev-task-catalog .ant-table-row').length,
     TASK_HANDLING_ROWS.length
   )
+  await v.click(v.button('收起', panel.querySelector('footer')))
+  assert.equal(filterTrigger.getAttribute('aria-expanded'), 'false')
+  assert.equal(document.activeElement === filterTrigger, true)
 })
 
 test('有筛选的独立深链直接打开，动作清空不回选且保留环节', async (t) => {

@@ -510,10 +510,13 @@
 .erp-progress-error {
   margin-top: 12px;
 }
+.erp-progress-modal--order {
+  --erp-progress-detail-height: 560px;
+}
 .erp-progress-modal .ant-modal-body {
   display: flex;
   flex-direction: column;
-  height: min(74dvh, 800px);
+  height: min(74dvh, var(--erp-progress-detail-height, 800px));
   overflow: hidden;
 }
 .erp-progress-detail-scroll {

@@ -10,6 +10,8 @@ GitLab 宿主上的自建 GitLab、隔离 Runner、备份与 GitHub 单向镜像
 
 该目录的 `compose.observability.yml` 是可选独立日志工作台，采集当前工作区和显式启用的登记环境，不推进业务版本或数据库。入口与边界见[集中日志接入与运维](../../docs/observability/集中日志接入与运维.md)。
 
+## 制品构建与目标预检
+
 部署构建边界：目标服务器配置较低，只负责从受控 Package 直接取得并加载已构建镜像、启动 Compose、执行 migration 和部署后检查；服务端/前端镜像必须先在 CI 构建并登记为不可变制品，不能由 Mac 二次中转。不要在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
 
 发布制品入口是仓库根目录的 `scripts/deploy/release-artifact-bundle.mjs` 与 `release-artifact-verify.mjs`：只接受 clean current HEAD 的 committed archive，正式 Server / Web 镜像都从 `server/Dockerfile` 的共享缓存图构建，前端只编译一次并被两个 runtime target 复用。
@@ -24,11 +26,15 @@ Docker save 结果用 zstd level 3 预压缩但保持现有归档文件名，man
 
 正式 promotion 前必须先用 `scripts/deploy/local-release-rehearsal.mjs` 在一次性数据库和本文件登记的唯一 Compose 上完成 migration、运行身份、登录、PDF、备份恢复与 steady-state restart；本地回执不能替代目标 preflight、active config、rollback 或 UAT。
 
+## GitLab 发布与断点续传
+
 GitLab `.gitlab-ci.yml` 是 main 和 MR 的 CI/CD 真源。GitHub main 的单向镜像用于代码审查。
 
 GitLab release pipeline 对 main 的 exact SHA 恢复并校验同一 protected push pipeline 的完整 `CI Gate` 证据，不重复 strict；随后只构建一次不可变候选，将镜像按 digest 发布到 GHCR，并把含同一演练回执的 七项制品登记到 GitLab Generic Package 与 Release，同时把同 SHA 的 `source.tar` 单独登记为目标内部物化输入。
 
 发布中断后只续传已校验远端子集所缺的资产，最后必须读回完整七资产和精确 source 包。
+
+## 目标取件与运行版本核对
 
 `demo-133` 与 `customer-test-133` 的 promotion 由 `scripts/deploy/promotion-controller.mjs` 与 `promotion-executor.mjs` 编排，代码回滚由对应 rollback controller / executor 编排。
 
@@ -45,6 +51,8 @@ promotion 会在同一份受保护 env 备份边界内，把 PostgreSQL、Jaeger
 根域 `yoyoosun.net` 临时 `302` 跳转到未来可能使用的 `erp.yoyoosun.net`，但不会把它登记为生产 target；`admin.yoyoosun.net` 退役后也不进入目标、检查、发布或回滚矩阵。
 
 目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/持续交付设计.md`。
+
+## 宿主机迁移与存量数据审计
 
 Atlas migration 在普通生产 / 低配服务器上使用宿主机 `/usr/local/bin/atlas`，版本统一固定为 `v1.3.0`。demo / test 使用各自目标根下固定、非符号链接、精确版本的 Atlas，并使用各自 registry 登记的数据库端口和 migration lock；运行环境不得通过 `ATLAS_BIN` 覆盖，也不得替换系统 Atlas。
 

@@ -32,6 +32,9 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 	if client == nil {
 		return nil, biz.ErrBadParam
 	}
+	if query.ProgressView != "" {
+		return loadWorkflowProgress(ctx, client, query)
+	}
 	if query.Calendar != nil {
 		base, err := applyWorkflowTaskBoardFilters(applyWorkflowTaskBoardVisibility(client.WorkflowTask.Query(), query), query)
 		if err != nil {
@@ -124,13 +127,7 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		}
 		tasks := make([]*biz.WorkflowTask, 0, len(rows))
 		for _, row := range rows {
-			task := entWorkflowTaskToBiz(row)
-			if task.TaskStatusKey == "done" || task.TaskStatusKey == "rejected" {
-				task.BlockedReason = nil
-				delete(task.Payload, "blocked_reason")
-				delete(task.Payload, "rejected_reason")
-			}
-			tasks = append(tasks, task)
+			tasks = append(tasks, workflowBoardTask(row))
 		}
 		lanes = append(lanes, biz.WorkflowTaskBoardLane{
 			Key:    laneKey,
@@ -474,4 +471,14 @@ func normalizeWorkflowTaskBoardSourceTypes(values []string) []string {
 
 func normalizeWorkflowTaskBoardOwnerRoleKeys(values []string) []string {
 	return biz.NormalizeAdminRoleKeys(values)
+}
+
+func workflowBoardTask(row *ent.WorkflowTask) *biz.WorkflowTask {
+	task := entWorkflowTaskToBiz(row)
+	if task.TaskStatusKey == "done" || task.TaskStatusKey == "rejected" {
+		task.BlockedReason = nil
+		delete(task.Payload, "blocked_reason")
+		delete(task.Payload, "rejected_reason")
+	}
+	return task
 }

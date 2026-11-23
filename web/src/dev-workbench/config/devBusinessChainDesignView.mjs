@@ -1,11 +1,11 @@
 // Presentation only: every condensed path retains its original draft edges.
 export const CHAIN_DISPLAY_OPTIONS = {
-  overview: { label: '链路概览', description: '从链路卡片查看用途和交接' },
-  mainline: { label: '业务步骤', description: '沿办理步骤和岗位任务阅读' },
-  all: { label: '全部已载入节点', description: '同时查看当前范围已载入的单据、记录和任务' },
+  overview: { label: '链路概览', description: '每条链路一张卡' },
+  mainline: { label: '业务步骤', description: '看办理顺序和参与岗位' },
+  all: { label: '节点明细', description: '进一步显示单据、记录和结果' },
 }
 export const CHAIN_LAYOUT_OPTIONS = {
-  lanes: { label: '业务泳道', description: '按业务领域分行' },
+  lanes: { label: '业务泳道', description: '按业务领域分组' },
   flow: { label: '阶段排布', description: '按办理顺序排列' },
 }
 
@@ -31,6 +31,13 @@ export const isBusinessChainStep = (node) =>
   (stepTypes.has(node.type) || (node.type === 'task' && !!node.processNode))
 const pair = (edge) => JSON.stringify([edge.from, edge.to])
 
+export function businessChainPathKind(kinds) {
+  if (kinds.includes('unknown')) return 'unknown'
+  if (kinds.includes('exception')) return 'exception'
+  if (kinds.includes('correction')) return 'correction'
+  return 'known'
+}
+
 export function projectBusinessChainDraft(
   draft,
   library,
@@ -46,11 +53,13 @@ export function projectBusinessChainDraft(
   const visible = new Set(
     draft.nodes
       .filter(({ id }) => {
+        const node = library.byId.get(id)
         const adjacent = [...incoming.get(id), ...outgoing.get(id)]
         return (
           mode === 'all' ||
           expandedNodes.includes(id) ||
-          isBusinessChainStep(library.byId.get(id)) ||
+          isBusinessChainStep(node) ||
+          (node.terminal && node.type === 'result' && !node.processNode) ||
           !adjacent.length ||
           adjacent.some((edge) => edge.kind === 'unknown')
         )
@@ -75,13 +84,9 @@ export function projectBusinessChainDraft(
   const collect = (from, to, path) => {
     // Feedback within a condensed node remains available in its inline details.
     if (from === to) return
-    const kind = path.some((edge) => edge.kind === 'unknown')
-      ? 'unknown'
-      : path.some(
-            (edge) => library.byPair.get(pair(edge))?.kind === 'exception'
-          )
-        ? 'exception'
-        : 'known'
+    const kind = businessChainPathKind(path.map((edge) =>
+      edge.kind === 'unknown' ? 'unknown' : library.byPair.get(pair(edge))?.kind
+    ))
     const dependency = path.some(
       (edge) => library.byPair.get(pair(edge))?.dependency
     )
@@ -290,19 +295,41 @@ export function layoutBusinessChainDraft(draft, library, mode = 'mainline') {
 const routeClearance = 8
 const routeLaneGap = 16
 const routeLeads = [24, 16, 32]
+const routeTrackSpacing = 24
 
-function businessChainRoutingSpace(nodes, width, height) {
+function businessChainRoutingSpace(nodes, width, height, horizontal = new Map(), vertical = new Map()) {
   return {
     nodes,
     width,
     height,
     positions: new Map(nodes.map((node) => [node.id, node])),
     tracks: [...new Set(nodes.flatMap(({ y }) => [y - routeLaneGap, y + height + routeLaneGap]))],
-    usedBends: new Map(),
+    horizontal,
+    vertical,
   }
 }
 
-function routeBetweenCards({ nodes, width, height, tracks, usedBends }, from, to) {
+// Index occupied intervals in both orientations. Disjoint parts of a track remain reusable.
+function visitRouteSegments(points, space, visit) {
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]
+    const b = points[i]
+    const horizontal = a.y === b.y
+    const low = horizontal ? Math.min(a.x, b.x) : Math.min(a.y, b.y)
+    const high = horizontal ? Math.max(a.x, b.x) : Math.max(a.y, b.y)
+    if (low < high) visit(horizontal ? space.horizontal : space.vertical, horizontal ? a.y : a.x, low, high)
+  }
+}
+
+function reserveRoute(points, space) {
+  visitRouteSegments(points, space, (tracks, axis, low, high) => {
+    if (!tracks.has(axis)) tracks.set(axis, [])
+    tracks.get(axis).push([low, high])
+  })
+}
+
+function routeBetweenCards(space, from, to, sideLanes = 8) {
+  const { nodes, width, height, tracks } = space
   const start = { x: from.x + width, y: from.y + height / 2 }
   const end = { x: to.x, y: to.y + height / 2 }
   const clear = (points) => points.slice(1).every((next, index) => {
@@ -317,99 +344,190 @@ function routeBetweenCards({ nodes, width, height, tracks, usedBends }, from, to
       right > node.x - routeClearance && left < node.x + width + routeClearance &&
       bottom > node.y - routeClearance && top < node.y + height + routeClearance)
   })
+  let best = null
+  const consider = (points) => {
+    let cost = 0
+    let overlap = 0
+    visitRouteSegments(points, space, (occupied, axis, low, high) => {
+      cost += high - low
+      for (const [otherAxis, intervals] of occupied) {
+        const distance = Math.abs(otherAxis - axis)
+        if (distance >= routeTrackSpacing) continue
+        for (const [a, b] of intervals) {
+          const common = Math.max(0, Math.min(high, b) - Math.max(low, a))
+          // Allow short stems to meet at a port, but separate longer shared spans first.
+          if (!distance) overlap += Math.max(0, common - routeTrackSpacing)
+          cost += (1 - distance / routeTrackSpacing) * common
+        }
+      }
+    })
+    if ((!best || overlap < best.overlap || (overlap === best.overlap && cost < best.cost)) && clear(points)) {
+      best = { points, overlap, cost }
+    }
+  }
   const gap = end.x - start.x
-  const middleX = (start.x + end.x) / 2
   if (gap >= routeClearance * 2) {
-    const top = Math.min(start.y, end.y)
-    const bottom = Math.max(start.y, end.y)
-    const overlapsBend = (x) => usedBends.get(x)?.some(([low, high]) => top < high && bottom > low) ?? false
-    const bends = gap >= routeLaneGap * 2
-      ? [middleX, start.x + routeLaneGap, end.x - routeLaneGap]
-      : [middleX]
-    // Separate parallel turns within the same gap when there is room.
-    for (const x of bends.sort((a, b) => Number(overlapsBend(a)) - Number(overlapsBend(b)))) {
-      const points = start.y === end.y
-        ? [start, end]
-        : [start, { x, y: start.y }, { x, y: end.y }, end]
-      if (!clear(points)) continue
-      if (top < bottom) usedBends.set(x, [...(usedBends.get(x) || []), [top, bottom]])
-      return points
+    if (start.y === end.y) {
+      consider([start, end])
+    } else {
+      const bends = [(start.x + end.x) / 2]
+      if (gap >= routeLaneGap * 2) bends.push(start.x + routeLaneGap, end.x - routeLaneGap)
+      for (const x of bends) consider([start, { x, y: start.y }, { x, y: end.y }, end])
+    }
+  }
+  if (best?.cost === gap + Math.abs(end.y - start.y)) return best
+  // Distant steps can leave and enter through a free side of the cards. Separate
+  // these spans above/below the row instead of piling them onto the mainline ports.
+  if (Math.abs(start.y - end.y) <= height * 2 && Math.abs(from.x - to.x) >= width) {
+    for (const side of [-1, 1]) {
+      const startY = from.y + (side > 0 ? height : 0)
+      const endY = to.y + (side > 0 ? height : 0)
+      const outerY = side > 0 ? Math.max(startY, endY) : Math.min(startY, endY)
+      const freePort = (card, y) => {
+        const center = card.x + width / 2
+        for (const offset of [0, -16, 16, -32, 32]) {
+          const x = center + offset
+          if (!space.vertical.get(x)?.some(([a, b]) => a <= y && b >= y)) return x
+        }
+        return center
+      }
+      const x1 = freePort(from, startY)
+      const x2 = freePort(to, endY)
+      for (let lane = 0; lane < sideLanes; lane++) {
+        const y = outerY + side * (routeLaneGap + lane * routeTrackSpacing)
+        consider([{ x: x1, y: startY }, { x: x1, y }, { x: x2, y }, { x: x2, y: endY }])
+      }
     }
   }
   const middleY = (start.y + end.y) / 2
-  // Try the nearby gaps first. Distant cards should not determine the detour.
-  for (const y of [middleY, ...tracks].sort((a, b) => Math.abs(a - middleY) - Math.abs(b - middleY))) {
+  const nearby = [middleY, from.y - routeLaneGap, from.y + height + routeLaneGap,
+    to.y - routeLaneGap, to.y + height + routeLaneGap]
+  const detour = (y) => {
     for (const out of routeLeads) {
       for (const into of routeLeads) {
         const startX = start.x + out
         const endX = end.x - into
-        const points = [
-          start,
-          { x: startX, y: start.y },
-          { x: startX, y },
-          { x: endX, y },
-          { x: endX, y: end.y },
-          end,
-        ]
-        if (clear(points)) return points
+        consider([start, { x: startX, y: start.y }, { x: startX, y },
+          { x: endX, y }, { x: endX, y: end.y }, end])
       }
+    }
+  }
+  for (const y of new Set(nearby)) detour(y)
+  if (!best || best.overlap || best.cost > Math.abs(gap) + Math.abs(end.y - start.y) + width) {
+    const top = Math.min(from.y, to.y) - routeLaneGap
+    const bottom = Math.max(from.y, to.y) + height + routeLaneGap
+    for (let lane = 1; lane < sideLanes; lane++) {
+      detour(top - lane * routeTrackSpacing)
+      detour(bottom + lane * routeTrackSpacing)
+    }
+  }
+  if (!best) {
+    for (const y of [...tracks].sort((a, b) => Math.abs(a - middleY) - Math.abs(b - middleY))) {
+      detour(y)
+      if (best) break
+    }
+  }
+  return best
+}
+
+function renderBusinessChainRoute(edge, points, direction) {
+  const vertices = points.map((point) => orientBusinessChainPoint(point, direction))
+  const segments = []
+  let previous = vertices[0]
+  const d = [`M ${previous.x} ${previous.y}`]
+  for (const next of vertices.slice(1)) {
+    const horizontal = previous.y === next.y
+    const length = Math.abs(horizontal ? next.x - previous.x : next.y - previous.y)
+    if (!length) continue
+    d.push(horizontal ? `H ${next.x}` : `V ${next.y}`)
+    segments.push({ start: previous, end: next, horizontal, length })
+    previous = next
+  }
+  return { ...edge, d: d.join(' '), segments }
+}
+
+// Center text on horizontal runs; keep vertical labels upright beside their line.
+export function placeBusinessChainLabel(segments, width, height, obstacles) {
+  const gap = 4
+  for (const segment of [...segments].sort((a, b) => b.length - a.length)) {
+    const { start, end, horizontal, length } = segment
+    const span = horizontal ? width : height
+    const endMargin = horizontal ? 12 : gap
+    if (length < span + 2 * endMargin) continue
+    const low = Math.min(horizontal ? start.x : start.y, horizontal ? end.x : end.y) + endMargin
+    const high = low + length - span - 2 * endMargin
+    const sides = horizontal ? [start.y - height / 2] : [start.x - gap - width, start.x + gap]
+    for (const near of sides) {
+      const blocked = obstacles.filter((box) => box.segment !== segment && (horizontal
+        ? box.top < near + height + gap && box.bottom > near - gap
+        : box.left < near + width + gap && box.right > near - gap))
+        .map((box) => horizontal ? [box.left, box.right] : [box.top, box.bottom])
+      const middle = (low + high) / 2
+      const candidates = [middle, ...blocked.flatMap(([a, b]) => [a - gap - span, b + gap])]
+        .filter((pos) => pos >= low && pos <= high)
+        .sort((a, b) => Math.abs(a - middle) - Math.abs(b - middle))
+      const pos = candidates.find((value) => blocked.every(([a, b]) => value + span + gap <= a || value >= b + gap))
+      if (pos === undefined) continue
+      const left = horizontal ? pos : near
+      const top = horizontal ? near : pos
+      return { left, top, right: left + width, bottom: top + height }
     }
   }
   return null
 }
 
-function renderBusinessChainRoute(edge, points, direction) {
-  let previous = orientBusinessChainPoint(points[0], direction)
-  const d = [`M ${previous.x} ${previous.y}`]
-  let longest = 0
-  let labelX = previous.x
-  let labelY = previous.y
-  for (const point of points.slice(1)) {
-    const next = orientBusinessChainPoint(point, direction)
-    const horizontal = previous.y === next.y
-    const length = Math.abs(horizontal ? next.x - previous.x : next.y - previous.y)
-    if (length === 0) continue
-    d.push(horizontal ? `H ${next.x}` : `V ${next.y}`)
-    if (length > longest) {
-      longest = length
-      labelX = (previous.x + next.x) / 2
-      labelY = (previous.y + next.y) / 2 + (horizontal ? -8 : 4)
-    }
-    previous = next
-  }
-  return { ...edge, d: d.join(' '), labelX, labelY }
-}
-
 // Choose gaps in the saved coordinate system so both directions use the same route.
-export function routeBusinessChainEdges(graph, direction = 'LR') {
+export function businessChainRoutePoints({ nodes, edges, routePoints = new Map() }) {
+  const remaining = edges.filter((edge) => !routePoints.has(edge.key))
+  if (!remaining.length) return routePoints
   const { width, height } = CHAIN_DESIGN_NODE_SIZE
-  const { nodes, edges } = graph
   const forward = businessChainRoutingSpace(nodes, width, height)
   const sideways = ({ x, y }) => ({ x: y, y: x })
   const cross = businessChainRoutingSpace(
-    nodes.map((node) => ({ id: node.id, ...sideways(node) })), height, width
+    nodes.map((node) => ({ id: node.id, ...sideways(node) })), height, width, forward.vertical, forward.horizontal
   )
-  return edges.map((edge) => {
+  const span = (edge) => {
+    const from = forward.positions.get(edge.from)
+    const to = forward.positions.get(edge.to)
+    return Math.abs(from.x - to.x) + Math.abs(from.y - to.y)
+  }
+  // Reserve short mainline connections before placing branches; preserve SVG and keyboard order.
+  const order = remaining.sort((a, b) => Number(b.kind === 'known') - Number(a.kind === 'known') || span(a) - span(b))
+  const routes = new Map(routePoints)
+  for (const points of routes.values()) reserveRoute(points, forward)
+  for (const edge of order) {
     const from = forward.positions.get(edge.from)
     const to = forward.positions.get(edge.to)
     const sideFrom = cross.positions.get(edge.from)
     const sideTo = cross.positions.get(edge.to)
+    const along = () => routeBetweenCards(forward, from, to)
     const across = () => {
       const reverse = from.y > to.y
-      const points = reverse ? routeBetweenCards(cross, sideTo, sideFrom) : routeBetweenCards(cross, sideFrom, sideTo)
-      return points && (reverse ? points.reverse() : points).map(sideways)
+      const route = reverse ? routeBetweenCards(cross, sideTo, sideFrom, 2) : routeBetweenCards(cross, sideFrom, sideTo, 2)
+      if (!route) return null
+      return { ...route, points: (reverse ? route.points.toReversed() : route.points).map(sideways) }
     }
-    // Same-stage cards read across the flow. Use facing sides if the main ports are blocked.
-    const points = Math.abs(from.x - to.x) < 1 && to.y - from.y >= height
-      ? across() || routeBetweenCards(forward, from, to)
-      : routeBetweenCards(forward, from, to) || across()
-    if (points) return renderBusinessChainRoute(edge, points, direction)
-    // Hand-placed cards can overlap and leave no unobstructed route.
-    const start = { x: from.x + width, y: from.y + height / 2 }
-    const end = { x: to.x, y: to.y + height / 2 }
-    const middle = (start.x + end.x) / 2
-    return renderBusinessChainRoute(edge, [
-      start, { x: middle, y: start.y }, { x: middle, y: end.y }, end,
-    ], direction)
-  })
+    const sameColumn = from.x === to.x && Math.abs(to.y - from.y) >= height
+    let route = sameColumn ? across() : along()
+    if (!route || route.overlap) {
+      const alternate = sameColumn ? along() : across()
+      if (alternate && (!route || alternate.overlap < route.overlap)) route = alternate
+    }
+    let points = route?.points
+    if (!points) {
+      // Hand-placed cards can overlap and leave no unobstructed route.
+      const start = { x: from.x + width, y: from.y + height / 2 }
+      const end = { x: to.x, y: to.y + height / 2 }
+      const middle = (start.x + end.x) / 2
+      points = [start, { x: middle, y: start.y }, { x: middle, y: end.y }, end]
+    }
+    reserveRoute(points, forward)
+    routes.set(edge.key, points)
+  }
+  return routes
+}
+
+export function routeBusinessChainEdges(graph, direction = 'LR') {
+  const points = businessChainRoutePoints(graph)
+  return graph.edges.map((edge) => renderBusinessChainRoute(edge, points.get(edge.key), direction))
 }

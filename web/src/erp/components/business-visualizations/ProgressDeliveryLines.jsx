@@ -1,10 +1,12 @@
 import React from 'react'
 import { BusinessProgressSort } from '@/common/consts/statuses.generated.mjs'
+import { progressDeliveryDetails, progressQuantity } from '../../utils/businessProgress.mjs'
+import ProgressMetricHint from './ProgressMetricHint.jsx'
 import ProgressSortHeader from './ProgressSortHeader.jsx'
 import { openWorkflowTaskRow } from '../../utils/workflowTaskEntry.mjs'
-import { ProgressDelivery, ProgressDocumentNumber, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus, ProgressOpenButton } from './ProgressCompactContent.jsx'
+import { ProgressDocumentNumber, ProgressLineProduct, ProgressLineRemaining, ProgressLineStatus, ProgressOpenButton } from './ProgressCompactContent.jsx'
 
-const labels = ['订单 / 客户', '产品', '交付日期', '已出货 / 订购', '剩余待交', '交付状态']
+const labels = ['订单 / 客户', '产品', '交付日期', '订购数量', '实际出货', '剩余待交', '交付状态']
 
 export default function ProgressDeliveryLines({ rows, snapshotAt, onOpen, selectedID, query, onSort }) {
   return (
@@ -14,8 +16,10 @@ export default function ProgressDeliveryLines({ rows, snapshotAt, onOpen, select
           <ProgressSortHeader field={BusinessProgressSort.ORDER_NO} query={query} onSort={onSort} label="订单号">{labels[0]}</ProgressSortHeader>
           <ProgressSortHeader field={BusinessProgressSort.PRODUCT} query={query} onSort={onSort}>{labels[1]}</ProgressSortHeader>
           <ProgressSortHeader field={BusinessProgressSort.DUE_DATE} query={query} onSort={onSort}>{labels[2]}</ProgressSortHeader>
-          {labels.slice(3, 5).map((label) => <th key={label} scope="col">{label}</th>)}
-          <th scope="col" className="erp-progress-line-status-cell">{labels[5]}</th>
+          <th scope="col" className="erp-progress-quantity-cell">{labels[3]}</th>
+          <th scope="col" className="erp-progress-quantity-cell">{labels[4]}</th>
+          <ProgressSortHeader className="erp-progress-quantity-cell" field={BusinessProgressSort.REMAINING} query={query} onSort={onSort}>{labels[5]}</ProgressSortHeader>
+          <th scope="col" className="erp-progress-line-status-cell">{labels[6]}</th>
           <th scope="col" className="erp-progress-action-cell">操作</th>
         </tr>
       </thead>
@@ -35,9 +39,10 @@ export default function ProgressDeliveryLines({ rows, snapshotAt, onOpen, select
             </td>
             <td className="erp-progress-line-product"><ProgressLineProduct row={row} /></td>
             <td data-label={labels[2]}>{row.due_date || '未排交期'}</td>
-            <td data-label={labels[3]}><ProgressDelivery row={row} showLabel={false} showProgress /></td>
-            <td data-label={labels[4]}><ProgressLineRemaining row={row} /></td>
-            <td data-label={labels[5]}><ProgressLineStatus row={row} snapshotAt={snapshotAt} /></td>
+            <td className="erp-progress-quantity-cell" data-label={labels[3]}>{progressQuantity(row.ordered_quantity)} {row.unit}</td>
+            <td className="erp-progress-quantity-cell" data-label={labels[4]}><ProgressMetricHint row={row} metric={progressDeliveryDetails(row)}>{row.shipped_quantity == null ? '待核对' : `${progressQuantity(row.shipped_quantity)} ${row.unit}`}</ProgressMetricHint></td>
+            <td className="erp-progress-quantity-cell" data-label={labels[5]}><ProgressLineRemaining row={row} /></td>
+            <td data-label={labels[6]}><ProgressLineStatus row={row} snapshotAt={snapshotAt} /></td>
             <td className="erp-progress-action-cell">
               <ProgressOpenButton row={row} onOpen={() => onOpen(row, 'lines')} />
             </td>

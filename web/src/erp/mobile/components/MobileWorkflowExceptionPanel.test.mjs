@@ -23,7 +23,7 @@ test('mobile exceptions restore query through task return and reset across acces
   JsonRpc.prototype.call = async (method, params) => {
     assert.equal(method, 'list_exceptions')
     reads.push(params)
-    return { data: { items: [], tasks: [], orders: [], total: 0, view_total: 0, open: 0, closed: 0, pending_tasks: 0, affected_orders: 0 } }
+    return { data: { items: [], tasks: [], orders: [], total: 0, view_total: 0, open: 0, closed: 0, pending_plan: 0, executing: 0, pending_tasks: 0, affected_orders: 0 } }
   }
   const container = document.createElement('div')
   document.body.appendChild(container)
@@ -41,7 +41,7 @@ test('mobile exceptions restore query through task return and reset across acces
   assert.equal(container.querySelector('input'), null)
   await act(async () => [...container.querySelectorAll('button')].find((button) => button.textContent === '返回异常跟踪').click())
   assert.equal(container.querySelector('input').value, '复检')
-  assert.deepEqual([...container.querySelectorAll('.erp-filter-chip__count')].map((node) => node.textContent), ['0', '0', '0'])
+  assert.deepEqual([...container.querySelectorAll('.erp-filter-chip__count')].map((node) => node.textContent), ['0', '0', '0', '0', '0'])
   assert.equal(window.history.state.mobileRoleTasksMainTab, 'exceptions')
   const clear = [...container.querySelectorAll('button')].find((button) => button.querySelector('.erp-filter-chip__label')?.textContent === '已处理完')
   assert.ok(clear)
@@ -53,12 +53,12 @@ test('mobile exceptions restore query through task return and reset across acces
   assert.equal(clear.getAttribute('aria-pressed'), 'false')
   assert.equal(clear.querySelector('.erp-filter-chip__clear'), null)
   assert.equal(container.querySelector('input').value, '复检')
-  await act(async () => [...container.querySelectorAll('button')].find((button) => button.querySelector('.erp-filter-chip__label')?.textContent === '未处理完').click())
-  assert.equal(reads.at(-1).state, 'open')
+  await act(async () => [...container.querySelectorAll('button')].find((button) => button.querySelector('.erp-filter-chip__label')?.textContent === '执行与复检中').click())
+  assert.equal(reads.at(-1).state, 'executing')
   assert.equal(reads.at(-1).offset, 0)
   await act(async () => root.render(null))
   await render('account-1')
-  assert.equal(reads.at(-1).state, 'open')
+  assert.equal(reads.at(-1).state, 'executing')
   assert.equal(reads.at(-1).keyword, '复检')
   assert.equal(reads.at(-1).module_key, undefined)
   await render('account-2')

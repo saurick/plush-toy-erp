@@ -334,6 +334,9 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 	if err != nil {
 		return nil, err
 	}
+	if err := refreshReceiptPayable(ctx, tx.client, adjustment.PurchaseReceiptID, 0); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
@@ -465,6 +468,9 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 	}
 	out, err := purchaseReceiptAdjustmentWithItems(ctx, tx.client, adjustment)
 	if err != nil {
+		return nil, err
+	}
+	if err := refreshReceiptPayable(ctx, tx.client, adjustment.PurchaseReceiptID, 0); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {

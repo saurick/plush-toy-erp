@@ -1810,7 +1810,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   }), Object.freeze({
     chain: 'finance',
     group: '财务结算',
-    groups: Object.freeze(['purchase_payable_registration', 'outsource_payable_registration']),
+    groups: Object.freeze(['handoff_receipt_payable', 'purchase_payable_registration', 'outsource_payable_registration']),
     key: 'payable_registration',
     label: '应付登记',
     module: 'finance',
@@ -2095,6 +2095,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   }), Object.freeze({
     chain: 'fulfillment',
     group: '采购与来料',
+    groups: Object.freeze(['handoff_purchase_price']),
     key: 'purchasing',
     label: '采购下单与审批',
     module: 'purchase',

@@ -38,7 +38,7 @@ test('dev flow state observatory covers its read-only desktop journeys', () => {
       { name: 'dev-business-chain-design-viewport-desktop', path: '/__dev/flow-explorer?new=blank', viewport: { width: 1440, height: 900 } },
       { name: 'dev-business-chain-design-mainline-desktop', path: '/__dev/flow-explorer?new=blank', viewport: { width: 1920, height: 1080 } },
       { name: 'dev-business-chain-design-desktop', path: '/__dev/flow-explorer?new=blank', viewport: { width: 1440, height: 900 } },
-      { name: 'dev-finance-prototype-alignment', path: '/__dev/status-flows?flow_tab=finance', viewport: { width: 1920, height: 1080 } },
+      { name: 'dev-finance-prototype-alignment', path: '/__dev/status-flows?flow_tab=finance', viewport: { width: 1280, height: 720 } },
       { name: 'dev-finance-rules-reading-desktop', path: '/__dev/business-rules?view=finance_rules&finance_rule=sources', viewport: { width: 1920, height: 1080 } },
       { name: 'dev-business-relations-desktop', path: '/__dev/status-flows?view=chain&chain=all', viewport: { width: 1920, height: 1080 } },
       { name: 'dev-finished-quality-responsibility', path: '/__dev/status-flows?view=chain&chain=all&flow_stage=finished_quality&flow_substep=passed', viewport: { width: 1920, height: 1080 } },
@@ -51,7 +51,7 @@ test('dev flow state observatory covers its read-only desktop journeys', () => {
       { name: 'dev-flow-state-details-desktop-light', path: '/__dev/status-flows?view=chain&chain=all', viewport: { width: 1920, height: 1080 } },
       { name: 'dev-flow-rules-complete', path: '/__dev/status-flows?view=states&flow=process.instance', viewport: { width: 1920, height: 1080 } },
       { name: 'dev-flow-action-rules-desktop-light', path: '/__dev/status-flows?view=states&flow=workflow.task', viewport: { width: 1920, height: 1080 } },
-      { name: 'dev-flow-details-design-preview', path: '/__dev/ui-design?page=workbench&workbenchMode=preview', viewport: { width: 1440, height: 900 } },
+      { name: 'dev-flow-details-design-preview', path: '/__dev/ui-design?page=workbench', viewport: { width: 1440, height: 900 } },
     ]
   )
   assert.equal(typeof scenarios[0].beforeNavigate, 'function')

@@ -12,20 +12,6 @@
   gap: 12px;
 }
 
-.erp-dev-migration-start {
-  display: grid;
-  justify-items: start;
-  gap: 12px;
-}
-
-.erp-dev-migration-start > .ant-typography {
-  margin: 0;
-}
-
-.erp-dev-migration-start > .erp-dev-static-guidance {
-  justify-self: stretch;
-}
-
 .erp-dev-database-migration-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

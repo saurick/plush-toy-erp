@@ -4,17 +4,15 @@ import { DEV_FLOW_STATE_CATALOG } from '../config/devFlowStateCatalog.mjs'
 
 import {
   buildDevFlowDefinitionSearchGroups,
-  createDevFlowDefinitionOptionFilter,
   normalizeDevFlowDefinitionSearchText,
 } from './devFlowDefinitionSearch.mjs'
 
-test('状态对象可用具体业务动作名搜索，质检纠正继续使用既有规则索引', () => {
-  const filter = createDevFlowDefinitionOptionFilter(DEV_FLOW_STATE_CATALOG, 'stateOptions')
-  for (const [query, value] of [
+test('定义搜索可通过具体业务动作名找到状态规则', () => {
+  for (const [query, key] of [
     ['启用 BOM', 'master.lifecycle'],
     ['财务退回用料', 'source.engineering_material_request'],
     ['纠正原判定并重新检验', 'fact.quality_inspection'],
-  ]) assert.equal(filter(query, { value }), true, query)
+  ]) assert(group(buildDevFlowDefinitionSearchGroups(DEV_FLOW_STATE_CATALOG, query), 'states').some((item) => item.key === key), query)
 })
 
 const catalog = {
@@ -101,16 +99,13 @@ const catalog = {
   ],
 }
 
-test('规则内容可通过定义搜索和对象选择器找到，结果归属准确', () => {
+test('定义搜索可找到规则内容及其归属', () => {
   const search = (query) => buildDevFlowDefinitionSearchGroups(DEV_FLOW_STATE_CATALOG, query)
   const allResults = (query) => search(query).flatMap((group) => group.items)
-  const filter = createDevFlowDefinitionOptionFilter(DEV_FLOW_STATE_CATALOG, 'stateOptions')
-  assert.equal(filter('退回责任池', { value: 'workflow.task' }), true)
-  assert.equal(filter('退回责任池', { value: 'fact.shipment' }), false)
-  assert.equal(filter('默认仓引用', { value: 'master.lifecycle' }), true)
-  assert.equal(filter('关联退款', { value: 'fact.finance_payment' }), true)
   assert(allResults('退回责任池').some((item) => item.key === 'workflow.task'))
+  assert(!allResults('退回责任池').some((item) => item.key === 'fact.shipment'))
   assert(allResults('默认仓引用').some((item) => item.key === 'master.lifecycle'))
+  assert(allResults('关联退款').some((item) => item.key === 'fact.finance_payment'))
 })
 
 function group(groups, key) {
@@ -215,41 +210,6 @@ test('definition search supports combined business keywords and controlled alias
   )
 })
 
-test('definition select filters reuse the same nested and combined keyword contract', () => {
-  const runtimeFilter = createDevFlowDefinitionOptionFilter(catalog, 'runtime')
-  assert.equal(
-    runtimeFilter('销售 PMC', {
-      value: 'sales_order_acceptance/approval_engineering_pmc',
-    }),
-    true
-  )
-  assert.equal(
-    runtimeFilter('采购 PMC', {
-      value: 'sales_order_acceptance/approval_engineering_pmc',
-    }),
-    false
-  )
-
-  const chainFilter = createDevFlowDefinitionOptionFilter(catalog, 'chains')
-  assert.equal(
-    chainFilter('生产 入库', { value: 'production_to_inventory' }),
-    true
-  )
-
-  const factFilter = createDevFlowDefinitionOptionFilter(catalog, 'facts')
-  assert.equal(factFilter('待出货', { value: 'fact.shipment' }), true)
-
-  const stateFilter = createDevFlowDefinitionOptionFilter(
-    catalog,
-    'stateOptions'
-  )
-  assert.equal(
-    stateFilter('销售 已提交', { value: 'source.sales_order' }),
-    true
-  )
-  assert.equal(stateFilter('', { value: 'source.sales_order' }), true)
-})
-
 test('definition search does not treat a database id as a definition lookup key', () => {
   const groups = buildDevFlowDefinitionSearchGroups(catalog, '数据库 ID：1818')
   assert.equal(
@@ -258,9 +218,8 @@ test('definition search does not treat a database id as a definition lookup key'
   )
 })
 
-test('definition search and object picker discover independent result dimensions', () => {
+test('definition search finds state rules outside a selected business chain', () => {
   for (const [query, key] of [['让步接收', 'fact.quality_inspection'], ['domain_command_effect_state', 'process.node'], ['模块可用状态', 'control.customer_config_revision']]) {
     assert(group(buildDevFlowDefinitionSearchGroups(DEV_FLOW_STATE_CATALOG, query), 'states').some((item) => item.key === key), query)
-    assert.equal(createDevFlowDefinitionOptionFilter(DEV_FLOW_STATE_CATALOG, 'states')(query, { value: key }), true, query)
   }
 })

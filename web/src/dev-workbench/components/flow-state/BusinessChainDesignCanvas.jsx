@@ -3,25 +3,27 @@ import React, {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
 import { Button, Dropdown, Space, Splitter } from 'antd'
 import DiagramViewControls from '@/common/components/diagram/DiagramViewControls.jsx'
-import BusinessTextArea from '@/erp/components/business-list/BusinessTextArea.jsx'
 import DiagramNodeIcon from '@/common/components/diagram/DiagramNodeIcon.jsx'
 import { diagramDomainStyle } from '@/common/components/diagram/diagramSemantics.mjs'
-import BusinessChainDesignViewPanel from './BusinessChainDesignViewPanel.jsx'
+import BusinessChainDesignViewPanel, { BusinessChainLayerFilter } from './BusinessChainDesignViewPanel.jsx'
+import BusinessChainDesignPopover from './BusinessChainDesignPopover.jsx'
 import BusinessChainDesignPicker from './BusinessChainDesignPicker.jsx'
 import { WorkbenchToolbar } from '../WorkbenchPattern.jsx'
 import {
   CHAIN_DESIGN_NODE_SIZE as size,
   CHAIN_DESIGN_TYPES,
   CHAIN_DESIGN_DOMAINS,
+  CHAIN_CONNECTION_LABELS,
   assessBusinessChainConnection,
   addBusinessChainDraftEdge,
 } from '../../config/devBusinessChainDesign.mjs'
-import { routeBusinessChainEdges, businessChainNeighbors, orientBusinessChainPoint, businessChainRoleHighlight } from '../../config/devBusinessChainDesignView.mjs'
+import { placeBusinessChainLabel, routeBusinessChainEdges, businessChainNeighbors, orientBusinessChainPoint, businessChainRoleHighlight } from '../../config/devBusinessChainDesignView.mjs'
 import {
   businessChainMapState,
   expandBusinessChainMap,
@@ -38,16 +40,11 @@ import {
 import BusinessChainDesignDetails, {
   ChainDesignEvidence,
 } from './BusinessChainDesignDetails.jsx'
-import { businessChainHandoffs, businessChainLaneBands, businessChainRelationLayer, projectBusinessChainReading } from '../../config/devBusinessChainReading.mjs'
+import { CHAIN_READING_LAYERS, businessChainStepLayer, businessChainHandoffs, businessChainLaneBands, businessChainRelationLayer, projectBusinessChainReading } from '../../config/devBusinessChainReading.mjs'
 import BusinessChainHandoffMap from './BusinessChainHandoffMap.jsx'
 import { ChainPurposeDetails, ChainHandoffDetails } from './BusinessChainReadingDetails.jsx'
+import { CHAIN_CANVAS_RELATIONS } from '../../config/devBusinessChainExport.mjs'
 
-const connectionLabels = {
-  known: '有接入规则',
-  unknown: '待核对',
-  blocked: '不能直连',
-  source: '当前起点',
-}
 const connectionPreview = (node, pointer, direction) => {
   const from = { x: node.x + size.width, y: node.y + size.height / 2 }
   const to = orientBusinessChainPoint(pointer, direction)
@@ -57,6 +54,60 @@ const connectionPreview = (node, pointer, direction) => {
     return `${x} ${y}`
   }
   return `M ${pointText(from)} C ${pointText({ ...from, x: from.x + bend })}, ${pointText({ ...to, x: to.x - bend })}, ${pointText(to)}`
+}
+
+function positionRouteLabels(surface, routes) {
+  const labels = [...surface.querySelectorAll('[data-design-edge] text')]
+  if (!labels.length) return
+  const origin = surface.getBoundingClientRect()
+  const scale = origin.width / surface.offsetWidth
+  if (!scale) return
+  const obstacles = [...surface.querySelectorAll('[data-design-node], .erp-chain-design__port, [data-chain-section] strong, .erp-chain-design__lane strong')].map((element) => {
+    // A lane heading spans the band; only its printed title occupies label space.
+    let target = element
+    if (element.tagName === 'STRONG') {
+      target = surface.ownerDocument.createRange()
+      target.selectNodeContents(element)
+    }
+    const rect = target.getBoundingClientRect()
+    return {
+      left: (rect.left - origin.left) / scale,
+      right: (rect.right - origin.left) / scale,
+      top: (rect.top - origin.top) / scale,
+      bottom: (rect.bottom - origin.top) / scale,
+    }
+  })
+  for (const { segments } of routes) {
+    for (const segment of segments) {
+      const { start, end } = segment
+      obstacles.push({
+        segment,
+        left: Math.min(start.x, end.x),
+right: Math.max(start.x, end.x),
+        top: Math.min(start.y, end.y),
+bottom: Math.max(start.y, end.y),
+      })
+    }
+  }
+  // Measure in SVG units before placing any labels, independent of the camera zoom.
+  for (const label of labels) label.parentElement.style.removeProperty('display')
+  const bounds = labels.map((label) => label.getBBox())
+  const byKey = new Map(routes.map((edge) => [edge.key, edge.segments]))
+  labels.forEach((label, index) => {
+    const box = bounds[index]
+    const placed = placeBusinessChainLabel(byKey.get(label.dataset.route), box.width, box.height, obstacles)
+    if (placed) {
+      label.parentElement.setAttribute('transform', `translate(${placed.left - box.x} ${placed.top - box.y})`)
+      const backdrop = label.previousElementSibling
+      backdrop.setAttribute('x', String(box.x - 2))
+      backdrop.setAttribute('y', String(box.y))
+      backdrop.setAttribute('width', String(box.width + 4))
+      backdrop.setAttribute('height', String(box.height))
+      obstacles.push(placed)
+    } else {
+      label.parentElement.style.display = 'none'
+    }
+  })
 }
 
 function CanvasCard({ title, onClose, actions, children }) {
@@ -71,66 +122,19 @@ function CanvasCard({ title, onClose, actions, children }) {
   )
 }
 
-function DraftNotes({ draft, change }) {
-  const [text, setText] = useState('')
-  return (
-    <>
-      <p>记录待讨论的顺序、接入条件或状态规则。</p>
-      <BusinessTextArea
-        aria-label="视图备注内容"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        maxLength={2000}
-        minRows={3}
-        placeholder="例如：这个接点还需要核对哪项前置条件？"
-      />
-      <div className="erp-chain-design__actions">
-        <Button
-          disabled={!text.trim()}
-          onClick={() => {
-            change((previous) => ({
-              ...previous,
-              ideas: [...previous.ideas, { text: text.trim() }],
-            }))
-            setText('')
-          }}
-        >
-          添加备注
-        </Button>
-      </div>
-      {draft.ideas.map((idea, index) => (
-        <div key={index} className="erp-chain-design__state-transition">
-          <p>{idea.text}</p>
-          <Button
-            danger
-            onClick={() =>
-              change((previous) => ({
-                ...previous,
-                ideas: previous.ideas.filter((_, i) => i !== index),
-              }))
-            }
-          >
-            移除第 {index + 1} 条备注
-          </Button>
-        </div>
-      ))}
-    </>
-  )
-}
-
 export default function BusinessChainDesignCanvas({
   scopeField,
+  libraryVisible,
   setLayout,
   returnAction,
   resultTrigger,
-  frameKey,
   fullscreen,
   toggleFullscreen,
   fullscreenButtonRef,
   map,
   projected,
   globalOverview,
-  effectiveMode,
+  viewMode,
   setViewMode,
   catalog,
   library,
@@ -148,7 +152,6 @@ export default function BusinessChainDesignCanvas({
   setNotice,
   view,
   setView,
-  viewRequest,
   onNavigate,
   onNavigateChain,
   onOpenVerification,
@@ -156,43 +159,27 @@ export default function BusinessChainDesignCanvas({
   layers,
   layout,
   setReadingOptions,
-  onCameraCommit,
 }) {
   const viewport = useRef(null)
   const scopePurpose = useRef(null)
-  const handoffDock = useRef(null)
+  const handoffToggle = useRef(null)
   const handoffTrigger = useRef(null)
   const panTarget = useRef(null)
   const surface = useRef(null)
   const gesture = useRef(null)
   const suppressClick = useRef(false)
   const [pointer, setPointer] = useState(null)
+  const [focusedRelation, setFocusedRelation] = useState(null)
   const [panning, setPanning] = useState(false)
   const [highlightPath, setHighlightPath] = useState(null)
   const [areaWidth, setAreaWidth] = useState(1000)
   const [detailShare, setDetailShare] = useState(36)
   const inspectorOnly = Boolean(selection && areaWidth < 820)
-  const [cameraDirty, setCameraDirty] = useState(false)
-  useEffect(() => { setCameraDirty(false) }, [viewRequest.revision])
-  useEffect(() => {
-    if (!cameraDirty) return undefined
-    const commit = () => { onCameraCommit(view); setCameraDirty(false) }
-    const timer = window.setTimeout(commit, 200)
-    window.addEventListener('pagehide', commit)
-    return () => { window.clearTimeout(timer); window.removeEventListener('pagehide', commit) }
-  }, [cameraDirty, onCameraCommit, view])
   useEffect(() => { setHighlightPath(null) }, [selection?.nodeId])
   const canGrowUpstream = businessChainMapCanGrow(draft, library, 'upstream')
   const canGrowDownstream = businessChainMapCanGrow(draft, library, 'downstream')
   const canCollapseGrowth = businessChainMapCanCollapseGrowth(draft, library)
-  const cameraScope = useRef(null)
-  const pendingFit = useRef(false)
-  const [frameRequest, setFrameRequest] = useState({ revision: 0, chainKey: null })
-  const requestFrame = (chainKey = null) =>
-    setFrameRequest((previous) => ({
-      revision: previous.revision + 1,
-      chainKey,
-    }))
+  const [fitRequest, setFitRequest] = useState(null)
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
   useLayoutEffect(() => {
     const area = viewport.current
@@ -212,8 +199,7 @@ export default function BusinessChainDesignCanvas({
     measure()
     return () => observer.disconnect()
   }, [])
-  const zoomTo = useCallback((next, anchor) => {
-    setCameraDirty(true)
+  const zoomTo = useCallback((next, anchor, mode = 'manual') => {
     const area = viewport.current
     const focus = anchor || {
       x: area.clientWidth / 2,
@@ -228,7 +214,7 @@ export default function BusinessChainDesignCanvas({
       return {
         ...previous,
         scale,
-        mode: 'manual',
+        mode,
         x: focus.x - (focus.x - previous.x) * ratio,
         y: focus.y - (focus.y - previous.y) * ratio,
       }
@@ -252,7 +238,6 @@ export default function BusinessChainDesignCanvas({
           y: event.clientY - rect.top,
         })
       } else {
-        setCameraDirty(true)
         setView((previous) => ({
           ...previous,
           mode: 'manual',
@@ -270,18 +255,31 @@ export default function BusinessChainDesignCanvas({
   const { scopeSummary } = projected
   const expandedInScope = Boolean(scopeSummary && map.expandedChains.includes(scopeSummary.chainKey))
   const expandedOverview = globalOverview && map.expandedChains.length > 0
-  const reading = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode, layout, expandedNodes: map.expandedNodes, showBranches: draft.presentation?.showBranches, selection, pathIds: highlightPath || [] })
-  const hasBranches = projectBusinessChainReading(projected, library, { scope: map.scope, mode: effectiveMode }).nodes.length < projected.nodes.length
+  const detailLayers = viewMode === 'all' || ((map.chainKey !== 'all' || map.scope === 'whole') && (viewMode === 'mainline' || expandedInScope))
+  const reading = useMemo(() => projectBusinessChainReading(projected, library, {
+    scope: map.scope,
+mode: viewMode,
+layout,
+expandedNodes: map.expandedNodes,
+    layers: detailLayers ? layers : undefined,
+selection,
+pathIds: highlightPath || [],
+  }), [projected, library, map.scope, viewMode, layout, map.expandedNodes, detailLayers, layers, selection, highlightPath])
   const directHandoffs = businessChainHandoffs(catalog, map.chainKey)
   const showHandoffs = Boolean(map.showHandoffs && directHandoffs.length)
-  const relations = globalOverview ? reading.edges.flatMap((edge) => edge.overview || []) : showHandoffs ? directHandoffs : []
-  const graph = {
+  const wholeMapDetails = detailLayers && map.scope === 'whole' && map.chainKey === 'all'
+  const scopeHandoffs = wholeMapDetails ? catalog.businessChainOverview.relations : directHandoffs
+  const relations = globalOverview ? reading.edges.flatMap((edge) => edge.overview || []) : detailLayers || showHandoffs ? scopeHandoffs : []
+  const availableLayers = new Set(relations.map(businessChainRelationLayer))
+  if (detailLayers) {
+    for (const { id } of projected.nodes) availableLayers.add(businessChainStepLayer(library.byId.get(id), library))
+  }
+  const visibleHandoffs = relations.filter((edge) => layers.includes(businessChainRelationLayer(edge)))
+  const graph = useMemo(() => ({
     ...reading,
     edges: reading.edges.filter((edge) => !edge.overview || (globalOverview && layers.includes(businessChainRelationLayer(edge.overview)))),
-  }
-  const usesDirection = globalOverview || layout === 'flow'
-  const canSwitchDirection = usesDirection && (globalOverview || map.chainKey !== 'all')
-  const direction = usesDirection && draft.presentation?.direction === 'TB' ? 'TB' : 'LR'
+  }), [reading, globalOverview, layers])
+  const direction = draft.presentation?.direction || 'LR'
   const nextDirection = direction === 'TB' ? 'LR' : 'TB'
   const itemFor = (id) =>
     graph.nodes.find((node) => node.id === id && node.summary) ||
@@ -290,12 +288,9 @@ export default function BusinessChainDesignCanvas({
     ? graph.nodes.map((node) => ({ ...node, ...orientBusinessChainPoint(node, direction) }))
     : graph.nodes
   const roleCounts = new Map()
-  let roleMatchCount = 0
   for (const node of reading.nodes) {
     if (node.summary) continue
-    const nodeRoles = new Set(library.byId.get(node.id).roles)
-    if (selectedRoles.some(({ value }) => nodeRoles.has(value))) roleMatchCount += 1
-    for (const key of nodeRoles) {
+    for (const key of new Set(library.byId.get(node.id).roles)) {
       roleCounts.set(key, (roleCounts.get(key) || 0) + 1)
     }
   }
@@ -306,13 +301,31 @@ export default function BusinessChainDesignCanvas({
     { key: 'absent', label: '本图暂无节点', options: absentRoles },
   ].filter((group) => group.options.length)
   const bands = layout === 'lanes' ? businessChainLaneBands(graph, library, direction) : []
-  const routes = routeBusinessChainEdges(graph, direction)
+  const sectionTitles = reading.sections ? reading.sections.map((section) => {
+    const positions = [section.routeOrigin, ...section.nodes].map((node) => orientBusinessChainPoint(node, direction))
+    const lane = bands.filter((band) => band.chainKey === section.key)
+    return { key: section.key,
+label: section.label,
+width: 270,
+height: 28,
+      x: Math.min(...[...positions, ...lane].map(({ x }) => x)),
+      y: Math.min(...[...positions, ...lane].map(({ y }) => y)) - 34 }
+  }) : []
+  const routes = useMemo(() => routeBusinessChainEdges(graph, direction), [graph, direction])
+  useLayoutEffect(() => { positionRouteLabels(surface.current, routes) }, [routes, viewportSize.width])
+  const sharedNodes = new Map(graph.nodes.filter((node) => node.sourceIds?.length > 1).map((node) => [node.id, node.sourceIds]))
+  const salesVariant = draft.presentation?.salesAcceptanceVariant
+  const selectVariant = (key, nodeId) => {
+    cancel()
+    if (projected.salesAcceptance) setReadingOptions({ salesAcceptanceVariant: key })
+    if (nodeId) setSelection({ nodeId })
+  }
   const connectingNode = connecting && graph.nodes.find((node) => node.id === connecting)
   const width = Math.max(720, ...nodes.map((node) => node.x + size.width + 60))
   const height = Math.max(
     440,
     ...nodes.map((node) => node.y + size.height + 80),
-    ...routes.map((edge) => edge.labelY + 40)
+    ...routes.flatMap((edge) => edge.segments.map(({ start, end }) => Math.max(start.y, end.y) + 40))
   )
   const point = (event) => {
     const rect = surface.current.getBoundingClientRect()
@@ -350,19 +363,19 @@ export default function BusinessChainDesignCanvas({
     setConnecting(null)
     setSelection(null)
   }
-  const fit = (mode, reset = true, preferredChain = null) => {
+  const fit = (mode, preferredChain = null) => {
     if (!nodes.length) return
     const area = viewport.current
-    if (!area.clientWidth || !area.clientHeight) return
-    if (reset) cancel()
+    if (!area.clientWidth || !area.clientHeight) {
+      // 窄屏详情可暂时占满画布，恢复可见后按当前选择重新测量。
+      setView({ mode, x: 0, y: 0, scale: 1, chainKey: preferredChain })
+      return
+    }
     // Overview cards use their own map positions; width reading follows the expanded steps.
     const chainKey =
-      effectiveMode === 'overview' && mode === 'fit-width'
+      viewMode === 'overview' && mode === 'fit-width'
         ? [
             preferredChain,
-            reset &&
-              (selection?.chainKey ||
-                library.byId.get(selection?.nodeId)?.chainKey),
             view.chainKey,
             ...map.expandedChains.toReversed(),
           ].find(
@@ -387,7 +400,7 @@ export default function BusinessChainDesignCanvas({
       ? businessChainLaneBands({ ...graph, nodes: graph.nodes.filter((node) => ids.has(node.id)) }, library, direction)
       : bands
     const bounds = fittedNodes.map((node) => ({ ...node, ...size }))
-    if (!overviewOnly) bounds.push(...fittedBands)
+    if (!overviewOnly) bounds.push(...fittedBands, ...sectionTitles)
     for (const edge of surface.current.querySelectorAll('[data-design-edge]')) {
       if (ids.has(edge.dataset.edgeFrom) && ids.has(edge.dataset.edgeTo)) {
         bounds.push(edge.getBBox())
@@ -413,83 +426,43 @@ export default function BusinessChainDesignCanvas({
           ? -top * scale
           : (area.clientHeight - (bottom + top) * scale) / 2,
     })
-    if (reset) {
-      setCameraDirty(true)
-      const label = chainKey
-        ? library.chains.find(({ value }) => value === chainKey).label
-        : '当前范围'
-      setNotice(
-        mode === 'fit-width'
-          ? `${label}已适配宽度，滚轮可上下查看。`
-          : '已显示全图。'
-      )
-    }
   }
-  const switchLayout = () => {
-    setCameraDirty(false)
-    setView((previous) => ({ ...previous, mode: 'fit-all', chainKey: null }))
-    setReadingOptions({ direction: nextDirection, viewport: undefined })
+  const chooseFit = (mode) => {
+    const chainKey = selection?.chainKey || library.byId.get(selection?.nodeId)?.chainKey || view.chainKey
+    cancel()
+    setFitRequest({ mode, chainKey })
+    setNotice(mode === 'fit-width' ? '已适配宽度，滚轮可上下查看。' : '已显示全图。')
   }
-  const scopeKey = `${frameKey}:${frameRequest.revision}:${effectiveMode}:${viewRequest.revision}:${direction}`
-  const geometryKey = JSON.stringify([
-    nodes.map(({ id, x, y }) => [id, x, y]),
-    graph.edges.map(({ from, to, kind }) => [from, to, kind]),
-  ])
-  const viewportKey = `${fullscreen}:${viewportSize.width}:${viewportSize.height}`
   const fitRef = useRef(fit)
+  const previousRequest = useRef(null)
+  const previousOverview = useRef(null)
+  const activeFit = useRef('fit-all')
   useLayoutEffect(() => {
     fitRef.current = fit
+    activeFit.current = view.mode
   })
   useLayoutEffect(() => {
-    const previous = cameraScope.current
-    if (!nodes.length) {
-      if (previous) setView({ x: 0, y: 0, scale: 1, mode: 'manual' })
-      cameraScope.current = null
+    const requested = fitRequest !== previousRequest.current ? fitRequest : null
+    previousRequest.current = fitRequest
+    const overview = globalOverview ? `${layout}:${direction}` : null
+    const sameOverview = overview === previousOverview.current
+    previousOverview.current = overview
+    if (requested?.mode === 'manual') {
+      activeFit.current = 'manual'
+      setView((previous) => ({ ...previous, mode: 'manual', chainKey: requested.chainKey }))
       return
     }
-    const changedScope = previous?.scopeKey !== scopeKey
-    const changedFrame = previous?.revision !== frameRequest.revision
-    cameraScope.current = {
-      scopeKey,
-      geometryKey,
-      viewportKey,
-      revision: frameRequest.revision,
-      restoreRevision: viewRequest.revision,
+    // Reading an expanded map in place keeps the handoff in view. On entry, frame its cards.
+    if (!requested && expandedOverview && sameOverview) return
+    activeFit.current = requested?.mode || (expandedOverview ? 'fit-overview' : 'fit-all')
+    if (nodes.length) fitRef.current(activeFit.current, requested?.chainKey)
+    else setView({ x: 0, y: 0, scale: 1, mode: 'fit-all' })
+  }, [draft, selection, fullscreen, libraryVisible, highlightPath, fitRequest, nodes.length, globalOverview, expandedOverview, layout, direction, setView])
+  useLayoutEffect(() => {
+    if (activeFit.current.startsWith('fit-')) {
+      fitRef.current(activeFit.current)
     }
-    // A saved automatic camera may have included a distant overview card.
-    const refitScope = (expandedInScope || expandedOverview) && viewRequest.view?.mode !== 'manual'
-    if (previous?.restoreRevision !== viewRequest.revision && viewRequest.view && !refitScope) {
-      pendingFit.current = false
-      return
-    }
-    if (changedScope) pendingFit.current = true
-    if (
-      !changedScope &&
-      previous?.geometryKey === geometryKey &&
-      previous?.viewportKey === viewportKey
-    ) return
-    if (!pendingFit.current && !changedScope && (view.mode === 'manual' || selection)) return
-    // An entry from the example first unhides the canvas; fit after its size is available.
-    if (!viewport.current.clientWidth || !viewport.current.clientHeight) return
-    const fitOverview = expandedOverview && (changedScope || view.mode === 'fit-overview')
-    const mode = view.mode === 'fit-width' ? 'fit-width' : fitOverview ? 'fit-overview' : 'fit-all'
-    fitRef.current(mode, false, changedFrame ? frameRequest.chainKey : view.chainKey)
-    pendingFit.current = false
-  }, [
-    nodes.length,
-    scopeKey,
-    geometryKey,
-    viewportKey,
-    frameRequest.revision,
-    frameRequest.chainKey,
-    view.mode,
-    view.chainKey,
-    selection,
-    viewRequest,
-    expandedInScope,
-    expandedOverview,
-    setView,
-  ])
+  }, [viewportSize])
   const pan = (event) => {
     if (event.button !== 0 && event.button !== 1) return
     if (
@@ -518,12 +491,15 @@ export default function BusinessChainDesignCanvas({
       suppressClick.current = false
       return
     }
+    if (sharedNodes.has(id)) {
+      setConnecting(null)
+      setSelection({ nodeId: id, shared: true })
+      return
+    }
     setSelection(
       id.startsWith('map:')
         ? { chainKey: id.slice(4) }
-        : connecting
-          ? { from: connecting, to: id }
-          : { nodeId: id }
+        : connecting ? { from: connecting, to: id } : { nodeId: id }
     )
   }
   const startLine = (event, id) => {
@@ -542,6 +518,8 @@ export default function BusinessChainDesignCanvas({
     const active = gesture.current
     if (!active) return
     if (active.kind === 'pan') {
+      if (!active.moved && event.clientX === active.start.x && event.clientY === active.start.y) return
+      active.moved = true
       setView({
         ...active.original,
         mode: 'manual',
@@ -566,7 +544,6 @@ export default function BusinessChainDesignCanvas({
     }
     if (active.kind === 'pan') {
       setPanning(false)
-      setCameraDirty(true)
       return
     }
     const target = document
@@ -574,7 +551,9 @@ export default function BusinessChainDesignCanvas({
       ?.closest('[data-design-node]')
     if (active.moved && target && surface.current.contains(target) &&
         library.byId.has(target.dataset.designNode)) {
-      setSelection({ from: active.id, to: target.dataset.designNode })
+      const to = target.dataset.designNode
+      if (sharedNodes.get(to)) setConnecting(null)
+      setSelection(sharedNodes.get(to) ? { nodeId: to, shared: true } : { from: active.id, to })
     }
     setPointer(null)
     suppressClick.current = active.moved
@@ -609,7 +588,7 @@ export default function BusinessChainDesignCanvas({
     referencedSteps.some((reference) => reference.key === step.key || reference.edgeKey === step.edgeKey)
   ) || []
   const removableNode =
-    selectedNode && map.visibleIds.includes(selectedNode.id)
+    !selection?.shared && selectedNode && map.visibleIds.includes(selectedNode.id)
   // A mainline edge represents paths; disconnect their final links without removing intermediate nodes.
   const selectedEdges = new Set(
     selection?.summary
@@ -658,17 +637,16 @@ export default function BusinessChainDesignCanvas({
     const opening = !map.expandedChains.includes(key)
     change((previous) => toggleBusinessChainMapRegion(previous, library, key))
     if (globalOverview) {
-      setView((previous) => ({ ...previous, mode: 'manual', chainKey: opening ? key : previous.chainKey }))
+      setFitRequest({ mode: 'manual', chainKey: opening ? key : view.chainKey })
       setNotice(opening ? '已展开步骤，可用「适配宽度」查看。' : '已收起这条链路的步骤。')
       return
     }
     setSelection(null)
-    requestFrame(opening ? key : null)
     setNotice('已调整这条链路的展开状态，其他区域位置保留。')
   }
   const cardActions = selectedSummary ? (
     <>
-      {effectiveMode === 'overview' && !globalOverview && selectedSummary.value === map.chainKey ? (
+      {viewMode === 'overview' && !globalOverview && selectedSummary.value === map.chainKey ? (
         <Button type="primary" onClick={() => toggleChain(selectedSummary.value)}>
           {map.expandedChains.includes(selectedSummary.value)
             ? '折叠这条链路为卡片'
@@ -702,12 +680,12 @@ export default function BusinessChainDesignCanvas({
         移除这条视图线
       </Button>
     </>
-  ) : selectedNode ? (
+  ) : selection?.shared ? null : selectedNode ? (
     <>
-      {!nodes.some((node) => node.id === selectedNode.id) && removableNode && effectiveMode !== 'overview' ? (
+      {!nodes.some((node) => node.id === selectedNode.id) && removableNode && viewMode !== 'overview' ? (
         <Button onClick={() => {
           change((previous) => ({ ...previous, map: { ...map, expandedNodes: [...new Set([...map.expandedNodes, selectedNode.id])] } }))
-          setSelection({ nodeId: selectedNode.id })
+          addNode(selectedNode.id)
         }}
         >展开此节点
         </Button>
@@ -825,7 +803,7 @@ export default function BusinessChainDesignCanvas({
     change((previous) => ({ ...previous, map: { ...businessChainMapState(previous, library), showHandoffs: open } }))
     cancel()
     setNotice('')
-    requestAnimationFrame(() => (open ? viewport.current?.closest('.erp-chain-design__workspace')?.querySelector('button[data-picker="view"]') : scopePurpose.current)?.focus({ preventScroll: true }))
+    requestAnimationFrame(() => handoffToggle.current?.focus({ preventScroll: true }))
   }
   const toolbar = (
     <WorkbenchToolbar
@@ -834,24 +812,12 @@ export default function BusinessChainDesignCanvas({
         if (event.target.closest('.erp-chain-design__canvas-actions')) handleCanvasKeyDown(event)
       }}
     >
-      {scopeField}
-      {globalOverview ? (
-        <span className="erp-chain-design__map-summary erp-chain-design__scope-label" role="status" aria-label="当前探索范围">
-          {relations.length === 0 && '链路概览 · '}{nodes.length} 个节点
-        </span>
-      ) : null}
-      {(!globalOverview || relations.length > 0) && (
+      <div className="erp-chain-design__toolbar-row" role="group" aria-label="阅读范围与视图">
+        {scopeField}
         <BusinessChainDesignViewPanel
-          mode={effectiveMode}
-          layout={layout}
+          mode={viewMode}
           globalOverview={globalOverview}
-          dock={showHandoffs ? handoffDock : undefined}
-          relations={relations}
-          layers={layers}
-          onLayersChange={(value) => {
-            if (selection?.overview && !value.includes(businessChainRelationLayer(selection.overview))) setSelection(null)
-            setReadingOptions({ layers: value })
-          }}
+          layout={layout}
           collapsedOverview={Boolean(scopeSummary && !expandedInScope)}
           onModeChange={(value) => {
             cancel()
@@ -860,111 +826,139 @@ export default function BusinessChainDesignCanvas({
           }}
           onLayoutChange={setLayout}
         />
-      )}
-      <BusinessChainDesignPicker
-        kind="role"
-        value={selectedRoles.map(({ value }) => value)}
-        groups={roleGroups}
-        onChange={(highlightedRoles) => setReadingOptions({ highlightedRoles })}
-        hint={nodes.length > 0 && nodes.every((node) => node.summary) ? '展开一条链路的步骤后，可查看办理岗位。' : undefined}
-      />
-      {!globalOverview && (
-        <div className="erp-chain-design__scope-bar" aria-label="当前探索范围">
-          <span className="erp-chain-design__scope-label erp-chain-design__scope-summary" aria-live="polite">
-            {map.focusId && <span>局部 · {library.byId.get(map.focusId).label}</span>}
-            {!draft.nodes.length ? '尚未加载链路' : scopeSummary ? `${scopeSummary.count} 步` : `${nodes.length} 个节点`}
-          </span>
-          {map.chainKey !== 'all' ? (
-            <Button ref={scopePurpose} onClick={() => { handoffTrigger.current = null; setSelection({ chainKey: map.chainKey }) }}>
-              用途与交接
-            </Button>
-          ) : null}
-          {scopeSummary ? (
-            <Button aria-expanded={expandedInScope} onClick={() => toggleChain(scopeSummary.chainKey)}>
-              {expandedInScope ? '折叠为链路卡片' : '展开链路步骤'}
-            </Button>
-          ) : null}
-        </div>
-      )}
-      <div className="erp-chain-design__canvas-actions" role="group" aria-label="画布操作">
-        {selectedRoles.length > 0 && <span className="erp-chain-design__scope-label" role="status">{roleMatchCount ? `高亮 ${roleMatchCount} 个节点` : '本图无所选岗位节点'}</span>}
-        {returnAction}
-        {map.scope !== 'whole' && draft.nodes.length > 0 ? (
-          <Button onClick={() => (onReturn ? onReturn() : onNavigateChain(map.chainKey))}>回到整体</Button>
-        ) : null}
-        {map.visibleIds.length > 0 && !canGrowUpstream && !canGrowDownstream && (
-          <span className="erp-chain-design__scope-label">已没有更多前后内容可展开</span>
-        )}
-        {hasBranches ? (
-          <Button
-            aria-pressed={Boolean(draft.presentation?.showBranches)}
-            onClick={() => setReadingOptions({ showBranches: !draft.presentation?.showBranches })}
+        {projected.salesAcceptance && (
+          <BusinessChainDesignPopover
+            kind="sales-variant"
+            label="受理流程"
+            title="选择受理流程"
+            closeLabel="关闭受理流程选择"
+            singleChoice
+            current={library.salesAcceptanceVariants.find(({ key }) => key === salesVariant)?.readingLabel || '合并共同步骤'}
           >
-            {draft.presentation?.showBranches ? '收起分支' : '展开分支'}
-          </Button>
+            {(dismiss) => [{ key: undefined, label: '合并共同步骤' }, ...library.salesAcceptanceVariants].map(({ key, label, readingLabel }) => (
+              <Button key={key || 'both'} aria-pressed={key === salesVariant} onClick={() => { selectVariant(key); dismiss() }}>{readingLabel || label}</Button>
+            ))}
+          </BusinessChainDesignPopover>
+        )}
+        <BusinessChainDesignPicker
+          kind="role"
+          value={selectedRoles.map(({ value }) => value)}
+          groups={roleGroups}
+          onChange={(highlightedRoles) => setReadingOptions({ highlightedRoles })}
+          hint={nodes.length > 0 && nodes.every((node) => node.summary) ? '展开一条链路的步骤后，可查看办理岗位。' : undefined}
+        />
+        {globalOverview ? (
+          <span className="erp-chain-design__map-summary erp-chain-design__scope-label" role="status" aria-label="当前探索范围">
+            {relations.length === 0 && '链路概览 · '}{nodes.length} 个节点
+          </span>
         ) : null}
-        {draft.nodes.length > 0 ? (
-          <Space wrap>
-            <div className="erp-chain-design__growth" role="group" aria-label="展开一步">
-              <span className="erp-chain-design__scope-label">展开一步</span>
-              <Space.Compact>
-                <Button
-                  aria-label="往前展开一步"
-                  disabled={!canGrowUpstream}
-                  onClick={() => {
-                    change((previous) => growBusinessChainMap(previous, library, 'upstream'))
-                    cancel()
-                    setNotice('已扩大一层上游，已有节点位置保留。')
-                  }}
-                >
-                  往前
-                </Button>
-                <Button
-                  aria-label="往后展开一步"
-                  disabled={!canGrowDownstream}
-                  onClick={() => {
-                    change((previous) => growBusinessChainMap(previous, library, 'downstream'))
-                    cancel()
-                    setNotice('已扩大一层下游，已有节点位置保留。')
-                  }}
-                >
-                  往后
-                </Button>
-              </Space.Compact>
-            </div>
-            {canCollapseGrowth ? (
-              <Button
-                onClick={() => {
-                  change((previous) => collapseBusinessChainMapGrowth(previous, library))
-                  cancel()
-                  setNotice('已收起额外展开，节点位置已保留。')
-                }}
-              >
-                收起扩展
+      </div>
+      <div className="erp-chain-design__toolbar-row" role="group" aria-label="显示内容与画布操作">
+        {(availableLayers.size > 0 || directHandoffs.length > 0) && (
+          <div className="erp-chain-design__display-controls">
+            {availableLayers.size > 0 && <BusinessChainLayerFilter
+              options={CHAIN_READING_LAYERS.filter(({ value }) => availableLayers.has(value))}
+              layers={layers}
+              onChange={(value) => {
+                cancel()
+                setHighlightPath(null)
+                setReadingOptions({ layers: value })
+              }}
+            />}
+            {directHandoffs.length > 0 && (
+              <Button ref={handoffToggle} aria-pressed={showHandoffs} onClick={() => toggleHandoffs(!showHandoffs)}>跨链交接</Button>
+            )}
+          </div>
+        )}
+        {!globalOverview && (
+          <div className="erp-chain-design__scope-bar" aria-label="当前探索范围">
+            <span className="erp-chain-design__scope-label erp-chain-design__scope-summary" aria-live="polite">
+              {map.focusId && <span>局部 · {library.byId.get(map.focusId).label}</span>}
+              {!draft.nodes.length ? '尚未加载链路' : scopeSummary ? `${scopeSummary.count} 步` : `${nodes.length} 个节点`}
+            </span>
+            {map.chainKey !== 'all' ? (
+              <Button ref={scopePurpose} onClick={() => { handoffTrigger.current = null; setSelection({ chainKey: map.chainKey }) }}>
+                用途与交接
               </Button>
             ) : null}
-          </Space>
-        ) : null}
-        <DiagramViewControls
-          label="画布"
-          zoom={view.scale}
-          zoomMode={view.mode}
-          minZoom={0.05}
-          maxZoom={2}
-          onFit={fit}
-          nextLayoutDirection={canSwitchDirection ? nextDirection : undefined}
-          onSwitchLayout={switchLayout}
-          onZoomOut={() => zoomTo((scale) => scale / 1.2)}
-          onZoomIn={() => zoomTo((scale) => scale * 1.2)}
-          onReset={() => zoomTo(1)}
-          disabled={panning || inspectorOnly}
-          fitDisabled={!nodes.length || inspectorOnly}
-          fullscreen={fullscreen}
-          onFullscreen={toggleFullscreen}
-          fullscreenButtonRef={fullscreenButtonRef}
-          fullscreenLabel="全屏探索"
-          exitFullscreenLabel="退出全屏"
-        />
+            {scopeSummary ? (
+              <Button aria-expanded={expandedInScope} onClick={() => toggleChain(scopeSummary.chainKey)}>
+                {expandedInScope ? '折叠为链路卡片' : '展开链路步骤'}
+              </Button>
+            ) : null}
+          </div>
+        )}
+        <div className="erp-chain-design__canvas-actions" role="group" aria-label="画布操作">
+          {returnAction}
+          {map.scope !== 'whole' && draft.nodes.length > 0 ? (
+            <Button onClick={onReturn}>回到整体</Button>
+          ) : null}
+          {(map.scope === 'local' || canCollapseGrowth) && map.visibleIds.length > 0 && !canGrowUpstream && !canGrowDownstream && (
+            <span className="erp-chain-design__scope-label">已没有更多前后内容可展开</span>
+          )}
+          {canGrowUpstream || canGrowDownstream || canCollapseGrowth ? (
+            <Space wrap>
+              <div className="erp-chain-design__growth" role="group" aria-label="展开一步">
+                <span className="erp-chain-design__scope-label">展开一步</span>
+                <Space.Compact>
+                  <Button
+                    aria-label="往前展开一步"
+                    disabled={!canGrowUpstream}
+                    onClick={() => {
+                      change((previous) => growBusinessChainMap(previous, library, 'upstream'))
+                      cancel()
+                      setNotice('已扩大一层上游，已有节点位置保留。')
+                    }}
+                  >
+                    往前
+                  </Button>
+                  <Button
+                    aria-label="往后展开一步"
+                    disabled={!canGrowDownstream}
+                    onClick={() => {
+                      change((previous) => growBusinessChainMap(previous, library, 'downstream'))
+                      cancel()
+                      setNotice('已扩大一层下游，已有节点位置保留。')
+                    }}
+                  >
+                    往后
+                  </Button>
+                </Space.Compact>
+              </div>
+              {canCollapseGrowth ? (
+                <Button
+                  onClick={() => {
+                    change((previous) => collapseBusinessChainMapGrowth(previous, library))
+                    cancel()
+                    setNotice('已收起额外展开，节点位置已保留。')
+                  }}
+                >
+                  收起扩展
+                </Button>
+              ) : null}
+            </Space>
+          ) : null}
+          <DiagramViewControls
+            label="画布"
+            zoom={view.scale}
+            zoomMode={view.mode}
+            minZoom={0.05}
+            maxZoom={2}
+            onFit={chooseFit}
+            nextLayoutDirection={nextDirection}
+            onSwitchLayout={() => setReadingOptions({ direction: nextDirection })}
+            onZoomOut={() => zoomTo((scale) => scale / 1.2)}
+            onZoomIn={() => zoomTo((scale) => scale * 1.2)}
+            onReset={() => zoomTo(1, null, 'reset')}
+            disabled={panning || inspectorOnly}
+            fitDisabled={!nodes.length || inspectorOnly}
+            fullscreen={fullscreen}
+            onFullscreen={toggleFullscreen}
+            fullscreenButtonRef={fullscreenButtonRef}
+            fullscreenLabel="全屏探索"
+            exitFullscreenLabel="退出全屏"
+          />
+        </div>
       </div>
     </WorkbenchToolbar>
   )
@@ -972,14 +966,14 @@ export default function BusinessChainDesignCanvas({
     <div
       className="erp-chain-design__canvas-area"
       data-handoffs={showHandoffs || undefined}
+      data-related={(detailLayers && !showHandoffs && visibleHandoffs.length > 0) || undefined}
       onKeyDown={handleCanvasKeyDown}
     >
-      <div role="status" className="erp-chain-design__canvas-status" hidden={!pending && !notice}>
-        {pending ? `从“${pending.label}”连接：拖到节点松开，或点节点查看条件` : notice}
+      <div role="status" className="erp-chain-design__canvas-status" hidden={!pending && !focusedRelation && !notice && !(projected.nodes.length && !nodes.length)}>
+        {pending ? `从“${pending.label}”连接：拖到节点松开，或点节点查看条件` : focusedRelation || notice || '当前选择没有链内步骤，可在顶部勾选其他内容。'}
         {pending ? <Button onClick={cancel}>取消连线</Button> : null}
       </div>
       {showHandoffs && <BusinessChainHandoffMap
-        dockRef={handoffDock}
         chainKey={map.chainKey}
         library={library}
         relations={directHandoffs}
@@ -988,6 +982,30 @@ export default function BusinessChainDesignCanvas({
         onChain={(chainKey, trigger) => { handoffTrigger.current = trigger; setSelection({ chainKey }) }}
         onClose={() => toggleHandoffs(false)}
       />}
+      {detailLayers && !showHandoffs && visibleHandoffs.length > 0 && (
+        <details key={map.chainKey} className="erp-dev-disclosure erp-chain-design__handoff-links" aria-label={wholeMapDetails ? '全图关联交接' : '本链关联交接'}>
+          <summary>{wholeMapDetails ? '跨链交接' : '本链交接'}（{visibleHandoffs.length}）</summary>
+          <div className="erp-chain-design__handoff-items">
+            {visibleHandoffs.map((edge) => {
+              const outgoing = wholeMapDetails || edge.fromChainKey === map.chainKey
+              const peer = outgoing ? edge.toChainKey : edge.fromChainKey
+              const destination = library.chainDefinitions.get(peer).label
+              const directionLabel = wholeMapDetails ? `${library.chainDefinitions.get(edge.fromChainKey).label} → ${destination}` : `${outgoing ? '交接至' : '接自'} ${destination}`
+              return (
+                <Button
+                  size="small"
+                  key={edge.key}
+                  title={destination}
+                  aria-label={`${directionLabel}：${edge.label}`}
+                  onClick={() => onNavigateChain(peer)}
+                >
+                  {edge.label} · {directionLabel}
+                </Button>
+              )
+            })}
+          </div>
+        </details>
+      )}
       <Splitter
         className="erp-chain-design__reading-split"
         onResize={(sizes) => {
@@ -1004,7 +1022,7 @@ export default function BusinessChainDesignCanvas({
             { key: 'arrange', label: '自动排布', disabled: !nodes.length },
           ],
           onClick: () => {
-            change(arrangeBusinessChainMap(draft, library, effectiveMode, layout))
+            change(arrangeBusinessChainMap(draft, library, viewMode, layout))
             cancel()
             setNotice('已自动排布，可撤销。')
           },
@@ -1015,7 +1033,7 @@ export default function BusinessChainDesignCanvas({
               className="erp-chain-design__viewport"
               role="region"
               aria-label="流程探索画布"
-              data-view-mode={effectiveMode}
+              data-view-mode={viewMode}
               data-direction={direction}
               data-map-scope={map.scope}
               data-panning={panning || undefined}
@@ -1037,7 +1055,6 @@ export default function BusinessChainDesignCanvas({
               )
             ) {
               event.preventDefault()
-              setCameraDirty(true)
               event.dataTransfer.dropEffect = 'copy'
             }
           }}
@@ -1048,7 +1065,6 @@ export default function BusinessChainDesignCanvas({
             if (!library.byId.has(id)) return
             event.preventDefault()
             const position = point(event)
-            setView((previous) => ({ ...previous, mode: 'manual' }))
             addNode(id, orientBusinessChainPoint({
               x: position.x - size.width / 2,
               y: position.y - size.height / 2,
@@ -1086,14 +1102,17 @@ export default function BusinessChainDesignCanvas({
               transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
             }}
               >
-                {!nodes.length ? (
+                {!nodes.length && !projected.nodes.length ? (
                   <div className="erp-chain-design__empty">
                     <strong>从一个业务节点开始</strong>
                     <p>尚未加载链路。选择上方流程范围，或从节点库加入一个节点。</p>
                     <Button onPointerDown={(event) => event.stopPropagation()} onClick={() => onNavigateChain('all')}>加载业务全流程地图</Button>
                   </div>
             ) : null}
-                {bands.map((band) => <div key={band.domain} className="erp-chain-design__lane" data-domain={band.domain} style={{ ...diagramDomainStyle(band.domain), left: band.x, top: band.y, width: band.width, height: band.height }}><strong>{CHAIN_DESIGN_DOMAINS[band.domain]}</strong></div>)}
+                {sectionTitles.map(({ key, label, x, y, width, height }) => (
+                  <div key={key} data-chain-section={key} data-domain="group" className="erp-chain-design__section-title" style={{ left: x, top: y, width, height }}><strong>{label}</strong></div>
+                ))}
+                {bands.map((band) => <div key={JSON.stringify([band.chainKey, band.domain])} data-lane-chain={band.chainKey} className="erp-chain-design__lane" data-domain={band.domain} style={{ ...diagramDomainStyle(band.domain), left: band.x, top: band.y, width: band.width, height: band.height }}><strong>{CHAIN_DESIGN_DOMAINS[band.domain]}</strong></div>)}
                 <svg
                   className="erp-chain-design__lines"
                   width={width}
@@ -1101,7 +1120,7 @@ export default function BusinessChainDesignCanvas({
                   aria-label="视图关系"
                 >
                   <defs>
-                    {['known', 'exception', 'highlighted'].map((kind) => (
+                    {['known', 'exception', 'correction', 'highlighted'].map((kind) => (
                       <marker
                         key={kind}
                         id={`${arrow}-${kind}`}
@@ -1117,44 +1136,45 @@ export default function BusinessChainDesignCanvas({
                       </marker>
                 ))}
                   </defs>
-                  {routes.map((edge) => {
+                  {routes.map((edge, index) => {
                 const unknown = edge.kind === 'unknown'
                 const condensed =
                   edge.paths.length > 1 || edge.paths[0]?.length > 1
-                const exceptionLabels = [
+                const branch = edge.kind === 'exception' || edge.kind === 'correction'
+                const branchLabels = branch ? [
                   ...new Set(
                     edge.paths
                       .flat()
                       .map((part) =>
                         library.byPair.get(JSON.stringify([part.from, part.to]))
                       )
-                      .filter((relation) => relation?.kind === 'exception')
+                      .filter((relation) => relation?.kind === edge.kind)
                       .map((relation) => relation.evidence.step.label)
                   ),
-                ]
+                ] : []
                 const highlighted = highlightPath
                   ? emphasized.has(edge.from) && emphasized.has(edge.to)
                   : overviewInGraph ? selection.overview.key === edge.overview?.key
                     : Boolean(focusId && [edge.from, edge.to].includes(focusId))
-                const label = edge.overview
+                const label = edge.readingLabel ?? (edge.overview
                   ? selection?.overview?.key === edge.overview.key ? edge.overview.label : ''
                   : unknown
-                    ? '待核对'
-                    : edge.kind === 'exception'
-                      ? exceptionLabels.length === 1
-                        ? exceptionLabels[0]
-                        : '异常分支'
-                      : edge.dependency
-                        ? '前置条件'
-                        : ''
+                    ? CHAIN_CANVAS_RELATIONS.unknown
+                    : branch
+                      ? branchLabels.length === 1 ? branchLabels[0] : CHAIN_CANVAS_RELATIONS[edge.kind]
+                      : edge.dependency ? '前置条件' : '')
                 const name = `${itemFor(edge.from).label}${unknown ? ' 与 ' : ' → '}${itemFor(edge.to).label}`
+                const description = label || edge.overview?.label
+                const descriptionId = description ? `${arrow}-edge-description-${index}` : undefined
+                const relationTitle = description ? `${name}：${description}` : name
                 const selectEdge = () =>
                   setSelection(
                     edge.overview
                       ? { overview: edge.overview }
                       : {
-                          from: edge.from,
-                          to: edge.to,
+                          from: edge.paths[0]?.[0].from || edge.from,
+                          to: edge.paths[0]?.at(-1).to || edge.to,
+                          label,
                           ...(condensed ? { summary: edge } : {}),
                         }
                   )
@@ -1174,6 +1194,9 @@ export default function BusinessChainDesignCanvas({
                     role="button"
                     tabIndex={0}
                     aria-label={`查看连线：${name}`}
+                    aria-describedby={descriptionId}
+                    onFocus={() => setFocusedRelation(description ? relationTitle : null)}
+                    onBlur={() => setFocusedRelation(null)}
                     onClick={selectEdge}
                     onKeyDown={(event) => {
                       if (['Enter', ' '].includes(event.key)) {
@@ -1182,17 +1205,19 @@ export default function BusinessChainDesignCanvas({
                       }
                     }}
                   >
-                    <title>{edge.overview ? `${name}：${edge.overview.label}` : name}</title>
+                    <title>{relationTitle}</title>
+                    {descriptionId ? <desc id={descriptionId}>{description}</desc> : null}
                     <path className="erp-chain-design__edge-hit" d={edge.d} />
                     <path
                       className="erp-chain-design__edge"
                       d={edge.d}
-                      markerEnd={unknown ? undefined : `url(#${arrow}-${highlighted ? 'highlighted' : edge.kind})`}
+                      markerEnd={unknown ? undefined : `url(#${arrow}-${highlighted && !branch ? 'highlighted' : edge.kind})`}
                     />
                     {label ? (
-                      <text x={edge.labelX} y={edge.labelY} textAnchor="middle">
-                        {label}
-                      </text>
+                      <g className="erp-chain-design__edge-label">
+                        <rect />
+                        <text data-route={edge.key}>{label}</text>
+                      </g>
                     ) : null}
                   </g>
                 )
@@ -1207,10 +1232,11 @@ export default function BusinessChainDesignCanvas({
                 {nodes.map((node) => {
               const item = itemFor(node.id)
               const type = node.summary ? 'group' : item.type
-              const overviewCard = globalOverview && node.summary
-              const expanded = node.summary && map.expandedChains.includes(node.chainKey)
+                  const overviewCard = globalOverview && node.summary
+                  const expanded = node.summary && map.expandedChains.includes(node.chainKey)
+              const exception = !node.summary && businessChainStepLayer(item, library) === 'exception'
               const roleHighlight = !node.summary && businessChainRoleHighlight(item.roles, selectedRoles)
-              const nodeDescription = roleHighlight ? `${CHAIN_DESIGN_TYPES[type]}。高亮岗位：${roleHighlight.text}` : ''
+              const nodeDescription = [exception && '异常分支节点', roleHighlight && `${CHAIN_DESIGN_TYPES[type]}。高亮岗位：${roleHighlight.text}`].filter(Boolean).join('。')
               const descriptionId = `${arrow}-${node.id}-description`
               const roleLabels = (item.roles || []).map((key) => library.roles.find((entry) => entry.value === key)?.label).filter(Boolean)
               const status =
@@ -1231,6 +1257,7 @@ export default function BusinessChainDesignCanvas({
                   data-domain={item.domain}
                   data-type={type}
                   data-chain-expandable={overviewCard || undefined}
+                  data-exception-node={exception || undefined}
                   data-candidate={status}
                   data-role-highlighted={roleHighlight?.kind}
                   data-dimmed={
@@ -1268,7 +1295,7 @@ export default function BusinessChainDesignCanvas({
                     {status || item.terminal || item.entry ? (
                       <small>
                         {status
-                          ? connectionLabels[status]
+                          ? CHAIN_CONNECTION_LABELS[status]
                           : item.terminal
                             ? '本次终止'
                             : item.entry
@@ -1289,7 +1316,7 @@ export default function BusinessChainDesignCanvas({
                       {expanded ? '收起' : '展开'}
                     </Button>
                   ) : null}
-                  {!node.summary ? (
+                  {!node.summary && !sharedNodes.get(node.id) ? (
                     <button
                       type="button"
                       className="erp-chain-design__port"
@@ -1315,18 +1342,12 @@ export default function BusinessChainDesignCanvas({
         <Splitter.Panel className="erp-chain-design__details-panel" size={`${!selection ? 0 : inspectorOnly ? 100 : detailShare}%`} min={selection ? inspectorOnly ? '100%' : 280 : 0} max={inspectorOnly ? '100%' : '60%'} resizable={Boolean(selection && !inspectorOnly)}>
           {selection ? (
             <CanvasCard
-              key={selectedNode ? `${selectedNode.id}:${selection.preview?.stateKey || ''}` : JSON.stringify(selection)}
-              title={
-            selection.ideas
-              ? '视图备注'
-              : selectedSummary?.label ||
-                (selection.overview
-                  ? '链路衔接'
-                  : selectedNode?.label || '接入条件')
-          }
+              key={selectedNode?.id || JSON.stringify(selection)}
+              title={selectedSummary?.label || (selection.overview ? '链路衔接' : selectedNode?.label || '接入条件')}
               onClose={close}
               actions={cardActions}
             >
+              {selection.label && <p>{selection.label}</p>}
               {selectedRoleHighlight && <p><strong>高亮岗位</strong> {selectedRoleHighlight.text}</p>}
               {selection.anchorId && selection.anchorId !== selection.nodeId ? (
                 <Button
@@ -1356,19 +1377,17 @@ export default function BusinessChainDesignCanvas({
                   catalog={catalog}
                   chainKey={selectedSummary.value}
                   onRelation={(overview) => setSelection({ overview })}
-                  onShowHandoffs={selectedSummary.value === map.chainKey && !showHandoffs ? () => toggleHandoffs(true) : undefined}
                   onOpenVerification={onOpenVerification}
                   restoreEvidence={selection.evidenceOpen}
                 />
           ) : selection.overview ? (
             <ChainHandoffDetails catalog={catalog} relation={selection.overview} onNavigate={onNavigateChain} />
-          ) : selection.ideas ? (
-            <DraftNotes draft={draft} change={change} />
           ) : selection.summary ? (
             <>
-              <p>这条主线归并了下列视图关系，具体动作与条件保留。</p>
+              <p>这条线来自以下登记路径。</p>
               {selection.summary.paths.map((path, index) => (
                 <div key={index} className="erp-chain-design__related-path">
+                  {(projected.salesAcceptance || wholeMapDetails) && (library.byId.get(path[0].from)?.variantLabel || library.byId.get(path.at(-1).to)?.variantLabel)}
                   {[path[0].from, ...path.map((edge) => edge.to)].map(
                     (id, i) => (
                       <React.Fragment key={`${id}-${i}`}>
@@ -1386,6 +1405,14 @@ export default function BusinessChainDesignCanvas({
                 </div>
               ))}
             </>
+          ) : selection.shared ? (
+            <>
+              <p>这一步由以下受理流程共用。选择流程可查看其上下游、接入条件和办理岗位。</p>
+              {(sharedNodes.get(selectedNode.id) || []).map((id) => {
+                const item = library.byId.get(id)
+                return <Button key={id} onClick={() => selectVariant(item.processNode.definitionKey, id)}>{item.variantLabel}</Button>
+              })}
+            </>
           ) : selectedNode ? (
             <BusinessChainDesignDetails
               key={selectedNode.id}
@@ -1393,7 +1420,6 @@ export default function BusinessChainDesignCanvas({
               library={library}
               node={selectedNode}
               draft={draft}
-              preview={selection.preview}
               onCanvas={nodes.some((node) => node.id === selectedNode.id)}
               onHighlight={setHighlightPath}
               onRelation={(overview) => setSelection({ overview, anchorId: selectedNode.id })}
@@ -1432,7 +1458,7 @@ export default function BusinessChainDesignCanvas({
                 </strong>
               </p>
               <p data-connection-status={assessment.status}>
-                <strong>{connectionLabels[assessment.status]}：</strong>
+                <strong>{CHAIN_CONNECTION_LABELS[assessment.status]}：</strong>
                 {assessment.reason}
               </p>
               <ChainDesignEvidence evidence={assessment.relation?.evidence} />

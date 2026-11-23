@@ -120,8 +120,8 @@ export function buildDevFlowRecordRelationship(flow) {
   return {
     direction: 'LR',
     nodes: [
-      { ...original, label: '原记录', role: original.label, kind: 'fact_ledger', summary: '已过账的原记录继续留存，不能更新或删除。' },
-      { ...reversal, label: reversal.label, kind: 'fact_ledger', summary: '另建反向记录，引用原记录并保留纠正依据。' },
+      { ...original, label: '原记录', role: original.label, kind: 'fact_ledger' },
+      { ...reversal, label: reversal.label, kind: 'fact_ledger' },
     ],
     edges: [{
       key: 'reversal-reference',
@@ -167,6 +167,7 @@ function getDevFlowStateHumanCondition(value) {
 export function getDevFlowStateHumanActionLabel(value) {
   const action = cleanText(value)
   const mappings = [
+    [/syncFulfillmentTaskRecord/u, '来源重新需要办理'],
     [/save_sales_order_engineering/iu, '保存工程资料进度'],
     [/boss_review_engineering_material_request/iu, '老板审核用料'],
     [/finance_review_engineering_material_request/iu, '财务审核与审批'],
@@ -197,7 +198,8 @@ export function getDevFlowStateHumanActionLabel(value) {
     [/return/iu, '退回'],
     [/rework/iu, '返工'],
     [/adjust/iu, '调整'],
-    [/close|settle/iu, '关闭或结清'],
+    [/close/iu, '关单'],
+    [/settle/iu, '结清'],
     [/start.*process/iu, '启动流程'],
   ]
   return (

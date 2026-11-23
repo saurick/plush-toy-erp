@@ -44,15 +44,27 @@ test('财务概览引用正式链路，采购已记账差额必须由财务显�
   assert.equal(adjustment.responsibility.mode, 'human')
   assert.deepEqual(adjustment.responsibility.ownerPoolKeys, ['finance'])
   assert.match(
-    purchaseFinanceScenario('posted', 'return').detail,
+    purchaseFinanceScenario('posted', 'return').steps[2][1],
     /撤销足额核销记录/
   )
+  assert.equal(purchaseFinanceScenario('posted', 'return').steps[2][2], '未核销余额足够')
   assert.match(purchaseFinanceScenario('posted', 'increase').title, /重新打开/)
-  assert.match(purchaseFinanceScenario('draft', 'return').title, /先取消/)
-  assert.equal(
-    purchaseFinanceScenario('posted', 'transfer').title,
-    '没有账款差额'
-  )
+  assert.equal(purchaseFinanceScenario('posted', 'increase').steps[2][2], '本次差额尚未确认')
+  for (const [stage, change, expected] of [
+    ['none', 'return', ['已过账入库', '采购退货过账', '形成净来源金额', '生成应付草稿']],
+    ['none', 'increase', ['已过账入库', '数量调增过账', '形成净来源金额', '生成应付草稿']],
+    ['none', 'transfer', ['已过账入库', '过账库存修正', '库存位置或批次更新', '生成应付草稿']],
+    ['draft', 'return', ['应付草稿', '取消应付草稿', '采购退货过账', '重新生成草稿']],
+    ['draft', 'increase', ['应付草稿', '取消应付草稿', '数量调增过账', '重新生成草稿']],
+    ['draft', 'transfer', ['应付草稿', '取消应付草稿', '过账库存修正', '重新生成草稿']],
+    ['posted', 'return', ['采购退货已过账', '采购待调整', '核对核销依赖', '财务确认调减']],
+    ['posted', 'increase', ['数量调增已过账', '采购待调整', '核对来源与重复', '财务确认调增']],
+    ['posted', 'transfer', ['已过账入库', '过账库存修正', '库存位置或批次更新', '账款差额为零']],
+  ]) {
+    const scenario = purchaseFinanceScenario(stage, change)
+    const steps = scenario.steps.map(([label]) => label)
+    assert.deepEqual(steps, expected, `${stage} / ${change}`)
+  }
   assert(
     FINANCE_RULES.every((rule) => financeRuleEvidence(rule.key).length > 0)
   )

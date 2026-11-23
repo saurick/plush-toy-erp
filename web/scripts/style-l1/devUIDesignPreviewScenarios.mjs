@@ -1,7 +1,7 @@
 import { UI_DESIGN_PREVIEW_TIMEOUT_MS } from '../../src/dev-workbench/config/devUIDesign.mjs'
 import { DEV_TESTING_FULL_ACCEPTANCE_VIEW, DEV_TESTING_ROUTE, DEV_TESTING_WORKSPACE_VIEWS } from '../../src/dev-workbench/config/devTesting.mjs'
 import { chooseSelectOption } from './selectControlActions.mjs'
-import { chooseUIDesignMode, chooseUIDesignState, visibleUIDesignFrame as frameSelector } from './devUIDesignNavigation.mjs'
+import { chooseUIDesignMode, chooseUIDesignScene, chooseUIDesignState, openUIDesignMobileTasks, visibleUIDesignFrame as frameSelector } from './devUIDesignNavigation.mjs'
 import { assertBusinessNoteTextAreas } from './businessFormPageAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
@@ -21,7 +21,8 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
   }
   const openSamples = (page) => page.getByRole('tab', { name: '设计样例', exact: true }).click()
   const returnToPreview = (page) => page.getByRole('tab', { name: '可交互设计', exact: true }).click()
-  const assertMobilePreviewFits = async (frame) => {
+  const assertMobilePreviewFits = async (page, frame) => {
+    assert.equal(await frame.locator('#sidebar, #topbar, .scrim, [data-action="open-nav"]').count(), 0, '手机版只挂载手机导航')
     const clipped = await frame.locator('.mobile-preview-stage').evaluate((stage) => {
       const area = stage.getBoundingClientRect()
       return ['.role-mobile-device', '.rm-bottom-nav'].filter((selector) => {
@@ -32,6 +33,31 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
       })
     })
     assert.deepEqual(clipped, [], '手机外框和底部导航完整显示在预览区内')
+    const phone = frame.locator('.role-mobile-device')
+    const screen = await frame.locator('.rm-preview-content').boundingBox()
+    const geometry = await phone.evaluate((device) => {
+      const frame = getComputedStyle(device)
+      const inner = getComputedStyle(device.querySelector('.rm-preview-content'))
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        border: device.clientLeft,
+        outerRadius: parseFloat(frame.borderBottomLeftRadius),
+        screenRadius: parseFloat(inner.borderBottomLeftRadius),
+      }
+    })
+    const box = await phone.boundingBox()
+    const iframeBox = await page.locator(frameSelector).boundingBox()
+    assert(Math.abs(box.x + box.width / 2 - iframeBox.x - geometry.viewportWidth / 2) <= 1, '手机居中使用整个预览画布')
+    assert.equal(geometry.screenRadius, geometry.outerRadius - geometry.border, '手机屏幕沿边框内圆角裁切')
+    if (geometry.border > 0) {
+      // 圆角外的像素应与底栏是否绘制无关，矩形边界检查无法发现模糊背景溢色。
+      for (const x of [screen.x + 1, screen.x + screen.width - 5]) {
+        const clip = { x: Math.round(x), y: Math.floor(screen.y + screen.height - 5), width: 4, height: 4 }
+        const painted = await page.screenshot({ clip })
+        const hidden = await page.screenshot({ clip, style: '.rm-bottom-nav { visibility: hidden !important; }' })
+        assert(painted.equals(hidden), '底栏底色必须裁切在手机内圆角内')
+      }
+    }
   }
   const assertMobilePreviewSelectAligned = async (frame, name) => {
     const control = frame.getByRole('combobox', { name, exact: true })
@@ -90,16 +116,52 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await details.getByRole('button', { name: '关闭', exact: true }).click()
         await modes.getByRole('button', { name: '整单', exact: true }).click()
         const overview = frame.getByRole('table', { name: '进度紧凑总览' })
-        const entryLocator = frame.getByRole('button', { name: '查看进度：SO-20260918-015', exact: true })
-        const cells = overview.getByRole('row').filter({ has: entryLocator }).getByRole('cell')
-        assert.equal(await cells.nth(1).getByText('已生效', { exact: true }).count(), 1)
-        assert.equal(await cells.last().getByRole('button', { name: '查看进度：SO-20260918-015', exact: true }).count(), 1)
-        const orderDetail = frame.getByRole('dialog', { name: 'SO-20260918-015 · 完整进度', exact: true })
-        await cells.nth(2).click()
+        const orderEntry = frame.getByRole('button', { name: '查看进度：SO-20260918-015', exact: true })
+        const orderCells = overview.getByRole('row').filter({ has: orderEntry }).getByRole('cell')
+        assert.equal(await orderCells.nth(1).getByText('已生效', { exact: true }).count(), 1)
+        assert.equal(await orderCells.first().getByText('已生效', { exact: true }).count(), 0)
+        assert.equal(await orderCells.last().getByRole('button', { name: '查看进度：SO-20260918-015', exact: true }).count(), 1)
+        const due = orderCells.nth(2)
+        const orderDetail = frame.getByRole('dialog', { name: 'SO-20260918-015 · 订单进度', exact: true })
+        await due.click()
         assert.equal(await orderDetail.isVisible(), false)
-        await cells.nth(2).dblclick()
-        await orderDetail.getByRole('button', { name: '返回进度', exact: true }).click()
+        await due.dblclick()
+        const concerns = orderDetail.getByRole('region', { name: '本单卡点' })
+        const stages = concerns.getByRole('button', { name: '阶段追踪', exact: true })
+        assert.equal(await stages.getAttribute('aria-expanded'), 'false')
+        assert.equal(await concerns.locator('article button, article a').count(), 0)
+        assert.deepEqual(await orderDetail.locator('.modal-foot button').allTextContents(), ['返回进度看板'])
+        await stages.click()
+        await orderDetail.getByRole('tab', { name: '关联任务', exact: true }).click()
+        const numberCopy = orderDetail.getByRole('button', { name: '复制 RW20260925-0029', exact: true })
+        assert.equal(await numberCopy.getAttribute('data-value'), 'RW20260925-0029')
+        await orderDetail.getByRole('button', { name: '打开任务详情 RW20260925-0029', exact: true }).waitFor()
+        await orderDetail.getByRole('tab', { name: '生产单', exact: true }).click()
+        const productionEntry = orderDetail.getByRole('button', { name: '查看生产单进度 MO-20260922-026', exact: true })
+        await productionEntry.click()
+        const production = frame.getByRole('dialog', { name: 'MO-20260922-026 · 生产单进度', exact: true })
+        await production.getByText('来源订单 SO-20260918-015', { exact: true }).waitFor()
+        await production.getByRole('button', { name: '返回订单进度', exact: true }).click()
+        assert(await productionEntry.evaluate((node) => node === document.activeElement))
+        await orderDetail.getByRole('tab', { name: '进度总览', exact: true }).click()
+        assert.equal(await stages.getAttribute('aria-expanded'), 'true')
+        await orderDetail.getByText(/已出货 \/ 订购 · 1,128 \/ 1,200 个/u).waitFor()
+        await orderDetail.getByRole('button', { name: '返回进度看板', exact: true }).click()
         await orderDetail.waitFor({ state: 'hidden' })
+        const taskDrawer = frame.locator('.drawer[role="dialog"]')
+        await frame.getByRole('button', { name: '处理客供图确认阻塞（SO-20260922-003）', exact: true }).click()
+        await taskDrawer.getByText('处理客供图确认阻塞', { exact: true }).waitFor()
+        await taskDrawer.getByRole('button', { name: '返回进度看板', exact: true }).click()
+        await frame.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await frame.getByRole('button', { name: '2 项待办（MO-20260922-026）', exact: true }).click()
+        const taskPicker = frame.getByRole('dialog', { name: 'MO-20260922-026 · 生产单进度', exact: true })
+        await taskPicker.getByRole('tab', { name: '关联任务', exact: true, selected: true }).waitFor()
+        assert.equal(await taskPicker.getByRole('button', { name: /^打开任务详情 RW/u }).count(), 2)
+        await taskPicker.getByRole('button', { name: '打开任务详情 RW20260925-0021', exact: true }).click()
+        await taskDrawer.getByText('确认本厂或外发安排', { exact: true }).waitFor()
+        await taskDrawer.getByRole('button', { name: '返回关联任务', exact: true }).click()
+        await taskPicker.getByRole('tab', { name: '关联任务', exact: true, selected: true }).waitFor()
+        await taskPicker.getByRole('button', { name: '返回进度看板', exact: true }).click()
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
         const choice = frame.locator('.table-wrap [data-action="select-row"]').first()
         const choiceID = await choice.getAttribute('data-id')
@@ -598,11 +660,45 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await page.goBack()
         await page.setViewportSize({ width: 1920, height: 873 })
         const mobileFrame = await waitReady(page)
-        await assertMobilePreviewFits(mobileFrame)
-        await assertMobilePreviewSelectAligned(mobileFrame, '预览身份')
-        await assertMobilePreviewSelectAligned(mobileFrame, '预览岗位')
+        await assertMobilePreviewFits(page, mobileFrame)
+        const toolbar = page.getByRole('group', { name: '手机版预览工具栏' })
+        const middleOf = async (locator) => {
+          const box = await locator.boundingBox()
+          return box.y + box.height / 2
+        }
+        const inlineCenters = await Promise.all([
+          toolbar.locator('.ant-select').first(), toolbar.locator('.ant-select').nth(1), toolbar.locator('.ant-select').nth(2),
+          toolbar.getByRole('link'), ...await toolbar.getByRole('button').all(),
+        ].map(middleOf))
+        assert(Math.max(...inlineCenters) - Math.min(...inlineCenters) <= 1, '三个场景选择和四项操作排在同一行')
+        assert.equal(await mobileFrame.locator('.mobile-preview-controls').count(), 0)
         assert.equal(await modes.getByRole('radio', { name: '手机版' }).isChecked(), true)
+        const phone = mobileFrame.locator('.role-mobile-device')
+        await phone.getByRole('button', { name: /的 3 款产品图片/u }).first().click()
+        const gallery = phone.getByRole('dialog', { name: /图片预览$/u })
+        await gallery.waitFor()
+        const dialogFits = await gallery.evaluate((node) => {
+          const bounds = node.closest('.rm-preview-content').getBoundingClientRect()
+          const box = node.getBoundingClientRect()
+          return box.left >= bounds.left && box.right <= bounds.right && box.top >= bounds.top && box.bottom <= bounds.bottom
+        })
+        assert(dialogFits, '图片弹窗完整显示在手机屏幕内')
+        await gallery.getByRole('button', { name: '关闭图片预览', exact: true }).click()
+        await phone.getByRole('button', { name: '我的', exact: true }).click()
+        const helpEntry = phone.getByRole('button', { name: '帮助与手册', exact: true })
+        await helpEntry.click()
+        await phone.getByRole('tab', { name: '业务使用手册', exact: true }).click()
+        assert.equal(await mobileFrame.locator('#sidebar, [data-action="open-nav"]').count(), 0)
+        await phone.getByRole('button', { name: '返回我的', exact: true }).click()
+        assert(await helpEntry.evaluate((node) => document.activeElement === node), '从帮助返回手机原入口')
+        await phone.getByRole('button', { name: /切换工作入口/u }).click()
+        await modes.getByRole('radio', { name: '桌面 ERP', checked: true }).waitFor({ state: 'attached' })
+        await (await waitReady(page)).locator('#sidebar').waitFor()
+        assert.equal(await search.inputValue(), '采购到货')
+        await page.goBack()
+        await phone.getByRole('button', { name: /^任务管理/u }).click()
         await page.setViewportSize({ width: 1920, height: 1080 })
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-mobile-preview-4k.png') })
         await chooseUIDesignMode(page, '桌面 ERP')
         await waitReady(page)
         assert.equal(await search.inputValue(), '采购到货')
@@ -610,8 +706,41 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await page.setViewportSize({ width: 390, height: 844 })
         await chooseUIDesignMode(page, '手机版')
         const narrowMobileFrame = await waitReady(page)
-        await assertMobilePreviewFits(narrowMobileFrame)
-        await assertMobilePreviewSelectAligned(narrowMobileFrame, '预览岗位')
+        await assertMobilePreviewFits(page, narrowMobileFrame)
+        const settingsTrigger = toolbar.getByRole('button', { name: /^预览设置/u })
+        const more = toolbar.getByRole('button', { name: '更多', exact: true })
+        await settingsTrigger.waitFor()
+        assert.equal(await toolbar.getByRole('button').count(), 3)
+        const compactCenters = await Promise.all([settingsTrigger, toolbar.getByRole('button', { name: '全屏', exact: true }), more].map(middleOf))
+        assert(Math.max(...compactCenters) - Math.min(...compactCenters) <= 1, '窄屏三项操作同排')
+        await chooseUIDesignScene(page, '预览岗位', '销售')
+        await settingsTrigger.filter({ hasText: '销售' }).waitFor()
+        await phone.getByRole('button', { name: '查看跟进客供包装到仓', exact: true }).waitFor()
+        await toolbar.getByRole('button', { name: '全屏', exact: true }).click()
+        await settingsTrigger.click()
+        const settings = page.getByRole('dialog', { name: '预览设置', exact: true })
+        const identity = settings.getByRole('combobox', { name: '预览身份', exact: true })
+        await identity.press('Enter')
+        await page.locator('.ant-select-dropdown:visible').waitFor()
+        await identity.press('Escape')
+        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        await settings.waitFor()
+        await identity.press('Escape')
+        await settings.waitFor({ state: 'hidden' })
+        assert(await settingsTrigger.evaluate((node) => node === document.activeElement), 'Escape 收起设置并恢复入口焦点')
+        await toolbar.getByRole('button', { name: '退出全屏', exact: true }).click()
+        await chooseUIDesignScene(page, '预览身份', '超级管理员')
+        await settingsTrigger.filter({ hasText: '超级管理员' }).waitFor()
+        await settingsTrigger.click()
+        assert.equal(await settings.getByRole('combobox', { name: '预览岗位', exact: true }).count(), 0)
+        await page.getByRole('button', { name: '收起预览设置', exact: true }).click()
+        await more.click()
+        await page.getByRole('menuitem', { name: /重置演示/u }).click()
+        await settingsTrigger.filter({ hasText: '仓库' }).waitFor()
+        await more.click()
+        const downloadEvent = page.waitForEvent('download')
+        await page.getByRole('menuitem', { name: /下载 HTML/u }).click()
+        assert.equal((await downloadEvent).suggestedFilename(), 'erp-ui-interaction-design.html')
         const headerTabs = page.locator('.erp-dev-ui-design-header').getByRole('tablist')
         assert.deepEqual(await headerTabs.getByRole('tab').allTextContents(), ['可交互设计', '设计样例', '设计说明', '设计依据'])
         assert.equal(await headerTabs.evaluate((node) => {
@@ -628,10 +757,24 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         assert(bar.fits && bar.labelsFit, '窄屏完整显示三个预览入口')
         await assertNoHorizontalOverflow(page)
         await page.screenshot({ path: path.join(outputDir, 'ui-design-preview-modes-narrow.png') })
-        await page.getByRole('link', { name: '设备支持范围', exact: true }).click()
+        await more.click()
+        await page.getByRole('menuitem', { name: '设备支持范围', exact: true }).click()
         await page.getByRole('heading', { name: '任务办理', exact: true }).waitFor()
         await page.goBack()
-        await assertMobilePreviewFits(await waitReady(page))
+        await assertMobilePreviewFits(page, await waitReady(page))
+
+        const standalone = await page.context().newPage()
+        try {
+          await standalone.goto(new URL('../../../docs/product/ui-design/index.html', import.meta.url).href)
+          await openUIDesignMobileTasks(standalone)
+          await assertMobilePreviewSelectAligned(standalone, '预览身份')
+          await assertMobilePreviewSelectAligned(standalone, '预览岗位')
+          await standalone.setViewportSize({ width: 390, height: 844 })
+          await waitForFiniteAnimations(standalone)
+          await assertMobilePreviewSelectAligned(standalone, '预览岗位')
+        } finally {
+          await standalone.close()
+        }
       },
     },
     {
@@ -670,11 +813,30 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
     },
     {
       name: 'dev-ui-design-workbench-navigation-sync',
-      path: '/__dev/ui-design?page=workbench&workbenchMode=preview',
+      path: '/__dev/ui-design?page=workbench',
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
+        const writes = []
+        page.on('request', (request) => {
+          if (!['GET', 'HEAD'].includes(request.method()) && new URL(request.url()).pathname.startsWith('/__dev/api/')) {
+            writes.push(request.url())
+          }
+        })
         const frame = await waitReady(page)
+        const topTabs = page.locator('.erp-dev-ui-design-header').getByRole('tablist')
+        const switcher = await topTabs.elementHandle()
+        const preview = page.locator(frameSelector)
+        const previewWindow = await preview.elementHandle()
+        await frame.getByRole('table', { name: '开发工具对照', exact: true }).waitFor()
+        await topTabs.getByRole('tab', { name: '设计样例', exact: true }).click()
+        await page.getByRole('region', { name: '组件设计', exact: true }).waitFor()
+        await preview.waitFor({ state: 'hidden' })
+        await topTabs.getByRole('tab', { name: '可交互设计', exact: true }).click()
+        await frame.getByRole('table', { name: '开发工具对照', exact: true }).waitFor()
+        assert(await previewWindow.evaluate((node) => node.isConnected), '组件样例往返保留原工作台预览')
+        assert(await switcher.evaluate((node) => node.isConnected), '预览与样例共用同一页签条')
+
         const navigation = frame.getByRole('navigation', { name: '效能工作台主导航' })
         const heading = frame.locator('.dev-design-heading')
         assert.equal(await frame.locator('#topbar').isVisible(), false)
@@ -691,6 +853,13 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await heading.getByRole('heading', { name: '测试执行', exact: true }).waitFor()
         const groups = frame.getByRole('tablist', { name: '测试环境与指引', exact: true })
         assert.deepEqual(await groups.getByRole('tab').allTextContents(), ['本地测试', '服务器验证', '测试指引'])
+        assert(await groups.evaluate((tabs) => {
+          const heading = tabs.closest('.dev-design-heading')
+          if (!heading || heading.querySelectorAll('[role="tablist"]').length !== 1) return false
+          const bounds = heading.getBoundingClientRect()
+          const bar = tabs.getBoundingClientRect()
+          return bar.top >= bounds.top && bar.bottom <= bounds.bottom && bar.left >= bounds.left && bar.right <= bounds.right
+        }), '完整工作台预览的主任务页签位于所属页头')
         assert.equal(await navigation.locator('[aria-current="page"]').innerText(), '测试执行')
         const reportStates = frame.getByRole('table', { name: '已有报告状态样例', exact: true })
         assert.equal(await reportStates.locator('tbody tr').count(), 5)
@@ -810,6 +979,7 @@ export function createDevUIDesignPreviewScenarios({ assert, assertNoHorizontalOv
         await frame.getByRole('heading', { name: '证据暂时无法读取', exact: true }).waitFor()
         await frame.getByRole('button', { name: '重新读取', exact: true }).click()
         await frame.getByRole('region', { name: '交付运维任务' }).waitFor()
+        assert.deepEqual(writes, [], '交互设计预览不会调用工作台写接口')
         await assertNoHorizontalOverflow(page)
         const innerOverflow = await frame.locator('body').evaluate((node) => node.scrollWidth - node.clientWidth)
         assert(innerOverflow <= 1, `设计稿横向溢出 ${innerOverflow}px`)

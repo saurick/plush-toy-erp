@@ -8,6 +8,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
@@ -26,6 +27,9 @@ func trackingProcesses(client *ent.Client, q biz.WorkflowTrackingQuery) *ent.Pro
 }
 
 func trackingProcessPredicates(q biz.WorkflowTrackingQuery) []predicate.ProcessInstance {
+	if q.RecordType == "task" {
+		return []predicate.ProcessInstance{func(s *entsql.Selector) { s.Where(entsql.ExprP("FALSE")) }}
+	}
 	started := processinstance.CreatedBy(q.ActorID)
 	participated := processinstance.Or(
 		processinstance.HasWorkflowTasksWith(trackingTaskParticipation(q.ActorID)),
@@ -90,6 +94,9 @@ func trackingStandaloneTasks(client *ent.Client, q biz.WorkflowTrackingQuery) *e
 }
 
 func trackingStandaloneTaskPredicates(q biz.WorkflowTrackingQuery) []predicate.WorkflowTask {
+	if q.RecordType == "flow" {
+		return []predicate.WorkflowTask{func(s *entsql.Selector) { s.Where(entsql.ExprP("FALSE")) }}
+	}
 	started, participated := workflowtask.CreatedBy(q.ActorID), trackingTaskParticipation(q.ActorID)
 	visible := workflowTaskRevisionVisibilityPredicate(q.VisibilityScope, "")
 	if visible == nil {
@@ -130,6 +137,10 @@ func trackingStandaloneTaskPredicates(q biz.WorkflowTrackingQuery) []predicate.W
 	return filters
 }
 
+func excludeMaterialTrackingTasks(task *entsql.Selector) {
+	task.Where(entsql.Not(hasMaterialTrackingRequest(task)))
+}
+
 func trackingSourceTypes(q biz.WorkflowTrackingQuery) []string {
 	// Type filters share the source identities used for display and search.
 	// A specific document link retains its exact type and ID binding.
@@ -161,7 +172,7 @@ func trackingCurrentTaskFilter(q biz.WorkflowTrackingQuery) []predicate.Workflow
 	return filters
 }
 
-// Page both record kinds together before hydrating entities and their relations.
+// Page all record kinds together before hydrating entities and their relations.
 // The same predicates own list, count, detail access and the page subqueries.
 func trackingPage(d string, q biz.WorkflowTrackingQuery) *entsql.Selector {
 	builder := entsql.Dialect(d)
@@ -176,7 +187,14 @@ func trackingPage(d string, q biz.WorkflowTrackingQuery) *entsql.Selector {
 	for _, filter := range trackingStandaloneTaskPredicates(q) {
 		filter(tasks)
 	}
-	merged := processes.UnionAll(tasks).As("tracking")
+	excludeMaterialTrackingTasks(tasks)
+	m := builder.Table(engineeringmaterialrequest.Table)
+	materials := builder.Select(m.C(engineeringmaterialrequest.FieldID), entsql.As(m.C(engineeringmaterialrequest.FieldSubmittedAt), "started_at")).
+		AppendSelectExprAs(entsql.Expr("'"+biz.WorkflowTrackingMaterialReviewKind+"'"), "kind").From(m)
+	for _, filter := range trackingMaterialReviewPredicates(q) {
+		filter(materials)
+	}
+	merged := processes.UnionAll(tasks).UnionAll(materials).As("tracking")
 	startedOrder := entsql.Desc("started_at")
 	if q.SortDirection == "asc" {
 		startedOrder = entsql.Asc("started_at")
@@ -196,12 +214,27 @@ func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowT
 		if err != nil {
 			return err
 		}
-		taskCounts, err := scanBusinessStatusCounts(ctx, trackingStandaloneTasks(client, facet).GroupBy(workflowtask.FieldTaskStatusKey).Aggregate(ent.Count()).Scan)
+		taskCounts, err := scanBusinessStatusCounts(ctx, trackingStandaloneTasks(client, facet).Where(excludeMaterialTrackingTasks).GroupBy(workflowtask.FieldTaskStatusKey).Aggregate(ent.Count()).Scan)
 		if err != nil {
 			return err
 		}
 		page.StatusCounts["active"] = processCounts[biz.ProcessStatusActive] + processCounts[biz.ProcessStatusBlocked] + taskCounts["ready"] + taskCounts["blocked"]
 		page.StatusCounts["completed"] = processCounts[biz.ProcessStatusCompleted] + taskCounts["done"] + taskCounts["rejected"] + taskCounts["withdrawn"]
+		if q.RecordType != "task" {
+			materials := trackingMaterialReviews(client, facet)
+			total, err := materials.Clone().Count(ctx)
+			if err != nil {
+				return err
+			}
+			if total > 0 {
+				active, err := materials.Where(func(s *entsql.Selector) { s.Where(materialTrackingActive(s)) }).Count(ctx)
+				if err != nil {
+					return err
+				}
+				page.StatusCounts["active"] += active
+				page.StatusCounts["completed"] += total - active
+			}
+		}
 		for status, count := range page.StatusCounts {
 			if q.Status == "" || q.Status == status {
 				page.Total += count
@@ -220,11 +253,14 @@ func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowT
 		}).Select().Scan(ctx, &refs); err != nil {
 			return err
 		}
-		processIDs, taskIDs := []int{}, []int{}
+		processIDs, taskIDs, materialIDs := []int{}, []int{}, []int{}
 		for _, ref := range refs {
-			if ref.Kind == "process" {
+			switch ref.Kind {
+			case "process":
 				processIDs = append(processIDs, ref.ID)
-			} else {
+			case biz.WorkflowTrackingMaterialReviewKind:
+				materialIDs = append(materialIDs, ref.ID)
+			case "task":
 				taskIDs = append(taskIDs, ref.ID)
 			}
 		}
@@ -248,6 +284,13 @@ func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowT
 		for _, t := range ts {
 			page.Items = append(page.Items, &biz.WorkflowTrackingEntry{Ref: biz.WorkflowTrackingRef{Kind: "task", ID: t.ID}, Task: entWorkflowTaskToBiz(t)})
 		}
+		if len(materialIDs) > 0 {
+			materials, err := trackingMaterialReviewEntries(ctx, client.EngineeringMaterialRequest.Query().Where(engineeringmaterialrequest.IDIn(materialIDs...)))
+			if err != nil {
+				return err
+			}
+			page.Items = append(page.Items, materials...)
+		}
 		sort.Slice(page.Items, func(i, j int) bool {
 			a, b := page.Items[i], page.Items[j]
 			if !a.StartedAt().Equal(b.StartedAt()) {
@@ -269,7 +312,8 @@ func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowT
 func (r *workflowRepo) GetWorkflowTracking(ctx context.Context, q biz.WorkflowTrackingQuery, ref biz.WorkflowTrackingRef, beforeEventID int) (*biz.WorkflowTrackingEntry, error) {
 	entry := &biz.WorkflowTrackingEntry{Ref: ref}
 	err := r.readWorkflowSnapshot(ctx, q.Keyword, func(client *ent.Client) error {
-		if ref.Kind == "process" {
+		switch ref.Kind {
+		case "process":
 			row, err := trackingProcesses(client, q).Where(processinstance.ID(ref.ID)).Only(ctx)
 			if ent.IsNotFound(err) {
 				return biz.ErrForbidden
@@ -278,7 +322,16 @@ func (r *workflowRepo) GetWorkflowTracking(ctx context.Context, q biz.WorkflowTr
 				return err
 			}
 			entry.Instance = entProcessInstanceToBiz(row)
-		} else {
+		case biz.WorkflowTrackingMaterialReviewKind:
+			rows, err := trackingMaterialReviewEntries(ctx, trackingMaterialReviews(client, q).Where(engineeringmaterialrequest.ID(ref.ID)))
+			if err != nil {
+				return err
+			}
+			if len(rows) != 1 {
+				return biz.ErrForbidden
+			}
+			entry = rows[0]
+		case "task":
 			row, err := trackingStandaloneTasks(client, q).Where(workflowtask.ID(ref.ID)).Only(ctx)
 			if ent.IsNotFound(err) {
 				return biz.ErrForbidden
@@ -287,6 +340,8 @@ func (r *workflowRepo) GetWorkflowTracking(ctx context.Context, q biz.WorkflowTr
 				return err
 			}
 			entry.Task = entWorkflowTaskToBiz(row)
+		default:
+			return biz.ErrBadParam
 		}
 		if err := loadTrackingRelations(ctx, client, []*biz.WorkflowTrackingEntry{entry}); err != nil {
 			return err
@@ -324,14 +379,20 @@ func (r *workflowRepo) GetWorkflowTracking(ctx context.Context, q biz.WorkflowTr
 
 func loadTrackingRelations(ctx context.Context, client *ent.Client, entries []*biz.WorkflowTrackingEntry) error {
 	byProcess := map[int]*biz.WorkflowTrackingEntry{}
+	byMaterial := map[int]*biz.WorkflowTrackingEntry{}
 	ids := []int{}
 	for _, e := range entries {
 		if e.Instance != nil {
 			byProcess[e.Instance.ID] = e
 			ids = append(ids, e.Instance.ID)
+		} else if e.MaterialRequest != nil {
+			byMaterial[e.MaterialRequest.ID] = e
 		} else {
 			e.Tasks = []*biz.WorkflowTask{e.Task}
 		}
+	}
+	if err := loadTrackingMaterialTasks(ctx, client, byMaterial); err != nil {
+		return err
 	}
 	if len(ids) > 0 {
 		nodes, err := client.ProcessNodeInstance.Query().Where(processnodeinstance.ProcessInstanceIDIn(ids...)).Order(ent.Asc(processnodeinstance.FieldID)).All(ctx)
@@ -392,6 +453,12 @@ func loadTrackingPeople(ctx context.Context, client *ent.Client, entries []*biz.
 	for _, e := range entries {
 		if e.Instance != nil {
 			add(e.Instance.CreatedBy)
+		}
+		if request := e.MaterialRequest; request != nil {
+			add(&request.SubmittedBy)
+			add(request.BossReviewedBy)
+			add(request.FinanceReviewedBy)
+			add(request.RejectedBy)
 		}
 		for _, node := range e.Nodes {
 			add(node.DomainCommandResultRecordedBy)

@@ -178,7 +178,7 @@ export function createEmptyStateScenarios({
     },
     {
       name: 'dev-ui-design-workbench',
-      path: '/__dev/ui-design?page=workbench&workbenchMode=preview',
+      path: '/__dev/ui-design?page=workbench',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')

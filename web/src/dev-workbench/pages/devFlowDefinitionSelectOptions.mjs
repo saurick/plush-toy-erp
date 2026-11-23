@@ -1,3 +1,5 @@
+import { groupBusinessChainOptions } from '../config/devBusinessChainCatalog.mjs'
+
 function asArray(value) {
   return Array.isArray(value) ? value : []
 }
@@ -48,8 +50,9 @@ export function buildBusinessChainSelectOptions(catalog) {
     throw new Error('business chain select is missing its overview')
   }
   const options = chains.map((chain) => selectOption(chain.key, chain.label))
-  assertExactCoverage(chains, options, (chain) => chain.key, 'business chain')
-  return [selectOption(overview.key, overview.label), ...options]
+  const groups = groupBusinessChainOptions(overview, options).map(({ key, label, options }) => selectGroup(key, label, options))
+  assertExactCoverage(chains, groups, (chain) => chain.key, 'business chain')
+  return [selectOption(overview.key, overview.label), ...groups]
 }
 
 function processGroupLabel(definitions, processKey) {

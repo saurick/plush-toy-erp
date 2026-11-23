@@ -248,8 +248,24 @@ name: 'dev-ui-toolbar-composition',
         await inventory.getByLabel('演示仓库分布', { exact: true }).waitFor()
         await inventory.getByLabel('库存余额展示方式').getByRole('radio', { name: '余额明细', exact: true }).locator('..').click()
         await page.getByRole('checkbox', { name: '显示职责标注', exact: true }).check()
-        await inventory.getByRole('button', { name: '查询 · 共用交互', exact: true }).click()
-        assert.equal(await inventory.locator('[data-toolbar-part="query"][data-highlighted="true"]').count(), 1)
+        const requirements = inventory.getByRole('region', { name: '工具栏职责标注', exact: true })
+        const queryRule = requirements.getByRole('button', { name: '关键词查询', exact: true })
+        await queryRule.click()
+        assert.equal(await queryRule.getAttribute('aria-pressed'), 'true')
+        const queryPart = inventory.locator('[data-toolbar-part="query"][data-highlighted="true"]')
+        const row = requirements.locator('tr[data-usage-selected]')
+        assert.equal(await row.locator('th').innerText(), '关键词查询')
+        assert.equal(
+          await queryPart.evaluate((node) => getComputedStyle(node).backgroundColor),
+          await row.locator('td').first().evaluate((node) => getComputedStyle(node).backgroundColor),
+          '选中的职责行和示例部位沿用相同的主题底色',
+        )
+        const recordRule = requirements.getByRole('button', { name: '记录动作', exact: true })
+        await recordRule.click()
+        assert.equal(await inventory.locator('[data-toolbar-part="record"][data-highlighted="true"]').count(), 1)
+        await recordRule.click()
+        assert.equal(await inventory.locator('[data-toolbar-part][data-highlighted="true"]').count(), 0)
+        assert.equal(await inventory.locator('.erp-business-operation-panel__command').evaluate((node, previous) => node === previous, command), true, '定位仅高亮当前部位')
         await page.getByRole('button', { name: '恢复示例', exact: true }).click()
         assert.equal(await current(page).getByRole('textbox', { name: '库存查询搜索', exact: true }).inputValue(), '')
         assert.equal(await page.locator('.erp-dev-toolbar-example__page').count(), 1, '恢复示例释放已访问的样例')
@@ -276,7 +292,7 @@ name: 'dev-ui-toolbar-category-growth',
             await current(page).getByRole('button', { name: /^筛选(?:，|$)/u }).click()
             await choose(page, '扩展待办分类', '扩展分类 F', 'F')
             await page.keyboard.press('Escape')
-          } else await choose(page, `${label}内容分类`, '扩展分类 F', 'F')
+          } else await choose(page, `${label}内容分类`, '扩展分类 F')
           assert.equal(await current(page).locator('tbody tr.ant-table-row').count(), 1)
           for (const width of [1366, 1920]) {
             await page.setViewportSize({ width, height: 1080 })
@@ -324,8 +340,9 @@ name: 'dev-ui-toolbar-data-growth',
         await page.screenshot({ path: `${outputDir}/dev-toolbar-data-growth-4k.png` })
         const reading = page.locator('.erp-control-library-content')
         await reading.evaluate((node) => { node.scrollTop = node.scrollHeight })
-        await page.getByRole('heading', { name: '什么时候用，为什么这样设计', exact: true }).scrollIntoViewIfNeeded()
-        assert.equal(await page.getByRole('heading', { name: '什么时候用，为什么这样设计', exact: true }).isVisible(), true, '长样例底部规则可达')
+        const usage = page.getByRole('region', { name: '用法要求', exact: true })
+        await usage.scrollIntoViewIfNeeded()
+        assert.equal(await usage.isVisible(), true, '长样例底部规则可达')
       },
     },
   ]

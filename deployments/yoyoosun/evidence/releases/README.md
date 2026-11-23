@@ -17,11 +17,15 @@ evidence/releases/<YYYY-MM-DD>/
 | `base-release` | 普通发布和客户配置激活前底线 | 保留当前备份和回滚路径；按迁移及恢复流程变更决定是否演练，不要求客户签收 |
 | `customer-trial-acceptance` | 客户试用或交付前 | 恢复与回滚演练、签收、凭据轮换、岗位登录、SMS、PDF；`demo-133` 还要客户配置读回 |
 
+## 普通发布所需回执
+
 `base-release` 始终必需七项：`release-evidence.md`、`production-preflight-report.json`、`image-digests.txt`、`backup-evidence.md`、`migration-status.txt`、`smoke-test-report.json`、`rollback-forward-fix-plan.md`。
 
 只有确认本次没有迁移（`migrationBefore` 等于 `migrationAfter`），且备份、恢复、回滚流程及其运行配置均未改变，才把 `release-evidence.md` 的 `recoveryProcedureChanged` 从默认 `true` 改为 `false`，免去本轮重复演练。
 
 有迁移、流程变更或信息缺失时，仍要求 `backup-restore-report.json`、`rollback-rehearsal-report.json` 及恢复演练引用的 `migration-status-before-apply.txt`、`command-summary.txt`。免演练不免发布前备份、备份摘要、迁移状态、固定回滚版本和恢复路径。
+
+## 客户试用验收与脱敏
 
 `customer-trial-acceptance` 始终要求上述演练及 `release-signoff-checklist.md`、`credential-rotation-report.json`。发布包含客户配置 revision 时再提供 `customer-config-manifest-evidence.json`。
 
@@ -30,6 +34,8 @@ evidence/releases/<YYYY-MM-DD>/
 所有内容必须脱敏。`release-evidence.md` 用 `releaseId` 表示本次操作批次，用完整 40 位 `productCommit` 表示产品代码；所有适用证据必须绑定同一批次与目标。`production-preflight-report.json` 是机器合同，不解析中文日志。
 
 验收档 preflight 回执可以用于基础发布或客户配置激活，但仍逐项校验运行身份和必需检查；基础回执不能反过来证明验收档通过。字段级校验以 `release-evidence-gate.mjs` 为唯一可执行真源，本 README 不复制解析逻辑。
+
+## 跨版本恢复及客户配置证据
 
 恢复链跨越 `20260714055504` 时，restored DB 必须在 apply 前完成 populated upgrade read-only audit；`backup-evidence.md`、backup restore 的 restore / summary 和 `command-summary.txt` 必须同时记录 `populatedUpgradeAuditStatus=passed`，步骤必须包含 read-only audit。
 

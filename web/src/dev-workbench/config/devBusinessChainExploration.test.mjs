@@ -14,7 +14,7 @@ import {
 
 const library = buildBusinessChainDesignLibrary(catalog)
 const quality = 'step:purchase_quality:posts_fact:purchase_accepted'
-const empty = { nodes: [{ id: quality, x: 512, y: 96 }], edges: [], ideas: [] }
+const empty = { nodes: [{ id: quality, x: 512, y: 96 }], edges: [] }
 
 test('单步查完整上下游和状态，无需先把关联节点加入画布', () => {
   const before = JSON.stringify(catalog)

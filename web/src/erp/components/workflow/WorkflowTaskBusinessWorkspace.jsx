@@ -235,7 +235,7 @@ export default function WorkflowTaskBusinessWorkspace({ controls, renderPage }) 
     taskFormScope: scope,
     workflowTaskNavigation: { taskID: actual?.id, adminID: profile.id, returnPath: taskCenterPath, productionHandling: productionTaskHandling(actual, entry), businessReceipt: currentResult },
     taskCommand: command && relatedReady ? { kind: mode, ...related.source, selected } : null,
-    taskBusiness: { device, taskID: actual?.id, task: actual, mode, contract, readOnly, processing: readingResult, formEditing, information, collaborationExternal: controls.collaborationExternal, onFormEditingChange: setFormEditing, onBusyChange: reportBusinessBusy, onCollaboration: controls.onCollaboration, actionHost, onResult, viewResult: openResult, navigate, confirmLeave, taskCenterPath } }
+    taskBusiness: { device, taskID: actual?.id, task: actual, mode, contract, readOnly, processing: readingResult, formEditing, information, materialDraftRef: controls.materialDraftRef, collaborationExternal: controls.collaborationExternal, onFormEditingChange: setFormEditing, onBusyChange: reportBusinessBusy, onCollaboration: controls.onCollaboration, actionHost, onResult, viewResult: openResult, navigate, confirmLeave, taskCenterPath } }
   const processFailed = needsBusinessProcess && currentBusinessProcess?.failed
   const checking = !failed && (!actual || access.loading || (needsBusinessProcess && !currentBusinessProcess && !sameBusinessProcessSource))
   const relatedActions = mode === 'source' ? (

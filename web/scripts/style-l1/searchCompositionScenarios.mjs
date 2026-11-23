@@ -17,8 +17,8 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
     { name: 'rules', path: '/__dev/testing?view=coverage&coverage=rules', label: '搜索关键规则', queryKey: 'ruleQuery' },
     { name: 'quality', path: '/__dev/quality-gates?view=governance', label: '搜索门禁名称或风险', queryKey: 'q' },
     { name: 'version-history', path: '/__dev/version-center?view=history', label: '搜索版本、SHA 或操作 ID', queryKey: 'history_q' },
-    { name: 'prototype-tools', path: '/__dev/ui-design?page=workbench&workbenchMode=preview', inputSelector: '#dev-design-search' },
-    { name: 'prototype-integration', path: '/__dev/ui-design?page=workbench&workbenchMode=preview', inputSelector: '[data-dev-integration-search]' },
+    { name: 'prototype-tools', path: '/__dev/ui-design?page=workbench', inputSelector: '#dev-design-search' },
+    { name: 'prototype-integration', path: '/__dev/ui-design?page=workbench', inputSelector: '[data-dev-integration-search]' },
     { name: 'prototype-help', path: '/__dev/ui-design?page=help', inputSelector: '#rh-manualSearch' },
     { name: 'prototype-statistics', path: '/__dev/ui-design', inputSelector: '#statistics-search' },
     { name: 'prototype-visual', path: '/__dev/ui-design', inputSelector: '#visual-search' },
@@ -51,7 +51,7 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
       if (submittedRows) assert(initialRowCount > 0)
       await input.click()
       const scope = name === 'controls'
-        ? page.getByRole('tooltip').filter({ hasText: '复用边界' })
+        ? page.getByRole('tooltip').filter({ hasText: '可搜索：组件代码名' })
         : name === 'prototype-integration'
           ? frame.getByRole('tooltip').filter({ hasText: '接口名称' })
           : null
@@ -102,7 +102,7 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
         if (scope) await scope.waitFor({ state: 'hidden' })
         await assertQuery('下拉选择菜单')
         if (submittedRows) assert.equal(await submittedRows.count(), 0, 'the search button applies the Chinese query')
-        if (name === 'prototype-help') await frame.locator('#rh-manualResults').getByRole('heading', {name:'搜索“下拉选择菜单”'}).waitFor()
+        if (name === 'prototype-help') await frame.locator('#rh-manualResults').getByRole('heading', { name: '搜索“下拉选择菜单”' }).waitFor()
         if (queryKey) {
           await page.reload()
           await input.waitFor()
@@ -125,7 +125,7 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
         await assertQuery('')
         await input.press('Enter')
         await assertQuery('中文搜索恢复')
-        if (name === 'prototype-help') await frame.locator('#rh-manualResults').getByRole('heading', {name:'搜索“中文搜索恢复”'}).waitFor()
+        if (name === 'prototype-help') await frame.locator('#rh-manualResults').getByRole('heading', { name: '搜索“中文搜索恢复”' }).waitFor()
         await input.fill('放弃草稿')
         await input.press('Escape')
         assert.equal(await input.inputValue(), '中文搜索恢复')
@@ -182,11 +182,11 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
       const client = await page.context().newCDPSession(page)
       try {
         await input.click()
-        await client.send('Input.imeSetComposition', {text:'renwu',selectionStart:5,selectionEnd:5})
-        await client.send('Input.insertText', {text:'任务'})
+        await client.send('Input.imeSetComposition', { text: 'renwu', selectionStart: 5, selectionEnd: 5 })
+        await client.send('Input.insertText', { text: '任务' })
         assert.equal(page.taskSearchQueries.length, 0)
         await input.press('Enter')
-        await finder.getByText('没有找到名称、任务编号或来源单号相符的可见任务', {exact:true}).waitFor()
+        await finder.getByText('没有找到名称、任务编号或来源单号相符的可见任务', { exact: true }).waitFor()
         await button.click()
         assert.deepEqual(page.taskSearchQueries, ['任务'])
       } finally { await client.detach() }
@@ -195,16 +195,16 @@ export function createSearchCompositionScenarios({ assert, assertNoHorizontalOve
       await definitions.getByRole('textbox').fill('预填任务')
       await definitions.getByRole('textbox').press('Enter')
       await definitions.getByRole('button', { name: '去查真实任务', exact: true }).click()
-      await definitions.waitFor({state:'hidden'})
+      await definitions.waitFor({ state: 'hidden' })
       assert.equal(await input.inputValue(), '预填任务')
       assert.deepEqual(page.taskSearchQueries, ['任务'], 'carrying text into task lookup does not query')
       await button.click()
-      await finder.getByText('任务查找失败', {exact:true}).waitFor()
+      await finder.getByText('任务查找失败', { exact: true }).waitFor()
       assert.deepEqual(page.taskSearchQueries, ['任务', '预填任务'])
-      await finder.getByRole('button', {name:'重试',exact:true}).click()
-      await finder.getByText('没有找到名称、任务编号或来源单号相符的可见任务', {exact:true}).waitFor()
+      await finder.getByRole('button', { name: '重试', exact: true }).click()
+      await finder.getByText('没有找到名称、任务编号或来源单号相符的可见任务', { exact: true }).waitFor()
       assert.deepEqual(page.taskSearchQueries, ['任务', '预填任务', '预填任务'])
-      await finder.getByRole('button', {name:'清除搜索',exact:true}).click()
+      await finder.getByRole('button', { name: '清除搜索', exact: true }).click()
       assert.equal(await input.inputValue(), '')
       assert.equal(page.taskSearchQueries.length, 3, 'clearing a lookup does not send an unbounded task query')
       await assertNoHorizontalOverflow(page, 'shared task lookup search')

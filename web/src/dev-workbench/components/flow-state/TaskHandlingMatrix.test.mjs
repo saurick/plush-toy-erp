@@ -33,16 +33,29 @@ async function mount(t) {
     await ui.act(() => el.click())
     await ui.flush()
   }
-  const button = (label) =>
-    [...root.querySelectorAll('button')].find(
+  const button = (label, container = root) =>
+    [...container.querySelectorAll('button')].find(
       (el) => el.textContent.replace(/\s/gu, '') === label.replace(/\s/gu, '')
     )
+  const openFilterPanel = async () => {
+    const trigger = root.querySelector('.erp-dev-task-matrix button[aria-haspopup="dialog"]')
+    assert(trigger)
+    if (trigger.getAttribute('aria-expanded') === 'false') await click(trigger)
+    const panel = document.getElementById(trigger.getAttribute('aria-controls'))
+    assert(panel)
+    return panel
+  }
   const choose = async (label, text) => {
-    const group = root.querySelector(`[aria-label="${label}"][role="group"]`)
+    const panel = await openFilterPanel()
+    const group = panel.querySelector(`[aria-label="${label}"][role="group"]`)
     assert(group, label)
     const option = [...group.querySelectorAll('button')].find((el) => el.textContent === text)
     assert(option, text)
     await click(option)
+  }
+  const clearFilters = async () => {
+    const panel = await openFilterPanel()
+    await click(button('清空筛选', panel))
   }
   return {
     ui,
@@ -50,11 +63,12 @@ async function mount(t) {
     click,
     button,
     choose,
+    clearFilters,
     params: () => new URLSearchParams(location.search),
   }
 }
 
-test('矩阵筛选及重置保留工作台入口，展开后选择动作不会关闭详情', async (t) => {
+test('清空任务清单的筛选条件后保留展开事项和关联动作', async (t) => {
   const v = await mount(t)
   assert.match(
     v.root.querySelector('[role="status"]').textContent,
@@ -85,12 +99,15 @@ test('矩阵筛选及重置保留工作台入口，展开后选择动作不会�
   ]
   await v.click(options.at(-1))
   assert.equal(v.params().get('stage'), 'sewing_execute')
-  assert(v.params().has('action'))
+  const action = v.params().get('action')
+  assert(action)
   assert(v.root.querySelector('[data-relation-action]'))
-  await v.click(v.button('重置'))
+  await v.clearFilters()
   assert.equal(v.params().has('tab'), false)
   assert.equal(v.params().has('kind'), false)
-  assert.equal(v.params().has('action'), false)
+  assert.equal(v.params().get('stage'), 'sewing_execute')
+  assert.equal(v.params().get('action'), action)
+  assert(v.root.querySelector('[data-relation-action]'))
   assert.equal(
     v.root.querySelectorAll('.erp-dev-task-catalog .ant-table-row').length,
     TASK_HANDLING_ROWS.length
@@ -127,7 +144,7 @@ test('岗位切换核对九岗位完整集合，清空后恢复固定执行和�
     assert(keys.length > 0, label)
     assert.equal(v.params().has('stage'), false)
   }
-  await v.click(v.button('重置'))
+  await v.clearFilters()
   assert(v.button('收付款执行'))
   assert(v.button('人工库存调整执行'))
   assert.match(v.root.textContent, /按任务分派/)

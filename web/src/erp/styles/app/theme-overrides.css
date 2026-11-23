@@ -656,21 +656,10 @@
 [data-erp-theme='dark'] .erp-print-center-nav-panel,
 [data-erp-theme='dark'] .erp-print-center-preview-panel,
 [data-erp-theme='dark'] .erp-print-center-note-item,
-[data-erp-theme='dark'] .erp-print-center-template-btn,
 [data-erp-theme='dark'] .erp-print-template-card {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text);
-}
-
-[data-erp-theme='dark'] .erp-print-center-template-btn--active {
-  border-color: var(--erp-interactive-border-hover);
-  background: var(--erp-surface-bg);
-}
-
-[data-erp-theme='dark'] .erp-print-center-template-btn:disabled {
-  color: var(--erp-text-muted);
-  background: var(--erp-surface-bg);
 }
 
 [data-erp-theme='dark'] .erp-print-center-paper-preview,
@@ -685,8 +674,7 @@
   color: #6b7280;
 }
 
-[data-erp-theme='dark'] .erp-print-center-detail-eyebrow,
-[data-erp-theme='dark'] .erp-print-center-template-meta {
+[data-erp-theme='dark'] .erp-print-center-detail-eyebrow {
   color: var(--erp-primary-strong);
 }
 
@@ -698,10 +686,6 @@
 [data-erp-theme='dark'] .erp-print-center-note-text,
 [data-erp-theme='dark'] .erp-print-center-workbench-note {
   color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-print-center-template-title {
-  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-print-template-card-active,

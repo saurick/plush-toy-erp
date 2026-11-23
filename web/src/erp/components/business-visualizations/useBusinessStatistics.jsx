@@ -708,6 +708,13 @@ export default function useBusinessStatistics({
     )
   } else {
     summaryColumns.push(
+      ...[['ordered', '订购数量'], ['shipped', '实际出货'], ['remaining', '剩余待交']].map(([key, title]) => ({
+        key,
+title,
+align: 'right',
+width: 112,
+        render: (_, row) => statisticsQuantity(row, key),
+      })),
       ...[
         ['done', '已交齐'],
         ['pending', '待交付'],
@@ -1002,6 +1009,7 @@ export default function useBusinessStatistics({
                               >
                                 {index === 0
                                     ? '筛选结果合计'
+                                    : ['ordered', 'shipped', 'remaining'].includes(column.key) ? statisticsQuantity(board.totals, column.key)
                                     : number(
                                         board.totals[column.key],
                                         amountKeysForTable.includes(column.key)
@@ -1062,6 +1070,12 @@ export default function useBusinessStatistics({
   )
   return { canUse: canSales || canFinance, content }
 }
+function statisticsQuantity(row, key) {
+  if (!row.quantities?.unit) return row.count ? '按来源查看' : '—'
+  const value = row.quantities[key]
+  return value == null ? '—' : `${number(value)} ${row.quantities.unit}`
+}
+
 const amountKeysForTable = [
   'amount',
   'shipped_amount',

@@ -66,11 +66,15 @@ status 不执行发布、不读取真实 `.env`、不恢复备份、不跑 migra
 
 最终是否可进入客户试用或交付仍以 `release-evidence-gate.mjs` 通过为准。
 
+### 按发布类型判断必备证据
+
 门禁按所选 profile 校验。两档都要求真实运行时 preflight、完整 40 位 `productCommit`、镜像 digest、当前备份、migration before/after、基础 smoke 和回滚方案。
 
 普通发布无迁移且经复核 `recoveryProcedureChanged=false` 时，不要求重复恢复 / 回滚演练或客户签收；迁移、恢复流程变更及客户验收仍须完成演练。所有适用材料绑定同一 `releaseId`、environment 与 backup identity。
 
 详细条件由 [发布记录](releases/README.md) 与 `release-evidence-gate.mjs` 维护。
+
+### 跨迁移版本的恢复核对
 
 恢复链跨越 `20260714055504` 时，还必须先在 restored DB 完成 populated upgrade read-only audit；`backup-evidence.md`、backup restore 的 restore / summary 和 `command-summary.txt` 必须同时记录 `populatedUpgradeAuditStatus=passed`，步骤必须包含 read-only audit。
 

@@ -13,12 +13,12 @@ import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 import { workflowTaskLinkPath } from '../../utils/workflowTaskLink.mjs'
 import './workflowTaskCopy.css'
 
-async function copyTaskText(text, label, trigger) {
+async function copyTaskText(text, label, trigger, failureMessage = '复制失败，请在任务详情中选中文字复制') {
   try {
     await copyTextToClipboard(text)
     showCopySuccess(label, trigger)
   } catch {
-    showCopyFailure('复制失败，请在任务详情中选中文字复制')
+    showCopyFailure(failureMessage)
   } finally {
     if (trigger?.isConnected && document.activeElement === document.body) {
       trigger.focus({ preventScroll: true })
@@ -26,7 +26,7 @@ async function copyTaskText(text, label, trigger) {
   }
 }
 
-export function TaskCopyButton({ text, label, showLabel = false }) {
+export function TaskCopyButton({ text, label, showLabel = false, failureMessage }) {
   if (!text?.trim()) return null
   return (
     <Button
@@ -38,7 +38,7 @@ export function TaskCopyButton({ text, label, showLabel = false }) {
       title={`复制${label}`}
       onClick={(event) => {
         event.stopPropagation()
-        copyTaskText(text, label, event.currentTarget)
+        copyTaskText(text, label, event.currentTarget, failureMessage)
       }}
       onDoubleClick={(event) => event.stopPropagation()}
     >
@@ -47,11 +47,11 @@ export function TaskCopyButton({ text, label, showLabel = false }) {
   )
 }
 
-export function TaskCopyField({ value, label, children }) {
+export function TaskCopyField({ value, label, children, failureMessage }) {
   return (
     <span className="erp-task-copy-field">
       <span className="erp-task-copy-field__value">{children}</span>
-      <TaskCopyButton text={value} label={label} />
+      <TaskCopyButton text={value} label={label} failureMessage={failureMessage} />
     </span>
   )
 }

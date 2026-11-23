@@ -1,10 +1,12 @@
 import { DIAGRAM_NODE_TYPES, DIAGRAM_DOMAINS } from '../../common/components/diagram/diagramSemantics.mjs'
+import { groupBusinessChainOptions } from './devBusinessChainCatalog.mjs'
 import {
   describeDevBusinessChainStep,
   describeDevBusinessChainResponsibility,
 } from './devBusinessChainProjection.mjs'
 import {
   isBusinessChainStep,
+  businessChainPathKind,
 } from './devBusinessChainDesignView.mjs'
 import {
   appendBusinessProcessNodes,
@@ -21,9 +23,16 @@ import {
   buildBusinessChainNodeEntries,
 } from './devBusinessChainNodeCatalog.mjs'
 import { parseBusinessChainMap } from './devBusinessChainMap.mjs'
-import { CHAIN_READING_LAYERS } from './devBusinessChainReading.mjs'
+import { CHAIN_READING_LAYERS, businessChainSourceEdgeKind } from './devBusinessChainReading.mjs'
 
 export { CHAIN_DESIGN_NODE_SIZE } from './devBusinessChainDesignView.mjs'
+
+export const CHAIN_CONNECTION_LABELS = Object.freeze({
+  source: '当前起点',
+  known: '此方向有衔接规则',
+  blocked: '不能直连',
+  unknown: '连接规则待核对',
+})
 
 export const CHAIN_DESIGN_TYPES = Object.freeze(Object.fromEntries(
   ['task', 'business_action', 'document', 'record', 'master', 'group', 'result', 'rule', 'system'].map((key) => [key, DIAGRAM_NODE_TYPES[key]])
@@ -82,7 +91,6 @@ const unique = (items) => [...new Set(items)]
 const objectId = (key) => `node:${key}`
 const actionId = (key) => `step:${key}`
 const pairKey = (from, to) => JSON.stringify([from, to])
-const isException = (kind) => ['returns', 'reworks', 'reverses'].includes(kind)
 
 function domainFor(node, chain) {
   if (NODE_DOMAINS[node.key]) return NODE_DOMAINS[node.key]
@@ -199,7 +207,7 @@ export function buildBusinessChainDesignLibrary(catalog) {
           })
         ),
       }
-      const kind = isException(edge.kind) ? 'exception' : 'known'
+      const kind = businessChainSourceEdgeKind(chain, edge)
       relations.push(
         {
           from: from.id,
@@ -233,6 +241,7 @@ export function buildBusinessChainDesignLibrary(catalog) {
     const from = byId.get(edge.from)
     const to = byId.get(edge.to)
     if (!from.processNode || !to.processNode) continue
+    if (to.rejectionCommand || (from.rejectionCommand && to.terminal)) edge.kind = 'exception'
     const detail = to.atomicEvidence
     edge.evidence = {
       ...detail,
@@ -293,6 +302,18 @@ export function buildBusinessChainDesignLibrary(catalog) {
       evidence: node.atomicEvidence,
     })
   }
+  // A terminal business result follows the single registered command for its step.
+  // The collapsed step itself is absent from the explorable graph.
+  for (const edge of [...relations]) {
+    const step = byId.get(edge.from)
+    const result = byId.get(edge.to)
+    if (!result.terminal || result.type !== 'result' || step.splitInto?.length !== 1 ||
+      step.source.toNodeKey !== result.source.key) continue
+    const command = byId.get(step.splitInto[0])
+    if (command.processNode && command.source.type === 'domain_command') {
+      relations.push({ ...edge, from: command.id })
+    }
+  }
   const canonical = (id) => byId.get(id).representedBy || id
   const explorationRelations = [
     ...new Map(
@@ -334,10 +355,7 @@ export function buildBusinessChainDesignLibrary(catalog) {
       stepRelations.push({
         from: first.from,
         to: second.to,
-        kind:
-          first.kind === 'exception' || second.kind === 'exception'
-            ? 'exception'
-            : 'known',
+        kind: businessChainPathKind([first.kind, second.kind]),
         dependency: first.dependency || second.dependency,
         paths: [[first, second]],
         evidence: { ...second.evidence, via: byId.get(first.to).label },
@@ -348,16 +366,10 @@ export function buildBusinessChainDesignLibrary(catalog) {
     value: key,
     label,
   }))
-  const chainByValue = new Map(chains.map((chain) => [chain.value, chain]))
-  const chainOptionGroups = catalog.businessChainOverview.lanes.map(
-    ({ key, label, chainKeys }) => ({
-      key,
-      label,
-      options: chainKeys.map((chainKey) => chainByValue.get(chainKey)),
-    })
-  )
+  const chainOptionGroups = groupBusinessChainOptions(catalog.businessChainOverview, chains)
   return {
     nodes,
+    salesAcceptanceVariants: catalog.processDefinitions.filter((definition) => definition.processKey === 'sales_order_acceptance'),
     overview: catalog.businessChainOverview,
     chainDefinitions: new Map(catalog.businessChains.map((chain) => [chain.key, chain])),
     entries: buildBusinessChainNodeEntries(nodes),
@@ -424,7 +436,6 @@ export function assessBusinessChainConnection(library, from, to) {
 export const emptyBusinessChainDraft = () => ({
   nodes: [],
   edges: [],
-  ideas: [],
 })
 
 export function addBusinessChainDraftEdge(draft, library, from, to) {
@@ -453,8 +464,7 @@ export function parseBusinessChainDraft(raw, library) {
   if (
     !draft ||
     !Array.isArray(draft.nodes) ||
-    !Array.isArray(draft.edges) ||
-    !Array.isArray(draft.ideas)
+    !Array.isArray(draft.edges)
   ) {
     throw new Error('Invalid chain design draft')
   }
@@ -469,16 +479,6 @@ export function parseBusinessChainDraft(raw, library) {
       throw new Error('Invalid chain design node')
     }
     ids.add(node.id)
-  }
-  for (const idea of draft.ideas) {
-    if (
-      !idea ||
-      typeof idea.text !== 'string' ||
-      !idea.text.trim() ||
-      idea.text.length > 2000
-    ) {
-      throw new Error('Invalid chain design idea')
-    }
   }
   const pairs = new Set()
   for (const edge of draft.edges) {
@@ -521,17 +521,12 @@ export function parseBusinessChainDraft(raw, library) {
       highlightedRoles.some((key) => typeof key !== 'string' || !key) ||
       (draft.presentation.layout !== undefined && !['flow', 'lanes'].includes(draft.presentation.layout)) ||
       (draft.presentation.direction !== undefined && !['LR', 'TB'].includes(draft.presentation.direction)) ||
+      (draft.presentation.salesAcceptanceVariant !== undefined &&
+        !library.salesAcceptanceVariants.some(({ key }) => key === draft.presentation.salesAcceptanceVariant)) ||
       (draft.presentation.showBranches !== undefined && typeof draft.presentation.showBranches !== 'boolean') ||
       (draft.presentation.layers !== undefined && (!Array.isArray(draft.presentation.layers) ||
         new Set(draft.presentation.layers).size !== draft.presentation.layers.length ||
-        draft.presentation.layers.some((key) => !CHAIN_READING_LAYERS.some((layer) => layer.value === key)))) ||
-      (draft.presentation.viewport !== undefined && (
-        !draft.presentation.viewport ||
-        ![draft.presentation.viewport.x, draft.presentation.viewport.y, draft.presentation.viewport.scale].every(Number.isFinite) ||
-        draft.presentation.viewport.scale <= 0 || draft.presentation.viewport.scale > 2 ||
-        !['manual', 'fit-all', 'fit-width'].includes(draft.presentation.viewport.mode) ||
-        (draft.presentation.viewport.chainKey != null && !library.chains.some((chain) => chain.value === draft.presentation.viewport.chainKey))
-      )))
+        draft.presentation.layers.some((key) => !CHAIN_READING_LAYERS.some((layer) => layer.value === key)))))
   ) {
     throw new Error('Invalid exploration presentation')
   }
@@ -544,7 +539,6 @@ export function parseBusinessChainDraft(raw, library) {
       ...(manual ? { manual: true } : {}),
     })),
     edges: draft.edges.map(({ from, to, kind }) => ({ from, to, kind })),
-    ideas: draft.ideas.map(({ text }) => ({ text })),
     ...(draft.map
       ? { map: parseBusinessChainMap(draft.map, library, ids) }
       : {}),
@@ -554,17 +548,10 @@ export function parseBusinessChainDraft(raw, library) {
             mode: draft.presentation.mode,
             highlightedRoles: highlightedRoles.filter((key) => library.roles.some(({ value }) => value === key)),
             ...(draft.presentation.layout ? { layout: draft.presentation.layout } : {}),
+            ...(draft.presentation.salesAcceptanceVariant ? { salesAcceptanceVariant: draft.presentation.salesAcceptanceVariant } : {}),
             ...(draft.presentation.direction ? { direction: draft.presentation.direction } : {}),
-            ...(draft.presentation.showBranches !== undefined ? { showBranches: draft.presentation.showBranches } : {}),
-            ...(draft.presentation.layers ? { layers: [...new Set(draft.presentation.layers)] } : {}),
-            ...(draft.presentation.viewport ? { viewport: {
-              x: draft.presentation.viewport.x,
-              y: draft.presentation.viewport.y,
-              scale: draft.presentation.viewport.scale,
-              mode: draft.presentation.viewport.mode,
-              chainKey: library.chains.some((chain) => chain.value === draft.presentation.viewport.chainKey)
-                ? draft.presentation.viewport.chainKey : null,
-            } } : {}),
+            ...(draft.presentation.showBranches ? { layers: CHAIN_READING_LAYERS.map(({ value }) => value) } :
+              draft.presentation.layers ? { layers: [...draft.presentation.layers] } : {}),
           },
         }
       : {}),

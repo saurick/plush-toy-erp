@@ -336,6 +336,44 @@ body .ant-select-dropdown .ant-select-item-option-grouped .ant-select-item-optio
   margin-inline-start: 8px;
 }
 
+.app-select__group-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-block-end: 4px;
+  margin-block-end: 4px;
+  border-block-end: 1px solid var(--erp-popup-option-divider);
+}
+
+.app-select__group-shortcuts > .app-select__group-shortcut {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: max(32px, var(--erp-touch-target, 0px));
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 6px;
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.app-select__group-shortcuts > .app-select__group-shortcut[aria-current='location'] {
+  background: var(--erp-popup-option-selected);
+  color: var(--erp-primary-strong);
+}
+
+body .ant-select-dropdown .app-select__pinned-option {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+}
+
+body .ant-select-dropdown .app-select__pinned-option:not(.ant-select-item-option-active, .ant-select-item-option-selected) {
+  background: var(--erp-surface-bg-elevated, var(--erp-surface-bg));
+}
+
 body .ant-select-dropdown .ant-select-item-option:not(.ant-select-item-option-grouped):not(:last-child),
 body .ant-dropdown .ant-dropdown-menu-item:not(:last-child),
 body .ant-dropdown .ant-dropdown-menu-submenu:not(:last-child),

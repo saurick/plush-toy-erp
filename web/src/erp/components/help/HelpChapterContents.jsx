@@ -1,37 +1,35 @@
 import React, { useState } from 'react'
+import Directory, { DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 
 export default function HelpChapterContents({ id, items }) {
   const [expanded, setExpanded] = useState(false)
   if (!items.length) return null
 
   return (
-    <nav
+    <Directory
       className="erp-help-handbook-anchors"
       aria-label="本章内容"
-      data-expanded={expanded}
     >
-      <button
-        type="button"
+      <DirectoryItem
         className="erp-help-handbook-anchors__toggle"
-        aria-expanded={expanded}
+        expanded={expanded}
         aria-controls={id}
         onClick={() => setExpanded((open) => !open)}
       >
-        本章内容 <span aria-hidden="true">{expanded ? '−' : '+'}</span>
-      </button>
-      <ol id={id}>
+        <span>本章内容</span>
+      </DirectoryItem>
+      <ol id={id} className="erp-directory-list" hidden={!expanded}>
         {items.map((item) => (
           <li key={item.id}>
-            <a
-              className="erp-help-handbook-anchor-link"
+            <DirectoryItem
               href={`#${item.id}`}
               onClick={() => setExpanded(false)}
             >
-              {item.title}
-            </a>
+              <span>{item.title}</span>
+            </DirectoryItem>
           </li>
         ))}
       </ol>
-    </nav>
+    </Directory>
   )
 }

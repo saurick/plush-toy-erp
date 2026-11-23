@@ -9,8 +9,7 @@ import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
-import DevDirectoryHeader from '../components/DevDirectoryHeader.jsx'
-import { DevDirectoryItem } from '../components/DevDirectoryTree.jsx'
+import Directory, { DirectoryHeader, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import Select from '@/common/components/select/AppSelect'
 import DevProjectSkillsExecutionGuide from '../components/DevProjectSkillsExecutionGuide.jsx'
 import { buildDevDocsLocation } from './devDocsNavigation.mjs'
@@ -195,12 +194,12 @@ export default function DevProjectSkillsPage() {
           ) : null}
           <div className="erp-dev-skills__workspace">
             <WorkbenchSection aria-label="项目 Skill 目录">
-              <DevDirectoryHeader>
+              <DirectoryHeader>
                 <Text strong role="heading" aria-level={2}>Skill 目录</Text>
                 <Text type="secondary" role="status">
                   {keyword ? `${filtered.length} / ` : ''}{skills.length} 项
                 </Text>
-              </DevDirectoryHeader>
+              </DirectoryHeader>
               <SearchInput
                 allowClear
                 aria-label="搜索任务或 Skill"
@@ -212,9 +211,9 @@ export default function DevProjectSkillsPage() {
                 }
               />
               {filtered.length ? (
-                <nav className="erp-dev-directory-list erp-dev-skills__list" aria-label="Skill 条目">
+                <Directory className="erp-directory-list erp-dev-skills__list" aria-label="Skill 条目">
                   {filtered.map((skill) => (
-                    <DevDirectoryItem
+                    <DirectoryItem
                       key={skill.name}
                       className="erp-dev-skills__item"
                       title={skill.summary || skill.scope}
@@ -225,9 +224,9 @@ export default function DevProjectSkillsPage() {
                       {skill.issues.length ? (
                         <Tag color="warning">需处理</Tag>
                       ) : null}
-                    </DevDirectoryItem>
+                    </DirectoryItem>
                   ))}
-                </nav>
+                </Directory>
               ) : (
                 <Empty
                   description={

@@ -88,7 +88,7 @@ export function useOperationalFactMutations({
     const successText = ['production', 'outsourcing', 'finance'].includes(currentActiveKey) && ['post', 'cancel'].includes(actionKey)
       ? operationalFactActionPresentation(currentActiveKey, row, actionKey).success
       : `${actionLabel}已完成`
-    if (currentActiveKey === 'production') reportBusinessResult(successText, confirmedRecord)
+    if (currentActiveKey === 'production' || currentActiveKey === 'finance') await reportBusinessResult(successText, confirmedRecord)
     message.success(resultUnknown ? `已重新读取并确认：${successText}` : successText)
     if (!refreshedRows) {
       message.warning(`${successText}，请稍后刷新查看最新结果`)

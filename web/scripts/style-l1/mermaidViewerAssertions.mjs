@@ -306,7 +306,6 @@ export async function assertMermaidZoomMode(diagram, assert, selectedAction) {
 
 export async function verifyMermaidZoomModes(page, diagram, assert) {
   const initialViewport = page.viewportSize()
-  const canvas = diagram.locator('.erp-markdown-mermaid__canvas')
   const button = (action) =>
     diagram.locator(`[data-diagram-zoom-action="${action}"]`)
   const assertWidth = async () => {
@@ -336,7 +335,7 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   await button('zoom-in').click()
   await assertMermaidZoomMode(diagram, assert, null)
   await button('zoom-out').click()
-  await assertMermaidZoomMode(diagram, assert, 'reset')
+  await assertMermaidZoomMode(diagram, assert, null)
   await button('fit').click()
   await page.setViewportSize({
     width: Math.max(320, Math.min(initialViewport.width - 30, 960)),
@@ -348,7 +347,6 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   await page.setViewportSize(initialViewport)
   await waitForFiniteAnimations(page)
   await assertWidth()
-  const inlineZoom = await canvas.getAttribute('data-mermaid-zoom')
   const appearance = () =>
     diagram.evaluate((root) => {
       const tool = getComputedStyle(
@@ -409,17 +407,13 @@ export async function verifyMermaidZoomModes(page, diagram, assert) {
   await diagram
     .locator('[data-diagram-fullscreen-action="close"]')
     .press('Escape')
-  await assertMermaidZoomMode(diagram, assert, 'fit')
+  await assertMermaidZoomMode(diagram, assert, 'fit-all')
   assert.deepEqual(
     await appearance(),
     inlineAppearance,
     '退出全屏恢复原有主题外观'
   )
-  assert.equal(
-    await canvas.getAttribute('data-mermaid-zoom'),
-    inlineZoom,
-    '退出全屏恢复页面原有的模式与缩放'
-  )
+  await assertMermaidFits(diagram, assert)
   await fitMermaidDiagram(diagram, assert)
   await assertMermaidZoomMode(diagram, assert, 'fit-all')
 }

@@ -25,7 +25,7 @@ import DevIntegrationRelationshipExamples, {
   DevIntegrationAccess,
 } from '../components/DevIntegrationRelationships.jsx'
 import { buildProjectGraph } from '../config/devProjectGraph.mjs'
-import { buildIntegrationDomainSelectOptions, matchCatalogSelectOption } from '../config/devCatalogSelectOptions.mjs'
+import { buildIntegrationDomainSelectOptions } from '../config/devCatalogSelectOptions.mjs'
 import { readPermissionRelationshipSnapshot } from '../config/devPermissionRelationshipApi.mjs'
 import { createDevQualityGateClient } from '../config/devQualityGates.mjs'
 import { qualityGateViewStatus } from '../config/qualityGatePresentation.mjs'
@@ -377,10 +377,8 @@ export default function DevIntegrationPage() {
                     id="integration-domain"
                     aria-label="筛选业务域"
                     allowClear
-                    showSearch
                     virtual={false}
                     listHeight={420}
-                    filterOption={matchCatalogSelectOption}
                     value={query.domain || undefined}
                     placeholder="全部业务域"
                     options={domainOptions}

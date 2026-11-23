@@ -2,11 +2,15 @@
 
 这些单元将生产 PG＋附件成套备份接到独立的 `plush-toy-erp-paired-*` 定时任务。生产成套包与原 PostgreSQL 专用备份使用不同目录和回执。原任务和 PD-SSD 同步继续使用 [backup.env.example](../env/backup.env.example)，不能用旧的数据库回执证明附件可恢复。包内容、独占停写窗口和恢复报告以[备份恢复](../runbooks/04-backup-restore.md)为准。
 
+## 配置备份身份与连接
+
 生产配置用 [paired-backup.env.example](../env/paired-backup.env.example) 安装为 `/etc/plush-toy-erp/paired-backup.env`（`root:0600`）。安装前核对 `production-133` 的运行 release、Compose、runtime env 和备份目录，将 `BACKUP_TOOL_DIR` 指向经过校验的固定工具目录。成套备份每天北京时间 02:15 运行；错过窗口不补跑停写动作。异地恢复检查每周日北京时间 03:15 运行，恢复本身不暂停生产。
 
 本机生产模板使用与 registry 一致的 root 操作身份，以读取 `root:0600` env 和私有 release 目录；数据库备份仍经只读 `erp_backup`。安装时核对脚本只操作本项目 Compose、本地与异机备份目录。异地目录必须是独立主机或独立存储的受控挂载，不能只是数据库服务器上的另一个普通目录。
 
 备份任务的 `COMPOSE_PROJECT_NAME`、`BACKUP_DATABASE` 必须与 registry 及实际运行容器一致；工具显式传入 project，不按目录猜测。Node 路径需指向项目约定版本，模板为 `/usr/local/bin/node`；恢复工作目录应放在有容量的独立数据盘，需容纳解密包、展开文件与临时 PG / S3。恢复主机预先加载配套应用镜像、PG 18.6 及固定 SeaweedFS 镜像，不在低配目标构建。
+
+## 加密异地副本
 
 异地副本固定使用 `age` 公钥加密。先在受控恢复端生成身份，再只把 recipient 文件复制到数据库服务器；identity 不进入仓库，也不应与异地备份放在一起：
 

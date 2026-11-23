@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -29,6 +30,10 @@ func syncFulfillmentTask(ctx context.Context, client *ent.Client, kind string, i
 	if err != nil {
 		return err
 	}
+	return syncFulfillmentTaskRecord(ctx, client, expected, status, reason, actorID)
+}
+
+func syncFulfillmentTaskRecord(ctx context.Context, client *ent.Client, expected *biz.WorkflowTaskCreate, status, reason string, actorID int) error {
 	row, err := client.WorkflowTask.Query().Where(workflowtask.TaskCode(expected.TaskCode)).Only(ctx)
 	if ent.IsNotFound(err) {
 		if status != "ready" && status != "blocked" {
@@ -57,11 +62,11 @@ func syncFulfillmentTask(ctx context.Context, client *ent.Client, kind string, i
 		reason = "来源已取消或本步骤不再适用"
 	}
 	entryChanged := row.Payload["entry_path"] != expected.Payload["entry_path"] || row.TaskName != expected.TaskName
-	if row.TaskStatusKey == status && optionalStringValueOrEmpty(row.BlockedReason) == reason && optionalStringValueOrEmpty(row.SourceNo) == no && !entryChanged {
+	if row.TaskStatusKey == status && optionalStringValueOrEmpty(row.BlockedReason) == reason && optionalStringValueOrEmpty(row.SourceNo) == *expected.SourceNo && !entryChanged {
 		return nil
 	}
 	update := client.WorkflowTask.Update().Where(workflowtask.ID(row.ID), workflowtask.Version(row.Version)).
-		SetTaskStatusKey(status).SetSourceNo(no).AddVersion(1)
+		SetTaskStatusKey(status).SetSourceNo(*expected.SourceNo).AddVersion(1)
 	if entryChanged {
 		payload := cloneSourceWorkflowPayload(row.Payload)
 		payload["entry_path"] = expected.Payload["entry_path"]
@@ -93,7 +98,7 @@ func syncFulfillmentTask(ctx context.Context, client *ent.Client, kind string, i
 	}
 	event := client.WorkflowTaskEvent.Create().SetTaskID(row.ID).SetTaskVersion(row.Version + 1).
 		SetEventType(eventType).SetFromStatusKey(row.TaskStatusKey).SetToStatusKey(status).
-		SetPayload(map[string]any{"source_task_producer": biz.FulfillmentTaskProducer, "source_action": kind, "source_id": id})
+		SetPayload(map[string]any{"source_task_producer": biz.FulfillmentTaskProducer, "source_action": strings.TrimPrefix(expected.TaskGroup, "handoff_"), "source_id": expected.SourceID})
 	if reason != "" {
 		event.SetReason(reason)
 	}
@@ -174,6 +179,9 @@ func syncPurchaseReceiptHandoffs(ctx context.Context, client *ent.Client, receip
 		}
 	}
 
+	if err := syncReceiptPayable(ctx, client, row, status == "done", 0); err != nil {
+		return err
+	}
 	if err := syncFulfillmentTask(ctx, client, "receipt_inbound", row.ID, row.ReceiptNo, "", status, reason, 0); err != nil {
 		return err
 	}
@@ -620,6 +628,9 @@ func syncPurchaseOrderHandoffs(ctx context.Context, client *ent.Client, id, acto
 		status = "done"
 	case biz.PurchaseOrderStatusCanceled:
 		status = "withdrawn"
+	}
+	if err := syncPurchasePriceTask(ctx, client, row, actorID); err != nil {
+		return err
 	}
 	return syncFulfillmentTask(ctx, client, "purchase_arrival", id, row.PurchaseOrderNo, "", status, "", actorID)
 }

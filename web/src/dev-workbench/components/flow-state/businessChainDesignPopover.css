@@ -10,8 +10,8 @@
   max-height: min(480px, calc(50dvh - 56px));
 }
 .erp-chain-design__picker-panel[data-picker="role"] { --chain-picker-max-width: 420px; }
-.erp-chain-design__picker-panel[data-picker="view"] { width: min(335px, calc(100vw - 56px)); }
-.erp-chain-design__picker-trigger[data-picker="view"] { min-width: 0; }
+.erp-chain-design__picker-panel[data-picker="layout"] { width: min(335px, calc(100vw - 56px)); }
+.erp-chain-design__picker-trigger:is([data-picker="layout"], [data-picker="sales-variant"]) { min-width: 0; }
 .erp-chain-design__picker-panel > header { display: flex; align-items: center; justify-content: space-between; }
 .erp-chain-design__picker-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .erp-chain-design__picker-heading > small { color: var(--erp-text-muted); }

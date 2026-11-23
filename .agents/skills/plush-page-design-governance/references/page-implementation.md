@@ -8,10 +8,10 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
 
 ## 工作台页面组合 / Workbench Patterns
 
-1. 写出本页的使用任务、判断和下一步，按[统一页面样板](../../../../docs/product/ui-design/交互设计说明.md#workbench-patterns)选择目录与检索、执行与诊断、结果与核验或阅读与关系。实际打开 `/__dev/ui-design?page=workbench` 的对应样板，再核对受影响真实页面；既有有效能力保留。
-2. 查看 `web/src/dev-workbench/components/WorkbenchPattern.jsx`、`DevWorkbenchStandards.jsx` 和该类型已有消费者，复用组合并连接当前页面数据及动作。共享组合缺能力时连同样板扩展；领域逻辑留在原页。不创建平行主题、第二套状态判定或以继续叠 CSS 代替父子布局修复。
+1. 写出本页的使用任务、判断和下一步，按[工作台页面组合](../../../../docs/product/ui-design/交互设计说明.md#workbench-patterns)选择目录与检索、执行与诊断、结果与核验或阅读与关系。打开对应的真实示例，核对受影响页面和既有有效能力。
+2. 查看 `web/src/dev-workbench/components/WorkbenchPattern.jsx` 和该类型已有消费者，复用组合并连接当前页面数据及动作。通用能力不足时扩展共享组合，领域逻辑留在原页。不创建平行主题、第二套状态判定或以继续叠 CSS 代替父子布局修复。
 3. 核对默认范围、结果 / 阻断、下一步是否容易找到，删除重复说明和空壳，再处理间距。详细尺度与状态规则只在正式设计维护，不复制到 Skill。
-4. 按改动运行样板或真实消费者的相关浏览器场景；共享组合变化两者都验证，新消费者同步 `scripts/qa/affected.mjs` 的定向映射。完成实际任务路径，并按正式设计核对延迟、刷新失败保留、范围切换、历史恢复、长文本与桌面收缩。涉及独立模式时执行[制品浏览器验收](../../../../server/deploy/workbench/README.md#artifact-browser-acceptance)，不能只测 Vite 或服务端桩页面。静态通过和几何数字只作辅助；交付说明实际迁移范围，不能将样板存在写成所有页面已治理。
+4. 按改动运行实际使用页面的浏览器场景，新消费者同步 `scripts/qa/affected.mjs` 的定向映射。完成实际任务路径，并按正式设计核对延迟、刷新失败保留、范围切换、历史恢复、长文本与桌面收缩。涉及独立模式时按[制品浏览器验收](../../../../server/deploy/workbench/README.md#artifact-browser-acceptance)验证实际构建产物。静态检查和布局测量作为辅助证据，交付说明实际验证范围。
 
 ## Implement with the existing design system.
    - 样式修改先按[共享控件样式边界](../../../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)定位全局基线、属性维护文件、模块布局和 portal 根。按属性检索所有写入位置，核对实际命中规则；删除竞争声明后修改唯一维护位置，不把“新增覆盖且截图正常”当作治理完成。

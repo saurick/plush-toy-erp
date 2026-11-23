@@ -87,7 +87,7 @@ export function createDevDisclosureScenarios({ assert, assertNoHorizontalOverflo
         '/__dev/status-flows?view=chain',
         '/__dev/docs',
         '/__dev/project-skills',
-        '/__dev/customer-config?view=assets',
+        '/__dev/customer-config?view=import&action=release',
         '/__dev/drill-recovery?view=security',
       ]
       for (const route of routes) {

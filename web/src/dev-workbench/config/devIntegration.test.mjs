@@ -21,7 +21,7 @@ import {
   buildIntegrationCurl,
 } from './devIntegration.mjs'
 import { RpcInspection } from './rpcInspection.generated.mjs'
-import { buildIntegrationDomainSelectOptions, matchCatalogSelectOption } from './devCatalogSelectOptions.mjs'
+import { buildIntegrationDomainSelectOptions } from './devCatalogSelectOptions.mjs'
 
 const api = readFileSync(
   new URL('../../../../server/docs/api.md', import.meta.url),
@@ -36,7 +36,6 @@ test('the domain selector groups every registered domain once with its catalog l
   const options = groups.flatMap((group) => group.options)
   assert.equal(options.length, expected.size)
   assert.deepEqual(new Map(options.map(({ value, label }) => [value, label])), expected)
-  assert.deepEqual(options.filter((option) => matchCatalogSelectOption('SALES_ORDER', option)).map(({ value }) => value), ['sales_order'])
 })
 
 test('integration field tables preserve nullable unions, conditions and escaped pipes in descriptions', () => {

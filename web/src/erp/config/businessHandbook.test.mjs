@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { BUSINESS_HANDBOOK_OPERATIONS } from './businessHandbookOperations.mjs'
 import { BUSINESS_USABILITY_CATALOG } from './businessUsabilityCatalog.mjs'
 import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
@@ -19,6 +19,8 @@ import {
   resolveHelpReference,
 } from './helpManualCatalog.mjs'
 import { renderBusinessHandbookHtml } from '../utils/businessHandbookExport.mjs'
+
+const directoryStyles = readFileSync(new URL('../../common/components/navigation/directory.css', import.meta.url), 'utf8')
 
 test('完整业务手册保留每个业务页的步骤、字段、完成标准、交接与边界', () => {
   const markdown = renderBusinessHandbookMarkdown()
@@ -165,18 +167,20 @@ test('离线 HTML 包含同一范围的完整内容并转义文本，不依赖�
     roles: [{ role_key: 'warehouse' }],
   })
   const pages = getHelpReadingCatalog(guides).referencePages
-  const html = renderBusinessHandbookHtml({ guides, pages })
+  const html = renderBusinessHandbookHtml({ guides, pages }, directoryStyles)
   assert(html.startsWith('<!doctype html>'))
   assert(html.includes('采购入库'))
   assert(!html.includes('月结 N 天'))
   assert(!/<script|fetch\(|https?:\/\//u.test(html))
+  assert(html.includes(directoryStyles))
+  assert.match(html, /<a class="erp-directory-item" href="#/u)
   for (const page of pages) assert(html.includes(`id="${page.key}"`), page.key)
   const sample = {
     ...pages[0],
     title: '<script>alert(1)</script>',
     task: 'A & B < C',
   }
-  const escaped = renderBusinessHandbookHtml({ guides, pages: [sample] })
+  const escaped = renderBusinessHandbookHtml({ guides, pages: [sample] }, directoryStyles)
   assert(escaped.includes('&lt;script&gt;alert(1)&lt;/script&gt;'))
   assert(escaped.includes('A &amp; B &lt; C'))
   assert(!escaped.includes('<script>'))
@@ -201,7 +205,7 @@ test('办理手册逐页保留真实操作来源，新增规则同时进入全�
   const html = renderBusinessHandbookHtml({
     guides,
     pages: catalog.referencePages,
-  })
+  }, directoryStyles)
   const markdown = renderBusinessHandbookMarkdown()
   for (const [query, key, text] of [
     ['SKU 单重', 'products', '创建后不可更换所属产品'],

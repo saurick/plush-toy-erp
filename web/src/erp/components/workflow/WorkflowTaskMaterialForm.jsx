@@ -27,6 +27,7 @@ export default function WorkflowTaskMaterialForm() {
     mobile={taskBusiness.device === 'mobile'}
     readOnly={taskBusiness.readOnly}
     leaveGuardRef={leaveGuard}
+    draftRef={taskBusiness.materialDraftRef}
     onBusyChange={taskBusiness.onBusyChange}
     onChanged={(record, result) => reportResult(result.successMessage, record)}
     render={({ content, footer }) => (

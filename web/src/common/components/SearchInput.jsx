@@ -15,6 +15,8 @@ function isComposing(event) {
   return event?.nativeEvent?.isComposing || event?.nativeEvent?.keyCode === 229
 }
 
+const searchPrefix = <SearchOutlined aria-hidden="true" />
+
 const SearchInput = forwardRef(
   (
     {
@@ -122,9 +124,7 @@ const SearchInput = forwardRef(
             >
               <ArrowLeftOutlined aria-hidden="true" />
             </button>
-          ) : (
-            <SearchOutlined aria-hidden="true" />
-          )
+          ) : searchPrefix
         }
         placeholder={placeholder}
         aria-label={accessibleLabel}
@@ -165,8 +165,15 @@ const SearchInput = forwardRef(
         open={showHint}
         trigger={[]}
         placement="bottomLeft"
+        transitionName=""
+        autoAdjustOverflow={{ shiftX: true }}
+        align={{ dynamicInset: false }}
         styles={{
           root: {
+            // Constrain width while the trigger moves and the popup realigns.
+            position: 'fixed',
+            right: 0,
+            width: 'fit-content',
             maxWidth: 'min(384px, calc(100vw - 64px))',
             pointerEvents: 'none',
           },

@@ -68,7 +68,7 @@ test('task and flow reads fail independently; filters reuse their page and pagin
   const app = await mount(t)
   await app.render({ task, profile })
   assert.equal(app.pending.length, 2)
-  assert.equal(app.current.scope, 'flow')
+  assert.equal(app.current.scope, 'task')
   await app.flush(() => {
     app.pending
       .find((call) => call.scope === 'task')
@@ -106,8 +106,10 @@ test('task and flow reads fail independently; filters reuse their page and pagin
 test('task and effective permission changes cancel old reads and never reveal their late results', async (t) => {
   const app = await mount(t)
   await app.render({ task, profile })
+  await app.flush(() => app.current.changeScope('flow'))
   const oldFlow = app.pending.find((call) => call.scope === 'flow')
   await app.render({ task: { ...task, id: 42 }, profile })
+  assert.equal(app.current.scope, 'task')
   assert.equal(oldFlow.signal.aborted, true)
   await app.flush(() =>
     oldFlow.resolve({ items: [{ id: 99 }], truncated: false })

@@ -944,7 +944,7 @@ export function createDevQualityGateScenarios({
         assert.deepEqual(
           (
             await jobGuideDrawer
-              .locator('.ant-list-item-meta-title code')
+              .locator('.erp-directory-branch .erp-directory-item code')
               .allTextContents()
           ).sort(),
           SERVER_JOB_TIMINGS.map(([jobName]) => jobName).sort()

@@ -11,7 +11,7 @@
 | `$plush-docs-governance`                  | 当前真源、文档清单、中文文件名、读者路径和 `progress.md`                                                                               |
 | `$plush-domain-boundary-governance`       | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC、字段真源和数据增长与容量设计                      |
 | `$plush-git-conflict-coordination`        | 由当前提交会话核清混合改动、归属与依赖，验证后串行提交 |
-| `$plush-page-design-governance`           | ERP 与效能工作台的任务语义、统一页面样板、共享组件、原型与任务路径验收                                                                  |
+| `$plush-page-design-governance`           | ERP 与效能工作台的任务语义、页面组合、共享组件、原型与任务路径验收                                                                      |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真                                                                     |
 | `$plush-seed-import-governance`           | 模块化 seed / fixture / 模拟数据、甲方资料到脱敏场景映射、增量复用、import dry-run、批次与数据 cleanup 边界                           |
 | `$plush-manual-acceptance-governance`     | 人工验收目录/批次、岗位账号/任务、浏览器/PDF 与人工证据、签收和退出清理                                                                |

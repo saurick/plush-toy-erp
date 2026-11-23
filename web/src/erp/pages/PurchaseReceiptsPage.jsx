@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
 import { getBusinessDocumentTitle } from '../config/businessModules.mjs'
+import useTaskBusinessEditor from '../hooks/useTaskBusinessEditor.js'
 import useBusinessPageContext from '../hooks/useBusinessPageContext.js'
 import RemoteReferenceSelect, { ReferenceRecordsProvider } from '../components/RemoteReferenceSelect.jsx'
 import { useReferenceRecords, useReferenceHydration } from '../hooks/useReferenceRecords.js'
@@ -864,6 +865,14 @@ export default function PurchaseReceiptsPage() {
     [canCreatePayable, payableSourceAccess.reason]
   )
 
+  useTaskBusinessEditor({
+    record: selectedRow,
+    enabled: outletContext?.taskBusiness?.task?.task_group === 'handoff_receipt_payable' &&
+      selectedRow?.id === outletContext.taskBusiness.task.source_id && canCreatePayable &&
+      selectedRow.status === PurchaseReceiptStatus.POSTED && Number(selectedRow.pending_inbound_lines) === 0,
+    open: openPurchaseReceiptPayable,
+  })
+
   const closePurchaseReceiptPayable = useCallback(() => {
     if (financeSourceInFlightRef.current) return
     setFinanceSourceReceipt(null)
@@ -895,10 +904,11 @@ export default function PurchaseReceiptsPage() {
       financeSourceInFlightRef.current = true
       setFinanceSourceLoading(true)
       try {
-        await createPayableFromPurchaseReceipt(attempt.params)
+        const payable = await createPayableFromPurchaseReceipt(attempt.params)
         financeSourceAttemptsRef.current.settle(scope, attempt, null)
         setFinanceSourceReceipt(null)
-        message.success('应付草稿已生成，请到应付管理核对并确认')
+        await reportBusinessResult('应付草稿已生成，待核对并过账', payable)
+        message.success('应付草稿已生成，待核对并过账')
         await loadRows()
       } catch (error) {
         const retained = financeSourceAttemptsRef.current.settle(
@@ -921,7 +931,7 @@ export default function PurchaseReceiptsPage() {
         setFinanceSourceLoading(false)
       }
     },
-    [activeCustomerKey, canCreatePayable, financeSourceReceipt, loadRows]
+    [activeCustomerKey, canCreatePayable, financeSourceReceipt, loadRows, reportBusinessResult]
   )
 
   const viewPurchaseReceiptPayable = useCallback(

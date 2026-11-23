@@ -1099,3 +1099,48 @@ func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t
 		t.Fatalf("postgres completion projection leaked payload rejected reason %#v", projected.Payload)
 	}
 }
+
+func TestWorkflowProgressGroupsBeforePagingAndDrillsWithinScope(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:progress_groups?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	now := time.Now().UTC().Truncate(time.Second)
+	for i, fixture := range []struct {
+		source, role, status string
+		id                   int
+		delta                time.Duration
+	}{
+		{"sales_order", "warehouse", "ready", 7, -48 * time.Hour}, {"sales-orders", "warehouse", "blocked", 7, 0},
+		{"sales_order", "finance", "ready", 7, -72 * time.Hour}, {"production_order", "warehouse", "ready", 7, time.Hour},
+		{"", "warehouse", "ready", 0, 0}, {"", "warehouse", "ready", 0, 0},
+	} {
+		c := client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("TEST-GROUP-%d", i)).SetTaskName("核对包装").SetTaskGroup("generic").SetTaskStatusKey(fixture.status).SetOwnerRoleKey(fixture.role).SetDueAt(now.Add(fixture.delta)).SetPayload(map[string]any{})
+		if fixture.id != 0 {
+			c.SetSourceType(fixture.source).SetSourceID(fixture.id)
+		}
+		c.SaveX(ctx)
+	}
+	q := biz.WorkflowTaskBoardQuery{ProgressView: "open", OwnerRoleKey: "warehouse", Limit: 1, SnapshotAt: now}
+	read := func() *biz.WorkflowProgressPage {
+		board, err := repo.GetWorkflowTaskBoard(ctx, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return board.Progress
+	}
+	page := read()
+	if page.Total != 4 || len(page.Rows) != 1 || page.Rows[0].Count != 2 || page.Counts["open"] != 5 || page.Counts["due"] != 5 || page.Rows[0].Task.TaskStatusKey != "blocked" || !page.Rows[0].Date.Equal(now.Add(-48*time.Hour)) {
+		t.Fatalf("incorrect document summary: %+v", page)
+	}
+	q.ProgressAnchor = page.Rows[0].Task.ID
+	q.Offset = 1
+	if detail := read(); detail.Total != 2 || len(detail.Rows) != 1 || detail.Rows[0].Task.OwnerRoleKey != "warehouse" {
+		t.Fatalf("incorrect expanded page: %+v", detail)
+	}
+	q.ProgressAnchor = 0
+	q.Offset = 10
+	if page := read(); page.Total != 4 || len(page.Rows) != 0 {
+		t.Fatalf("out of range: %+v", page)
+	}
+}

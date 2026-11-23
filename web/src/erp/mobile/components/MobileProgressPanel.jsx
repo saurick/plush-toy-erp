@@ -20,7 +20,6 @@ import { listBusinessProgress } from '../../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import BusinessProgressFilterFields, { ProgressDueFilters, ProgressBlockedFilter, ProgressDeliveryFilters, ProgressDeliverySwitch } from '../../components/business-visualizations/BusinessProgressFilters.jsx'
 import BusinessProgressDrawer from '../../components/business-visualizations/BusinessProgressDrawer'
-import RoleProgressPanel from '../../components/business-visualizations/RoleProgressPanel.jsx'
 import useBusinessStatistics from '../../components/business-visualizations/useBusinessStatistics.jsx'
 import SalesDeliveryWorkspace from '../../components/sales-orders/SalesDeliveryWorkspace.jsx'
 import { useSalesDeliveryWorkspace } from '../../components/sales-orders/useSalesDeliveryWorkspace.js'
@@ -70,6 +69,7 @@ export default function MobileProgressPanel({
   roleKey,
   adminProfile,
   onOpenTask,
+  onOpenRelatedTasks,
 }) {
   const initial = useRef(
     readMobileProgressState(
@@ -79,9 +79,7 @@ export default function MobileProgressPanel({
     )
   ).current
   const [values, setValues] = useState(initial.query)
-  const [roleProgress, setRoleProgress] = useState(initial.roleProgress)
   const [statisticsParams, setStatisticsParams] = useState(() => new URLSearchParams(initial.statisticsQuery))
-  const updateRoleProgress = useCallback((changes) => setRoleProgress((current) => ({ ...current, ...changes })), [])
   const updateStatisticsParams = useCallback((updater) => setStatisticsParams(updater), [])
   const queriesRef = useRef(initial.queries)
   const [selection, setSelection] = useState(initial.selection)
@@ -107,7 +105,7 @@ export default function MobileProgressPanel({
   const viewingList = view === 'orders' || view === 'production'
   const listActive = active && viewingList
   const deliveryWorkspace = useSalesDeliveryWorkspace(adminProfile, active && access.sales)
-  const scopedOrderID = active && selection?.view === 'orders' && (access.scopedDelivery || view === 'role') ? selection.id : null
+  const scopedOrderID = active && selection?.view === 'orders' && access.scopedDelivery ? selection.id : null
   const { openProgress, close: closeDelivery } = deliveryWorkspace
   useEffect(() => {
     if (scopedOrderID) openProgress(scopedOrderID)
@@ -124,8 +122,8 @@ export default function MobileProgressPanel({
   const hasMore = Boolean(data && !endReached && data.rows.length < data.total)
   const resultRef = useRef(result)
   resultRef.current = result
-  const latest = useRef({ values, selection, roleProgress, statisticsParams })
-  latest.current = { values, selection, roleProgress, statisticsParams }
+  const latest = useRef({ values, selection, statisticsParams })
+  latest.current = { values, selection, statisticsParams }
 
   const remember = useCallback(
     (changes = {}) => {
@@ -137,7 +135,6 @@ export default function MobileProgressPanel({
         query: latest.current.values,
         queries: queriesRef.current,
         selection: latest.current.selection,
-        roleProgress: latest.current.roleProgress,
         statisticsQuery: latest.current.statisticsParams.toString(),
         scrollTop: restoreScroll.current ?? scrollRef.current?.scrollTop ?? 0,
         ...changes,
@@ -152,7 +149,7 @@ export default function MobileProgressPanel({
   )
   useEffect(() => {
     if (active) remember()
-  }, [active, remember, values, selection, roleProgress, statisticsParams])
+  }, [active, remember, values, selection, statisticsParams])
   useEffect(() => () => {
     clearTimeout(scrollHistoryTimer.current)
   }, [])
@@ -178,7 +175,6 @@ export default function MobileProgressPanel({
       setSelection(restored.selection)
       queriesRef.current = restored.queries
       setValues(restored.query)
-      setRoleProgress(restored.roleProgress)
       setStatisticsParams(new URLSearchParams(restored.statisticsQuery))
       restoreScroll.current = restored.scrollTop
     }
@@ -352,10 +348,10 @@ export default function MobileProgressPanel({
     }
   }, [active, data, hasMore])
 
-  const open = (row, section = null) => {
+  const open = (row, section, sourceOrderNo) => {
     remember()
     setSuppressDetailOpenMotion(false)
-    const next = { id: row.line?.sales_order_id || row.id, lineID: row.line ? row.id : undefined, view: row.view, orderNo: row.order_no, section }
+    const next = { id: row.line?.sales_order_id || row.id, lineID: row.line ? row.id : undefined, view: row.view, orderNo: row.order_no, section: section ?? null, sourceOrderNo }
     window.history.pushState(
       {
         ...window.history.state,
@@ -372,6 +368,14 @@ export default function MobileProgressPanel({
   const close = () => {
     if (window.history.state?.mobileProgress?.detailEntry) window.history.back()
     else setSelection(null)
+  }
+  const openProductionFromDetail = (record, context) => {
+    latest.current.selection = { ...selection, ...context }
+    open({ id: record.id, view: 'production', order_no: record.number }, null, selection.orderNo)
+  }
+  const openTaskFromDetail = (taskID, context) => {
+    remember({ selection: { ...selection, ...context } })
+    onOpenTask(taskID)
   }
   const counts = data?.counts
   const canReadStatisticsSource = useCallback((path) => canOpenRelatedDocumentPath({
@@ -500,20 +504,6 @@ export default function MobileProgressPanel({
           </>
           )}
         </div>
-        {view === 'role' && (
-          <RoleProgressPanel
-            active={active}
-            mobile
-            adminProfile={adminProfile}
-            roles={access.roles || []}
-            allowGlobal={access.supervise}
-            state={roleProgress}
-            onStateChange={updateRoleProgress}
-            onOpenTask={onOpenTask ? (task) => onOpenTask(task.id) : undefined}
-            onOpenDelivery={deliveryWorkspace.enabled ? (id) => open({ id, view: 'orders' }) : undefined}
-            suspendDetails={Boolean(scopedOrderID)}
-          />
-        )}
         {view === 'statistics' && <div className="erp-progress-board erp-progress-board--statistics">{statistics.content}</div>}
         {viewingList && (
         <>
@@ -597,7 +587,7 @@ export default function MobileProgressPanel({
                         if (directTaskID) {
                           remember()
                           onOpenTask(directTaskID)
-                        } else open(row, 'tasks')
+                        } else { remember(); onOpenRelatedTasks({ view: row.view, id: row.id, orderNo: row.order_no }) }
                       }}
                     >
                       <ProgressAttention
@@ -670,17 +660,12 @@ export default function MobileProgressPanel({
       <BusinessProgressDrawer
         mobile
         suppressOpenMotion={suppressDetailOpenMotion}
-        selection={active && !access.scopedDelivery && view !== 'role' ? selection : null}
+        selection={active && !scopedOrderID ? selection : null}
+        sourceOrderNo={selection?.sourceOrderNo}
         adminProfile={adminProfile}
         onClose={close}
-        onOpenProduction={(record) =>
-          open({ id: record.id, view: 'production', order_no: record.number })
-        }
-        onOpenTask={onOpenTask}
-        onRememberContext={(context) => {
-          latest.current.selection = { ...latest.current.selection, ...context }
-          remember({ selection: latest.current.selection })
-        }}
+        onOpenProduction={selection?.view === 'orders' ? openProductionFromDetail : undefined}
+        onOpenTask={onOpenTask ? openTaskFromDetail : undefined}
         onSectionChange={(section) =>
           setSelection((current) =>
             current ? { ...current, section } : current

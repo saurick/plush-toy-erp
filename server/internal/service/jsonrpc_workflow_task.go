@@ -268,6 +268,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := rejectUnknownWorkflowTaskParams(
 			pm,
 			method,
+			"progress_view", "progress_anchor",
 			"keyword",
 			"status",
 			"owner_role_key",
@@ -294,6 +295,24 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		admin, adminRes := d.CurrentAdmin(ctx)
 		if adminRes != nil {
 			return id, adminRes, nil
+		}
+		if query.ProgressView != "" {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+				return id, res, nil
+			}
+			// Reading another role or the global queue requires both supervisory capabilities.
+			own := d.requireEffectiveWorkflowWorkbenchRole(ctx, admin, query.OwnerRoleKey)
+			if own != nil && own.Code != errcode.PermissionDenied.Code {
+				return id, own, nil
+			}
+			if own != nil || query.OwnerRoleKey == "" || biz.NormalizeRoleKey(query.OwnerRoleKey) == "all" {
+				if res := d.RequireAdminPermission(ctx, biz.PermissionERPBusinessDashboardRead); res != nil {
+					return id, res, nil
+				}
+				if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskSupervise); res != nil {
+					return id, res, nil
+				}
+			}
 		}
 		if query.TodoOnly {
 			// Personal reminders use responsibility scope, not supervisory or creator visibility.

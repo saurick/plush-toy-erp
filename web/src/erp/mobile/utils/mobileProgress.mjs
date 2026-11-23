@@ -1,22 +1,17 @@
-import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
+import { canMountCustomerRuntime, effectiveSessionAllowsPage } from '../../utils/adminProfileSync.mjs'
 import { progressAttention, progressQueryFromURL } from '../../utils/businessProgress.mjs'
-import { progressBoardAccess, progressBoardViews } from '../../utils/progressBoardAccess.mjs'
+import { defaultProgressView, progressBoardAccess, progressBoardViews } from '../../utils/progressBoardAccess.mjs'
 
 export function mobileProgressAccess(profile, roleKey) {
   const access = progressBoardAccess(profile, roleKey)
   return {
     ...access,
-    enabled: canMountCustomerRuntime(profile) && progressBoardViews(access).length > 0,
+    enabled: canMountCustomerRuntime(profile) && effectiveSessionAllowsPage(profile, 'business-dashboard', { isSuperAdmin: profile?.is_super_admin }) && progressBoardViews(access).length > 0,
   }
 }
 
 export function mobileProgressDefaultView(role, access) {
-  if (access.roles?.length) return 'role'
-  if (!access.sales && !access.production && access.finance) return 'statistics'
-  if (!access.sales && !access.production && access.supervise) return 'role'
-  return access.production && (role === 'pmc' || !access.sales)
-    ? 'production'
-    : 'orders'
+  return defaultProgressView(access, role)
 }
 
 export function normalizeMobileProgressQuery(values, defaultView) {
@@ -26,7 +21,7 @@ export function normalizeMobileProgressQuery(values, defaultView) {
   const query = progressQueryFromURL(params)
   const requested = params.get('view')
   return {
-    view: ['role', 'statistics'].includes(requested) ? requested : query.view || defaultView,
+    view: requested === 'statistics' ? requested : query.view || defaultView,
     q: query.keyword,
     scope: query.scope,
     due_status: query.due_status,
@@ -45,7 +40,7 @@ export function readMobileProgressState(history, scope, defaultView) {
   const query = normalizeMobileProgressQuery(saved.query, defaultView)
   return {
     query,
-    queries: Object.fromEntries(['role', 'orders', 'production', 'statistics'].map((view) => [
+    queries: Object.fromEntries(['orders', 'production', 'statistics'].map((view) => [
       view, normalizeMobileProgressQuery(view === query.view ? query : { ...saved.queries?.[view], view }, view),
     ])),
     selection:
@@ -56,7 +51,6 @@ export function readMobileProgressState(history, scope, defaultView) {
         ? saved.selection
         : null,
     scrollTop: Math.max(0, Number(saved.scrollTop) || 0),
-    roleProgress: saved.roleProgress || {},
     statisticsQuery: saved.statisticsQuery || '',
   }
 }

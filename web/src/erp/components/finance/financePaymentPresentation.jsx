@@ -1,12 +1,13 @@
 import React from 'react'
 import { Tag } from 'antd'
-
 import {
   FinanceAllocationStatus,
   FinancePaymentDirection,
   FinancePaymentKind,
-  FinancePaymentStatus,
 } from '../../../common/consts/statuses.generated.mjs'
+import { PAYMENT_STATUS_META } from './financePaymentStatus.mjs'
+
+export { PAYMENT_STATUS_META }
 
 export const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
 
@@ -14,15 +15,6 @@ export const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'
 
 export const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY =
   'finance-credit-notes-records'
-
-export const PAYMENT_STATUS_META = Object.freeze({
-  [FinancePaymentStatus.DRAFT]: ['待审批', 'blue'],
-  [FinancePaymentStatus.APPROVED]: ['已批准待入账', 'gold'],
-  [FinancePaymentStatus.REJECTED]: ['已退回', 'red'],
-  [FinancePaymentStatus.CANCELLED]: ['已取消', 'default'],
-  [FinancePaymentStatus.POSTED]: ['已入账', 'green'],
-  [FinancePaymentStatus.REVERSED]: ['已冲销', 'magenta'],
-})
 
 export const PAYMENT_STATUS_OPTIONS = [
   { value: '', label: '全部状态' },

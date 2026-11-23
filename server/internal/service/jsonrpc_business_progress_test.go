@@ -13,6 +13,7 @@ type progressAPIRepo struct {
 	query biz.BusinessProgressQuery
 	calls int
 	err   error
+	tasks []biz.BusinessProgressRecord
 }
 
 func (r *progressAPIRepo) GetSalesDeliveryProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.SalesDeliveryProgress, error) {
@@ -58,7 +59,7 @@ func TestBusinessProgressOwnerOptionsRPC(t *testing.T) {
 
 func (r *progressAPIRepo) ListBusinessProgressTasks(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressTaskPage, error) {
 	r.query, r.calls = q, r.calls+1
-	return &biz.BusinessProgressTaskPage{Rows: []biz.BusinessProgressRecord{}}, r.err
+	return &biz.BusinessProgressTaskPage{Rows: r.tasks, Total: len(r.tasks)}, r.err
 }
 func (r *progressAPIRepo) GetBusinessProgress(_ context.Context, q biz.BusinessProgressQuery) (*biz.BusinessProgressDetail, error) {
 	r.query, r.calls = q, r.calls+1
@@ -75,13 +76,20 @@ func TestBusinessProgressTaskPageRPC(t *testing.T) {
 				keys = append(keys, biz.PermissionWorkflowTaskRead)
 			}
 			d, _, _, _ := newProductionOrderJSONRPCTestData(t, keys...)
-			repo := &progressAPIRepo{}
+			repo := &progressAPIRepo{tasks: []biz.BusinessProgressRecord{{
+				ID: 7, Kind: "task", Number: "TASK-0007", Label: "办理出货前检验",
+				Status: "ready", Role: "quality", ParentID: 3, TaskGroup: "handoff_shipment_quality",
+			}}}
 			d.businessProgressUC = biz.NewBusinessProgressUsecase(repo)
 			_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress_tasks", "tasks", newDataStruct(params))
 			if withTasks {
 				if err != nil || res.Code != errcode.OK.Code || repo.query.ID != 2 || repo.query.TaskRole != "quality" || repo.query.TaskVisibility == nil ||
-					repo.query.TaskStatus != "open" || res.Data.AsMap()["total"] != float64(0) {
+					repo.query.TaskStatus != "open" || res.Data.AsMap()["total"] != float64(1) {
 					t.Fatalf("task page: result=%+v query=%+v err=%v", res, repo.query, err)
+				}
+				record := res.Data.AsMap()["rows"].([]any)[0].(map[string]any)
+				if record["task_group"] != "handoff_shipment_quality" {
+					t.Fatalf("task group not projected: %v", record)
 				}
 			} else if err != nil || res.Code != errcode.PermissionDenied.Code || repo.calls != 0 {
 				t.Fatalf("task visibility required: result=%+v calls=%d err=%v", res, repo.calls, err)

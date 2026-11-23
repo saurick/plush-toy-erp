@@ -201,31 +201,6 @@ function readGoConstants(repoRoot, contractRef) {
   )
 }
 
-function readMarkdownInlineSet(repoRoot, contractRef) {
-  const source = readContractSource(repoRoot, contractRef)
-  const line = source
-    .split(/\r?\n/u)
-    .find((candidate) => candidate.includes(contractRef.marker))
-  if (!line) {
-    throw new Error(
-      `canonical marker ${contractRef.marker} is missing from ${contractRef.path}`
-    )
-  }
-  const tail = line.slice(line.indexOf(contractRef.marker) + contractRef.marker.length)
-  const match = tail.match(
-    /([a-z][a-z0-9_-]*(?:\s*\/\s*[a-z][a-z0-9_-]*)+)/u
-  )
-  if (!match) {
-    throw new Error(
-      `canonical marker ${contractRef.marker} has no inline status set`
-    )
-  }
-  return assertNonEmptyStates(
-    match[1].split('/').map((value) => value.trim()),
-    contractRef
-  )
-}
-
 export function readCanonicalStatusContract(repoRoot, contractRef) {
   if (!contractRef || typeof contractRef !== 'object') {
     throw new Error('canonical status contract reference is required')
@@ -243,8 +218,13 @@ export function readCanonicalStatusContract(repoRoot, contractRef) {
       const pattern = new RegExp(`${escapeRegExp(contractRef.selector)}\\s*!=\\s*"([^"]+)"`, 'gu')
       return assertNonEmptyStates([...new Set([...source.matchAll(pattern)].map((item) => item[1]))], contractRef)
     }
-    case 'markdown_inline_set':
-      return readMarkdownInlineSet(repoRoot, contractRef)
+    case 'ent_bool_activation': {
+      const source = readContractSource(repoRoot, contractRef)
+      if (!source.includes(`field.Bool("${contractRef.field}")`)) {
+        throw new Error(`missing boolean activation field: ${contractRef.path}#${contractRef.field}`)
+      }
+      return ['active', 'inactive']
+    }
     case 'ent_check_agreement': {
       if (!Array.isArray(contractRef.refs) || contractRef.refs.length < 2) {
         throw new Error('canonical status agreement requires at least two refs')

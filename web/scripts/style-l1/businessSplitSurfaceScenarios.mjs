@@ -19,7 +19,6 @@ export function createBusinessSplitSurfaceScenarios(existing, { assert, customer
     const right = page.locator('.erp-split-pane--right')
     const picker = right.getByRole('combobox', { name: '选择右栏页面' })
     await picker.click()
-    await picker.fill(title)
     await page.locator('.ant-select-dropdown:visible').getByText(title, { exact: true }).click()
     return { left, right, picker }
   }

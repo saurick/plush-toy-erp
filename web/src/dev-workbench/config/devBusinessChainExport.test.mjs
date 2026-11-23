@@ -56,7 +56,7 @@ test('默认图例仅说明图中类型，静态输出安全保留中文和完�
   assert(text.includes('订单 <规格> & 数量'))
   assert(text.includes('图例'))
   assert(text.includes('操作说明（在流程探索页面使用）'))
-  assert(text.includes('待核对'))
+  assert(text.includes('待核对的参考线'))
   assert(!text.includes('异常分支'))
   assert(!text.includes('品质'))
   assert.equal(doc.querySelectorAll('foreignObject, script, image, a').length, 0)

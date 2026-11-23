@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -112,13 +113,62 @@ func runPurchaseReceiptPayableAndReconciliation(t *testing.T, ctx context.Contex
 	if err != nil {
 		t.Fatalf("post purchase receipt payable source: %v", err)
 	}
+	initialTask := assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
+	terms := biz.NewPurchaseOrderUsecase(NewPurchaseOrderRepo(data, logger))
+	if _, err := terms.CompletePurchaseOrderTerms(ctx, &biz.PurchaseOrderTermsCompletion{ID: order.ID, ExpectedVersion: order.Version, ActorID: actor.ID, IdempotencyKey: "terms-" + suffix, Items: []biz.PurchaseOrderTermsItem{{ID: orderItem.ID, UnitPrice: &unitPrice}}}); err != nil {
+		t.Fatalf("confirm existing source price: %v", err)
+	}
+	if afterTerms := assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey); afterTerms.Version != initialTask.Version {
+		t.Fatal("unchanged terms duplicated the payable handoff event")
+	}
+
+	vendors := NewMasterDataRepo(data, logger)
+	if _, err := vendors.SetSupplierActive(ctx, supplier.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "blocked", biz.FinanceRoleKey)
+	if _, err := vendors.SetSupplierActive(ctx, supplier.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
 	client.Supplier.UpdateOneID(supplier.ID).SetDefaultPaymentTermDays(60).SaveX(ctx)
 	payableInput := &biz.FinanceFactFromPurchaseReceiptCreate{
 		FactNo: "AP-RECEIPT-" + suffix, PurchaseReceiptID: receipt.ID, IdempotencyKey: "AP-RECEIPT-" + suffix,
 	}
+	var concurrentResult chan error
+	if data.sqlDialect == "postgres" {
+		concurrentResult = make(chan error, 1)
+		sameIntent := *payableInput
+		go func() {
+			_, err := operationalUC.CreatePayableFromPurchaseReceipt(ctx, &sameIntent)
+			concurrentResult <- err
+		}()
+	}
 	payable, err := operationalUC.CreatePayableFromPurchaseReceipt(ctx, payableInput)
+	if concurrentResult != nil {
+		if err := <-concurrentResult; err != nil {
+			t.Fatalf("concurrent replay: %v", err)
+		}
+	}
 	if err != nil {
 		t.Fatalf("create payable from purchase receipt: %v", err)
+	}
+	draftTask := assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
+	if draftTask.ID != initialTask.ID || draftTask.TaskName == initialTask.TaskName || draftTask.Payload["entry_path"] != fmt.Sprintf("/erp/finance/payables?source_type=PURCHASE_RECEIPT&source_id=%d&fact_id=%d", receipt.ID, payable.ID) {
+		t.Fatalf("draft handoff=%+v", draftTask)
+	}
+	if _, err := operationalUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(payable.ID, payable.Version, actor.ID, "核对后重建")); err != nil {
+		t.Fatal(err)
+	}
+	reopened := assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "ready", biz.FinanceRoleKey)
+	if reopened.ID != initialTask.ID || reopened.TaskName != initialTask.TaskName || reopened.Payload["entry_path"] != initialTask.Payload["entry_path"] {
+		t.Fatalf("draft cancellation did not restore receipt: %+v", reopened)
+	}
+	payableInput.FactNo += "-NEW"
+	payableInput.IdempotencyKey += "-NEW"
+	payable, err = operationalUC.CreatePayableFromPurchaseReceipt(ctx, payableInput)
+	if err != nil {
+		t.Fatal(err)
 	}
 	wantDueAt := mustFinanceFactDueAt(t, receipt.ReceivedAt, orderTermDays)
 	if payable.FactType != biz.FinanceFactPayable || payable.CounterpartyID == nil || *payable.CounterpartyID != supplier.ID ||
@@ -158,6 +208,7 @@ func runPurchaseReceiptPayableAndReconciliation(t *testing.T, ctx context.Contex
 	if err != nil {
 		t.Fatalf("post payable: %v", err)
 	}
+	assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "done", biz.FinanceRoleKey)
 	reconciliation, err := operationalUC.CreateReconciliationFromFinanceFact(ctx, &biz.FinanceReconciliationFromFactCreate{
 		FactNo: "REC-AP-" + suffix, FinanceFactID: payable.ID, IdempotencyKey: "REC-AP-" + suffix,
 	})
@@ -198,6 +249,7 @@ func runPurchaseReceiptPayableAndReconciliation(t *testing.T, ctx context.Contex
 	if _, err := inventoryUC.CancelPostedPurchaseReceipt(ctx, receipt.ID); err != nil {
 		t.Fatalf("cancel receipt after finance and return cancellation: %v", err)
 	}
+	assertFulfillmentTask(t, ctx, client, "receipt_payable", receipt.ID, "withdrawn", biz.FinanceRoleKey)
 }
 
 func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, client *ent.Client, suffix string) {

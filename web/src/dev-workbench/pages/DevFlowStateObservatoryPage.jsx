@@ -19,6 +19,7 @@ import SupplementalHelp from '@/common/components/help/SupplementalHelp'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import { message } from '@/common/utils/antdApp'
 import Modal from '@/common/components/modal/AppModal'
+import Directory, { DirectoryBranch, DirectoryItem } from '@/common/components/navigation/Directory.jsx'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
 import { FactsView } from '../components/flow-state/FactsView.jsx'
 import { FlowDiagramPrintContext } from '../components/flow-state/FlowDiagramPrintContext.mjs'
@@ -27,7 +28,12 @@ import { WorkflowView } from '../components/flow-state/WorkflowView.jsx'
 import BusinessChainInstanceView from '../components/flow-state/BusinessChainInstanceView.jsx'
 import FinanceTraceView from '../components/flow-state/FinanceTraceView.jsx'
 import FinanceRulesView from '../components/flow-state/FinanceRulesView.jsx'
-import { FINANCE_RULES, FINANCE_TOPIC_KEYS } from '../config/devFinanceWorkbench.mjs'
+import {
+  FINANCE_RULES,
+  FINANCE_TOPIC_KEYS,
+  PURCHASE_FINANCE_CHANGES,
+  PURCHASE_FINANCE_STAGES,
+} from '../config/devFinanceWorkbench.mjs'
 import BusinessRelationFilters from '../components/flow-state/BusinessRelationFilters.jsx'
 import { TaskFinder } from '../components/flow-state/FlowTaskContext.jsx'
 import {
@@ -86,6 +92,7 @@ import {
   DEV_BUSINESS_RULE_VIEWS,
   DEV_FLOW_FINANCE_RELATIONS_TAB,
   resolveDevFlowViewRoute,
+  DEV_FLOW_RELATION_FILTER_KEYS,
   readDevFlowRelationFilters,
   patchDevFlowRelationFilters,
 } from './devFlowStateQuery.mjs'
@@ -404,29 +411,28 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
         onSearch={(value) => setSearchKeyword(value)}
       />
       {normalized ? (
-        <div
+        <Directory
+          as="div"
           className="erp-dev-flow-search-results"
           id="dev-flow-definition-search-results"
           aria-label="定义搜索结果"
+          title={<strong>定义搜索结果</strong>}
+          actions={<Tag>{resultCount} 个定义</Tag>}
         >
-          <div className="erp-dev-flow-search-result-summary">
-            <Tag>{resultCount} 个定义</Tag>
-          </div>
           {resultCount > 0 ? (
             <div className="erp-dev-flow-search-groups">
               {groups.map((group) => (
                 <section key={group.key}>
-                  <h3 className="erp-dev-directory-group-title">
+                  <h3 className="erp-directory-group-title">
                     {group.label}
                     <span>{group.items.length}</span>
                   </h3>
                   {group.items.length > 0 ? (
-                    <ul>
+                    <DirectoryBranch as="ul">
                       {group.items.map((item) => (
                         <li key={`${item.type}:${item.key}`}>
-                          <button
-                            type="button"
-                            className="erp-dev-directory-item erp-dev-directory-item--stacked erp-dev-directory-item--nested"
+                          <DirectoryItem
+                            className="erp-directory-item--stacked"
                             onClick={() => openResult(item)}
                           >
                             <strong>{item.label}</strong>
@@ -434,10 +440,10 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
                               <small>{item.matchContext}</small>
                             ) : null}
                             <code>{item.key}</code>
-                          </button>
+                          </DirectoryItem>
                         </li>
                       ))}
-                    </ul>
+                    </DirectoryBranch>
                   ) : (
                     <small>没有匹配定义</small>
                   )}
@@ -449,7 +455,7 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
               description="没有匹配定义；具体任务请使用“去查真实任务”"
             />
           )}
-        </div>
+        </Directory>
       ) : null}
     </section>
   )
@@ -477,8 +483,8 @@ function invalidQueryMessages(searchParams, catalog, defaultView = DEFAULT_VIEW)
     [QUERY_KEYS.financeRule, ['', ...FINANCE_RULES.map((item) => item.key)]],
     [QUERY_KEYS.financeTopic, FINANCE_TOPIC_KEYS],
     [QUERY_KEYS.financeStep, ['0', '1', '2', '3']],
-    [QUERY_KEYS.financeStage, ['none', 'draft', 'posted']],
-    [QUERY_KEYS.financeChange, ['return', 'increase', 'transfer']],
+    [QUERY_KEYS.financeStage, PURCHASE_FINANCE_STAGES.map(({ value }) => value)],
+    [QUERY_KEYS.financeChange, PURCHASE_FINANCE_CHANGES.map(({ value }) => value)],
   ]) {
     if (searchParams.has(key) && !values.includes(searchParams.get(key))) messages.push('未登记的财务阅读条件')
   }
@@ -1001,6 +1007,7 @@ export default function DevFlowStateObservatoryPage() {
       if (
         allowedSelectionKeys.includes(key) ||
         FLOW_READING_CONTEXT_KEYS.includes(key) ||
+        Object.values(DEV_FLOW_RELATION_FILTER_KEYS).includes(key) ||
         key === QUERY_KEYS.taskId ||
         key === QUERY_KEYS.chain ||
         key === QUERY_KEYS.node

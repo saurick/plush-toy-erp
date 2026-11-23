@@ -7,19 +7,9 @@
 }
 
 .erp-workbench-reading__catalog {
-  display: grid;
-  gap: 4px;
   min-width: 0;
   padding-inline-end: 12px;
   border-inline-end: 1px solid var(--erp-border);
-}
-
-.erp-workbench-reading__catalog > button {
-  width: 100%;
-  min-width: 0;
-  white-space: normal;
-  text-align: start;
-  overflow-wrap: anywhere;
 }
 
 .erp-workbench-reading__body {
@@ -35,10 +25,6 @@
 
 .erp-workbench-reading--custom-catalog {
   grid-template-columns: minmax(0, 1fr) minmax(300px, min(40%, 520px));
-}
-
-.erp-workbench-reading--custom-catalog > .erp-workbench-reading__catalog {
-  display: block;
 }
 
 .erp-workbench-reading--catalog-only {
@@ -57,16 +43,20 @@
   }
 
   .erp-workbench-reading__catalog {
-    display: flex;
-    flex-wrap: wrap;
     padding-inline-end: 0;
     padding-block-end: 8px;
     border-inline-end: 0;
     border-block-end: 1px solid var(--erp-border);
   }
 
-  .erp-workbench-reading__catalog > button {
+  .erp-workbench-reading__catalog > .erp-directory-list {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .erp-workbench-reading__catalog > .erp-directory-list > button {
     width: auto;
+    max-width: 100%;
   }
 }
 

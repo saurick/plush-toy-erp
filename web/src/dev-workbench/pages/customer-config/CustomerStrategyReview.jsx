@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Button, Tag, Typography } from 'antd'
-import Select from '@/common/components/select/AppSelect'
+import AppModal from '@/common/components/modal/AppModal'
 import { MermaidDiagram } from '@/common/components/diagram/MermaidDiagram.jsx'
 import { buildBusinessFlowMermaid } from '@/common/components/diagram/mermaidGraph.mjs'
 import { customerPackageTraceForItem } from '../../../../../config/schemas/customerPackageFieldTrace.mjs'
 import { buildRuntimeProcessSelection } from '../../config/devFlowStateCatalog.mjs'
-import DevStaticGuidance from '../../components/DevStaticGuidance.jsx'
-import { WorkbenchNotice, WorkbenchSection, WorkbenchToolbar } from '../../components/WorkbenchPattern.jsx'
+import { WorkbenchNotice, WorkbenchSection } from '../../components/WorkbenchPattern.jsx'
 import { ProcessDefinitionCard } from '../../components/flow-state/RuntimeView.jsx'
 import { CustomerConfigTrace } from './CustomerConfigTrace.jsx'
 
@@ -39,7 +38,7 @@ function PolicyDeclarationDiagram({ policy }) {
   )
 }
 
-export default function CustomerStrategyReview({ summary }) {
+export default function CustomerStrategyReview({ summary, onOpenReference, disabled = false }) {
   const [selectedKey, select] = useState('')
   const { flows, policies } = useMemo(() => {
     const flows = summary.runtimeProcessSelections.map((item, index) => {
@@ -60,7 +59,7 @@ export default function CustomerStrategyReview({ summary }) {
     return { flows, policies }
   }, [summary])
   const choices = [...policies, ...flows]
-  const current = choices.find((choice) => choice.value === selectedKey) || choices[0]
+  const current = choices.find((choice) => choice.value === selectedKey)
   const scopeLabel = current?.policy
     ? current.policy.status === 'preview_only' ? '仅预览 · 不执行' : '草案状态待核对'
     : '发布候选 · 未核验目标'
@@ -72,60 +71,87 @@ export default function CustomerStrategyReview({ summary }) {
       className="erp-dev-customer-panel erp-dev-customer-panel--wide"
       title="本包的流程与策略"
       description={`${summary.runtimeProcessSelections.length} 项流程选择 · ${summary.processPolicies.length} 条策略草案`}
+      tools={onOpenReference ? (
+        <Button disabled={disabled} onClick={onOpenReference}>其他草案与通用审批规则</Button>
+      ) : null}
     >
-      <WorkbenchToolbar role="group" aria-label="流程策略草案">
-        <Text strong>策略草案</Text>
-        {policies.length ? policies.map((choice) => (
-          <Button
-            key={choice.value}
-            size="small"
-            type={current.value === choice.value ? 'primary' : 'default'}
-            aria-pressed={current.value === choice.value}
-            onClick={() => select(choice.value)}
-          >
-            {choice.label}
-          </Button>
-        )) : <Text type="secondary">暂无流程策略草案</Text>}
-      </WorkbenchToolbar>
-      <WorkbenchToolbar role="group" aria-label="发布候选流程">
-        <Text strong>发布候选流程</Text>
+      <WorkbenchSection flat headingLevel={3} title="发布候选流程" description="发布候选 · 未核验目标">
         {flows.length ? (
-          <Select
-            className="erp-dev-customer-strategy-select"
-            aria-label="查看发布候选流程"
-            allowClear={false /* 不可清空：图解需对应一个客户包中的流程或策略。 */}
-            virtual={false}
-            placeholder="选择流程查看定义"
-            value={current.selection ? current.value : null}
-            options={flows}
-            onChange={select}
-          />
+          <div className="erp-dev-tool-table-wrap">
+            <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="发布候选流程">
+              <thead><tr><th scope="col">流程</th><th scope="col">选择的变体</th><th scope="col">操作</th></tr></thead>
+              <tbody>
+                {flows.map((choice) => (
+                  <tr key={choice.value}>
+                    <th scope="row">
+                      {choice.label}
+                      <div className="erp-dev-customer-field-ref">流程 <code>{choice.selection.processKey}</code></div>
+                    </th>
+                    <td>
+                      <code>{choice.selection.variantKey}</code>
+                      <div className="erp-dev-customer-field-ref">版本 <code>{choice.selection.processVersion}</code> · 业务来源 <code>{choice.selection.businessRefType}</code></div>
+                      {!choice.selection.canonicalProcessDefinition ? <Text type="danger">此流程选择未匹配登记定义</Text> : null}
+                    </td>
+                    <td>
+                      <Button size="small" disabled={disabled} onClick={() => select(choice.value)}>
+                        查看{choice.label}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : <Text type="secondary">暂无发布候选流程</Text>}
-      </WorkbenchToolbar>
-      {current ? (
-        <WorkbenchSection
-          flat
-          headingLevel={3}
-          aria-label="当前流程或策略"
-          title={current.label}
-          description={(
-            <>
-              <Tag>{scopeLabel}</Tag>
-              {current.policy ? <Text type="secondary">{current.policy.ruleCountLabel}</Text> : null}
-            </>
-          )}
-        >
-          {current.policy ? (
-            <PolicyDeclarationDiagram key={current.value} policy={current.policy} />
-          ) : current.selection.canonicalProcessDefinition ? (
-            <>
-              <Text type="secondary">图为所选产品流程定义。目标环境的审批条件、负责人和在途实例需另行核对。</Text>
-              <ProcessDefinitionCard key={current.value} definition={current.selection.canonicalProcessDefinition} />
-            </>
-          ) : (
-            <WorkbenchNotice tone="warning" title="此流程选择未匹配登记定义" description="请在工作区配置中核对流程、变体、版本和业务来源。" />
-          )}
-          <DevStaticGuidance key={`trace:${current.value}`} title="当前条目的来源与清单">
+      </WorkbenchSection>
+      <WorkbenchSection flat headingLevel={3} title="策略草案" description="仅供评审">
+        {policies.length ? (
+          <div className="erp-dev-tool-table-wrap">
+            <table className="erp-dev-tool-table" data-table-lines="appearance" aria-label="流程策略草案">
+              <thead><tr><th scope="col">策略</th><th scope="col">状态与用途</th><th scope="col">操作</th></tr></thead>
+              <tbody>
+                {policies.map((choice) => (
+                  <tr key={choice.value}>
+                    <th scope="row">
+                      {choice.label}
+                      <div className="erp-dev-customer-field-ref">策略标识 <code>{choice.policy.key}</code></div>
+                    </th>
+                    <td>
+                      <div className="erp-dev-customer-field-ref">状态 <code>{choice.policy.status}</code></div>
+                      {choice.policy.guardrail}
+                    </td>
+                    <td>
+                      <Button size="small" disabled={disabled} onClick={() => select(choice.value)}>
+                        查看{choice.label}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <Text type="secondary">暂无流程策略草案</Text>}
+      </WorkbenchSection>
+      <AppModal
+        title={current?.label}
+        open={Boolean(current)}
+        width={1080}
+        rootClassName="erp-dev-tool-page erp-dev-customer-dialog"
+        onCancel={() => select('')}
+        footer={null}
+        destroyOnHidden
+      >
+        {current ? (
+          <div aria-label="当前流程或策略">
+            <Tag>{scopeLabel}</Tag>
+            {current.policy ? (
+              <PolicyDeclarationDiagram key={current.value} policy={current.policy} />
+            ) : current.selection.canonicalProcessDefinition ? (
+              <>
+                <Text type="secondary">图为产品登记的流程定义。目标环境的审批条件、负责人和在途实例需另行核对。</Text>
+                <ProcessDefinitionCard key={current.value} definition={current.selection.canonicalProcessDefinition} />
+              </>
+            ) : <WorkbenchNotice tone="warning" title="此流程选择未匹配登记定义" description="请在工作区配置中核对流程、变体、版本和业务来源。" />}
             <CustomerConfigTrace
               sourcePath={summary.sourcePath}
               fieldPath={`${traceKey}[${current.index}]`}
@@ -136,9 +162,9 @@ export default function CustomerStrategyReview({ summary }) {
                 rules: current.policy.ruleItems.map((item) => item.declaration),
               } : current.selection.definition}
             />
-          </DevStaticGuidance>
-        </WorkbenchSection>
-      ) : null}
+          </div>
+        ) : null}
+      </AppModal>
     </WorkbenchSection>
   )
 }

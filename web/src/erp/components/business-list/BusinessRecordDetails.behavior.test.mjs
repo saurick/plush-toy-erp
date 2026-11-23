@@ -59,6 +59,56 @@ test('字段角色不越过显示权限，零值和否保留，切换对象清�
   assert.deepEqual([...document.querySelectorAll('.mobile-task-facts dd')].map((node) => node.textContent), ['0', '否'])
 })
 
+test('任务资料合并已经展示的同一张单号，来源缺失或变化时仍可核对', async (t) => {
+  const harness = await businessFormHarness(t)
+  const { default: Details } = await import('./BusinessRecordDetails.jsx')
+  const columns = [
+    { title: '生产单号', dataIndex: 'order_no', taskDetailRole: 'identity' },
+    { title: '状态', dataIndex: 'status' },
+  ]
+  const record = { id: 71, order_no: 'MO-DEMO-71', status: '已发布' }
+  const task = { id: 9, source_type: 'production_order', source_id: 71, source_no: 'MO-DEMO-71' }
+  const render = (props = {}) => harness.render(h(Details, { presentation: 'mobile-task', columns, record, task, ...props }))
+  await render()
+  assert.doesNotMatch(document.querySelector('.mobile-task-facts').textContent, /MO-DEMO-71/u)
+  assert.match(document.querySelector('.mobile-task-facts').textContent, /已发布/u)
+  await render({ task: { ...task, display_context: { available: false } } })
+  assert.match(document.querySelector('.mobile-task-facts').textContent, /MO-DEMO-71/u)
+  await render({ record: { ...record, order_no: 'MO-DEMO-71-R' } })
+  assert.match(document.querySelector('.mobile-task-facts').textContent, /MO-DEMO-71-R/u)
+  await render({ columns: columns.slice(0, 1) })
+  assert.equal(Boolean(document.querySelector('.mobile-task-facts')), false)
+})
+
+test('同一来源的产品身份已展示时，单据产品资料按需打开', async (t) => {
+  const harness = await businessFormHarness(t)
+  const previousObserver = Object.getOwnPropertyDescriptor(globalThis, 'IntersectionObserver')
+  Object.defineProperty(globalThis, 'IntersectionObserver', {
+    configurable: true,
+    value: class { observe() {}
+
+ disconnect() {} },
+  })
+  t.after(() => previousObserver ? Object.defineProperty(globalThis, 'IntersectionObserver', previousObserver) : delete globalThis.IntersectionObserver)
+  const [{ default: Details }, { documentProductGalleryColumn }, { BusinessPageContext }] = await Promise.all([
+    import('./BusinessRecordDetails.jsx'), import('./BusinessDocumentProductGallery.jsx'), import('../../hooks/useBusinessPageContext.js'),
+  ])
+  const permissions = ['product.read', 'pmc.plan.read']
+  const profile = { id: 1, permissions, effective_session: { actions: permissions } }
+  const record = { id: 71, order_no: 'MO-DEMO-71' }
+  const task = { id: 9, source_type: 'production_order', source_id: 71, display_context: { available: true, items: [{ kind: 'product', product_id: 70, name: '模拟小熊' }] } }
+  const columns = documentProductGalleryColumn('production_order', profile, { showIdentity: true })
+  const render = (currentTask) => harness.render(h(BusinessPageContext.Provider, { value: { adminProfile: profile } }, h(Details, { presentation: 'mobile-task', columns, record, task: currentTask })))
+  await render(task)
+  const disclosure = document.querySelector('.mobile-task-facts__product-details')
+  assert.equal(disclosure.open, false)
+  assert.equal(disclosure.querySelector('summary').textContent, '查看单据产品资料')
+  assert.equal(Boolean(disclosure.querySelector('[data-gallery-state]')), true)
+  await render({ ...task, id: 10, source_id: 72 })
+  assert.equal(Boolean(document.querySelector('.mobile-task-facts__product-details')), false)
+  assert.equal(Boolean(document.querySelector('.mobile-task-facts [data-gallery-state]')), true)
+})
+
 test('短复制值与短缺值提示可并排，长文字和缺值原因完整展示并随新值清除', async (t) => {
   const harness = await businessFormHarness(t)
   const { default: Details } = await import('./BusinessRecordDetails.jsx')

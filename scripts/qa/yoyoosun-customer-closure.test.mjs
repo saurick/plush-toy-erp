@@ -96,7 +96,6 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "materials",
     "material-bom",
     "task-board",
-    "business-dashboard",
     "print-center",
   ],
   pmc: [
@@ -126,7 +125,6 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "inbound",
     "quality-inspections",
     "task-board",
-    "business-dashboard",
     "print-center",
   ],
   warehouse: [
@@ -144,7 +142,6 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "outbound",
     "shipments",
     "task-board",
-    "business-dashboard",
   ],
   quality: [
     "global-dashboard",
@@ -160,7 +157,6 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "inbound",
     "processing-contracts",
     "task-board",
-    "business-dashboard",
   ],
   finance: [
     "global-dashboard",
@@ -179,7 +175,6 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "inbound",
     "shipments",
     "task-board",
-    "business-dashboard",
     "print-center",
   ],
   production: [
@@ -195,7 +190,6 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "production-exceptions",
     "production-progress",
     "task-board",
-    "business-dashboard",
     "print-center",
   ],
 });

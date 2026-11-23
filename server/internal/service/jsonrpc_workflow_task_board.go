@@ -12,6 +12,14 @@ import (
 const workflowTaskBoardMaxOffset = 2_147_483_647
 
 func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *v1.JsonrpcResult) {
+	progress, failure := getOptionalWorkflowTaskBoardString(pm, "progress_view", 16)
+	if failure != nil {
+		return biz.WorkflowTaskBoardQuery{}, failure
+	}
+	anchor, ok := getOptionalWorkflowTaskBoardInteger(pm, "progress_anchor", 0, 1)
+	if !ok {
+		return biz.WorkflowTaskBoardQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "progress_anchor 必须是正整数"}
+	}
 	calendar, calendarRes := parseWorkflowTaskCalendar(pm)
 	if calendarRes != nil {
 		return biz.WorkflowTaskBoardQuery{}, calendarRes
@@ -88,6 +96,7 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 		*target = value
 	}
 	return biz.WorkflowTaskBoardQuery{
+		ProgressView: progress, ProgressAnchor: anchor,
 		Period: period, DateFrom: dateFrom, DateTo: dateTo,
 		DueDateFrom: dueDateFrom, DueDateTo: dueDateTo,
 		Calendar:                    calendar,
@@ -201,6 +210,16 @@ func workflowWorkbenchToMap(workbench *biz.WorkflowWorkbenchPage) map[string]any
 func workflowTaskBoardToMap(board *biz.WorkflowTaskBoard) map[string]any {
 	if board == nil {
 		return nil
+	}
+	if page := board.Progress; page != nil {
+		rows := make([]any, 0, len(page.Rows))
+		for _, row := range page.Rows {
+			rows = append(rows, map[string]any{"task": workflowTaskToMap(row.Task), "task_count": row.Count, "date": optionalTimeUnix(row.Date)})
+		}
+		return map[string]any{"snapshot_at": board.SnapshotAt.Unix(), "total": page.Total, "rows": rows,
+			"counts":    map[string]any{"open": page.Counts["open"], "due": page.Counts["due"], "exception": page.Counts["exception"], "unassigned": page.Counts["unassigned"], "finished": page.Counts["finished"]},
+			"assignees": workflowTaskPeopleToAny(board.Assignees)}
+
 	}
 	if board.Calendar != nil {
 		return workflowTaskCalendarToMap(board.Calendar)

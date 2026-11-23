@@ -123,7 +123,7 @@ next_event_id: 0,
     return {
       ...common,
       name: mobile ? 'unified-role-progress-mobile' : 'unified-role-progress-desktop',
-      path: mobile ? '/m/sales/tasks' : BUSINESS_ROUTE_PATHS.businessDashboard,
+      path: mobile ? '/m/sales/tasks' : '/erp/task-board',
       customerKey: 'yoyoosun',
       ...(mobile ? { hasTouch: true, viewport: { width: 390, height: 844 }, deviceScaleFactor: 3 } : {}),
       adminProfile: {
@@ -152,11 +152,7 @@ workPools: roles,
         recordedReason = ''
         await page.route('**/rpc/workflow', (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
-          if (method === 'get_task_board' && params.assignee === 'unassigned') {
-            assert.equal(params.owner_role_key, 'sales')
-            assert.equal(params.status, 'open')
-            assert.equal(params.lane_key, 'all')
-          }
+          if (method === 'get_task_board' && params.progress_view) assert.equal(params.owner_role_key, 'sales')
           if (method === 'get_tracking' && params.kind === 'task' && params.id === 803) {
             return fulfill(route, id, trackingData(completedTask || items[2], recordedReason))
           }
@@ -179,12 +175,25 @@ workPools: roles,
         })
       },
       verify: async (page) => {
-        if (mobile) await page.getByRole('tab', { name: '进度', exact: true }).click()
-        const panel = page.getByRole('region', { name: '本岗进度', exact: true })
-        await panel.getByRole('region', { name: '受阻与异常', exact: true }).getByText('确认包装规格', { exact: true }).waitFor()
-        await panel.getByRole('region', { name: '临期与超时', exact: true }).getByText('核对客户交期', { exact: true }).waitFor()
-        const unassigned = panel.getByRole('region', { name: '无人接手', exact: true })
-        await unassigned.getByRole('button', { name: /跟进出货预约.*未指定办理人/u }).click()
+        if (mobile) await page.getByTestId('mobile-role-nav-tasks').click()
+        else await page.getByRole('tab',{name:'全部任务',exact:true}).click()
+        if (mobile) await page.getByRole('tab',{name:'按单据',exact:true}).click()
+        else await page.getByLabel('全部任务查看方式',{exact:true}).getByText('按单据',{exact:true}).click()
+        const panel = page.getByRole('region', { name: '按单据查看任务', exact: true })
+        await panel.getByRole('button', { name: /受阻与异常/ }).click()
+        await panel.getByText('确认包装规格', { exact:true }).waitFor()
+        await panel.getByRole('button', { name: /临期与超时/ }).click()
+        await panel.getByText('核对客户交期', { exact:true }).waitFor()
+        await panel.getByRole('button', { name: /无人接手/ }).click()
+        await panel.getByRole('button', { name: /SO-0001/ }).click()
+        const documentItems = panel.getByRole('region', { name: '单据事项' })
+        await documentItems.getByRole('button', { name: '跟进出货预约', exact: true }).waitFor()
+        assert.equal(await panel.locator('table table').count(), 0)
+        assert.equal(await panel.getByRole('button', { name: /无人接手/ }).count(), 0)
+        await documentItems.getByRole('button', { name: '返回单据列表' }).click()
+        assert(await panel.getByRole('button', { name: /SO-0001/ }).evaluate(node => node === document.activeElement))
+        await panel.getByRole('button', { name: /SO-0001/ }).click()
+        await documentItems.getByRole('button', { name: '跟进出货预约', exact: true }).click()
         const tracking = page.getByRole('dialog', { name: '流程跟踪', exact: true })
         await tracking.getByText('下一步', { exact: true }).waitFor()
         await tracking.getByRole('button', { name: '查看交付进度', exact: true }).click()
@@ -216,19 +225,22 @@ workPools: roles,
         recordedReason = mobile ? actionParams.payload.feedback : actionParams.reason
         assert.equal(recordedReason, resultText)
         if (mobile) {
-          await page.getByTestId('mobile-task-receipt-screen').getByRole('button', { name: '返回进度', exact: true }).last().click()
+          await page.getByTestId('mobile-task-receipt-screen').getByRole('button', { name: '返回单据任务', exact: true }).last().click()
         } else {
-          await taskDetail.getByRole('button', { name: '返回进度看板', exact: true }).last().click()
+          await taskDetail.getByRole('button', { name: '返回单据任务', exact: true }).last().click()
         }
         await tracking.getByText(resultText, { exact: true }).waitFor()
         await tracking.getByRole('button', { name: '返回列表', exact: true }).click()
+        await documentItems.getByRole('button', { name: '返回单据列表' }).click()
         await panel.getByRole('button', { name: '无人接手 0', exact: true }).waitFor()
         await panel.getByRole('button', { name: '处理结果 2', exact: true }).click()
+        await panel.getByRole('button', { name: /SO-0001/ }).click()
         await panel.getByRole('button', { name: /交期核对完成/u }).click()
         await tracking.getByText('已按客户确认日期核对', { exact: true }).waitFor()
         await tracking.getByText('跟单经办', { exact: false }).first().waitFor()
         await tracking.getByRole('button', { name: '返回列表', exact: true }).click()
-        await page.getByRole('tab', { name: '订单交付', exact: true }).click()
+        if(mobile) await page.getByTestId('mobile-role-nav-progress').click()
+        else await page.locator('.erp-admin-menu:visible').getByRole('menuitem',{name:'进度看板',exact:true}).click()
         assert.equal(await page.getByRole('tab', { name: '经营统计', exact: true }).count(), 0)
         assert.equal(await page.getByRole('tab', { name: '生产执行', exact: true }).count(), 0)
         const drill = (mobile ? page : details(page)).getByRole('button', { name: mobile ? /SO-0001.*第 1 行进度/u : /查看进度：SO-0001.*第 1 行/u })
@@ -291,8 +303,8 @@ workPools: roles,
         assert.equal(await details(page).locator('tbody tr').count(), 2, '按所选订单读取，排除同客户或同名其他单')
         const first = details(page).locator('tbody tr').first()
         await assertControlCursor(first.getByRole('cell').nth(2), 'auto')
-        assert.match(await first.textContent(), /云朵小熊.*48 \/ 120 只.*72 只/u)
-        assert.match(await details(page).locator('tbody tr').last().textContent(), /星星挂兔.*0 \/ 120 套.*120 套/u)
+        assert.match(await first.textContent(), /云朵小熊.*120 只.*48 只.*72 只/u)
+        assert.match(await details(page).locator('tbody tr').last().textContent(), /星星挂兔.*120 套.*0 套.*120 套/u)
         await page.screenshot({ path: `${outputDir}/delivery-board-lines-4k.png` })
         await facets(page).getByRole('button', { name: /逾期.*1 条/u }).click()
         await page.waitForURL((url) => url.searchParams.get('delivery_status') === 'overdue')
@@ -304,7 +316,7 @@ workPools: roles,
         await display(page, '产品明细').click()
         await details(page).locator('tbody tr').first().waitFor()
         assert.equal(await details(page).locator('tbody tr').count(), 1, '切回明细恢复本视图的快捷条件')
-        assert.deepEqual(await details(page).locator('th').allTextContents(), ['订单 / 客户', '产品', '交付日期', '已出货 / 订购', '剩余待交', '交付状态', '操作'])
+        assert.deepEqual(await details(page).locator('th').allTextContents(), ['订单 / 客户', '产品', '交付日期', '订购数量', '实际出货', '剩余待交', '交付状态', '操作'])
         const cells = details(page).locator('tbody tr').first().getByRole('cell')
         const drill = cells.last().getByRole('button', { name: /查看进度：SO-0001.*第 1 行/u })
         await drill.waitFor()
@@ -315,7 +327,7 @@ workPools: roles,
         await date.dblclick()
         await dialog.locator('[data-progress-line-selected]').waitFor()
         assert.match(await dialog.textContent(), /SO-0001.*云朵小熊/u)
-        await dialog.getByRole('button', { name: '返回进度', exact: true }).click()
+        await dialog.getByRole('button', { name: '返回进度看板', exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })
         assert(await drill.evaluate((node) => node === document.activeElement))
         await page.getByRole('button', { name: '返回销售订单', exact: true }).click()
@@ -367,8 +379,8 @@ workPools: roles,
         await facets(page).getByRole('button', { name: /待核对.*1 条/u }).click()
         await details(page).locator('tbody tr:only-child[data-progress-line-id="105"]').waitFor()
         const cells = details(page).locator('tbody tr').first().locator('td')
-        assert.match(await cells.nth(3).textContent(), /待核对/u)
-        assert.equal((await cells.nth(4).textContent()).trim(), '—')
+        assert.match(await cells.nth(4).textContent(), /待核对/u)
+        assert.equal((await cells.nth(5).textContent()).trim(), '—')
         for (const width of [1440, 840, 390]) {
           await page.setViewportSize({ width, height: 900 })
           await assertNoHorizontalOverflow(page, `delivery-board-${width}`)
