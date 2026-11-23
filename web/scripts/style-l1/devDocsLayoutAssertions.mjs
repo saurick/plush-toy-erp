@@ -200,15 +200,27 @@ export async function verifyDevDocsScopeHelp(page, assert) {
 }
 
 export function createDevDocsReadingFixture(keyword) {
+  const body = '示例正文，用于验证滚动定位与章节层级。'.repeat(45)
   return [
     '# 归档全文检索探针',
     keyword,
+    '[跳到章节内的子标题](#阅读子标题)',
     ...Array.from({ length: 20 }, (_, index) => {
-      const mark = '#'.repeat(2 + (index % 5))
       const title = index === 4
         ? '阅读章节 5 的完整标题需要在狭窄的章节目录中分行显示'
         : `阅读章节 ${index + 1}`
-      return `${mark} ${title}\n\n${'示例正文，用于验证滚动定位与章节层级。'.repeat(45)}`
+      const chapter = `## ${title}\n\n${body}`
+      if (index === 7) return `${chapter}\n\n### 另一个主章的小节\n\n${body}`
+      if (index !== 4) return chapter
+      return [
+        chapter,
+        '### 5.1 有编号小节的完整标题需要在缩进后自然换行',
+        body,
+        '### 阅读子标题',
+        body,
+        '#### 深层说明',
+        body,
+      ].join('\n\n')
     }),
   ].join('\n\n')
 }
@@ -227,12 +239,12 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   await page.waitForFunction(
     () =>
       document.querySelectorAll('.erp-dev-docs-toc [data-dev-doc-heading-id]')
-        .length === 20
+        .length === 23
   )
   assert.equal(
     await chapters.count(),
-    20,
-    '保留全部正文章节及深层标题，不重复列出文档标题'
+    23,
+    '目录显示主章与下一级小节'
   )
   assert.equal(
     await chapters.filter({ hasText: '归档全文检索探针' }).count(),
@@ -249,8 +261,9 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   const navigation = page.getByRole('navigation', { name: '文档章节', exact: true })
   await navigation.waitFor()
   const chapterLayout = await toc.evaluate((element) => {
-    const first = element.querySelector('button[data-dev-doc-heading-level="2"] span')
-    const nested = element.querySelector('button[data-dev-doc-heading-level="6"] span')
+    const branch = element.querySelector('.erp-dev-directory-branch')
+    const first = branch.previousElementSibling.querySelector('span')
+    const nested = branch.querySelector('button span')
     const { height } = nested.getBoundingClientRect()
     const nestedIndent = nested.getBoundingClientRect().left - first.getBoundingClientRect().left
     element.scrollTop = element.scrollHeight
@@ -262,9 +275,25 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
       horizontalOverflow: element.scrollWidth > element.clientWidth + 1,
     }
   })
-  assert(chapterLayout.nestedIndent > 0 && chapterLayout.wraps, '深层章节缩进，长标题可完整换行')
+  assert(chapterLayout.nestedIndent === 16 && chapterLayout.wraps, '小节使用共享缩进，长标题可完整换行')
   assert(chapterLayout.chapterScroll > 0 && chapterLayout.bodyScroll === 0, '章节列表可独立滚到末尾')
   assert(!chapterLayout.horizontalOverflow, '长标题在章节栏内换行')
+
+  const nestedChapter = toc.getByRole('button', { name: /^5\.1 有编号小节/u })
+  const parent = chapters.nth(4)
+  const parentId = await parent.getAttribute('data-dev-doc-heading-id')
+  const subsectionId = await nestedChapter.getAttribute('data-dev-doc-heading-id')
+  const current = toc.locator('[aria-current="location"]')
+  await nestedChapter.click()
+  await page.waitForURL((url) => decodeURIComponent(url.hash.slice(1)) === subsectionId)
+  await current.filter({ hasText: /^5\.1 有编号小节/u }).waitFor()
+  await navigation.getByRole('button', { name: '收起全部', exact: true }).click()
+  assert.equal(await current.getAttribute('data-dev-doc-heading-id'), parentId)
+  assert.equal(await toc.locator('.erp-dev-directory-branch button:visible').count(), 0)
+  assert.equal(decodeURIComponent(new URL(page.url()).hash.slice(1)), subsectionId)
+  await navigation.getByRole('button', { name: '展开全部', exact: true }).press('Space')
+  assert.equal(await current.getAttribute('data-dev-doc-heading-id'), subsectionId)
+
   const lastId = await chapters.last().getAttribute('data-dev-doc-heading-id')
   await chapters.last().click()
   await page.waitForFunction(
@@ -428,7 +457,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
     )
     if (width === 390) {
       assert(geometry.navAboveArticle && geometry.navHeight < 180, '窄屏章节保留有限高度，正文占满该行')
-      await navigation.getByRole('button').first().click()
+      await chapters.first().click()
       await page.waitForFunction(() => document.querySelector('.erp-dev-docs-markdown').scrollTop > 0)
     } else {
       assert(geometry.sidebarWidth <= 240 && geometry.navLeftOfArticle, '桌面文档列表收窄，章节与正文齐顶并排')

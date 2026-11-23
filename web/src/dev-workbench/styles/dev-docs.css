@@ -158,14 +158,8 @@
 }
 
 .erp-dev-docs-sidebar__section-head {
-  display: flex;
-  min-height: 26px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-small);
-  white-space: nowrap;
 }
 
 .erp-dev-docs-sidebar__section-icon {
@@ -262,15 +256,7 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-docs-tree,
-.erp-dev-docs-tree__children {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 2px;
-}
-
 .erp-dev-docs-tree {
-  align-content: start;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -278,19 +264,8 @@
   scrollbar-gutter: stable;
 }
 
-.erp-dev-docs-tree__children {
-  margin-inline-start: 12px;
-  border-inline-start: 1px solid var(--erp-border);
-  padding-inline-start: 3px;
-}
-
-.erp-dev-docs-tree__row > .anticon,
-.erp-dev-docs-tree__doc::before {
+.erp-dev-docs-tree__row > .anticon {
   flex: 0 0 1em;
-}
-
-.erp-dev-docs-tree__doc::before {
-  content: '';
 }
 
 .erp-dev-docs-tree__doc {
@@ -469,26 +444,19 @@
   background: var(--erp-surface-bg-soft);
 }
 
-.erp-dev-docs-toc-shell__label {
-  padding: 10px 18px 4px;
-  color: var(--erp-text-muted);
-  font-weight: 600;
+.erp-dev-docs-toc__header {
+  flex: 0 0 auto;
+  margin: 6px 8px 0;
 }
 
 .erp-dev-docs-toc {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  gap: 2px;
   min-height: 0;
+  margin: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   padding: 2px 8px 10px;
   scrollbar-gutter: stable;
-}
-
-.erp-dev-docs-toc__item > span {
-  margin-inline-start: calc(10px * var(--heading-depth));
+  list-style: none;
 }
 
 .erp-dev-docs-markdown {

@@ -40,28 +40,11 @@
 }
 
 .erp-dev-skills__list {
-  display: grid;
   min-width: 0;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 8px;
-  background: var(--erp-surface-bg-soft);
 }
 
 .erp-dev-skills__item {
-  position: relative;
   justify-content: space-between;
-}
-
-.erp-dev-skills__item[aria-pressed='true']::before {
-  position: absolute;
-  inset-block: 9px;
-  inset-inline-start: 3px;
-  inline-size: 3px;
-  border-radius: 2px;
-  background: currentColor;
-  content: '';
-  pointer-events: none;
 }
 
 .erp-dev-skills__name {

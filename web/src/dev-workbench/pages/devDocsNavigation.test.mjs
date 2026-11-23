@@ -2,10 +2,50 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildDevDocsChapterOutline,
   buildDevDocsLocation,
   resolveDevDocsMarkdownHref,
   resolveDevDocsReadingHeading,
 } from './devDocsNavigation.mjs'
+
+test('buildDevDocsChapterOutline: 列出两级标题，深层标题沿用最近的目录项', () => {
+  const headings = [
+    { id: 'title', level: 1 },
+    { id: 'example', level: 2 },
+    { id: 'contract', level: 2 },
+    { id: 'note', level: 4 },
+    { id: 'workflow', level: 3, title: '4.1 流程' },
+    { id: 'master-data', level: 5 },
+    { id: 'facts', level: 3, title: '业务事实' },
+    { id: 'finance', level: 2 },
+  ]
+  const { chapters, locationByHeadingId } = buildDevDocsChapterOutline(headings, 'title')
+  assert.deepEqual(chapters.map(({ heading, sections }) => [
+    heading.id, sections.map(({ id }) => id),
+  ]), [
+    ['example', []],
+    ['contract', ['workflow', 'facts']],
+    ['finance', []],
+  ])
+  assert.equal(locationByHeadingId.has('title'), false)
+  assert.deepEqual(locationByHeadingId.get('note'), { chapterId: 'contract', tocHeadingId: 'contract' })
+  assert.deepEqual(locationByHeadingId.get('master-data'), { chapterId: 'contract', tocHeadingId: 'workflow' })
+  assert.deepEqual(locationByHeadingId.get('facts'), { chapterId: 'contract', tocHeadingId: 'facts' })
+  assert.deepEqual(locationByHeadingId.get('finance'), { chapterId: 'finance', tocHeadingId: 'finance' })
+})
+
+test('buildDevDocsChapterOutline: 使用文档实际的主标题层级', () => {
+  const headings = [
+    { id: 'title', level: 1 },
+    { id: 'chapter', level: 3 },
+    { id: 'section', level: 4 },
+    { id: 'detail', level: 5 },
+  ]
+  assert.deepEqual(buildDevDocsChapterOutline(headings.slice(0, 1), 'title').chapters, [])
+  assert.deepEqual(buildDevDocsChapterOutline(headings, 'title').chapters, [
+    { heading: headings[1], sections: [headings[2]] },
+  ])
+})
 
 test('resolveDevDocsReadingHeading: 阅读位置、底部与短文档各自定位', () => {
   const headings = [

@@ -13,12 +13,22 @@ export async function assertPlainDirectory(page, selector, assert) {
   await waitForFiniteAnimations(page, { selector: selector.replaceAll(':visible', '') })
   const rows = await page.locator(selector).evaluateAll((nodes) => nodes.map((node) => {
     const style = getComputedStyle(node)
+    const decoration = ['::before', '::after'].some((selector) => {
+      const pseudo = getComputedStyle(node, selector)
+      return !['none', 'normal'].includes(pseudo.content) && pseudo.display !== 'none' &&
+        pseudo.visibility !== 'hidden' && (
+          pseudo.backgroundColor !== 'rgba(0, 0, 0, 0)' ||
+          pseudo.backgroundImage !== 'none' ||
+          pseudo.boxShadow !== 'none'
+        )
+    })
     return {
       text: node.textContent.trim(),
       current: node.matches('[aria-current]:not([aria-current="false"]), [aria-pressed="true"], .ant-anchor-link-title-active'),
       category: node.hasAttribute('aria-expanded'),
       border: ['Top', 'Right', 'Bottom', 'Left'].some((side) => parseFloat(style[`border${side}Width`]) > 0),
       shadow: style.boxShadow,
+      decoration,
       background: style.backgroundColor,
       weight: style.fontWeight,
       height: node.getBoundingClientRect().height,
@@ -28,6 +38,7 @@ export async function assertPlainDirectory(page, selector, assert) {
   for (const row of rows) {
     assert.equal(row.border, false, `${row.text}不应有独立卡片边框`)
     assert.equal(row.shadow, 'none', `${row.text}不应叠加阴影或选中底线`)
+    assert.equal(row.decoration, false, `${row.text}不应叠加目录条目的装饰底色或短标记`)
     assert(row.height >= 40 && row.fits, `${row.text}应有完整点击区域且文字不溢出`)
     if (!row.category) assert.equal(row.weight, row.current ? '600' : '400', `${row.text}只在当前项加粗`)
     if (!row.current) assert.equal(row.background, 'rgba(0, 0, 0, 0)', `${row.text}默认透明`)
@@ -39,7 +50,7 @@ export async function assertPlainDirectory(page, selector, assert) {
 async function assertDevDocsTreeHierarchy(tree, assert) {
   const layout = await tree.evaluate((element) => {
     const titleStart = (node) => node.querySelector('.erp-dev-docs-tree__name, .erp-dev-docs-tree__doc-title').getBoundingClientRect().left
-    const branches = [...element.querySelectorAll('.erp-dev-docs-tree__children')].map((group) => {
+    const branches = [...element.querySelectorAll('.erp-dev-directory-branch')].map((group) => {
       const folder = group.previousElementSibling
       const childStarts = [...group.children].map(titleStart)
       return {
@@ -53,7 +64,7 @@ async function assertDevDocsTreeHierarchy(tree, assert) {
   })
   assert(layout.branches.length > 0, '已展开的目录应有子项')
   for (const { path, indent, spread, guideWidth } of layout.branches) {
-    assert(indent >= 12, `${path} 的子项标题应比父文件夹缩进，实测 ${indent}px`)
+    assert(Math.abs(indent - 16) <= 1, `${path} 的子项标题使用统一缩进，实测 ${indent}px`)
     assert(spread <= 1, `${path} 下的同层文件与子文件夹标题应对齐，实测偏差 ${spread}px`)
     assert(guideWidth > 0, `${path} 应有标示归属的引导线`)
   }
@@ -99,7 +110,11 @@ export function createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizonta
         for (const { route, label } of routes) {
           if (new URL(page.url()).pathname !== route) await page.goto(new URL(route, page.url()).href)
           await page.locator('h1').first().waitFor()
-          if (route === '/__dev/project-skills') await page.locator('.erp-dev-skills__list > button').first().waitFor()
+          if (route === '/__dev/project-skills') {
+            const directory = page.getByRole('region', { name: '项目 Skill 目录', exact: true })
+            await directory.locator('.erp-dev-directory-header').getByRole('heading', { name: 'Skill 目录', exact: true }).waitFor()
+            await directory.getByRole('navigation', { name: 'Skill 条目', exact: true }).getByRole('button').first().waitFor()
+          }
           if (route === '/__dev/docs') await page.locator('.erp-dev-docs-tree__doc').first().waitFor()
           const navigation = await page.locator('.erp-dev-workspace-nav').evaluateAll((nodes) => nodes.flatMap((node) => [...node.querySelectorAll('a[aria-current="page"]')].map((link) => {
             const style = getComputedStyle(link)
@@ -128,6 +143,10 @@ export function createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizonta
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
+        const toc = page.getByRole('navigation', { name: '文档章节', exact: true })
+        await toc.locator('.erp-dev-directory-header').getByText('章节目录', { exact: true }).waitFor()
+        assert.equal(await toc.getByRole('button', { name: /^(收起|展开)全部$/u }).count(), 0, '一级目录显示共用标题栏和章节链接')
+
         const tree = '.erp-dev-docs-tree__row'
         await assertPlainDirectory(page, tree, assert)
         const folder = page.locator('[data-dev-doc-dir="docs"]')
@@ -136,15 +155,16 @@ export function createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizonta
         await folder.press('Enter')
         assert.equal(await folder.getAttribute('aria-expanded'), 'true')
         const directory = page.locator('.erp-dev-docs-tree')
+        const directoryRegion = page.getByRole('region', { name: '文档目录', exact: true })
         const viewport = page.viewportSize()
-        await page.getByRole('button', { name: '展开全部', exact: true }).click()
+        await directoryRegion.getByRole('button', { name: '展开全部', exact: true }).click()
         await assertDevDocsTreeHierarchy(directory, assert)
         await page.setViewportSize({ width: 390, height: 844 })
         await assertDevDocsTreeHierarchy(directory, assert)
         await assertNoHorizontalOverflow(page, '文档树窄屏展开')
         await page.setViewportSize(viewport)
-        await page.getByRole('button', { name: '收起全部', exact: true }).click()
-        assert.equal(await directory.locator('.erp-dev-docs-tree__children').count(), 0)
+        await directoryRegion.getByRole('button', { name: '收起全部', exact: true }).click()
+        assert.equal(await directory.locator('.erp-dev-directory-branch').count(), 0)
         const search = page.getByRole('textbox', { name: '搜索项目文档' })
         await search.fill('工作台')
         await search.press('Enter')
@@ -157,8 +177,7 @@ export function createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizonta
         if (await pin.count()) await pin.click()
         await page.locator('.erp-dev-docs-pinned-disclosure > summary').click()
         await assertPlainDirectory(page, '.erp-dev-docs-pinned__open', assert)
-        const toc = page.getByRole('navigation', { name: '文档章节', exact: true })
-        const chapter = toc.getByRole('button').nth(1)
+        const chapter = toc.locator('[data-dev-doc-heading-id]').nth(1)
         const chapterID = await chapter.getAttribute('data-dev-doc-heading-id')
         await chapter.press('Enter')
         await page.waitForFunction((id) => document.querySelector('.erp-dev-docs-toc [aria-current="location"]')?.dataset.devDocHeadingId === id, chapterID)
@@ -186,6 +205,37 @@ export function createDevWorkbenchDirectoryScenarios({ assert, assertNoHorizonta
 
         await page.goto(new URL(DEV_VERSION_GUIDE_ROUTE, page.url()).href)
         const guide = page.getByRole('navigation', { name: '操作指引章节目录' })
+        const collapseGuide = guide.getByRole('button', { name: '收起全部', exact: true })
+        const expandGuide = guide.getByRole('button', { name: '展开全部', exact: true })
+        const guideSection = guide.getByRole('link', { name: 'Job 并行、汇总与等待', exact: true })
+        const guideTitle = page.locator('#dev-version-guide-ci-parallel')
+        const branchLayout = await guideSection.evaluate((link) => {
+          const branch = link.parentElement
+          const parentLink = branch.parentElement.querySelector(':scope > a')
+          return {
+            indent: link.getBoundingClientRect().left - parentLink.getBoundingClientRect().left,
+            guideWidth: getComputedStyle(branch).borderInlineStartWidth,
+          }
+        })
+        assert.deepEqual(branchLayout, { indent: 16, guideWidth: '1px' }, '操作指引目录使用同款层级线和缩进')
+        await guideSection.click()
+        await page.waitForURL((url) => url.hash === '#dev-version-guide-ci-parallel')
+        await page.waitForFunction(() => {
+          const { top } = document.getElementById('dev-version-guide-ci-parallel').getBoundingClientRect()
+          return top >= 15 && top <= 17
+        })
+        await collapseGuide.click()
+        await guide.locator('.ant-anchor-link-title-active').filter({ hasText: 'CI/CD 流程与原理' }).waitFor()
+        assert.equal(await guideSection.count(), 0, '收起指引目录时隐藏下级链接')
+        assert(await guideTitle.isVisible(), '收起目录后正文直接可读')
+        assert.equal(new URL(page.url()).hash, '#dev-version-guide-ci-parallel', '开合目录时保持正文锚点')
+        await expandGuide.press('Space')
+        await guide.locator('.ant-anchor-link-title-active').filter({ hasText: 'Job 并行、汇总与等待' }).waitFor()
+        await collapseGuide.click()
+        await page.reload()
+        await guideSection.waitFor()
+        assert.equal(new URL(page.url()).hash, '#dev-version-guide-ci-parallel')
+
         const anchor = guide.getByRole('link', { name: '四处操作各管什么', exact: true })
         await anchor.click()
         await guide.locator('.ant-anchor-link-title-active').filter({ hasText: '四处操作各管什么' }).waitFor()

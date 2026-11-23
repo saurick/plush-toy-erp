@@ -9,6 +9,8 @@ import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevDirectoryHeader from '../components/DevDirectoryHeader.jsx'
+import { DevDirectoryItem } from '../components/DevDirectoryTree.jsx'
 import Select from '@/common/components/select/AppSelect'
 import DevProjectSkillsExecutionGuide from '../components/DevProjectSkillsExecutionGuide.jsx'
 import { buildDevDocsLocation } from './devDocsNavigation.mjs'
@@ -192,15 +194,13 @@ export default function DevProjectSkillsPage() {
             />
           ) : null}
           <div className="erp-dev-skills__workspace">
-            <WorkbenchSection
-              title="Skill 目录"
-              aria-label="项目 Skill 目录"
-              tools={
+            <WorkbenchSection aria-label="项目 Skill 目录">
+              <DevDirectoryHeader>
+                <Text strong role="heading" aria-level={2}>Skill 目录</Text>
                 <Text type="secondary" role="status">
                   {keyword ? `${filtered.length} / ` : ''}{skills.length} 项
                 </Text>
-              }
-            >
+              </DevDirectoryHeader>
               <SearchInput
                 allowClear
                 aria-label="搜索任务或 Skill"
@@ -212,12 +212,11 @@ export default function DevProjectSkillsPage() {
                 }
               />
               {filtered.length ? (
-                <div className="erp-dev-skills__list">
+                <nav className="erp-dev-directory-list erp-dev-skills__list" aria-label="Skill 条目">
                   {filtered.map((skill) => (
-                    <button
+                    <DevDirectoryItem
                       key={skill.name}
-                      type="button"
-                      className="erp-dev-directory-item erp-dev-skills__item"
+                      className="erp-dev-skills__item"
                       title={skill.summary || skill.scope}
                       aria-pressed={selected?.name === skill.name}
                       onClick={() => updateQuery({ skill: skill.name })}
@@ -226,9 +225,9 @@ export default function DevProjectSkillsPage() {
                       {skill.issues.length ? (
                         <Tag color="warning">需处理</Tag>
                       ) : null}
-                    </button>
+                    </DevDirectoryItem>
                   ))}
-                </div>
+                </nav>
               ) : (
                 <Empty
                   description={

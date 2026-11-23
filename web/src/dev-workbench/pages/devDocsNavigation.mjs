@@ -1,8 +1,35 @@
 const DEV_DOCS_ORIGIN = 'https://dev-docs.local'
 
+export function buildDevDocsChapterOutline(headings, titleHeadingId) {
+  const bodyHeadings = headings.filter((heading) => heading.id !== titleHeadingId)
+  const chapterLevel = Math.min(...bodyHeadings.map((heading) => heading.level))
+  const chapters = []
+  const locationByHeadingId = new Map()
+  let chapter
+  let tocHeadingId
+
+  for (const heading of bodyHeadings) {
+    if (heading.level === chapterLevel) {
+      chapter = { heading, sections: [] }
+      chapters.push(chapter)
+      tocHeadingId = heading.id
+    } else if (chapter && heading.level === chapterLevel + 1) {
+      chapter.sections.push(heading)
+      tocHeadingId = heading.id
+    }
+    if (chapter) {
+      locationByHeadingId.set(heading.id, {
+        chapterId: chapter.heading.id,
+        tocHeadingId,
+      })
+    }
+  }
+  return { chapters, locationByHeadingId }
+}
+
 export function resolveDevDocsReadingHeading(
   headings = [],
-  { scrollTop = 0, clientHeight = 0, scrollHeight = 0 } = {}
+  { scrollTop = 0, clientHeight = 0, scrollHeight = 0, readingInset = 16 } = {}
 ) {
   if (headings.length === 0) return ''
   if (
@@ -14,7 +41,7 @@ export function resolveDevDocsReadingHeading(
   }
   let current = headings[0].id
   for (const heading of headings) {
-    if (heading.top > scrollTop + 16) break
+    if (heading.top > scrollTop + readingInset) break
     current = heading.id
   }
   return current

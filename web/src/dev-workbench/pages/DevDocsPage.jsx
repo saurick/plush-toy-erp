@@ -2,13 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   BookOutlined,
   CopyOutlined,
-  DownOutlined,
   FileMarkdownOutlined,
   FolderOpenOutlined,
   FolderOutlined,
   PushpinFilled,
   PushpinOutlined,
-  RightOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
 import { Button, Space, Spin, Tag, Tooltip, Typography } from 'antd'
@@ -23,6 +21,8 @@ import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import DevDocsLayout from '../components/DevDocsLayout.jsx'
+import DevDirectoryHeader from '../components/DevDirectoryHeader.jsx'
+import { DevDirectoryBranch, DevDirectoryItem } from '../components/DevDirectoryTree.jsx'
 import DevPageHeader from '../components/DevPageHeader.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
@@ -51,6 +51,7 @@ import {
   sortDevDocsItemsByPinned,
 } from '../config/devDocs.mjs'
 import {
+  buildDevDocsChapterOutline,
   buildDevDocsLocation,
   findDevDocsMarkdownAnchor,
   resolveDevDocsMarkdownHref,
@@ -281,21 +282,19 @@ function DevDocsTreeNode({
     const expanded = expandedKeys.has(node.key)
     return (
       <div className="erp-dev-docs-tree__node">
-        <button
-          type="button"
+        <DevDirectoryItem
           data-dev-doc-dir={node.path}
           title={node.path}
-          className="erp-dev-directory-item erp-dev-docs-tree__row"
-          aria-expanded={expanded}
+          className="erp-dev-docs-tree__row"
+          expanded={expanded}
           onClick={() => onToggleDirectory(node.key)}
         >
-          {expanded ? <DownOutlined /> : <RightOutlined />}
           {expanded ? <FolderOpenOutlined /> : <FolderOutlined />}
           <span className="erp-dev-docs-tree__name">{node.label}</span>
           <span className="erp-dev-docs-tree__count">{node.docCount}</span>
-        </button>
+        </DevDirectoryItem>
         {expanded ? (
-          <div className="erp-dev-docs-tree__children">
+          <DevDirectoryBranch>
             {node.children.map((child) => (
               <DevDocsTreeNode
                 key={child.key}
@@ -307,7 +306,7 @@ function DevDocsTreeNode({
                 onSelectDoc={onSelectDoc}
               />
             ))}
-          </div>
+          </DevDirectoryBranch>
         ) : null}
       </div>
     )
@@ -324,9 +323,9 @@ function DevDocsTreeNode({
           : 'erp-dev-docs-tree__doc-shell'
       }
     >
-      <button
-        type="button"
-        className="erp-dev-directory-item erp-dev-docs-tree__row erp-dev-docs-tree__doc"
+      <DevDirectoryItem
+        className="erp-dev-docs-tree__row erp-dev-docs-tree__doc"
+        reserveDisclosure
         title={`${node.item.title}\n${node.item.path}`}
         aria-current={active ? 'true' : undefined}
         onClick={() => onSelectDoc(node.item.key)}
@@ -337,7 +336,7 @@ function DevDocsTreeNode({
             {getDevDocsDisplayTitle(node.item.title)}
           </span>
         </span>
-      </button>
+      </DevDirectoryItem>
       <Tooltip title={pinned ? '取消置顶' : '置顶文档'}>
         <button
           type="button"
@@ -356,6 +355,72 @@ function DevDocsTreeNode({
         </button>
       </Tooltip>
     </div>
+  )
+}
+
+function DevDocsChapterNavigation({ chapters, activeLocation, onOpenHeading }) {
+  const tocRef = useRef(null)
+  const [sectionsExpanded, setSectionsExpanded] = useState(true)
+  const hasSections = chapters.some(({ sections }) => sections.length > 0)
+  const { chapterId, tocHeadingId } = activeLocation ?? {}
+  const currentItemId = sectionsExpanded ? tocHeadingId : chapterId
+
+  useEffect(() => {
+    const toc = tocRef.current
+    if (!toc) return
+    const currentItem = toc.querySelector('[aria-current="location"]')
+    if (!currentItem) {
+      toc.scrollTop = 0
+      return
+    }
+
+    const listBox = toc.getBoundingClientRect()
+    const itemBox = currentItem.getBoundingClientRect()
+    if (itemBox.top < listBox.top) {
+      toc.scrollTop += itemBox.top - listBox.top
+    } else if (itemBox.bottom > listBox.bottom) {
+      toc.scrollTop += itemBox.bottom - listBox.bottom
+    }
+  }, [chapters, currentItemId, sectionsExpanded])
+
+  const renderTocHeading = (heading) => (
+    <DevDirectoryItem
+      className="erp-dev-docs-toc__item"
+      data-dev-doc-heading-id={heading.id}
+      aria-current={heading.id === currentItemId ? 'location' : undefined}
+      title={heading.title}
+      onClick={() => onOpenHeading(heading.id)}
+    >
+      <span>{getDevDocsDisplayTitle(heading.title)}</span>
+    </DevDirectoryItem>
+  )
+
+  if (chapters.length === 0) return null
+
+  return (
+    <nav className="erp-dev-docs-toc-shell" aria-label="文档章节">
+      <DevDirectoryHeader
+        className="erp-dev-docs-sidebar__section-head erp-dev-docs-toc__header"
+        allExpanded={sectionsExpanded}
+        onToggleAll={hasSections ? () => setSectionsExpanded((expanded) => !expanded) : undefined}
+      >
+        <Text strong>章节目录</Text>
+      </DevDirectoryHeader>
+      <ul className="erp-dev-directory-list erp-dev-docs-toc" ref={tocRef}>
+        {chapters.map(({ heading, sections }) => (
+          <li key={heading.id}>
+            {renderTocHeading(heading)}
+            {sections.length > 0 ? (
+              <DevDirectoryBranch as="ul" hidden={!sectionsExpanded}>
+                {sections.map((section) => (
+                  <li key={section.id}>{renderTocHeading(section)}</li>
+                ))}
+              </DevDirectoryBranch>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </nav>
   )
 }
 
@@ -423,7 +488,6 @@ export default function DevDocsPage() {
     () => new Set(readExpandedKeys(allDirectoryKeys))
   )
   const markdownRef = useRef(null)
-  const tocRef = useRef(null)
   const [readingHeading, setReadingHeading] = useState(null)
   const treeRef = useRef(null)
   const pendingTreeRevealRef = useRef('')
@@ -473,12 +537,16 @@ export default function DevDocsPage() {
     headings[0]?.level === 1 && headings[0].title === selectedDoc?.title
       ? headings[0].id
       : ''
-  const tocHeadings = titleHeadingId ? headings.slice(1) : headings
+  const { chapters, locationByHeadingId } = useMemo(
+    () => buildDevDocsChapterOutline(headings, titleHeadingId),
+    [headings, titleHeadingId]
+  )
   const activeHeadingId =
     readingHeading?.path === selectedDocPath &&
     headings.some((heading) => heading.id === readingHeading.id)
       ? readingHeading.id
       : readHeadingIdFromHash(location.hash) || headings[0]?.id || ''
+  const activeLocation = locationByHeadingId.get(activeHeadingId)
 
   useEffect(() => {
     const container = markdownRef.current
@@ -489,12 +557,19 @@ export default function DevDocsPage() {
     let frame
     const update = () => {
       const { top } = container.getBoundingClientRect()
+      const { paddingBlockStart, fontSize } = window.getComputedStyle(container)
+      const readingInset = Number.parseFloat(paddingBlockStart) + Number.parseFloat(fontSize)
       const id = resolveDevDocsReadingHeading(
         anchors.map((anchor) => ({
           id: anchor.id,
           top: anchor.getBoundingClientRect().top - top + container.scrollTop,
         })),
-        container
+        {
+          scrollTop: container.scrollTop,
+          clientHeight: container.clientHeight,
+          scrollHeight: container.scrollHeight,
+          readingInset,
+        }
       )
       // 阅读位置只更新章节提示，不改写 URL 或增加历史记录。
       setReadingHeading((current) =>
@@ -517,24 +592,6 @@ export default function DevDocsPage() {
       observer.disconnect()
     }
   }, [headings, selectedDocPath, selectedDocSource])
-
-  useEffect(() => {
-    const toc = tocRef.current
-    if (!toc) return
-    const chapter = toc.querySelector('[aria-current="location"]')
-    if (!chapter) {
-      toc.scrollTop = 0
-      return
-    }
-
-    const listBox = toc.getBoundingClientRect()
-    const chapterBox = chapter.getBoundingClientRect()
-    if (chapterBox.top < listBox.top) {
-      toc.scrollTop += chapterBox.top - listBox.top
-    } else if (chapterBox.bottom > listBox.bottom) {
-      toc.scrollTop += chapterBox.bottom - listBox.bottom
-    }
-  }, [activeHeadingId, selectedDocPath, selectedDocSource])
 
   useEffect(() => {
     pendingTreeRevealRef.current = selectedDocPath || ''
@@ -1025,7 +1082,7 @@ export default function DevDocsPage() {
 
           {isSearching ? (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--results">
-              <div className="erp-dev-docs-sidebar__section-head">
+              <div className="erp-dev-directory-header erp-dev-docs-sidebar__section-head">
                 <Text strong>搜索结果</Text>
                 <Text type="secondary">
                   {visibleDocs.length} / {lifecycleDocs.length}
@@ -1136,8 +1193,12 @@ export default function DevDocsPage() {
               </div>
             </section>
           ) : (
-            <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--tree">
-              <div className="erp-dev-docs-sidebar__section-head">
+            <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--tree" aria-label="文档目录">
+              <DevDirectoryHeader
+                className="erp-dev-docs-sidebar__section-head"
+                allExpanded={allExpanded}
+                onToggleAll={allDirectoryKeys.length > 0 ? toggleAllDirectories : undefined}
+              >
                 <Space size={6}>
                   <Text strong>目录</Text>
                   <Text
@@ -1147,11 +1208,8 @@ export default function DevDocsPage() {
                     {lifecycleDocs.length}/{docs.length}
                   </Text>
                 </Space>
-                <Button size="small" type="text" onClick={toggleAllDirectories}>
-                  {allExpanded ? '收起全部' : '展开全部'}
-                </Button>
-              </div>
-              <div ref={treeRef} className="erp-dev-docs-tree" aria-label="项目文档目录树">
+              </DevDirectoryHeader>
+              <div ref={treeRef} className="erp-dev-directory-list erp-dev-docs-tree" aria-label="项目文档目录树">
                 {docTree.map((node) => (
                   <DevDocsTreeNode
                     key={node.key}
@@ -1230,28 +1288,12 @@ export default function DevDocsPage() {
           ) : null}
 
           <div className="erp-dev-docs-reader__body">
-            {tocHeadings.length > 0 ? (
-              <nav className="erp-dev-docs-toc-shell" aria-label="文档章节">
-                <div className="erp-dev-docs-toc-shell__label">章节</div>
-                <div className="erp-dev-docs-toc" ref={tocRef}>
-                  {tocHeadings.map((heading) => (
-                    <button
-                      type="button"
-                      key={heading.id}
-                      className="erp-dev-directory-item erp-dev-docs-toc__item"
-                      data-dev-doc-heading-id={heading.id}
-                      data-dev-doc-heading-level={heading.level}
-                      style={{ '--heading-depth': Math.max(0, heading.level - 2) }}
-                      aria-current={heading.id === activeHeadingId ? 'location' : undefined}
-                      title={heading.title}
-                      onClick={() => scrollToHeading(heading.id)}
-                    >
-                      <span>{getDevDocsDisplayTitle(heading.title)}</span>
-                    </button>
-                  ))}
-                </div>
-              </nav>
-            ) : null}
+            <DevDocsChapterNavigation
+              key={selectedDocPath}
+              chapters={chapters}
+              activeLocation={activeLocation}
+              onOpenHeading={scrollToHeading}
+            />
 
             {selectedDoc?.source ? (
               <article className="erp-dev-docs-markdown" ref={markdownRef}>

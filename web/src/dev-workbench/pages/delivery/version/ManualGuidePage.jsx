@@ -1,8 +1,9 @@
 import { ToolOutlined } from '@ant-design/icons'
 import { Anchor, Typography } from 'antd'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import DevPageHeader from '../../../components/DevPageHeader.jsx'
+import DevDirectoryHeader from '../../../components/DevDirectoryHeader.jsx'
 import { CI_WORKFLOW_SECTIONS } from '../../../config/devCiWorkflow.mjs'
 import {
   MANUAL_GUIDE_CI_SECTION_PREFIX,
@@ -52,9 +53,13 @@ const guideChapters = [
   },
 ]
 
+const guideMainChapters = guideChapters.map(({ key, title, href }) => ({ key, title, href }))
+const guideHasSubsections = guideChapters.some(({ children }) => children?.length > 0)
+
 export default function ManualGuidePage() {
   const { pathname, search, hash } = useLocation()
   const navigate = useNavigate()
+  const [sectionsExpanded, setSectionsExpanded] = useState(true)
   useEffect(() => {
     if (!hash) return
     document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
@@ -71,13 +76,19 @@ export default function ManualGuidePage() {
   return (
     <div className="erp-dev-hub-page erp-dev-tool-page erp-dev-version-guide-page">
       <aside className="erp-dev-version-guide-toc">
-        <Typography.Title level={2}>章节目录</Typography.Title>
         <nav aria-label="操作指引章节目录">
+          <DevDirectoryHeader
+            className="erp-dev-version-guide-toc__header"
+            allExpanded={sectionsExpanded}
+            onToggleAll={guideHasSubsections ? () => setSectionsExpanded((expanded) => !expanded) : undefined}
+          >
+            <Typography.Title level={2}>章节目录</Typography.Title>
+          </DevDirectoryHeader>
           <Anchor
             className="erp-dev-directory-anchor"
             affix={false}
             offsetTop={16}
-            items={guideChapters}
+            items={sectionsExpanded ? guideChapters : guideMainChapters}
             onClick={selectChapter}
           />
         </nav>
