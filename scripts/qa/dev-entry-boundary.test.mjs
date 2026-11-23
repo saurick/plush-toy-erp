@@ -1171,17 +1171,17 @@ test("dev entry boundary: customer config console stays preview or gated apply o
     /<Title\s+className="erp-dev-customer-title"\s+level=\{1\}>\s*客户配置\s*<\/Title>/u,
     "customer config console heading",
   );
-  assert.match(pageSource, /<PreflightPanel\b/u);
+  assert.match(pageSource, /<ValidationPanel\b/u);
+  assert.match(pageSource, /<ReleasePanel\b/u);
   assertIncludes(
     consoleSource,
-    "不执行流程或写入业务事实",
-    "customer config draft paths must not imply workflow or fact execution",
+    "不会修改测试服或正式服，也不导入客户业务数据",
+    "test configuration must describe its limited write scope",
   );
-  assertIncludes(
-    consoleSource,
-    "当前没有运行时实现",
-    "customer config extension candidates must not imply a runtime implementation",
-  );
+  const extensionRegistry = sources.get(moduleDir + "CustomerExtensionRegistry.jsx");
+  assert.match(extensionRegistry, /<StatusTag status=\{item\.status\}/u);
+  assert.match(extensionRegistry, /\{item\.note\}/u);
+  assert.doesNotMatch(extensionRegistry, /\b(?:fetch|XMLHttpRequest|WebSocket)\b|\/api\//u);
   assert(
     !consoleSource.includes("客户配置包导入控制台"),
     "customer config console must not imply an arbitrary package upload/import surface",

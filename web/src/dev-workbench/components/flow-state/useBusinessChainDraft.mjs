@@ -11,7 +11,7 @@ function blankState() {
     ...emptyBusinessChainDraft(),
     presentation: { mode: 'mainline', highlightedRoles: [], layout: 'lanes', layers: ['normal'] },
   }
-  return { draft, initialDraft: draft, past: [], future: [], issue: '', restoreFailed: false }
+  return { draft, initialDraft: draft, past: [], future: [], issue: '', persisted: false, restoreFailed: false }
 }
 
 function initialState(library, initialRange, startBlank) {
@@ -61,7 +61,11 @@ export default function useBusinessChainDraft(library, initialRange, startBlank 
   const [state, setState] = useState(() => initialState(library, initialRange, startBlank))
   const current = useRef(state)
   const publish = useCallback((next, persist = true) => {
-    const value = persist && !next.restoreFailed ? { ...next, issue: persistWorking(next.draft) } : next
+    let value = next
+    if (persist && !next.restoreFailed) {
+      const issue = persistWorking(next.draft)
+      value = { ...next, issue, persisted: !issue }
+    }
     current.current = value
     setState(value)
   }, [])
@@ -98,10 +102,10 @@ export default function useBusinessChainDraft(library, initialRange, startBlank 
     const error = persistWorking(next.draft)
     if (error) {
       // The explicit blank URL stays in place until the new tab can record its draft.
-      if (startBlank) publish({ ...current.current, issue: error }, false)
+      if (startBlank) publish({ ...current.current, issue: error, persisted: false }, false)
       return error
     }
-    publish(next, false)
+    publish({ ...next, persisted: true }, false)
     return ''
   }
   return {

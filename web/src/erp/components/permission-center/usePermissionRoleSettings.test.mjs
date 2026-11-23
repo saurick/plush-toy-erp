@@ -117,7 +117,7 @@ function checklist(view) {
 async function selectRole(view, name) {
   const button = findElement(
     view.state.roleTemplateTab,
-    (node) => node.type === 'button' && node.key === name
+    (node) => node.type?.name === 'DirectoryItem' && node.key === name
   )
   assert.ok(button, `岗位 ${name} 应可选择`)
   await act(async () => button.props.onClick())

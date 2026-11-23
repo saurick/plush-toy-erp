@@ -123,14 +123,17 @@ test('工作台内容区只保留受控对象关联、岗位配置和规则出�
       const controlledReadingLink = relative === 'components/DevReadingNavigation.jsx' &&
         expression?.type === 'Identifier' && expression.name === 'to' &&
         source.includes('if (!isProductCoreReadingDestination(to)) return')
-      const contextualLink = samePageExample || permissionLink || customerApprovalLink || skillSourceLink || skillSourceRecovery || visualizationSourceLink || controlledReadingLink
+      const previewDeviceSupport = relative === 'components/DevUIDesignPreviewToolbar.jsx' &&
+        target === routes.DEV_TASK_HANDLING_ROUTE && source.includes("const supportLabel = '设备支持范围'")
+      const contextualLink = samePageExample || permissionLink || customerApprovalLink || skillSourceLink || skillSourceRecovery || visualizationSourceLink || controlledReadingLink || previewDeviceSupport
       if (routerLinks.has(node.name.name) && !contextualLink) violations.push(`${relative}:${node.loc.start.line} 内容区路由链接`)
       if ((['Button', 'a'].includes(node.name.name) || routerLinks.has(node.name.name)) && destination && !attributes.some((item) => item.name.name === 'download') && /^\/(?:__dev|erp)(?:\/|\?|$)/u.test(target) && !contextualLink) violations.push(`${relative}:${node.loc.start.line} 内容区跨页地址`)
       const click = attributes.find((item) => item.name.name === 'onClick')
       const clickSource = click ? source.slice(click.range[0], click.range[1]) : ''
       const permissionAction = permissionSurfaces.has(relative) && permissionCallbacks.test(clickSource)
       const contextualRuleAction = relative === 'components/flow-state/BusinessActionRelations.jsx' && /onOpenRules\(action\)/u.test(clickSource)
-      if (node.name.name === 'Button' && click && navigationCallbacks.test(clickSource) && !permissionAction && !contextualRuleAction) violations.push(`${relative}:${node.loc.start.line} 关联跳转回调`)
+      const libraryChainAction = relative === 'components/flow-state/BusinessChainNodeLibrary.jsx' && /^onClick=\{\(\) => onOpenChain\(value\)\}$/u.test(clickSource)
+      if (node.name.name === 'Button' && click && navigationCallbacks.test(clickSource) && !permissionAction && !contextualRuleAction && !libraryChainAction) violations.push(`${relative}:${node.loc.start.line} 关联跳转回调`)
     })
   }
   assert.deepEqual(violations, [])

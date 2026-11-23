@@ -151,16 +151,21 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(page, /<summary>查看查询边界与开发者信息<\/summary>/u);
 });
 
-test("dev flow state observatory: business topics stay flat and long fact and state selects retain grouping", () => {
+test("dev flow state observatory: business chains, facts, and states retain their registered groups", () => {
   const catalog = DEV_FLOW_STATE_CATALOG;
   const page = readObservatorySource();
   const chainOptions = buildBusinessChainSelectOptions(catalog);
   const factOptions = buildFactDefinitionSelectOptions(catalog);
   const stateOptions = buildStateDefinitionSelectOptions(catalog);
 
+  assert.equal(chainOptions[0].value, catalog.businessChainOverview.key);
   assert.deepEqual(
-    chainOptions.map((option) => option.value),
-    [catalog.businessChainOverview.key, ...catalog.businessChains.map((chain) => chain.key)],
+    chainOptions.slice(1).map((group) => ({
+      key: group.key,
+      label: group.businessGroupLabel,
+      chainKeys: group.options.map((option) => option.value),
+    })),
+    catalog.businessChainOverview.lanes.map(({ key, label, chainKeys }) => ({ key, label, chainKeys })),
   );
   assert.deepEqual(
     factOptions.map((group) => group.label),

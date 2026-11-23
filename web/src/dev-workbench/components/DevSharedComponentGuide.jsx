@@ -23,11 +23,10 @@ export function DevUIConsumerName({ consumer }) {
 }
 
 function SampleLink({ topic }) {
-  const sampleUrl = `/__dev/ui-design?page=controls&control=${topic.key}`
   return (
     <span className="erp-control-library-catalog-links">
-      <Link aria-label={`操作${topic.title}示例`} to={sampleUrl}>{topic.title}</Link>
-      <Link aria-label={`查看${topic.title}用法要求`} to={`${sampleUrl}&controlSection=usage`}>用法要求</Link>
+      <Link aria-label={`操作${topic.title}示例`} to={`/__dev/ui-design?page=controls&control=${topic.key}`}>{topic.title}</Link>
+      <Link aria-label={`查看${topic.title}用法要求`} to={`/__dev/ui-design?page=controls&control=${topic.key}&controlSection=usage`}>用法要求</Link>
     </span>
   )
 }

@@ -67,7 +67,7 @@ export default function BusinessChainDesigner({
   useEffect(() => {
     if (startBlank) {
       if (appliedEntry.current === 'blank') {
-        if (!issue) onEntryApplied()
+        if (draftModel.persisted) onEntryApplied()
       } else {
         appliedEntry.current = 'blank'
         // Keep the entry until this tab has persisted its blank state, even if opener storage was copied.

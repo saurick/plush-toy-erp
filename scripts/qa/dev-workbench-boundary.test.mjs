@@ -278,6 +278,7 @@ const businessDateRangeDependencies = [
   ])],
   ["components/business-list/BusinessFilterPopoverContent.jsx", new Set([
     "react", "antd", "@ant-design/icons", "@/common/components/overlay/OverlayScopeContext.mjs",
+    "@/common/components/overlay/FilterPopoverPanel.jsx",
     "./BusinessFilterPanelContext.mjs",
   ])],
   ["components/business-list/BusinessFilterPanelContext.mjs", new Set(["react"])],
@@ -330,6 +331,10 @@ const toolbarSamplePresentationImports = new Set([
 ]);
 const commonSamplePresentationDependencies = [
   "web/src/common/components/overlay/OverlayScopeContext.mjs",
+  "web/src/common/components/overlay/FilterPopoverPanel.jsx",
+  "web/src/common/components/overlay/filterPopoverPanel.css",
+  "web/src/common/components/navigation/Directory.jsx",
+  "web/src/common/components/navigation/directory.css",
   "web/src/common/components/navigation/FilterChip.jsx",
   "web/src/common/components/navigation/FilterChipGroup.jsx",
   "web/src/common/components/navigation/FilterField.jsx",
@@ -383,16 +388,28 @@ const allowedERPImportsByFile = new Map([
     "components/business-list/BusinessLineItemsFooter.jsx",
     "components/business-list/BusinessTextArea.jsx",
   ])],
-  ["web/src/dev-workbench/components/flow-state/BusinessChainDesignCanvas.jsx", new Set([
-    "components/business-list/BusinessTextArea.jsx",
-  ])],
   ["web/src/dev-workbench/components/flow-state/FinanceRelationshipsView.jsx", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/components/flow-state/FinanceTraceView.jsx", new Set(["api/operationalFactApi.mjs", "components/finance/financePaymentPresentation.jsx"])],
   ["web/src/dev-workbench/config/devFulfillmentRelations.mjs", new Set(["utils/roleKeys.mjs"])],
+  ["web/src/dev-workbench/config/devCustomerConfig.mjs", new Set([
+    "config/customerMenuConfig.mjs",
+    "config/seedData.mjs",
+  ])],
+  ["web/src/dev-workbench/config/devFlowStateCatalog.mjs", new Set([
+    "components/finance/financePaymentStatus.mjs",
+    "utils/warehouseProductionWork.mjs",
+  ])],
+  ["web/src/dev-workbench/pages/DevDocsPage.jsx", new Set([
+    "components/business-list/BusinessFormSectionTitle.jsx",
+  ])],
   ["web/src/dev-workbench/config/devTaskHandling.mjs", new Set(["utils/taskHandlingPolicy.mjs", "utils/roleKeys.mjs", "utils/workflowTaskActionPresentation.mjs"])],
   ["web/src/dev-workbench/config/devTaskHandlingResponsibilities.test.mjs", new Set(["utils/roleKeys.mjs"])],
   ["web/src/dev-workbench/components/flow-state/TaskHandlingMatrix.jsx", new Set(["utils/roleKeys.mjs", "utils/workflowTaskActionFlow.mjs", "utils/workflowTaskActionContract.mjs"])],
   ["web/src/dev-workbench/components/flow-state/TaskHandlingFilters.jsx", new Set(["components/business-list/BusinessFilterPopoverContent.jsx"])],
+  ["web/src/dev-workbench/components/flow-state/BusinessRelationFilters.jsx", new Set([
+    "components/business-list/BusinessFilterPopoverContent.jsx",
+    "utils/workflowFulfillment.mjs",
+  ])],
   ["web/src/dev-workbench/config/devFlowActionRules.mjs", new Set(["utils/workflowTaskActionFlow.mjs"])],
   ["web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
   ["web/src/dev-workbench/config/devRoleResponsibilities.mjs", new Set(["utils/rolePermissionPolicy.mjs"])],
@@ -449,6 +466,7 @@ const allowedERPImportsByFile = new Map([
   [
     "web/src/dev-workbench/components/DevControlStandards.jsx",
     new Set([
+      "components/business-list/BusinessListLayout.jsx",
       "utils/businessProgress.mjs",
       "mobile/components/MobileFilterPopover.jsx",
       "mobile/components/MobileFilterChoices.jsx",
@@ -635,7 +653,12 @@ test("finance trace imports only registered reads and presentation metadata", ()
   const presentation = read("web/src/erp/components/finance/financePaymentPresentation.jsx");
   assert.doesNotMatch(presentation, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
   assert.deepEqual([...presentation.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)].map((match) => match[1]), [
-    "react", "antd", "../../../common/consts/statuses.generated.mjs",
+    "react", "antd", "../../../common/consts/statuses.generated.mjs", "./financePaymentStatus.mjs",
+  ]);
+  const status = read("web/src/erp/components/finance/financePaymentStatus.mjs");
+  assert.doesNotMatch(status, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b|\/api\//u);
+  assert.deepEqual([...status.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)["']([^"']+)["']/gu)].map((match) => match[1]), [
+    "../../../common/consts/statuses.generated.mjs",
   ]);
 });
 
@@ -691,11 +714,10 @@ function listERPImports(source) {
   )].map((match) => match[1]);
 }
 
-test("flow explorer draft notes only consume the shared ERP presentation control", () => {
+test("flow explorer canvas stays independent of ERP internals", () => {
   const canvas = "web/src/dev-workbench/components/flow-state/BusinessChainDesignCanvas.jsx";
-  const control = "@/erp/components/business-list/BusinessTextArea.jsx";
-  assert.deepEqual(listERPImports(read(canvas)), [control]);
-  assert.equal(isAllowedERPImport("web/src/dev-workbench/pages/DevTestingPage.jsx", control), false);
+  assert.deepEqual(listERPImports(read(canvas)), []);
+  assert.equal(isAllowedERPImport(canvas, "@/erp/components/business-list/BusinessTextArea.jsx"), false);
 });
 
 test("dev workbench boundary: ERP imports stay on explicit adapters and presentation samples", () => {
@@ -1040,7 +1062,8 @@ test("date and mobile filter samples keep shared controls free of business I/O",
     ["web/src/erp/utils/filterDateRange.mjs", new Set(["./businessDate.mjs", "./dateRange.mjs"])],
     ["web/src/erp/utils/businessDate.mjs", new Set()],
     ["web/src/erp/mobile/components/MobileFilterPopover.jsx", new Set([
-      "react", "react-dom", "antd", "@ant-design/icons", "./mobileFilterPopover.css",
+      "react", "react-dom", "antd", "@ant-design/icons",
+      "@/common/components/overlay/AnchoredControlPopover.jsx", "./mobileFilterPopover.css",
     ])],
     ["web/src/erp/mobile/components/MobileFilterChoices.jsx", new Set([
       "react", "@/common/components/navigation/FilterChipGroup.jsx", "@/common/components/navigation/FilterField.jsx", "./mobileFilterPopover.css",
@@ -1061,6 +1084,12 @@ test("date and mobile filter samples keep shared controls free of business I/O",
       "../overlay/OverlayScopeContext.mjs",
     ])],
     ["web/src/common/components/overlay/OverlayScopeContext.mjs", new Set(["react"])],
+    ["web/src/common/components/overlay/AnchoredControlPopover.jsx", new Set([
+      "react", "antd", "@ant-design/icons", "./anchoredControlPopover.css",
+    ])],
+    ["web/src/common/components/overlay/FilterPopoverPanel.jsx", new Set([
+      "react", "antd", "@ant-design/icons", "./filterPopoverPanel.css",
+    ])],
     ["web/src/common/components/empty/AppEmpty.jsx", new Set([
       "react", "antd", "@ant-design/icons", "./empty-state.css",
     ])],

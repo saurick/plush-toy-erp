@@ -1006,12 +1006,14 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
 test('devCustomerConfig: 配置字段直接显示路径和取值，技术状态使用可读文案', async () => {
   const source = (await Promise.all([
     'DevCustomerConfigPage.jsx',
-    ...['AssetsPanel.jsx', 'CustomerConfigReview.jsx', 'ReviewEvidence.jsx', 'DiffPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'CustomerPackageContents.jsx', 'CustomerStrategyReview.jsx', 'CustomerExtensionRegistry.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
+    ...['AssetsPanel.jsx', 'CustomerConfigReview.jsx', 'CustomerConfigDeclarationTable.jsx', 'ReviewEvidence.jsx', 'DiffPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'CustomerPackageContents.jsx', 'CustomerStrategyReview.jsx', 'CustomerExtensionRegistry.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
   ].map((name) => readFile(new URL(`../pages/${name}`, import.meta.url), 'utf8')))).join('\n')
 
   assert.match(source, /ariaLabel="配置核对内容"/)
-  assert.match(source, /字段路径<\/span><code>\{row\.path\}<\/code>/u)
-  assert.match(source, /记录条件<\/span>\s+<span>\s*\{row\.conditions\.map/u)
+  assert.match(source, /aria-label="客户包声明"/u)
+  assert.match(source, /<code\b[^>]*>\{row\.path\}<\/code>/u)
+  assert.match(source, /data-customer-value-label="记录条件">\s*\{row\.conditions\.length \? row\.conditions\.map/u)
+  assert.match(source, /data-customer-value-label="声明值">\s*<code\b[^>]*>\{row\.value\}<\/code>/u)
 
   assert.doesNotMatch(source, />runtime off</)
   assert.doesNotMatch(source, />handler forbidden</)
