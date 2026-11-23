@@ -12,6 +12,8 @@ import {
   wipExceptionReferences,
 } from "./test-fixtures/manual-acceptance-state-samples.mjs";
 
+import { manualAcceptanceFactRole, manualAcceptanceFactRPCCall } from "./manual-acceptance-fact-rpc.mjs";
+
 import {
   MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES,
   MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
@@ -26,8 +28,6 @@ import {
   ensureFinanceCreditNoteSpecimens,
   ensureManualAcceptanceQualityCorrections,
   assertReceiptMatchesPlan,
-  manualAcceptanceFactRPCCall,
-  manualAcceptanceFactRole,
   manualAcceptanceFactRPCParams,
   mergeManualAcceptanceFactReferences,
   readFinalManualAcceptanceFinanceFacts,

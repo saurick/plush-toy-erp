@@ -17,7 +17,7 @@ func TestInventoryRepo_BOMAutomaticVersions(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "bom_automatic_versions")
 	f := createInventoryTestFixtures(t, ctx, client)
 	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
-	uc := biz.NewInventoryUsecase(repo)
+	uc := biz.NewBOMUsecase(repo)
 	first := saveBOMDraftFixture(t, ctx, uc, f.productID)
 	if first.Header.Version != "V1" {
 		t.Fatalf("first: %s", first.Header.Version)
@@ -61,7 +61,7 @@ func TestBOMPostgresConcurrentAutomaticVersions(t *testing.T) {
 	ctx := t.Context()
 	data, client := openInventoryLotPostgresTestData(t)
 	f := createInventoryPostgresFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	source := saveBOMDraftFixture(t, ctx, uc, f.productID)
 	const writers = 12
 	start := make(chan struct{})

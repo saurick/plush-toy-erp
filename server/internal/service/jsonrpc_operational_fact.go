@@ -22,9 +22,6 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 	if res != nil {
 		return id, res, nil
 	}
-	if d.operationalFactUC == nil {
-		return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
-	}
 
 	switch method {
 	case "create_production_completion_from_order",
@@ -43,6 +40,9 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"cancel_production_fact",
 		"list_production_facts",
 		"list_production_order_material_requirements":
+		if d.productionFactUC == nil {
+			break
+		}
 		return d.handleOperationalFactProduction(ctx, method, id, pm, claims.UserID)
 	case "create_outsourcing_material_issue_from_order",
 		"create_outsourcing_return_receipt_from_order",
@@ -56,6 +56,9 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"post_outsourcing_fact",
 		"cancel_outsourcing_fact",
 		"list_outsourcing_facts":
+		if d.outsourcingFactUC == nil {
+			break
+		}
 		return d.handleOperationalFactOutsourcing(ctx, method, id, pm, claims.UserID)
 	case "create_shipment_with_items",
 		"save_shipment_draft",
@@ -64,10 +67,16 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"ship_shipment",
 		"cancel_shipment",
 		"list_shipments":
+		if d.shipmentUC == nil {
+			break
+		}
 		return d.handleOperationalFactShipment(ctx, method, id, pm, claims.UserID)
 	case "create_stock_reservation_from_sales_order",
 		"release_stock_reservation",
 		"list_stock_reservations":
+		if d.stockReservationUC == nil {
+			break
+		}
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
 	case "create_receivable_from_shipment",
 		"create_invoice_from_shipment",
@@ -80,8 +89,12 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"cancel_finance_fact",
 		"list_finance_facts", "get_finance_fact",
 		"get_finance_statement", "list_finance_source_adjustments", "create_finance_source_adjustment", "list_finance_payment_allocation_candidates", "allocate_finance_payment", "reverse_finance_allocation", "create_finance_payment", "cancel_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
+		if d.financeFactUC == nil {
+			break
+		}
 		return d.handleOperationalFactFinance(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}
+	return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 }

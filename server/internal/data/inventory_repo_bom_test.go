@@ -17,7 +17,7 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom")
 	f := createInventoryTestFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	part := biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID,
 		Quantity: mustDecimal(t, "1.25"), LossRate: mustDecimal(t, "0.1"),
 		Position: stringPtr("face"), PieceCount: stringPtr("2"), TotalUsageSnapshot: stringPtr("378.75"),
@@ -157,7 +157,7 @@ func TestInventoryUsecase_BOMRejectsInactiveNewReferencesAndKeepsArchiveAllowed(
 	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom_inactive_refs")
 	f := createInventoryTestFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	part := &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(1)}}
 	created := saveBOMDraftFixture(t, ctx, uc, f.productID, part)
 	if _, err := uc.ActivateBOMVersion(ctx, created.Header.ID); err != nil {
@@ -177,7 +177,7 @@ func TestInventoryUsecase_BOMRejectsInactiveNewReferencesAndKeepsArchiveAllowed(
 	}
 }
 
-func saveBOMDraftFixture(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, productID int, items ...*biz.BOMItemSaveMutation) *biz.BOMVersionDetail {
+func saveBOMDraftFixture(t *testing.T, ctx context.Context, uc *biz.BOMUsecase, productID int, items ...*biz.BOMItemSaveMutation) *biz.BOMVersionDetail {
 	t.Helper()
 	result, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{}}, items)
 	if err != nil {

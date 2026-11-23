@@ -31,7 +31,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateStockReservationFromSalesOrder(ctx, in)
+		item, err := d.stockReservationUC.CreateStockReservationFromSalesOrder(ctx, in)
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "release_stock_reservation":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionStockReservationRelease); res != nil {
@@ -44,7 +44,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, targetID)
+		item, err := d.stockReservationUC.ReleaseStockReservation(ctx, targetID)
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "list_stock_reservations":
 		permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
@@ -72,12 +72,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 			return id, invalidParamResult(), nil
 		}
 		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
-			return d.operationalFactUC.CountStockReservationsByStatusForAccess(ctx, filter, scope)
+			return d.stockReservationUC.CountStockReservationsByStatusForAccess(ctx, filter, scope)
 		})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		items, total, err := d.operationalFactUC.ListStockReservationsForAccess(ctx, filter, scope)
+		items, total, err := d.stockReservationUC.ListStockReservationsForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}

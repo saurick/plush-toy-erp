@@ -6,10 +6,8 @@ import {
   submitPurchaseOrderThroughProcess,
 } from './purchase-order-approval-process.mjs'
 import { advancePurchaseOrderLifecycleThroughProcess } from './manual-acceptance-source-data.mjs'
-import {
-  manualAcceptanceFactRPCCall,
-  manualAcceptanceFactRPCParams,
-} from './manual-acceptance-fact-data.mjs'
+import { manualAcceptanceFactRPCCall } from './manual-acceptance-fact-rpc.mjs'
+import { manualAcceptanceFactRPCParams } from './manual-acceptance-fact-data.mjs'
 
 function createHarness() {
   const calls = []

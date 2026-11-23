@@ -17,7 +17,7 @@ import {
   resolveLocalScenarioDemoCredentials,
   runScenarioDemoCli,
 } from "./scenario-demo-data.mjs";
-import { manualAcceptanceFactRPCCall } from "./manual-acceptance-fact-data.mjs";
+import { manualAcceptanceFactRPCCall } from "./manual-acceptance-fact-rpc.mjs";
 
 export const VISUALIZATION_DEMO_SCHEMA_VERSION =
   "plush.visualization-demo-data/v1";

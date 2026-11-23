@@ -138,7 +138,7 @@ type ProductionExceptionContextRepo interface {
 	GetProductionExceptionContext(context.Context, int) (*ProductionExceptionContext, error)
 }
 
-func (uc *OperationalFactUsecase) GetProductionExceptionContext(ctx context.Context, inspectionID int) (*ProductionExceptionContext, error) {
+func (uc *ProductionFactUsecase) GetProductionExceptionContext(ctx context.Context, inspectionID int) (*ProductionExceptionContext, error) {
 	if uc == nil || uc.repo == nil || inspectionID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -149,7 +149,7 @@ func (uc *OperationalFactUsecase) GetProductionExceptionContext(ctx context.Cont
 	return repo.GetProductionExceptionContext(ctx, inspectionID)
 }
 
-func (uc *OperationalFactUsecase) ListProductionExceptions(ctx context.Context, filter ProductionExceptionFilter) ([]*ProductionExceptionDecision, int, error) {
+func (uc *ProductionFactUsecase) ListProductionExceptions(ctx context.Context, filter ProductionExceptionFilter) ([]*ProductionExceptionDecision, int, error) {
 	if uc == nil || uc.repo == nil || filter.ProductionOrderID < 0 || filter.Offset < 0 {
 		return nil, 0, ErrBadParam
 	}
@@ -164,7 +164,7 @@ func (uc *OperationalFactUsecase) ListProductionExceptions(ctx context.Context, 
 	return repo.ListProductionExceptions(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context, in *ProductionExceptionSubmit) (*ProductionExceptionDecision, error) {
+func (uc *ProductionFactUsecase) SubmitProductionException(ctx context.Context, in *ProductionExceptionSubmit) (*ProductionExceptionDecision, error) {
 	repo, ok := productionExceptionRepo(uc)
 	if !ok || in == nil {
 		return nil, ErrBadParam
@@ -211,7 +211,7 @@ func ProductionExceptionCreatesBatch(decisionType string) bool {
 	return decisionType == ProductionExceptionReworkOriginal || decisionType == ProductionExceptionReworkSwitch || decisionType == ProductionExceptionRemake
 }
 
-func (uc *OperationalFactUsecase) CancelProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
+func (uc *ProductionFactUsecase) CancelProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
 	repo, ok := productionExceptionRepo(uc)
 	if !ok || !validProductionExceptionMutation(in, false) {
 		return nil, ErrBadParam
@@ -221,7 +221,7 @@ func (uc *OperationalFactUsecase) CancelProductionException(ctx context.Context,
 	n.ApprovedQuantity = nil
 	return repo.CancelProductionException(ctx, &n)
 }
-func (uc *OperationalFactUsecase) ReverseProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
+func (uc *ProductionFactUsecase) ReverseProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
 	if uc == nil || uc.repo == nil || !validProductionExceptionMutation(in, false) {
 		return nil, ErrBadParam
 	}
@@ -234,7 +234,7 @@ func (uc *OperationalFactUsecase) ReverseProductionException(ctx context.Context
 	n.ApprovedQuantity = nil
 	return repo.ReverseProductionException(ctx, &n)
 }
-func (uc *OperationalFactUsecase) GetProductionException(ctx context.Context, id int) (*ProductionExceptionDecision, error) {
+func (uc *ProductionFactUsecase) GetProductionException(ctx context.Context, id int) (*ProductionExceptionDecision, error) {
 	repo, ok := productionExceptionRepo(uc)
 	if !ok || id <= 0 {
 		return nil, ErrBadParam
@@ -242,7 +242,7 @@ func (uc *OperationalFactUsecase) GetProductionException(ctx context.Context, id
 	return repo.GetProductionException(ctx, id)
 }
 
-func productionExceptionRepo(uc *OperationalFactUsecase) (ProductionExceptionDecisionRepo, bool) {
+func productionExceptionRepo(uc *ProductionFactUsecase) (ProductionExceptionDecisionRepo, bool) {
 	if uc == nil || uc.repo == nil {
 		return nil, false
 	}

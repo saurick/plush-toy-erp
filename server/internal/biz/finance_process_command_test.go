@@ -55,7 +55,7 @@ func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, NewOperationalFactUsecase(operationalFactRepo)); err != nil {
+	if err := RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, NewFinanceFactUsecase(operationalFactRepo)); err != nil {
 		t.Fatalf("register finance process command handler failed: %v", err)
 	}
 
@@ -122,7 +122,7 @@ func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 
 func TestFinanceProcessDomainCommandReceivableLeadRejectsMismatchedBusinessRef(t *testing.T) {
 	ctx := context.Background()
-	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(&financeProcessOperationalFactRepoStub{
+	handler := &financeReceivableLeadProcessCommandHandler{uc: NewFinanceFactUsecase(&financeProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Status: ShipmentStatusShipped},
 	})}
 
@@ -158,7 +158,7 @@ func TestFinanceProcessDomainCommandReceivableLeadRequiresShippedShipment(t *tes
 	repo := &financeProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Status: ShipmentStatusDraft},
 	}
-	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(repo)}
+	handler := &financeReceivableLeadProcessCommandHandler{uc: NewFinanceFactUsecase(repo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "shipment", BusinessRefID: 9001},
@@ -179,7 +179,7 @@ func TestFinanceProcessDomainCommandReceivableLeadRequiresShippedShipment(t *tes
 
 func TestFinanceProcessDomainCommandReceivableLeadRequiresSourceAndAmount(t *testing.T) {
 	ctx := context.Background()
-	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(&financeProcessOperationalFactRepoStub{
+	handler := &financeReceivableLeadProcessCommandHandler{uc: NewFinanceFactUsecase(&financeProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Status: ShipmentStatusShipped},
 	})}
 
@@ -202,7 +202,7 @@ func TestFinanceProcessDomainCommandReceivableLeadRequiresSourceAndAmount(t *tes
 }
 
 func TestFinanceProcessDomainCommandReceivableLeadRequiresShipmentCustomerTruth(t *testing.T) {
-	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(&financeProcessOperationalFactRepoStub{
+	handler := &financeReceivableLeadProcessCommandHandler{uc: NewFinanceFactUsecase(&financeProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	})}
 	base := &ProcessDomainCommandInput{
@@ -226,7 +226,7 @@ func TestFinanceProcessDomainCommandReceivableLeadRequiresShipmentCustomerTruth(
 
 func TestOperationalFactUsecaseCancelFinanceRequiresActorAndTrimmedReason(t *testing.T) {
 	repo := &financeProcessOperationalFactRepoStub{}
-	uc := NewOperationalFactUsecase(repo)
+	uc := NewFinanceFactUsecase(repo)
 	for _, tc := range []struct {
 		name    string
 		id      int

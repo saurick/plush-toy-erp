@@ -86,7 +86,7 @@ type FinanceFactAccessRepo interface {
 	ListFinanceFactsForAccess(ctx context.Context, filter OperationalFactFilter, scope FinanceFactAccessScope) ([]*FinanceFact, int, error)
 }
 
-func (uc *OperationalFactUsecase) GetFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) GetFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
@@ -97,7 +97,7 @@ func (uc *OperationalFactUsecase) GetFinanceFact(ctx context.Context, id int) (*
 	return repo.GetFinanceFact(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) ListFinanceFactsForAccess(
+func (uc *FinanceFactUsecase) ListFinanceFactsForAccess(
 	ctx context.Context,
 	filter OperationalFactFilter,
 	scope FinanceFactAccessScope,

@@ -16,7 +16,7 @@ func TestBOMHeaderOptionalFieldsReplaceAndClearThroughAggregateSave(t *testing.T
 	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "bom_optional_fields_aggregate")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	created, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{
 		ProductID:       fixtures.productID,
 		BOMHeaderUpdate: biz.BOMHeaderUpdate{},

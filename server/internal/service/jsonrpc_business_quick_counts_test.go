@@ -23,7 +23,10 @@ func TestRPCDocumentedBusinessQuickCounts(t *testing.T) {
 	activateOperationalFactTestCustomerConfig(t, d, customerConfigPublishParamsWithRevisionAndModuleState(t, customerConfigPublishParams(t), "quick-counts-production", "production", "enabled"))
 	logger := log.NewStdLogger(io.Discard)
 	d.adminManageUC = newAllWarehouseScopeAdminUsecase()
-	d.operationalFactUC = biz.NewOperationalFactUsecase(datarepo.NewOperationalFactRepo(data, logger))
+	d.inventoryUC = biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger))
+	factRepo := datarepo.NewOperationalFactRepo(data, logger)
+	d.productionFactUC = biz.NewProductionFactUsecase(factRepo)
+	d.stockReservationUC = biz.NewStockReservationUsecase(factRepo)
 	d.workflowUC = biz.NewWorkflowUsecase(datarepo.NewWorkflowRepo(data, logger))
 	raw, err := os.ReadFile("../../cmd/public-contracts/testdata/rpc_examples.json")
 	if err != nil {

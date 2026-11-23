@@ -51,7 +51,7 @@ func TestShipmentProcessDomainCommandShipBindsUsecase(t *testing.T) {
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, NewOperationalFactUsecase(operationalFactRepo)); err != nil {
+	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, NewShipmentUsecase(operationalFactRepo)); err != nil {
 		t.Fatalf("register shipment process command handler failed: %v", err)
 	}
 
@@ -128,7 +128,7 @@ func TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase(t *testing.T) {
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, NewOperationalFactUsecase(operationalFactRepo)); err != nil {
+	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, NewShipmentUsecase(operationalFactRepo)); err != nil {
 		t.Fatalf("register shipment process command handler failed: %v", err)
 	}
 
@@ -167,7 +167,7 @@ func TestShipmentProcessDomainCommandFinanceReleaseRequiresDraftShipment(t *test
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	}
-	handler := &shipmentFinanceReleaseProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
+	handler := &shipmentFinanceReleaseProcessCommandHandler{uc: NewShipmentUsecase(operationalFactRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "shipment", BusinessRefID: 9001},
@@ -208,7 +208,7 @@ func TestShipmentProcessDomainCommandFinanceRejectRecordsReasonAndCompletesBranc
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, NewOperationalFactUsecase(operationalFactRepo)); err != nil {
+	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, NewShipmentUsecase(operationalFactRepo)); err != nil {
 		t.Fatalf("register shipment handlers: %v", err)
 	}
 
@@ -238,7 +238,7 @@ func TestShipmentProcessDomainCommandShipRejectsMismatchedBusinessRef(t *testing
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	}
-	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
+	handler := &shipmentShipProcessCommandHandler{uc: NewShipmentUsecase(operationalFactRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "sales_order", BusinessRefID: 9001},
@@ -265,7 +265,7 @@ func TestShipmentProcessDomainCommandShipRejectsMismatchedBusinessRef(t *testing
 func TestShipmentProcessDomainCommandShipRequiresShipment(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{}
-	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
+	handler := &shipmentShipProcessCommandHandler{uc: NewShipmentUsecase(operationalFactRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "shipment", BusinessRefID: 9001},
@@ -285,7 +285,7 @@ func TestShipmentProcessDomainCommandShipRejectsLegacyID(t *testing.T) {
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
 		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	}
-	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
+	handler := &shipmentShipProcessCommandHandler{uc: NewShipmentUsecase(operationalFactRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "shipment", BusinessRefID: 9001},

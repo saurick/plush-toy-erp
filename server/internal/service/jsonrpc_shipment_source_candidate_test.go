@@ -373,10 +373,10 @@ func TestJSONRPCListShipmentSourceCandidatesRequiresEnabledShipmentAndSalesOrder
 			{ModuleKey: "sales_orders", State: "disabled"},
 		}
 		dispatcher := &jsonrpcDispatcher{
-			log:               log.NewHelper(log.NewStdLogger(io.Discard)),
-			adminReader:       stubAdminAccountReader{admin: admin},
-			operationalFactUC: biz.NewOperationalFactUsecase(repo),
-			customerConfigUC:  biz.NewCustomerConfigUsecase(configRepo),
+			log:              log.NewHelper(log.NewStdLogger(io.Discard)),
+			adminReader:      stubAdminAccountReader{admin: admin},
+			shipmentUC:       biz.NewShipmentUsecase(repo),
+			customerConfigUC: biz.NewCustomerConfigUsecase(configRepo),
 		}
 		_, result, err := dispatcher.handleOperationalFact(ctx, "list_shipment_source_candidates", "disabled-source", mustJSONRPCStruct(t, map[string]any{}))
 		// The deliberately inconsistent active revision removes sales-order
@@ -394,10 +394,10 @@ func TestJSONRPCListShipmentSourceCandidatesRequiresEnabledShipmentAndSalesOrder
 		repo := &shipmentSourceCandidateJSONRPCRepo{}
 		configRepo := newServiceCustomerConfigRepo()
 		dispatcher := &jsonrpcDispatcher{
-			log:               log.NewHelper(log.NewStdLogger(io.Discard)),
-			adminReader:       stubAdminAccountReader{admin: admin},
-			operationalFactUC: biz.NewOperationalFactUsecase(repo),
-			customerConfigUC:  biz.NewCustomerConfigUsecase(configRepo),
+			log:              log.NewHelper(log.NewStdLogger(io.Discard)),
+			adminReader:      stubAdminAccountReader{admin: admin},
+			shipmentUC:       biz.NewShipmentUsecase(repo),
+			customerConfigUC: biz.NewCustomerConfigUsecase(configRepo),
 		}
 		params := customerConfigPublishParams(t)
 		activateOperationalFactTestCustomerConfig(t, dispatcher, params)
@@ -568,10 +568,10 @@ func TestJSONRPCCreateShipmentWithItemsRequiresWritableShipmentDependencyClosure
 				configRepo.modules[key] = append(configRepo.modules[key], biz.DeploymentModuleStateInput{ModuleKey: "sales_orders", State: moduleShape.state})
 			}
 			dispatcher := &jsonrpcDispatcher{
-				log:               log.NewHelper(log.NewStdLogger(io.Discard)),
-				adminReader:       stubAdminAccountReader{admin: admin},
-				operationalFactUC: biz.NewOperationalFactUsecase(repo),
-				customerConfigUC:  biz.NewCustomerConfigUsecase(configRepo),
+				log:              log.NewHelper(log.NewStdLogger(io.Discard)),
+				adminReader:      stubAdminAccountReader{admin: admin},
+				shipmentUC:       biz.NewShipmentUsecase(repo),
+				customerConfigUC: biz.NewCustomerConfigUsecase(configRepo),
 			}
 			_, result, err := dispatcher.handleOperationalFact(ctx, "create_shipment_with_items", "blocked-source", mustJSONRPCStruct(t, shipmentCreateWithItemsParams(true, true)))
 			if err != nil || result == nil || result.Code == errcode.OK.Code {

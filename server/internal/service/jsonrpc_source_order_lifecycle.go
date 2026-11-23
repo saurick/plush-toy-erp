@@ -1,10 +1,29 @@
 package service
 
 import (
+	"context"
+
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
 )
+
+func (d *jsonrpcDispatcher) requireSourceOrderLifecycleAction(
+	ctx context.Context, pm map[string]any, actorID int,
+	permission, moduleKey, actionKey string,
+) (*biz.SourceOrderLifecycleAction, *v1.JsonrpcResult) {
+	if res := d.RequireAdminPermission(ctx, permission); res != nil {
+		return nil, res
+	}
+	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), moduleKey); res != nil {
+		return nil, res
+	}
+	in, ok := sourceOrderLifecycleActionFromParams(pm, actionKey, actorID)
+	if !ok {
+		return nil, invalidSourceOrderLifecycleParamsResult()
+	}
+	return in, nil
+}
 
 func sourceOrderLifecycleActionFromParams(
 	pm map[string]any,

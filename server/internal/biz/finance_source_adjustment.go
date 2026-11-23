@@ -42,7 +42,7 @@ type FinanceSourceAdjustmentRepo interface {
 	CreateFinanceSourceAdjustment(context.Context, *FinanceSourceAdjustmentCreate, int, string) (*FinanceCreditNote, error)
 }
 
-func (uc *OperationalFactUsecase) ListFinanceSourceAdjustments(ctx context.Context, filter FinanceSourceAdjustmentFilter) ([]*FinanceSourceAdjustment, int, error) {
+func (uc *FinanceFactUsecase) ListFinanceSourceAdjustments(ctx context.Context, filter FinanceSourceAdjustmentFilter) ([]*FinanceSourceAdjustment, int, error) {
 	repo, ok := uc.repo.(FinanceSourceAdjustmentRepo)
 	if !ok || filter.FinanceFactID < 0 || filter.Offset < 0 {
 		return nil, 0, ErrBadParam
@@ -51,7 +51,7 @@ func (uc *OperationalFactUsecase) ListFinanceSourceAdjustments(ctx context.Conte
 	return repo.ListFinanceSourceAdjustments(ctx, filter)
 }
 
-func (uc *OperationalFactUsecase) CreateFinanceSourceAdjustment(ctx context.Context, in *FinanceSourceAdjustmentCreate, actorID int) (_ *FinanceCreditNote, err error) {
+func (uc *FinanceFactUsecase) CreateFinanceSourceAdjustment(ctx context.Context, in *FinanceSourceAdjustmentCreate, actorID int) (_ *FinanceCreditNote, err error) {
 	ctx, finish := startBusinessTrace(ctx, "finance.adjust_payable_from_source")
 	defer func() { finish(err) }()
 	repo, ok := uc.repo.(FinanceSourceAdjustmentRepo)

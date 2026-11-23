@@ -22,7 +22,7 @@ func TestInventoryRepo_BOMEditorFieldsPersistAndClear(t *testing.T) {
 	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom_editor_fields")
 	f := createInventoryTestFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	printed := time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC)
 	in := &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{
 		PrintDate:     &printed,
@@ -78,11 +78,11 @@ func TestInventoryRepo_BOMSourceValuesPersistCopyAndClear(t *testing.T) {
 	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "bom_source_values")
 	f := createInventoryTestFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	assertBOMSourceValuesRoundTrip(t, uc, f.productID, f.materialID, f.unitID)
 }
 
-func assertBOMSourceValuesRoundTrip(t *testing.T, uc *biz.InventoryUsecase, productID, materialID, unitID int) {
+func assertBOMSourceValuesRoundTrip(t *testing.T, uc *biz.BOMUsecase, productID, materialID, unitID int) {
 	t.Helper()
 	ctx := t.Context()
 	source := map[string]any{"file_name": "教学材料.xlsx", "sheet_name": "材料分析明细表", "row_number": 6,
@@ -121,7 +121,7 @@ func TestInventoryRepo_SaveBOMWithItemsAtomicCAS(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom_atomic_save")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
-	uc := biz.NewInventoryUsecase(repo)
+	uc := biz.NewBOMUsecase(repo)
 
 	created, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{
 		ProductID: fixtures.productID,

@@ -160,13 +160,15 @@ func newIntegrationHTTP(t *testing.T, additionalModules ...string) *integrationH
 	}
 	sales := biz.NewSalesOrderUsecase(data.NewSalesOrderRepo(db, logger))
 	purchase := biz.NewPurchaseOrderUsecase(data.NewPurchaseOrderRepo(db, logger))
-	inventory := biz.NewInventoryUsecase(data.NewInventoryRepo(db, logger))
+	inventoryRepo := data.NewInventoryRepo(db, logger)
+	inventory := biz.NewInventoryUsecase(inventoryRepo)
+	bom := biz.NewBOMUsecase(inventoryRepo)
 	facts := biz.NewOperationalFactUsecase(data.NewOperationalFactRepo(db, logger))
 	svc := service.NewJsonrpcService(config, logger, auth, admin, workflow, process,
 		biz.NewDebugUsecase(data.NewDebugSeedRepo(db, logger), data.NewDebugSafetyConfig(config)),
 		biz.NewMasterDataUsecase(data.NewMasterDataRepo(db, logger)), sales, purchase,
 		biz.NewProductionOrderUsecase(data.NewProductionOrderRepo(db, logger)),
-		biz.NewOutsourcingOrderUsecase(data.NewOutsourcingOrderRepo(db, logger)), inventory, facts,
+		biz.NewOutsourcingOrderUsecase(data.NewOutsourcingOrderRepo(db, logger)), inventory, bom, facts,
 		biz.NewBusinessAttachmentUsecase(data.NewBusinessAttachmentRepo(db, nil, logger)), customerConfig, authRepo,
 		biz.NewBusinessProgressUsecase(data.NewBusinessProgressRepo(db)), biz.NewBusinessStatisticsUsecase(data.NewBusinessStatisticsRepo(db)), data.NewHelpContentRepo(db), biz.NewPartnerReadUsecase(data.NewPartnerReadRepo(db)))
 	srv := appserver.NewHTTPServer(&conf.Server{}, logger, svc, nil, db, customerConfig, auth, config)

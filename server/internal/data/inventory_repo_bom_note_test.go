@@ -16,7 +16,7 @@ func TestInventoryRepo_BOMLongNotesPersistCopyRejectOverflowAndClear(t *testing.
 	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "bom_long_notes")
 	f := createInventoryTestFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	note := strings.Repeat("备", corevalue.BusinessNoteMaxCharacters-2) + "\n注"
 	header := biz.BOMHeaderUpdate{Note: &note}
 	part := biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(1), Note: &note}

@@ -32,15 +32,9 @@ func (d *jsonrpcDispatcher) handleSalesOrderLifecycleAction(
 	actionKey string,
 	action func(context.Context, *biz.SourceOrderLifecycleAction) (*biz.SalesOrder, error),
 ) (string, *v1.JsonrpcResult, error) {
-	if res := d.RequireAdminPermission(ctx, permission); res != nil {
+	in, res := d.requireSourceOrderLifecycleAction(ctx, pm, actorID, permission, "sales_orders", actionKey)
+	if res != nil {
 		return id, res, nil
-	}
-	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
-		return id, res, nil
-	}
-	in, ok := sourceOrderLifecycleActionFromParams(pm, actionKey, actorID)
-	if !ok {
-		return id, invalidSourceOrderLifecycleParamsResult(), nil
 	}
 	item, err := action(ctx, in)
 	return id, salesOrderMutationResult(ctx, d, item, err), nil

@@ -32,7 +32,7 @@ func (d *jsonrpcDispatcher) handleFinanceReporting(ctx context.Context, method, 
 		if snapshot != nil {
 			q.SnapshotAt = *snapshot
 		}
-		out, err := d.operationalFactUC.GetFinanceStatement(ctx, q)
+		out, err := d.financeFactUC.GetFinanceStatement(ctx, q)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -46,7 +46,7 @@ func (d *jsonrpcDispatcher) handleFinanceReporting(ctx context.Context, method, 
 			if !jsonRPCParamsAllowed(pm, "customer_key", "finance_fact_id", "limit", "offset") {
 				return id, invalidParamResult(), nil
 			}
-			items, total, err := d.operationalFactUC.ListFinanceSourceAdjustments(ctx, biz.FinanceSourceAdjustmentFilter{FinanceFactID: getInt(pm, "finance_fact_id", 0), Limit: normalizedBusinessListLimit(pm), Offset: getInt(pm, "offset", 0)})
+			items, total, err := d.financeFactUC.ListFinanceSourceAdjustments(ctx, biz.FinanceSourceAdjustmentFilter{FinanceFactID: getInt(pm, "finance_fact_id", 0), Limit: normalizedBusinessListLimit(pm), Offset: getInt(pm, "offset", 0)})
 			if err != nil {
 				return id, d.mapOperationalFactError(ctx, err), nil
 			}
@@ -56,7 +56,7 @@ func (d *jsonrpcDispatcher) handleFinanceReporting(ctx context.Context, method, 
 		if !jsonRPCParamsAllowed(pm, "customer_key", "source_type", "source_id", "credit_note_no", "reason", "idempotency_key") {
 			return id, invalidParamResult(), nil
 		}
-		out, err := d.operationalFactUC.CreateFinanceSourceAdjustment(ctx, &biz.FinanceSourceAdjustmentCreate{SourceType: getString(pm, "source_type"), SourceID: getInt(pm, "source_id", 0), CreditNoteNo: getString(pm, "credit_note_no"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key")}, actorID)
+		out, err := d.financeFactUC.CreateFinanceSourceAdjustment(ctx, &biz.FinanceSourceAdjustmentCreate{SourceType: getString(pm, "source_type"), SourceID: getInt(pm, "source_id", 0), CreditNoteNo: getString(pm, "credit_note_no"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key")}, actorID)
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	}
 	return id, unknownOperationalFactResult(method), nil

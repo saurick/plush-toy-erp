@@ -72,6 +72,7 @@ var ProviderSet = wire.NewSet(
 	wire.Bind(new(biz.OutsourcingOrderRepo), new(*outsourcingOrderRepo)),
 	NewInventoryRepo,
 	wire.Bind(new(biz.InventoryRepo), new(*inventoryRepo)),
+	wire.Bind(new(biz.BOMRepo), new(*inventoryRepo)),
 	NewOperationalFactRepo,
 	wire.Bind(new(biz.OperationalFactRepo), new(*operationalFactRepo)),
 	NewBusinessAttachmentRepo,

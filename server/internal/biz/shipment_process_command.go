@@ -14,15 +14,15 @@ const (
 )
 
 type shipmentFinanceReleaseProcessCommandHandler struct {
-	uc *OperationalFactUsecase
+	uc *ShipmentUsecase
 }
 
 type shipmentFinanceRejectProcessCommandHandler struct {
-	uc *OperationalFactUsecase
+	uc *ShipmentUsecase
 }
 
 type shipmentShipProcessCommandHandler struct {
-	uc *OperationalFactUsecase
+	uc *ShipmentUsecase
 }
 
 type ShipmentProcessCommandRepo interface {
@@ -34,25 +34,25 @@ type ShipmentFinanceRejectProcessCommandRepo interface {
 	RecordShipmentFinanceRejectionProcessCommand(ctx context.Context, shipmentID int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int, reason string) (*Shipment, error)
 }
 
-func RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, operationalFactUC *OperationalFactUsecase) error {
-	if processRuntimeUC == nil || operationalFactUC == nil {
+func RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, shipmentUC *ShipmentUsecase) error {
+	if processRuntimeUC == nil || shipmentUC == nil {
 		return ErrBadParam
 	}
 	if err := processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandShipmentFinanceRelease,
-		&shipmentFinanceReleaseProcessCommandHandler{uc: operationalFactUC},
+		&shipmentFinanceReleaseProcessCommandHandler{uc: shipmentUC},
 	); err != nil {
 		return err
 	}
 	if err := processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandShipmentFinanceReject,
-		&shipmentFinanceRejectProcessCommandHandler{uc: operationalFactUC},
+		&shipmentFinanceRejectProcessCommandHandler{uc: shipmentUC},
 	); err != nil {
 		return err
 	}
 	return processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandShipmentShip,
-		&shipmentShipProcessCommandHandler{uc: operationalFactUC},
+		&shipmentShipProcessCommandHandler{uc: shipmentUC},
 	)
 }
 

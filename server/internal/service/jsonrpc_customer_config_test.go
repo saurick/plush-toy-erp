@@ -107,16 +107,16 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 	var operationalFactUC *biz.OperationalFactUsecase
 	if operationalFactRepo != nil {
 		operationalFactUC = biz.NewOperationalFactUsecase(operationalFactRepo)
-		if err := biz.RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+		if err := biz.RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.ShipmentUsecase); err != nil {
 			panic(err)
 		}
-		if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+		if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.FinanceFactUsecase); err != nil {
 			panic(err)
 		}
-		if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+		if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.FinanceFactUsecase); err != nil {
 			panic(err)
 		}
-		if err := biz.RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+		if err := biz.RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.ProductionFactUsecase); err != nil {
 			panic(err)
 		}
 	} else {
@@ -130,15 +130,19 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		panic(err)
 	}
 	return &jsonrpcDispatcher{
-		log:               log.NewHelper(logger),
-		adminManageUC:     biz.NewAdminManageUsecase(adminRepo, logger, tracesdk.NewTracerProvider()),
-		customerConfigUC:  customerConfigUC,
-		processRuntimeUC:  processRuntimeUC,
-		salesOrderUC:      salesOrderUC,
-		purchaseOrderUC:   purchaseOrderUC,
-		inventoryUC:       inventoryUC,
-		operationalFactUC: operationalFactUC,
-		adminReader:       adminRepo,
+		log:                log.NewHelper(logger),
+		adminManageUC:      biz.NewAdminManageUsecase(adminRepo, logger, tracesdk.NewTracerProvider()),
+		customerConfigUC:   customerConfigUC,
+		processRuntimeUC:   processRuntimeUC,
+		salesOrderUC:       salesOrderUC,
+		purchaseOrderUC:    purchaseOrderUC,
+		inventoryUC:        inventoryUC,
+		productionFactUC:   operationalFactUC.ProductionFactUsecase,
+		outsourcingFactUC:  operationalFactUC.OutsourcingFactUsecase,
+		shipmentUC:         operationalFactUC.ShipmentUsecase,
+		stockReservationUC: operationalFactUC.StockReservationUsecase,
+		financeFactUC:      operationalFactUC.FinanceFactUsecase,
+		adminReader:        adminRepo,
 	}, processRuntimeRepo
 }
 

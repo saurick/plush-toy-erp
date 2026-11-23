@@ -102,10 +102,10 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 		t.Fatalf("register quality handlers failed: %v", err)
 	}
 	operationalFactUC := NewOperationalFactUsecase(operationalFactRepo)
-	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.ShipmentUsecase); err != nil {
 		t.Fatalf("register shipment handlers failed: %v", err)
 	}
-	if err := RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+	if err := RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.FinanceFactUsecase); err != nil {
 		t.Fatalf("register finance handlers failed: %v", err)
 	}
 

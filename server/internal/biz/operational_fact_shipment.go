@@ -167,7 +167,21 @@ type ShipmentReleaseSourceRepo interface {
 	ValidateShipmentReleaseForShipping(ctx context.Context, id int) error
 }
 
-func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error) {
+type ShipmentUsecaseRepo interface {
+	ShipmentRepo
+	salesLineReferenceRepo
+	CustomerIsActive(ctx context.Context, id int) (bool, error)
+}
+
+type ShipmentUsecase struct {
+	repo ShipmentUsecaseRepo
+}
+
+func NewShipmentUsecase(repo ShipmentUsecaseRepo) *ShipmentUsecase {
+	return &ShipmentUsecase{repo: repo}
+}
+
+func (uc *ShipmentUsecase) CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -179,14 +193,14 @@ func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Conte
 		return nil, err
 	}
 	for _, item := range normalized.Items {
-		if err := uc.validateSalesLineReferences(ctx, item.SalesOrderItemID, item.ProductID, item.ProductSkuID, item.UnitID, item.WarehouseID); err != nil {
+		if err := validateSalesLineReferences(ctx, uc.repo, item.SalesOrderItemID, item.ProductID, item.ProductSkuID, item.UnitID, item.WarehouseID); err != nil {
 			return nil, err
 		}
 	}
 	return uc.repo.CreateShipmentDraftWithItems(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context, in *ShipmentDraftSave) (*Shipment, error) {
+func (uc *ShipmentUsecase) SaveShipmentDraftWithItems(ctx context.Context, in *ShipmentDraftSave) (*Shipment, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -217,7 +231,7 @@ func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context
 		return nil, err
 	}
 	for _, item := range normalized.Items {
-		if err := uc.validateSalesLineReferences(ctx, item.SalesOrderItemID, item.ProductID, item.ProductSkuID, item.UnitID, item.WarehouseID); err != nil {
+		if err := validateSalesLineReferences(ctx, uc.repo, item.SalesOrderItemID, item.ProductID, item.ProductSkuID, item.UnitID, item.WarehouseID); err != nil {
 			return nil, err
 		}
 	}
@@ -225,7 +239,7 @@ func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context
 	return repo.SaveShipmentDraftWithItems(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) SubmitShipmentRelease(ctx context.Context, id int, actorID int) (*WorkflowTask, bool, error) {
+func (uc *ShipmentUsecase) SubmitShipmentRelease(ctx context.Context, id int, actorID int) (*WorkflowTask, bool, error) {
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
 		return nil, false, ErrBadParam
 	}
@@ -233,7 +247,7 @@ func (uc *OperationalFactUsecase) SubmitShipmentRelease(ctx context.Context, id 
 	return repo.SubmitShipmentRelease(ctx, id, actorID)
 }
 
-func (uc *OperationalFactUsecase) ValidateShipmentReleaseForShipping(ctx context.Context, id int) error {
+func (uc *ShipmentUsecase) ValidateShipmentReleaseForShipping(ctx context.Context, id int) error {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return ErrBadParam
 	}
@@ -241,7 +255,7 @@ func (uc *OperationalFactUsecase) ValidateShipmentReleaseForShipping(ctx context
 	return repo.ValidateShipmentReleaseForShipping(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (_ *Shipment, err error) {
+func (uc *ShipmentUsecase) ShipShipment(ctx context.Context, id int) (_ *Shipment, err error) {
 	ctx, finish := startBusinessTrace(ctx, "shipment.ship")
 	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || id <= 0 {
@@ -250,7 +264,7 @@ func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (_ *
 	return uc.repo.ShipShipment(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) ShipShipmentWithActor(ctx context.Context, id int, actorID int) (_ *Shipment, err error) {
+func (uc *ShipmentUsecase) ShipShipmentWithActor(ctx context.Context, id int, actorID int) (_ *Shipment, err error) {
 	ctx, finish := startBusinessTrace(ctx, "shipment.ship")
 	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
@@ -260,21 +274,21 @@ func (uc *OperationalFactUsecase) ShipShipmentWithActor(ctx context.Context, id 
 	return repo.ShipShipmentWithActor(ctx, id, actorID)
 }
 
-func (uc *OperationalFactUsecase) GetShipment(ctx context.Context, id int) (*Shipment, error) {
+func (uc *ShipmentUsecase) GetShipment(ctx context.Context, id int) (*Shipment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.GetShipment(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) CancelShippedShipment(ctx context.Context, id int) (*Shipment, error) {
+func (uc *ShipmentUsecase) CancelShippedShipment(ctx context.Context, id int) (*Shipment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelShippedShipment(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) CancelShippedShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error) {
+func (uc *ShipmentUsecase) CancelShippedShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -282,7 +296,7 @@ func (uc *OperationalFactUsecase) CancelShippedShipmentWithActor(ctx context.Con
 	return repo.CancelShippedShipmentWithActor(ctx, id, actorID)
 }
 
-func (uc *OperationalFactUsecase) ListShipments(ctx context.Context, filter OperationalFactFilter) ([]*Shipment, int, error) {
+func (uc *ShipmentUsecase) ListShipments(ctx context.Context, filter OperationalFactFilter) ([]*Shipment, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -299,7 +313,7 @@ var shipmentStatuses = map[string]struct{}{
 	ShipmentStatusCancelled: {},
 }
 
-func (uc *OperationalFactUsecase) validateShipmentHeaderActiveReferences(ctx context.Context, in *ShipmentCreate) error {
+func (uc *ShipmentUsecase) validateShipmentHeaderActiveReferences(ctx context.Context, in *ShipmentCreate) error {
 	if in == nil {
 		return ErrBadParam
 	}

@@ -54,7 +54,7 @@ type FinanceStatementRepo interface {
 	GetFinanceStatement(context.Context, FinanceStatementQuery) (*FinanceStatement, error)
 }
 
-func (uc *OperationalFactUsecase) GetFinanceStatement(ctx context.Context, q FinanceStatementQuery) (*FinanceStatement, error) {
+func (uc *FinanceFactUsecase) GetFinanceStatement(ctx context.Context, q FinanceStatementQuery) (*FinanceStatement, error) {
 	repo, ok := uc.repo.(FinanceStatementRepo)
 	if !ok {
 		return nil, ErrBadParam
@@ -92,7 +92,7 @@ type FinancePaymentTotalsRepo interface {
 	FinancePaymentTotals(context.Context, FinancePaymentFilter) ([]*FinancePaymentTotal, error)
 }
 
-func (uc *OperationalFactUsecase) FinancePaymentTotals(ctx context.Context, filter FinancePaymentFilter) ([]*FinancePaymentTotal, error) {
+func (uc *FinanceFactUsecase) FinancePaymentTotals(ctx context.Context, filter FinancePaymentFilter) ([]*FinancePaymentTotal, error) {
 	repo, ok := uc.repo.(FinancePaymentTotalsRepo)
 	if !ok {
 		return nil, ErrBadParam

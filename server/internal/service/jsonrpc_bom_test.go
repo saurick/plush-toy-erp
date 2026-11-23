@@ -151,7 +151,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if status := jsonRPCNestedMap(t, activateCopyRes, "bom_version")["status"]; status != biz.BOMStatusActive {
 		t.Fatalf("expected copied version active, got %#v", status)
 	}
-	oldHeader, err := j.inventoryUC.GetBOMVersion(ctx, headerID)
+	oldHeader, err := j.bomUC.GetBOMVersion(ctx, headerID)
 	if err != nil {
 		t.Fatalf("get old version failed: %v", err)
 	}
@@ -426,7 +426,7 @@ func newBOMJSONRPCTestData(t *testing.T, data *datarepo.Data, admin *biz.AdminUs
 	dispatcher := &jsonrpcDispatcher{
 		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.bom.test")),
 		adminReader:      stubAdminAccountReader{admin: admin},
-		inventoryUC:      biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+		bomUC:            biz.NewBOMUsecase(datarepo.NewInventoryRepo(data, logger)),
 		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
 	}
 	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParamsWithRevisionAndModuleState(

@@ -62,7 +62,7 @@ type OutsourcingReturnDispositionListRepo interface {
 	ListOutsourcingReturnDispositions(context.Context, OutsourcingReturnDispositionFilter) ([]*OutsourcingReturnDisposition, int, error)
 }
 
-func (uc *OperationalFactUsecase) ListOutsourcingReturnDispositions(ctx context.Context, filter OutsourcingReturnDispositionFilter) ([]*OutsourcingReturnDisposition, int, error) {
+func (uc *OutsourcingFactUsecase) ListOutsourcingReturnDispositions(ctx context.Context, filter OutsourcingReturnDispositionFilter) ([]*OutsourcingReturnDisposition, int, error) {
 	if uc == nil || uc.repo == nil || filter.QualityInspectionID < 0 || filter.OutsourcingReturnFactID < 0 || filter.Offset < 0 {
 		return nil, 0, ErrBadParam
 	}
@@ -80,7 +80,7 @@ func (uc *OperationalFactUsecase) ListOutsourcingReturnDispositions(ctx context.
 	return repo.ListOutsourcingReturnDispositions(ctx, filter)
 }
 
-func (uc *OperationalFactUsecase) CreateOutsourcingReturnDisposition(ctx context.Context, in *OutsourcingReturnDispositionCreate) (*OutsourcingReturnDisposition, error) {
+func (uc *OutsourcingFactUsecase) CreateOutsourcingReturnDisposition(ctx context.Context, in *OutsourcingReturnDispositionCreate) (*OutsourcingReturnDisposition, error) {
 	repo, ok := outsourcingDispositionRepo(uc)
 	if !ok || in == nil {
 		return nil, ErrBadParam
@@ -106,14 +106,14 @@ func (uc *OperationalFactUsecase) CreateOutsourcingReturnDisposition(ctx context
 	sum := sha256.Sum256(payload)
 	return repo.CreateOutsourcingReturnDisposition(ctx, &n, hex.EncodeToString(sum[:]))
 }
-func (uc *OperationalFactUsecase) PostOutsourcingReturnDisposition(ctx context.Context, in *OutsourcingReturnDispositionMutation) (*OutsourcingReturnDisposition, error) {
+func (uc *OutsourcingFactUsecase) PostOutsourcingReturnDisposition(ctx context.Context, in *OutsourcingReturnDispositionMutation) (*OutsourcingReturnDisposition, error) {
 	repo, ok := outsourcingDispositionRepo(uc)
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 {
 		return nil, ErrBadParam
 	}
 	return repo.PostOutsourcingReturnDisposition(ctx, in)
 }
-func (uc *OperationalFactUsecase) CancelOutsourcingReturnDisposition(ctx context.Context, in *OutsourcingReturnDispositionMutation) (*OutsourcingReturnDisposition, error) {
+func (uc *OutsourcingFactUsecase) CancelOutsourcingReturnDisposition(ctx context.Context, in *OutsourcingReturnDispositionMutation) (*OutsourcingReturnDisposition, error) {
 	repo, ok := outsourcingDispositionRepo(uc)
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || strings.TrimSpace(in.Reason) == "" {
 		return nil, ErrBadParam
@@ -122,14 +122,14 @@ func (uc *OperationalFactUsecase) CancelOutsourcingReturnDisposition(ctx context
 	n.Reason = strings.TrimSpace(n.Reason)
 	return repo.CancelOutsourcingReturnDisposition(ctx, &n)
 }
-func (uc *OperationalFactUsecase) GetOutsourcingReturnDisposition(ctx context.Context, id int) (*OutsourcingReturnDisposition, error) {
+func (uc *OutsourcingFactUsecase) GetOutsourcingReturnDisposition(ctx context.Context, id int) (*OutsourcingReturnDisposition, error) {
 	repo, ok := outsourcingDispositionRepo(uc)
 	if !ok || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return repo.GetOutsourcingReturnDisposition(ctx, id)
 }
-func outsourcingDispositionRepo(uc *OperationalFactUsecase) (OutsourcingReturnDispositionRepo, bool) {
+func outsourcingDispositionRepo(uc *OutsourcingFactUsecase) (OutsourcingReturnDispositionRepo, bool) {
 	if uc == nil || uc.repo == nil {
 		return nil, false
 	}

@@ -42,7 +42,7 @@ func TestFinanceAttachmentFactTypeAccess(t *testing.T) {
 						SHA256: testAttachmentProofSHA256}
 					repo := &stubAttachmentJSONRPCRepo{current: attachment}
 					d := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, grant.read, grant.write))
-					d.operationalFactUC = biz.NewOperationalFactUsecase(&attachmentFinanceAccessRepo{factType: target.factType})
+					d.financeFactUC = biz.NewFinanceFactUsecase(&attachmentFinanceAccessRepo{factType: target.factType})
 					params := map[string]any{"owner_type": "finance_fact", "owner_id": float64(9), "id": float64(101),
 						"attachment_type": "evidence", "file_name": "proof.pdf", "mime_type": "application/pdf",
 						"content_base64": base64.StdEncoding.EncodeToString([]byte("proof")), "reason": reason}
@@ -73,7 +73,7 @@ func TestFinanceAttachmentReportReadAndReadOnlyCannotMutate(t *testing.T) {
 		for _, method := range []string{"list_attachments", "download_attachment", "upload_attachment", "withdraw_attachment"} {
 			repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{ID: 101, OwnerType: "finance_fact", OwnerID: 9}}
 			d := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, permissions...))
-			d.operationalFactUC = biz.NewOperationalFactUsecase(&attachmentFinanceAccessRepo{factType: biz.FinanceFactPayable})
+			d.financeFactUC = biz.NewFinanceFactUsecase(&attachmentFinanceAccessRepo{factType: biz.FinanceFactPayable})
 			_, res, err := d.handleBusinessAttachment(workflowJSONRPCAdminContext(), method, "1", mustAuthStruct(t, map[string]any{
 				"id": float64(101), "owner_type": "finance_fact", "owner_id": float64(9), "reason": "凭证提交有误",
 			}))
@@ -88,7 +88,7 @@ func TestFinanceAttachmentSameFamilyReadCannotMutate(t *testing.T) {
 	for _, method := range []string{"upload_attachment", "withdraw_attachment"} {
 		repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{ID: 101, OwnerType: "finance_fact", OwnerID: 9}}
 		d := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionFinanceReceivableRead))
-		d.operationalFactUC = biz.NewOperationalFactUsecase(&attachmentFinanceAccessRepo{factType: biz.FinanceFactReceivable})
+		d.financeFactUC = biz.NewFinanceFactUsecase(&attachmentFinanceAccessRepo{factType: biz.FinanceFactReceivable})
 		_, res, err := d.handleBusinessAttachment(workflowJSONRPCAdminContext(), method, "1", mustAuthStruct(t, map[string]any{
 			"id": float64(101), "owner_type": "finance_fact", "owner_id": float64(9), "reason": "凭证提交有误",
 			"attachment_type": "evidence", "file_name": "proof.pdf", "mime_type": "application/pdf", "content_base64": base64.StdEncoding.EncodeToString([]byte("proof")),

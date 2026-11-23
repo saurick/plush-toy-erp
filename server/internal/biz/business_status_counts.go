@@ -107,7 +107,7 @@ type ShipmentsStatusCounter interface {
 	CountShipmentsByStatus(context.Context, OperationalFactFilter) (map[string]int, error)
 }
 
-func (uc *OperationalFactUsecase) CountShipmentsByStatus(ctx context.Context, filter OperationalFactFilter) (map[string]int, error) {
+func (uc *ShipmentUsecase) CountShipmentsByStatus(ctx context.Context, filter OperationalFactFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -127,7 +127,7 @@ type FinancePaymentsStatusCounter interface {
 	CountFinancePaymentsByStatus(context.Context, FinancePaymentFilter) (map[string]int, error)
 }
 
-func (uc *OperationalFactUsecase) CountFinancePaymentsByStatus(ctx context.Context, filter FinancePaymentFilter) (map[string]int, error) {
+func (uc *FinanceFactUsecase) CountFinancePaymentsByStatus(ctx context.Context, filter FinancePaymentFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -147,7 +147,7 @@ type FinanceCreditNotesStatusCounter interface {
 	CountFinanceCreditNotesByStatus(context.Context, FinanceCreditNoteFilter) (map[string]int, error)
 }
 
-func (uc *OperationalFactUsecase) CountFinanceCreditNotesByStatus(ctx context.Context, filter FinanceCreditNoteFilter) (map[string]int, error) {
+func (uc *FinanceFactUsecase) CountFinanceCreditNotesByStatus(ctx context.Context, filter FinanceCreditNoteFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -211,7 +211,7 @@ type FinanceFactsStatusCounter interface {
 	CountFinanceFactsByStatusForAccess(context.Context, OperationalFactFilter, FinanceFactAccessScope) (map[string]int, error)
 }
 
-func (uc *OperationalFactUsecase) CountFinanceFactsByStatusForAccess(ctx context.Context, filter OperationalFactFilter, scope FinanceFactAccessScope) (map[string]int, error) {
+func (uc *FinanceFactUsecase) CountFinanceFactsByStatusForAccess(ctx context.Context, filter OperationalFactFilter, scope FinanceFactAccessScope) (map[string]int, error) {
 	if uc == nil || scope.Empty() {
 		return nil, ErrBadParam
 	}
@@ -249,7 +249,7 @@ type BOMHeadersStatusCounter interface {
 	CountBOMHeadersByStatus(context.Context, BOMHeaderFilter) (map[string]int, error)
 }
 
-func (uc *InventoryUsecase) CountBOMHeadersByStatus(ctx context.Context, filter BOMHeaderFilter) (map[string]int, error) {
+func (uc *BOMUsecase) CountBOMHeadersByStatus(ctx context.Context, filter BOMHeaderFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -287,7 +287,7 @@ type ProductionFactsStatusCounter interface {
 	CountProductionFactsByStatus(context.Context, OperationalFactFilter) (map[string]int, error)
 }
 
-func (uc *OperationalFactUsecase) CountProductionFactsByStatus(ctx context.Context, filter OperationalFactFilter) (map[string]int, error) {
+func (uc *ProductionFactUsecase) CountProductionFactsByStatus(ctx context.Context, filter OperationalFactFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -306,7 +306,7 @@ type ProductionExceptionsStatusCounter interface {
 	CountProductionExceptionsByStatus(context.Context, ProductionExceptionFilter) (map[string]int, error)
 }
 
-func (uc *OperationalFactUsecase) CountProductionExceptionsByStatus(ctx context.Context, filter ProductionExceptionFilter) (map[string]int, error) {
+func (uc *ProductionFactUsecase) CountProductionExceptionsByStatus(ctx context.Context, filter ProductionExceptionFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -348,7 +348,7 @@ type StockReservationsStatusCounter interface {
 	CountStockReservationsByStatusForAccess(context.Context, OperationalFactFilter, StockReservationReadScope) (map[string]int, error)
 }
 
-func (uc *OperationalFactUsecase) CountStockReservationsByStatusForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) (map[string]int, error) {
+func (uc *StockReservationUsecase) CountStockReservationsByStatusForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}

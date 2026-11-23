@@ -11,10 +11,8 @@ import {
   selectManualAcceptanceWIPExceptionInspection,
   assertManualAcceptanceConcessionResult,
 } from "./manual-acceptance-exception-chain-data.mjs";
-import {
-  manualAcceptanceFactRPCCall,
-  manualAcceptanceFactRPCParams,
-} from "./manual-acceptance-fact-data.mjs";
+import { manualAcceptanceFactRPCCall } from "./manual-acceptance-fact-rpc.mjs";
+import { manualAcceptanceFactRPCParams } from "./manual-acceptance-fact-data.mjs";
 import {
   FORMAL_RPC_PARAM_ALLOWLIST,
   manualAcceptanceBusinessNo,

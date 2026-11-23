@@ -221,7 +221,7 @@ func TestBOMPostgresConstraints(t *testing.T) {
 	data, client := openInventoryLotPostgresTestData(t)
 
 	fixtures := createInventoryLotPostgresFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+	uc := biz.NewBOMUsecase(NewInventoryRepo(
 		data,
 		log.NewStdLogger(io.Discard),
 	))
@@ -270,7 +270,7 @@ func TestBOMPostgresSourceValuesPersistCopyAndClear(t *testing.T) {
 	ctx := t.Context()
 	data, client := openInventoryLotPostgresTestData(t)
 	fixtures := createInventoryLotPostgresFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	assertBOMSourceValuesRoundTrip(t, uc, fixtures.productID, fixtures.materialID, fixtures.unitID)
 }
 
@@ -279,7 +279,7 @@ func TestBOMPostgresCoefficientsHaveNoFixedStorageScale(t *testing.T) {
 	data, client := openInventoryLotPostgresTestData(t)
 	client.Use(unitQuantityGuard)
 	f := createInventoryLotPostgresFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	for _, raw := range []string{"0.12345678901234567890123456789", "0.00000049", "1e-324"} {
 		quantity, loss := decimal.RequireFromString(raw), decimal.RequireFromString("0.0000001234567890123456789")
 		draft := saveBOMDraftFixture(t, ctx, uc, f.productID, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: quantity, LossRate: loss}})
@@ -294,7 +294,7 @@ func TestBOMPostgresConcurrentActivateKeepsSingleActive(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryLotPostgresTestData(t)
 	fixtures := createInventoryLotPostgresFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	uc := biz.NewBOMUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 
 	headers := make([]*biz.BOMHeader, 0, 2)
 	for range 2 {

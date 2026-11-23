@@ -483,7 +483,7 @@ func (d *jsonrpcDispatcher) requireExceptionProcessSourceRead(
 		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
 			return res
 		}
-		item, err := d.operationalFactUC.GetProductionException(ctx, businessRefID)
+		item, err := d.productionFactUC.GetProductionException(ctx, businessRefID)
 		if err != nil {
 			return d.mapOperationalFactError(ctx, err)
 		}
@@ -505,7 +505,7 @@ func (d *jsonrpcDispatcher) requireExceptionProcessSourceRead(
 		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
 			return res
 		}
-		item, err := d.operationalFactUC.GetFinancePayment(ctx, businessRefID)
+		item, err := d.financeFactUC.GetFinancePayment(ctx, businessRefID)
 		if err != nil {
 			return d.mapOperationalFactError(ctx, err)
 		}
@@ -536,7 +536,7 @@ func (d *jsonrpcDispatcher) exceptionProcessSourceReadback(
 ) (any, *v1.JsonrpcResult) {
 	switch contract.processKey {
 	case biz.ProcessKeyFinancePaymentApproval:
-		item, err := d.operationalFactUC.GetFinancePayment(ctx, businessRefID)
+		item, err := d.financeFactUC.GetFinancePayment(ctx, businessRefID)
 		if err != nil {
 			return nil, d.mapOperationalFactError(ctx, err)
 		}
@@ -555,7 +555,7 @@ func (d *jsonrpcDispatcher) exceptionProcessSourceReadback(
 		}
 		return inventoryOperationToAny(item), nil
 	case biz.ProcessKeyProductionExceptionApproval:
-		item, err := d.operationalFactUC.GetProductionException(ctx, businessRefID)
+		item, err := d.productionFactUC.GetProductionException(ctx, businessRefID)
 		if err != nil {
 			return nil, d.mapOperationalFactError(ctx, err)
 		}

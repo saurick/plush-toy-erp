@@ -17,7 +17,7 @@ const (
 )
 
 type productionExceptionProcessCommandHandler struct {
-	uc         *OperationalFactUsecase
+	uc         *ProductionFactUsecase
 	commandKey string
 }
 
@@ -27,8 +27,8 @@ type ProductionExceptionProcessCommandRepo interface {
 	ExecuteProductionExceptionForProcessCommand(ctx context.Context, in *ProductionExceptionMutation, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult) (*ProductionExceptionDecision, error)
 }
 
-func RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, operationalFactUC *OperationalFactUsecase) error {
-	if processRuntimeUC == nil || operationalFactUC == nil {
+func RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, productionFactUC *ProductionFactUsecase) error {
+	if processRuntimeUC == nil || productionFactUC == nil {
 		return ErrBadParam
 	}
 	for _, commandKey := range []string{
@@ -37,7 +37,7 @@ func RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC *P
 		ProcessDomainCommandProductionExceptionExecute,
 	} {
 		if err := processRuntimeUC.RegisterDomainCommandHandler(commandKey, &productionExceptionProcessCommandHandler{
-			uc:         operationalFactUC,
+			uc:         productionFactUC,
 			commandKey: commandKey,
 		}); err != nil {
 			return err

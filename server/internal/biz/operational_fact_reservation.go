@@ -93,7 +93,20 @@ type StockReservationReadRepo interface {
 	ListStockReservationsForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) ([]*StockReservation, int, error)
 }
 
-func (uc *OperationalFactUsecase) CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error) {
+type StockReservationUsecaseRepo interface {
+	StockReservationRepo
+	salesLineReferenceRepo
+}
+
+type StockReservationUsecase struct {
+	repo StockReservationUsecaseRepo
+}
+
+func NewStockReservationUsecase(repo StockReservationUsecaseRepo) *StockReservationUsecase {
+	return &StockReservationUsecase{repo: repo}
+}
+
+func (uc *StockReservationUsecase) CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -101,13 +114,13 @@ func (uc *OperationalFactUsecase) CreateStockReservation(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	if err := uc.validateSalesLineReferences(ctx, normalized.SalesOrderItemID, normalized.ProductID, normalized.ProductSkuID, normalized.UnitID, normalized.WarehouseID); err != nil {
+	if err := validateSalesLineReferences(ctx, uc.repo, normalized.SalesOrderItemID, normalized.ProductID, normalized.ProductSkuID, normalized.UnitID, normalized.WarehouseID); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateStockReservation(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CreateStockReservationFromSalesOrder(ctx context.Context, in *StockReservationFromSalesOrderCreate) (*StockReservation, error) {
+func (uc *StockReservationUsecase) CreateStockReservationFromSalesOrder(ctx context.Context, in *StockReservationFromSalesOrderCreate) (*StockReservation, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -121,21 +134,21 @@ func (uc *OperationalFactUsecase) CreateStockReservationFromSalesOrder(ctx conte
 	return uc.repo.CreateStockReservationFromSalesOrder(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error) {
+func (uc *StockReservationUsecase) ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ReleaseStockReservation(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error) {
+func (uc *StockReservationUsecase) ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error) {
 	return uc.ListStockReservationsForAccess(ctx, filter, StockReservationReadScope{
 		IncludeSalesOrderReferences: true,
 		IncludeInventoryReferences:  true,
 	})
 }
 
-func (uc *OperationalFactUsecase) ListStockReservationsForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) ([]*StockReservation, int, error) {
+func (uc *StockReservationUsecase) ListStockReservationsForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) ([]*StockReservation, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}

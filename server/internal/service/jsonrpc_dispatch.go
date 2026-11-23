@@ -38,7 +38,12 @@ type jsonrpcDispatcher struct {
 	productionOrderUC      *biz.ProductionOrderUsecase
 	outsourcingOrderUC     *biz.OutsourcingOrderUsecase
 	inventoryUC            *biz.InventoryUsecase
-	operationalFactUC      *biz.OperationalFactUsecase
+	bomUC                  *biz.BOMUsecase
+	productionFactUC       *biz.ProductionFactUsecase
+	outsourcingFactUC      *biz.OutsourcingFactUsecase
+	shipmentUC             *biz.ShipmentUsecase
+	stockReservationUC     *biz.StockReservationUsecase
+	financeFactUC          *biz.FinanceFactUsecase
 	attachmentUC           *biz.BusinessAttachmentUsecase
 	customerConfigUC       *biz.CustomerConfigUsecase
 	authSMS                authSMSRuntimeConfig
@@ -63,6 +68,7 @@ func newJSONRPCDispatcher(
 	productionOrderUC *biz.ProductionOrderUsecase,
 	outsourcingOrderUC *biz.OutsourcingOrderUsecase,
 	inventoryUC *biz.InventoryUsecase,
+	bomUC *biz.BOMUsecase,
 	operationalFactUC *biz.OperationalFactUsecase,
 	attachmentUC *biz.BusinessAttachmentUsecase,
 	customerConfigUC *biz.CustomerConfigUsecase,
@@ -103,6 +109,9 @@ func newJSONRPCDispatcher(
 	if inventoryUC == nil {
 		panic("newJSONRPCDispatcher: inventoryUC is nil")
 	}
+	if bomUC == nil {
+		panic("newJSONRPCDispatcher: bomUC is nil")
+	}
 	if operationalFactUC == nil {
 		panic("newJSONRPCDispatcher: operationalFactUC is nil")
 	}
@@ -130,19 +139,19 @@ func newJSONRPCDispatcher(
 	if err := biz.RegisterInventoryProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register inventory process command handlers: %v", err))
 	}
-	if err := biz.RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+	if err := biz.RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.ShipmentUsecase); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register shipment process command handlers: %v", err))
 	}
-	if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+	if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.FinanceFactUsecase); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register finance process command handlers: %v", err))
 	}
-	if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+	if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.FinanceFactUsecase); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register finance payment process command handlers: %v", err))
 	}
 	if err := biz.RegisterInventoryAdjustmentProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register inventory adjustment process command handlers: %v", err))
 	}
-	if err := biz.RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+	if err := biz.RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC.ProductionFactUsecase); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register production exception process command handlers: %v", err))
 	}
 	if err := biz.RegisterExceptionApprovalProcessBranchPolicyHandlers(processRuntimeUC); err != nil {
@@ -177,7 +186,12 @@ func newJSONRPCDispatcher(
 		productionOrderUC:      productionOrderUC,
 		outsourcingOrderUC:     outsourcingOrderUC,
 		inventoryUC:            inventoryUC,
-		operationalFactUC:      operationalFactUC,
+		bomUC:                  bomUC,
+		productionFactUC:       operationalFactUC.ProductionFactUsecase,
+		outsourcingFactUC:      operationalFactUC.OutsourcingFactUsecase,
+		shipmentUC:             operationalFactUC.ShipmentUsecase,
+		stockReservationUC:     operationalFactUC.StockReservationUsecase,
+		financeFactUC:          operationalFactUC.FinanceFactUsecase,
 		attachmentUC:           attachmentUC,
 		customerConfigUC:       customerConfigUC,
 		authSMS:                authSMS,

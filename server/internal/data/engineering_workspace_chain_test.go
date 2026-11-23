@@ -23,7 +23,7 @@ func TestEngineeringWorkspaceFromCustomerDemandToMaterialSubmission(t *testing.T
 	logger := log.NewStdLogger(io.Discard)
 	sales := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
 	master := biz.NewMasterDataUsecase(NewMasterDataRepo(data, logger))
-	inventory := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
+	bomUC := biz.NewBOMUsecase(NewInventoryRepo(data, logger))
 	media := biz.NewBusinessAttachmentUsecase(NewBusinessAttachmentRepo(data, newAttachmentMemoryStore(), logger))
 	customer := createSalesOrderTestCustomer(t, ctx, client, "WORKSPACE-C", true)
 	unit := createSalesOrderTestUnit(t, ctx, client, "WORKSPACE-PCS", true)
@@ -64,7 +64,7 @@ func TestEngineeringWorkspaceFromCustomerDemandToMaterialSubmission(t *testing.T
 	}
 	date := time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC)
 	header := &biz.BOMVersionMutation{ProductID: product.ID, BOMHeaderUpdate: biz.BOMHeaderUpdate{SourceOrderNo: str("WORKSPACE-SO"), QuantityText: str("102"), SpareText: str("2"), PrintDate: &date, Designer: str("工程甲"), Maker: str("制表乙"), Auditor: str("审核丙"), HairDirection: str("向下"), Note: str("按确认样")}}
-	bom, err := inventory.SaveBOMWithItems(ctx, 0, header, nil)
+	bom, err := bomUC.SaveBOMWithItems(ctx, 0, header, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestEngineeringWorkspaceFromCustomerDemandToMaterialSubmission(t *testing.T
 	apply(biz.ErrSalesOrderEngineeringNotReady)
 	header.ExpectedVersion = bom.Header.EditVersion
 	parts := []*biz.BOMItemSaveMutation{{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: material.ID, UnitID: unit.ID, Quantity: decimal.RequireFromString("0.25"), LossRate: decimal.RequireFromString("0.03"), Position: str("身体"), PieceCount: str("2"), ProcessBase: str("贴衬"), ProcessMethod: str("车缝"), Note: str("按样核对")}}}
-	bom, err = inventory.SaveBOMWithItems(ctx, bom.Header.ID, header, parts)
+	bom, err = bomUC.SaveBOMWithItems(ctx, bom.Header.ID, header, parts)
 	if err != nil {
 		t.Fatal(err)
 	}

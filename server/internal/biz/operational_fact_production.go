@@ -166,7 +166,20 @@ type ProductionReworkFromCompletionRepo interface {
 	CreateProductionReworkFromCompletion(ctx context.Context, in *ProductionReworkFromCompletionCreate) (*ProductionFact, error)
 }
 
-func (uc *OperationalFactUsecase) CreateProductionCompletionFromOrder(ctx context.Context, in *ProductionCompletionFromOrderCreate) (*ProductionFact, error) {
+type ProductionFactUsecaseRepo interface {
+	ProductionFactRepo
+	operationalItemReferenceRepo
+}
+
+type ProductionFactUsecase struct {
+	repo ProductionFactUsecaseRepo
+}
+
+func NewProductionFactUsecase(repo ProductionFactUsecaseRepo) *ProductionFactUsecase {
+	return &ProductionFactUsecase{repo: repo}
+}
+
+func (uc *ProductionFactUsecase) CreateProductionCompletionFromOrder(ctx context.Context, in *ProductionCompletionFromOrderCreate) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -225,7 +238,7 @@ func (uc *OperationalFactUsecase) CreateProductionCompletionFromOrder(ctx contex
 	})
 }
 
-func (uc *OperationalFactUsecase) CreateProductionMaterialIssueFromOrder(ctx context.Context, in *ProductionMaterialIssueFromOrderCreate) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) CreateProductionMaterialIssueFromOrder(ctx context.Context, in *ProductionMaterialIssueFromOrderCreate) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -237,19 +250,19 @@ func (uc *OperationalFactUsecase) CreateProductionMaterialIssueFromOrder(ctx con
 	return repo.CreateProductionMaterialIssueFromOrder(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) SaveProductionMaterialIssueDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) SaveProductionMaterialIssueDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
 	return uc.saveProductionFactDraft(ctx, in, ProductionFactMaterialIssue, ProductionOrderSourceType)
 }
 
-func (uc *OperationalFactUsecase) SaveProductionCompletionDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) SaveProductionCompletionDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
 	return uc.saveProductionFactDraft(ctx, in, ProductionFactFinishedGoodsReceipt, ProductionOrderSourceType)
 }
 
-func (uc *OperationalFactUsecase) SaveProductionReworkFromCompletionDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) SaveProductionReworkFromCompletionDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
 	return uc.saveProductionFactDraft(ctx, in, ProductionFactRework, ProductionFactSourceType)
 }
 
-func (uc *OperationalFactUsecase) saveProductionFactDraft(ctx context.Context, in *ProductionFactDraftSave, factType, sourceType string) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) saveProductionFactDraft(ctx context.Context, in *ProductionFactDraftSave, factType, sourceType string) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -261,7 +274,7 @@ func (uc *OperationalFactUsecase) saveProductionFactDraft(ctx context.Context, i
 	return repo.SaveProductionFactDraft(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CreateProductionReworkFromCompletion(ctx context.Context, in *ProductionReworkFromCompletionCreate) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) CreateProductionReworkFromCompletion(ctx context.Context, in *ProductionReworkFromCompletionCreate) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -273,7 +286,7 @@ func (uc *OperationalFactUsecase) CreateProductionReworkFromCompletion(ctx conte
 	return repo.CreateProductionReworkFromCompletion(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) ListProductionOrderMaterialRequirements(ctx context.Context, productionOrderID int) ([]*ProductionOrderMaterialRequirement, error) {
+func (uc *ProductionFactUsecase) ListProductionOrderMaterialRequirements(ctx context.Context, productionOrderID int) ([]*ProductionOrderMaterialRequirement, error) {
 	if uc == nil || uc.repo == nil || productionOrderID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -281,7 +294,7 @@ func (uc *OperationalFactUsecase) ListProductionOrderMaterialRequirements(ctx co
 	return repo.ListProductionOrderMaterialRequirements(ctx, productionOrderID)
 }
 
-func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -291,7 +304,7 @@ func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context,
 	}
 	productionOrderLinked := normalized.SourceType != nil && *normalized.SourceType == ProductionOrderSourceType
 	if !productionOrderLinked {
-		if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
+		if err := validateOperationalSubjectActive(ctx, uc.repo, normalized.SubjectType, normalized.SubjectID); err != nil {
 			return nil, err
 		}
 		if err := requireOptionalActiveReference(ctx, normalized.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
@@ -307,7 +320,7 @@ func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context,
 	return uc.repo.CreateProductionFactDraft(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) PostProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *ProductionFact, err error) {
+func (uc *ProductionFactUsecase) PostProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *ProductionFact, err error) {
 	ctx, finish := startBusinessTrace(ctx, "production.post_fact")
 	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
@@ -317,7 +330,7 @@ func (uc *OperationalFactUsecase) PostProductionFact(ctx context.Context, in *Op
 	return uc.repo.PostProductionFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CancelPostedProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (*ProductionFact, error) {
+func (uc *ProductionFactUsecase) CancelPostedProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (*ProductionFact, error) {
 	normalized, err := normalizeOperationalFactStatusMutation(in, true)
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam
@@ -325,7 +338,7 @@ func (uc *OperationalFactUsecase) CancelPostedProductionFact(ctx context.Context
 	return uc.repo.CancelPostedProductionFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) ListProductionFacts(ctx context.Context, filter OperationalFactFilter) ([]*ProductionFact, int, error) {
+func (uc *ProductionFactUsecase) ListProductionFacts(ctx context.Context, filter OperationalFactFilter) ([]*ProductionFact, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -336,7 +349,7 @@ func (uc *OperationalFactUsecase) ListProductionFacts(ctx context.Context, filte
 	return uc.repo.ListProductionFacts(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) GetProductionFactTransitionPolicy(ctx context.Context, id int) (*ProductionFactTransitionPolicy, error) {
+func (uc *ProductionFactUsecase) GetProductionFactTransitionPolicy(ctx context.Context, id int) (*ProductionFactTransitionPolicy, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}

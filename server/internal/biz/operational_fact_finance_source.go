@@ -72,7 +72,7 @@ type FinanceFactFromBusinessSourceRepo interface {
 	CreateReconciliationFromFinanceFact(ctx context.Context, in *FinanceReconciliationFromFactCreate) (*FinanceFact, error)
 }
 
-func (uc *OperationalFactUsecase) CreatePayableFromPurchaseReceipt(ctx context.Context, in *FinanceFactFromPurchaseReceiptCreate) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) CreatePayableFromPurchaseReceipt(ctx context.Context, in *FinanceFactFromPurchaseReceiptCreate) (*FinanceFact, error) {
 	normalized, err := normalizeFinanceFactFromPurchaseReceiptCreate(in)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (uc *OperationalFactUsecase) CreatePayableFromPurchaseReceipt(ctx context.C
 	return repo.CreatePayableFromPurchaseReceipt(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CreatePayableFromOutsourcingReturn(ctx context.Context, in *FinanceFactFromOutsourcingReturnCreate) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) CreatePayableFromOutsourcingReturn(ctx context.Context, in *FinanceFactFromOutsourcingReturnCreate) (*FinanceFact, error) {
 	normalized, err := normalizeFinanceFactFromOutsourcingReturnCreate(in)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (uc *OperationalFactUsecase) CreatePayableFromOutsourcingReturn(ctx context
 	return repo.CreatePayableFromOutsourcingReturn(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CreateReconciliationFromFinanceFact(ctx context.Context, in *FinanceReconciliationFromFactCreate) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) CreateReconciliationFromFinanceFact(ctx context.Context, in *FinanceReconciliationFromFactCreate) (*FinanceFact, error) {
 	normalized, err := normalizeFinanceReconciliationFromFactCreate(in)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (uc *OperationalFactUsecase) CreateReconciliationFromFinanceFact(ctx contex
 	return repo.CreateReconciliationFromFinanceFact(ctx, normalized)
 }
 
-func ucFinanceFactSourceRepo(uc *OperationalFactUsecase) (FinanceFactFromBusinessSourceRepo, bool) {
+func ucFinanceFactSourceRepo(uc *FinanceFactUsecase) (FinanceFactFromBusinessSourceRepo, bool) {
 	if uc == nil || uc.repo == nil {
 		return nil, false
 	}
@@ -169,7 +169,7 @@ func normalizeFinanceSourceCommand(
 	return nil
 }
 
-func (uc *OperationalFactUsecase) CreatePayableFromOutsourcingOrder(ctx context.Context, in *FinanceFactFromOutsourcingOrderCreate) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) CreatePayableFromOutsourcingOrder(ctx context.Context, in *FinanceFactFromOutsourcingOrderCreate) (*FinanceFact, error) {
 	if in == nil {
 		return nil, ErrBadParam
 	}

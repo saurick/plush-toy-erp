@@ -454,7 +454,7 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerAccess(ctx context.Con
 		}
 		return d.requireBusinessAttachmentWarehouseAccess(ctx, ownerType, ownerID)
 	}
-	if d.operationalFactUC == nil {
+	if d.financeFactUC == nil {
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
 	var scope biz.FinanceFactAccessScope

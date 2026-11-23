@@ -37,7 +37,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateReceivableFromShipment(ctx, in)
+		item, err := d.financeFactUC.CreateReceivableFromShipment(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "create_invoice_from_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceInvoiceConfirm); res != nil {
@@ -56,7 +56,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateInvoiceFromShipment(ctx, in)
+		item, err := d.financeFactUC.CreateInvoiceFromShipment(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "create_payable_from_purchase_receipt":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
@@ -75,7 +75,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreatePayableFromPurchaseReceipt(ctx, in)
+		item, err := d.financeFactUC.CreatePayableFromPurchaseReceipt(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "create_payable_from_outsourcing_return":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
@@ -94,7 +94,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreatePayableFromOutsourcingReturn(ctx, in)
+		item, err := d.financeFactUC.CreatePayableFromOutsourcingReturn(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "create_payable_from_outsourcing_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
@@ -113,7 +113,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreatePayableFromOutsourcingOrder(ctx, in)
+		item, err := d.financeFactUC.CreatePayableFromOutsourcingOrder(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "create_reconciliation_from_finance_fact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReconciliationConfirm); res != nil {
@@ -129,7 +129,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.requireAnySourceActionReadPermission(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
-		source, err := d.operationalFactUC.GetFinanceFact(ctx, in.FinanceFactID)
+		source, err := d.financeFactUC.GetFinanceFact(ctx, in.FinanceFactID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -143,7 +143,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method, condition); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CreateReconciliationFromFinanceFact(ctx, in)
+		item, err := d.financeFactUC.CreateReconciliationFromFinanceFact(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "post_finance_fact":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
@@ -165,7 +165,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 			return id, res, nil
 		}
 		pkglogger.SetRequestObject(ctx, "finance_fact", mutation.ID)
-		item, err := d.operationalFactUC.PostFinanceFact(ctx, mutation)
+		item, err := d.financeFactUC.PostFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "settle_finance_fact":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
@@ -187,7 +187,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 			return id, res, nil
 		}
 		pkglogger.SetRequestObject(ctx, "finance_fact", mutation.ID)
-		item, err := d.operationalFactUC.SettleFinanceFact(ctx, mutation)
+		item, err := d.financeFactUC.SettleFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "cancel_finance_fact":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
@@ -209,7 +209,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 			return id, res, nil
 		}
 		pkglogger.SetRequestObject(ctx, "finance_fact", mutation.ID)
-		item, err := d.operationalFactUC.CancelPostedFinanceFact(ctx, mutation)
+		item, err := d.financeFactUC.CancelPostedFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "get_finance_fact":
 		scope, res := d.financeFactReadAccessScope(ctx)
@@ -220,7 +220,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if !valid || !jsonRPCParamsAllowed(pm, "customer_key", "id") {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.GetFinanceFact(ctx, factID)
+		item, err := d.financeFactUC.GetFinanceFact(ctx, factID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -240,12 +240,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if filter.FactType != "" && !scope.AllowsType(filter.FactType) {
 			return id, financeFactPermissionDeniedResult(), nil
 		}
-		items, total, err := d.operationalFactUC.ListFinanceFactsForAccess(ctx, filter, scope)
+		items, total, err := d.financeFactUC.ListFinanceFactsForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
-			return d.operationalFactUC.CountFinanceFactsByStatusForAccess(ctx, filter, scope)
+			return d.financeFactUC.CountFinanceFactsByStatusForAccess(ctx, filter, scope)
 		})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
@@ -282,7 +282,7 @@ func (d *jsonrpcDispatcher) financeFactReadAccessScope(ctx context.Context) (biz
 }
 
 func (d *jsonrpcDispatcher) requireFinanceFactAccess(ctx context.Context, factID int, scope biz.FinanceFactAccessScope) *v1.JsonrpcResult {
-	item, err := d.operationalFactUC.GetFinanceFact(ctx, factID)
+	item, err := d.financeFactUC.GetFinanceFact(ctx, factID)
 	if err != nil {
 		return d.mapOperationalFactError(ctx, err)
 	}

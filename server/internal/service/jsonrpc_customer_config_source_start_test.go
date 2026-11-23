@@ -120,7 +120,7 @@ func TestCustomerConfigProcessSourceValidationUsesDomainTruth(t *testing.T) {
 				if tt.name == "not found" {
 					repo.err = biz.ErrShipmentNotFound
 				}
-				d := &jsonrpcDispatcher{operationalFactUC: biz.NewOperationalFactUsecase(repo)}
+				d := &jsonrpcDispatcher{shipmentUC: biz.NewShipmentUsecase(repo)}
 				got, err := d.shipmentProcessSourceRefNo(ctx, 9001)
 				assertCustomerConfigSourceRefResult(t, got, err, tt.err, tt.want)
 			})
@@ -229,7 +229,7 @@ func TestCustomerConfigProcessStartsRequireEnabledSourceModuleBeforeSourceOrRunt
 			},
 			setup: func(d *jsonrpcDispatcher) func() int {
 				repo := &customerConfigShipmentSourceRepoStub{}
-				d.operationalFactUC = biz.NewOperationalFactUsecase(repo)
+				d.shipmentUC = biz.NewShipmentUsecase(repo)
 				return func() int { return repo.calls }
 			},
 		},

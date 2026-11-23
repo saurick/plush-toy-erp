@@ -102,7 +102,21 @@ type OutsourcingFactFromOrderRepo interface {
 	CreateOutsourcingReturnReceiptFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error)
 }
 
-func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error) {
+type OutsourcingFactUsecaseRepo interface {
+	OutsourcingFactRepo
+	operationalItemReferenceRepo
+	SupplierIsActive(ctx context.Context, id int) (bool, error)
+}
+
+type OutsourcingFactUsecase struct {
+	repo OutsourcingFactUsecaseRepo
+}
+
+func NewOutsourcingFactUsecase(repo OutsourcingFactUsecaseRepo) *OutsourcingFactUsecase {
+	return &OutsourcingFactUsecase{repo: repo}
+}
+
+func (uc *OutsourcingFactUsecase) CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -111,7 +125,7 @@ func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context
 		return nil, err
 	}
 	normalized.SupplierName = normalizeOptionalString(normalized.SupplierName)
-	if err := uc.validateOperationalSubjectActive(ctx, normalized.SubjectType, normalized.SubjectID); err != nil {
+	if err := validateOperationalSubjectActive(ctx, uc.repo, normalized.SubjectType, normalized.SubjectID); err != nil {
 		return nil, err
 	}
 	if err := requireOptionalActiveReference(ctx, normalized.ProductSkuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
@@ -129,7 +143,7 @@ func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context
 	return uc.repo.CreateOutsourcingFactDraft(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CreateOutsourcingMaterialIssueFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error) {
+func (uc *OutsourcingFactUsecase) CreateOutsourcingMaterialIssueFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -147,7 +161,7 @@ func (uc *OperationalFactUsecase) CreateOutsourcingMaterialIssueFromOrder(ctx co
 	return repo.CreateOutsourcingMaterialIssueFromOrder(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CreateOutsourcingReturnReceiptFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error) {
+func (uc *OutsourcingFactUsecase) CreateOutsourcingReturnReceiptFromOrder(ctx context.Context, in *OutsourcingFactFromOrderCreate) (*OutsourcingFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -168,15 +182,15 @@ func (uc *OperationalFactUsecase) CreateOutsourcingReturnReceiptFromOrder(ctx co
 	return repo.CreateOutsourcingReturnReceiptFromOrder(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) SaveOutsourcingMaterialIssueDraft(ctx context.Context, in *OutsourcingFactDraftSave) (*OutsourcingFact, error) {
+func (uc *OutsourcingFactUsecase) SaveOutsourcingMaterialIssueDraft(ctx context.Context, in *OutsourcingFactDraftSave) (*OutsourcingFact, error) {
 	return uc.saveOutsourcingFactDraft(ctx, in, OutsourcingFactMaterialIssue)
 }
 
-func (uc *OperationalFactUsecase) SaveOutsourcingReturnReceiptDraft(ctx context.Context, in *OutsourcingFactDraftSave) (*OutsourcingFact, error) {
+func (uc *OutsourcingFactUsecase) SaveOutsourcingReturnReceiptDraft(ctx context.Context, in *OutsourcingFactDraftSave) (*OutsourcingFact, error) {
 	return uc.saveOutsourcingFactDraft(ctx, in, OutsourcingFactReturnReceipt)
 }
 
-func (uc *OperationalFactUsecase) saveOutsourcingFactDraft(ctx context.Context, in *OutsourcingFactDraftSave, factType string) (*OutsourcingFact, error) {
+func (uc *OutsourcingFactUsecase) saveOutsourcingFactDraft(ctx context.Context, in *OutsourcingFactDraftSave, factType string) (*OutsourcingFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -188,7 +202,7 @@ func (uc *OperationalFactUsecase) saveOutsourcingFactDraft(ctx context.Context, 
 	return repo.SaveOutsourcingFactDraft(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) PostOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *OutsourcingFact, err error) {
+func (uc *OutsourcingFactUsecase) PostOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *OutsourcingFact, err error) {
 	ctx, finish := startBusinessTrace(ctx, "outsourcing.post_fact")
 	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
@@ -198,7 +212,7 @@ func (uc *OperationalFactUsecase) PostOutsourcingFact(ctx context.Context, in *O
 	return uc.repo.PostOutsourcingFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CancelPostedOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error) {
+func (uc *OutsourcingFactUsecase) CancelPostedOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error) {
 	normalized, err := normalizeOperationalFactStatusMutation(in, true)
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam
@@ -206,7 +220,7 @@ func (uc *OperationalFactUsecase) CancelPostedOutsourcingFact(ctx context.Contex
 	return uc.repo.CancelPostedOutsourcingFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) ListOutsourcingFacts(ctx context.Context, filter OperationalFactFilter) ([]*OutsourcingFact, int, error) {
+func (uc *OutsourcingFactUsecase) ListOutsourcingFacts(ctx context.Context, filter OperationalFactFilter) ([]*OutsourcingFact, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}

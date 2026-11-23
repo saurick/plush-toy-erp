@@ -18,7 +18,7 @@ const (
 )
 
 type financePaymentProcessCommandHandler struct {
-	uc         *OperationalFactUsecase
+	uc         *FinanceFactUsecase
 	commandKey string
 }
 
@@ -28,8 +28,8 @@ type FinancePaymentProcessCommandRepo interface {
 	PostFinancePaymentForProcessCommand(ctx context.Context, in *FinancePaymentPost, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*FinancePayment, error)
 }
 
-func RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, operationalFactUC *OperationalFactUsecase) error {
-	if processRuntimeUC == nil || operationalFactUC == nil {
+func RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, financeFactUC *FinanceFactUsecase) error {
+	if processRuntimeUC == nil || financeFactUC == nil {
 		return ErrBadParam
 	}
 	for _, commandKey := range []string{
@@ -38,7 +38,7 @@ func RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC *Proces
 		ProcessDomainCommandFinancePaymentPost,
 	} {
 		if err := processRuntimeUC.RegisterDomainCommandHandler(commandKey, &financePaymentProcessCommandHandler{
-			uc:         operationalFactUC,
+			uc:         financeFactUC,
 			commandKey: commandKey,
 		}); err != nil {
 			return err

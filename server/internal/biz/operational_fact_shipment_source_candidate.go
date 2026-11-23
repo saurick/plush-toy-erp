@@ -87,7 +87,7 @@ type ShipmentSourceCandidateRepo interface {
 	ListShipmentSourceOrderOptions(ctx context.Context, selectable *bool) ([]*ShipmentSourceOrderOption, error)
 }
 
-func (uc *OperationalFactUsecase) ListShipmentSourceOrderOptions(ctx context.Context, selectable *bool) ([]*ShipmentSourceOrderOption, error) {
+func (uc *ShipmentUsecase) ListShipmentSourceOrderOptions(ctx context.Context, selectable *bool) ([]*ShipmentSourceOrderOption, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -98,7 +98,7 @@ func (uc *OperationalFactUsecase) ListShipmentSourceOrderOptions(ctx context.Con
 	return repo.ListShipmentSourceOrderOptions(ctx, selectable)
 }
 
-func (uc *OperationalFactUsecase) ListShipmentSourceCandidates(
+func (uc *ShipmentUsecase) ListShipmentSourceCandidates(
 	ctx context.Context,
 	filter ShipmentSourceCandidateFilter,
 ) ([]*ShipmentSourceCandidate, int, error) {

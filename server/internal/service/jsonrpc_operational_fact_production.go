@@ -38,7 +38,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateProductionCompletionFromOrder(ctx, in)
+		item, err := d.productionFactUC.CreateProductionCompletionFromOrder(ctx, in)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "create_production_material_issue_from_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionMaterialIssueCreate); res != nil {
@@ -57,7 +57,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateProductionMaterialIssueFromOrder(ctx, in)
+		item, err := d.productionFactUC.CreateProductionMaterialIssueFromOrder(ctx, in)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "create_production_rework_from_completion":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionReworkCreate); res != nil {
@@ -83,7 +83,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateProductionReworkFromCompletion(ctx, in)
+		item, err := d.productionFactUC.CreateProductionReworkFromCompletion(ctx, in)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "save_production_material_issue_draft",
 		"save_production_completion_draft",
@@ -99,15 +99,15 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		case "save_production_material_issue_draft":
 			permissions = []string{biz.PermissionProductionMaterialIssueCreate}
 			modules = []string{"production", "production_orders"}
-			save = d.operationalFactUC.SaveProductionMaterialIssueDraft
+			save = d.productionFactUC.SaveProductionMaterialIssueDraft
 		case "save_production_completion_draft":
 			permissions = []string{biz.PermissionProductionCompletionCreate, biz.PermissionWarehouseInboundConfirm}
 			modules = []string{"production", "production_orders"}
-			save = d.operationalFactUC.SaveProductionCompletionDraft
+			save = d.productionFactUC.SaveProductionCompletionDraft
 		case "save_production_rework_from_completion_draft":
 			permissions = []string{biz.PermissionProductionReworkCreate}
 			modules = []string{"production", "production_orders", "quality_inspections", workflowModuleKeyTasks}
-			save = d.operationalFactUC.SaveProductionReworkFromCompletionDraft
+			save = d.productionFactUC.SaveProductionReworkFromCompletionDraft
 		}
 		if res := d.RequireAdminAnyPermission(ctx, permissions...); res != nil {
 			return id, res, nil
@@ -138,7 +138,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 			return id, res, nil
 		}
 		factID := mutation.ID
-		policy, err := d.operationalFactUC.GetProductionFactTransitionPolicy(ctx, factID)
+		policy, err := d.productionFactUC.GetProductionFactTransitionPolicy(ctx, factID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -158,7 +158,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.PostProductionFact(ctx, mutation)
+		item, err := d.productionFactUC.PostProductionFact(ctx, mutation)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "cancel_production_fact":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
@@ -172,7 +172,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 			return id, res, nil
 		}
 		factID := mutation.ID
-		policy, err := d.operationalFactUC.GetProductionFactTransitionPolicy(ctx, factID)
+		policy, err := d.productionFactUC.GetProductionFactTransitionPolicy(ctx, factID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -193,7 +193,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CancelPostedProductionFact(ctx, mutation)
+		item, err := d.productionFactUC.CancelPostedProductionFact(ctx, mutation)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "list_production_facts":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
@@ -204,12 +204,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 			return id, invalidParamResult(), nil
 		}
 		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
-			return d.operationalFactUC.CountProductionFactsByStatus(ctx, filter)
+			return d.productionFactUC.CountProductionFactsByStatus(ctx, filter)
 		})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		items, total, err := d.operationalFactUC.ListProductionFacts(ctx, filter)
+		items, total, err := d.productionFactUC.ListProductionFacts(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -227,7 +227,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if !jsonRPCParamsAllowed(pm, "customer_key", "production_order_id") {
 			return id, invalidParamResult(), nil
 		}
-		items, err := d.operationalFactUC.ListProductionOrderMaterialRequirements(ctx, getInt(pm, "production_order_id", 0))
+		items, err := d.productionFactUC.ListProductionOrderMaterialRequirements(ctx, getInt(pm, "production_order_id", 0))
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}

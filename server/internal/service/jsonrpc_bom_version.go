@@ -19,12 +19,12 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		}
 		filter := bomHeaderFilterFromParams(pm)
 		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
-			return d.inventoryUC.CountBOMHeadersByStatus(ctx, filter)
+			return d.bomUC.CountBOMHeadersByStatus(ctx, filter)
 		})
 		if err != nil {
 			return id, d.mapBOMError(ctx, err), nil
 		}
-		items, total, err := d.inventoryUC.ListBOMHeaders(ctx, filter)
+		items, total, err := d.bomUC.ListBOMHeaders(ctx, filter)
 		if err != nil {
 			return id, d.mapBOMError(ctx, err), nil
 		}
@@ -38,7 +38,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMRead); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.GetBOMVersion(ctx, getInt(pm, "id", 0))
+		item, err := d.bomUC.GetBOMVersion(ctx, getInt(pm, "id", 0))
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
 	case "save_bom_with_items":
 		headerID := getInt(pm, "id", 0)
@@ -69,7 +69,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.inventoryUC.SaveBOMWithItems(ctx, headerID, in, items)
+		item, err := d.bomUC.SaveBOMWithItems(ctx, headerID, in, items)
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
 	case "copy_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
@@ -85,7 +85,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.inventoryUC.CopyBOMVersion(ctx, getInt(pm, "source_id", 0), in)
+		item, err := d.bomUC.CopyBOMVersion(ctx, getInt(pm, "source_id", 0), in)
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
 	case "activate_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMActivate); res != nil {
@@ -94,7 +94,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.ActivateBOMVersion(ctx, getInt(pm, "id", 0))
+		item, err := d.bomUC.ActivateBOMVersion(ctx, getInt(pm, "id", 0))
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
 	case "archive_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
@@ -103,7 +103,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
 			return id, res, nil
 		}
-		item, err := d.inventoryUC.ArchiveBOMVersion(ctx, getInt(pm, "id", 0))
+		item, err := d.bomUC.ArchiveBOMVersion(ctx, getInt(pm, "id", 0))
 		if err != nil {
 			return id, d.mapBOMError(ctx, err), nil
 		}

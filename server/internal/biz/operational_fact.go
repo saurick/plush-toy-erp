@@ -163,34 +163,33 @@ type OperationalFactStatusMutation struct {
 	Reason          string
 }
 
-type OperationalFactReferenceRepo interface {
-	CustomerIsActive(ctx context.Context, id int) (bool, error)
-	MaterialIsActive(ctx context.Context, id int) (bool, error)
-	ProductIsActive(ctx context.Context, id int) (bool, error)
-	ProductSKUIsActive(ctx context.Context, id int) (bool, error)
-	SupplierIsActive(ctx context.Context, id int) (bool, error)
-	UnitIsActive(ctx context.Context, id int) (bool, error)
-	WarehouseIsActive(ctx context.Context, id int) (bool, error)
-}
-
-// OperationalFactRepo requires every capability used by the operational-fact
-// usecase at construction. Fact families expose their own focused contracts.
-// Optional process-command adapters remain separate from this aggregate.
+// OperationalFactRepo is the combined contract of the shared data adapter.
 type OperationalFactRepo interface {
-	OperationalFactReferenceRepo
-	ProductionFactRepo
-	OutsourcingFactRepo
-	ShipmentRepo
-	StockReservationRepo
-	FinanceFactRepo
+	ProductionFactUsecaseRepo
+	OutsourcingFactUsecaseRepo
+	ShipmentUsecaseRepo
+	StockReservationUsecaseRepo
+	FinanceFactUsecaseRepo
 }
 
+// OperationalFactUsecase assembles the domain usecases over the shared
+// repository. RPC and process-command handlers receive the owning usecase.
 type OperationalFactUsecase struct {
-	repo OperationalFactRepo
+	*ProductionFactUsecase
+	*OutsourcingFactUsecase
+	*ShipmentUsecase
+	*StockReservationUsecase
+	*FinanceFactUsecase
 }
 
 func NewOperationalFactUsecase(repo OperationalFactRepo) *OperationalFactUsecase {
-	return &OperationalFactUsecase{repo: repo}
+	return &OperationalFactUsecase{
+		ProductionFactUsecase:   NewProductionFactUsecase(repo),
+		OutsourcingFactUsecase:  NewOutsourcingFactUsecase(repo),
+		ShipmentUsecase:         NewShipmentUsecase(repo),
+		StockReservationUsecase: NewStockReservationUsecase(repo),
+		FinanceFactUsecase:      NewFinanceFactUsecase(repo),
+	}
 }
 
 var postedOperationalFactStatuses = map[string]struct{}{
@@ -203,12 +202,17 @@ func OperationalFactInventoryIdempotencyKey(sourceType string, sourceID int, sou
 	return fmt.Sprintf("%s:%d:%d:%s", sourceType, sourceID, sourceLineID, action)
 }
 
-func (uc *OperationalFactUsecase) validateOperationalSubjectActive(ctx context.Context, subjectType string, subjectID int) error {
+type operationalItemReferenceRepo interface {
+	salesLineReferenceRepo
+	MaterialIsActive(ctx context.Context, id int) (bool, error)
+}
+
+func validateOperationalSubjectActive(ctx context.Context, repo operationalItemReferenceRepo, subjectType string, subjectID int) error {
 	switch subjectType {
 	case InventorySubjectMaterial:
-		return requireActiveReference(ctx, subjectID, uc.repo.MaterialIsActive, ErrMaterialInactive)
+		return requireActiveReference(ctx, subjectID, repo.MaterialIsActive, ErrMaterialInactive)
 	case InventorySubjectProduct:
-		return requireActiveReference(ctx, subjectID, uc.repo.ProductIsActive, ErrProductInactive)
+		return requireActiveReference(ctx, subjectID, repo.ProductIsActive, ErrProductInactive)
 	default:
 		return ErrBadParam
 	}

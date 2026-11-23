@@ -213,7 +213,7 @@ type FinancePaymentRepo interface {
 	ListFinancePayments(ctx context.Context, filter FinancePaymentFilter) ([]*FinancePayment, int, error)
 }
 
-func (uc *OperationalFactUsecase) CreateFinancePayment(ctx context.Context, in *FinancePaymentCreate, actorID int) (*FinancePayment, error) {
+func (uc *FinanceFactUsecase) CreateFinancePayment(ctx context.Context, in *FinancePaymentCreate, actorID int) (*FinancePayment, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok || in == nil || actorID <= 0 {
 		return nil, ErrBadParam
@@ -224,7 +224,7 @@ func (uc *OperationalFactUsecase) CreateFinancePayment(ctx context.Context, in *
 	}
 	return repo.CreateFinancePayment(ctx, &normalized, actorID, hash)
 }
-func (uc *OperationalFactUsecase) CancelFinancePayment(ctx context.Context, in *FinancePaymentTransition, actorID int) (*FinancePayment, error) {
+func (uc *FinanceFactUsecase) CancelFinancePayment(ctx context.Context, in *FinancePaymentTransition, actorID int) (*FinancePayment, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
@@ -235,7 +235,7 @@ func (uc *OperationalFactUsecase) CancelFinancePayment(ctx context.Context, in *
 	}
 	return repo.CancelFinancePayment(ctx, in, actorID)
 }
-func (uc *OperationalFactUsecase) ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (_ *FinancePayment, err error) {
+func (uc *FinanceFactUsecase) ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (_ *FinancePayment, err error) {
 	ctx, finish := startBusinessTrace(ctx, "finance.reverse_payment")
 	defer func() { finish(err) }()
 	repo, ok := uc.financePaymentRepo()
@@ -248,7 +248,7 @@ func (uc *OperationalFactUsecase) ReverseFinancePayment(ctx context.Context, in 
 	}
 	return repo.ReverseFinancePayment(ctx, in, actorID)
 }
-func (uc *OperationalFactUsecase) CreateFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteCreate, actorID int) (*FinanceCreditNote, error) {
+func (uc *FinanceFactUsecase) CreateFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteCreate, actorID int) (*FinanceCreditNote, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok || in == nil || actorID <= 0 {
 		return nil, ErrBadParam
@@ -259,7 +259,7 @@ func (uc *OperationalFactUsecase) CreateFinanceCreditNote(ctx context.Context, i
 	}
 	return repo.CreateFinanceCreditNote(ctx, &n, actorID, h)
 }
-func (uc *OperationalFactUsecase) ReverseFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteReverse, actorID int) (*FinanceCreditNote, error) {
+func (uc *FinanceFactUsecase) ReverseFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteReverse, actorID int) (*FinanceCreditNote, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok || in == nil || in.CreditNoteID <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
@@ -277,14 +277,14 @@ func (uc *OperationalFactUsecase) ReverseFinanceCreditNote(ctx context.Context, 
 	sum := sha256.Sum256(raw)
 	return repo.ReverseFinanceCreditNote(ctx, in, actorID, hex.EncodeToString(sum[:]))
 }
-func (uc *OperationalFactUsecase) GetFinanceCreditNote(ctx context.Context, id int) (*FinanceCreditNote, error) {
+func (uc *FinanceFactUsecase) GetFinanceCreditNote(ctx context.Context, id int) (*FinanceCreditNote, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return repo.GetFinanceCreditNote(ctx, id)
 }
-func (uc *OperationalFactUsecase) ListFinanceCreditNotes(ctx context.Context, filter FinanceCreditNoteFilter) ([]*FinanceCreditNote, int, error) {
+func (uc *FinanceFactUsecase) ListFinanceCreditNotes(ctx context.Context, filter FinanceCreditNoteFilter) ([]*FinanceCreditNote, int, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok {
 		return nil, 0, ErrBadParam
@@ -310,14 +310,14 @@ func normalizeFinanceCreditNoteListFilter(filter FinanceCreditNoteFilter) (Finan
 	return filter, nil
 }
 
-func (uc *OperationalFactUsecase) GetFinancePayment(ctx context.Context, id int) (*FinancePayment, error) {
+func (uc *FinanceFactUsecase) GetFinancePayment(ctx context.Context, id int) (*FinancePayment, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return repo.GetFinancePayment(ctx, id)
 }
-func (uc *OperationalFactUsecase) ListFinancePayments(ctx context.Context, filter FinancePaymentFilter) ([]*FinancePayment, int, error) {
+func (uc *FinanceFactUsecase) ListFinancePayments(ctx context.Context, filter FinancePaymentFilter) ([]*FinancePayment, int, error) {
 	repo, ok := uc.financePaymentRepo()
 	if !ok {
 		return nil, 0, ErrBadParam
@@ -385,7 +385,7 @@ func normalizeFinancePaymentListFilter(filter FinancePaymentFilter) (FinancePaym
 	return filter, nil
 }
 
-func (uc *OperationalFactUsecase) financePaymentRepo() (FinancePaymentRepo, bool) {
+func (uc *FinanceFactUsecase) financePaymentRepo() (FinancePaymentRepo, bool) {
 	if uc == nil || uc.repo == nil {
 		return nil, false
 	}

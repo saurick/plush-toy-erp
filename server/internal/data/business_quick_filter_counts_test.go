@@ -56,6 +56,7 @@ func TestBusinessQuickCountsLotsAndBOMScope(t *testing.T) {
 	f := createInventoryTestFixtures(t, ctx, client)
 	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewInventoryUsecase(repo)
+	bomUC := biz.NewBOMUsecase(repo)
 	for i, status := range []string{"ACTIVE", "HOLD", "DISABLED"} {
 		lot := client.InventoryLot.Create().SetSubjectType("MATERIAL").SetSubjectID(f.materialID).SetLotNo(fmt.Sprintf("QUICK-LOT-%d", i)).SetStatus(status).SaveX(ctx)
 		if i < 2 {
@@ -85,7 +86,7 @@ func TestBusinessQuickCountsLotsAndBOMScope(t *testing.T) {
 		{biz.LifecycleScopeHistory, "ARCHIVED", map[string]int{"ARCHIVED": 1}},
 		{biz.LifecycleScopeAll, "ACTIVE", map[string]int{"DRAFT": 1, "ACTIVE": 1, "ARCHIVED": 1}},
 	} {
-		got, err := uc.CountBOMHeadersByStatus(ctx, biz.BOMHeaderFilter{ProductID: f.productID, LifecycleScope: tc.scope, Status: tc.status, Limit: 1, Offset: 100})
+		got, err := bomUC.CountBOMHeadersByStatus(ctx, biz.BOMHeaderFilter{ProductID: f.productID, LifecycleScope: tc.scope, Status: tc.status, Limit: 1, Offset: 100})
 		assertBusinessCounts(t, got, err, tc.want)
 	}
 }

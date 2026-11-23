@@ -62,6 +62,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	outsourcingOrderUsecase := biz.NewOutsourcingOrderUsecase(outsourcingOrderRepo)
 	inventoryRepo := data.NewInventoryRepo(dataData, logger)
 	inventoryUsecase := biz.NewInventoryUsecase(inventoryRepo)
+	bomUsecase := biz.NewBOMUsecase(inventoryRepo)
 	operationalFactRepo := data.NewOperationalFactRepo(dataData, logger)
 	operationalFactUsecase := biz.NewOperationalFactUsecase(operationalFactRepo)
 	store, err := attachmentstore.NewFromEnv(logger)
@@ -78,7 +79,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	helpContentRepo := data.NewHelpContentRepo(dataData)
 	partnerReadRepo := data.NewPartnerReadRepo(dataData)
 	partnerReadUsecase := biz.NewPartnerReadUsecase(partnerReadRepo)
-	jsonrpcService := service.NewJsonrpcService(confData, logger, adminAuthUsecase, adminManageUsecase, workflowUsecase, processRuntimeUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, productionOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, operationalFactUsecase, businessAttachmentUsecase, customerConfigUsecase, adminAuthRepo, businessProgressUsecase, businessStatisticsUsecase, helpContentRepo, partnerReadUsecase)
+	jsonrpcService := service.NewJsonrpcService(confData, logger, adminAuthUsecase, adminManageUsecase, workflowUsecase, processRuntimeUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, productionOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, bomUsecase, operationalFactUsecase, businessAttachmentUsecase, customerConfigUsecase, adminAuthRepo, businessProgressUsecase, businessStatisticsUsecase, helpContentRepo, partnerReadUsecase)
 	httpServer := server.NewHTTPServer(confServer, logger, jsonrpcService, tracerProvider, dataData, customerConfigUsecase, adminAuthUsecase, confData)
 	app := newApp(logger, httpServer, processRuntimeUsecase)
 	return app, func() {

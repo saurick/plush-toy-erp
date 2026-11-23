@@ -11,7 +11,7 @@ func TestFinancePaymentCashCommandRequiresExplicitMatchingKind(t *testing.T) {
 	for _, kind := range []string{FinancePaymentKindSettlement, FinancePaymentKindAdvance, FinancePaymentKindRefund} {
 		t.Run(kind, func(t *testing.T) {
 			repo := &exceptionOperationalFactRepoStub{financePayment: &FinancePayment{ID: 51, Kind: kind, Status: FinancePaymentStatusApproved, Amount: decimal.NewFromInt(10)}}
-			h := &financePaymentProcessCommandHandler{uc: NewOperationalFactUsecase(repo), commandKey: ProcessDomainCommandFinancePaymentPost}
+			h := &financePaymentProcessCommandHandler{uc: NewFinanceFactUsecase(repo), commandKey: ProcessDomainCommandFinancePaymentPost}
 			for _, cashOnly := range []bool{true, false} {
 				allocations := []any{}
 				if !cashOnly {

@@ -35,7 +35,7 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 			if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionExceptionSubmit, biz.PermissionProductionOverIssueSubmit); res != nil {
 				return id, res, nil
 			}
-			item, err := d.operationalFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
+			item, err := d.productionFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
 			if err != nil {
 				return id, d.mapOperationalFactError(ctx, err), nil
 			}
@@ -68,7 +68,7 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
-		value, err := d.operationalFactUC.GetProductionExceptionContext(ctx, inspectionID)
+		value, err := d.productionFactUC.GetProductionExceptionContext(ctx, inspectionID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -106,13 +106,13 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		if !validOperation || !validSupplier {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{DecisionNo: getString(pm, "decision_no"), DecisionType: decisionType, ProductionOrderID: getInt(pm, "production_order_id", 0), ProductionOrderItemID: getInt(pm, "production_order_item_id", 0), ProductionMaterialRequirementID: getOptionalInt(pm, "production_material_requirement_id"), ProductionWIPBatchID: getOptionalInt(pm, "production_wip_batch_id"), QualityInspectionID: getOptionalInt(pm, "quality_inspection_id"), TargetOperationID: targetOperationID, TargetSupplierID: targetSupplierID, RequestedQuantity: quantity, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), RequestedBy: actorID})
+		item, err = d.productionFactUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{DecisionNo: getString(pm, "decision_no"), DecisionType: decisionType, ProductionOrderID: getInt(pm, "production_order_id", 0), ProductionOrderItemID: getInt(pm, "production_order_item_id", 0), ProductionMaterialRequirementID: getOptionalInt(pm, "production_material_requirement_id"), ProductionWIPBatchID: getOptionalInt(pm, "production_wip_batch_id"), QualityInspectionID: getOptionalInt(pm, "quality_inspection_id"), TargetOperationID: targetOperationID, TargetSupplierID: targetSupplierID, RequestedQuantity: quantity, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), RequestedBy: actorID})
 	case "cancel_production_exception":
 		mutation, ok := productionExceptionMutationFromParams(pm, actorID, false)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.CancelProductionException(ctx, mutation)
+		item, err = d.productionFactUC.CancelProductionException(ctx, mutation)
 	case "reverse_production_exception":
 		mutation, ok := productionExceptionMutationFromParams(pm, actorID, false)
 		if !ok {
@@ -123,24 +123,24 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 			return id, result, nil
 		}
 		mutation.WarehouseScope = &scope
-		item, err = d.operationalFactUC.ReverseProductionException(ctx, mutation)
+		item, err = d.productionFactUC.ReverseProductionException(ctx, mutation)
 	case "get_production_exception":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
+		item, err = d.productionFactUC.GetProductionException(ctx, getInt(pm, "id", 0))
 	case "list_production_exceptions":
 		if !jsonRPCParamsAllowed(pm, "keyword", "include_status_counts", "handling_status", "customer_key", "status", "execution_status", "decision_type", "production_order_id", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
 		filter := biz.ProductionExceptionFilter{Keyword: getString(pm, "keyword"), HandlingStatus: getString(pm, "handling_status"), Status: getString(pm, "status"), ExecutionStatus: getString(pm, "execution_status"), DecisionType: getString(pm, "decision_type"), ProductionOrderID: getInt(pm, "production_order_id", 0), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
 		statusCounts, countErr := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
-			return d.operationalFactUC.CountProductionExceptionsByStatus(ctx, filter)
+			return d.productionFactUC.CountProductionExceptionsByStatus(ctx, filter)
 		})
 		if countErr != nil {
 			return id, d.mapOperationalFactError(ctx, countErr), nil
 		}
-		items, total, listErr := d.operationalFactUC.ListProductionExceptions(ctx, filter)
+		items, total, listErr := d.productionFactUC.ListProductionExceptions(ctx, filter)
 		if listErr != nil {
 			return id, d.mapOperationalFactError(ctx, listErr), nil
 		}
@@ -222,27 +222,27 @@ func (d *jsonrpcDispatcher) handleOutsourcingReturnDisposition(ctx context.Conte
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.CreateOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionCreate{DispositionNo: getString(pm, "disposition_no"), QualityInspectionID: getInt(pm, "quality_inspection_id", 0), DispositionType: getString(pm, "disposition_type"), Quantity: quantity, ProductionWIPBatchID: getOptionalInt(pm, "production_wip_batch_id"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), CreatedBy: actorID})
+		item, err = d.outsourcingFactUC.CreateOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionCreate{DispositionNo: getString(pm, "disposition_no"), QualityInspectionID: getInt(pm, "quality_inspection_id", 0), DispositionType: getString(pm, "disposition_type"), Quantity: quantity, ProductionWIPBatchID: getOptionalInt(pm, "production_wip_batch_id"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), CreatedBy: actorID})
 	case "post_outsourcing_return_disposition":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID})
+		item, err = d.outsourcingFactUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID})
 	case "cancel_outsourcing_return_disposition":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.CancelOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID, Reason: getString(pm, "reason")})
+		item, err = d.outsourcingFactUC.CancelOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID, Reason: getString(pm, "reason")})
 	case "get_outsourcing_return_disposition":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id") {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.GetOutsourcingReturnDisposition(ctx, getInt(pm, "id", 0))
+		item, err = d.outsourcingFactUC.GetOutsourcingReturnDisposition(ctx, getInt(pm, "id", 0))
 	case "list_outsourcing_return_dispositions":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "quality_inspection_id", "outsourcing_return_fact_id", "status", "limit", "offset") {
 			return id, invalidParamResult(), nil
 		}
-		items, total, listErr := d.operationalFactUC.ListOutsourcingReturnDispositions(ctx, biz.OutsourcingReturnDispositionFilter{QualityInspectionID: getInt(pm, "quality_inspection_id", 0), OutsourcingReturnFactID: getInt(pm, "outsourcing_return_fact_id", 0), Status: getString(pm, "status"), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
+		items, total, listErr := d.outsourcingFactUC.ListOutsourcingReturnDispositions(ctx, biz.OutsourcingReturnDispositionFilter{QualityInspectionID: getInt(pm, "quality_inspection_id", 0), OutsourcingReturnFactID: getInt(pm, "outsourcing_return_fact_id", 0), Status: getString(pm, "status"), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)})
 		if listErr != nil {
 			return id, d.mapOperationalFactError(ctx, listErr), nil
 		}

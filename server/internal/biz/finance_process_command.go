@@ -16,7 +16,7 @@ const (
 )
 
 type financeReceivableLeadProcessCommandHandler struct {
-	uc *OperationalFactUsecase
+	uc *FinanceFactUsecase
 }
 
 type FinanceReceivableLeadProcessCommandRepo interface {
@@ -27,13 +27,13 @@ type financeFactProcessPreflight interface {
 	ValidateFinanceFactCreateReplay(ctx context.Context, in *FinanceFactCreate) error
 }
 
-func RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, operationalFactUC *OperationalFactUsecase) error {
-	if processRuntimeUC == nil || operationalFactUC == nil {
+func RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, financeFactUC *FinanceFactUsecase) error {
+	if processRuntimeUC == nil || financeFactUC == nil {
 		return ErrBadParam
 	}
 	return processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandFinanceReceivableLead,
-		&financeReceivableLeadProcessCommandHandler{uc: operationalFactUC},
+		&financeReceivableLeadProcessCommandHandler{uc: financeFactUC},
 	)
 }
 
@@ -93,8 +93,8 @@ func FinanceReceivableLeadProcessCommandResult(fact *FinanceFact) (*ProcessDomai
 	}, nil
 }
 
-func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *OperationalFactUsecase, in *ProcessDomainCommandInput) (*FinanceFactCreate, error) {
-	if uc == nil || in == nil || in.ProcessInstance == nil {
+func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *FinanceFactUsecase, in *ProcessDomainCommandInput) (*FinanceFactCreate, error) {
+	if uc == nil || uc.repo == nil || in == nil || in.ProcessInstance == nil {
 		return nil, ErrBadParam
 	}
 	if err := validateProcessDomainCommandPayloadKeys(in.Payload,
@@ -113,7 +113,7 @@ func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *Oper
 	if !ProcessInstanceHasBusinessRef(in.ProcessInstance, shipmentProcessCommandBusinessRefType, shipmentID) {
 		return nil, ErrBadParam
 	}
-	shipment, err := uc.GetShipment(ctx, shipmentID)
+	shipment, err := uc.repo.GetShipment(ctx, shipmentID)
 	if err != nil {
 		return nil, err
 	}

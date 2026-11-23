@@ -137,16 +137,15 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	}, 7); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
-	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(
-		data,
-		log.NewStdLogger(io.Discard),
-	))
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	inventoryUC := biz.NewInventoryUsecase(inventoryRepo)
+	bomUC := biz.NewBOMUsecase(inventoryRepo)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	detail := saveBOMDraftFixture(t, ctx, inventoryUC, fixtures.productID, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
+	detail := saveBOMDraftFixture(t, ctx, bomUC, fixtures.productID, &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
 		MaterialID: fixtures.materialID, UnitID: fixtures.unitID, Quantity: mustDecimal(t, "1.5"), LossRate: mustDecimal(t, "0.02"),
 	}})
 	header := detail.Header
-	if _, err := inventoryUC.ActivateBOMVersion(ctx, header.ID); err != nil {
+	if _, err := bomUC.ActivateBOMVersion(ctx, header.ID); err != nil {
 		t.Fatalf("activate bom failed: %v", err)
 	}
 	createAndPostPurchaseReceipt(t, ctx, inventoryUC, "DBG-PR-CLEAR-001", fixtures, stringPtr("DBG-LOT-CLEAR-001"), mustDecimal(t, "8"))

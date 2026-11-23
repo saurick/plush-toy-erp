@@ -19,7 +19,6 @@ import {
   Popconfirm,
   Popover,
   Space,
-  Spin,
   Tag,
   Tooltip,
   Typography,
@@ -27,7 +26,7 @@ import {
 } from 'antd'
 import Empty from '@/common/components/empty/AppEmpty.jsx'
 import AnchoredControlPopover, { FilterPopoverButton } from '@/common/components/overlay/AnchoredControlPopover.jsx'
-import useBusinessPageContext, { BusinessPageContext } from '../../hooks/useBusinessPageContext.js'
+import useBusinessPageContext from '../../hooks/useBusinessPageContext.js'
 import Select from '@/common/components/select/AppSelect'
 import FilterSelect from '@/common/components/select/FilterSelect'
 import { filterSelectOptions, isEmptyFilterValue } from '@/common/components/select/filterSelectOptions.mjs'
@@ -40,9 +39,14 @@ import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresenta
 import BusinessFilterPopoverContent from './BusinessFilterPopoverContent.jsx'
 import { BusinessFilterPanelContext } from './BusinessFilterPanelContext.mjs'
 import './businessFilterChoices.css'
-import BusinessRecordDetails from './BusinessRecordDetails.jsx'
-import { taskBusinessActionNode } from './taskBusinessActions.mjs'
-import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
+import {
+  describeSelectionActions,
+  flattenSelectionActions,
+  inspectSelectionAction,
+  SELECTION_ACTION_GROUPS,
+  withSelectionActionKey,
+} from './businessSelectionActions.mjs'
+import { WorkflowTaskSelectionActions, WorkflowTaskSourceDetails } from '../workflow/WorkflowTaskBusinessViews.jsx'
 import ERPPageActions from '../ERPPageActions.jsx'
 import { BusinessSplitPageTitle } from '../BusinessSplitHeader.jsx'
 import useBusinessListStickyHeader from './useBusinessListStickyHeader.js'
@@ -66,104 +70,8 @@ const BusinessToolbarContext = React.createContext(null)
 const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
-const SELECTION_ACTION_PRIORITIES = {
-  collaboration: 120,
-  primary: 100,
-  edit: 80,
-  view: 60,
-  action: 40,
-  related: 30,
-  output: 20,
-  secondary: 20,
-  danger: 10,
-  recovery: 0,
-}
-const SELECTION_ACTION_GROUPS = {
-  collaboration: '任务协作',
-  business: '业务办理',
-  query: '查看与关联',
-  output: '打印与输出',
-  lifecycle: '单据处理',
-  other: '其他操作',
-}
-const SELECTION_ACTION_ROLE_GROUPS = {
-  collaboration: 'collaboration',
-  primary: 'business',
-  edit: 'business',
-  action: 'business',
-  view: 'query',
-  related: 'query',
-  output: 'output',
-  secondary: 'other',
-  danger: 'lifecycle',
-  recovery: 'other',
-}
-
 function joinClassNames(...items) {
   return items.filter(Boolean).join(' ')
-}
-
-function flattenSelectionActions(children) {
-  const actions = []
-
-  React.Children.forEach(children, (child) => {
-    if (React.isValidElement(child) && child.type === React.Fragment) {
-      actions.push(...flattenSelectionActions(child.props.children))
-      return
-    }
-    if (
-      child != null && child !== false && child.props?.visible !== false &&
-      child.type?.selectionActionVisible?.(child.props) !== false
-    ) {
-      actions.push(child)
-    }
-  })
-
-  return actions
-}
-
-function isSourceDocumentDetailsAction(action) {
-  if (!React.isValidElement(action)) return false
-  const key = action.props['data-business-action-key'] || ''
-  if (key === 'view' || key.endsWith('-details')) return true
-  const children = flattenSelectionActions(action.props.children)
-  return children.length > 0 && children.every(isSourceDocumentDetailsAction)
-}
-
-function inspectSelectionAction(action) {
-  if (!React.isValidElement(action)) {
-    return { actionable: false, enabled: false, score: -1 }
-  }
-
-  if (action.type === Tag) {
-    return { actionable: false, enabled: false, score: -1 }
-  }
-
-  const nestedActions = flattenSelectionActions(action.props.children)
-    .map(inspectSelectionAction)
-    .filter((item) => item.actionable)
-  const actionable = action.type === Button || nestedActions.length > 0 ||
-    typeof action.type === 'function' || typeof action.type === 'object'
-  const role = action.props['data-business-action-role'] || action.type?.selectionActionRole
-  const priorityValue = action.props.selectionActionPriority ?? action.type?.selectionActionPriority
-  const priority = typeof priorityValue === 'function' ? priorityValue(action.props) : priorityValue
-  const groupValue = action.props['data-business-action-group'] || action.type?.selectionActionGroup
-  const actionGroup = (typeof groupValue === 'function' ? groupValue(action.props) : groupValue) ||
-    SELECTION_ACTION_ROLE_GROUPS[role] || nestedActions[0]?.group || 'business'
-  const group = Object.hasOwn(SELECTION_ACTION_GROUPS, actionGroup) ? actionGroup : 'other'
-  const nestedScore = nestedActions.length ? Math.max(...nestedActions.map((item) => item.score)) : 30
-  return {
-    actionable,
-    moreOnly: action.props['data-business-action-placement'] === 'more' || nestedActions.some((item) => item.moreOnly),
-    group,
-    authoring: ['edit', 'create'].includes(role) || action.type?.taskHandlingKind === 'authoring' || (nestedActions.length > 0 && nestedActions.every((item) => item.authoring)),
-    pinned: role === 'collaboration' || nestedActions.some((item) => item.pinned),
-    dangerous: role === 'danger' || action.props.danger === true || action.props.action?.danger === true || (!role && nestedActions.length > 0 && nestedActions.every((item) => item.dangerous)),
-    enabled: action.props.disabled !== true && action.props.loading !== true && (nestedActions.length === 0 || nestedActions.some((item) => item.enabled)),
-    score: Number.isFinite(priority)
-      ? priority
-      : SELECTION_ACTION_PRIORITIES[role] ?? (action.type === Button ? 40 : nestedScore),
-  }
 }
 
 function deEmphasizeCreation(action) {
@@ -178,31 +86,8 @@ function deEmphasizeCreation(action) {
     : action
 }
 
-function partitionSelectionActions(children, space, mobile = false) {
-  const nodes = flattenSelectionActions(children)
-  const descriptors = nodes.map((node, index) => ({
-    index,
-    node,
-    ...inspectSelectionAction(node),
-  }))
-  const measured = space && descriptors.every((item) =>
-    !item.actionable || Object.hasOwn(space.widths, item.index)
-  )
-  const actions = descriptors
-    .filter((item) => item.actionable && (!measured || space.widths[item.index] > 0))
-    .sort((left, right) => Number(right.pinned) - Number(left.pinned) || Number(left.dangerous) - Number(right.dangerous) || left.index - right.index)
-  if (mobile) {
-    const mobileScore = (item) => item.pinned ? SELECTION_ACTION_PRIORITIES.related : item.score
-    // 手机任务的查询、追踪与附件由任务界面统一提供。
-    const handling = actions.filter((item) => ['business', 'collaboration', 'lifecycle'].includes(item.group))
-    const primary = [...handling].sort((left, right) => Number(left.dangerous) - Number(right.dangerous) || Number(right.enabled) - Number(left.enabled) || mobileScore(right) - mobileScore(left) || left.index - right.index)[0]
-    return {
-      context: descriptors.filter((item) => !item.actionable).map((item) => item.node),
-      visible: primary ? [primary] : [],
-      additional: handling.filter((item) => item !== primary && !item.pinned && item.enabled),
-      overflow: [],
-    }
-  }
+function partitionSelectionActions(children, space) {
+  const { context, actions, measured } = describeSelectionActions(children, space)
   const visibleIndexes = new Set(measured
     ? selectStableBusinessActionIndexes(actions.map((item) => ({
       ...item, width: space.widths[item.index],
@@ -210,9 +95,7 @@ function partitionSelectionActions(children, space, mobile = false) {
     : actions.filter((item) => !item.moreOnly).map((item) => item.index))
 
   return {
-    context: descriptors
-      .filter((item) => !item.actionable)
-      .map((item) => item.node),
+    context,
     visible: actions.filter((item) => visibleIndexes.has(item.index)),
     overflow: actions.filter((item) => !visibleIndexes.has(item.index)),
   }
@@ -311,7 +194,7 @@ function disableUnselectedAction(action) {
     : action.props.children)
 }
 
-function ResponsiveSelectionActions({ children, mobile = false }) {
+function ResponsiveSelectionActions({ children, compact = false, selectActions = partitionSelectionActions }) {
   const { token } = theme.useToken()
   const [space, setSpace] = React.useState(null)
   const [measurementRevision, setMeasurementRevision] = React.useState(0)
@@ -332,8 +215,8 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
   if (!actionOverlayOpen && !moreActionsOpen && !actionsBusy) partitionSpaceRef.current = space
   const partitionSpace = partitionSpaceRef.current
   const { context, visible, overflow } = React.useMemo(
-    () => partitionSelectionActions(children, partitionSpace, mobile),
-    [children, partitionSpace, mobile]
+    () => selectActions(children, partitionSpace),
+    [children, partitionSpace, selectActions]
   )
   const overflowRenderKey = React.useMemo(
     () => overflow.map((item) => selectionActionRenderState(item.node)).join('|'),
@@ -346,7 +229,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
     .map(([key, label]) => ({ key, label, actions: visible.filter((item) => item.group === key) }))
     .filter((group) => group.actions.length > 0)
     .sort((left, right) => Number(left.key === 'lifecycle') - Number(right.key === 'lifecycle')), [visible])
-  const showGroupHeadings = !mobile && new Set([...visible, ...overflow].map((item) => item.group)).size > 1
+  const showGroupHeadings = !compact && new Set([...visible, ...overflow].map((item) => item.group)).size > 1
   const attachMoreActionsList = React.useCallback((node) => {
     moreActionsListRef.current = node
     if (node) setMeasurementRevision((current) => current + 1)
@@ -576,7 +459,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
           </div>
         ) : null}
         <div ref={visibleActionsRef} className="erp-business-selection-action-bar__compact-visible">
-          {mobile ? visible.map(renderVisibleAction) : visibleGroups.map((group) => (
+          {compact ? visible.map(renderVisibleAction) : visibleGroups.map((group) => (
             <div key={group.key} className="erp-business-selection-action-bar__group" role="group" aria-label={group.label} data-business-action-group={group.key}>
               {showGroupHeadings ? <div className="erp-business-selection-action-bar__group-heading">{group.label}</div> : null}
               <div className="erp-business-selection-action-bar__group-actions">
@@ -585,7 +468,7 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
             </div>
           ))}
         </div>
-        {!mobile && overflow.length > 0 ? (
+        {!compact && overflow.length > 0 ? (
           <Dropdown
             key={overflowRenderKey}
             trigger={['click']}
@@ -610,12 +493,12 @@ function ResponsiveSelectionActions({ children, mobile = false }) {
               aria-expanded={moreActionsOpen}
               aria-controls={moreActionsId}
             >
-              {mobile ? <EllipsisOutlined aria-hidden="true" /> : <>更多操作 <DownOutlined /></>}
+              更多操作 <DownOutlined />
             </Button>
           </Dropdown>
         ) : null}
         <div className="erp-business-selection-action-bar__measure" aria-hidden="true" inert="" data-scroll-edges="off">
-          <Button ref={measureMoreRef} href="#" tabIndex={-1} size="small" className="erp-action-button">{mobile ? <EllipsisOutlined aria-hidden="true" /> : <>更多操作 <DownOutlined /></>}</Button>
+          <Button ref={measureMoreRef} href="#" tabIndex={-1} size="small" className="erp-action-button">{compact ? <EllipsisOutlined aria-hidden="true" /> : <>更多操作 <DownOutlined /></>}</Button>
           <div ref={measureItemsRef} />
         </div>
       </div>
@@ -1272,42 +1155,26 @@ export function SelectionActionBar({
   const selectionAvailability = React.useContext(BusinessSelectionAvailabilityContext)
   const hasSelection = Number(selectedCount) > 0
   const actionNodes = flattenSelectionActions(children)
-    .map((action) => taskBusiness?.contract ? taskBusinessActionNode(action, taskBusiness.contract) : action)
-    .filter((action) => action && (!taskBusiness || !isSourceDocumentDetailsAction(action)))
   const clearActions = actionNodes.filter(
     (child) => child.type === SelectionClearAction
   )
-  const recordActions = actionNodes.filter(
-    (child) => child.type !== SelectionClearAction
-  ).map((action, index) => {
-    if (!React.isValidElement(action)) return action
-    const key = action.key || (inspectSelectionAction(action).pinned ? 'task-collaboration' : `record-action-${index}`)
-    const node = React.cloneElement(action, { key })
+  const selectionActions = actionNodes.filter((child) => child.type !== SelectionClearAction)
+  if (taskBusiness) {
+    return (
+      <WorkflowTaskSelectionActions
+        taskBusiness={taskBusiness}
+        hasSelection={hasSelection}
+        actions={selectionActions}
+        ActionList={ResponsiveSelectionActions}
+      />
+    )
+  }
+  const recordActions = selectionActions.map((action, index) => {
+    const node = withSelectionActionKey(action, index)
     return hasSelection ? node : disableUnselectedAction(node)
   })
   const visible = hasSelection || (recordActions.length > 0 && (selectionAvailability?.visible ?? true))
   const loading = !hasSelection && selectionAvailability?.loading
-  if (taskBusiness) {
-    if (!hasSelection || !taskBusiness.actionHost || taskBusiness.formEditing) return null
-    const scopedActions = recordActions.filter((action) => {
-      const { pinned, authoring } = inspectSelectionAction(action)
-      return (!taskBusiness.readOnly || pinned) && (!(taskBusiness.onCollaboration || taskBusiness.collaborationExternal) || !pinned) && (taskBusiness.device !== 'mobile' || !authoring)
-    })
-    if (taskBusiness.onCollaboration && !taskBusiness.collaborationExternal) {
-      scopedActions.push(<Button key="task-collaboration" data-business-action-group="collaboration" onClick={taskBusiness.onCollaboration}>任务协作</Button>)
-    }
-    const { visible: primary, additional } = partitionSelectionActions(scopedActions, null, true)
-    return (
-      <>
-        {createPortal(
-          <div className="mobile-task-business-primary" role="group" aria-label="本次业务操作">
-            <ResponsiveSelectionActions mobile>{[...primary, ...additional].map(({ node }) => node)}</ResponsiveSelectionActions>
-          </div>,
-          taskBusiness.actionHost
-        )}
-      </>
-    )
-  }
   const className = joinClassNames(
     'erp-business-selection-action-bar erp-business-module-current-action',
     hasSelection
@@ -1678,17 +1545,7 @@ export function BusinessDataTable({
   emptyDescription = '暂无匹配记录',
 }) {
   const toolbar = React.useContext(BusinessToolbarContext)
-  const pageContext = useBusinessPageContext() || {}
-  const { taskBusiness } = pageContext
-  const informationSnapshot = React.useRef(null)
-  const information = taskBusiness?.mode === 'bom' ? null : taskBusiness?.information
-  const { stage, release, scopeKey } = information || {}
-  React.useLayoutEffect(() => {
-    if (!release) return undefined
-    release(scopeKey)
-    stage(scopeKey, informationSnapshot.current)
-    return undefined
-  })
+  const { taskBusiness } = useBusinessPageContext() || {}
   const tableCardRef = React.useRef(null)
   const sticky = useBusinessListStickyHeader(tableCardRef, !taskBusiness && !scroll?.y, toolbar?.toolbarRef)
   const selectionContext = React.useContext(BusinessSelectionAvailabilityContext)
@@ -1765,22 +1622,13 @@ export function BusinessDataTable({
   )
 
   if (taskBusiness) {
-    if (taskBusiness.mode === 'bom' && taskBusiness.information) return null
     const selectedKeys = rowSelection?.selectedRowKeys || []
     const selected = (dataSource || []).find((row) => selectedKeys.includes(typeof rowKey === 'function' ? rowKey(row) : row[rowKey || 'id']))
-    const sourceDetails = (
-      <section className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} aria-busy={busy}>
-        <Spin spinning={busy && Boolean(selected)}>
-          {selected ? (
-            <><BusinessRecordDetails columns={taskDetailColumns} record={selected} presentation="mobile-task" title={isTerminalWorkflowTask(taskBusiness.task) ? '来源业务当前资料' : '本次业务资料'} />{taskSourceDetails}</>
-          ) : <Empty state={busy ? 'loading' : 'empty'} description={busy ? '正在读取任务业务资料' : '未读取到任务对应单据，请返回任务后重新读取。'} />}
-        </Spin>
-      </section>
+    return (
+      <WorkflowTaskSourceDetails columns={taskDetailColumns} record={selected} busy={busy}>
+        {taskSourceDetails}
+      </WorkflowTaskSourceDetails>
     )
-    informationSnapshot.current = <BusinessPageContext.Provider value={pageContext}>{sourceDetails}</BusinessPageContext.Provider>
-    return taskBusiness.information
-      ? taskBusiness.information.host ? createPortal(sourceDetails, taskBusiness.information.host) : null
-      : sourceDetails
   }
 
   return (

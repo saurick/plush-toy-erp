@@ -33,11 +33,11 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.operationalFactUC.ListShipmentSourceCandidates(ctx, filter)
+		items, total, err := d.shipmentUC.ListShipmentSourceCandidates(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		orders, err := d.operationalFactUC.ListShipmentSourceOrderOptions(ctx, filter.Selectable)
+		orders, err := d.shipmentUC.ListShipmentSourceOrderOptions(ctx, filter.Selectable)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -72,7 +72,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 				return id, res, nil
 			}
 		}
-		item, err := d.operationalFactUC.CreateShipmentDraftWithItems(ctx, in)
+		item, err := d.shipmentUC.CreateShipmentDraftWithItems(ctx, in)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "save_shipment_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentUpdate); res != nil {
@@ -98,7 +98,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 				return id, res, nil
 			}
 		}
-		item, err := d.operationalFactUC.SaveShipmentDraftWithItems(ctx, in)
+		item, err := d.shipmentUC.SaveShipmentDraftWithItems(ctx, in)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "ship_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
@@ -112,7 +112,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 			return id, invalidParamResult(), nil
 		}
 		pkglogger.SetRequestObject(ctx, "shipment", shipmentID)
-		item, err := d.operationalFactUC.ShipShipmentWithActor(ctx, shipmentID, actorID)
+		item, err := d.shipmentUC.ShipShipmentWithActor(ctx, shipmentID, actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "cancel_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCancel); res != nil {
@@ -126,7 +126,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 			return id, invalidParamResult(), nil
 		}
 		pkglogger.SetRequestObject(ctx, "shipment", shipmentID)
-		item, err := d.operationalFactUC.CancelShippedShipmentWithActor(ctx, shipmentID, actorID)
+		item, err := d.shipmentUC.CancelShippedShipmentWithActor(ctx, shipmentID, actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "get_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
@@ -139,7 +139,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.GetShipment(ctx, shipmentID)
+		item, err := d.shipmentUC.GetShipment(ctx, shipmentID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "list_shipments":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
@@ -149,12 +149,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.operationalFactUC.ListShipments(ctx, filter)
+		items, total, err := d.shipmentUC.ListShipments(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 		statusCounts, err := requestedBusinessStatusCounts(pm, func() (map[string]int, error) {
-			return d.operationalFactUC.CountShipmentsByStatus(ctx, filter)
+			return d.shipmentUC.CountShipmentsByStatus(ctx, filter)
 		})
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil

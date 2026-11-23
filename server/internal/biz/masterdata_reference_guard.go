@@ -34,17 +34,24 @@ func requireOptionalActiveReference(ctx context.Context, id *int, check activeRe
 	return requireActiveReference(ctx, *id, check, inactiveErr)
 }
 
-func (uc *OperationalFactUsecase) validateSalesLineReferences(ctx context.Context, sourceItemID *int, productID int, skuID *int, unitID, warehouseID int) error {
+type salesLineReferenceRepo interface {
+	ProductIsActive(ctx context.Context, id int) (bool, error)
+	ProductSKUIsActive(ctx context.Context, id int) (bool, error)
+	UnitIsActive(ctx context.Context, id int) (bool, error)
+	WarehouseIsActive(ctx context.Context, id int) (bool, error)
+}
+
+func validateSalesLineReferences(ctx context.Context, repo salesLineReferenceRepo, sourceItemID *int, productID int, skuID *int, unitID, warehouseID int) error {
 	if sourceItemID == nil {
-		if err := requireActiveReference(ctx, productID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+		if err := requireActiveReference(ctx, productID, repo.ProductIsActive, ErrProductInactive); err != nil {
 			return err
 		}
-		if err := requireOptionalActiveReference(ctx, skuID, uc.repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
+		if err := requireOptionalActiveReference(ctx, skuID, repo.ProductSKUIsActive, ErrProductSKUInactive); err != nil {
 			return err
 		}
-		if err := requireActiveReference(ctx, unitID, uc.repo.UnitIsActive, ErrUnitInactive); err != nil {
+		if err := requireActiveReference(ctx, unitID, repo.UnitIsActive, ErrUnitInactive); err != nil {
 			return err
 		}
 	}
-	return requireActiveReference(ctx, warehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
+	return requireActiveReference(ctx, warehouseID, repo.WarehouseIsActive, ErrWarehouseInactive)
 }

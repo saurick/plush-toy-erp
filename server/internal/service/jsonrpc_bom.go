@@ -21,7 +21,7 @@ func (d *jsonrpcDispatcher) handleBOM(
 	if _, res := d.requireAdmin(ctx); res != nil {
 		return id, res, nil
 	}
-	if d.inventoryUC == nil {
+	if d.bomUC == nil {
 		return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 	}
 

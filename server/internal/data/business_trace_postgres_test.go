@@ -300,7 +300,7 @@ func (h *businessTracePostgresHarness) shipment(t *testing.T, process bool) {
 	}
 	if process {
 		runtime, input := h.command(t, biz.ProcessDomainCommandShipmentShip, "shipment", item.ID, actor.ID, map[string]any{"shipment_id": item.ID})
-		if err := biz.RegisterShipmentProcessDomainCommandHandlers(runtime, uc); err != nil {
+		if err := biz.RegisterShipmentProcessDomainCommandHandlers(runtime, uc.ShipmentUsecase); err != nil {
 			t.Fatal(err)
 		}
 		call = func(ctx context.Context) error {
@@ -343,7 +343,7 @@ func (h *businessTracePostgresHarness) payment(t *testing.T, factType string) {
 		t.Fatal(err)
 	}
 	runtime, input := h.command(t, biz.ProcessDomainCommandFinancePaymentPost, "finance_payment", payment.ID, actor.ID, map[string]any{"finance_payment_id": payment.ID, "allocations": []any{map[string]any{"finance_fact_id": fact.ID, "amount": fact.Amount.String()}}})
-	if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(runtime, uc); err != nil {
+	if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(runtime, uc.FinanceFactUsecase); err != nil {
 		t.Fatal(err)
 	}
 	call := func(ctx context.Context) error {
@@ -353,7 +353,7 @@ func (h *businessTracePostgresHarness) payment(t *testing.T, factType string) {
 	operation := "process." + biz.ProcessDomainCommandFinancePaymentPost
 	h.check(t, t.Name()+"_approval_required", operation, biz.ErrBadParam, false, call)
 	approval, approveInput := h.command(t, biz.ProcessDomainCommandFinancePaymentApprove, "finance_payment", payment.ID, actor.ID, map[string]any{"finance_payment_id": payment.ID, "reason": "private-trace-approval"})
-	if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(approval, uc); err != nil {
+	if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(approval, uc.FinanceFactUsecase); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := approval.ExecuteDomainCommandNode(ctx, approveInput, actor.ID); err != nil {

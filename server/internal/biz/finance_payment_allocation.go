@@ -26,7 +26,7 @@ type FinancePaymentAllocationRepo interface {
 	ReverseFinanceAllocation(context.Context, *FinanceAllocationReverse, int) (*FinancePayment, error)
 }
 
-func (uc *OperationalFactUsecase) FinancePaymentAllocationCandidates(ctx context.Context, id int) ([]*FinanceFact, error) {
+func (uc *FinanceFactUsecase) FinancePaymentAllocationCandidates(ctx context.Context, id int) ([]*FinanceFact, error) {
 	if uc == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
@@ -37,7 +37,7 @@ func (uc *OperationalFactUsecase) FinancePaymentAllocationCandidates(ctx context
 	return repo.FinancePaymentAllocationCandidates(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) AllocateFinancePayment(ctx context.Context, in *FinancePaymentAllocate, actorID int) (*FinancePayment, error) {
+func (uc *FinanceFactUsecase) AllocateFinancePayment(ctx context.Context, in *FinancePaymentAllocate, actorID int) (*FinancePayment, error) {
 	if uc == nil || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -59,7 +59,7 @@ func (uc *OperationalFactUsecase) AllocateFinancePayment(ctx context.Context, in
 	return repo.AllocateFinancePayment(ctx, in, actorID)
 }
 
-func (uc *OperationalFactUsecase) ReverseFinanceAllocation(ctx context.Context, in *FinanceAllocationReverse, actorID int) (*FinancePayment, error) {
+func (uc *FinanceFactUsecase) ReverseFinanceAllocation(ctx context.Context, in *FinanceAllocationReverse, actorID int) (*FinancePayment, error) {
 	if uc == nil || in == nil || in.PaymentID <= 0 || in.AllocationID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}

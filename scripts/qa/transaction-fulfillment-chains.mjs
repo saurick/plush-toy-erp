@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { createTransactionClient, prepareTransactionFixture, prepareTransactionProductionSource } from './transaction-real-backend-fixture.mjs';
 import { executeProductionWIPAction, applyFinishedGoodsDeliveryProcess } from './manual-acceptance-source-driven-facts.mjs';
-import { manualAcceptanceFactRole } from './manual-acceptance-fact-data.mjs';
+import { manualAcceptanceFactRole } from './manual-acceptance-fact-rpc.mjs';
 import { buildManualAcceptanceBusinessChainContract, validateBusinessChainDefinitionSnapshot } from './manual-acceptance-business-chain-contract.mjs';
 import { DEV_FLOW_STATE_CATALOG } from '../../web/src/dev-workbench/config/devFlowStateCatalog.mjs';
 import { BUSINESS_ROUTE_PATHS as ROUTES } from '../../web/src/erp/utils/masterDataOrderView.mjs';

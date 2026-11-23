@@ -106,7 +106,22 @@ type FinanceFactShipmentPaymentTermRepo interface {
 	GetShipmentPaymentTermDays(ctx context.Context, shipmentID int) (*int, error)
 }
 
-func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
+type FinanceFactUsecaseRepo interface {
+	FinanceFactRepo
+	GetShipment(ctx context.Context, id int) (*Shipment, error)
+	CustomerIsActive(ctx context.Context, id int) (bool, error)
+	SupplierIsActive(ctx context.Context, id int) (bool, error)
+}
+
+type FinanceFactUsecase struct {
+	repo FinanceFactUsecaseRepo
+}
+
+func NewFinanceFactUsecase(repo FinanceFactUsecaseRepo) *FinanceFactUsecase {
+	return &FinanceFactUsecase{repo: repo}
+}
+
+func (uc *FinanceFactUsecase) CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -123,18 +138,18 @@ func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in
 	return uc.repo.CreateFinanceFactDraft(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CreateReceivableFromShipment(ctx context.Context, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) CreateReceivableFromShipment(ctx context.Context, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
 	if in != nil && in.InvoiceCategory != nil {
 		return nil, ErrBadParam
 	}
 	return uc.createFinanceFactFromShipment(ctx, FinanceFactReceivable, in)
 }
 
-func (uc *OperationalFactUsecase) CreateInvoiceFromShipment(ctx context.Context, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) CreateInvoiceFromShipment(ctx context.Context, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
 	return uc.createFinanceFactFromShipment(ctx, FinanceFactInvoice, in)
 }
 
-func (uc *OperationalFactUsecase) createFinanceFactFromShipment(ctx context.Context, factType string, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) createFinanceFactFromShipment(ctx context.Context, factType string, in *FinanceFactFromShipmentCreate) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -152,7 +167,7 @@ func (uc *OperationalFactUsecase) createFinanceFactFromShipment(ctx context.Cont
 	return repo.CreateFinanceFactDraftFromShipment(ctx, factType, normalized)
 }
 
-func (uc *OperationalFactUsecase) shipmentFinancePaymentTermSnapshot(ctx context.Context, shipmentID int) (*string, *int, error) {
+func (uc *FinanceFactUsecase) shipmentFinancePaymentTermSnapshot(ctx context.Context, shipmentID int) (*string, *int, error) {
 	if uc == nil || uc.repo == nil || shipmentID <= 0 {
 		return nil, nil, ErrBadParam
 	}
@@ -164,7 +179,7 @@ func (uc *OperationalFactUsecase) shipmentFinancePaymentTermSnapshot(ctx context
 	return FinancePaymentTermSnapshotFromDays(days)
 }
 
-func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *FinanceFact, err error) {
+func (uc *FinanceFactUsecase) PostFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *FinanceFact, err error) {
 	ctx, finish := startBusinessTrace(ctx, "finance.post_fact")
 	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
@@ -174,7 +189,7 @@ func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, in *Opera
 	return uc.repo.PostFinanceFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *FinanceFact, err error) {
+func (uc *FinanceFactUsecase) SettleFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *FinanceFact, err error) {
 	ctx, finish := startBusinessTrace(ctx, "finance.settle_fact")
 	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
@@ -192,7 +207,7 @@ func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, in *Ope
 	return uc.repo.SettleFinanceFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) CancelPostedFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+func (uc *FinanceFactUsecase) CancelPostedFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
 	normalized, err := normalizeOperationalFactStatusMutation(in, true)
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam
@@ -200,7 +215,7 @@ func (uc *OperationalFactUsecase) CancelPostedFinanceFact(ctx context.Context, i
 	return uc.repo.CancelPostedFinanceFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error) {
+func (uc *FinanceFactUsecase) ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -302,7 +317,7 @@ var financeFactStatuses = map[string]struct{}{
 	OperationalFactStatusSettled:   {},
 }
 
-func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context, in *FinanceFactCreate) error {
+func (uc *FinanceFactUsecase) validateFinanceFactSource(ctx context.Context, in *FinanceFactCreate) error {
 	if in == nil {
 		return ErrBadParam
 	}
@@ -327,7 +342,7 @@ func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context,
 	return nil
 }
 
-func (uc *OperationalFactUsecase) validateFinanceCounterpartyActiveReferences(ctx context.Context, in *FinanceFactCreate) error {
+func (uc *FinanceFactUsecase) validateFinanceCounterpartyActiveReferences(ctx context.Context, in *FinanceFactCreate) error {
 	if in == nil {
 		return ErrBadParam
 	}

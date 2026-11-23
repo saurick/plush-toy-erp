@@ -71,7 +71,7 @@ func TestFinancePaymentProcessCommandHandlersCanonicalizeAndExecute(t *testing.T
 			Amount: decimal.RequireFromString("10"),
 		},
 	}
-	uc := NewOperationalFactUsecase(repo)
+	uc := NewFinanceFactUsecase(repo)
 	post := &financePaymentProcessCommandHandler{uc: uc, commandKey: ProcessDomainCommandFinancePaymentPost}
 	rawPayload := map[string]any{
 		financePaymentProcessPayloadID: 51,
@@ -201,7 +201,7 @@ func TestProductionExceptionProcessCommandHandlersRouteExactDecision(t *testing.
 			RequestedBy: 5, RequestedQuantity: decimal.RequireFromString("3"),
 		},
 	}
-	uc := NewOperationalFactUsecase(repo)
+	uc := NewProductionFactUsecase(repo)
 	approve := &productionExceptionProcessCommandHandler{uc: uc, commandKey: ProcessDomainCommandProductionExceptionApprove}
 	input := exceptionProcessCommandInput(
 		ProcessDomainCommandProductionExceptionApprove,

@@ -41,11 +41,15 @@ func newOperationalFactJSONRPCTestDataWithRepo(t *testing.T, admin *biz.AdminUse
 	logger := log.NewStdLogger(io.Discard)
 	customerConfigUC := biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo())
 	dispatcher := &jsonrpcDispatcher{
-		log:               log.NewHelper(log.With(logger, "module", "service.jsonrpc.operational_fact.test")),
-		adminManageUC:     newAllWarehouseScopeAdminUsecase(),
-		adminReader:       stubAdminAccountReader{admin: admin},
-		operationalFactUC: biz.NewOperationalFactUsecase(repo),
-		customerConfigUC:  customerConfigUC,
+		log:                log.NewHelper(log.With(logger, "module", "service.jsonrpc.operational_fact.test")),
+		adminManageUC:      newAllWarehouseScopeAdminUsecase(),
+		adminReader:        stubAdminAccountReader{admin: admin},
+		productionFactUC:   biz.NewProductionFactUsecase(repo),
+		outsourcingFactUC:  biz.NewOutsourcingFactUsecase(repo),
+		shipmentUC:         biz.NewShipmentUsecase(repo),
+		stockReservationUC: biz.NewStockReservationUsecase(repo),
+		financeFactUC:      biz.NewFinanceFactUsecase(repo),
+		customerConfigUC:   customerConfigUC,
 	}
 	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParams(t))
 	return dispatcher

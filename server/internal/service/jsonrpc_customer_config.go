@@ -774,10 +774,10 @@ func (d *jsonrpcDispatcher) purchaseOrderProcessSourceRefNo(ctx context.Context,
 }
 
 func (d *jsonrpcDispatcher) shipmentProcessSourceRefNo(ctx context.Context, shipmentID int) (*string, error) {
-	if d == nil || d.operationalFactUC == nil || shipmentID <= 0 {
+	if d == nil || d.shipmentUC == nil || shipmentID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	shipment, err := d.operationalFactUC.GetShipment(ctx, shipmentID)
+	shipment, err := d.shipmentUC.GetShipment(ctx, shipmentID)
 	if err != nil {
 		return nil, err
 	}

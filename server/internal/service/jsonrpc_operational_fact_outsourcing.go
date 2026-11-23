@@ -35,7 +35,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateOutsourcingMaterialIssueFromOrder(ctx, in)
+		item, err := d.outsourcingFactUC.CreateOutsourcingMaterialIssueFromOrder(ctx, in)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "create_outsourcing_return_receipt_from_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingReturnReceiptCreate); res != nil {
@@ -51,7 +51,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.operationalFactUC.CreateOutsourcingReturnReceiptFromOrder(ctx, in)
+		item, err := d.outsourcingFactUC.CreateOutsourcingReturnReceiptFromOrder(ctx, in)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "save_outsourcing_material_issue_draft", "save_outsourcing_return_receipt_draft":
 		in, ok := outsourcingFactDraftSaveFromParams(pm, method)
@@ -59,10 +59,10 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 			return id, invalidParamResult(), nil
 		}
 		permission := biz.PermissionOutsourcingMaterialIssueCreate
-		save := d.operationalFactUC.SaveOutsourcingMaterialIssueDraft
+		save := d.outsourcingFactUC.SaveOutsourcingMaterialIssueDraft
 		if method == "save_outsourcing_return_receipt_draft" {
 			permission = biz.PermissionOutsourcingReturnReceiptCreate
-			save = d.operationalFactUC.SaveOutsourcingReturnReceiptDraft
+			save = d.outsourcingFactUC.SaveOutsourcingReturnReceiptDraft
 		}
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
@@ -89,7 +89,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.PostOutsourcingFact(ctx, mutation)
+		item, err := d.outsourcingFactUC.PostOutsourcingFact(ctx, mutation)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "cancel_outsourcing_fact":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "expected_version", "reason") {
@@ -105,7 +105,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CancelPostedOutsourcingFact(ctx, mutation)
+		item, err := d.outsourcingFactUC.CancelPostedOutsourcingFact(ctx, mutation)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "list_outsourcing_facts":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingFactRead); res != nil {
@@ -115,7 +115,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.operationalFactUC.ListOutsourcingFacts(ctx, filter)
+		items, total, err := d.outsourcingFactUC.ListOutsourcingFacts(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
