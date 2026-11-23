@@ -46,7 +46,11 @@ func TestProductionOrderPostgresTerminalAssigneeCheckpoint(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			before, err := terminalCheckpointRow(t.Context(), target, 1)
+			// Use the checkpoint's time zone when serializing the backup snapshot.
+			if _, err := history.ExecContext(t.Context(), `SET LOCAL TIME ZONE 'UTC'`); err != nil {
+				t.Fatal(err)
+			}
+			backupBefore, err := terminalCheckpointRow(t.Context(), history, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -74,9 +78,12 @@ func TestProductionOrderPostgresTerminalAssigneeCheckpoint(t *testing.T) {
 			if err != nil || replay.Captured != 0 || replay.AlreadyCaptured != 2 {
 				t.Fatalf("replay=%+v err=%v", replay, err)
 			}
-			unchanged, err := terminalCheckpointRow(t.Context(), history, 1)
-			if err != nil || unchanged != before {
-				t.Fatalf("backup changed: %v", err)
+			backupAfter, err := terminalCheckpointRow(t.Context(), history, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if backupAfter != backupBefore {
+				t.Fatal("backup task snapshot changed after checkpoint and replay")
 			}
 			// Exercise the destructive responsibility statement followed by both
 			// unchanged formal restoration migrations, inside this rolled-back fixture.
